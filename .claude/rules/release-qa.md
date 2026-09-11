@@ -52,10 +52,9 @@ paths:
   scripts (`scripts/verify_*.sh`, `scripts/release_evidence.py`, `scripts/required_step_ledger.py`,
   `scripts/quality_promotion.py`, `scripts/project_health.py`, `scripts/supply_chain_contract.py`,
   `scripts/create_dmg.sh`, etc.)
-- Claude Code configuration governance: `.claude/settings.json` (hooks, permissions), the project
-  skills and subagents under `.claude/`, the `paths:` scoping of `.claude/rules/*.md`, and their validator
-  `scripts/claude_config_contract.py` with `scripts/tests/test_claude_config_contract.py` and
-  `scripts/tests/test_claude_hook_contract.py`. Personal `settings.local.json` (untracked, under `.claude/`) stays untracked.
+- Claude Code configuration: `.claude/settings.json` (hooks, permissions), the project skills and
+  subagents under `.claude/`, the `paths:` scoping of `.claude/rules/*.md`, with the hook behaviour
+  tests in `scripts/tests/test_claude_hooks.py`. Personal `settings.local.json` (untracked, under `.claude/`) stays untracked.
 - Release-candidate evidence, SBOM/checksum generation, immutable Actions pins, and repository
   security/governance files
 - Production-model-catalog reproducibility and activation gating. Backend owns artifact meaning and
@@ -225,7 +224,7 @@ owns reference comparison and update instructions.
 | `check_qwen3_backend_only.sh`, `check_backend_resource_contract.sh` | MLX-only and native resource wiring |
 | `repo_invariants.sh` | exact greps for product invariants: no Simulator route, no UI execution in CI, no `DEBUG` branch, no hidden test hooks, condition-based UI tests, one owned-package suite |
 | `python_test_contract.py` | discovery-complete Python inventory, runner compatibility, and zero-test rejection |
-| `benchmark_history.py`, `supply_chain_contract.py`, `required_step_ledger.py`, `claude_config_contract.py`, `check_release_notes.py` | history, supply chain, release steps, Claude Code configuration, and release-note contracts |
+| `benchmark_history.py`, `supply_chain_contract.py`, `required_step_ledger.py`, `privacy_scan.py`, `check_release_notes.py` | history, supply chain, release steps, private-path and credential scan, and release-note contracts |
 
 Exemptions require a reason in `config/surface-coverage-exemptions.json`. Read
 `docs/reference/repository-self-verification.md` before adding or weakening a gate.

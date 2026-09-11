@@ -193,9 +193,9 @@ confidence becomes misplaced.
   measured on one host. Gates protect behavior and cache routing, not a permanent wall-clock SLA.
 - **Delivery and audio quality.** These need models, seeds, and audio. The text-level contract
   checks what is deterministic about the instruction copy and says nothing about how a take sounds.
-- **User-scoped tooling.** Repository-owned Claude Code configuration under `.claude/` is validated by
-  `claude_config_contract.py` (hook wiring, deny-list shape, skill and subagent frontmatter, rule
-  path scopes, no Simulator destinations). User-scoped skills, plugins and MCP servers still live
+- **User-scoped tooling.** Repository-owned Claude Code configuration under `.claude/` is covered by
+  the hook behaviour tests (`scripts/tests/test_claude_hooks.py`) and the Simulator grep in
+  `repo_invariants.sh`. User-scoped skills, plugins and MCP servers still live
   outside the repository, so the tooling table in `CLAUDE.md` is only partly verifiable; the guard
   protects its *presence* and its optional framing, not the accuracy of user-scoped rows.
 - **Whether a document is simply wrong** about something the machine does not know. Fact scanning
@@ -218,10 +218,9 @@ confidence becomes misplaced.
 5. **Name it in `CLAUDE.md` or a domain rule**, or `check_surface_coverage.py` will fail —
    deliberately, since a gate no guidance mentions is invisible to anyone reading the docs.
 
-The local checkpoint cache follows the same rule. `tree_fingerprint.py` retains unchanged full-tree
-semantics for release consumers, with a separate versioned local marker binding tools/environment
-as well as HEAD, tracked content and non-ignored paths/bytes. Staging identical bytes is not a new
-tree; editing them is. A local checkpoint reclassifies after refresh and rejects mid-check edits.
+`tree_fingerprint.py` keeps the full-tree identity device-lane evidence binds to (HEAD, tracked
+content and non-ignored paths/bytes). There is no local commit receipt: `scripts/dev.sh check` is
+advisory and CI on `main` is the gate.
 It can satisfy the commit hook but never stand in for CI, candidate or promotion evidence.
 
 The root Swift dependency watch follows this pattern: `swift_dependency_updates.py` validates exact

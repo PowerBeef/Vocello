@@ -9,7 +9,6 @@
 #   * whole build-cache deletion outside scripts/clean_build_caches.sh (Owned output)
 #   * force pushes, new branches and worktrees (Main only)
 #   * shell writes to QwenVoice.xcodeproj/project.pbxproj (Generated project)
-#   * QVOICE_SKIP_COMMIT_GATE=1 without an explicit acknowledgement token
 #
 # Everything else exits 0 immediately. The guard is pure bash pattern matching
 # (patterns live in variables so macOS bash 3.2 parses them) and finishes in
@@ -84,14 +83,6 @@ re_pbxproj_write='(sed[[:space:]]+-[A-Za-z]*i|perl[[:space:]]+-[A-Za-z]*i|tee[[:
 if [[ "$command_text" =~ $re_pbxproj_write ]]; then
   block "QwenVoice.xcodeproj/project.pbxproj is generated (CLAUDE.md: Generated project)." \
     "Edit project.yml and run ./scripts/regenerate_project.sh --fast."
-fi
-
-# 5. Commit-gate bypass needs an explicit acknowledgement.
-re_skip='QVOICE_SKIP_COMMIT_GATE=1'
-re_ack='QVOICE_SKIP_COMMIT_GATE_ACK=user'
-if [[ "$command_text" =~ $re_skip ]] && [[ ! "$command_text" =~ $re_ack ]]; then
-  block "QVOICE_SKIP_COMMIT_GATE=1 skips the checkpoint receipt." \
-    "Only an explicit user instruction authorizes it; if the user asked, prefix the command with QVOICE_SKIP_COMMIT_GATE_ACK=user and say so in the reply. Otherwise run scripts/dev.sh checkpoint."
 fi
 
 exit 0

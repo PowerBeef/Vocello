@@ -38,7 +38,6 @@ REQUIRED_SURFACES=(
     "scripts/generate_ios_logic_scheme.py"
     "scripts/build_foundation_targets.sh"
     "scripts/build_output_policy.py"
-    "scripts/claude_config_contract.py"
     "scripts/cli_version_contract.py"
     "scripts/localization_contract.py"
     "scripts/support_contact_contract.py"
@@ -96,8 +95,6 @@ REQUIRED_SURFACES=(
     "scripts/clone_speaker_similarity.py"
     "scripts/tests/test_clone_speaker_similarity.py"
     "scripts/tests/test_build_output_policy.py"
-    "scripts/tests/test_claude_config_contract.py"
-    "scripts/tests/test_claude_hook_contract.py"
     "scripts/tests/test_claude_hooks.py"
     "scripts/lib/xctest_summary.py"
     "scripts/tests/test_xctest_summary.py"
@@ -298,7 +295,6 @@ fi
 # Validate the machine-readable generated-output contract before any producer,
 # cleanup, or higher-level workflow check can rely on its paths.
 python3 "$SCRIPT_DIR/build_output_policy.py" validate
-python3 "$SCRIPT_DIR/claude_config_contract.py" validate
 python3 "$SCRIPT_DIR/generate_cli_scheme.py" --check
 python3 "$SCRIPT_DIR/generate_ios_logic_scheme.py" --check
 python3 "$SCRIPT_DIR/cli_version_contract.py" validate
@@ -523,12 +519,13 @@ python3 "$SCRIPT_DIR/check_surface_coverage.py"
 "$SCRIPT_DIR/check_qwen3_backend_only.sh"
 python3 "$SCRIPT_DIR/validate_backend_risk_spine.py" --root "$PROJECT_DIR"
 "$SCRIPT_DIR/repo_invariants.sh"
+python3 "$SCRIPT_DIR/privacy_scan.py"
 
 # Script self-tests. --local selects the modules affected by the dirty tree;
 # CI and checkpoint --full run the complete suite once, here and nowhere else.
 python3 "$SCRIPT_DIR/python_test_contract.py" validate
 if [[ "$LOCAL_MODE" == 1 ]]; then
-    python3 "$SCRIPT_DIR/development_workflow.py" python-tests
+    python3 "$SCRIPT_DIR/development_workflow.py" py
 elif [[ "${QVOICE_GATES:-}" == "quick" && -z "${CI:-}${GITHUB_ACTIONS:-}" ]] \
     && [[ -z "$(git -C "$PROJECT_DIR" status --porcelain -- scripts config 2>/dev/null)" ]]; then
     echo "==> quick gate mode: scripts/config unchanged — skipping script self-tests" >&2

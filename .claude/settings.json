@@ -19,8 +19,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/precommit_gate.sh",
-            "timeout": 30
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/commit_lint.sh",
+            "timeout": 15
           },
           {
             "type": "command",
@@ -68,7 +68,6 @@
       "Bash(python3 scripts/doc_metadata.py *)",
       "Bash(python3 scripts/documentation_contract.py *)",
       "Bash(python3 scripts/check_surface_coverage.py*)",
-      "Bash(python3 scripts/claude_config_contract.py *)",
       "Bash(scripts/regenerate_project.sh*)",
       "Bash(./scripts/regenerate_project.sh*)",
       "Bash(./scripts/check_project_inputs.sh*)",
@@ -80,7 +79,11 @@
       "Bash(scripts/macos_test.sh core-test*)",
       "Bash(scripts/macos_test.sh test)",
       "Bash(./scripts/build_foundation_targets.sh *)",
-      "Bash(npm --prefix website run check)"
+      "Bash(npm --prefix website run check)",
+      "Bash(python3 scripts/privacy_scan.py *)",
+      "Bash(python3 scripts/ci/*)",
+      "Bash(pytest *)",
+      "Bash(gh run *)"
     ],
     "ask": [
       "Bash(scripts/ui_test.sh *)",

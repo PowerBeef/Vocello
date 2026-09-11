@@ -11,10 +11,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import os
-import platform
-import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -75,52 +72,12 @@ def worktree_fingerprint(root: Path) -> str:
     return digest.hexdigest()
 
 
-def checkpoint_fingerprint(root: Path) -> str:
-    """Local reuse only; never changes release/full-tree identity semantics."""
-    tools = {}
-    for name in ("python3", "bash", "sh", "git", "xcrun", "xcodebuild", "xcodegen", "swift", "node", "npm", "rg"):
-        executable = shutil.which(name)
-        if executable:
-            path = Path(executable).resolve()
-            stat = path.stat()
-            tools[name] = [str(path), stat.st_size, stat.st_mtime_ns, stat.st_mode]
-        else:
-            tools[name] = None
-    environment = {
-        "python": sys.version, "platform": platform.platform(), "tools": tools,
-        # PATH itself is deliberately not bound. The Bash tool, a login shell and a
-        # Claude Code hook see the same tools through different PATH lists (the
-        # tool shell appends plugin bin directories that hooks never receive), and
-        # that difference changes no verification result. What matters is which
-        # executable each tool name resolves to, and `tools` above binds exactly
-        # that: a shadowing PATH entry shows up as a different resolved path.
-        "environment": {key: os.environ.get(key) for key in (
-            "DEVELOPER_DIR", "SDKROOT", "PYTHONPATH", "VIRTUAL_ENV",
-            "QWENVOICE_ENABLE_TSAN", "SWIFT_EXEC", "TOOLCHAINS",
-        )},
-    }
-    if shutil.which("xcode-select"):
-        environment["developer"] = _git_command_output(["xcode-select", "-p"])
-        environment["xcode"] = _git_command_output(["xcodebuild", "-version"])
-    return "local-v3:" + hashlib.sha256(
-        worktree_fingerprint(root).encode() + json.dumps(environment, sort_keys=True).encode()
-    ).hexdigest()
-
-
-def _git_command_output(command: list[str]) -> str:
-    result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=15)
-    if result.returncode:
-        raise FingerprintError("cannot resolve local verification toolchain")
-    return result.stdout.strip()
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
-    parser.add_argument("--checkpoint", action="store_true", help="bind local tools and verification semantics too")
     args = parser.parse_args(argv)
     try:
-        print(checkpoint_fingerprint(args.root) if args.checkpoint else worktree_fingerprint(args.root))
+        print(worktree_fingerprint(args.root))
     except (OSError, FingerprintError) as error:
         print(f"error: cannot fingerprint worktree: {error}", file=sys.stderr)
         return 1

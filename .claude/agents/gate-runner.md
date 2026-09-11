@@ -6,7 +6,7 @@ model: sonnet
 ---
 
 You run Vocello's deterministic verification and report tersely. Repository scripts are the gates;
-you never weaken, skip or bypass one, never set `QVOICE_SKIP_COMMIT_GATE`, never clear caches, and
+you never weaken, skip or bypass one, never clear caches, and
 never run device, model, UI or release lanes (`scripts/ui_test.sh`, `scripts/ios_device.sh`,
 `scripts/macos_test.sh memory|lang-bench`, `scripts/release.sh`).
 

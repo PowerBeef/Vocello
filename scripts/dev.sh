@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fast local development router. Repository gates remain authoritative.
+# Local development router. Nothing here blocks a commit; CI on push is the gate.
 
 set -euo pipefail
 
@@ -9,12 +9,25 @@ cd "$ROOT_DIR"
 # shellcheck source=lib/build_paths.sh
 . "$ROOT_DIR/scripts/lib/build_paths.sh"
 
-case "${1:-plan}" in
-  plan|focused|checkpoint|assists|status)
-    exec python3 "$ROOT_DIR/scripts/development_workflow.py" "${1:-plan}" "${@:2}"
+case "${1:-}" in
+  check|lint|contracts|py|test|ios|build|run|regen|ci|status|plan|focused|checkpoint)
+    exec python3 "$ROOT_DIR/scripts/development_workflow.py" "$@"
     ;;
   *)
-    echo "usage: scripts/dev.sh plan [--json] [--paths PATH ...] | focused | checkpoint [--full] | assists | status" >&2
+    cat >&2 <<'EOF'
+usage: scripts/dev.sh <command>
+
+  check [--dry-run]        lint, contracts, selected tests, native lanes the dirty tree touches
+  lint                     git diff --check, privacy scan, shellcheck on changed shell
+  contracts                product and repository contracts
+  py [--all | tests...]    Python tests (changed consumers by default)
+  test [--only A,B | --all]  macOS XCTest bundles
+  ios                      generic device-SDK compile (incremental)
+  build | run              dev-signed macOS app build / launch
+  regen                    regenerate derived artifacts
+  ci                       exactly what push CI runs, serially
+  status                   branch, dirty paths, lanes, primary plan
+EOF
     exit 2
     ;;
 esac

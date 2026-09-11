@@ -36,7 +36,7 @@ class PolicyGuardTests(unittest.TestCase):
     def test_ordinary_commands_are_allowed_quickly(self):
         for command in (
             "git status --short --branch",
-            "scripts/dev.sh checkpoint --full",
+            "scripts/dev.sh check",
             "xcodebuild -project QwenVoice.xcodeproj -scheme QwenVoice -destination 'platform=macOS,arch=arm64' build",
             "git push",
             "git branch --show-current",
@@ -95,16 +95,9 @@ class PolicyGuardTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertIn("regenerate_project.sh", result.stderr)
 
-    def test_commit_gate_bypass_needs_acknowledgement(self):
-        blocked = self.guard("QVOICE_SKIP_COMMIT_GATE=1 git com" "mit -m x")
-        self.assertEqual(blocked.returncode, 2, blocked.stderr)
-        self.assertIn("QVOICE_SKIP_COMMIT_GATE_ACK=user", blocked.stderr)
-        allowed = self.guard("QVOICE_SKIP_COMMIT_GATE_ACK=user QVOICE_SKIP_COMMIT_GATE=1 git com" "mit -m x")
-        self.assertEqual(allowed.returncode, 0, allowed.stderr)
-
     def test_heredoc_bodies_are_data_not_commands(self):
         # A commit message or generated file may mention guarded patterns.
-        heredoc = ("git com" "mit -F - <<'EOF'\nExplain QVOICE_SKIP_COMMIT_GATE=1 and git push --force\n"
+        heredoc = ("git com" "mit -F - <<'EOF'\nExplain rm -rf build/cache and git push --force\n"
                    f"and platform=iOS {SIM} in prose.\nEOF\n")
         self.assertEqual(self.guard(heredoc).returncode, 0)
         # But a real command after the heredoc is still inspected.
@@ -198,12 +191,51 @@ class SessionStartTests(unittest.TestCase):
         self.assertIn("paired iPhone", result.stdout)
 
 
+class CommitLintTests(unittest.TestCase):
+    def repo(self, root: Path, *, branch: str = "main") -> None:
+        subprocess.run(["git", "init", "-q", "-b", branch, str(root)], check=True)
+        subprocess.run(["git", "-C", str(root), "config", "user.email", "fixture@example.invalid"], check=True)
+        subprocess.run(["git", "-C", str(root), "config", "user.name", "Fixture"], check=True)
+
+    def lint(self, root: Path, command: str = "git com" "mit -m x"):
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(root))
+        return run_hook("commit_lint.sh", {"command": command}, cwd=root, env=env)
+
+    def test_non_commit_commands_are_allowed_without_touching_git(self):
+        with tempfile.TemporaryDirectory() as temp:
+            result = self.lint(Path(temp), "git status")
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_commit_off_main_is_blocked(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.repo(root, branch="topic")
+            result = self.lint(root)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("main", result.stderr)
+
+    def test_staged_private_path_or_trailing_whitespace_is_blocked_and_clean_staging_passes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.repo(root)
+            (root / "notes.md").write_text("logs live in " + "/Users/" + "someone/Library\n")
+            subprocess.run(["git", "-C", str(root), "add", "notes.md"], check=True)
+            self.assertEqual(self.lint(root).returncode, 2)
+            (root / "notes.md").write_text("logs live in /Users/example/Library \n")
+            subprocess.run(["git", "-C", str(root), "add", "notes.md"], check=True)
+            self.assertEqual(self.lint(root).returncode, 2)
+            (root / "notes.md").write_text("logs live in /Users/example/Library\n")
+            subprocess.run(["git", "-C", str(root), "add", "notes.md"], check=True)
+            result = self.lint(root)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+
 class DevStatusTests(unittest.TestCase):
-    def test_dev_status_reports_branch_receipt_and_primary_plan(self):
+    def test_dev_status_reports_branch_lanes_and_primary_plan(self):
         result = subprocess.run(["scripts/dev.sh", "status"], cwd=str(REPO_ROOT), text=True,
                                 capture_output=True, check=False, timeout=60)
         self.assertEqual(result.returncode, 0, result.stderr)
-        for key in ("branch:", "dirty:", "verification:", "receipt:", "primaryPlan:"):
+        for key in ("branch:", "dirty:", "lanes:", "primaryPlan:"):
             self.assertIn(key, result.stdout)
 
 

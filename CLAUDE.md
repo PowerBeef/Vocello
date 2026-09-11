@@ -32,10 +32,9 @@ and reference languages; never mutate `AppleLanguages`. Details: `.claude/rules/
 ## Commands
 
 ```sh
-scripts/dev.sh plan                          # classify the dirty tree; what verification it needs
-scripts/dev.sh focused                       # fast loop: adjacent Python tests + changed XCTest classes
-scripts/dev.sh checkpoint [--full]           # deterministic checkpoint; writes the commit-gate receipt
-scripts/dev.sh assists                       # optional: validate .xcodebuildmcp/config.yaml
+scripts/dev.sh check [--dry-run]             # lint, contracts, selected tests, native lanes the dirty tree touches
+scripts/dev.sh test | py | lint | ios        # one lane at a time while editing
+scripts/dev.sh ci                            # exactly what push CI runs, serially
 ./scripts/regenerate_project.sh --fast       # after editing project.yml (never edit the .xcodeproj)
 python3 scripts/roadmap.py status            # work authority: plans, items, primary plan
 python3 scripts/refresh_derived_artifacts.py refresh   # then `validate`; regenerates indexes/catalog
@@ -104,7 +103,7 @@ and the [programme posture](.claude/rules/release-qa.md#programme-posture-and-ha
 | macOS app and XPC stack | `.claude/rules/macos.md` | `docs/reference/macos-app-guide.md` | `scripts/macos_test.sh`; native XCUITest only when requested |
 | Scripts, CI, packaging, benchmarks, release | `.claude/rules/release-qa.md` | `docs/reference/repository-self-verification.md` | Repository scripts and workflows; the complete [gate map](.claude/rules/release-qa.md#deterministic-gate-map) |
 | Generated inventories and indexes | `.claude/rules/derived-artifacts.md` | — | `scripts/refresh_derived_artifacts.py` |
-| Hooks, skills, subagents, MCP routing | `.claude/rules/claude-tooling.md` | `docs/reference/development-workflow.md` | `scripts/claude_config_contract.py` |
+| Hooks, skills, subagents, MCP routing | `.claude/rules/claude-tooling.md` | `docs/reference/development-workflow.md` | `scripts/repo_invariants.sh` |
 | Website | `website/CLAUDE.md` | `website/PRODUCT.md`, `website/DESIGN.md` | Node contracts, Vite build, browser verification |
 
 `./scripts/check_project_inputs.sh` is the T1/T2 gate. Read repository self-verification before adding
@@ -129,13 +128,13 @@ a release. Commit messages end with the attribution trailer the session provides
 
 ## Claude Code tooling (optional assists; verify before relying)
 
-Repository-owned `.claude/` configuration (hooks, permissions, rules, skills, subagents) is validated by
-`scripts/claude_config_contract.py`. User-scoped skills, plugins, MCP servers and devices are
+Repository-owned `.claude/` configuration (hooks, permissions, rules, skills, subagents) is covered by
+the hook tests in `scripts/tests/`. User-scoped skills, plugins, MCP servers and devices are
 never a prerequisite: scripts remain the gates. Details and routing: `.claude/rules/claude-tooling.md`.
 
 | Task | Optional capability |
 | --- | --- |
-| Checkpoint, docs refresh, roadmap checkpoint | Project skills `/checkpoint`, `/refresh-docs`, `/roadmap-checkpoint`; gate output via the `gate-runner` subagent |
+| Verify and commit, docs refresh, roadmap checkpoint | Project skills `/checkpoint`, `/refresh-docs`, `/roadmap-checkpoint`; long gate output via the `gate-runner` subagent |
 | Device, macOS UI and release lanes | User-invoked skills `/ios-lane`, `/macos-ui-lane`, `/device-diagnostics`, `/release-evidence`; triage via `xcresult-triage` |
 | Xcode inner loop | `xcodebuildmcp` skill with the shared XcodeBuildMCP server: `session_show_defaults`, then profile `macos` or `ios-device`; device id at runtime only; scratch builds; never Simulator, preview or UI routes |
 | Apple frameworks and compiler behavior | `axiom-apple-docs`, Sosumi MCP, Xcode documentation |
@@ -149,15 +148,14 @@ Discover assists only when needed; verify a tool is callable before relying on i
 
 <!-- END CLAUDE TOOLING -->
 
-## Hooks and commit gate
+## Hooks and commit lint
 
-`.claude/settings.json` wires `PreToolUse` hooks: `scripts/hooks/precommit_gate.sh` blocks a `git commit`
-off `main` or without a fresh checkpoint receipt (`build/scratch/gate-fingerprint/last-pass`, exit 2);
-policy and generated-file guards block Simulator destinations, whole-cache deletion, force pushes, new
-branches, direct `project.pbxproj` writes and hand edits of generated files. Hooks only check; they never
-build. Run long checks through `scripts/dev.sh checkpoint`. `QVOICE_SKIP_COMMIT_GATE=1` skips validation
-once and only on an explicit user instruction; it never bypasses `main` or CI. Personal overrides live in
-the untracked `settings.local.json` (untracked, under `.claude/`).
+`.claude/settings.json` wires `PreToolUse` hooks: `scripts/hooks/commit_lint.sh` blocks a `git commit` off
+`main`, with whitespace errors, or with a private path or credential in the staged files (under 15 s,
+never a build); policy and generated-file guards block Simulator destinations, whole-cache deletion,
+force pushes, new branches, direct `project.pbxproj` writes and hand edits of generated files. Nothing
+else blocks a commit: run `scripts/dev.sh check` before pushing and let CI on `main` be the gate.
+Personal overrides live in the untracked `settings.local.json` (untracked, under `.claude/`).
 
 ## Explicit frontend acceptance
 

@@ -22,8 +22,8 @@ Claude Code replaced Codex as the development environment in six checkpointed co
 177-line `CLAUDE.md`; the five domain rules moved to path-scoped `.claude/rules/` with a new
 always-loaded `claude-tooling.md`; the nested website guidance became `website/CLAUDE.md`. Every gate that
 named the old files was rewired in the same commit, the Codex hook config and session-storage tooling
-were retired (runbook pinned historical), and `scripts/claude_config_contract.py` now validates the
-repository-owned configuration inside the project gate. `.claude/settings.json` wires the unchanged
+were retired (runbook pinned historical), and a configuration contract validated the repository-owned
+`.claude/` files inside the project gate (retired on September 11 in favour of the hook behaviour tests). `.claude/settings.json` wires the unchanged
 commit gate plus `policy_guard.sh` (Simulator destinations, whole-cache deletion, force pushes, new
 branches, `project.pbxproj` writes, unacknowledged gate skips), `generated_file_guard.sh` (generated
 and frozen files, pinned bodies ask first), a `project.yml` regeneration reminder and a session-start

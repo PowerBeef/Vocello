@@ -1,12 +1,12 @@
 ---
 status: active
 owner: release-qa
-summary: Fast local development workflow — path-aware focused checks, content-complete checkpoints, governed cache reuse, measured latency, and the unchanged explicit acceptance boundary.
+summary: Local development workflow — path-aware checks, no commit receipt, governed cache reuse, and the unchanged explicit acceptance boundary.
 sourceOfTruth:
   - scripts/dev.sh
   - scripts/development_workflow.py
-  - scripts/tree_fingerprint.py
-  - scripts/hooks/precommit_gate.sh
+  - scripts/hooks/commit_lint.sh
+  - scripts/privacy_scan.py
   - scripts/hooks/policy_guard.sh
   - scripts/hooks/generated_file_guard.sh
   - .claude/settings.json
@@ -25,28 +25,20 @@ lanes remain explicit and are never silently inferred.
 
 ```sh
 scripts/dev.sh plan        # read-only: show changes, classifications, and selected commands
-scripts/dev.sh focused     # fast regeneration plus adjacent Python/changed XCTest checks
-scripts/dev.sh checkpoint  # refresh, relevant contracts/tests and platform checks
-scripts/dev.sh checkpoint --full  # complete deterministic checkpoint
+scripts/dev.sh check [--dry-run]   # lint, contracts, selected tests and the native lanes the dirty tree touches
+scripts/dev.sh test | py | lint | ios   # one lane at a time
+scripts/dev.sh ci                  # exactly what push CI runs, serially
 ```
 
-Run `focused` repeatedly while editing. Run one `checkpoint` after a coherent change is ready. The
-checkpoint records a privacy-safe exact-tree PASS marker, so staging the same bytes and committing
-does not run the project gate again. Any subsequent edit, added untracked file, or HEAD change
-invalidates the marker. Local markers also bind resolved tool executables, Python/OS/Xcode identity
-and relevant toolchain environment. Equivalent shell PATH ordering reuses a marker only when PATH
-membership and all fingerprinted tool resolutions remain unchanged. They are not release evidence. The checker refuses edits during
-verification instead of attaching PASS to the later untested content. The commit hook
-(`scripts/hooks/precommit_gate.sh`, wired as a Claude Code `PreToolUse` Bash hook in
-`.claude/settings.json`) only checks the receipt and blocks if it is absent, stale or unreadable. It
-never starts another build. Run the checkpoint directly so long checks remain observable and are not
-limited by the hook timeout. The receipt binds tree bytes plus resolved tool identities, not PATH
-membership, so the hook environment and the tool shell agree. `scripts/dev.sh status` prints the
-receipt state (fresh, stale, missing) with the branch, dirty paths and verification class; the
-`SessionStart` hook prints it at the start of every session. Two more `PreToolUse` guards
+Nothing blocks a commit except the commit lint hook (`scripts/hooks/commit_lint.sh`, wired as a
+Claude Code `PreToolUse` Bash hook in `.claude/settings.json`): the branch must be `main`, the staged
+diff whitespace-clean, and `scripts/privacy_scan.py` must find no private path or credential in the
+staged files. It finishes in seconds and never builds. Run `scripts/dev.sh check` before pushing; the
+routing is the same `scripts/ci/classify_changes.py` CI uses, so the local plan and the CI lanes agree.
+CI on `main` is the gate; a red push is fixed forward or reverted. Two more `PreToolUse` guards
 (`scripts/hooks/policy_guard.sh`, `scripts/hooks/generated_file_guard.sh`) block Simulator destinations,
 whole-cache deletion, force pushes, new branches, direct `project.pbxproj` writes and hand edits of
-generated files; `scripts/claude_config_contract.py` validates the wiring.
+generated files; `scripts/tests/test_claude_hooks.py` pins their behaviour.
 
 Finalize intended tracked-file membership **before** derived refresh: project-health inventories
 use Git-tracked files. Adding a new file to the index afterward can stale that generated summary

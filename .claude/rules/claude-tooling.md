@@ -2,18 +2,17 @@
 status: active
 owner: release-qa
 reviewed: 2026-09-11
-summary: Domain rule for the repository-owned Claude Code configuration — hooks, permissions, path-scoped rules, project skills, project subagents, MCP routing (XcodeBuildMCP, GitHub, Sosumi) and Axiom usage — and what the claude_config_contract.py gate enforces.
+summary: Domain rule for the repository-owned Claude Code configuration — hooks, permissions, path-scoped rules, project skills, project subagents, MCP routing (XcodeBuildMCP, GitHub, Sosumi) and Axiom usage.
 sourceOfTruth:
   - .claude/settings.json
-  - scripts/claude_config_contract.py
-  - scripts/hooks/precommit_gate.sh
+  - scripts/hooks/commit_lint.sh
   - scripts/development_workflow.py
 ---
 # Claude Code tooling — hooks, skills, subagents, MCP
 
 Claude Code is the development environment. Everything it needs from the repository lives under
-`.claude/` and is validated by `scripts/claude_config_contract.py` inside
-`./scripts/check_project_inputs.sh`. Nothing here is a prerequisite for CI, commits or packaging:
+`.claude/`; the hooks are behaviour-tested in `scripts/tests/test_claude_hooks.py`. Nothing here is a
+prerequisite for CI, commits or packaging:
 scripts remain the gates, and this configuration only makes the scripted routes easier to follow.
 
 ## Layout
@@ -36,22 +35,22 @@ All hook scripts live in `scripts/hooks/`, read the hook JSON from stdin, and ex
 
 | Event | Script | Behavior |
 | --- | --- | --- |
-| `PreToolUse` Bash | `precommit_gate.sh` | `git commit` requires `main` and a fresh checkpoint receipt (`build/scratch/gate-fingerprint`); otherwise exit 2 |
-| `PreToolUse` Bash | `policy_guard.sh` | Blocks Simulator destinations, whole-cache deletion, force pushes, new branches or worktrees, direct `project.pbxproj` writes, and unrequested `QVOICE_SKIP_COMMIT_GATE=1` |
+| `PreToolUse` Bash | `commit_lint.sh` | `git commit` requires `main`, a whitespace-clean staged diff and no private path or credential in staged files; under 15 s, never a build |
+| `PreToolUse` Bash | `policy_guard.sh` | Blocks Simulator destinations, whole-cache deletion, force pushes, new branches or worktrees, and direct `project.pbxproj` writes |
 | `PreToolUse` Edit/Write | `generated_file_guard.sh` | Blocks hand edits of generated or frozen files and names the generator; warns on pinned historical docs |
 | `PostToolUse` Edit/Write | `project_yml_reminder.sh` | After editing `project.yml`, reminds to run `scripts/regenerate_project.sh --fast` |
-| `SessionStart` | `session_start.sh` | Prints branch/dirty state, `scripts/dev.sh status`, the "Resume now" excerpt, iPhone reachability (no identifier) and the TSan deadline |
+| `SessionStart` | `session_start.sh` | Prints branch/dirty state, `scripts/dev.sh status` (lanes, primary plan), the "Resume now" excerpt, iPhone reachability (no identifier) and the TSan deadline |
 
 `permissions.allow` pre-approves read-only and deterministic commands; `permissions.ask` covers device,
 model and publication routes; `permissions.deny` mirrors the guards. Permissions reduce prompts, hooks
-enforce policy; the contract requires the deny entries for Simulator boot, `project.pbxproj` writes,
-force pushes and `rm -rf build/cache`.
+enforce policy; the deny entries for Simulator boot, `project.pbxproj` writes, force pushes and
+`rm -rf build/cache` stay in place.
 
 ## Skills (`.claude/skills/`)
 
 | Skill | Invocation | Routes to |
 | --- | --- | --- |
-| `/checkpoint` | Claude or user | `scripts/dev.sh plan` → `focused` → `checkpoint [--full]`, then the commit |
+| `/checkpoint` | Claude or user | `scripts/dev.sh check`, then the commit (no receipt; CI on push is the gate) |
 | `/refresh-docs` | Claude or user | `scripts/refresh_derived_artifacts.py`, `scripts/doc_metadata.py validate`, contentDigest re-pins |
 | `/roadmap-checkpoint` | Claude or user | `config/roadmap.json` item update, narrative block, `scripts/roadmap.py validate` and `render` |
 | `/ios-lane` | user only | `scripts/ui_test.sh ios <lane>` with probe, storage floor and consent statement; triage afterwards |
@@ -101,16 +100,11 @@ Every project agent declares an explicit tool allowlist and none uses worktree i
   writes the untracked `buildServer.json`. Xcode's default DerivedData has no build, so without
   `--build_root` SourceKit reports missing modules. Verify one symbol lookup before relying on it; never a gate.
 
-## What the contract checks
+## What is checked
 
-`scripts/claude_config_contract.py validate`: settings parse; every hook command resolves to an
-executable script under `scripts/hooks/`; the commit gate is wired as a `PreToolUse` Bash hook; no
-`PreToolUse` timeout above 30 s; the required deny entries exist; every skill has `name` and
-`description` and declares `disable-model-invocation: true` when it references a device, model or
-release script; every agent has `name`, `description`, an explicit `tools` list and no worktree
-isolation; every rule `paths:` glob matches a file; nothing under `.claude/` or a project `.mcp.json`
-names a Simulator destination. `scripts/tests/test_claude_config_contract.py` and
-`scripts/tests/test_claude_hook_contract.py` cover it.
+`scripts/tests/test_claude_hooks.py` runs every hook against real payloads (allowed, blocked, ask) and
+`scripts/repo_invariants.sh` rejects Simulator destinations anywhere under `.claude/`. There is no
+separate configuration validator: a hook that stops working fails its behaviour test.
 
 Authority: `CLAUDE.md` hard invariants **Scripts outrank assists**, **One UI driver**, **Physical
 iPhone only** and **Main only**. Scripts win over this rule.

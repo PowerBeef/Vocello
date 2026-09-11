@@ -439,8 +439,8 @@ Narrative authority: [`docs/reference/development-workflow.md`](reference/develo
 | --- | --- | --- | --- |
 | `CCA-01` | done | Rewire guidance gates from AGENTS.md/.agents to CLAUDE.md/.claude/rules | `commit:152273a4f8a9`, `file:config/documentation-contract.json`, `file:scripts/check_project_inputs.sh`, `file:scripts/check_surface_coverage.py` |
 | `CCA-02` | done | Rewrite root CLAUDE.md (≤ 200 lines) and nested website/CLAUDE.md | `commit:86260ce15275`, `file:.claude/rules/claude-tooling.md`, `file:CLAUDE.md`, `file:website/CLAUDE.md` |
-| `CCA-03` | done | Port the commit gate to .claude/settings.json with a contract test | `commit:152273a4f8a9`, `commit:462ca1f94fff`, `file:.claude/settings.json`, `file:scripts/tests/test_claude_hook_contract.py` |
-| `CCA-04` | done | Add the claude_config_contract.py gate | `commit:152273a4f8a9`, `commit:462ca1f94fff`, `file:scripts/claude_config_contract.py`, `file:scripts/tests/test_claude_config_contract.py` |
+| `CCA-03` | done | Port the commit gate to .claude/settings.json with a contract test | `commit:152273a4f8a9`, `commit:462ca1f94fff`, `file:.claude/settings.json` |
+| `CCA-04` | done | Add the claude_config_contract.py gate | `commit:152273a4f8a9`, `commit:462ca1f94fff` |
 | `CCA-05` | done | Retire Codex session-storage governance | `commit:152273a4f8a9`, `doc:docs/reference/codex-session-storage.md`, `file:config/evidence-impact.json` |
 | `CCA-06` | done | Project skills for checkpoint, device lanes, docs refresh, roadmap checkpoint and release evidence | `commit:86260ce15275`, `file:.claude/skills/checkpoint/SKILL.md`, `file:.claude/skills/ios-lane/SKILL.md`, `file:.claude/skills/release-evidence/SKILL.md` |
 | `CCA-07` | done | Project subagents for gate summarisation, xcresult triage, doc governance and Swift review | `commit:462ca1f94fff`, `commit:86260ce15275`, `file:.claude/agents/gate-runner.md`, `file:.claude/agents/xcresult-triage.md`, `file:scripts/hooks/generated_file_guard.sh`, `file:scripts/hooks/policy_guard.sh`, `file:scripts/tests/test_claude_hooks.py` |
@@ -494,7 +494,7 @@ Narrative authority: [`docs/reference/development-workflow.md`](reference/develo
 | `DWF-01` | done | Measure development-loop latency and cache invalidation | `doc:docs/reference/development-workflow.md` |
 | `DWF-02` | done | Separate fast generation and focused edit loops from checkpoints | `file:scripts/dev.sh`, `file:scripts/development_workflow.py`, `file:scripts/tests/test_development_workflow.py` |
 | `DWF-03` | done | Preserve valid Xcode and package caches | `file:scripts/build_foundation_targets.sh`, `file:scripts/lib/build_cache.sh`, `file:project.yml`, `file:scripts/tests/test_build_routing_contract.py` |
-| `DWF-04` | done | Make checkpoint reuse content-complete and fail-closed | `file:scripts/tree_fingerprint.py`, `file:scripts/tests/test_tree_fingerprint.py`, `file:scripts/hooks/precommit_gate.sh` |
+| `DWF-04` | done | Make checkpoint reuse content-complete and fail-closed | `file:scripts/tree_fingerprint.py`, `file:scripts/tests/test_tree_fingerprint.py`, `file:scripts/hooks/commit_lint.sh` |
 | `DWF-05` | done | Validate and adopt the new development workflow | `doc:docs/reference/development-workflow.md`, `doc:docs/development-progress.md` |
 | `DWF-06` | done | Streamline Codex local gates without weakening CI or release evidence | `file:scripts/development_workflow.py`, `file:scripts/tests/test_development_workflow.py`, `file:scripts/tests/test_evidence_impact.py`, `doc:docs/reference/development-workflow.md`, `doc:docs/development-progress.md#codex-workflow-streamlining`, `doc:docs/reference/repository-self-verification.md#replace-and-retire-tests-and-harnesses`, `doc:docs/development-progress.md#project-wide-test-and-harness-evolution--september-6` |
 

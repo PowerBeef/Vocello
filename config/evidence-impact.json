@@ -482,10 +482,7 @@
         ".claude/settings.json",
         ".claude/agents/**",
         ".claude/skills/**",
-        "scripts/claude_config_contract.py",
-        "scripts/hooks/**",
-        "scripts/tests/test_claude_config_contract.py",
-        "scripts/tests/test_claude_hook_contract.py"
+        "scripts/hooks/**"
       ],
       "mergeRequiredEvidence": [
         "project-inputs",

@@ -2267,7 +2267,7 @@
         "scripts/regenerate_project.sh",
         "scripts/build_foundation_targets.sh",
         "scripts/ui_test.sh",
-        "scripts/hooks/precommit_gate.sh"
+        "scripts/hooks/commit_lint.sh"
       ],
       "updated": "2026-08-29",
       "notes": "The audit reproduced redundant full-gate regeneration, disposable generic-iOS DerivedData, package-wide diagnostics flag invalidation, unfocused core tests, multi-megabyte console streams, and an index-sensitive commit marker."
@@ -2321,11 +2321,11 @@
       "evidence": [
         "file:scripts/tree_fingerprint.py",
         "file:scripts/tests/test_tree_fingerprint.py",
-        "file:scripts/hooks/precommit_gate.sh"
+        "file:scripts/hooks/commit_lint.sh"
       ],
       "sourceOfTruth": [
         "scripts/tree_fingerprint.py",
-        "scripts/hooks/precommit_gate.sh"
+        "scripts/hooks/commit_lint.sh"
       ],
       "updated": "2026-08-29",
       "notes": "The prior key could reuse a stale PASS after re-editing an already-dirty file. The final-content identity closes that false-green while avoiding a second gate after staging."
@@ -3558,8 +3558,7 @@
       "evidence": [
         "commit:152273a4f8a9",
         "commit:462ca1f94fff",
-        "file:.claude/settings.json",
-        "file:scripts/tests/test_claude_hook_contract.py"
+        "file:.claude/settings.json"
       ],
       "notes": "The hook environment lacks the plugin bin PATH entries the tool shell has; the receipt fingerprint now binds resolved tool identities only (local-v3)."
     },
@@ -3572,9 +3571,7 @@
       "updated": "2026-09-11",
       "evidence": [
         "commit:152273a4f8a9",
-        "commit:462ca1f94fff",
-        "file:scripts/claude_config_contract.py",
-        "file:scripts/tests/test_claude_config_contract.py"
+        "commit:462ca1f94fff"
       ]
     },
     {

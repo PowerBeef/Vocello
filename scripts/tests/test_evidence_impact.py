@@ -167,9 +167,7 @@ class EvidenceImpactTests(unittest.TestCase):
             ".claude/settings.json",
             ".claude/skills/checkpoint/SKILL.md",
             ".claude/agents/gate-runner.md",
-            "scripts/claude_config_contract.py",
             "scripts/hooks/precommit_gate.sh",
-            "scripts/tests/test_claude_config_contract.py",
         )
         for path in paths:
             with self.subTest(path=path):

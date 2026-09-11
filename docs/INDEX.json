@@ -42,11 +42,10 @@
       "path": ".claude/rules/claude-tooling.md",
       "status": "active",
       "owner": "release-qa",
-      "summary": "Domain rule for the repository-owned Claude Code configuration \u2014 hooks, permissions, path-scoped rules, project skills, project subagents, MCP routing (XcodeBuildMCP, GitHub, Sosumi) and Axiom usage \u2014 and what the claude_config_contract.py gate enforces.",
+      "summary": "Domain rule for the repository-owned Claude Code configuration \u2014 hooks, permissions, path-scoped rules, project skills, project subagents, MCP routing (XcodeBuildMCP, GitHub, Sosumi) and Axiom usage.",
       "sourceOfTruth": [
         ".claude/settings.json",
-        "scripts/claude_config_contract.py",
-        "scripts/hooks/precommit_gate.sh",
+        "scripts/hooks/commit_lint.sh",
         "scripts/development_workflow.py"
       ]
     },
@@ -473,12 +472,12 @@
       "path": "docs/reference/development-workflow.md",
       "status": "active",
       "owner": "release-qa",
-      "summary": "Fast local development workflow \u2014 path-aware focused checks, content-complete checkpoints, governed cache reuse, measured latency, and the unchanged explicit acceptance boundary.",
+      "summary": "Local development workflow \u2014 path-aware checks, no commit receipt, governed cache reuse, and the unchanged explicit acceptance boundary.",
       "sourceOfTruth": [
         "scripts/dev.sh",
         "scripts/development_workflow.py",
-        "scripts/tree_fingerprint.py",
-        "scripts/hooks/precommit_gate.sh",
+        "scripts/hooks/commit_lint.sh",
+        "scripts/privacy_scan.py",
         "scripts/hooks/policy_guard.sh",
         "scripts/hooks/generated_file_guard.sh",
         ".claude/settings.json",

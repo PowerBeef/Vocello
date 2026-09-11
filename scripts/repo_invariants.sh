@@ -18,7 +18,7 @@ out="$(rg -n -i 'platform=iOS Simulator|build_run_sim|test_sim|launch_sim' \
 [[ -z "$out" ]] || fail "Simulator route in an active surface:\n$out"
 
 # One UI driver: ordinary CI and release workflows never execute UI tests.
-ci_error="$(python3 - <<'PY'
+ci_error="$(python3 - 2>&1 <<'PY' || true
 from pathlib import Path
 import re
 
@@ -41,7 +41,7 @@ for path in paths:
         if re.search(pattern, text):
             raise SystemExit(f'{path} {label}; UI execution must stay explicit')
 PY
-2>&1 || true)"
+)"
 [[ -z "$ci_error" ]] || fail "$ci_error"
 
 # Release-only configuration: no generic DEBUG branch in shippable sources.

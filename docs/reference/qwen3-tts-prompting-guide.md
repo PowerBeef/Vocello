@@ -355,7 +355,7 @@ above chance — exactly the shipped `EmotionPreset.distinctDeliveryIDs` set —
 correctly by ear (`angry` 0/11; `fearful` heard as sad). Acoustic separability is not listener
 recognizability; the UI's distinct-versus-directional-hint split follows the listener. Corrected
 record and follow-up program:
-[`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md).
+`delivery-control-audit-2026-08.md` (removed 2026-09-11; history: `docs/reference/delivery-control-audit-2026-08.md` at 60adde4d).
 
 `MEASURED-HERE`, **DP-26, 2026-08-22 — a comprehensive rewrite is not a general cure.** A
 same-seed 9-speaker × 8-preset × 5-seed screen retained the shipped baseline's acoustic adherence
@@ -667,7 +667,7 @@ instructions that crowd out the emotion signal.
 But which presets tripped that rule was incidental to their wording, and — on the then-shipping
 ten-preset × two-tier roster (the roster was cut to 8 on 2026-08-03 and the user-facing intensity
 control retired 2026-08-02; see §4.3 and
-[`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md)) — **three presets tripped
+`delivery-control-audit-2026-08.md` (removed 2026-09-11; history: `docs/reference/delivery-control-audit-2026-08.md` at 60adde4d)) — **three presets tripped
 it on one intensity tier and not the other**:
 
 | Preset | `normal` | `strong` | Boilerplate delta |
@@ -818,7 +818,7 @@ preset grid with the wrong intensity-tier count, contradicting the guide's own �
 then-shipped code. The correct figure at the time was **10 presets × 2 intensity tiers**; the
 roster has since been cut to 8 presets (2026-08-03) and the user-facing intensity control retired
 (2026-08-02), each surviving preset shipping its `strong` copy — see §4.3 and
-[`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md).
+`delivery-control-audit-2026-08.md` (removed 2026-09-11; history: `docs/reference/delivery-control-audit-2026-08.md` at 60adde4d).
 [`doc_metadata.py`](../../scripts/doc_metadata.py) now derives the current counts from
 [`EmotionPreset.swift`](../../Sources/QwenVoiceCore/EmotionPreset.swift) and fails the build on any
 document that contradicts them.
@@ -977,7 +977,7 @@ Community, quality varies:
 
 ## Related documents
 
-- [`qwen3-tts-emotion-tone-research-2026-08-22.md`](qwen3-tts-emotion-tone-research-2026-08-22.md) — pinned current research, evaluator audit, coverage gaps, and remediation boundary
+- `qwen3-tts-emotion-tone-research-2026-08-22.md` (removed 2026-09-11; history: `docs/reference/qwen3-tts-emotion-tone-research-2026-08-22.md` at 0f595447) — pinned current research, evaluator audit, coverage gaps, and remediation boundary
 - [`qwen3-tts-guide.md`](qwen3-tts-guide.md) — architecture, model variants, speaker roster, parameters
 - [`../qwen_tone.md`](../qwen_tone.md) — the earlier app-facing tone guide this document supersedes for provenance questions
 - [`benchmarking-procedure.md`](benchmarking-procedure.md) — how to run the matrix the §10 experiments need

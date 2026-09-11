@@ -2,7 +2,6 @@
 status: historical
 owner: backend-and-platform
 summary: Preserved legacy design prototype or critique; not current product guidance or acceptance.
-contentDigest: sha256:4d47b6c759ac98773555f7f6b87fbb44bdd4f3b189c402a59bb3bd17be0ef9ce
 ---
 > **Historical reference only.** This retained prototype/review is not the current app, release
 > procedure, acceptance evidence, or asset-licensing authority. Follow root AGENTS.md, the

@@ -9,7 +9,7 @@ allowed-tools: Bash(python3 scripts/lib/ios_coredevice_probe.py probe) Bash(pyth
 # iPhone lane
 
 Authority: `docs/reference/ios-device-testing.md` (lanes, pause/resume, retention) and
-`.claude/rules/ios.md`. This is explicit QA scope: it drives the paired physical iPhone, may generate
+`.claude/rules/native.md`. This is explicit QA scope: it drives the paired physical iPhone, may generate
 speech with real models, and takes minutes to hours. It never runs unasked and never retries.
 
 ## Preflight

@@ -8,7 +8,7 @@ allowed-tools: Bash(scripts/ui_test.sh macos *) Bash(scripts/macos_test.sh model
 
 # macOS UI lane
 
-Authority: `docs/reference/macos-testing.md` and `.claude/rules/macos.md`. Explicit QA scope: the lane
+Authority: `docs/reference/macos-testing.md` and `.claude/rules/native.md`. Explicit QA scope: the lane
 launches the built app, may generate speech with real models, and owns the screen while it runs. It
 never runs unasked and never retries.
 

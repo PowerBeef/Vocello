@@ -273,7 +273,7 @@ source identity and assigns only the terminal vocabulary in
 `SKIPPED_AFTER_FAILURE`; permission or destructive work that cannot be restored becomes
 `BLOCKED_PRESERVATION_POLICY`. Neither is a passing result. The campaign contract is `config/ios-control-audit.json`; the
 [current checkpoint](../development-progress.md) routes to the primary roadmap.
-The [August report](ios-on-device-control-audit-2026-08-28.md) is historical evidence only.
+The August report (removed 2026-09-11; history: `docs/reference/ios-on-device-control-audit-2026-08-28.md` at 343635cb) is historical evidence only.
 Do not repeat completed phases merely for a green aggregate or reuse a token after source changes.
 `--retain-result` pins the bundle before Xcode starts, including legacy-shaped metadata.
 
@@ -321,7 +321,7 @@ value. No automatic test/generation retry is added. These source repairs require
 Runner PASS is written only after required-step finalization; failure exits also finalize the ledger.
 
 Historical pilot failures, including missing warm/capture evidence, remain in the
-[preserved device history](ios-device-testing-history-2026-09-06.md). Never infer a PASS from an
+preserved device history (removed 2026-09-11; history: `docs/reference/ios-device-testing-history-2026-09-06.md` at 5029a348). Never infer a PASS from an
 optional ledger subtotal when mandatory correlation or artifact evidence fails.
 
 New generation/all runs declare `controlEvidenceVersion: 2`. Their dedicated
@@ -687,9 +687,9 @@ See also [`testing-runbook.md`](testing-runbook.md) and
 
 ## Historical checkpoint references
 
-Dated run logs were preserved verbatim in [the historical snapshot](ios-device-testing-history-2026-09-06.md).
+Dated run logs were preserved verbatim in the historical snapshot (removed 2026-09-11; history: `docs/reference/ios-device-testing-history-2026-09-06.md` at 5029a348).
 They are evidence, not the next commands to execute.
 
 ### Control-audit one-hour continuation — 2026-09-02
 
-Historical only: [preserved checkpoint](ios-device-testing-history-2026-09-06.md#control-audit-one-hour-continuation--2026-09-02).
+Historical only: preserved checkpoint (removed 2026-09-11; history: `docs/reference/ios-device-testing-history-2026-09-06.md` at 5029a348).

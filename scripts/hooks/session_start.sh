@@ -1,14 +1,6 @@
 #!/usr/bin/env bash
-# Claude Code SessionStart hook: the "Start and resume work" ritual, printed.
-#
-# Output goes to the session context. Read-only, bounded (< 8 s), never fails:
-# each section is best-effort and a missing tool just prints a short note.
-#
-#   1. branch and dirty state
-#   2. scripts/dev.sh status (classification, receipt state, primary plan)
-#   3. the "Resume now" head of docs/development-progress.md
-#   4. paired iPhone reachability and lock state (never the identifier)
-#   5. TSan characterization deadline when it is close
+# Claude Code SessionStart hook: branch and dirty state, dev.sh status, the "Resume now"
+# head of the checkpoint, paired-iPhone reachability. Read-only, bounded, never fails.
 
 root="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 cd "$root" 2>/dev/null || exit 0
@@ -18,7 +10,7 @@ with_deadline() {
   perl -e 'alarm shift @ARGV; exec @ARGV' "$@" 2>/dev/null
 }
 
-echo "== Vocello session start (CLAUDE.md: Start and resume work) =="
+echo "== Vocello session start (CLAUDE.md: Working here) =="
 echo
 echo "-- git --"
 git status --short --branch 2>/dev/null | head -n 20 || echo "(git unavailable)"
@@ -58,19 +50,4 @@ print(f"{name}: {state}, {lock_text} (device lanes need explicit consent)")
 else
   echo "no paired iPhone reachable (fine for deterministic work)"
 fi
-echo
-python3 - <<'PY' 2>/dev/null || true
-import datetime, json, pathlib
-try:
-    policy = json.loads(pathlib.Path("config/tsan-policy.json").read_text())
-    ch = policy.get("characterization", {})
-    deadline = datetime.date.fromisoformat(ch["deadline"])
-    days = (deadline - datetime.date.today()).days
-    if days <= 30:
-        print(f"-- TSan characterization -- deadline {deadline} ({days} days): "
-              f"{ch.get('recordedConsecutivePasses', '?')}/{ch.get('requiredConsecutivePassesForBlockingReview', '?')} "
-              "consecutive passes recorded; see config/tsan-policy.json")
-except Exception:
-    pass
-PY
 exit 0

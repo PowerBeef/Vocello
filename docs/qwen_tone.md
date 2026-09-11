@@ -28,7 +28,7 @@ is unchanged. The delivery instruction contract owns the exact text and digests.
 > their `normal` copy (DP-22 branch (a), maintainer call 2026-08-15). Preset references below
 > predate that change; see
 > [`reference/qwen3-tts-prompting-guide.md`](reference/qwen3-tts-prompting-guide.md) and
-> [`reference/delivery-control-audit-2026-08.md`](reference/delivery-control-audit-2026-08.md)
+> `reference/delivery-control-audit-2026-08.md` (removed 2026-09-11; history: `docs/reference/delivery-control-audit-2026-08.md` at 60adde4d)
 > for the corrected record.
 
 This guide is a supplemental prompt-writing reference for the shipped macOS app. It is supplemental and may lag shipped behavior — when in doubt, trust the sources listed below before this guide.

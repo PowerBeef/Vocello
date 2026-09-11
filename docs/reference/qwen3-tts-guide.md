@@ -286,7 +286,7 @@ not separable from each other. That measurement was taken in early August 2026 o
 ten-preset roster: for five presets the nearest cell in the whole space was its own other tier,
 seven of nine non-neutral presets moved *less* at strong than at normal, and the since-retired
 `dramatic` reversed outright (the roster was cut to 8 on 2026-08-03 — see
-[`delivery-control-audit-2026-08.md`](delivery-control-audit-2026-08.md)). Every
+`delivery-control-audit-2026-08.md` (removed 2026-09-11; history: `docs/reference/delivery-control-audit-2026-08.md` at 60adde4d)). Every
 preset therefore initially shipped its strong copy. The later measured shipped-tier policy keeps
 `happy` and `angry` at Normal while every other preset retains Strong; legacy drafts continue to
 use the exact raw instruction they stored. Since 2026-08-04 the eight presets also carry the

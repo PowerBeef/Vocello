@@ -148,7 +148,10 @@ def validate(root: Path, config_path: Path) -> list[str]:
         errors.append("deferredMatrix must be an object")
     else:
         source = deferred.get("source")
-        if not isinstance(source, str) or not (root / source).is_file():
+        # The deferred matrix may cite a tracked file or a document that now lives only in
+        # git history ("git history: <path> at <sha>"); either way the policy text is what binds.
+        historical = isinstance(source, str) and source.startswith("git history: ")
+        if not isinstance(source, str) or not (historical or (root / source).is_file()):
             errors.append(f"deferredMatrix.source does not resolve: {source!r}")
 
     return errors

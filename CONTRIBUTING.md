@@ -54,7 +54,7 @@ See [`docs/reference/testing-runbook.md`](docs/reference/testing-runbook.md) for
 - Code and machine-readable contracts take precedence over prose.
 - Update relevant documentation in the same change when behavior, public facts, commands, platform support, models, or test contracts change.
 - Keep dated run details in preserved evidence/checkpoints, not general instructions. During a frozen acceptance campaign, record progress untracked; a deliberate source/documentation checkpoint creates a new acceptance identity.
-- Keep dependencies pinned. MLX dependency changes require the backend review and benchmark process in [`.claude/rules/backend-mlx.md`](.claude/rules/backend-mlx.md).
+- Keep dependencies pinned. MLX dependency changes require the backend review and benchmark process in [`.claude/rules/native.md`](.claude/rules/native.md).
 - Keep external Actions pinned to the full SHA in [`config/toolchain.json`](config/toolchain.json).
   Dependabot proposals must update that manifest and the adjacent workflow version comment together.
 - Do not commit prompts, transcripts, usernames, device identifiers, absolute paths, secrets, raw telemetry, WAV evidence, screenshots from test results, traces, or `.xcresult` bundles.

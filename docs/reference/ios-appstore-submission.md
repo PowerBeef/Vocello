@@ -14,7 +14,7 @@ sourceOfTruth:
 # iOS App Store submission runbook
 
 The end-to-end steps to ship **Vocello for iPhone** (`com.patricedery.vocello`) to TestFlight / the App Store. The generic Release target, assets, privacy manifest, entitlement sources, in-app privacy link, and signed-archive CI lane are in place. That is not yet submission readiness: the pinned
-[`2026-08-26 readiness audit`](ios-app-store-readiness-audit-2026-08-26.md) records source,
+`2026-08-26 readiness audit` (removed 2026-09-11; history: `docs/reference/ios-app-store-readiness-audit-2026-08-26.md` at 87636935) records source,
 privacy/legal, support, licensing, metadata, signing/account, hosting, and physical-device gaps.
 `config/roadmap.json` owns their live `ASR-*` status. This document is the operator checklist after
 those gates are closed.

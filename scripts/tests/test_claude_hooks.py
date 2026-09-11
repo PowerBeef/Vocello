@@ -167,7 +167,7 @@ class SessionStartTests(unittest.TestCase):
             result = subprocess.run([str(HOOKS / "session_start.sh")], input="{}", text=True,
                                     capture_output=True, env=env, cwd=str(REPO_ROOT), check=False, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Start and resume work", result.stdout)
+        self.assertIn("Working here", result.stdout)
         self.assertIn("-- git --", result.stdout)
         self.assertIn("Resume now", result.stdout)
         self.assertIn("paired iPhone", result.stdout)

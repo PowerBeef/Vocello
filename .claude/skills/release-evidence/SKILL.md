@@ -9,7 +9,7 @@ allowed-tools: Bash(python3 scripts/release_source_authority.py *) Bash(python3 
 # Release evidence (read-only)
 
 Authority: `docs/reference/quality-promotion.md`, `docs/reference/macos-release-qa.md`,
-`.claude/rules/release-qa.md`. Candidate production and public promotion are separate; neither is
+`.claude/rules/release.md`. Candidate production and public promotion are separate; neither is
 authorized by this skill. Do not run `scripts/release.sh`, `gh release create|edit`, or any workflow
 dispatch.
 

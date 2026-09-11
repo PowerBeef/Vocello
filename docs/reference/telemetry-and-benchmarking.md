@@ -668,4 +668,4 @@ committed bounded quality summaries and baselines remain permitted.
 
 - [`mlx-audio-swift-patching.md`](mlx-audio-swift-patching.md) — owned core runtime procedure and validation gates.
 - [`privacy-storage.md`](privacy-storage.md) — where diagnostics live; deletion paths.
-- [`.claude/rules/backend-mlx.md`](../../.claude/rules/backend-mlx.md) — telemetry summary + engine invariants (bounded measured event delivery, typed cancellation, prewarm reentrancy, per-tier memory).
+- [`.claude/rules/native.md`](../../.claude/rules/native.md) — telemetry summary + engine invariants (bounded measured event delivery, typed cancellation, prewarm reentrancy, per-tier memory).

@@ -1,128 +1,88 @@
----
-status: active
-owner: release-qa
-summary: Local development workflow — path-aware checks, no commit receipt, governed cache reuse, and the unchanged explicit acceptance boundary.
-sourceOfTruth:
-  - scripts/dev.sh
-  - scripts/development_workflow.py
-  - scripts/hooks/commit_lint.sh
-  - scripts/privacy_scan.py
-  - scripts/hooks/policy_guard.sh
-  - scripts/hooks/generated_file_guard.sh
-  - .claude/settings.json
-  - scripts/build_foundation_targets.sh
-  - scripts/regenerate_project.sh
-  - scripts/evidence_impact.py
----
 # Development workflow
 
-Vocello separates rapid feedback from publication evidence. The edit loop answers whether the
-changed unit is coherent; the local checkpoint checks the current tree in proportion to the change.
-CI remains the independent complete T2 authority. Model, phone, UI, benchmark, signing, and release
-lanes remain explicit and are never silently inferred.
+Local verification is fast and advisory; CI on `main` is the gate. Nothing blocks a commit except a
+15-second lint.
 
-## Daily route
+## Daily loop
 
 ```sh
-scripts/dev.sh plan        # read-only: show changes, classifications, and selected commands
-scripts/dev.sh check [--dry-run]   # lint, contracts, selected tests and the native lanes the dirty tree touches
-scripts/dev.sh test | py | lint | ios   # one lane at a time
-scripts/dev.sh ci                  # exactly what push CI runs, serially
+scripts/dev.sh check --dry-run       # what the dirty tree needs
+scripts/dev.sh check                 # lint, contracts, selected Python tests, native lanes touched
+scripts/dev.sh test --only FooTests  # one XCTest class on the incremental test build
+scripts/dev.sh py --changed          # Python tests that consume the changed tooling
+scripts/dev.sh ios                   # generic device-SDK compile (incremental, no phone)
+scripts/dev.sh regen                 # regenerate roadmap render, catalog, inventories, charts
+git add -A && git commit && git push
 ```
 
-Nothing blocks a commit except the commit lint hook (`scripts/hooks/commit_lint.sh`, wired as a
-Claude Code `PreToolUse` Bash hook in `.claude/settings.json`): the branch must be `main`, the staged
-diff whitespace-clean, and `scripts/privacy_scan.py` must find no private path or credential in the
-staged files. It finishes in seconds and never builds. Run `scripts/dev.sh check` before pushing; the
-routing is the same `scripts/ci/classify_changes.py` CI uses, so the local plan and the CI lanes agree.
-CI on `main` is the gate; a red push is fixed forward or reverted. Two more `PreToolUse` guards
-(`scripts/hooks/policy_guard.sh`, `scripts/hooks/generated_file_guard.sh`) block Simulator destinations,
-whole-cache deletion, force pushes, new branches, direct `project.pbxproj` writes and hand edits of
-generated files; `scripts/tests/test_claude_hooks.py` pins their behaviour.
+Routing is `scripts/ci/classify_changes.py`, the same file CI uses, so the local plan and the CI lanes
+agree: `swift` runs the macOS test bundles (`scripts/macos_test.sh test`, or `core-test --only` when
+only test classes changed), `ios` runs the generic compile, `python` runs the reverse-dependency Python
+selection, `website` runs `npm --prefix website run check`. A change to shared tooling
+(`scripts/lib/`, `scripts/development_workflow.py`, `config/toolchain.json`,
+`config/build-output-policy.json`) runs the whole Python suite.
 
-Finalize intended tracked-file membership **before** derived refresh: project-health inventories
-use Git-tracked files. Adding a new file to the index afterward can stale that generated summary
-even if the content fingerprint is unchanged. Do not change index membership during a gate.
+## The commit lint
 
-During frozen acceptance, do not run an editing/checkpoint cycle between shards. Keep progress in
-the existing pinned untracked run bundles; follow [device pause/resume](ios-device-testing.md#pause-and-resume).
-At a deliberate source checkpoint, update the roadmap and narrative together and acknowledge the
-new full-tree evidence identity.
+`scripts/hooks/commit_lint.sh` (a Claude Code `PreToolUse` hook in `.claude/settings.json`) requires
+branch `main`, a whitespace-clean staged diff (`git diff --cached --check`) and a clean
+`scripts/privacy_scan.py --staged` (no developer home path, no credential-shaped token, no key file).
+It never builds or tests. Two more guards block Simulator destinations, whole-cache deletion, force
+pushes, new branches, `project.pbxproj` writes and hand edits of generated files;
+`scripts/tests/test_claude_hooks.py` pins all of them.
 
-`scripts/evidence_impact.py` remains the classifier. The optional, versioned `localVerification`
-section of its existing contract controls local scheduling; release/promotion requirements stay
-separate. Exact reviewed prose exclusions prevent a package README from being treated as engine
-code. New/unreviewed resource documentation and license/NOTICE files remain conservative.
+## The contract gate
 
-`scripts/dev.sh check --dry-run` prints the lanes and commands for the dirty tree; `check` runs them.
-Python selection walks literal import/helper/config references transitively and deliberately
-over-selects on shared basenames; an input without a known test consumer, or a change to shared
-tooling, runs the whole suite. Selection is local feedback, not a proof of complete dependency
-coverage; CI runs every test. The runner is pytest with `pytest-xdist` (`-n auto`, pinned in
-`config/toolchain.json`); `scripts/tests/conftest.py` marks modules `research` (audio, delivery,
-prosody and device-analysis tooling, run when those paths change and nightly) and `darwin_only`
-(run inside the macOS gate). `--durations` prints the slowest tests on every run.
+`./scripts/check_project_inputs.sh` runs every deterministic contract: build-output policy, generated
+schemes, CLI identity, localization, saved-voice lifecycle, entitlements, support contact, public facts
+(`scripts/public_facts_contract.py`: release identity, README and website copy), attribution, runtime
+security (debug knobs, concurrency registry, TSan policy), owned-runtime inventory, backend wiring,
+model catalog and host availability, App Store readiness, supply chain, release steps, benchmark
+history, README charts, the text-level delivery and prosody contracts, the roadmap, the exact
+product-invariant greps in `scripts/repo_invariants.sh`, the privacy scan, and the Python suite.
 
-`check_project_inputs.sh` without arguments is the full gate. `--local` selects local Python feedback
-and is rejected in CI. `repo_invariants.sh` holds the exact product-invariant greps, `privacy_scan.py`
-the private-path and credential scan, and `public_facts_contract.py` the release-identity and public
-copy checks. Nothing local schedules XCUITest, a model download, generated audio, a benchmark,
-signing, notarization, App Store work, or a release; run those canonical scripts only when the task
-explicitly asks for their evidence.
+`--local` selects Python tests by the dirty tree; `--python darwin-only` runs only the modules that need
+the macOS host (CI runs the rest on Linux); the default runs everything.
+
+## Python tests
+
+pytest with `pytest-xdist` (`-n auto`), both pinned in `config/toolchain.json`. The whole suite runs in
+about 90 seconds on an M2. `scripts/tests/conftest.py` marks modules by name: `research` (audio,
+delivery, prosody and device-analysis tooling) runs when those paths change and nightly; `darwin_only`
+runs inside the macOS gate. Every run prints its slowest tests; a test that outgrows its lane moves,
+it does not slow every push.
+
+## CI
+
+| Job | Runner | Runs when | Warm / cold |
+| --- | --- | --- | --- |
+| `changes` | ubuntu | always | seconds |
+| `contracts` | ubuntu | always | about 1 min: action pins, invariants, privacy scan, roadmap |
+| `python` | ubuntu | Python or workflow paths | 2 to 3 min: product and tooling tests; research tests when routed |
+| `macos-tests` | macos-26 | Swift, config, scripts or workflow paths | cached DerivedData; contract gate (darwin-only Python), macOS bundles, CLI identity |
+| `ios-compile` | macos-26 | iOS-relevant paths | cached DerivedData; `build_foundation_targets.sh ios --incremental` |
+| `website` | ubuntu | `website/` | about 4 min |
+| `CI required` | ubuntu | always | the branch-protection context; skipped lanes count as passed |
+
+Caches are keyed on the toolchain and dependency graph and saved after every run on `main`;
+`scripts/ci/restore_mtimes.py` gives tracked files their commit mtimes so Xcode's task signatures hit.
+Dispatch with `cold: true` to skip the restore. `nightly.yml` runs the TSan subset, the complete Python
+suite and cold compiles of both platforms and files one `nightly` issue on failure; `security.yml`
+(CodeQL, npm audit) runs weekly, on dispatch and inside `release.yml` on the tagged commit.
 
 ## Cache and generation policy
 
-- `./scripts/regenerate_project.sh --fast` runs XcodeGen and the two narrow shared-scheme renderers,
-  then atomically records the `project.yml` digest. It does not claim repository validation.
-- `./scripts/regenerate_project.sh` retains checkpoint behavior and runs the project gate after
-  generation. Normal iteration uses `--fast`, followed by one checkpoint.
+- `./scripts/regenerate_project.sh --fast` runs XcodeGen and the two scheme renderers; the plain form
+  also runs the contract gate afterwards.
 - `./scripts/build_foundation_targets.sh ios --incremental` reuses the governed
-  `build/cache/xcode/ios-device` DerivedData and matches physical-device Release optimization. The
-  default command retains disposable clean DerivedData for isolated or CI-style proof. After the
-  shared app and logic-test builds finish, the incremental route UUID-validates and preserves the
-  final sibling app dSYM so `scripts/ios_device.sh preflight` cannot inherit stale symbols from the
-  product that existed before the checkpoint.
-- Internal diagnostic flags are target settings rather than package-wide `OTHER_SWIFT_FLAGS`, so
-  diagnostics do not rebuild MLX, GRDB, NIO, Swift Collections, and every other dependency.
-- Foundation and UI lanes retain full Xcode output under `build/artifacts/` while showing concise
-  progress and a bounded failure tail in the task.
+  `build/cache/xcode/ios-device` DerivedData and matches physical-device Release optimization.
+- Internal diagnostic flags are target settings, so diagnostics never rebuild MLX and the other
+  dependencies. `scripts/macos_test.sh test --coverage` is an opt-in llvm-cov export and forces a full
+  rebuild of the shared cache.
+- Serialize native Xcode commands (one SwiftPM lock spans XCTest); never clear caches to evade
+  contention. `config/build-output-policy.json` owns every path under `build/`.
 
-Do not delete persistent caches to recover speed. Use the build-output policy and selective cleanup
-only when a verified invalidation or storage threshold requires it.
+## What never runs from here
 
-## Measured 2026-08-27 baseline
-
-September 6 workflow validation measured the representative documentation checkpoint at **24.3 s**
-on the development Mac: refresh 6.7 s, derived validation 3.2 s, documentation 1.0 s, metadata 6.1 s,
-roadmap 7.3 s and surface coverage under 0.1 s. Every command passed and the source remained
-unchanged. No native build, model or phone was used. This is a route measurement, not full-patch
-acceptance or a permanent timing gate. An analyzer-edit example selected 45 of 122 Python modules
-through reverse dependencies; unknown/routing changes still select all modules.
-
-These are observations on the base M2/8 GB development Mac, not permanent thresholds:
-
-| Operation | Before / cold | Steady state after overhaul |
-| --- | ---: | ---: |
-| Xcode project regeneration | full repository gate coupled to regeneration | 0.29 s fast generation |
-| Focused 12-test Swift state suite | full core bundle was the only script route | 7.3 s warm |
-| Generic iOS app + logic compile | 239 s clean package rebuild | 12.5 s warm governed cache |
-| Failed iOS UI invocation output | 2.18 MB / 7,865 console lines | retained log plus concise output |
-
-The first compile after removing the global diagnostics flag rebuilds the dependency graph once.
-The regression signal is whether a no-source-change incremental run reuses it.
-
-## Quality controls retained or strengthened
-
-- The complete project gate, discovered Python inventory, native tests and generic device-SDK
-  compile remain CI/release authorities. Local selection cannot replace candidate evidence.
-- The commit marker hashes HEAD, final tracked content, and every non-ignored untracked path and
-  byte. It ignores only index placement, so staging identical content is free while a re-edit cannot
-  reuse stale evidence.
-- `project.yml` remains the only project authority. Fast regeneration cannot record a stamp until
-  XcodeGen and both generated schemes succeed.
-- Local test selection is an optimization, never coverage authority. CI/release still run the full
-  required inventory. Legacy quick-gate behavior remains local-only; new work uses `dev.sh`.
-- Full logs and `.xcresult` bundles remain governed artifacts; concise output discards no evidence.
-
-When a focused lane exposes an environment failure, use the applicable build/test triage guidance.
-Do not switch to Simulator, invent a cache root, or weaken the checkpoint.
+XCUITest, model downloads, generated audio, benchmarks, signing, notarization, App Store work and
+releases run only when the task explicitly asks for that evidence, through their canonical scripts.

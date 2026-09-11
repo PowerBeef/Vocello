@@ -216,9 +216,8 @@ def print_status() -> None:
         roadmap = json.loads(roadmap_path.read_text(encoding="utf-8"))
         primary = roadmap.get("primaryPlan")
         items = [item for item in roadmap.get("items", []) if item.get("plan") == primary]
-        done = sum(1 for item in items if item.get("status") == "done")
         open_items = [item["id"] for item in items if item.get("status") in ("in-flight", "planned")]
-        print(f"primaryPlan: {primary} — {done}/{len(items)} done; open: {', '.join(open_items[:6])}"
+        print(f"primaryPlan: {primary} — {len(open_items)} open: {', '.join(open_items[:6])}"
               + (" …" if len(open_items) > 6 else ""))
 
 

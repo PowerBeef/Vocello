@@ -5,7 +5,6 @@ user-invocable: false
 status: historical
 owner: backend-and-platform
 summary: Preserved legacy design prototype or critique; not current product guidance or acceptance.
-contentDigest: sha256:cd6d1918014f2a8411eeb784478e1d8826e4424713de19fe1f3b9b4d74223b50
 ---
 > **Historical reference only.** This retained prototype/review is not the current app, release
 > procedure, acceptance evidence, or asset-licensing authority. Follow root AGENTS.md, the

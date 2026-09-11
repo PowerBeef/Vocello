@@ -367,7 +367,7 @@ without a new maintainer decision.
 **P3 — mlx-swift 0.31.x / mlx-swift-lm 2.31.x bump (gated).** Deferred — **stay pinned at 0.30.6 /
 2.30.6**. 0.31 changes the quantization API (`Quantizable.toQuantized` gains a `QuantizationMode`;
 quantize moves to a top-level fn), which lands on the 4-bit/8-bit model-load path, so it's not a free
-bump. Procedure (OPTIMIZATION.md §E, `.claude/rules/backend-mlx.md` "SPM pins move in lockstep"):
+bump. Procedure (OPTIMIZATION.md §E, `.claude/rules/native.md` "SPM pins move in lockstep"):
 obtain explicit maintainer authorization on `main` → bump all pin sites in lockstep (`project.yml`
 *and* owned `Packages/VocelloQwen3Core/Package.swift`) →
 `regenerate_project.sh` → both `build_foundation_targets.sh` → fixed-seed `vocello bench` vs the

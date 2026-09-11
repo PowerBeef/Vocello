@@ -165,8 +165,8 @@ class EvidenceImpactTests(unittest.TestCase):
     def test_claude_code_configuration_surfaces_require_project_inputs_and_docs(self) -> None:
         paths = (
             ".claude/settings.json",
-            ".claude/skills/checkpoint/SKILL.md",
-            ".claude/agents/gate-runner.md",
+            ".claude/skills/ios-lane/SKILL.md",
+            ".claude/agents/swift-review.md",
             "scripts/hooks/precommit_gate.sh",
         )
         for path in paths:

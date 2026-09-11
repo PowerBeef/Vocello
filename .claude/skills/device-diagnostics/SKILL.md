@@ -8,7 +8,7 @@ allowed-tools: Bash(scripts/ios_device.sh *) Bash(python3 scripts/lib/ios_corede
 
 # iPhone headless diagnostics
 
-Authority: `docs/reference/ios-device-testing.md` and `.claude/rules/ios.md`. `scripts/ios_device.sh` is
+Authority: `docs/reference/ios-device-testing.md` and `.claude/rules/native.md`. `scripts/ios_device.sh` is
 the deterministic physical-device driver; it is not a UI driver. Verbs that generate speech (`bench`,
 `lang-bench`, `memory`, `profile`) need the on-device models and minutes of device time.
 

@@ -106,7 +106,9 @@
         "VocelloCoreTests/GenerationTelemetrySchemaTests/testTransportAdapterPreservesGapAndTerminalSemantics",
         "VocelloCoreTests/GenerationTelemetrySchemaTests/testFrontendAdapterDoesNotRequireRawUserContent"
       ],
-      "runtimeChecks": ["telemetry-overhead"],
+      "runtimeChecks": [
+        "telemetry-overhead"
+      ],
       "status": "implemented",
       "remaining": []
     },
@@ -168,7 +170,7 @@
     }
   ],
   "deferredMatrix": {
-    "source": "docs/audits/archive/2026-07-10/06_Verification_Test_and_Benchmark_Matrix.md",
+    "source": "git history: docs/audits/archive/2026-07-10/06_Verification_Test_and_Benchmark_Matrix.md at 25a895ed",
     "policy": "The remaining corrected-report rows are explicitly deferred; no row is covered without an executable test or validator reference."
   }
 }

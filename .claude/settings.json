@@ -81,7 +81,9 @@
       "Bash(python3 scripts/ci/*)",
       "Bash(pytest *)",
       "Bash(gh run *)",
-      "Bash(python3 -m pytest *)"
+      "Bash(python3 -m pytest *)",
+      "Bash(python3 scripts/roadmap.py render*)",
+      "Bash(scripts/repo_invariants.sh)"
     ],
     "ask": [
       "Bash(scripts/ui_test.sh *)",

@@ -68,7 +68,7 @@ if [[ "$MODE" == "checkpoint" ]]; then
     bash "$SCRIPT_DIR/check_project_inputs.sh"
 else
     echo "==> Fast regeneration complete; checkpoint validation intentionally deferred."
-    echo "==> Run QVOICE_GATES=quick ./scripts/check_project_inputs.sh before commit."
+    echo "==> Run ./scripts/check_project_inputs.sh --local (or scripts/dev.sh checkpoint) before commit."
 fi
 
 echo "==> Done. Project regenerated at QwenVoice.xcodeproj"

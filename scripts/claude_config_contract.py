@@ -66,7 +66,7 @@ EXPLICIT_SCOPE_TOKENS = (
     "install_app_device",
 )
 # Built from pieces so this file never contains the literal strings that
-# scripts/check_test_workflows.sh rejects across the active tree.
+# scripts/repo_invariants.sh rejects across the active tree.
 _SIM = "Sim" + "ulator"
 FORBIDDEN_DESTINATION = re.compile(
     "|".join([

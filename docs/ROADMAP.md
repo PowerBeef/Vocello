@@ -92,7 +92,7 @@ Narrative authority: [`docs/reference/autonomous-validation-audit-2026-08-21.md`
 
 | Item | Status | Title | Evidence |
 | --- | --- | --- | --- |
-| `AV-01` | done | P1 — make Python test execution discovery-complete | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/python_test_contract.py`, `file:scripts/tests/test_python_test_contract.py`, `file:scripts/check_test_workflows.sh` |
+| `AV-01` | done | P1 — make Python test execution discovery-complete | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:scripts/python_test_contract.py`, `file:scripts/tests/test_python_test_contract.py`, `file:scripts/repo_invariants.sh` |
 | `AV-02` | done | P1 — close evidence-impact critical-path fallbacks | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/evidence-impact.json`, `file:docs/project-health.md` |
 | `AV-03` | done | P1 — make promotion evidence capability-complete | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/quality-promotion-contract.json`, `file:docs/reference/quality-promotion.md` |
 | `AV-04` | done | P2 — make baseline coverage changes fail closed | `doc:docs/reference/autonomous-validation-audit-2026-08-21.md`, `file:config/benchmark-baseline-migrations.json`, `file:scripts/tests/test_compare_baseline.py` |
@@ -190,7 +190,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | --- | --- | --- | --- |
 | `F-01` | in-flight | High — make saved-voice review transactional and add iOS deletion | `file:Sources/QwenVoiceCore/PreparedVoiceRepository.swift`, `file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift`, `file:Tests/VocelloEngineIntegrationTests/PreparedVoiceWireContractTests.swift`, `file:Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift`, `file:scripts/saved_voice_lifecycle_contract.py`, `doc:docs/reference/privacy-storage.md`, `doc:docs/reference/ios-app-guide.md` |
 | `F-02` | done | Medium — make behavior-changing diagnostics an enforceable distribution boundary | `file:Sources/QwenVoiceCore/RuntimeDebugGate.swift`, `file:Tests/VocelloCoreTests/RuntimeDebugGateTests.swift`, `file:config/runtime-debug-knobs.json`, `file:scripts/runtime_security_contract.py`, `doc:docs/decisions/runtime-hardening-and-trust-boundary.md` |
-| `F-03` | done | Medium — execute deterministic iOS policy assertions in ordinary CI | `file:Tests/VocelloiOSLogicTests/VocelloiOSLogicTests.swift`, `file:project.yml`, `file:scripts/macos_test.sh`, `file:scripts/build_foundation_targets.sh`, `file:scripts/check_test_workflows.sh`, `file:.github/workflows/ci.yml` |
+| `F-03` | done | Medium — execute deterministic iOS policy assertions in ordinary CI | `file:Tests/VocelloiOSLogicTests/VocelloiOSLogicTests.swift`, `file:project.yml`, `file:scripts/macos_test.sh`, `file:scripts/build_foundation_targets.sh`, `file:scripts/repo_invariants.sh`, `file:.github/workflows/ci.yml` |
 | `F-04` | done | Medium — bind public promotion to exact-source canonical evidence | `commit:f6404ce`, `file:config/quality-promotion-contract.json`, `file:.github/workflows/promote-release.yml`, `doc:docs/reference/quality-promotion.md` |
 | `F-05` | planned | Medium — restore packaged macOS launch verification | — |
 | `F-06` | in-flight | Medium — durably couple audio publication and History persistence | `file:Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift`, `file:Tests/VocelloCoreTests/HistoryDeletionEngineTests.swift`, `file:docs/reference/privacy-storage.md` |

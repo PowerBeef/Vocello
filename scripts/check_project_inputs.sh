@@ -77,7 +77,7 @@ REQUIRED_SURFACES=(
     "scripts/lib/storage_preflight.py"
     "scripts/lib/ios_platform_preflight.py"
     "scripts/ui_test.sh"
-    "scripts/check_test_workflows.sh"
+    "scripts/repo_invariants.sh"
     "scripts/python_test_contract.py"
     "scripts/validate_backend_risk_spine.py"
     "scripts/check_ios_ui_benchmark.py"
@@ -330,8 +330,8 @@ fi
 
 # General hygiene bans only (kept): broad upstream tests, stale macOS-15 product /
 # old build-path names, and the Python-script variants (the "no Python backend"
-# standing decision — the .sh versions are canonical). UI-stack consistency is
-# enforced separately by check_test_workflows.sh.
+# standing decision — the .sh versions are canonical). Product invariants that are
+# pure greps live in scripts/repo_invariants.sh.
 PROHIBITED_REFERENCE_PATTERNS=(
     "Packages/VocelloQwen3Core/Tests/(MLXAudioTTSTests|MLXAudioCodecsTests)"
     "QwenVoice-macos15.dmg"
@@ -349,7 +349,6 @@ for removed_pattern in "${PROHIBITED_REFERENCE_PATTERNS[@]}"; do
             --glob '!build/**' \
             --glob '!scratch/**' \
             --glob '!**/scripts/check_project_inputs.sh' \
-            --glob '!**/scripts/check_test_workflows.sh' \
             >/tmp/qwenvoice_removed_reference_grep 2>/dev/null; then
             echo "error: removed test/benchmark reference is still present:" >&2
             cat /tmp/qwenvoice_removed_reference_grep >&2
@@ -358,7 +357,6 @@ for removed_pattern in "${PROHIBITED_REFERENCE_PATTERNS[@]}"; do
         fi
     elif git -C "$PROJECT_DIR" grep -nE "$removed_pattern" -- \
         ':!:scripts/check_project_inputs.sh' \
-        ':!:scripts/check_test_workflows.sh' \
         ':!:build/**' \
         >/tmp/qwenvoice_removed_reference_grep 2>/dev/null; then
         echo "error: removed test/benchmark reference is still present:" >&2
@@ -524,10 +522,18 @@ python3 "$SCRIPT_DIR/check_surface_coverage.py"
 "$SCRIPT_DIR/check_backend_resource_contract.sh" --project
 "$SCRIPT_DIR/check_qwen3_backend_only.sh"
 python3 "$SCRIPT_DIR/validate_backend_risk_spine.py" --root "$PROJECT_DIR"
+"$SCRIPT_DIR/repo_invariants.sh"
+
+# Script self-tests. --local selects the modules affected by the dirty tree;
+# CI and checkpoint --full run the complete suite once, here and nowhere else.
+python3 "$SCRIPT_DIR/python_test_contract.py" validate
 if [[ "$LOCAL_MODE" == 1 ]]; then
-    "$SCRIPT_DIR/check_test_workflows.sh" --project-inputs --local
+    python3 "$SCRIPT_DIR/development_workflow.py" python-tests
+elif [[ "${QVOICE_GATES:-}" == "quick" && -z "${CI:-}${GITHUB_ACTIONS:-}" ]] \
+    && [[ -z "$(git -C "$PROJECT_DIR" status --porcelain -- scripts config 2>/dev/null)" ]]; then
+    echo "==> quick gate mode: scripts/config unchanged — skipping script self-tests" >&2
 else
-    "$SCRIPT_DIR/check_test_workflows.sh" --project-inputs
+    (cd "$PROJECT_DIR" && python3 -m unittest discover -s scripts/tests -p 'test_*.py')
 fi
 
 echo "==> Project inputs are clean."

@@ -850,7 +850,7 @@ def default_inputs(record: dict[str, Any]) -> dict[str, Any]:
     ]
     harness_paths = [
         REPO_ROOT / "scripts" / "ui_test.sh",
-        REPO_ROOT / "scripts" / "check_test_workflows.sh",
+        REPO_ROOT / "scripts" / "repo_invariants.sh",
         REPO_ROOT / "scripts" / "check_macos_xpc_bench.py",
         REPO_ROOT / "scripts" / "check_ios_ui_benchmark.py",
         REPO_ROOT / "scripts" / "summarize_generation_telemetry.py",

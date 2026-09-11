@@ -84,8 +84,8 @@ changed paths from Git and reclassify after derived refresh. `scripts/dev.sh ass
 Xcode configuration only; it neither requires installation nor contacts devices/accounts.
 
 `check_project_inputs.sh` without arguments remains the full gate. `--local` selects local Python
-feedback and is rejected in CI. `check_test_workflows.sh` delegates to the one required-surface
-inventory and does not repeat its parent's validators. Documentation link/path/command checks
+feedback and is rejected in CI. `repo_invariants.sh` holds the exact product-invariant greps and
+the Python suite runs once, inside the parent gate. Documentation link/path/command checks
 live in `documentation_contract.py`, with negative fixtures, rather than duplicate inline scripts.
 
 The helper never schedules XCUITest, a model download, generated audio, a benchmark, signing,

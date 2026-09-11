@@ -223,7 +223,7 @@ owns reference comparison and update instructions.
 | `scripts/attribution_manifest.py`, `config/third-party-attribution-policy.json` | bundled license/NOTICE coverage |
 | `check_convergence_promotion_gate.py` | convergence promotion preconditions |
 | `check_qwen3_backend_only.sh`, `check_backend_resource_contract.sh` | MLX-only and native resource wiring |
-| `check_test_workflows.sh` | one UI stack, retired-harness exclusion, and script self-tests |
+| `repo_invariants.sh` | exact greps for product invariants: no Simulator route, no UI execution in CI, no `DEBUG` branch, no hidden test hooks, condition-based UI tests, one owned-package suite |
 | `python_test_contract.py` | discovery-complete Python inventory, runner compatibility, and zero-test rejection |
 | `benchmark_history.py`, `supply_chain_contract.py`, `required_step_ledger.py`, `claude_config_contract.py`, `check_release_notes.py` | history, supply chain, release steps, Claude Code configuration, and release-note contracts |
 

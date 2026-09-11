@@ -199,7 +199,7 @@ def validate_private_paths(root: Path) -> list[str]:
     if not (root / ".git").exists():
         return []
     result = subprocess.run(
-        ["git", "grep", "-nE", "/Users/[A-Za-z0-9._-]+/", "--", ":!scripts/check_test_workflows.sh"],
+        ["git", "grep", "-nE", "/Users/[A-Za-z0-9._-]+/", "--", ":!scripts/repo_invariants.sh"],
         cwd=root, capture_output=True, text=True, check=False,
     )
     if result.returncode not in (0, 1):

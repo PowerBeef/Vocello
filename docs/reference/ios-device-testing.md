@@ -253,7 +253,7 @@ prove actual UIKit scrolling; new physical AX-XXXL/pseudo acceptance is required
 Every lane uses the paired physical-device destination. Tests use stable accessibility identifiers,
 condition-based waits, XCTest activities, screenshots, and failure attachments. Coordinate tables,
 OCR taps, alternate UI drivers, and fixed sleeps are not supported — the perf scenario file is the
-one recorded exemption (`scripts/check_test_workflows.sh`): its paced sleeps ARE the measured
+one recorded exemption (`scripts/repo_invariants.sh`): its paced sleeps ARE the measured
 workload, and its sweep gestures anchor on the application root so deep per-event accessibility
 re-queries stay out of the measured windows.
 

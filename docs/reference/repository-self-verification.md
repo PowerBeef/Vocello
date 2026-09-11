@@ -138,7 +138,7 @@ None of these deterministic checks needs a model, a device, or XCUITest.
 | `benchmark_history.py` | integrity | Registry validity and generated index |
 | `project_health.py` | contradiction | Generated health summary matches the tree |
 | `check_qwen3_backend_only.sh` | omission | MLX is the only backend |
-| `check_test_workflows.sh` | omission | One UI stack; no retired harness artifacts |
+| `repo_invariants.sh` | omission | Product invariants expressed as exact greps |
 
 ## Three patterns worth reusing
 
@@ -210,8 +210,8 @@ confidence becomes misplaced.
    git history — and confirming a red build. A check that has only ever passed has not been tested.
 3. **Decide severity from precision**, per the calibration rule above.
 4. **Register it once at its execution boundary.** A gate spans its script, its self-test and
-   `scripts/check_project_inputs.sh`; `scripts/check_test_workflows.sh` delegates required-surface
-   inventory to that parent instead of maintaining a duplicate list. Contracts
+   `scripts/check_project_inputs.sh`; `scripts/repo_invariants.sh` holds the exact greps and
+   asserts nothing about the text of other scripts or workflows. Contracts
    with an `env` field span the manifest, `scripts/lib/build_paths.sh`, and the test's
    `REQUIRED_EXPORTS`. Landing a partial set leaves the tree green locally while CI fails from a
    clean checkout — that exact split broke `main` on 2026-08-02.

@@ -60,7 +60,7 @@ their completion statuses into an unconditional audio-quality PASS.
 Only the text-only `check_delivery_instructions.py` and cadence-contract validation run in the
 deterministic commit/CI gate; audio generation and calibration remain explicit measurement lanes.
 Test files live under `scripts/tests/` and run in
-the script self-test suite via `scripts/check_test_workflows.sh`.
+the script self-test suite via `scripts/check_project_inputs.sh`.
 
 | Tool | Purpose | Tests |
 | --- | --- | --- |

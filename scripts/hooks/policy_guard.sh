@@ -16,7 +16,7 @@
 # milliseconds; it never runs git, xcodebuild or python beyond parsing stdin.
 #
 # The unsupported-destination words are assembled from fragments so this file
-# never contains the literal strings that scripts/check_test_workflows.sh
+# never contains the literal strings that scripts/repo_invariants.sh
 # rejects across the active tree.
 
 set -euo pipefail

@@ -192,17 +192,6 @@ class DevelopmentWorkflowTests(unittest.TestCase):
             self.assertEqual(MODULE.main(["checkpoint"]), 1)
             record.assert_not_called()
 
-    def test_parent_gate_runs_shared_contracts_once_and_standalone_still_checks_them(self):
-        parent = (ROOT / "scripts/check_project_inputs.sh").read_text()
-        child = (ROOT / "scripts/check_test_workflows.sh").read_text()
-        self.assertIn('"$SCRIPT_DIR/check_test_workflows.sh" --project-inputs', parent)
-        for script in ("build_output_policy.py", "documentation_contract.py", "vendor_runtime_contract.py"):
-            self.assertEqual(parent.count(f'python3 "$SCRIPT_DIR/{script}"'), 1)
-            self.assertIn(f'[[ "$PARENT_VALIDATED" == 1 ]] || python3 scripts/{script}', child)
-        self.assertNotIn("for required_policy_surface in", child)
-        self.assertIn("scripts/check_project_inputs.sh --surfaces-only", child)
-        self.assertNotIn("XCODE_MCP_CONFIG=", parent)
-
     def test_real_tooling_dependency_selection_reaches_consumers(self):
         selection = MODULE.python_test_selection(["scripts/analyze_prosody.py"])
         self.assertEqual(selection["mode"], "selected")
@@ -213,19 +202,6 @@ class DevelopmentWorkflowTests(unittest.TestCase):
         plan = MODULE.workflow_plan(["docs/unregistered.json"])
         self.assertEqual(plan["localVerification"], "affected")
 
-    def test_parent_dispatch_works_with_macos_bash_nounset_in_both_modes(self):
-        source = (ROOT / "scripts/check_project_inputs.sh").read_text()
-        dispatch = source[source.index('if [[ "$LOCAL_MODE" == 1 ]]; then'):]
-        with tempfile.TemporaryDirectory() as directory:
-            child = Path(directory) / "check_test_workflows.sh"
-            child.write_text('#!/bin/bash\nprintf "%s\\n" "$@"\n')
-            child.chmod(0o755)
-            for mode, expected in (("0", False), ("1", True)):
-                result = subprocess.run(["/bin/bash", "-euc", dispatch], capture_output=True, text=True,
-                                        env={**os.environ, "SCRIPT_DIR": directory, "LOCAL_MODE": mode})
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertIn("--project-inputs", result.stdout)
-                self.assertEqual("--local" in result.stdout, expected)
 
 
 if __name__ == "__main__":

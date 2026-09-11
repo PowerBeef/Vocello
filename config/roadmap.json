@@ -660,7 +660,7 @@
         "file:project.yml",
         "file:scripts/macos_test.sh",
         "file:scripts/build_foundation_targets.sh",
-        "file:scripts/check_test_workflows.sh",
+        "file:scripts/repo_invariants.sh",
         "file:.github/workflows/ci.yml"
       ],
       "sourceOfTruth": [
@@ -891,7 +891,7 @@
       "gate": "Add a scheduled TSan lane for the deterministic core/XPC subset, non-blocking only while noise is characterized, then promote stable coverage. Extend the concurrency registry so new unsafe declarations require review date and removal condition in addition to the already-enforced owner, invariant, and direct tests; add an explicit no-unreviewed-growth budget. Current scripts support opt-in TSan and the registry fail-closes on unregistered declarations, but no scheduled lane or review/removal metadata is enforced.",
       "sourceOfTruth": [
         "scripts/macos_test.sh",
-        "scripts/check_test_workflows.sh",
+        "scripts/repo_invariants.sh",
         "config/concurrency-safety.json",
         "config/tsan-policy.json",
         "scripts/runtime_security_contract.py",
@@ -2359,10 +2359,10 @@
         "doc:docs/reference/autonomous-validation-audit-2026-08-21.md",
         "file:scripts/python_test_contract.py",
         "file:scripts/tests/test_python_test_contract.py",
-        "file:scripts/check_test_workflows.sh"
+        "file:scripts/repo_invariants.sh"
       ],
       "sourceOfTruth": [
-        "scripts/check_test_workflows.sh",
+        "scripts/repo_invariants.sh",
         "scripts/check_project_inputs.sh",
         "scripts/tests/test_compare_baseline.py",
         "scripts/python_test_contract.py"
@@ -3515,7 +3515,7 @@
         "config/evidence-impact.json",
         "scripts/development_workflow.py",
         "scripts/check_project_inputs.sh",
-        "scripts/check_test_workflows.sh"
+        "scripts/repo_invariants.sh"
       ],
       "updated": "2026-09-06",
       "notes": "September 6 project-wide policy extension: AGENTS.md and the testing router now direct all tests/harnesses to the existing self-verification reference's replacement/retirement procedure. Each scoped migration states its claim, independent evidence, replacement, remaining consumers and retirement condition. Known-wrong baselines have no automatic authority; temporary comparisons must end in one current route or an explicit unresolved decision. Preserve necessary readers and original evidence, not redundant execution paths. This records guidance adoption only, not a completed suite-wide audit or relaxation of the 201-take, data-preservation, QC or release requirements. Concrete corrections remain with existing subsystem owners; no new audit programme or blocker was created. Earlier workflow checkpoint: implementation and focused routing/negative fixtures completed. Commit-hook validation is receipt-only: absent, stale or unreadable receipts block without starting another checkpoint; long checks run directly outside the host hook timeout. The interrupted 7887bfda hook recheck is not a completed PASS. A direct coherent full deterministic checkpoint remains required for the follow-up; results stay in the existing gate artifacts. This is workflow implementation, not product/candidate acceptance. Release-first remains primary; the phone and product investigations remain paused."

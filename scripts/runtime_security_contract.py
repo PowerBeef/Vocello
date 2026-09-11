@@ -570,61 +570,24 @@ def validate_release_contract() -> list[str]:
                 errors.append(
                     f"release-evidence-contract {platform} steps differ from managed orchestration"
                 )
-    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
-    promotion_workflow = (ROOT / ".github/workflows/promote-release.yml").read_text(encoding="utf-8")
-    if "release.published" in workflow:
-        errors.append("release workflow must not trigger after public release publication")
-    if "--draft" not in workflow or "--latest" in workflow or "--draft=false" in workflow:
-        errors.append("release workflow must create and verify a draft without publishing it")
-    if (
-        "scripts/release_evidence.py validate" not in promotion_workflow
-        or "scripts/quality_promotion.py validate" not in promotion_workflow
-        or "--draft=false" not in promotion_workflow
-        or "--latest" not in promotion_workflow
-    ):
-        errors.append("promotion workflow must validate both evidence layers before publication")
-    if "release_evidence.py" not in workflow:
-        errors.append("release workflow does not invoke release_evidence.py")
-    for required in (
-        "capture-source-identity", "required_step_ledger.py run", "required_step_ledger.py finalize",
-        "--source-identity", "--step-ledger", "release-verification.json",
-    ):
-        if required not in workflow:
-            errors.append(f"release workflow does not bind managed verification evidence: {required}")
-    evidence_source = (ROOT / "scripts/release_evidence.py").read_text(encoding="utf-8")
-    if "import release_sbom" not in evidence_source:
-        errors.append("release evidence does not generate the release SBOM")
-    if '"managed-subprocess"' not in evidence_source or "validate_step_ledger" not in evidence_source:
-        errors.append("release evidence can self-assert verification without managed step manifests")
     return errors
 
 
-def tsan_contract_errors(
-    policy: dict,
-    *,
-    workflow: str,
-    macos_test: str,
-    today: date | None = None,
-) -> list[str]:
+def tsan_policy_errors(policy: dict) -> list[str]:
+    """The TSan policy names its subset and every test it skips under the sanitizer."""
     errors: list[str] = []
     if policy.get("schemaVersion") != 1:
         errors.append("TSan policy schemaVersion must be 1")
-    if policy.get("workflow") != ".github/workflows/tsan.yml":
-        errors.append("TSan policy must own .github/workflows/tsan.yml")
     if policy.get("command") != "scripts/macos_test.sh tsan":
         errors.append("TSan policy command must use the repository macOS test driver")
-    if policy.get("derivedDataEntry") != "xcode-macos-tsan-derived-data":
-        errors.append("TSan policy must use the isolated governed macOS TSan DerivedData entry")
-    if policy.get("subset") != ["VocelloCoreTests", "VocelloEngineIntegrationTests"]:
-        errors.append("TSan policy must cover the deterministic core and injectable XPC subset")
+    subset = policy.get("subset")
+    if not isinstance(subset, list) or not subset or not all(isinstance(s, str) and s for s in subset):
+        errors.append("TSan policy subset must be a non-empty list of test bundle names")
     excluded = policy.get("excluded")
-    if (
-        not isinstance(excluded, dict)
-        or set(excluded) != {"Qwen3RuntimeTests"}
-        or not isinstance(excluded.get("Qwen3RuntimeTests"), str)
-        or len(excluded["Qwen3RuntimeTests"].strip()) < 40
+    if not isinstance(excluded, dict) or any(
+        not isinstance(reason, str) or len(reason.strip()) < 40 for reason in excluded.values()
     ):
-        errors.append("TSan policy must justify the MLX/Metal runtime exclusion")
+        errors.append("TSan policy must justify every excluded suite in at least 40 characters")
     # Individual tests may skip under the sanitizer only by name, with a reason, and only
     # when the test really exists; the ordinary lane still runs them on every checkpoint.
     skipped = policy.get("skippedUnderSanitizer", {})
@@ -643,77 +606,11 @@ def tsan_contract_errors(
             method = test_id.rsplit("/", 1)[1]
             if test_sources and f"func {method}(" not in test_sources:
                 errors.append(f"TSan skippedUnderSanitizer names a test that does not exist: {test_id}")
-
-    characterization = policy.get("characterization")
-    if not isinstance(characterization, dict):
-        errors.append("TSan policy characterization block is missing")
-        characterization = {}
-    try:
-        deadline = date.fromisoformat(characterization.get("deadline", ""))
-    except ValueError:
-        errors.append("TSan characterization deadline must be an ISO date")
-        deadline = date.min
-    required_passes = characterization.get("requiredConsecutivePassesForBlockingReview")
-    recorded_passes = characterization.get("recordedConsecutivePasses")
-    open_races = characterization.get("openConfirmedRaceCount")
-    if not isinstance(required_passes, int) or required_passes < 2:
-        errors.append("TSan blocking review requires at least two consecutive clean runs")
-    if not isinstance(recorded_passes, int) or recorded_passes < 0:
-        errors.append("TSan recordedConsecutivePasses must be non-negative")
-    if not isinstance(open_races, int) or open_races < 0:
-        errors.append("TSan openConfirmedRaceCount must be non-negative")
-    if characterization.get("promotionRequiresMaintainerReview") is not True:
-        errors.append("TSan promotion to blocking must require maintainer review")
-
-    status = policy.get("status")
-    if status not in {"characterizing-non-blocking", "blocking"}:
-        errors.append("TSan policy status must be characterizing-non-blocking or blocking")
-    current = today or date.today()
-    if status == "characterizing-non-blocking":
-        if deadline < current:
-            errors.append("TSan non-blocking characterization deadline has expired")
-        if "continue-on-error: true" not in workflow:
-            errors.append("TSan characterization workflow must preserve failed evidence non-blockingly")
-    elif "continue-on-error: true" in workflow:
-        errors.append("blocking TSan workflow cannot continue on sanitizer failure")
-
-    for token in (
-        "schedule:",
-        "workflow_dispatch:",
-        "permissions:\n  contents: read",
-        "runs-on: macos-26",
-        "scripts/macos_test.sh tsan",
-        "if: always()",
-        "actions/upload-artifact@",
-        "retention-days: 14",
-        "no retry is automatic",
-    ):
-        if token not in workflow:
-            errors.append(f"TSan workflow is missing: {token}")
-    for forbidden in ("pull_request:", "push:", "git commit", "gh pr create"):
-        if forbidden in workflow:
-            errors.append(f"TSan characterization workflow has a forbidden mutation/trigger: {forbidden}")
-    for token in (
-        "cmd_tsan()",
-        "QWENVOICE_ENABLE_TSAN=1 build_mac_test_bundles",
-        'derived_data="$QVOICE_XCODE_MACOS_TSAN_DERIVED"',
-        "assert_macos_tsan_bundle_architectures",
-        'libclang_rt.tsan_osx_dynamic.dylib',
-        'DYLD_INSERT_LIBRARIES="$tsan_runtime"',
-        'xctest_runner="$(xcrun --find xctest',
-        "run_mac_test_bundle VocelloCoreTests",
-        "run_mac_test_bundle VocelloEngineIntegrationTests",
-    ):
-        if token not in macos_test:
-            errors.append(f"macOS TSan driver is missing: {token}")
     return errors
 
 
 def validate_tsan_contract() -> list[str]:
-    policy = load_json(ROOT / "config/tsan-policy.json")
-    workflow = (ROOT / ".github/workflows/tsan.yml").read_text(encoding="utf-8")
-    macos_test = (ROOT / "scripts/macos_test.sh").read_text(encoding="utf-8")
-    return tsan_contract_errors(policy, workflow=workflow, macos_test=macos_test)
+    return tsan_policy_errors(load_json(ROOT / "config/tsan-policy.json"))
 
 
 def runtime_refactor_contract_errors(

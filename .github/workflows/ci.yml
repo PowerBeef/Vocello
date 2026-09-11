@@ -149,7 +149,7 @@ jobs:
             spm-ios-compile-${{ runner.os }}-xcode26-
 
       - name: Regenerate Xcode project
-        run: ./scripts/regenerate_project.sh
+        run: ./scripts/regenerate_project.sh --fast
 
       - name: Resolve SwiftPM dependencies
         run: |
@@ -245,7 +245,7 @@ jobs:
             spm-macos-tests-${{ runner.os }}-xcode26-
 
       - name: Regenerate Xcode project
-        run: ./scripts/regenerate_project.sh
+        run: ./scripts/regenerate_project.sh --fast
 
       - name: Check project inputs
         run: ./scripts/check_project_inputs.sh

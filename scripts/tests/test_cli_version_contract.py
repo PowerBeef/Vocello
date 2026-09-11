@@ -129,9 +129,8 @@ class CLIVersionContractTests(unittest.TestCase):
         project_gate = (ROOT / "scripts/check_project_inputs.sh").read_text(encoding="utf-8")
         self.assertIn('python3 "$SCRIPT_DIR/cli_version_contract.py" validate', project_gate)
 
-        workflow_gate = (ROOT / "scripts/check_test_workflows.sh").read_text(encoding="utf-8")
-        self.assertIn("python3 scripts/python_test_contract.py validate", workflow_gate)
-        self.assertIn("python3 -m unittest discover -s scripts/tests -p 'test_*.py'", workflow_gate)
+        self.assertIn('python3 "$SCRIPT_DIR/python_test_contract.py" validate', project_gate)
+        self.assertIn("python3 -m unittest discover -s scripts/tests -p 'test_*.py'", project_gate)
 
         ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
         self.assertIn("Verify source-built CLI version identity", ci)

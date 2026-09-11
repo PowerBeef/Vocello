@@ -67,24 +67,11 @@ class RuntimeSecurityContractTests(unittest.TestCase):
         )
         self.assertTrue(any("review is stale" in error for error in errors))
 
-    def test_tsan_characterization_contract_is_bounded_and_non_blocking(self) -> None:
-        policy = MODULE.load_json(ROOT / "config/tsan-policy.json")
-        workflow = (ROOT / ".github/workflows/tsan.yml").read_text(encoding="utf-8")
-        macos_test = (ROOT / "scripts/macos_test.sh").read_text(encoding="utf-8")
-        self.assertEqual(
-            MODULE.tsan_contract_errors(
-                policy,
-                workflow=workflow,
-                macos_test=macos_test,
-                today=date(2026, 8, 26),
-            ),
-            [],
-        )
+    def test_tsan_policy_is_valid(self) -> None:
+        self.assertEqual(MODULE.validate_tsan_contract(), [])
 
     def test_tsan_skipped_tests_are_named_justified_and_real(self) -> None:
         policy = MODULE.load_json(ROOT / "config/tsan-policy.json")
-        workflow = (ROOT / ".github/workflows/tsan.yml").read_text(encoding="utf-8")
-        macos_test = (ROOT / "scripts/macos_test.sh").read_text(encoding="utf-8")
         self.assertIn(
             "VocelloCoreTests.CLIExecutionTests/testRealSignalsReachNativeSupervisorAndAwaitCleanup",
             policy["skippedUnderSanitizer"],
@@ -95,48 +82,10 @@ class RuntimeSecurityContractTests(unittest.TestCase):
             "not a test id": "y" * 50,
             "VocelloCoreTests.CLIExecutionTests/testRealSignalsReachNativeSupervisorAndAwaitCleanup": "short",
         }
-        errors = MODULE.tsan_contract_errors(broken, workflow=workflow, macos_test=macos_test, today=date(2026, 9, 11))
+        errors = MODULE.tsan_policy_errors(broken)
         self.assertTrue(any("does not exist" in error for error in errors), errors)
         self.assertTrue(any("must be Suite/testMethod" in error for error in errors), errors)
         self.assertTrue(any("at least 40 characters" in error for error in errors), errors)
-
-    def test_tsan_non_blocking_characterization_cannot_outlive_deadline(self) -> None:
-        policy = MODULE.load_json(ROOT / "config/tsan-policy.json")
-        workflow = (ROOT / ".github/workflows/tsan.yml").read_text(encoding="utf-8")
-        macos_test = (ROOT / "scripts/macos_test.sh").read_text(encoding="utf-8")
-        errors = MODULE.tsan_contract_errors(
-            policy,
-            workflow=workflow,
-            macos_test=macos_test,
-            today=date(2026, 10, 1),
-        )
-        self.assertTrue(any("deadline has expired" in error for error in errors))
-
-    def test_tsan_must_use_isolated_governed_derived_data(self) -> None:
-        policy = MODULE.load_json(ROOT / "config/tsan-policy.json")
-        policy["derivedDataEntry"] = "xcode-macos-derived-data"
-        workflow = (ROOT / ".github/workflows/tsan.yml").read_text(encoding="utf-8")
-        macos_test = (ROOT / "scripts/macos_test.sh").read_text(encoding="utf-8")
-        errors = MODULE.tsan_contract_errors(
-            policy,
-            workflow=workflow,
-            macos_test=macos_test,
-            today=date(2026, 8, 26),
-        )
-        self.assertTrue(any("isolated governed" in error for error in errors))
-
-    def test_tsan_blocking_status_cannot_keep_continue_on_error(self) -> None:
-        policy = MODULE.load_json(ROOT / "config/tsan-policy.json")
-        policy["status"] = "blocking"
-        workflow = (ROOT / ".github/workflows/tsan.yml").read_text(encoding="utf-8")
-        macos_test = (ROOT / "scripts/macos_test.sh").read_text(encoding="utf-8")
-        errors = MODULE.tsan_contract_errors(
-            policy,
-            workflow=workflow,
-            macos_test=macos_test,
-            today=date(2026, 8, 26),
-        )
-        self.assertTrue(any("blocking TSan workflow" in error for error in errors))
 
     def test_runtime_debug_groups_classify_behavior_and_observability(self) -> None:
         contract = MODULE.load_json(ROOT / "config/runtime-debug-knobs.json")

@@ -575,7 +575,7 @@
       "scripts/evidence_impact.py",
       "scripts/tree_fingerprint.py",
       "scripts/check_project_inputs.sh",
-      "scripts/check_test_workflows.sh",
+      "scripts/repo_invariants.sh",
       "scripts/hooks/**",
       "scripts/lib/**",
       "config/evidence-impact.json",

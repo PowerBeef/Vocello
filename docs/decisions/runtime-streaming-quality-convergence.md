@@ -1,13 +1,16 @@
 ---
 status: active
 owner: backend-and-platform
+reviewed: 2026-09-12
 summary: The living convergence ADR — interprets config/runtime-refactor-contract.json (the sole phase-status authority), records the promotion history, and defines the streaming/quality invariants.
 sourceOfTruth:
   - config/runtime-refactor-contract.json
 ---
 # Runtime, streaming, and quality convergence
 
-- **Status:** Accepted; Phase 4 overall promotion passed (Phases 0–6 closed 2026-07-20; Phases 7, 8, and 14 closed 2026-07-23 by amendment). Phases 9–13 remain open.
+- **Status:** Accepted and complete — every phase is closed (the amendments below record the
+  dates; `phaseStatus` in the machine contract is the authority). The characterization gate and
+  its fixtures were retired 2026-09-12.
 - **Date:** 2026-07-20
 - **Owners:** Backend/MLX, macOS, iOS, and Release/QA
 - **Machine contract:** [`config/runtime-refactor-contract.json`](../../config/runtime-refactor-contract.json)
@@ -51,8 +54,10 @@ product sources. Its convergence direction is accepted with these corrections:
   change.
 - Clone artifacts already use schema 3, and the current first/later stream schedule already exists.
 - Disk component deduplication and in-memory decoder reuse are independent decisions.
-- Existing three-pass ASR consensus remains the promotion authority; a one-pass diagnostic cannot
-  replace it.
+- Recognizer-family consensus remains the promotion authority: the in-app three-pass Apple Speech
+  file consensus is one witness and the pinned whisper-small MLX family (`scripts/independent_asr.py`,
+  after the generator exits) is the second; two families must agree, and a single-pass diagnostic
+  cannot replace them.
 - Timing and memory thresholds remain candidate budgets until repeated clean controls establish
   measurement noise.
 
@@ -87,12 +92,13 @@ conditioning. The initial plan types are shadow-only and cannot run a second mod
 
 Correctness prerequisites landed before actor/session cutover. Plans remain in comparison-only
 shadow mode, while Custom, Design, and Clone now share the actor/classified-session/product-adapter
-source path. The named `VocelloQwen3LegacyCompatibility` SPI remains only for prepared-model
-load/prewarm and validated schema-3 conditioning adoption; it is not product generation authority.
+source path. The `VocelloQwen3LegacyCompatibility` SPI that bridged prepared-model load/prewarm and
+schema-3 conditioning adoption was retired by Phase 14b (2026-07-23); loading, priming and clone
+artifacts are actor-owned public surfaces.
 Sampling, telemetry, preview calibration, component storage, long-form, and unified quality remain
 separately promotable changes.
 
-No permanent feature flag or dual backend is introduced. Each small pull request must leave `main`
+No permanent feature flag or dual backend is introduced. Each small commit on `main` must leave `main`
 releasable and is independently revertible. Protected remote history is the rollback surface; no
 local Git bundle or migration tag is required.
 
@@ -100,7 +106,15 @@ local Git bundle or migration tag is required.
 
 Runtime behavior changes require deterministic macOS/Core/XPC tests and iOS device-SDK compilation.
 Mode cutover or shared generation changes additionally require explicit model-dependent focused and
-full macOS/physical-iPhone evidence. Ordinary commits and merges remain deterministic-only.
+full macOS/physical-iPhone evidence. Ordinary commits on `main` remain deterministic-only; push CI
+on `main` is the gate.
+
+Since the 2026-09-12 scar removal (`cb786c92`) promotion routing lives in
+`config/quality-promotion-contract.json` under `promotionRouting`: the paths changed since the
+previous release select the capability lanes a public promotion must prove, and
+`python3 scripts/quality_promotion.py classify --base <tag>` lists them. That commit also
+retired the separate evidence-impact router, the convergence promotion gate and its
+characterization fixtures.
 
 Promotion must prove ordered complete final audio, one model and product terminal, readable atomic
 WAV output, unchanged mandatory QC and language outcomes, qualified memory evidence, and no hard
@@ -113,14 +127,15 @@ than assumed from a single benchmark record.
 - Adding a second backend, permanent dual session, Simulator, or alternate UI driver.
 - Upgrading MLX dependencies during convergence.
 - Parallel model candidates, hidden retries, or hidden sampling/memory globals.
-- Buffering full long-form audio or weakening autonomous three-pass language proof.
+- Buffering full long-form audio or weakening autonomous recognizer-family language proof.
 - Promoting decoder-object reuse or a speaker evaluator without isolated evidence and resource
 qualification on the 8 GB support floor.
 
-## Implementation checkpoint
+## Implementation checkpoint (as of 2026-07-23; superseded by the amendments below and by `phaseStatus`)
 
-The machine-readable contract distinguishes implemented shipping behavior from foundations that
-must not yet be treated as product authority. At this checkpoint:
+This section is a dated snapshot. The machine-readable contract distinguished implemented shipping
+behavior from foundations that were not yet product authority; every open item below was closed by a
+later amendment in this file and by the contract's `phaseStatus` block. At that checkpoint:
 
 - XPC reserve-before-side-effects, synchronized pressure snapshots, and continuous critical-relief
   admission are implemented on the current product path.
@@ -140,9 +155,9 @@ must not yet be treated as product authority. At this checkpoint:
   Deterministic coverage includes delayed drains, receiver and producer cancellation, consumer
   failure, maximum-length ordering, bounded high-water evidence, and terminal/finalization lease
   ordering. `VocelloQwen3Engine` is the shipping generation-mutation authority; the old combined
-  event session is package-internal. QwenVoiceCore imports `VocelloQwen3LegacyCompatibility` only
-  for the remaining load/prewarm and conditioning bridge, so the actor is not yet described as the
-  sole MLX mutator. The actor correctness closure remains complete:
+  event session is package-internal. QwenVoiceCore imported `VocelloQwen3LegacyCompatibility` for
+  the load/prewarm and conditioning bridge until Phase 14b retired it (Amendment 2026-07-23c), after
+  which the actor is the sole MLX mutator. The actor correctness closure was complete:
   explicit reserved/generating/aborting ownership makes duplicate aborts join one finalization and
   rejects open after abort ownership begins; typed cache-trim/full-unload relief transfers the
   generation lease directly into critical relief and reopens admission only after that relief
@@ -164,15 +179,19 @@ must not yet be treated as product authority. At this checkpoint:
   iOS delivery. Exact verified content is published atomically, surfaced through ordinary hard
   links, and read alongside legacy schema-v1 installations. Delivery-plan resolution now
   authenticates and automatically migrates or repairs each existing installed artifact locally;
-  live all-artifact proof remains pending, and runtime component-object reuse is still a separate
-  experiment. Long-form v4 stages A–C shipped 2026-07-23: the spoken-text planner and
+  live all-artifact proof passed on 2026-07-23 (`sharedComponentStorage`), and runtime
+  component-object reuse shipped separately as Phase 9 speech-tokenizer residency (Amendment
+  2026-07-26). Long-form v4 stages A–C shipped 2026-07-23: the spoken-text planner and
   long-form planner drive segmentation, segments execute sequentially through the shipping
   streaming path with preview publication suppressed, the bounded PCM16 assembler joins the
   output, and manifest v4 (plan + execution + assembly evidence) replaces v3 writes (v3 stays
-  read-compatible). Resume/replacement and History/UI integration remain open (stages D–E).
-- The low-dependency prosody analyzer is now two-pass and bounded-memory, while the typed unified
-  quality registry remains a foundation. Existing persisted-WAV Fast QC and specialized language,
-  delivery, and prosody gates still own shipping decisions.
+  read-compatible). Resume/replacement and History/UI integration (stages D–E) followed in
+  Amendment 2026-07-23e.
+- The low-dependency prosody analyzer was already two-pass and bounded-memory, while the typed
+  unified quality registry was still a foundation; the Fast-depth registry shipped on every take
+  on 2026-07-26 and the composed canonical depth went live on the delivery bench on 2026-08-01
+  (`unifiedQuality`). Persisted-WAV Fast QC and the specialized language, delivery and prosody
+  gates remain the blocking authorities.
 - Telemetry JSONL remains schema v8 with a nested transition projection. Publication-ready
   transitions with exact MLX chunk instants publish complete `*.streaming-telemetry-v9.json`
   sidecars; those sidecars are the history authority for streaming detail. Benchmark history
@@ -184,10 +203,15 @@ must not yet be treated as product authority. At this checkpoint:
   rule. Non-blocking layer gaps (`notApplicable`,
   aggregate-only transport list, missing player render callback) may remain listed.
 
-Overall Phase 4 promotion is closed. The broader convergence program remains open for Phases
-9–13; Phases 8 and 14 (14a + 14b) closed 2026-07-23 (see the amendments below).
+Overall Phase 4 promotion is closed, and every remaining phase closed by 2026-08-01 (the amendments
+below record the dates; `phaseStatus` is the authority). The program
+is complete.
 
 ## Amendment 2026-07-22 — characterization-gate resequencing (maintainer endorsed)
+
+> Figures in the 07-22 and 07-23 amendments are the pre-2026-09-12 inverted ratio (audio ÷ wall,
+> now published as `decodeSpeedupX`, higher is faster), not the current `rtf` (wall ÷ audio, lower
+> is faster).
 
 The R1 characterization gate (backend refactor review) proved the engine innocent of the
 post-cutover canonical macOS RTF decline: interleaved CLI A/B benches across the cutover

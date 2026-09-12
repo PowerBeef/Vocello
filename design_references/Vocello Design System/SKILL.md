@@ -7,7 +7,7 @@ owner: backend-and-platform
 summary: Preserved legacy design prototype or critique; not current product guidance or acceptance.
 ---
 > **Historical reference only.** This retained prototype/review is not the current app, release
-> procedure, acceptance evidence, or asset-licensing authority. Follow root AGENTS.md, the
+> procedure, acceptance evidence, or asset-licensing authority. Follow root CLAUDE.md, the
 > current platform guide and source; do not apply its older layout or font-distribution advice.
 
 

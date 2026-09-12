@@ -59,7 +59,9 @@ remain useful for explicit offline/diagnostic paths; they are not the universal 
 
 Sampling follows the checkpoint’s official talker defaults. The Code Predictor/subtalker inherits
 the effective talker temperature, top-k, and top-p unless a controlled diagnostic override is set.
-See [`PERFORMANCE.md`](PERFORMANCE.md) for the active, diagnostic, dormant, and rejected mechanisms.
+See [`PERFORMANCE.md`](PERFORMANCE.md) for the design narrative; `RUNTIME_CAPABILITIES.json` records
+each capability's production, diagnostic, internal or retired state and `PATCHES.json` each patch's
+active, diagnostic, dormant, shared, superseded or removed state.
 
 ## Selective upstream intake
 
@@ -74,7 +76,10 @@ Future upstream intake is selective engineering, not a rebase:
 5. Run `python3 scripts/vendor_runtime_contract.py rebuild-current-inventory`. Benchmark evidence
    remains `diagnostic` or `unverified` after runtime-impacting changes until a matching clean
    record exists.
-6. Run `python3 scripts/vendor_runtime_contract.py validate` and the deterministic backend gates.
+6. Run `scripts/dev.sh check` (its contract lane runs `python3 scripts/vendor_runtime_contract.py
+   validate`) and let CI on `main` gate the push. A runtime-impacting intake needs new validated
+   benchmark records (schema v3 for generation lanes; `rtf` = wall ÷ audio, lower is faster, with `run.rtfDefinition`;
+   `toolchain.optimization` from the hash-bound build receipt) before its evidence leaves `diagnostic`.
 
 Never replace the directory wholesale, infer parity from matching filenames, or treat a newer
 upstream implementation as equivalent without the relevant deterministic and benchmark evidence.

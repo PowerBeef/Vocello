@@ -1,6 +1,7 @@
 ---
 status: active
 owner: ios
+reviewed: 2026-09-12
 summary: Staged evidence plan for whether the iPhone hardware floor can drop to 6 GB devices — kill-cheap steps, step-1 clamp result (2026-08-02), and the gates any floor move must pass.
 sourceOfTruth:
   - Sources/iOS/IOSAppBootstrap.swift
@@ -9,8 +10,9 @@ sourceOfTruth:
 # iPhone 6 GB hardware-floor feasibility — staged evidence plan
 
 > **Currency review (2026-08-27):** later diagnostic knobs do not change the production hardware
-> floor or this staged-evidence decision. App Store installation eligibility is now separately owned
-> by ASR-01; no 6 GB support claim has been made.
+> floor or this staged-evidence decision. App Store installation eligibility was aligned with the
+> runtime hardware floor by ASR-01 (closed, `config/roadmap-archive.json`); no 6 GB support claim
+> has been made.
 
 - **Status:** pre-registered 2026-08-01 (maintainer-directed). The floor does **not**
   move on simulation evidence alone; this document stages the question so each step
@@ -51,7 +53,7 @@ this decision, never canonical history.
 
 Clamped matrix on the paired iPhone 17 Pro (`iphone14pro` profile honored: headroom
 started at 3,577 MB), fp32 artifacts (conservative — f16 subtracts another ~234 MB),
-full 140-character spec text, runs `ios-engine-20260802-0104/0105/0106…`:
+full 140-character spec text, runs `ios-engine-20260802-0104`, `-0105`, `-0106` and following:
 
 | mode | peak phys footprint | worst headroom | vs ≤3,300 MB bound |
 | --- | --- | --- | --- |
@@ -73,8 +75,8 @@ way before diagnosis).
 The clamp cannot simulate A16 compute, thermals, or real-world ambient Jetsam
 pressure. Options, cheapest first: a used iPhone 15; or a TestFlight build with the
 hardware gate relaxed for a known 6 GB volunteer tester. Required evidence: the
-standard bench matrix + a long-form project on the real device — RTF ≥ 1.0× realtime
-warm on every Speed cell, thermal state ≤ serious throughout, QC clean, no memory
+standard bench matrix + a long-form project on the real device — `rtf` ≤ 1.0 (wall ÷ audio,
+i.e. `decodeSpeedupX` ≥ 1.0) warm on every Speed cell, thermal state ≤ serious throughout, QC clean, no memory
 events. iOS floors also stay honest with the existing burn-in-safe rules.
 
 ## Step 3 — the floor decision (maintainer)

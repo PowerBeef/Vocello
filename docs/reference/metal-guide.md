@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-08-29
+reviewed: 2026-09-12
 summary: Project-specific Metal reference — how MLX uses Metal for the Qwen3 engine, memory/latency implications, and direct-Metal patterns for potential future custom kernels.
 sourceOfTruth:
   - project.yml
@@ -31,7 +31,7 @@ This document covers both paths:
 2. `Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift` — cache/memory-limit policy.
 3. `Sources/QwenVoiceCore/IOSMemorySnapshot.swift` — iOS Metal memory telemetry.
 4. `Sources/QwenVoiceCore/NativeTelemetrySampler.swift` — runtime sampling of GPU allocation.
-5. `docs/reference/mlx-guide.md`, `docs/reference/ios-engine-optimization.md`, `docs/reference/swift-performance-guide.md`.
+5. `docs/reference/mlx-guide.md`, `docs/reference/swift-performance-guide.md` (and `docs/reference/ios-engine-optimization.md` as historical background only).
 6. This document.
 
 ---
@@ -490,7 +490,7 @@ This entitlement is required for Vocello iOS to load the 1.7 B model. It is self
 
 ### 10.1 Unexpectedly slow generation
 
-**Symptoms:** RTF drops, long time-to-first-audio, high CPU wait time.
+**Symptoms:** RTF rises (`rtf` = wall ÷ audio, lower is faster), long time-to-first-audio, high CPU wait time.
 
 **Likely causes:**
 
@@ -612,7 +612,7 @@ Distributed builds omit the capability.
 
 - [`mlx-guide.md`](mlx-guide.md) — MLX runtime, lazy evaluation, quantization.
 - [`swift-performance-guide.md`](swift-performance-guide.md) — Swift 6 concurrency and performance.
-- [`ios-engine-optimization.md`](ios-engine-optimization.md) — iOS-specific memory, streaming, Jetsam.
+- [`ios-engine-optimization.md`](ios-engine-optimization.md) — historical iOS memory/streaming/Jetsam program notes (current policy lives in `NativeMemoryPolicyResolver` and `.claude/rules/native.md`).
 - [`mimi-codec-guide.md`](mimi-codec-guide.md) — Neural audio codec implementation.
 - [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) — Telemetry schema and benchmarking.
 

@@ -1,4 +1,13 @@
+---
+status: historical
+owner: backend-mlx
+summary: Dated backend/MLX optimization decision ledger through 2026-08-01; its RTF figures predate the 2026-09-12 standard and use the inverted decodeSpeedupX semantics.
+---
 # Historical optimization decision ledger
+
+> **Figures here predate the 2026-09-12 RTF standard.** Every "RTF" in this ledger is the inverted ratio
+> now published as `decodeSpeedupX` (audio ÷ wall, higher is faster), not the current `rtf` (synthesis
+> wall ÷ audio, lower is faster).
 
 Durable, dated record of backend/MLX and output-quality optimization work that was investigated,
 decided, shipped, or deferred through the 2026-06-16 program and its explicitly dated follow-ups.
@@ -95,7 +104,7 @@ QC findings:
 | B | The ~586 ms "dropout" investigation | ✅ done — root-caused | this doc + `641a541` baseline note |
 | C | Punctuation-aware audioQC recalibration | ✅ done + verified | `ac86b8a` (now `GenerationOutputAdapter.swift`) |
 | D | CodePredictor RoPE fusion | ✅ **done — closed by §H P3** (`f3cd2aa`): +26%, realtime crossed | §H |
-| E | MLXSwift / mlx-swift-lm version bump (0.31.x) | ⏸ deferred — stay pinned, gated | this doc + [.claude/rules/native.md](../.claude/rules/native.md) "SPM pins move in lockstep" |
+| E | MLXSwift / mlx-swift-lm version bump | ✅ done 2026-08-01 (§Q: 0.31.6 / 3.31.4, kept after the same-day A/B) | §Q + [.claude/rules/native.md](../.claude/rules/native.md) "MLX is the only backend" (the pins move together, benchmark-gated) |
 | F | iPhone 1.7B-4bit program — feasibility + WS0b profiling + compile/KV spikes | 🔬 see §F: compile rejected; **iOS RAM premise corrected — streaming peaks ~3 GB flat, KV windowing unneeded** | this doc + session plan |
 
 ## Grounding (the headline conclusion)
@@ -333,7 +342,8 @@ dormant dev/insurance capability that activates only if the token ceiling is eve
 - Don't pipeline the autoregressive 15-pass Code Predictor loop; don't quantize TTS KV; keep macOS
   event delivery lossless. The original unbounded-stream implementation recorded by this ledger has
   since been superseded by the current bounded, measured backpressure contract; see
-  `docs/development-progress.md` rather than restoring the historical buffer choice.
+  `.claude/rules/native.md` ("Lossless core audio") and `config/runtime-refactor-contract.json`
+  rather than restoring the historical buffer choice.
 - Don't "fix" the phantom 1.7B arch bugs (projection / speaker-dim / MRoPE are correct).
 
 ## iOS (now on-device-capable — see the iOS-engine doc)
@@ -807,8 +817,8 @@ one-cell lanes (custom/long warm, identical `-O` engine code, same session):
 
 ## L — Roadmap Stage 0 measurements (2026-07-26)
 
-Stage 0 of the adopted optimization roadmap
-(`docs/reference/optimization-report-review-2026-07-25.md`) landed as four commits with the
+Stage 0 of the adopted optimization roadmap (the review of 2026-07-25, retained only in git
+history: `git show f2efacde^:docs/reference/optimization-report-review-2026-07-25.md`) landed as four commits with the
 following measured outcomes on the canonical Mac mini M2 8 GB:
 
 - **Clone reference trailing-silence append (`b16167d`).** ICL references now carry 0.5 s of
@@ -835,7 +845,7 @@ following measured outcomes on the canonical Mac mini M2 8 GB:
   published `macos-engine-20260726-054111-e95e1285` — the comparison record for post-change
   clone RTF against the `release-QA-2.2.0` band.
 
-## M — Stage 1 launch-bound program (2026-07-26, in progress)
+## M — Stage 1 launch-bound program (2026-07-26, closed the same day)
 
 Successor to the §H P0 re-capture, executing the staged roadmap's Stage 1 on the current pins.
 All measurements are -Onone CLI bench cells on the canonical Mac mini M2 8 GB; every step is
@@ -979,7 +989,8 @@ the §K 12-seed clone/long QC soak.
 ## O — Gate 0: MPP TensorOps `matmul2d` vs MLX on the M2 floor (2026-08-01)
 
 The pre-registered go/no-go from the Metal 4 feasibility study
-(`docs/reference/metal4-tensor-feasibility-2026-07-31.md`, roadmap 1.1): can
+(the Metal 4 feasibility study of 2026-07-31, git history only:
+`git show f2efacde^:docs/reference/metal4-tensor-feasibility-2026-07-31.md`; roadmap 1.1): can
 MetalPerformancePrimitives `matmul2d` reach parity with MLX's kernels at the engine's real
 batch-1 GEMM shapes on the canonical Mac mini M2 8 GB floor? **Verdict: no-go.** MPP never
 exceeds parity; where it ties, launch overhead is doing the tying. Per the
@@ -1041,7 +1052,8 @@ Gate 2 prototype from the 2026-08 roadmap's Tier 3.
 
 ## P — Delivery-fidelity and clone-fidelity diagnosis (2026-08-01)
 
-Full findings and method: `docs/reference/delivery-fidelity-report-2026-08-01.md`.
+Full findings and method: the 2026-08-01 delivery-fidelity report, git history only
+(`git show f2efacde^:docs/reference/delivery-fidelity-report-2026-08-01.md`).
 Headlines from the autonomous harness (7-seed × 18-cell paired preset matrix
 banked as `delivery-cal-s*` records; three 8-seed neutral cohorts; 6-take clone
 lane with negative controls):

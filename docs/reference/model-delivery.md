@@ -1,6 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
+reviewed: 2026-09-12
 summary: The shared model downloader — chunked-transfer defaults, iOS background session and restoration ledger, retry/cancel, verification, diagnostics, and the isolated live proof lane.
 sourceOfTruth:
   - Sources/QwenVoiceCore/HuggingFaceDownloader.swift
@@ -44,7 +45,7 @@ multi-gigabyte artifacts stay pinned to Wi-Fi even when Wi-Fi Assist would silen
 connection over LTE, which collapsed observed throughput to sub-MB/s. The allowlisted
 `diagnostics/model-downloads/` records (per-transfer task metrics including the cellular/expensive/
 constrained path flags, phase transitions, and terminal summaries) are dual-written into the
-devicectl-pullable caches mirror (`Library/Caches/Vocello/diagnostics/model-downloads/`) so download
+devicectl-pullable caches mirror (`<container>/Library/Caches/Vocello/diagnostics/model-downloads/`) so download
 behavior is triageable from the host; the App Group primary cannot be pulled.
 
 ### Cross-platform production catalog
@@ -113,7 +114,8 @@ live repository. `validate --require-complete` proves this static contract. It d
 isolated Mac/iPhone lifecycle proofs, which must be refreshed after redirect, restoration,
 delivery-routing, or shared-component changes. The current Mac proof is the 2026-08-08
 isolated `pro_custom_speed` install at the 2026.08.06.1 marking re-pin (currency note
-below); the current-generation iPhone proof is queued for the next phone window. The
+below); the current-generation iPhone proof is the 2026-08-29 acceptance run
+`ios-xcui-model-download-20260829-182534-91d70526` ("Diagnostics and acceptance" below). The
 2026-07-23 six-artifact Mac run and three-artifact iPhone run described below remain exact
 history for the prior artifact generation.
 
@@ -158,8 +160,9 @@ nominal thermal). Observed disk cost on the Mac was 12 GiB for the 16.2 GB catal
 > 29,360,042 bytes, digest `0e743d11…`) to every artifact. Fresh Mac delivery evidence
 > ran the same day: an isolated root installed `pro_custom_speed` at the new
 > 1,708,583,689-byte plan with the marking file arriving byte-exact against its pinned
-> digest, full verify + install clean, zero retries. iOS post-change delivery evidence
-> queues for the next physical-device window.
+> digest, full verify + install clean, zero retries. iOS post-change delivery evidence: the
+> 2026-08-29 acceptance run `ios-xcui-model-download-20260829-182534-91d70526` (see
+> "Diagnostics and acceptance").
 
 The iOS ledger is atomically written, versioned, and contains only privacy-safe identifiers and
 relative paths. It records the logical request, model and artifact version, expected and verified
@@ -386,8 +389,8 @@ visible progress at `1.0` rather than waiting for the one-hour outer bound. Befo
 failure, it used the visible Cancel action and confirmation again, proved Custom returned to Install,
 left the isolated root, and verified Built-in Voice, Voice Design, and Voice Cloning were still Ready
 in the canonical root with no visible progress operation. This proves the fail-closed watchdog and
-cleanup behavior; it does not clear the adopted-transfer finalization defect or provide the still-
-required three-model install/reuse/delete PASS.
+cleanup behavior; at the time it neither cleared the adopted-transfer finalization defect nor
+provided the then-required three-model install/reuse/delete PASS.
 
 The first schema-v1 correlated run,
 `ios-xcui-model-download-20260821-184903-1b372030`, then isolated a distinct progress-accounting
@@ -404,7 +407,8 @@ path emitted no structured UI observation. Terminal installs now replace the led
 retryable interrupted work still resumes; the no-advance wait is 300 seconds, captures the row,
 and returns without mutating the failed state. Host replay classifies the original first divergence
 as `queued-ledger-progress-mismatch` and records the missing observation separately instead of
-inventing an installed-but-not-Ready result. A new device run remains required for acceptance.
+inventing an installed-but-not-Ready result. The 2026-08-29 acceptance run above supplied the
+device run these 2026-08-21 records still called for; they remain failure history only.
 
 The 2026-07-14 isolated Custom Speed acceptance passed on the Mac mini M2 8 GB and physical iPhone
 17 Pro. Both transfers moved the exact 2,312,057,897 expected bytes without retry or duplicate
@@ -414,8 +418,9 @@ background/relaunch/install/visible-delete lifecycle in
 81.6 seconds and reported HTTP/2 plus HTTP/1.1 with fair thermal state. This is lifecycle evidence,
 not a performance baseline, and did not change concurrency or range-chunking defaults.
 
-The lane also enters canonical Settings before and after the isolated lifecycle and requires all
-three production models to remain installed with no visible canonical transfer in flight. The
+The lane also enters canonical Settings before and after the isolated lifecycle and requires the
+same quiescent canonical snapshot both times (each production model installed or plainly
+downloadable, no visible canonical transfer in flight). The
 debug isolation override accepts only an absolute
 diagnostic path or one safe relative leaf; traversal and nested relative paths fail closed. Only
 the managed relative leaf selects a separate app-lifetime background session, and its identifier
@@ -450,8 +455,8 @@ without more retries, duplicate bytes, thermal regression, or restoration failur
 > thermal, final integrity clean; the chunked arm also collapsed run-to-run variance from
 > ~100 s to ~2 s. A per-worker-session pilot measured within noise of the shared session
 > (30.8 s vs 28.6 s), so the shared session remains the default topology. This is the
-> evidence behind the macOS/CLI default flip; iPhone chunking remains a future device
-> experiment per the concurrency section above.
+> evidence behind the macOS/CLI default flip; the iPhone default followed on 2026-08-11 on the
+> same mechanism (see "iPhone restoration and ownership" above).
 
 Background Assets was evaluated and not adopted in this change. See
 [`../decisions/model-delivery-background-assets.md`](../decisions/model-delivery-background-assets.md).

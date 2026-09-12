@@ -10,9 +10,9 @@ sourceOfTruth:
 
 > **Living document.** A project-specific reference for the MLX runtime, the Qwen3-TTS backend, and the optimization decisions that shape Vocello's macOS/iOS engine. When this doc disagrees with the code, the code wins — fix this file.
 >
-> Last reviewed: 2026-08-19 (main-only development-policy pass; post-CP-2/MD-2 currency pass: the CP-2 marking seam only added
-> `AudioMarkingConfiguration` plumbing to the streaming-session factory, and the additive
-> `MLXAudioMark` package target changes nothing this document claims). Shipping pins: `mlx-swift` **0.31.6**, `mlx-swift-lm` **3.31.4**, `swift-transformers` **1.3.3** (direct since the lm 3.x Hub/Tokenizers externalization; 1.1.9 → 1.3.3 shipped 2026-08-05 with byte-identical English fixed-seed WAVs and the full §9.3 battery).
+> Last reviewed: 2026-09-12 (RTF = wall ÷ audio with the §7 history relabelled `decodeSpeedupX`;
+> the shipped compiled code predictor DECODE-001; the pinned `PowerBeef02` catalog; the lean
+> verification loop). Shipping pins: `mlx-swift` **0.31.6**, `mlx-swift-lm` **3.31.4**, `swift-transformers` **1.3.3** (direct since the lm 3.x Hub/Tokenizers externalization; 1.1.9 → 1.3.3 shipped 2026-08-05 with byte-identical English fixed-seed WAVs and the full §9.3 battery).
 
 ---
 
@@ -140,10 +140,10 @@ Vocello Qwen3 Core was written against the 0.30.x API. The 2026-08-01 sanctioned
 
 ### 3.4 Loading weights
 
-Models are downloaded from the Hugging Face `mlx-community` repos listed in `Sources/Resources/qwenvoice_contract.json`. Weights are stored as `.safetensors` and loaded into the owned Qwen3-TTS model. The load path:
+Models are downloaded from the six pinned `PowerBeef02/Qwen3-TTS-12Hz-1.7B-{Base,CustomVoice,VoiceDesign}-{4bit,8bit}` Hugging Face repositories recorded in `Sources/Resources/qwenvoice_contract.json` (revision, artifact version and required files are pinned there). Weights are stored as `.safetensors` and loaded into the owned Qwen3-TTS model. The load path:
 
 1. Resolve the model ID from the contract.
-2. Download / verify the package via `SwiftHuggingFace`.
+2. Download through the production catalog's exact delivery plan (generated from `config/model-artifact-receipts.json`; `swift-huggingface` 0.9.0 is only the transport) and activate only after every file's digest verifies (see [`model-delivery.md`](model-delivery.md)).
 3. Load `*.safetensors` into `MLXArray` dictionaries.
 4. Call the model initializer, which maps weights into `Linear`, `Embedding`, `LayerNorm`, `RMSNorm`, etc.
 5. If the variant is Speed/Quality, the checkpoint is already quantized; the model constructs `QuantizedLinear` layers from the packed weights, scales, and biases.
@@ -182,7 +182,7 @@ frame 1: talker -> cb0
 ...
 ```
 
-Historically the code predictor used a hand-rolled RoPE (rotate-half). Vocello replaced it with **`MLXFast.RoPE`**, which reduced the number of kernel launches per frame and improved RTF by ~26% on the native 8 GB Mac (the largest single backend win to date).
+Historically the code predictor used a hand-rolled RoPE (rotate-half). Vocello replaced it with **`MLXFast.RoPE`**, which reduced the number of kernel launches per frame and improved warm decode speedup by ~26% on the native 8 GB Mac (`decodeSpeedupX` 0.81 → 1.02; standard `rtf` ≈ 1.23 → 0.98) (the largest single backend win to date).
 
 ### 4.3 Audio decoder (Mimi codec)
 
@@ -297,7 +297,7 @@ The streaming peak is **flat with length** — short, medium, and long inputs al
 
 ### 6.1 Core audio and frontend events use different suspending contracts
 
-`MLXTTSEngine.events` is an `AsyncStream` view over a custom per-generation suspending router:
+`MLXTTSEngine.events(for:)` returns one `AsyncStream<GenerationEvent>` per generation ID over the custom suspending router:
 
 - **macOS**: capacity 256.
 - **iOS**: capacity 96 to stay bounded under the shared-process budget.
@@ -316,6 +316,11 @@ policy for audio-bearing product events.
 
 ## 7. Optimization levers and measured outcomes
 
+> **Reading the figures below.** The §7 history predates the 2026-09-12 RTF standard. Every "RTF"
+> number in §7.2–§7.5 is the old inverted decode speedup (audio ÷ wall, higher is faster), which
+> current records carry as `decodeSpeedupX`; the standard `rtf` is wall ÷ audio, lower is faster
+> (§8.2), and the two never share a comparison key. The figures are kept as recorded, relabelled.
+
 ### 7.1 Decode breakdown (where time goes)
 
 An `xctrace` capture of a long custom/Speed generation (Vocello P0, `benchmarks/OPTIMIZATION.md` §H) showed:
@@ -330,11 +335,11 @@ An `xctrace` capture of a long custom/Speed generation (Vocello P0, `benchmarks/
 
 **Interpretation:** the workload is **kernel-launch / graph-build bound**, not GPU-bound. Even inside the fused `eval()`, the GPU idles roughly half the time waiting for small batch-1 kernels to be launched. Every millisecond of Swift graph-build time removed converts roughly 1:1 to wall time.
 
-### 7.2 Fused Code-Predictor RoPE (+26% RTF)
+### 7.2 Fused Code-Predictor RoPE (+26% decode speedup, `decodeSpeedupX`)
 
 Replacing the hand-rolled rotate-half RoPE in the code predictor with `MLXFast.RoPE` eliminated ~600 kernel launches per frame. On a native 8 GB M2:
 
-- custom/speed/long warm RTF: **0.81 → 1.02**
+- custom/speed/long warm decode speedup (`decodeSpeedupX`, higher is faster; standard `rtf` ≈ 1.23 → 0.98): **0.81 → 1.02**
 - stepEval/frame: 65.8 ms → ~50 ms
 - codePred build: 16.0 ms → 11.3 ms
 
@@ -342,20 +347,30 @@ Numerics shifted by 1–2 bf16 ULPs (a precision improvement, not identical toke
 
 ### 7.3 Sampler scratch / allocator caches (~+1% wall)
 
-Cacheing dtype-keyed `-inf` rows, zero rows, EOS rows, and the code-predictor pass-0 mask removed ~17K allocations per generation. The wall-time gain is within noise on Mac (RTF 0.80 → 0.81), but the allocator-pressure reduction matters on iPhone.
+Cacheing dtype-keyed `-inf` rows, zero rows, EOS rows, and the code-predictor pass-0 mask removed ~17K allocations per generation. The wall-time gain is within noise on Mac (`decodeSpeedupX` 0.80 → 0.81), but the allocator-pressure reduction matters on iPhone.
 
-### 7.4 `compile()` on the quantized per-frame graph (tested and rejected)
+### 7.4 `compile()` with quantized parameters as `inputs:` (rejected) vs the pass-indexed compiled code predictor (shipped)
 
-Compiling the quantized talker MLP with `compile(inputs: [gate, up, down], shapeless: true)` built and ran correctly, but it **regressed warm RTF by ~5%** (0.80 → 0.76). The reason: declaring quantized parameters as `inputs:` forces `compile` to marshal their packed state (weights, scales, biases) on every call, costing more than the Swift build overhead it removes. This cost scales with the compiled region, so compiling a larger region would regress more.
+The streaming decode loop replays a per-pass compiled code predictor on every frame: the 15
+code-predictor passes are compiled once per generation per pass index
+(`Qwen3TTSCodePredictorCompiled.swift`; `PATCHES.json` DECODE-001, state `active`). The per-frame
+position sequence is identical, so the pass-indexed traces are exact and fixed-seed output stays
+byte-identical (`Qwen3CodePredictorCompiledTests`). Its same-day A/B measured +8.3% to +10.6% warm
+decode speedup with 12/12 fixed-seed byte identity; the benchmark evidence stays classed
+`diagnostic` until a clean canonical matrix upgrades it.
 
-**Lesson:** on MLX 0.30.6, `compile()` is not a free win for small, quantized, autoregressive graphs. Re-confirmed on 0.31.6 by the P1b re-test and its paired 6-seed soak (§Q: +0.74% slower on medium, 6/6 seeds).
+What remains rejected is compiling the quantized talker MLP with its packed weights declared as
+`inputs:`. `compile(inputs: [gate, up, down], shapeless: true)` built and ran correctly, but it
+**regressed warm decode speedup by ~5%** (`decodeSpeedupX` 0.80 → 0.76). The reason: declaring quantized parameters as `inputs:` forces `compile` to marshal their packed state (weights, scales, biases) on every call, costing more than the Swift build overhead it removes. This cost scales with the compiled region, so compiling a larger region would regress more.
+
+**Lesson:** on MLX 0.30.6, `compile()` is not a free win for small, quantized, autoregressive graphs when the quantized parameters are marshalled as inputs. Re-confirmed on 0.31.6 by the P1b re-test and its paired 6-seed soak (§Q: +0.74% slower on medium, 6/6 seeds). The shipped code-predictor plan avoids the cost by owning its K/V buffers and compiling per pass index instead.
 
 ### 7.5 KV cache options
 
 Vocello's default talker KV cache is unbounded `KVCacheSimple` in fp16. Two alternatives were evaluated:
 
 - **`RotatingKVCache` (sliding window)** — implemented and validated, but **inert at the current token cap**. `maxNewTokens` is 2048 and the window was 2048, so the cache never rotates. It is kept as an env-only override (`QVOICE_TALKER_KV_WINDOW`) for future token-ceiling increases.
-- **`QuantizedKVCache` (8-bit / 4-bit)** — saves ~271 MB physical footprint on clone/long, but costs **−8.6% RTF** because dequant kernels add overhead on a launch-bound decode. It is kept as a dev-only knob (`QVOICE_TALKER_KV_QUANT=8|4`), default off.
+- **`QuantizedKVCache` (8-bit / 4-bit)** — saves ~271 MB physical footprint on clone/long, but costs **−8.6% decode speedup** (`decodeSpeedupX`) because dequant kernels add overhead on a launch-bound decode. It is kept as a dev-only knob (`QVOICE_TALKER_KV_QUANT=8|4`), default off.
 
 Neither is shipped on any tier because the iOS streaming peak is already ~3 GB and 0 trims.
 
@@ -365,9 +380,10 @@ The smaller **0.6B Qwen3-TTS** variant was considered as the next iPhone RTF/foo
 lever but **ruled out by maintainer decision (2026-07-02)**: Voice Design is only
 available on the 1.7B model, and Vocello ships one model family (1.7B Speed 4-bit /
 Quality 8-bit) across all three modes. It is off the roadmap — do not re-open without
-a new maintainer decision. iPhone speed work targets the 1.7B variants only
-(benchmark-gated mlx-swift bumps, kernel-level work — see
-[`ios-engine-optimization.md`](ios-engine-optimization.md) §9).
+a new maintainer decision. iPhone speed work targets the 1.7B variants only (benchmark-gated
+mlx-swift bumps, kernel-level work) and is tracked in `config/roadmap.json`
+(`python3 scripts/roadmap.py status`); [`ios-engine-optimization.md`](ios-engine-optimization.md)
+is historical background.
 
 ---
 
@@ -394,13 +410,13 @@ Trace overhead is ~25%, so compare fractions, not absolute RTF.
 
 ### 8.2 Reading Vocello telemetry
 
-When telemetry is on (`QWENVOICE_DEBUG=1` or the debug toggle), each generation writes rows to `diagnostics/engine/generations.jsonl`. The key fields for MLX work are:
+When telemetry is on (`QWENVOICE_DEBUG=1` in an internal-diagnostics build), each generation writes rows to `<app-support root>/diagnostics/engine/generations.jsonl`. The key fields for MLX work are:
 
 - `timingsMS.qwen_*` — Swift-side wall-clock breakdown of the decode loop.
 - `mlxMemoryByStage` — `active` / `cache` / `peak` GPU memory at stage boundaries.
 - `chunkTimeline` — per-chunk substage timings (streaming only).
-- `derivedMetrics.realTimeFactor` — **RTF** (request wall ÷ audio; <1 = faster than real time).
-- `derivedMetrics.audioSecondsPerWallSecond` — decode-loop speedup (`xRT`, higher is faster).
+- `derivedMetrics.realTimeFactor` — **RTF** (request wall ÷ audio; lower is faster, <1 = faster than real time). Benchmark records publish it as `rtf` and declare `run.rtfDefinition` (`wall/audio`) since 2026-09-12.
+- `derivedMetrics.audioSecondsPerWallSecond` — decode-loop speedup (higher is faster); records carry it as `decodeSpeedupX`, the old inverted figure, and it is never called RTF.
 - `derivedMetrics.tokensPerSecond` — token throughput.
 - `summary.targetIntervalNS` / `effectiveIntervalNS` / `maximumDriftNS` / `maximumLatenessNS` — sampler cadence, observed interval, and anchored scheduling phase error/lateness.
 - `summary.missedPeriodicDeadlineCount` — cadence deadlines skipped instead of issuing misleading burst catch-up samples.
@@ -430,6 +446,12 @@ See [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) for the ful
 - `mlx-swift-lm`: exact **3.31.4** in `Packages/VocelloQwen3Core/Package.swift`
 - `swift-transformers`: exact **1.3.3** in `Packages/VocelloQwen3Core/Package.swift` — the app-supplied
   Hub/Tokenizers implementation required since mlx-swift-lm 3.x
+- `swift-huggingface`: exact **0.9.0** in `project.yml` and `Packages/VocelloQwen3Core/Package.swift`
+  (model download transport)
+- `GRDB.swift`: exact **7.10.0** in `project.yml` (app only)
+
+These are the five coordinated exact pins that `config/swift-dependency-update-policy.json` binds
+and §9.4 watches.
 
 Move the mlx pair in lockstep; review the swift-transformers pin in the same change. Do not float one without the others. mlx-swift ≥0.31 ships a `CudaBuild` build-tool plugin that cannot be fingerprint-approved headlessly; `xcb_run` (scripts/lib/build_cache.sh) passes `-skipPackagePluginValidation` unconditionally with the reviewed justification recorded in its header.
 
@@ -446,19 +468,31 @@ Only upgrade when:
 1. Obtain explicit maintainer authorization, confirm the checkout is on `main`, and require the
    pin-owned files to be clean. Do not create or use another branch for the experiment.
 2. Update both pin sites simultaneously:
-   - `project.yml` → `mlx-swift` pin
-   - `Packages/VocelloQwen3Core/Package.swift` → `mlx-swift-lm` and `mlx-swift` pins
-3. Run `./scripts/regenerate_project.sh`.
+   - `project.yml` → `mlx-swift` and `swift-huggingface` pins
+   - `Packages/VocelloQwen3Core/Package.swift` → `mlx-swift`, `mlx-swift-lm`, `swift-huggingface`
+     and `swift-transformers` pins
+3. Run `./scripts/regenerate_project.sh` (regenerate only; `--fast` is the historical spelling of
+   that default, `--verify` also runs the contract gate afterwards).
 4. Build both foundation targets:
    ```sh
    ./scripts/build_foundation_targets.sh macos
    ./scripts/build_foundation_targets.sh ios
    ```
-5. Run a fixed-seed `vocello bench`; compare its generated registry entry with the nearest
-   compatible clean run in `benchmarks/HISTORY.md`, and require the applicable automated
-   language/prosody evidence. Optional listening may be annotated independently.
-6. Keep the bump only if RTF, memory, and audioQC are unchanged or improved.
-7. If anything regresses, document the blocker and revert.
+5. Run `scripts/dev.sh check` (advisory) and let CI on `main` gate the push; `scripts/dev.sh ci`
+   reproduces push CI serially.
+6. Build the CLI optimized (`scripts/build.sh cli-optimized`) and run a fixed-seed `vocello bench` on
+   a quiet host (`require_quiet_host` refuses a loaded one; the gate bench compares medians of three
+   warm takes and reports a loaded or throttled host as inconclusive, exit 3). Compare the generated
+   registry entry (schema v3 for generation records) with the nearest compatible clean run in `benchmarks/HISTORY.md`: `rtf`
+   is wall ÷ audio (lower is faster) and is declared through `run.rtfDefinition`; `decodeSpeedupX`
+   is the old inverted figure and never shares a comparison key with `rtf`; `toolchain.optimization`
+   comes from the hash-bound build receipt via `scripts/lib/build_provenance.py`, never a literal.
+7. Require the applicable automated language/prosody evidence, naming its recognizer family:
+   Apple Speech in the iPhone app, the pinned whisper-small MLX producer
+   (`scripts/independent_asr.py`) on the Mac after the generator has exited; two families for
+   consensus. Optional listening is annotation only, with no lane.
+8. Keep the bump only if `rtf`, memory, and audioQC are unchanged or improved.
+9. If anything regresses, document the blocker and revert.
 
 ### 9.4 Scheduled release and advisory watch
 
@@ -494,8 +528,8 @@ Do not regress these without a maintainer decision:
 
 - **No hard `Memory.memoryLimit` in production.** Use `cacheLimit`, explicit clears, and pressure bands.
 - **No Quality→Speed OOM fallback.** iPhone is Speed-only by contract; load the chosen variant and surface the real error.
-- **No TTS KV quantization by default.** It saves memory but costs RTF.
-- **No `compile()` on the quantized per-frame graph.** It was measured and regressed.
+- **No TTS KV quantization by default.** It saves memory but slows decode (−8.6% `decodeSpeedupX`, §7.5).
+- **No `compile()` that declares quantized parameters as `inputs:`.** It was measured and regressed (§7.4). The pass-indexed compiled code predictor (`PATCHES.json` DECODE-001) is the shipped exception and must keep fixed-seed byte identity (`Qwen3CodePredictorCompiledTests`).
 - **No output-side silence gating.** Suppressing natural pauses masks real defects.
 - **Do not revert the input-side decoder-drift fix (`4fab110`).**
 - **Do not pipeline the 15-pass Code Predictor loop.** It is autoregressive; pipelining would change sampling semantics.
@@ -584,7 +618,7 @@ scripts/macos_test.sh profile custom:speed:
 - [Qwen3-TTS Hugging Face](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice)
 - Vocello docs:
   - [`mlx-audio-swift-patching.md`](mlx-audio-swift-patching.md)
-  - [`ios-engine-optimization.md`](ios-engine-optimization.md)
+  - [`ios-engine-optimization.md`](ios-engine-optimization.md) (historical)
   - [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md)
   - [`benchmarks/OPTIMIZATION.md`](../../benchmarks/OPTIMIZATION.md)
   - [`benchmarks/HISTORY.md`](../../benchmarks/HISTORY.md)

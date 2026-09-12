@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-09-10
+reviewed: 2026-09-12
 summary: Vocello localization architecture, String Catalog ownership, typed presentation vocabulary, literal-growth guard, and pseudo-localization acceptance.
 sourceOfTruth:
   - project.yml
@@ -137,10 +137,13 @@ it during cleanup; failed restoration is not a pass. New page IDs are
 Authorized September 10 runs exercised English/French selection, relaunch and draft preservation.
 The latest bounded run completed Default/French-Default/AX-L, but was interrupted for the phone
 deadline before AX-XXXL/pseudo acceptance. These are source-bound partial observations, not a
-passing whole-lane result; see the current development checkpoint for retained run identities.
+passing whole-lane result; the retained run identities are in the ISU-4 notes of `config/roadmap.json`
+(`python3 scripts/roadmap.py status`), and the run bundles themselves were removed by a host cleanup
+on 2026-09-11.
 
 Broad translations may be accepted only after the relevant deterministic checks, macOS smoke, and
 physical-iPhone long-string/accessibility walk pass for the exact source change. Completed
 English/French Default and AX-L Settings checks from September 10 remain historical evidence;
 AX-XXXL/pseudo navigation failures and incomplete broader accessibility coverage remain open,
-not inherited PASS for later translations. See the current development checkpoint for exact runs.
+not inherited PASS for later translations. The ISU-4 notes in `config/roadmap.json` name the exact
+runs.

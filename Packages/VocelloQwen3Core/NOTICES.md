@@ -8,8 +8,8 @@ That source is licensed under the MIT License. The complete license text is pres
 
 ## Package dependencies
 
-This source package references MLX Swift, MLX Swift LM, and Swift Hugging Face as external SwiftPM
-dependencies. Their source is not copied into this directory. Their licenses and notices are
+This source package references MLX Swift, MLX Swift LM, Swift Hugging Face and Swift Transformers as
+external SwiftPM dependencies (exact pins in `Package.swift`). Their source is not copied into this directory. Their licenses and notices are
 provided by their respective upstream distributions and resolved package checkouts.
 
 ## Models

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-09-04
+reviewed: 2026-09-12
 summary: Consolidated macOS app map — screens, elements, and options, and how XCUITest addresses each through the stable accessibility surface.
 sourceOfTruth:
   - Sources/Views
@@ -55,7 +55,7 @@ factory/engine, not the editor.
 ### Semantic state surfaces
 
 XCUITest inspects the real accessibility state. Destination containers use `screen_*`, primary
-controls expose stable identifiers, and `{mode}_readiness` values report `ready=true/false`.
+controls expose stable identifiers, and `{mode}_readiness` values report `ready=true` or `ready=false`.
 Tests assert these visible production surfaces directly.
 
 ### Built-in Voice (`sidebar_customVoice` → `screen_customVoice`)
@@ -158,7 +158,7 @@ language boundary.
 | Variation | `settings_generationVariation` (segmented: Expressive/Balanced/Consistent) |
 | Clone consent | `voiceCloning_consentAcknowledgment`; persistent and required before Clone Generate |
 | Output dir | `preferences_outputDirectory` / `preferences_browseButton` / `preferences_openFinderButton` |
-| Version label | tap 7× → toggles `QWENVOICE_DEBUG` mode |
+| Version label | read-only `version (build)` caption in the Application data row (beside `preferences_openFinderButton`); the runtime debug gate is a launch environment (`QWENVOICE_DEBUG=1`, internal-diagnostics builds only), not an in-app toggle |
 
 ### Sidebar player + engine status
 
@@ -197,7 +197,7 @@ generation-resume feature. A joined-row commit reloads the complete History proj
 ## 3. Model download management
 
 macOS has **both Speed (4-bit) and Quality (8-bit)** variants (unlike iOS Speed-only).
-Settings → Voice Models shows per-mode packages. Download via `settings_download_<id>`;
+Settings → Model downloads shows per-mode packages. Download via `settings_download_<id>`;
 cancel via `settings_cancel_<id>`; repair via `settings_repair_<id>`; a complete install whose files no longer match the pinned catalog identity shows **Update available** with `settings_update_<id>` (the same authenticated download path repairs it in place).
 
 The shared foreground downloader distinguishes queued, waiting for connectivity, downloading,
@@ -236,7 +236,7 @@ The shell harness owns deterministic proof and evidence:
 | `scripts/macos_test.sh test` | Core, XPC transport, and runtime tests; no UI driving |
 | `scripts/ui_test.sh macos smoke` | Seven ordered focused journeys (navigation/readiness, completed generation + History, mid-generation cancellation, virtual-mic recording, library surfaces, three-segment long-form project, two-line batch) with named screenshots and automatic on-failure desktop + element-tree evidence |
 | `scripts/ui_test.sh macos benchmark` | UI-driven generation matrix plus merged telemetry proof |
-| `scripts/ui_test.sh macos perf` | Nine scripted frame-health scenarios (`VocelloMacPerfUITests`) with the in-app 500 ms display-link probe, gated by `scripts/check_macos_ui_perf.py` against warn-only ceilings in `config/ui-perf-thresholds.json`; a canonical-hardware PASS publishes a `ui-perf` registry record → [`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md) |
+| `scripts/ui_test.sh macos perf` | Nine scripted frame-health scenarios (`VocelloMacPerfUITests`) with the in-app 500 ms display-link probe, gated by `scripts/check_macos_ui_perf.py` against warn-only ceilings in `config/ui-perf-thresholds.json`; a canonical-hardware PASS publishes a `ui-perf` record under `benchmarks/runs/ui-perf/` (see [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md); the August 2026 refresh that introduced the lane is recorded historically in [`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md)) |
 
 ### macOS-specific patterns (vs iOS)
 

@@ -11,9 +11,13 @@ matches the current capability sources.
 
 Model resolution includes repository revision in cache identity. Prepared loading validates the
 checkpoint once, records the required capability profile, and reuses only the immutable text
-tokenizer through a platform-bounded LRU. Every loaded model owns a fresh speech tokenizer and
-mutable decoder state; whole-decoder reuse remains a separate Phase 9 experiment and cannot bypass
-engine-operation isolation. Clone-capable profiles include learned encoders while ordinary
+tokenizer through a platform-bounded LRU. The speech tokenizer is resident across generations on
+macOS and, device-class gated (physical memory of 7 GB or more), on iOS
+(`speechTokenizerResidencySupported`; status in `config/runtime-refactor-contract.json`
+`phaseStatus.runtimeComponentReuse`; `QWENVOICE_TOKENIZER_RESIDENCY` is the registered diagnostic
+override). Residency never bypasses engine-operation isolation or reset: critical trim and full
+unload invalidate the resident cache, and every loaded model still owns its mutable decoder state.
+Clone-capable profiles include learned encoders while ordinary
 synthesis may load the decoder-only tokenizer surface. Weight materialization is batched to bound
 transient unified-memory peaks.
 

@@ -17,6 +17,24 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Documentation currency pass (September 12)
+
+After the workflow rebuild the maintainer asked whether the documentation, READMEs, rules and
+CLAUDE.md still matched it. A mechanical pass (every back-ticked path in the 68 living documents
+checked for existence, retired vocabulary counted) and a read-only audit workflow (ten slice auditors
+reading every line, an independent verifier per slice, one cross-document consistency critic) found
+217 verified discrepancies in 55 files (13 high, 73 medium, 131 low) and 58 operational facts no
+living document stated. Maintainer decisions: document the main-only reality rather than add a
+pull-request lane; make `benchmarks/OPTIMIZATION.md` historical with a `decodeSpeedupX` banner; fill
+the gaps in their owning documents. Five commits (four listed here plus this one: `9392f5c9`, `1e3dcbdd`, `e7824453`, `e34f5a66`, `__E__`) apply
+the corrections by area: entry points and permissions; workflow, testing and release guides;
+benchmarks, telemetry and CLI; audio QC, delivery and the Qwen guides; architecture, engine guides,
+decisions and ledgers. Recurrent findings were the retired verbs and receipts, `python3 -m unittest`
+as the test route, schema v2 named as current, pre-cutover speedups labelled RTF, pull-request
+vocabulary, and pointers to deleted documents or rules. Reported and left in code: the
+`sensevoice` family id in `scripts/lib/language_metrics.py` that no document names, six archive
+evidence anchors to the deleted September 6 history, and two surviving experiment branches.
+
 ### Workflow and harness scar removal (September 12)
 
 The maintainer asked whether other parts of the development workflow or the remaining test harnesses
@@ -27,7 +45,7 @@ release-time quality-promotion validation and fold path routing into its contrac
 invariants out of the source-text tests and delete every text assertion; delete the unlinked dated
 docs and mark the linked ones historical; consolidate the duplicated helpers.
 
-Five commits. `cb786c92` (+ `0327121d`) retires the evidence-impact router, the closed convergence
+Five commits. `cb786c92` (+ `0327121d`) retired the evidence-impact router, the closed convergence
 gate and characterization fixtures, five fp16-decoder research scripts, four reader-less configs and
 the tracked third-party critique; `config/quality-promotion-contract.json` now carries
 `promotionRouting` and `quality_promotion.py classify` replaces the deleted module. `72dae52c` moves
@@ -41,11 +59,11 @@ default (`--verify` runs the gate), restores `dev.sh ci` to exactly the push-CI 
 the CI cache keys from `config/toolchain.json` and corrects the skills, agents and hook wording.
 `40d03135` adds `scripts/lib/jsonio.py` (load, canonical and pretty bytes, digests, atomic writes as
 keyword options; every persisted digest re-validated byte-identical) and moves the lane scripts'
-shared shell helpers into `scripts/lib/shared.sh`. This commit rewrites CONTRIBUTING and the testing
+shared shell helpers into `scripts/lib/shared.sh`. `cb90ea89` rewrites CONTRIBUTING and the testing
 runbook to the current loop, deletes three unlinked dated docs, marks six dated docs historical,
 removes the 32 "removed 2026-09-11" stubs and corrects the release-QA, benchmarks and privacy docs.
 
-Fixed afterwards: `test_delivery_experiment_runner.py::test_screen_summary_requires_one_factor`
+Fixed afterwards: `test_delivery_experiment_runner.py::test_screen_summary_requires_one_factor_and_keeps_failures_in_denominator`
 failed once under xdist with "another generator or heavy delivery analyzer is already active"
 because `run_execution_plan` defaulted `lock_root` to the real `build/cache/delivery-analysis`
 lock and five test calls omitted it. `lock_root` is now a required keyword: the runner CLI and
@@ -157,7 +175,7 @@ fingerprint, `check_test_workflows.sh`, the documentation contract, doc metadata
 coverage and its byte budget, the project-health and Python-test contracts, the 254-path existence
 list, the workflow token assertions, seven governance test modules, the 53 pinned historical
 documents (release notes and decisions stay), and the Codex-era instruction sprawl. `CLAUDE.md` is
-under 8 KB with two rules (`native.md`, `release.md`) plus `website/CLAUDE.md`. `config/roadmap.json`
+about 9 KB with two rules (`native.md`, `release.md`) plus `website/CLAUDE.md`. `config/roadmap.json`
 now holds only open work (finished items and completed plans moved to `config/roadmap-archive.json`,
 notes capped at 1,200 characters); `docs/ROADMAP.md` lists open items with their blockers.
 
@@ -175,22 +193,23 @@ CI job on the second push after the cache save.
 ### Claude Code adoption (September 11)
 
 Claude Code replaced Codex as the development environment in six checkpointed commits on `main`
-(roadmap plan `claude-code-adoption-2026-09`, CCA-01 to CCA-12, all done and the plan complete). `AGENTS.md` became a
+(roadmap plan `claude-code-adoption-2026-09`, CCA-01 to CCA-12, all done and the plan complete). The since-retired `AGENTS.md` became a
 177-line `CLAUDE.md`; the five domain rules moved to path-scoped `.claude/rules/` with a new
 always-loaded `claude-tooling.md`; the nested website guidance became `website/CLAUDE.md`. Every gate that
 named the old files was rewired in the same commit, the Codex hook config and session-storage tooling
 were retired (runbook pinned historical), and a configuration contract validated the repository-owned
-`.claude/` files inside the project gate (retired on September 11 in favour of the hook behaviour tests). `.claude/settings.json` wires the unchanged
-commit gate plus `policy_guard.sh` (Simulator destinations, whole-cache deletion, force pushes, new
-branches, `project.pbxproj` writes, unacknowledged gate skips), `generated_file_guard.sh` (generated
-and frozen files, pinned bodies ask first), a `project.yml` regeneration reminder and a session-start
-ritual; `scripts/dev.sh status` reports branch, verification class, receipt state and primary plan.
-Seven project skills and four read-mostly subagents route to the existing scripts and documents;
-device, model and release lanes stay user-invoked only.
+`.claude/` files inside the project gate (retired on September 11 in favour of the hook behaviour tests). `.claude/settings.json` wires the commit
+lint plus `policy_guard.sh` (Simulator destinations, whole-cache deletion, force pushes, new
+branches, `project.pbxproj` writes), `generated_file_guard.sh` (refuses hand edits of generated and
+frozen files), the `project.yml` regeneration reminder and the session-start script;
+`scripts/dev.sh status` reports branch, dirty paths, the lanes `check` would run and the primary
+plan's open items. Four project skills (`/ios-lane`, `/macos-ui-lane`, `/device-diagnostics`,
+`/release-evidence`) and two read-mostly subagents (`swift-review`, `xcresult-triage`) route to the
+existing scripts and documents; device, model and release lanes stay user-invoked only.
 
-Two harness findings were recorded with evidence rather than assumed. The checkpoint receipt no longer
-binds PATH membership (`local-v3`): the hook environment lacks the plugin `bin` entries the tool shell
-appends, which made a fresh receipt read as stale. For CCA-09 the direct `xcrun xctest` runner stays:
+Two harness findings were recorded with evidence rather than assumed. The checkpoint receipt (since
+deleted) had stopped binding PATH membership (`local-v3`) because the hook environment lacks the plugin
+`bin` entries the tool shell appends, which made a fresh receipt read as stale. For CCA-09 the direct `xcrun xctest` runner stays:
 bounded `xcodebuild test-without-building` trials on the same xctestrun passed one class in 4 s but
 took 95 s for the full bundles and failed two tests that pass under the direct runner on every
 checkpoint (`CLIExecutionTests.testRealSignalsReachNativeSupervisorAndAwaitCleanup` at 31.4 s and
@@ -199,7 +218,8 @@ checkpoint (`CLIExecutionTests.testRealSignalsReachNativeSupervisorAndAwaitClean
 writes `core`, `transport` and `runtime` `test-results.json` summaries through the shared
 `scripts/lib/xctest_summary.py`, and `scripts/macos_test.sh test --coverage` is an opt-in,
 non-blocking llvm-cov export. The Python test roots are one root (`scripts/tests/`); the
-2026-08-21 omitted-tests finding was already closed, and full discovery runs every module (130 modules, 1736 declared tests; discovery ran 1736 tests in 302.029s).
+2026-08-21 omitted-tests finding was already closed, and pytest collects every module under `scripts/tests/`
+(the 302 s unittest discovery figure recorded then is superseded by the ~90 s pytest run).
 
 Follow-ups scheduled, not started: TSan characterization before its 2026-09-30 deadline
 (`config/tsan-policy.json`, one of three consecutive passes recorded) with `axiom:concurrency-auditor`
@@ -248,17 +268,18 @@ open items were inaccurate. What changed, all in the ledger and active docs, no 
   September 2 language run is exploratory, partial and dirty-source with every cell
   `passedWithWarnings`, no Korean), AV-09 (the controllable-clock clause is untouched). ICA-06 carries a
   maintainer-visible re-scope proposal because seed-exact reproduction is unreachable through the UI.
-- Evidence anchors that resolved to "Historical only" redirect stubs now point at the pinned
-  `development-history-2026-09-06.md` sections. `config/delivery-evaluator-v2-contract.json` names the
-  live `polyphase-kaiser5-v2` resampler instead of the retired one. The CLAUDE.md holdout invariant now
-  says where the holdout really comes from.
+- Evidence anchors that resolved to "Historical only" redirect stubs were repointed at the pinned
+  September 6 history, itself deleted on September 11 (`f2efacde`); those six archive anchors now
+  resolve only through git history. `config/delivery-evaluator-v2-contract.json` names the
+  live `polyphase-kaiser5-v2` resampler instead of the retired one. The holdout rule (now in
+  `.claude/rules/release.md`) says where the holdout really comes from.
 - Two code defects were filed, not fixed: F-25 (a busy Saved Voice store is fatal to engine
   initialization, untyped and unlocalized; the exact app+CLI coexistence F-22 was for) and F-26 (CLI
   `afplay` children outlive a signalled process, signal sources install after the task starts, and a
   failure coinciding with a signal is reported as cancelled). ISU-5 carries a note on the stacked
   App Language row layout to decide before the physical walk.
 - The September 11 host cleanup removed every retained run bundle and diagnostics directory under
-  `build/artifacts`. No run id cited in the ledger is inspectable locally and `scripts/ui_test.sh
+  `build/artifacts`. No run id cited in the ledger is inspectable locally and `scripts/ui_test.sh ios control-audit
   --resume` has nothing to validate; the 201-take campaign restarts from take 1 on the frozen source.
 
 Critical path is unchanged: ISU-4's post-ISU-5 walk, RF-13, then RF-09's freeze.

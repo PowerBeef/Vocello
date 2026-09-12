@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-08-29
+reviewed: 2026-09-12
 summary: Swift 6 language and runtime performance reference for the apps and CLI — ARC, generics, isolation, and allocation patterns as they apply to this codebase.
 sourceOfTruth:
   - project.yml
@@ -10,9 +10,8 @@ sourceOfTruth:
 
 > **Living document.** A project-specific reference for Swift 6 language and runtime performance decisions that affect Vocello's macOS app, iOS app, and `vocello` CLI. It is meant to complement the backend-focused [`mlx-guide.md`](mlx-guide.md) and the model-focused [`qwen3-tts-guide.md`](qwen3-tts-guide.md). When this doc disagrees with the code, the code wins — fix this file.
 >
-> Last reviewed: 2026-08-29. Swift version: **6.0** (`SWIFT_VERSION: "6"` in `project.yml`).
-> The latest manifest change only registers iOS support/attribution UI and resources; build
-> configuration, optimization posture, concurrency mode, and runtime performance guidance are unchanged.
+> Last reviewed: 2026-09-12 (`@Observable` store, `events(for:)`, `Memory.cacheLimit`, the current
+> verification loop). Swift version: **6.0** (`SWIFT_VERSION: "6"` in `project.yml`).
 
 ---
 
@@ -46,13 +45,15 @@ If you change any of those areas in `Sources/`, update this doc with the new rat
 | --- | --- | --- |
 | `scripts/build.sh build` | `-Onone`, incremental | Fast local dev loop. |
 | `scripts/build.sh cli` | `-Onone`, incremental | Headless CLI dev loop. |
+| `scripts/build.sh cli-optimized` | `-O` | Optimized `vocello` for benchmark and shipping-performance evidence; `toolchain.optimization` in a record comes from its hash-bound build receipt, never a literal. |
 | `scripts/release.sh` | Xcode Release defaults (`-O`, whole-module) | Signed/notarized DMG. |
+| `scripts/build.sh release` | runs `scripts/release.sh` | The same DMG build through the shared regeneration and SwiftPM caches. |
 
 The release build relies on Xcode's default Release optimization level (`-O`) and whole-module compilation. We do **not** override `SWIFT_OPTIMIZATION_LEVEL`, `SWIFT_COMPILATION_MODE`, or `GCC_OPTIMIZATION_LEVEL` in `project.yml`; the scripts pass them as build-settings overrides. This keeps `project.yml` simple and lets the release path stay at Xcode defaults.
 
 ### 2.2 Swift 6 language mode
 
-All Swift targets use `SWIFT_VERSION: "6"`. The project uses strict-concurrency-aware patterns (`Sendable`, `actor`, `@MainActor`) but does **not** set the experimental strict-concurrency build flag in `project.yml`. The compiler still enforces the Swift 6 data-race safety rules at the language level.
+All Swift targets use `SWIFT_VERSION: "6"`. App, engine and CLI targets rely on the Swift 6 language mode alone for data-race safety (`Sendable`, `actor`, `@MainActor`); only the three XCUITest bundles (`VocelloMacUITests`, `VocelloiOSUITests`, `VocelloiOSCandidateUITests`) set `SWIFT_STRICT_CONCURRENCY: complete` explicitly in `project.yml`.
 
 ### 2.3 Compilation-condition switches
 
@@ -89,13 +90,14 @@ This keeps data-race checking tractable and matches the natural boundaries of th
 
 ### 3.2 `@MainActor` and the UI
 
-`TTSEngineStore` is a `@MainActor` `ObservableObject` that bridges Combine publishers from the XPC engine into SwiftUI state:
+`TTSEngineStore` is a `@MainActor` `@Observable` class that bridges the engine's Combine publishers into SwiftUI state. It left `ObservableObject` in the 2026-08 UI review (W2-A) because the coarse object made every screen re-diff on every engine tick; with Observation, a view that reads one property re-renders only when that property changes. The Observation framework has no publishers, so the few imperative consumers subscribe to explicit Combine bridges instead of `$`-projections:
 
 ```swift
 @MainActor
-public final class TTSEngineStore: ObservableObject {
-    @Published public private(set) var snapshot: TTSEngineSnapshot
-    private var snapshotCancellable: AnyCancellable?
+@Observable
+public final class TTSEngineStore {
+    public private(set) var snapshot: TTSEngineSnapshot
+    @ObservationIgnored private var snapshotCancellable: AnyCancellable?
 
     init(engine: any MacTTSEngine) {
         ...
@@ -116,7 +118,7 @@ public final class TTSEngineStore: ObservableObject {
 
 - Every `await` on the actor is a potential suspension point.
 - The actor's executor is a single serial queue; long synchronous work inside it blocks all other callers.
-- The prewarm slot gate (`acquirePrewarmSlot` / `releasePrewarmSlot`) exists because the actor mutex alone is not enough: the prewarm body itself `await`s inside MLX, releasing actor access while the KV-cache is still mutating. See the invariant in `.claude/rules/backend-mlx.md`.
+- The prewarm slot gate (`acquirePrewarmSlot` / `releasePrewarmSlot`) exists because the actor mutex alone is not enough: the prewarm body itself `await`s inside MLX, releasing actor access while the KV-cache is still mutating. See the "Prewarm reentrancy gate" invariant in `.claude/rules/native.md`.
 
 Rule: keep actor-isolated methods short. Move heavy MLX work off the actor when possible, or design explicit gates when MLX calls suspend but must remain mutually exclusive.
 
@@ -134,7 +136,7 @@ matching registry entry. Prefer `actor`, `Mutex` (Swift 6), immutable adapters, 
 ### 3.5 `Task` and `Task.detached`
 
 - Use `Task { ... }` from `@MainActor` contexts when the work must hop off the main thread and you want structured concurrency.
-- Use `Task.detached(priority: .utility) { ... }` for long-lived background work that must outlive the initiating scope, such as draining XPC event streams. The XPC host drains `engine.events` on a detached utility task so the synchronous XPC encode cannot lag the producer; only `lastPublishedEvent` hops to `@MainActor`.
+- Use `Task.detached(priority: .utility) { ... }` for long-lived background work that must outlive the initiating scope, such as draining XPC event streams. The XPC host drains the per-generation stream `engine.events(for: generationID)` on a detached utility task so the synchronous XPC encode cannot lag the producer; only `lastPublishedEvent` hops to `@MainActor`.
 - Avoid `Task.sleep` busy-waiting on the hot path. The telemetry sampler uses `try? await Task.sleep(nanoseconds:)` with a device-tiered cadence (500 ms on 8 GB Mac / iPhone).
 
 ---
@@ -236,17 +238,17 @@ For synchronous functions, local values that fit in the call frame are essential
 
 ### 6.3 Closures and context allocation
 
-Non-escaping closures are stack-allocated; escaping closures are heap-allocated and reference-counted. In `TTSEngineStore.generateBatch`, the progress handler is wrapped in a `@Sendable` closure that captures a `BatchProgressRelay`. Because the relay is `final` and `@unchecked Sendable`, the closure context is heap-allocated, but the per-progress call is lightweight:
+Non-escaping closures are stack-allocated; escaping closures are heap-allocated and reference-counted. The macOS batch path shows the pattern the codebase prefers: `BatchGenerationRunner` (a `@MainActor` class in `Sources/Services`) takes its progress sinks as `@escaping @MainActor (BatchProgressSnapshot) -> Void` closures, so every UI update is already isolated to the main actor and nothing needs an `@unchecked Sendable` relay object. The engine-side `MLXTTSEngine.generateBatch(_:progressHandler:)` takes the same shape (`@MainActor (Double?, String) -> Void`). Off-main work that must not block the actor (audio QC, duration probes) hops through `Task.detached(priority: .utility)` and returns a value:
 
 ```swift
-let forwardedHandler = progressRelay.map { relay in
-    { @Sendable (fraction: Double?, message: String) in
-        relay.send(fraction, message)
-    }
+audioQualityEvaluator: @escaping (URL, Int) async -> AudioQualityGate.Report = { url, expectedPauseCount in
+    await Task.detached(priority: .utility) {
+        AudioQualityGate.evaluate(url: url, expectedPauseCount: expectedPauseCount)
+    }.value
 }
 ```
 
-`relay.send` immediately dispatches to `@MainActor`, so the heavy UI update runs on the main thread while the progress callback returns quickly on the engine thread.
+Each escaping closure context is one heap allocation per run, not per token, so the cost is not on the hot path; keep it that way by passing snapshots (value types) through the closures rather than capturing mutable `var`s.
 
 ---
 
@@ -319,7 +321,7 @@ WWDC 2025 demonstrated profiling a test from Xcode's test navigator (secondary-c
 
 ### 9.2 iOS memory policy is Swift-layer driven
 
-`NativeMemoryPolicyResolver` picks a policy per `NativeDeviceMemoryClass`. The Swift code sets MLX `GPU.cacheLimit`, clears caches, and triggers idle-unloads. The iOS `iPhonePro` tier is the most aggressive because the engine runs in-process and shares the app's Jetsam budget. Any Swift change that increases long-lived heap usage directly threatens the iOS streaming guarantee. See [`ios-engine-optimization.md`](ios-engine-optimization.md).
+`NativeMemoryPolicyResolver` picks a policy per `NativeDeviceMemoryClass`. The Swift code sets MLX `Memory.cacheLimit` in `NativeMemoryPolicyResolver.apply(_:)` (and `Memory.memoryLimit` only when the registered iPhone override supplies one), clears caches, and triggers idle-unloads. The iOS `iPhonePro` tier is the most aggressive because the engine runs in-process and shares the app's Jetsam budget. Any Swift change that increases long-lived heap usage directly threatens the iOS streaming guarantee. The 2026 iPhone program that produced these tiers is recorded historically in [`ios-engine-optimization.md`](ios-engine-optimization.md); the resolver and `.claude/rules/native.md` are the current policy.
 
 ### 9.3 Core audio and frontend events both backpressure safely
 
@@ -340,21 +342,25 @@ The prewarm slot gate in `NativeEngineRuntime` is a project-specific invariant. 
 
 ## 10. Promotion/release checklist for performance changes
 
-Ordinary development commits, pushes, pull requests, and merges use deterministic verification and
-do not wait for models, a device, or XCUITest evidence. Before promoting or releasing a
-Swift performance change, complete the deeper checklist:
+Ordinary commits and pushes on `main` use `scripts/dev.sh check` (advisory; the commit lint hook is
+the only local block) and CI on `main` as the gate; nothing waits for a model, a device, or XCUITest
+evidence. Before promoting or releasing a Swift performance change, complete the deeper checklist:
 
-- [ ] Build the change optimized (`scripts/release.sh` or `-O` xcodebuild), not just `-Onone`.
-- [ ] Run the relevant benchmark (`vocello bench`, `scripts/ios_device.sh bench`, or a targeted Instruments profile).
+- [ ] Build the change optimized (`scripts/build.sh cli-optimized` for the CLI, `scripts/release.sh` for the apps), not just `-Onone`.
+- [ ] Run the relevant benchmark (`vocello bench`, `scripts/ios_device.sh bench`, or a targeted Instruments profile) on a quiet host: timing lanes refuse a loaded host (`require_quiet_host`), and the gate bench compares medians of three warm takes and reports a loaded or throttled host as inconclusive (exit 3), never as pass or fail.
+- [ ] Publish only validated records (schema v3 for generation lanes): `rtf` is wall ÷ audio (lower is faster) and is declared through `run.rtfDefinition`; `decodeSpeedupX` is the old inverted figure and never shares a comparison key with `rtf`; `toolchain.optimization` comes from the hash-bound build receipt via `scripts/lib/build_provenance.py`.
 - [ ] Compare telemetry KPIs: `realTimeFactor` (lower is faster), `tokensPerSecond`, process-owned
       physical-footprint peak, `maximumDelayedHeartbeatMS`, and heartbeat coverage.
 - [ ] Check for new `swift_retain` / `swift_release` hot spots in Time Profiler.
 - [ ] On iOS, confirm memory stays flat with length and no trims appear.
-- [ ] Run `./scripts/check_project_inputs.sh`.
+- [ ] Run `scripts/dev.sh check` (or `scripts/dev.sh ci` for the full push-CI list, serially).
 - [ ] When explicit frontend acceptance is requested, run the isolated UI lane:
       `scripts/ui_test.sh macos smoke`. Its absence never blocks promotion or release packaging.
 - [ ] For audio-output changes, require clean deterministic QC plus the applicable fixed-seed
-      language/prosody gates; optional listening is annotation only.
+      language/prosody gates. Language verdicts name their recognizer family: Apple Speech in the
+      iPhone app, the pinned whisper-small MLX producer (`scripts/independent_asr.py`) on the Mac after
+      the generator has exited; one family is one witness and two must agree for consensus. Listening
+      is optional annotation with no lane and never clears a machine failure.
 
 ---
 
@@ -362,7 +368,7 @@ Swift performance change, complete the deeper checklist:
 
 - [`mlx-guide.md`](mlx-guide.md) — MLX runtime, lazy evaluation, streams, quantization.
 - [`qwen3-tts-guide.md`](qwen3-tts-guide.md) — model architecture, generation modes, parameters.
-- [`ios-engine-optimization.md`](ios-engine-optimization.md) — iPhone memory and streaming specifics.
+- [`ios-engine-optimization.md`](ios-engine-optimization.md) — historical iPhone memory/streaming program notes (current policy lives in `NativeMemoryPolicyResolver` and `.claude/rules/native.md`).
 - [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) — telemetry schema and benchmark procedure.
 - [`CLAUDE.md`](../../CLAUDE.md) — build system, architecture, and critical invariants.
 - Apple: [Explore Swift performance (WWDC 2024)](https://developer.apple.com/videos/play/wwdc2024/10217)

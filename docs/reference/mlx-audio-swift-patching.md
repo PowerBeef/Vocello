@@ -1,6 +1,7 @@
 ---
 status: active
 owner: backend-mlx
+reviewed: 2026-09-12
 summary: Maintaining the owned Qwen3 core package — first-party monorepo posture, facade vs compatibility identities, and the vendor-runtime contract that guards the boundary.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Package.swift
@@ -74,19 +75,21 @@ read-only for comparison; it is not a development branch or an alternate source 
 2. Never rebuild the immutable import inventory merely to record a newer review point.
 3. Port selected changes as isolated commits and update the capability contract. Rebuild the
    baseline only for an explicitly approved new import lineage.
-4. Regenerate the Xcode project when products or dependencies change.
-5. Run:
-
-```sh
-python3 scripts/vendor_runtime_contract.py validate
-./scripts/check_project_inputs.sh
-scripts/macos_test.sh test
-./scripts/build_foundation_targets.sh macos
-./scripts/build_foundation_targets.sh ios
-```
+4. Regenerate the Xcode project when products or dependencies change:
+   `./scripts/regenerate_project.sh` regenerates only (`--fast` is the historical spelling of that
+   default); `--verify` also runs the contract gate afterwards.
+5. Run `scripts/dev.sh check` (advisory: lint, contracts, selected tests and the native lanes the
+   dirty tree touches; `python3 scripts/vendor_runtime_contract.py validate` runs inside its contract
+   lane), or `scripts/dev.sh ci` to reproduce push CI serially. Commit on `main`; the commit lint hook
+   is the only local block and CI on `main` is the gate.
 
 Model-dependent benchmarks remain explicit evidence for performance or output-quality changes;
-they are not required for documentation-only or ordinary deterministic publishing.
+they are not required for documentation-only or ordinary deterministic publishing. A measured claim
+needs a validated generation record (schema v3; `rtf` = wall ÷ audio, lower is faster, declared through `run.rtfDefinition`;
+`decodeSpeedupX` is the old inverted figure; `toolchain.optimization` comes from the hash-bound build
+receipt, never a literal), and language or prosody evidence names its recognizer family (Apple Speech
+on the iPhone, the pinned whisper-small MLX producer `scripts/independent_asr.py` on the Mac after the
+generator has exited; two families for consensus).
 
 ## Review checklist
 
@@ -96,4 +99,5 @@ they are not required for documentation-only or ordinary deterministic publishin
 - [ ] Measured claims cite a current record or carry an explicit non-current evidence class.
 - [ ] Immutable lineage and the separate upstream review point are current.
 - [ ] Package products and dependency pins still match `COMPATIBILITY.json`.
-- [ ] Deterministic gates pass without writing `.build` inside the owned package.
+- [ ] `scripts/dev.sh check` passes without writing `.build` inside the owned package, and CI on
+      `main` is green after the push.

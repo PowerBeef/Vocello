@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-02
+reviewed: 2026-09-12
 summary: System architecture — engine core, macOS XPC request lifecycle, iOS in-process lifecycle, model management, telemetry layers, and the engine invariants each surface must preserve.
 sourceOfTruth:
   - project.yml
@@ -19,7 +19,10 @@ sourceOfTruth:
 > review into SharedSupport and registers the pure macOS Design/Clone request factory with its
 > deterministic tests; engine hosting, model delivery, and runtime topology are unchanged.
 > A bounded September 4 audit correction updates the resolved swift-transformers entry below;
-> it does not represent a new whole-architecture review.
+> it does not represent a new whole-architecture review. A bounded September 12 currency pass
+> corrected the facts this document had drifted on (model repositories, persisted keys, caches,
+> caps and counts) and re-read the CI, security and release paragraph against `ci.yml`,
+> `security.yml` and `release.yml`; it is likewise not a whole-architecture review.
 
 ## TL;DR
 
@@ -40,9 +43,9 @@ One engine core (`QwenVoiceCore` / `MLXTTSEngine`) is hosted three ways:
 Platforms: macOS 26+, iOS 26+, Apple Silicon (`arm64`), Xcode 26, Swift 6. Minimum
 hardware support is an Apple Silicon Mac with 8 GB or iPhone 15 Pro or newer; canonical benchmark
 hardware is separately defined as Mac mini M2 8 GB and iPhone 17 Pro.
-Release identities live in [`project.yml`](../project.yml); at last review the
-stable macOS release is **Vocello 2.4.0** and iOS build 23 (v2.4.0) is live as a
-**public TestFlight beta** (both distribution groups).
+Release identities live in [`project.yml`](../project.yml) (currently the unpublished 3.0.0 /
+build 24 candidate); public facts live in `config/public-product-facts.json`: the stable macOS
+release is **Vocello 2.4.0** and iOS 2.4.0 is the live **public TestFlight beta**.
 
 > For repo conventions,
 > build commands, engine invariants, and release process, read [`CLAUDE.md`](../CLAUDE.md).
@@ -119,9 +122,9 @@ graph.)
 | `QwenVoiceEngineSupport` | framework.static | macOS | `QwenVoiceEngineSupport` | `com.qwenvoice.engine-support` | macOS runtime helpers + the **XPC wire protocol** (`EngineCommand`, envelopes, codec). |
 | `QwenVoiceNative` | framework.static | macOS | `QwenVoiceNative` | `com.qwenvoice.native` | macOS app-facing XPC client/coordinator/store bridging XPC to SwiftUI. |
 | `QwenVoiceEngineService` | xpc-service | macOS | `QwenVoiceEngineService` | `com.qwenvoice.app.engine-service` | Out-of-process engine host for crash isolation + memory containment. |
-| `VocelloCoreTests` | bundle.unit-test | macOS | `VocelloCoreTests` | `com.qwenvoice.core.tests` | Core semantics, typed telemetry compatibility, atomic/readable output contracts, and the 19 host-runnable Foundation-level iOS policy assertions. |
+| `VocelloCoreTests` | bundle.unit-test | macOS | `VocelloCoreTests` | `com.qwenvoice.core.tests` | Core semantics, typed telemetry compatibility, atomic/readable output contracts, and the host-runnable iOS policy assertions from `Tests/VocelloiOSLogicTests`, which this target also compiles. |
 | `VocelloiOSLogicTests` | bundle.unit-test | iOS | `VocelloiOSLogicTests` | `com.patricedery.vocello.logic-tests` | Duplicate standalone, app-host-free platform policy compile for catalog/ledger, memory, cancellation, storage gating, and privacy-safe diagnostics. Ordinary CI compiles this bundle for the physical-device SDK. Xcode 26 does not support executing a tool-hosted app-free bundle on a physical-device destination, so this target is compile-only; its shared assertions execute in `VocelloCoreTests`. |
-| `VocelloEngineIntegrationTests` | bundle.unit-test | macOS | `VocelloEngineIntegrationTests` | `com.qwenvoice.engine-integration.tests` | Injectable XPC client/transport lifecycle and correlation contracts; never launches frontend UI. |
+| `VocelloEngineIntegrationTests` | bundle.unit-test | macOS | `VocelloEngineIntegrationTests` | `com.qwenvoice.engine.integration-tests` | Injectable XPC client/transport lifecycle and correlation contracts; never launches frontend UI. |
 | `VocelloMacUITests` | bundle.ui-testing | macOS | `VocelloMacUITests` | `com.qwenvoice.app.uitests` | Explicit native-app smoke and benchmark XCUITest lanes. |
 | `VocelloiOSUITests` | bundle.ui-testing | iOS | `VocelloiOSUITests` | `com.patricedery.vocello.uitests` | Explicit paired-physical-iPhone smoke/benchmark lanes plus the isolated opt-in model-delivery lifecycle proof; never Simulator. |
 | `VocelloiOSCandidateUITests` | bundle.ui-testing | iOS | `VocelloiOSCandidateUITests` | `com.patricedery.vocello.candidateuitests` | Standalone black-box runner; no target-app dependency, no diagnostics, and no replacement of the preinstalled distribution app. |
@@ -130,7 +133,7 @@ graph.)
 
 | Layer | macOS | iOS | Development publishing policy |
 | --- | --- | --- | --- |
-| **Deterministic verification** | Core + XPC integration + `Qwen3RuntimeTests` + 19 host-runnable iOS policy assertions + app build | Project-input checks + app and standalone logic-test bundle physical-device SDK compile | Required by ordinary CI; sufficient for commit, push, pull request, and merge |
+| **Deterministic verification** | Core + XPC integration + `Qwen3RuntimeTests` + the host-runnable iOS policy assertions + app build | Project-input checks + app and standalone logic-test bundle physical-device SDK compile | Required by push CI on `main` (the gate, `CI required`); locally only `scripts/hooks/commit_lint.sh` blocks a commit and `scripts/dev.sh check` is advisory |
 | **Platform runtime gate** | `macos_test.sh gate` | `ios_device.sh gate` | Deterministic/device diagnostics; independent of XCUITest |
 | **UI regression** | `ui_test.sh macos smoke\|benchmark` XCUITest | `ui_test.sh ios smoke\|benchmark` XCUITest on a paired physical iPhone | Explicit frontend QA only; never required for publishing or packaging |
 | **Model-delivery lifecycle** | Isolated CLI install | `ui_test.sh ios model-download` on a paired physical iPhone | Opt-in diagnostic only; never part of smoke, benchmark, CI, or release |
@@ -139,6 +142,20 @@ graph.)
 
 Release packaging is deterministic and does not consume UI results. Frontend evidence remains
 platform-specific and is created only when explicitly requested.
+
+The loop around this table is short. `scripts/dev.sh check` runs lint, contracts, the selected
+tests and the native lanes the dirty tree touches, and is advisory; the only local block is
+`scripts/hooks/commit_lint.sh` (branch `main`, clean whitespace, no private path or credential).
+Push CI on `main` is the gate — `scripts/ci/classify_changes.py` routes each push into the
+`contracts`, `python`, `macos-tests`, `ios-compile` and `website` jobs and `CI required` is the
+single aggregate — and `scripts/dev.sh ci` reproduces that list serially. The timing lanes
+(`scripts/macos_test.sh gate|lang-bench|memory`, `scripts/ios_device.sh bench|lang-bench|memory|gate`
+and the XCUITest benchmark lanes) refuse to start on a busy host through `require_quiet_host`
+(load within twice the cores, no kernel memory pressure; `QVOICE_ALLOW_BUSY_HOST=1` records the
+numbers and continues). A public promotion is routed separately: `promotionRouting` in
+`config/quality-promotion-contract.json` maps the paths changed since the previous release to the
+capability lanes it must prove, and `python3 scripts/quality_promotion.py classify --base <tag>`
+lists them.
 
 **Seven shared schemes**: the five XcodeGen schemes, `QwenVoice` (macOS app + deterministic unit/integration tests), `VocelloiOS`
 (iOS app), `VocelloMacUI` (explicit macOS XCUITest), and `VocelloiOSUI` (explicit physical-device
@@ -169,7 +186,7 @@ for backend determinism. `mlx-swift` and `mlx-swift-lm` must move **in lockstep*
 is an **owned monorepo core package** under `Packages/VocelloQwen3Core/` (see
 [`reference/mlx-audio-swift-patching.md`](reference/mlx-audio-swift-patching.md)).
 
-Resolved versions (`QwenVoice.xcodeproj/.../Package.resolved`):
+Resolved versions (`QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`):
 
 | Package | Version | Role |
 | --- | --- | --- |
@@ -189,7 +206,8 @@ Resolved versions (`QwenVoice.xcodeproj/.../Package.resolved`):
 | swift-system | `1.6.4` | System types (transitive). |
 | swift-asn1 | `1.7.0` | ASN.1 parsing (transitive). |
 | EventSource | `1.4.1` | Server-sent events (transitive). |
-| yyjson | `0.12.0` | Fast JSON parser (transitive). |
+| swift-argument-parser | `1.8.2` | CLI argument parsing (transitive). |
+| swift-syntax | `603.0.2` | Macro support (transitive). |
 
 Shipped models (`Sources/Resources/qwenvoice_contract.json`): Qwen3-TTS 1.7B in
 **Speed (4-bit)** and **Quality (8-bit)** variants across three modes —
@@ -284,7 +302,9 @@ actors that own the heavy, isolated work:
 - `GenerationMode { custom, design, clone }`
 - `GenerationRequest` — `mode`, `modelID`, `text`, `outputPath`, `shouldStream`,
   `streamingInterval`, `languageHint`, `payload`, `generationID`, `seed`,
-  `variation`, plus batch (`batchIndex`/`batchTotal`).
+  `variation`, plus batch (`batchIndex`/`batchTotal`), `streamingTitle`,
+  `suppressStreamingPreview` (request-local silent generation), `captureCodecTrace`
+  (diagnostics only) and `deliveryInstructionCellID`.
   - `GenerationRequest.Payload`:
     - `.custom(speakerID:deliveryStyle:)`
     - `.design(voiceDescription:deliveryStyle:)`
@@ -397,8 +417,8 @@ record, and [`decisions/runtime-streaming-quality-convergence.md`](decisions/run
 defines the promotion boundaries. The source cutover, focused macOS plus physical-iPhone
 Custom/Design/Clone proof, clean Phase 0 controls, and the canonical matrices all passed:
 `overallPromotion: passed` (2026-07-20). Per-phase status lives solely in the contract's
-`phaseStatus` block — cite it rather than restating phase state here (the human summary is the
-phase table in [`development-progress.md`](development-progress.md)).
+`phaseStatus` block — cite it rather than restating phase state here (the human narrative is
+[`decisions/runtime-streaming-quality-convergence.md`](decisions/runtime-streaming-quality-convergence.md)).
 
 ### 4.5 Memory policy
 
@@ -498,10 +518,11 @@ once.
 `AudioQCReport` on the telemetry record.
 
 `GenerationQualityReport`, `QualityGateRegistry`, and `QualityReviewPolicy` now provide a typed,
-deterministic foundation for Fast, Standard, and Canonical gate composition. They are not the
-shipping quality authority yet: persisted Fast QC plus the existing specialized ASR, prosody,
-delivery, and benchmark validators remain authoritative until one end-to-end report/scheduler is
-cut over. The Python prosody analyzer is independently shipping algorithm v3, which uses two
+deterministic foundation for Fast, Standard, and Canonical gate composition. The Fast-depth
+registry ships on every take (2026-07-26) and the composed canonical depth runs on the delivery
+bench (2026-08-01, warn-first delivery-gate rule v1); persisted Fast QC plus the specialized ASR,
+prosody and delivery validators remain the blocking authorities — see `unifiedQuality` in
+`config/runtime-refactor-contract.json`. The Python prosody analyzer is independently shipping algorithm v3, which uses two
 bounded passes rather than a duration-sized PCM/frame matrix. Its phonation/spectral outputs are
 acoustic proxies, not calibrated emotion or clinical measures. See the
 [Audio QC engineering review](reference/audio-qc-engineering.md) for cache/resource and accuracy boundaries.
@@ -672,6 +693,11 @@ concrete type. Key iOS behaviors:
 - **Clone load profile**: `.fullCapabilities` vs `.iOSProductionDefault`
 (`.withoutCloneEncoders`) depending on the entitled memory limit.
 - **Hardware gate**: `IOSDeviceSupport.isSupportedHardware` (iPhone 15 Pro+).
+- **Ordering authorities** (2026-09-12): `IOSGenerationOwnershipAuthority`
+  (`Sources/iOSSupport/Services/`) owns generation admission, ownership and terminal ordering for
+  `TTSEngineStore`; `IOSModelDownloadCancellationSequence` records durable cancel intent before the
+  download task is cancelled (`IOSModelDownloadCoordinator`). Both are pure types covered by
+  `Tests/VocelloiOSLogicTests`.
 
 ---
 
@@ -687,8 +713,8 @@ benchmarks/quality gates (no Python, no bundled weights).
 order): the bundled resource (shipped CLI), repo-relative
 `Sources/Resources/qwenvoice_contract.json` (dev + benchmarks), next to the
 executable, then walking up from the cwd. Commands (`VocelloMain.swift`):
-`generate`, `custom`/`design`/`clone`, `batch`, `voices`, `speakers`, `models`,
-`bench`. stdout is machine-readable (a path, or JSON with `--json`); progress
+`generate`, `custom`/`design`/`clone`, `batch`, `modes`, `deliveries`, `voices`, `speakers`,
+`models`, `bench`, `version`. stdout is machine-readable (a path, or JSON with `--json`); progress
 goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
 
 ---
@@ -753,11 +779,14 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   `VoiceClipTranscriber` (on-device transcription plus privacy-safe enrollment metadata), `GenerationPersistence`
   (async GRDB writes), `LanguageSelectionPresentation`, `VoiceDesignBriefCatalog`,
   `AppGenerationTimeline` + `MainThreadStallWatchdog` (telemetry), and
-  `Database/GenerationMigrations.swift`.
+  `Sources/SharedSupport/Database/GenerationMigrations.swift`.
 - **`Sources/iOSSupport/`** is the iOS-only counterpart to macOS
   `Services/` + `QwenVoiceEngineSupport/`: runtime helpers + model wrappers
   coordinating through the **App Group** container
-  (`group.com.patricedery.vocello.shared`) and a `UserDefaults` suite.
+  (`group.com.patricedery.vocello.shared`) and a `UserDefaults` suite, plus the pure ordering
+  types the `@MainActor` iOS classes drive (`IOSGenerationOwnershipAuthority`,
+  `IOSModelDownloadCancellationSequence`, `CriticalMemoryReliefExecutor`), which is what lets
+  `Tests/VocelloiOSLogicTests` characterize them without an app host.
 - macOS uses `Sources/Services/` + the XPC stack; iOS uses `Sources/iOS/` +
   `iOSSupport/` + the in-process engine. The divergence point is exactly the
   XPC-vs-in-process choice from [§3](#3-runtime-architecture-three-engine-hosts).
@@ -786,7 +815,7 @@ table (current schema, after migrations `v1_create_generations` →
 | `voice` | text | speaker id (nullable) |
 | `emotion` | text | delivery style (nullable) |
 | `speed` | double | reserved/unused (nullable) |
-| `audioPath` | text | not null — `file://…/output.wav` |
+| `audioPath` | text | not null — absolute filesystem path of the generated WAV (`AudioService.makeOutputPath`: `<outputs>/<mode>/<yyyyMMdd_HH-mm-ss-SSS>_<text>.wav`); the outbox and enqueue state key records by it |
 | `duration` | double | seconds (nullable) |
 | `createdAt` | datetime | not null, default `CURRENT_TIMESTAMP` |
 | `longFormProjectID` | text | owning long-form plan digest; NULL for ordinary takes (v5) |
@@ -820,21 +849,24 @@ first persists a transaction containing database and pending-outbox paths, delet
 then removes outbox entries and requested WAVs; an interrupted cleanup resumes before any pending
 append can replay.
 
-**`UserDefaults` keys**: `QwenVoice.DebugModeEnabled` (debug toggle, mirrored to
-`TelemetryGate`), `vocello.voiceCloningConsent.v1` (visible Settings-owned clone-consent acknowledgment), per-mode variant choices
-(`QwenVoice.{CustomVoice,VoiceDesign,VoiceCloning}.VariantID`), and UI state
-(`QwenVoice.LastSelectedSidebarItem`, `QwenVoice.LastVoiceCloningSavedVoiceID`).
+**`UserDefaults` keys**: `vocello.voiceCloningConsent.v1` (visible Settings-owned clone-consent
+acknowledgment), per-mode variant choices (`QwenVoice.MacModelVariantPreference.<mode>`) and the
+global `QwenVoice.PreferSpeedEverywhere` override, and UI state
+(`QwenVoice.LastSelectedSidebarItem`, `QwenVoice.LastVoiceCloningSavedVoiceID`). Debug mode is not
+persisted — `DebugMode.isEnabled` reads `RuntimeDebugGate.isEnabled()` (internal-build capability
+plus `QWENVOICE_DEBUG`); `scripts/runtime_security_contract.py` rejects any persisted debug toggle.
 
 ### Repository-local generated output
 
 `config/build-output-policy.json` is the machine-readable owner and lifetime contract for native
-repository output under `build/`. Local development has two persistent Xcode platform caches,
-`build/cache/xcode/macos/` and `build/cache/xcode/ios-device/`, plus one serialized shared package
-checkout at `build/cache/xcode/source-packages/`. The owned Qwen3 Core runtime uses its separate
+repository output under `build/`. Local development has three persistent Xcode caches —
+`build/cache/xcode/macos/`, `build/cache/xcode/macos-tsan/` (nightly TSan) and
+`build/cache/xcode/ios-device/` — plus one serialized shared package checkout at
+`build/cache/xcode/source-packages/`. The owned Qwen3 Core runtime uses its separate
 policy-owned SwiftPM scratch cache and must not leave `.build` state in the source tree.
 
 Release, XcodeBuildMCP, package-resolution, CI, and compile-safety DerivedData are isolated below
-`build/scratch/`; no third persistent platform cache is permitted. Validator-owned telemetry,
+`build/scratch/`; no unregistered persistent cache is permitted. Validator-owned telemetry,
 profiles, UI results, crash data, and UUID-matched current dSYMs live below `build/artifacts/`.
 Signing, archives, exports, and packages live below `build/dist/` and are never removed by routine
 or aggressive cache cleanup. The compatibility paths `build/Vocello.app` and `build/vocello` are
@@ -885,16 +917,20 @@ as hard links. Legacy schema-v1 catalog documents remain read-compatible. Determ
 while resolving a schema-v2 delivery plan now authenticates every catalog file in an existing
 installation and automatically migrates or repairs its shared-component presentation. A failed
 local authentication contributes no reusable bytes and leaves the downloader to repair from the
-network. Live validation across all six macOS artifacts and the three iOS Speed artifacts remains
-explicit pending quality work rather than a claim made by static validation or local reconciliation.
+network. Live validation across all six macOS artifacts and the three iOS Speed artifacts passed on
+2026-07-23 (`sharedComponentStorage` in `config/runtime-refactor-contract.json`); static validation
+and local reconciliation do not by themselves re-prove it after a catalog change.
 
 The shipped model ids:
 
 | Model ID | Mode | Speed repo (4-bit) | Quality repo (8-bit) |
 | --- | --- | --- | --- |
-| `pro_custom` | Built-in Voice | `mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit` | `…-8bit` |
-| `pro_design` | Voice Design | `mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit` | `…-8bit` |
-| `pro_clone` | Voice Cloning | `mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit` | `…-8bit` |
+| `pro_custom` | Built-in Voice | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit` | `…-8bit` |
+| `pro_design` | Voice Design | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit` | `…-8bit` |
+| `pro_clone` | Voice Cloning | `PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit` | `…-8bit` |
+
+The exact pinned revisions and file digests live in `config/model-artifact-receipts.json`, from
+which the production catalog is generated.
 
 `ContractBackedModelRegistry` loads the contract and is expanded per-platform
 (`expandedForPlatform(_:deviceClass:includeBaseAliases:)`). Built-in speakers:
@@ -902,8 +938,8 @@ The shipped model ids:
 `sohee`.
 
 **iOS** also bundles `qwenvoice_ios_model_catalog.json` (an iOS-eligible subset,
-served at `bundle://vocello/ios/catalog/v1/models.json` via
-`Info.plist … QVoiceModelCatalogURL`) and `voice-previews/` (24 kHz mono Int16
+served at bundle://vocello/ios/catalog/v1/models.json, set from `project.yml`'s
+`QVOICE_IOS_DEFAULT_MODEL_CATALOG_URL` into the iOS `Info.plist` key `QVoiceModelCatalogURL`) and `voice-previews/` (24 kHz mono Int16
 WAVs named by speaker id, played by `IOSVoicePreviewPlayer`).
 
 **Download** (`Sources/QwenVoiceCore/HuggingFaceDownloader.swift`): consume the catalog's exact
@@ -917,7 +953,7 @@ verified files. Typed transient retries cover connection loss and HTTP 408/429/5
 failures remain terminal. Shared URLSession callbacks use a serial delegate queue; durable file
 staging is sequenced before terminal continuation, and cumulative progress is bounded per task while
 the exact final byte count is always delivered.
-TLS/filesystem/configuration errors fail without retry. Compact local diagnostics are capped at 60
+TLS/filesystem/configuration errors fail without retry. Compact local diagnostics are capped at 200
 records and 5 MB and contain no raw URLs or absolute paths. Downloads come from Hugging Face over
 HTTPS; **no cloud inference**. iOS catalog validation: `scripts/check_ios_catalog.sh`. Headless
 install: `vocello models install <id>` (CLI) or the app Settings UI. Full lifecycle and storage
@@ -935,8 +971,8 @@ and [`scripts/lib/test_models.sh`](../scripts/lib/test_models.sh).
 
 Telemetry is **off in production** and on only when `TelemetryGate.isEnabled` —
 resolved from `QWENVOICE_DEBUG` (1/true/on/yes) or
-`QWENVOICE_NATIVE_TELEMETRY_MODE`, then mirrored to `UserDefaults` and
-propagated to the engine over the `initialize` handshake. All diagnostic writers respect
+`QWENVOICE_NATIVE_TELEMETRY_MODE` and propagated to the engine over the `initialize` handshake
+(never persisted). All diagnostic writers respect
 `TelemetryGate.resolvedEnabled` — when the gate is off, no JSONL is appended.
 
 Environment-variable ownership is explicit. `config/runtime-debug-knobs.json` registers every
@@ -949,8 +985,9 @@ values without retaining those values. Likewise,
 `config/concurrency-safety.json` is the authoritative inventory and justification for owned
 `@unchecked Sendable` and other unsafe concurrency declarations; unregistered exceptions fail
 `scripts/runtime_security_contract.py`. Registry schema v2 also requires a current review date and
-substantive removal condition for every exception and caps unreviewed growth at the measured 40
-`@unchecked Sendable` and 9 `nonisolated(unsafe)` declarations. The scheduled CPU-focused
+substantive removal condition for every exception and caps unreviewed growth at the registered 41
+`@unchecked Sendable` and 9 `nonisolated(unsafe)` declarations (`budget` in
+`config/concurrency-safety.json`). The scheduled CPU-focused
 ThreadSanitizer subset is owned by `config/tsan-policy.json`; it covers the deterministic core and
 injectable XPC transport while MLX/Metal runtime execution stays in its single-owner deterministic
 suite. Characterization remains non-blocking only until the policy deadline and cannot become
@@ -1013,6 +1050,15 @@ envelope (`config/runtime-refactor-contract.json`, `telemetryV9`). Operational g
 publication gates continue to require telemetry v8 and benchmark-evidence v2; the v8 envelope
 remains the record of authority for the merger, validator, summarizer, and benchmark-history
 publisher.
+
+Published benchmark records follow one rule set. Generation records publish as benchmark
+history schema v3 (every take carries the quality-registry identity) and `ui-perf` records as v2;
+v1 and pre-cutover records stay valid, read-only history; since 2026-09-12 `rtf` is the
+standard real-time factor (synthesis wall ÷ audio, lower is faster), every new record declares
+`run.rtfDefinition`, the old inverted figure is published as `decodeSpeedupX`, and legacy records
+are never rewritten or compared under the new key. `toolchain.optimization` comes from the
+`last-build.json` receipt bound to the executable digest (`scripts/lib/build_provenance.py`), never
+from a literal.
 
 Retained-memory qualification is separate from Instruments profiling. The versioned
 `retained-memory-v1` policy runs fixed Custom→Design→Clone Speed/medium sequences and limits

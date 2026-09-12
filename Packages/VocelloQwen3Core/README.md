@@ -14,6 +14,8 @@ upstream model families remain recoverable from Git history or the recorded upst
 - **`MLXAudioCore`** — generation protocols and shared audio utilities.
 - **`MLXAudioCodecs`** — the Mimi codec subset used by the Qwen3 speech tokenizer.
 - **`MLXAudioTTS`** — Qwen3-TTS only.
+- **`MLXAudioMark`** — the AudioSeal audio-marking target consumed inside the package through the
+  facade (`audio-marking` capability; `PATCHES.json` MARK-001).
 - **`Qwen3RuntimeTests`** — deterministic coverage for the runtime behavior Vocello owns.
 
 There are no checked-in STT, speech-to-speech, VAD/diarization, UI, or non-Qwen TTS targets. Do not use
@@ -79,8 +81,8 @@ compatibility. They may be used inside this package, but are not the application
 boundary. The facade exposes owned Vocello contracts and opaque adapters; it does not re-export raw
 MLX or `MLXAudio*` implementation declarations.
 
-Keep MLX dependency versions synchronized with `project.yml`; see the repository backend role
-playbook for the required upgrade gates.
+Keep MLX dependency versions synchronized with `project.yml`; the lockstep rule is in
+`.claude/rules/native.md` and the pin-bump procedure in `docs/reference/mlx-guide.md` §9.
 
 ```swift
 .package(path: "Packages/VocelloQwen3Core")
@@ -91,15 +93,18 @@ targets are stricter and remain authoritative for the shipped products.
 
 ## Verification
 
-From the repository root, use the authoritative deterministic lane:
+From the repository root, run the native test lane:
 
 ```sh
-scripts/macos_test.sh test
+scripts/dev.sh test          # or: scripts/dev.sh test --all
 ```
 
-That lane runs the owned `Qwen3RuntimeTests` target in addition to Vocello's Core and XPC integration
-coverage. Model-dependent benchmark and frontend lanes remain explicit QA and are not prerequisites for
-committing or publishing ordinary development work.
+It drives `scripts/macos_test.sh test`, which runs `VocelloCoreTests`, `VocelloEngineIntegrationTests`
+and the owned `Qwen3RuntimeTests` target. `scripts/dev.sh check` is the advisory local loop (lint,
+contracts, selected tests, the native lanes the dirty tree touches); the commit lint hook is the only
+local block, and CI on `main` is the gate (`scripts/dev.sh ci` reproduces it serially). Model-dependent
+benchmark and frontend lanes remain explicit QA and are not prerequisites for committing or publishing
+ordinary development work.
 
 ## Provenance and license
 

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-09
+reviewed: 2026-09-12
 summary: Local-first privacy and on-disk storage layout on both platforms — app transfers, operating-system backups, and deletion semantics.
 sourceOfTruth:
   - Sources/SharedSupport
@@ -26,7 +26,7 @@ Installed/public macOS Release app support root:
 ~/Library/Application Support/QwenVoice/
 ```
 
-Debug builds use a separate persistent development root so models, saved voices, outputs, and `history.sqlite` survive rebuilds:
+There is no Debug build configuration. Repository-built internal-diagnostics binaries launched with the `QWENVOICE_DEBUG` runtime gate (`DebugMode.isEnabled`, resolved once at launch) use a separate persistent development root so models, saved voices, outputs, and `history.sqlite` survive rebuilds:
 
 ```text
 ~/Library/Application Support/QwenVoice-Debug/
@@ -46,9 +46,9 @@ Maintained macOS subtrees and preferences:
   `.qwenvoice-components-v1/` content-addressed store; ordinary model paths remain regular hard
   links, and component liveness is derived from strict installed manifests.
 - `.qwenvoice-downloads/` stores staged model downloads, partial files, resume data, and download-state metadata while a download is in progress.
-- `diagnostics/model-downloads/` stores allowlisted transfer/failure summaries, capped at 60 records and 5 MB; raw URLs and absolute paths are excluded.
+- `diagnostics/model-downloads/` stores allowlisted transfer/failure summaries, capped at 200 records and 5 MB; raw URLs and absolute paths are excluded.
 - `outputs/CustomVoice/`, `outputs/VoiceDesign/`, and `outputs/Clones/` store generated audio unless the user chooses a different output directory. If a user-chosen directory becomes missing or unwritable, new audio falls back to these default folders and Settings shows a warning — a generation is never lost to a vanished folder.
-- `outputs/bench-archive/<runID>/` (debug-store only; created by `vocello bench --delivery`) retains each delivery benchmark run's take WAVs and result/prosody/quality manifests as the durable measurement evidence. Local-only, never tracked or uploaded; unbounded, prune manually ([`delivery-harness.md`](delivery-harness.md) §3).
+- `outputs/bench-archive/` (one folder per run ID; debug-store only; created by `vocello bench --delivery`) retains each delivery benchmark run's take WAVs and result/prosody/quality manifests as the durable measurement evidence. Local-only, never tracked or uploaded; unbounded, prune manually ([`delivery-harness.md`](delivery-harness.md) §3).
 - `voices/` stores committed saved-voice reference assets (the source audio format plus an optional `.txt` transcript sidecar). Each voice is individually deletable; deleting a voice-bank member does not delete its siblings.
 - `voice-candidates/` privately stages saved-voice review candidates. Candidates are not listed or usable as saved voices, expire after 24 hours, and are removed on Cancel, Discard, or outside dismissal. `voice-transactions/` holds short-lived commit/replacement/delete journals; startup reconciliation restores a pre-publication replacement, completes a post-publication commit, and completes a user-confirmed delete without resurrecting it.
 - Reference-clip **recording** (macOS, 2026-06) uses two short-lived directories under the system temporary directory: `voice-clone-references/` holds the in-progress capture and `voice-enroll/` holds a stable copy while the private candidate is prepared. Both are deleted as part of enrollment/cancel; only an explicitly committed candidate moves into `voices/`.
@@ -127,9 +127,9 @@ Maintained iPhone subtrees:
 - `models/` stores verified installed model files plus the hidden catalog-v2
   `.qwenvoice-components-v1/` content-addressed store. Model-visible component paths are regular
   hard links; deletion preserves blobs still live in another strict installed manifest.
-- `downloads/ios_model_delivery_state.json` is the atomic schema-v2 delivery ledger. It stores only privacy-safe identifiers, relative paths, receipts, retry counts, byte progress, and terminal state.
+- `ios_model_delivery_state.json` under `downloads/` is the atomic schema-v2 delivery ledger. It stores only privacy-safe identifiers, relative paths, receipts, retry counts, byte progress, and terminal state.
 - `downloads/staging/` is the only iPhone delivery staging tree; it holds durable delegate files plus per-model verified files, partials, and resume data.
-- `diagnostics/model-downloads/` stores allowlisted local transfer/failure summaries, capped at 60 records and 5 MB. It excludes raw URLs, absolute paths, device identity, and user data.
+- `diagnostics/model-downloads/` stores allowlisted local transfer/failure summaries, capped at 200 records and 5 MB (the same shared store as macOS). It excludes raw URLs, absolute paths, device identity, and user data.
 - `outputs/` stores generated audio. Settings → Models & Files → "Saved outputs" optionally copies new Built-in clips
   to a user-granted Files/iCloud folder; Design/Clone copies require the iOS export purchase.
   The internal App Group copy always remains available to History. Checking/unowned access skips
@@ -232,6 +232,11 @@ relevant System Settings panes. Full permission model: [`macos-permissions.md`](
 
 Diagnostics should be user-initiated. The app may write local logs or exportable diagnostic files for model download, generation, playback, XPC, and model-admission failures, but it should not report those details over the network automatically.
 
+`scripts/privacy_scan.py` is the deterministic gate for the rules in this document. It runs inside
+`./scripts/check_project_inputs.sh` (the `contracts` lane of `scripts/dev.sh check`) and the CI
+`contracts` job, and it rejects tracked files or evidence that carry private paths, prompts,
+transcripts, credentials or raw diagnostics.
+
 When runtime telemetry is explicitly enabled, `generation-failures.jsonl` is a privacy-reduced
 schema-v3 support log capped at 200 entries and 256 KiB; schema-v2 rows remain decodable. It stores
 only an allowlisted error code and classification, known lifecycle stage and model identifier,
@@ -287,7 +292,7 @@ block byte-for-byte, so a manifest change cannot silently leave documentation st
 Repository inventory and cleanup own only the paths declared by
 `config/build-output-policy.json`. They never delete, download, install, or manage Xcode Platform
 Support, CoreSimulator runtime components, or global Xcode DerivedData. Removing all compatible iOS
-runtime components can make `generic/platform=iOS` unavailable on current Xcode 26 toolchains even
+runtime components can make the `-destination generic/platform=iOS` build destination unavailable on current Xcode 26 toolchains even
 while `xcodebuild -showsdks` still lists `iphoneos`. That state is an external toolchain issue, not
 reclaimable repository output. Use `scripts/lib/ios_platform_preflight.py check`, then make any
 multi-gigabyte component installation explicitly through Xcode Settings.

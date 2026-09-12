@@ -9,7 +9,7 @@ sourceOfTruth:
 
 > **Living document.** A project-specific reference for the Mimi-style neural audio codec used by Vocello's Qwen3-TTS backend. It focuses on the Qwen3-TTS speech tokenizer owned in `Packages/VocelloQwen3Core/`, with Kyutai's canonical Mimi as architectural background. When this doc disagrees with the code, the code wins — fix this file.
 >
-> Last reviewed: 2026-07-14. Upstream snapshot: `mlx-audio-swift` `v0.1.2` / `fcbd04d`, with Vocello-specific deltas.
+> Last reviewed: 2026-09-12. Upstream snapshot: `mlx-audio-swift` `v0.1.2` / `fcbd04d`, with Vocello-specific deltas.
 
 ---
 
@@ -176,12 +176,12 @@ The implementation lives under `Packages/VocelloQwen3Core/`. Vocello's owned run
 
 | File | Responsibility |
 | --- | --- |
-| `Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift` | Top-level tokenizer, encoder, decoder, weight sanitization. |
-| `Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSConfig.swift` | All config structs and validation. |
-| `Sources/MLXAudioCodecs/Mimi/Seanet.swift` | Generic SEANet encoder/decoder building blocks. |
-| `Sources/MLXAudioCodecs/Mimi/Quantization.swift` | `EuclideanCodebook`, `ResidualVectorQuantizer`, `SplitResidualVectorQuantizer`. |
-| `Sources/MLXAudioCodecs/Mimi/Transformer.swift` | `ProjectedTransformer`, causal attention with sliding-window KV cache. |
-| `Sources/MLXAudioCodecs/Mimi/Conv.swift` | `Conv1d`, `ConvTranspose1d`, `StreamableConv1d`, `StreamableConvTranspose1d`. |
+| `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift` | Top-level tokenizer, encoder, decoder, weight sanitization. |
+| `Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSConfig.swift` | All config structs and validation. |
+| `Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Seanet.swift` | Generic SEANet encoder/decoder building blocks. |
+| `Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Quantization.swift` | `EuclideanCodebook`, `ResidualVectorQuantizer`, `SplitResidualVectorQuantizer`. |
+| `Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Transformer.swift` | `ProjectedTransformer`, causal attention with sliding-window KV cache. |
+| `Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Conv.swift` | `Conv1d`, `ConvTranspose1d`, `StreamableConv1d`, `StreamableConvTranspose1d`. |
 
 ### 4.2 Quantization (`Quantization.swift`)
 
@@ -343,7 +343,7 @@ streaming does not treat that value as its schedule. Trade-offs:
 - **Smaller chunks** — lower latency, but more `eval()` boundaries and more opportunity for streaming-state overhead.
 - **Larger chunks** — better amortized kernel launch cost, but higher peak memory and longer time-to-first-audio.
 
-The sweet spot depends on the target device. For 8 GB Macs and iPhones, 100 is conservative. For 16 GB+ Macs, 150–300 may improve throughput without audible latency.
+These sizes apply only to the generic helper and the offline `chunkedDecode` path; production chunking is owned by the Qwen runtime schedule (`appStreamingInterval` and the mode profile, see §5.4), not by this default.
 
 ### 6.3 Causal conv efficiency
 
@@ -502,4 +502,4 @@ For short chunks, the decoder transformer and attention are the dominant cost be
 
 - Kyutai Mimi paper: *"Mimi: A Streaming Transformer-based Neural Audio Codec"* (arXiv, 2024).
 - `mlx-audio-swift` upstream: <https://github.com/Blaizzy/mlx-audio-swift>.
-- Qwen3-TTS technical report and checkpoints: <https://huggingface.co/Qwen> and <https://huggingface.co/mlx-community>.
+- Qwen3-TTS technical report: <https://huggingface.co/Qwen>. Vocello's pinned MLX checkpoints are the six `PowerBeef02/Qwen3-TTS-12Hz-1.7B-*` repositories recorded in `Sources/Resources/qwenvoice_contract.json`.

@@ -13,11 +13,11 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `release-first-3-0-2026-09` | active | release-qa | 5/13 (38%) |
-| `autonomous-validation-remediation-2026-08` | active | release-qa | 9/12 (75%) |
+| `autonomous-validation-remediation-2026-08` | active | release-qa | 9/14 (64%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 14/26 (54%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
-| `ios-control-audit-2026-08` | active | ios | 15/19 (79%) |
+| `ios-control-audit-2026-08` | active | ios | 15/20 (75%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
@@ -80,6 +80,8 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `AV-07` | in-flight | P2 — independently validate prosody thresholds | — |
 | `AV-08` | in-flight | P2 — qualify multilingual output beyond a single cohort | — |
 | `AV-09` | in-flight | P2 — make stateful physical-device lanes independently repeatable | — |
+| `AV-13` | planned | macOS XCUITest lanes for the untested identifiers (Design/Clone generation, enrollment, History actions, seed pin, downloads, batch cancel) | — |
+| `AV-14` | planned | re-baseline the benchmark harness under the standard RTF definition (consent-bound runs) | — |
 
 ### Open items in detail
 
@@ -91,6 +93,12 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 - **`AV-09`** (in-flight) — P2 — make stateful physical-device lanes independently repeatable.
   gate: Each stateful iOS UI lane must declare and preflight exact prerequisites, use a non-destructive test-owned run namespace, and keep fixture-dependent journeys separate from generic smoke; download scheduling unit tests must use a controllable clock while retaining one real-throttle integration proof. Required closure evidence: missing/present/stale prerequisite fixtures, isolated reruns without residual-state failures, unchanged fail-closed no-retry policy, and physical-device XCUITest evidence for affected lanes.
+
+- **`AV-13`** (planned) — macOS XCUITest lanes for the untested identifiers (Design/Clone generation, enrollment, History actions, seed pin, downloads, batch cancel).
+  gate: The 2026-09-11 XCUITest audit found 78 of 102 macOS accessibility identifiers never exercised. Add acceptance coverage, in the existing lane structure, for Voice Design and Voice Cloning generation through the visible controls, saved-voice enrollment (recording to enrollment and Save), History playback, export and delete, the seed pin, the Settings model download route, and batch cancel. Each lane asserts real persisted state (History rows, files) and restores user data; no hidden markers or seeded state. Validated only by an explicitly requested `scripts/ui_test.sh macos <lane>` run.
+
+- **`AV-14`** (planned) — re-baseline the benchmark harness under the standard RTF definition (consent-bound runs).
+  gate: After the 2026-09-12 harness fixes: (1) run `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` and re-save `benchmarks/baselines/mac-gate-bench.json` from a three-take run so it carries `rtfDefinition`, `rtfMAD`, n=3 and the host OS/Xcode identity; (2) one canonical `scripts/ui_test.sh macos benchmark` and one `scripts/ui_test.sh ios benchmark` run publish the first records with `run.rtfDefinition`, validate the provenance-bound optimization label, the iOS cell-length check and the sleep hold; (3) one macOS and one iOS `perf` run re-derive the warn-only thresholds under the clipped window arithmetic and the macOS environment row; (4) repin `scripts/generate_readme_charts.py` and the website chart to the new canonical macOS record. Each run needs explicit consent (model download, phone).
 
 ## Delivery instruction quality and Qwen3-TTS prompting
 
@@ -253,6 +261,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `ICA-05` | planned | Publish the evidence-linked device findings checkpoint | `ICA-04` |
 | `ICA-06` | in-flight | P1 — localize the long-Chinese non-EOS generation failure and terminal message | — |
 | `ICA-15` | in-flight | P1 — bound deterministic CustomVoice over-continuation without truncating valid speech | — |
+| `ICA-20` | planned | iOS XCUITest coverage for onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings | — |
 
 ### Open items in detail
 
@@ -267,6 +276,9 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 - **`ICA-15`** (in-flight) — P1 — bound deterministic CustomVoice over-continuation without truncating valid speech.
   gate: Preserve the exact custom-005 Eric, Calm Strong, Italian, Consistent request and independently reproduce its sampled-output failure across warm/cold and streaming/non-streaming paths. The retained codec traces, full and incremental decoder replays, final model counters, EOS/token-cap state, AudioQC, memory, and publication outcome must identify the first divergent layer. Evaluate any continuation-budget candidate on a pre-registered representative CustomVoice corpus spanning script lengths, languages, deliveries, speakers, seeds, and both output modes. A production change qualifies only if it prevents the reproduced pathological continuation without converting valid speech to token-cap/incomplete failures, worsening WER/CER or delivery evidence, changing sampling defaults, or weakening mandatory QC. If no candidate qualifies, preserve fail-closed rejection and explicit user-controlled retry; never trim, silently regenerate, or substitute a seed.
+
+- **`ICA-20`** (planned) — iOS XCUITest coverage for onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings.
+  gate: The 2026-09-11 XCUITest audit found 34 of 93 iOS identifiers never exercised: onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings. Extend the control-audit plan (`config/ios-control-audit.json`) and the smoke or control-audit classes so each control is source-bound, observed on the paired iPhone through genuine controls, and cleaned up. Replace the remaining English-label lookups (History clear and delete confirmations, seed unpin menu, Play/Pause label checks) with stable identifiers or accessibility values added in `Sources/iOS`. Validated only by an explicitly requested `scripts/ui_test.sh ios <lane>` run.
 
 ## iOS Built-in Voice startup reliability
 

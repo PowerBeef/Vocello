@@ -621,7 +621,7 @@ targets:
         MACOSX_DEPLOYMENT_TARGET: "26.0"
         CODE_SIGN_IDENTITY: "-"
         GENERATE_INFOPLIST_FILE: YES
-        SWIFT_STRICT_CONCURRENCY: minimal
+        SWIFT_STRICT_CONCURRENCY: complete
 
   # Explicit physical-device iPhone UI automation. Simulator destinations are
   # unsupported; scripts/ui_test.sh resolves and signs for the paired phone.
@@ -650,7 +650,7 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: NO
-        SWIFT_STRICT_CONCURRENCY: minimal
+        SWIFT_STRICT_CONCURRENCY: complete
         # This bundle imports StoreKitTest, whose Apple headers deprecate their
         # own API; with warnings as errors the clang module fails to build, so
         # the test bundle (never shipped) keeps warnings visible instead.
@@ -676,4 +676,4 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: NO
-        SWIFT_STRICT_CONCURRENCY: minimal
+        SWIFT_STRICT_CONCURRENCY: complete

@@ -26,7 +26,7 @@ import pathlib
 import re
 import sys
 
-CASE = re.compile(r"Test Case '-\[[\w.]+ (\w+)\]' (passed|failed|skipped) \((\d+\.\d+) seconds\)")
+CASE = re.compile(r"Test Case '-\[([\w.]+) (\w+)\]' (passed|failed|skipped) \((\d+\.\d+) seconds\)")
 EXECUTED = re.compile(r"Executed (\d+) tests?, with (?:(\d+) tests? skipped and )?(\d+) failures?")
 # A whole-bundle total follows the "All tests" suite verdict; a log that ran several
 # bundles (one xcodebuild invocation, or concatenated runs) has one per bundle.
@@ -37,7 +37,13 @@ BUNDLE_TOTAL = re.compile(
 
 def summarize(log_text: str, source: str = "") -> dict:
     tests = [
-        {"test": m.group(1), "verdict": m.group(2), "seconds": float(m.group(3))}
+        {
+            # "Module.Suite" as XCTest prints it; the bare suite is the last component.
+            "suite": m.group(1).rsplit(".", 1)[-1],
+            "test": m.group(2),
+            "verdict": m.group(3),
+            "seconds": float(m.group(4)),
+        }
         for m in CASE.finditer(log_text)
     ]
     passed = sum(1 for t in tests if t["verdict"] == "passed")
@@ -74,7 +80,7 @@ def write_summary(log_path: pathlib.Path, out_path: pathlib.Path, *, quiet: bool
     out_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if not quiet:
         for r in payload["tests"]:
-            print(f"  {r['verdict']:>6}  {r['seconds']:8.1f}s  {r['test']}")
+            print(f"  {r['verdict']:>6}  {r['seconds']:8.1f}s  {r['suite']}/{r['test']}")
         c = payload["counts"]
         print(f"  {c['passed']} passed, {c['failed']} failed, {c['skipped']} skipped, {c['total']} total -> {out_path}")
     return 0 if payload.get("consistent", True) else 3

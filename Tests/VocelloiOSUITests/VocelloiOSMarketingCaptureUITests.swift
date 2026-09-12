@@ -10,6 +10,15 @@ import XCTest
 /// Script copy must follow website/PRODUCT.md rules: local not offline, no em
 /// dashes, current preset names only.
 final class VocelloiOSMarketingCaptureUITests: VocelloiOSUITestCase {
+    /// A whole-bundle run must not turn asset captures into acceptance evidence.
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        try XCTSkipUnless(
+            ProcessInfo.processInfo.environment["QVOICE_MARKETING_CAPTURE"] == "1",
+            "marketing captures run only with QVOICE_MARKETING_CAPTURE=1"
+        )
+    }
+
     func test01_StudioCapture() {
         beginSession()
         defer { endSession() }

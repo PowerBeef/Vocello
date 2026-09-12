@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import sys
 import unittest
+import unittest.mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,6 +25,23 @@ class CoreDeviceProbeTests(unittest.TestCase):
         summary = probe.summarize_device(dev)
         self.assertTrue(summary["availableForDevelopment"])
         self.assertEqual(summary["tunnelState"], "connected")
+
+    def test_two_connected_devices_are_ambiguous_without_an_explicit_id(self) -> None:
+        data = json.loads((FIXTURES / "devicectl-list-connected.json").read_text())
+        devices = data["result"]["devices"]
+        twin = json.loads(json.dumps(devices[0]))
+        twin["identifier"] = "00000000-0000-0000-0000-000000000002"
+        devices.append(twin)
+        with self.assertRaisesRegex(probe.AmbiguousDeviceError, "QVOICE_IOS_DEVICE_ID"):
+            probe.pick_device(data, None)
+        # The explicit knob resolves it, by argument or by environment.
+        self.assertEqual(probe.pick_device(data, twin["identifier"])["identifier"], twin["identifier"])
+        import os
+        with unittest.mock.patch.dict(os.environ, {"QVOICE_IOS_DEVICE_ID": twin["identifier"]}):
+            self.assertEqual(probe.pick_device(data, None)["identifier"], twin["identifier"])
+        # A single connected phone still needs no selection.
+        devices.pop()
+        self.assertEqual(probe.pick_device(data, None)["identifier"], devices[0]["identifier"])
 
     def test_unavailable_device(self) -> None:
         data = json.loads((FIXTURES / "devicectl-list-unavailable.json").read_text())

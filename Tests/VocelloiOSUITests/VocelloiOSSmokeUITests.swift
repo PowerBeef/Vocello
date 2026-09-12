@@ -4,13 +4,6 @@ import XCTest
 /// seed adoption. A successful observation is not a speech-quality verdict.
 @MainActor
 final class VocelloiOSHistoryObservationUITests: VocelloiOSUITestCase {
-    // The async override is main-actor isolated like the class, so the session
-    // is released without crossing an isolation boundary (the synchronous
-    // tearDown is nonisolated by XCTest's declaration).
-    override func tearDown() async throws {
-        endSession()
-        try await super.tearDown()
-    }
 
     func testRetainedHistoryTranscript() throws {
         let environment = ProcessInfo.processInfo.environment
@@ -554,8 +547,14 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             },
             "Choosing a segment must visibly start the replacement generation"
         )
+        let liveCancel = element("studio_livePreview_cancel")
         XCTAssertTrue(
-            VocelloUIWait.condition("regenerated project to reassemble", timeout: 600) {
+            VocelloUIWait.progressing(
+                "regenerated project to reassemble", timeout: 600, stallBudget: 180,
+                progress: {
+                    "live=\(liveCancel.exists) chip=\(segmentsChip.exists ? segmentsChip.label : "-") player=\(completedPlayer.exists)"
+                }
+            ) {
                 completedPlayer.exists || generationError.exists
             }
         )

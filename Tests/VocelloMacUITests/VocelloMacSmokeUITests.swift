@@ -52,8 +52,12 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: generateAll, timeout: 20))
 
         let done = button("batch_doneButton")
+        let statusList = element("batch_itemStatusList")
         XCTAssertTrue(
-            VocelloUIWait.condition("line batch to settle", timeout: 600) {
+            VocelloUIWait.progressing(
+                "line batch to settle", timeout: 600, stallBudget: 180,
+                progress: { statusList.exists ? "\(statusList.label)|\(statusList.value ?? "")" : "no-status-list" }
+            ) {
                 done.exists && done.isEnabled
             }
         )

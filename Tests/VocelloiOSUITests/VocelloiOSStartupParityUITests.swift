@@ -130,11 +130,7 @@ final class VocelloiOSStartupParityUITests: VocelloiOSUITestCase {
 
     private func reveal(_ identifier: String) -> XCUIElement {
         let target = element(identifier)
-        for _ in 0..<12 {
-            if target.exists && target.isHittable { return target }
-            app.swipeUp()
-        }
-        XCTAssertTrue(target.exists && target.isHittable, "Could not reveal \(identifier)")
+        VocelloUIScroll.reveal(target, in: app, maxAttempts: 12)
         return target
     }
 

@@ -3551,7 +3551,7 @@
 				PRODUCT_NAME = VocelloiOSUITests;
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
-				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_TREAT_WARNINGS_AS_ERRORS = NO;
 				SWIFT_VERSION = 6;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -3600,7 +3600,7 @@
 				PRODUCT_NAME = VocelloiOSCandidateUITests;
 				SDKROOT = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
-				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
@@ -3698,7 +3698,7 @@
 				PRODUCT_MODULE_NAME = VocelloMacUITests;
 				PRODUCT_NAME = VocelloMacUITests;
 				SDKROOT = macosx;
-				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_VERSION = 6;
 				TEST_TARGET_NAME = QwenVoice;
 			};

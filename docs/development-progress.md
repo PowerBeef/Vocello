@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-11
+reviewed: 2026-09-12
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -16,6 +16,41 @@ Checkpoints older than the ones below live in git history (`git log -p -- docs/d
 last full copy at commit 25a895ed).
 
 ## Resume now
+
+### Benchmark harness and XCUITest review (September 11 to 12)
+
+Three read-only audits of the XCUITest suites (20 files, 7,747 lines), the benchmark harness
+(~18k lines of scripts) and the 291 published records answered the maintainer's question "is the
+benchmarking accurate, and does it cover CLI- and UI-driven runs on both platforms?" with: the harness
+exists on every axis and its design is sound (no clocks in the UI tests, monotonic in-app telemetry,
+three-layer authority on macOS, uptime-paired memory, hash-bound `-O` provenance on the macOS CLI), but
+the published numbers were not accurate. Two RTF definitions shared one key (decode-loop speedup in UI
+records, end-to-end audio/wall in CLI records, 10 to 28 % apart), bench wall time came from `Date()`,
+iOS optimization labels were literals, and the gate bench judged single takes at a flat 5 % without
+looking at host load. The maintainer decided to adopt the industry-standard RTF from now on.
+
+Commits so far: `458a7410` makes `rtf` the standard real-time factor (engine request wall ÷ audio,
+lower is faster) on every surface, derived from the engine's monotonic stage recorder as
+`requestWallSeconds` / `realTimeFactor`; the decode speedup survives as `decodeSpeedupX`, UI records add
+`rtfAppEndToEnd`, records declare `run.rtfDefinition`, legacy records are never rewritten and render a
+derived `~` value, comparison lineages never mix, the README and website charts moved to the newest
+canonical record (`0b234262`) with generated alt text and a stale-pin check. `7c2f9af2` binds every
+optimization label to a build receipt that names the executable and its digest
+(`scripts/lib/build_provenance.py`), makes `ios_device.sh bench` build `-O` and poll only the completion
+sentinel, stamps the CLI's own digest into `bench-results.json`, moves the gate bench to three warm takes
+compared by median with MAD-widened thresholds, an inconclusive verdict (exit 3) under host load or heat,
+OS/Xcode identity in the baseline, and publishes full-matrix engine runs as canonical. The following
+commits fix the UI perf lane (fractional window attribution, refresh fail-closed, contract-owned
+designations, macOS environment row, marker flush, readiness-free generation windows, sleep hold on
+every lane, iOS cell-length and per-mode seed checks) and the runner/test hygiene items from the audit.
+
+Open follow-ups are roadmap items AV-13 (macOS coverage lanes), ICA-20 (iOS coverage and the last
+English-label lookups) and AV-14 (consent-bound re-baseline runs: three-take gate baseline, one canonical
+macOS and iOS benchmark run and one perf run per platform under the new definition, then repin the
+charts). The first push's macOS CI job failed once in
+`Qwen3DecoderPartitionTests.testReplayCachePolicyPreservesBothPartitionsAndBoundsObservations` (an MLX
+cache-bytes assertion in the owned package, untouched by the change) and passed on the next commit;
+AV-14 carries the watch.
 
 ### Lean verification migration (September 11)
 

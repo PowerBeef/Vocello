@@ -39,6 +39,14 @@ class VocelloiOSUITestCase: XCTestCase {
         select(tab: .studio)
     }
 
+    /// XCTest's stop-on-failure abort bypasses Swift `defer`, which is how most
+    /// journeys end their session. Releasing it here (idempotent) restores the
+    /// Auto-play and interface-language preferences on every exit path.
+    override func tearDown() async throws {
+        endSession()
+        try await super.tearDown()
+    }
+
     func endSession() {
         defer {
             session?.terminate()

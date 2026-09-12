@@ -1034,6 +1034,53 @@
       ],
       "updated": "2026-09-11",
       "notes": "Filed 2026-09-11 from the roadmap reconciliation review of F-20/F-21; not fixed in that pass. F-20's supervisor, deadline and native-signal fixtures remain valid for the task lifecycle they cover; these gaps are the blocking playback stage F-20's notes already excluded, plus two edges the review found. Cross-reference F-20, F-21, RF-10."
+    },
+    {
+      "id": "AV-13",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "macOS XCUITest lanes for the untested identifiers (Design/Clone generation, enrollment, History actions, seed pin, downloads, batch cancel)",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "The 2026-09-11 XCUITest audit found 78 of 102 macOS accessibility identifiers never exercised. Add acceptance coverage, in the existing lane structure, for Voice Design and Voice Cloning generation through the visible controls, saved-voice enrollment (recording to enrollment and Save), History playback, export and delete, the seed pin, the Settings model download route, and batch cancel. Each lane asserts real persisted state (History rows, files) and restores user data; no hidden markers or seeded state. Validated only by an explicitly requested `scripts/ui_test.sh macos <lane>` run.",
+      "sourceOfTruth": [
+        "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift",
+        "Tests/VocelloMacUITests/VocelloMacUITestCase.swift",
+        "scripts/ui_test.sh"
+      ],
+      "updated": "2026-09-12",
+      "notes": "Opened from the 2026-09-11 review of the XCUITest suites and the benchmarking harness (commits 458a7410 onward). Writing the tests without a lane run would leave them unproven, so this item waits for explicit macOS UI QA scope."
+    },
+    {
+      "id": "ICA-20",
+      "plan": "ios-control-audit-2026-08",
+      "title": "iOS XCUITest coverage for onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "The 2026-09-11 XCUITest audit found 34 of 93 iOS identifiers never exercised: onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings. Extend the control-audit plan (`config/ios-control-audit.json`) and the smoke or control-audit classes so each control is source-bound, observed on the paired iPhone through genuine controls, and cleaned up. Replace the remaining English-label lookups (History clear and delete confirmations, seed unpin menu, Play/Pause label checks) with stable identifiers or accessibility values added in `Sources/iOS`. Validated only by an explicitly requested `scripts/ui_test.sh ios <lane>` run.",
+      "sourceOfTruth": [
+        "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift",
+        "config/ios-control-audit.json",
+        "scripts/ios_control_audit.py"
+      ],
+      "updated": "2026-09-12",
+      "notes": "Opened from the 2026-09-11 review. The label-dependent sites are `VocelloiOSControlAuditUITests` (History clear and delete dialogs, seed unpin, inline player Play/Pause labels) and `VocelloiOSPurchaseUITests` (player Play/Pause labels; the system share sheet's close button stays a system control). Waits for explicit device QA scope because identifier changes must be proven on the phone."
+    },
+    {
+      "id": "AV-14",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "re-baseline the benchmark harness under the standard RTF definition (consent-bound runs)",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "After the 2026-09-12 harness fixes: (1) run `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` and re-save `benchmarks/baselines/mac-gate-bench.json` from a three-take run so it carries `rtfDefinition`, `rtfMAD`, n=3 and the host OS/Xcode identity; (2) one canonical `scripts/ui_test.sh macos benchmark` and one `scripts/ui_test.sh ios benchmark` run publish the first records with `run.rtfDefinition`, validate the provenance-bound optimization label, the iOS cell-length check and the sleep hold; (3) one macOS and one iOS `perf` run re-derive the warn-only thresholds under the clipped window arithmetic and the macOS environment row; (4) repin `scripts/generate_readme_charts.py` and the website chart to the new canonical macOS record. Each run needs explicit consent (model download, phone).",
+      "sourceOfTruth": [
+        "scripts/summarize_generation_telemetry.py",
+        "scripts/publish_benchmark_history.py",
+        "scripts/generate_readme_charts.py",
+        "config/ui-perf-thresholds.json",
+        "config/ui-perf-thresholds-ios.json"
+      ],
+      "updated": "2026-09-12",
+      "notes": "Until (1) runs, the gate compares the legacy baseline's decode speedup with the current `decodeSpeedupX` and says so on every run. Until (2) runs, the README and website charts show a derived RTF from the 2026-09-05 record's app submit-to-completed span, labelled as such. Also watch `Qwen3DecoderPartitionTests.testReplayCachePolicyPreservesBothPartitionsAndBoundsObservations`, which failed once on the CI runner (run 34663845404) and passed on the next commit without a related change."
     }
   ]
 }

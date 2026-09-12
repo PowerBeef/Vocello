@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -67,8 +68,13 @@ def _reachable(d: dict[str, Any]) -> bool:
     return cp.get("pairingState") == "paired" and can_connect
 
 
+class AmbiguousDeviceError(RuntimeError):
+    """More than one connected phone and no explicit selection."""
+
+
 def pick_device(data: dict[str, Any], device_id: str | None = None) -> dict[str, Any] | None:
     devs = _devices(data)
+    device_id = device_id or os.environ.get("QVOICE_IOS_DEVICE_ID") or None
     if device_id:
         for d in devs:
             if d.get("identifier") == device_id:
@@ -77,14 +83,14 @@ def pick_device(data: dict[str, Any], device_id: str | None = None) -> dict[str,
     cands = [d for d in devs if _connected(d)]
     if not cands:
         return None
-    preferred = "iPhone 17 Pro"
-    for d in cands:
-        props = d.get("deviceProperties") or {}
-        if props.get("name") == preferred:
-            return d
     if len(cands) == 1:
         return cands[0]
-    return cands[0]
+    # Several connected phones: never guess. QVOICE_IOS_DEVICE_ID selects one
+    # (the same knob scripts/ios_device.sh honours); otherwise report the
+    # ambiguity so the operator resolves it instead of the harness.
+    raise AmbiguousDeviceError(
+        "several paired iPhones are connected; set QVOICE_IOS_DEVICE_ID to the one to use"
+    )
 
 
 def summarize_device(d: dict[str, Any]) -> dict[str, Any]:
@@ -138,7 +144,10 @@ def probe_coredevice(device_id: str | None = None) -> dict[str, Any]:
     data = list_devices_json()
     if "error" in data:
         return {"reachable": False, "error": data["error"]}
-    dev = pick_device(data, device_id)
+    try:
+        dev = pick_device(data, device_id)
+    except AmbiguousDeviceError as error:
+        return {"reachable": False, "error": str(error)}
     if not dev:
         return {"reachable": False, "error": "no matching device"}
     summary = summarize_device(dev)
@@ -157,6 +166,14 @@ def automation_blockers(*, verdict: str, coredevice: dict[str, Any]) -> tuple[bo
 
 
 def main() -> int:
+    try:
+        return _main()
+    except AmbiguousDeviceError as error:
+        print(json.dumps({"reachable": False, "error": str(error)}))
+        return 1
+
+
+def _main() -> int:
     if len(sys.argv) < 2:
         print("usage: ios_coredevice_probe.py list|reachable|lock-state|probe [--device ID]", file=sys.stderr)
         return 2

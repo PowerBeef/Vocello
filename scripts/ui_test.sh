@@ -507,13 +507,23 @@ write_test_summary() {
   python3 "$ROOT_DIR/scripts/lib/xctest_summary.py" "$out/xcodebuild.log" "$out/test-results.json"
 }
 
+# The crash marker is stamped by arm_mac_crash_marker right before the app
+# is launched for the test (after build-for-testing), so a report written by
+# the build step or an earlier session can never count against this run.
 mac_crash_marker="$out/.mac-crash-marker"
-touch "$mac_crash_marker"
 
+arm_mac_crash_marker() {
+  touch "$mac_crash_marker"
+}
+
+# Returns non-zero and records the reports; the ledger step that wraps this
+# function owns the verdict and the caller dies with the recorded status.
 check_mac_crash_delta() {
   local root="$HOME/Library/Logs/DiagnosticReports" new
+  [[ -f "$mac_crash_marker" ]] || { echo "crash marker was never armed" >"$out/new-crashes.txt"; return 1; }
   new="$(find "$root" \( -name 'Vocello-*.ips' -o -name 'QwenVoiceEngineService-*.ips' -o -name '*engine-service*.ips' \) -newer "$mac_crash_marker" -print 2>/dev/null || true)"
-  [[ -z "$new" ]] || { printf '%s\n' "$new" >"$out/new-crashes.txt"; die "new Vocello crash report detected (see $out/new-crashes.txt)"; }
+  [[ -z "$new" ]] || { printf '%s\n' "$new" >"$out/new-crashes.txt"; return 1; }
+  return 0
 }
 
 check_ios_crash_delta() {
@@ -1343,13 +1353,14 @@ WAV
       || die "macOS UI build-for-testing failed (see $out/xcodebuild.log)"
     printf '%s\n' "$mac_fingerprint" >"$mac_build_marker"
   fi
+  arm_mac_crash_marker
   required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test-without-building \
     -project "$PROJECT" -scheme VocelloMacUI -configuration Release \
     -destination 'platform=macOS,arch=arm64' -derivedDataPath "$MAC_DERIVED" \
     -resultBundlePath "$result" -only-testing:"$only_test" \
     || die "macOS XCUITest failed (see $out/xcodebuild.log)"
   required_step_run "$step_ledger" crash-delta check_mac_crash_delta \
-    || die "new Vocello crash report detected"
+    || die "new Vocello crash report detected (see $out/new-crashes.txt)"
   summarize_long_form_project_if_present "$out"
   # The lane rebuilt the app/XPC products in the shared cache; re-preserve
   # their dSYMs so the build-output symbol-identity check stays consistent
@@ -1705,7 +1716,10 @@ fi
 
 finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 note "per-test results:"
-write_test_summary || true
+# A summary that disagrees with the log's own totals (exit 3) means the log is
+# truncated or the run was interrupted; a PASS cannot be recorded on it.
+write_test_summary \
+  || die "test-results.json is inconsistent with the xcodebuild log; the run cannot be recorded as passed"
 final_run_status="passed"
 if [[ "$lane" == "control-audit" && -f "$out/control-audit-summary.json" ]]; then
   final_run_status="$(python3 - "$out/control-audit-summary.json" <<'PY'

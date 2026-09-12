@@ -27,14 +27,6 @@ final class VocelloiOSPerfUITests: VocelloiOSUITestCase {
         continueAfterFailure = false
     }
 
-    // The async override is main-actor isolated like the class, so the session
-    // is released without crossing an isolation boundary (the synchronous
-    // tearDown is nonisolated by XCTest's declaration).
-    override func tearDown() async throws {
-        endSession()
-        try await super.tearDown()
-    }
-
     // MARK: - Scenario driver
 
     private var perfRunID: String {

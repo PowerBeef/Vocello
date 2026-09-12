@@ -353,6 +353,49 @@ public enum VocelloUIWait {
         }
         return true
     }
+
+    /// Waits for `evaluate` like `condition`, but also gives up early when the
+    /// visible `progress` signature has not changed for `stallBudget` seconds.
+    /// Long generations legitimately take many minutes; a run whose UI stops
+    /// changing for that long is stuck, and waiting out a 10- or 15-minute
+    /// ceiling only delays the diagnosis.
+    public static func progressing(
+        _ description: String,
+        timeout: TimeInterval,
+        stallBudget: TimeInterval = 120,
+        pollInterval: TimeInterval = 1.0,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        progress: @escaping () -> String,
+        evaluate: @escaping () -> Bool
+    ) -> Bool {
+        let started = Date()
+        var lastSignature = progress()
+        var lastChange = started
+        while true {
+            if evaluate() { return true }
+            let now = Date()
+            if now.timeIntervalSince(started) >= timeout {
+                VocelloUIFailureEvidence.capture(reason: description)
+                XCTFail("Timed out after \(timeout)s waiting for \(description)", file: file, line: line)
+                return false
+            }
+            let signature = progress()
+            if signature != lastSignature {
+                lastSignature = signature
+                lastChange = now
+            } else if now.timeIntervalSince(lastChange) >= stallBudget {
+                VocelloUIFailureEvidence.capture(reason: "\(description) (stalled)")
+                XCTFail(
+                    "No visible progress for \(Int(stallBudget))s while waiting for \(description) "
+                    + "(last signature: \(signature))",
+                    file: file, line: line
+                )
+                return false
+            }
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: pollInterval))
+        }
+    }
 }
 
 /// Normalizes the stable boolean and English values XCTest returns for genuine
@@ -383,28 +426,60 @@ public enum VocelloUIToggle {
     }
 }
 
-#if os(macOS)
-/// Wheel-scrolls a container until an element becomes hittable. Needed for
-/// controls that live below the fold of a Form/List at the test window size
-/// (e.g. the Settings clone-consent toggle, deliberately placed last) —
-/// `VocelloUIPrimaryAction` requires hittability and macOS clicks never
-/// auto-scroll.
+/// Scrolls until an element becomes hittable, and says so when it never does.
+/// `VocelloUIPrimaryAction` requires hittability and neither platform's tap
+/// auto-scrolls. A silent `false` used to let a later, unrelated assertion
+/// take the blame; every miss is now reported at the reveal site.
 @MainActor
 public enum VocelloUIScroll {
+    #if os(macOS)
+    /// Wheel-scrolls a container (e.g. the Settings form whose clone-consent
+    /// toggle is deliberately last) until the element is hittable.
     @discardableResult
     public static func intoView(
         _ element: XCUIElement,
         in container: XCUIElement,
-        maxAttempts: Int = 8
+        maxAttempts: Int = 8,
+        file: StaticString = #filePath,
+        line: UInt = #line
     ) -> Bool {
         for _ in 0 ..< maxAttempts {
             if element.exists && element.isHittable { return true }
             container.scroll(byDeltaX: 0, deltaY: -120)
         }
-        return element.exists && element.isHittable
+        let revealed = element.exists && element.isHittable
+        if !revealed {
+            VocelloUIFailureEvidence.capture(reason: "reveal \(element.identifier)")
+            XCTFail("Could not scroll \(element.identifier) into view after \(maxAttempts) attempts",
+                    file: file, line: line)
+        }
+        return revealed
     }
+    #else
+    /// Swipes up on the surface (the app by default) until the element is
+    /// hittable; the single replacement for the per-class `reveal` loops.
+    @discardableResult
+    public static func reveal(
+        _ element: XCUIElement,
+        in surface: XCUIElement,
+        maxAttempts: Int = 16,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> Bool {
+        for _ in 0 ..< maxAttempts {
+            if element.exists && element.isHittable { return true }
+            surface.swipeUp()
+        }
+        let revealed = element.exists && element.isHittable
+        if !revealed {
+            VocelloUIFailureEvidence.capture(reason: "reveal \(element.identifier)")
+            XCTFail("Could not reveal \(element.identifier) after \(maxAttempts) swipes",
+                    file: file, line: line)
+        }
+        return revealed
+    }
+    #endif
 }
-#endif
 
 /// The platform-native primary activation gesture, always against an exact element.
 @MainActor

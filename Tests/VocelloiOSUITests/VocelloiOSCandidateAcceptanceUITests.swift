@@ -55,18 +55,11 @@ final class VocelloiOSCandidateAcceptanceUITests: XCTestCase {
             XCTAssertTrue(VocelloUIWait.disappears(back, timeout: 20))
         }
         let about = VocelloUIWait.element(app, id: "iosSettings_aboutRow")
-        for _ in 0..<12 {
-            if about.exists && about.isHittable { break }
-            app.swipeUp()
-        }
+        VocelloUIScroll.reveal(about, in: app, maxAttempts: 12)
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: about, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(VocelloUIWait.element(app, id: "screen_settings_about"), timeout: 20))
         let version = VocelloUIWait.element(app, id: "iosSettings_versionLabel")
-        let scroll = app.scrollViews.firstMatch
-        for _ in 0..<12 {
-            if version.exists && version.isHittable { break }
-            scroll.swipeUp()
-        }
+        VocelloUIScroll.reveal(version, in: app.scrollViews.firstMatch, maxAttempts: 12)
         XCTAssertTrue(VocelloUIWait.exists(version, timeout: 10))
         let visibleVersion = version.label + " " + (version.value as? String ?? "")
         let expectedVersion = try XCTUnwrap(identity["marketingVersion"] as? String)

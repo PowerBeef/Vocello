@@ -146,17 +146,8 @@ def successful_asr_verification(
     reference: str = "un deux trois quatre cinq six sept huit",
     transcript: str = "un deux trois quatre cinq six sept neuf",
 ) -> dict:
-    word_metrics = publisher.language_edit_metrics(
-        reference,
-        transcript,
-        characters=False,
-        expected_language="french",
-    )
-    character_metrics = publisher.language_edit_metrics(
-        reference,
-        transcript,
-        characters=True,
-        expected_language="french",
+    word_metrics, character_metrics = publisher.recomputed_accuracy(
+        reference, transcript, "french",
     )
     repetitions = [
         {
@@ -298,6 +289,53 @@ def language_sentinel(
         },
         "outputVerification": verification or successful_asr_verification(),
     }
+
+
+def independent_recognition(*, audio_sha256: str, script: str, transcript: str | None = None,
+                            language: str = "french", detected: str | None = None,
+                            duration: float = 2.0) -> dict:
+    """One whisper-family recognition as `scripts/independent_asr.py` emits it."""
+    return {
+        "schemaVersion": 1,
+        "algorithmVersion": publisher.INDEPENDENT_ASR_ALGORITHM,
+        "modelFamily": "whisper",
+        "audioSHA256": audio_sha256,
+        "inputTextSHA256": publisher.text_sha256(script),
+        "status": "complete",
+        "outputLanguage": language,
+        "decodeLanguage": "fr",
+        "detectedLanguage": detected or language,
+        "languageMatchScore": 0.97,
+        "detectedLanguageProbability": 0.97,
+        "fullFileProcessed": True,
+        "processedDurationSeconds": duration,
+        "segmentCount": 1,
+        "firstSegmentStartSeconds": 0.0,
+        "lastSegmentEndSeconds": duration,
+        "recognitionDurationSeconds": 0.4,
+        "transcript": script if transcript is None else transcript,
+        "provenance": {
+            "runtimeSHA256": "1" * 64, "modelIdentitySHA256": "2" * 64, "configSHA256": "3" * 64,
+        },
+    }
+
+
+def independent_evidence(path: Path, *, run_id: str, platform: str, cells: dict) -> Path:
+    path.write_text(json.dumps({
+        "schemaVersion": 1,
+        "kind": "independent-asr-language-evidence",
+        "runID": run_id,
+        "platform": platform,
+        "generationProcessExited": True,
+        "families": ["whisper"],
+        "producer": {
+            "adapterID": "whisper-small-mlx", "algorithmVersion": publisher.INDEPENDENT_ASR_ALGORITHM,
+            "modelLaunches": 1, "cacheHits": 0, "rowCount": len(cells),
+            "resourceEnvelope": {"qualified": True, "peakRSSBytes": 900 * 1024**2},
+        },
+        "cells": cells,
+    }))
+    return path
 
 
 def qualified_memory_fixture(generation_ids: list[str]) -> tuple[list[SimpleNamespace], dict]:
@@ -1406,6 +1444,168 @@ class PublisherTests(unittest.TestCase):
             json.dumps(manifest, sort_keys=True),
         )
 
+    def test_macos_language_publishes_a_single_whisper_witness_as_focused(self) -> None:
+        matrix = self.root / "matrix.json"
+        corpus = self.root / "corpus.json"
+        matrix.write_text(json.dumps({"cells": [
+            {"id": "fr", "quick": True, "expectedHint": "french", "scriptLang": "french"},
+        ]}))
+        reference_script = "un deux trois quatre cinq six sept huit"
+        corpus.write_text(json.dumps({"languages": [{"id": "french", "script": reference_script}]}))
+        fr = engine_row("fr-id", run_id="lang-run", cell="fr")
+        fr["notes"]["languageHint"] = "french"
+        fr["notes"]["samplingWAVDigest"] = "a" * 64
+        recognitions = independent_evidence(
+            self.root / "independent-asr.json", run_id="lang-run", platform="macos",
+            cells={"fr": {
+                "generationID": "fr-id", "audioSHA256": "a" * 64, "expectedLanguage": "french",
+                "expectedOutcome": "pass",
+                "recognitions": [independent_recognition(
+                    audio_sha256="a" * 64, script=reference_script,
+                    transcript="un deux trois quatre cinq six sept neuf",
+                )],
+            }},
+        )
+        args = SimpleNamespace(
+            matrix=matrix, corpus=corpus, subset="quick", diagnostics=self.root,
+            run_id="lang-run", output_gate="independent", recognitions=recognitions, platform="macos",
+            started_at="2026-09-12T12:00:00Z", finished_at="2026-09-12T12:01:00Z",
+            label="fixture", artifact_dir=self.root, snapshot=self.root / "snapshot.json",
+        )
+        captured, write_patch = self.capture_manifest()
+        patches = (
+            mock.patch.object(publisher, "load_engine_rows", return_value=[fr]),
+            mock.patch.object(publisher, "qualify_memory_rows", return_value=qualified_memory_fixture(["fr-id"])),
+            mock.patch.object(publisher, "source_from_snapshot", return_value=source_fixture()),
+            mock.patch.object(publisher, "crash_delta_from_snapshot", return_value={"passed": True, "count": 0}),
+            self.hardware_patch(),
+            write_patch,
+        )
+        with contextlib.ExitStack() as stack:
+            for item in patches:
+                stack.enter_context(item)
+            publisher.language_command(args)
+        record = captured["manifest"]["historyRecord"]
+        self.assertEqual(record["run"]["matrixScope"], "focused")
+        verification = record["evidence"]["languageVerification"]
+        self.assertEqual(verification["families"], ["whisper"])
+        self.assertEqual(verification["recognitionAlgorithm"], publisher.INDEPENDENT_ASR_ALGORITHM)
+        self.assertEqual(verification["outputAlgorithm"], publisher.INDEPENDENT_OUTPUT_ALGORITHM)
+        self.assertEqual(verification["requiredPassCount"], 1)
+        self.assertEqual(verification["independentModelIdentitySHA256"], "2" * 64)
+        self.assertEqual(verification["outputCellsPassed"], 1)
+        take = record["takes"][0]
+        self.assertEqual(take["accuracyMetric"], "wordErrorRate")
+        self.assertEqual(take["metrics"]["independentWordErrorRate"], 0.125)
+        self.assertEqual(take["metrics"]["independentPrimaryAccuracyScore"], 0.125)
+        self.assertEqual(take["metrics"]["independentLanguagePass"], 1.0)
+        self.assertNotIn("wordErrorRate", take["metrics"])
+        self.assertNotIn("recognitionPassCount", take["metrics"])
+        self.assertEqual(captured["manifest"]["historyRecord"]["inputs"].get("analysisProfileHash") is not None, True)
+
+        # A failing transcript, a wrong detected language, or audio bound to
+        # other bytes each refuses publication; a supplied score never helps.
+        for label, mutate in (
+            ("failed", lambda c: c["recognitions"][0].__setitem__("transcript", "neuf huit sept six cinq quatre trois deux")),
+            ("failed", lambda c: c["recognitions"][0].__setitem__("detectedLanguage", "english")),
+            ("other audio", lambda c: c.__setitem__("audioSHA256", "b" * 64)),
+            ("unqualified", lambda c: c["recognitions"][0].__setitem__("audioSHA256", "b" * 64)),
+            ("unqualified", lambda c: c["recognitions"][0].__setitem__("fullFileProcessed", False)),
+        ):
+            payload = json.loads(recognitions.read_text())
+            mutate(payload["cells"]["fr"])
+            payload["cells"]["fr"]["recognitions"][0]["errorRate"] = 0.0
+            bad = self.root / "bad.json"
+            bad.write_text(json.dumps(payload))
+            args.recognitions = bad
+            with self.subTest(label=label), contextlib.ExitStack() as stack:
+                for item in patches:
+                    stack.enter_context(item)
+                with self.assertRaisesRegex(publisher.PublicationError, label):
+                    publisher.language_command(args)
+
+    def test_ios_language_requires_two_recognizer_families_to_agree(self) -> None:
+        matrix = self.root / "matrix.json"
+        corpus = self.root / "corpus.json"
+        matrix.write_text(json.dumps({"cells": [
+            {"id": "fr", "quick": True, "expectedHint": "french",
+             "mode": "custom", "variant": "speed", "scriptLang": "french"},
+        ]}))
+        reference_script = "un deux trois quatre cinq six sept huit"
+        corpus.write_text(json.dumps({"languages": [{
+            "id": "french", "script": reference_script, "customSpeakerID": "aiden",
+            "designInstruction": "A warm, friendly narrator with a calm, measured pace.",
+        }]}))
+        plan_path = self.root / "language-run-plan.json"
+        plan = language_plan(matrix=matrix, corpus=corpus)
+        plan_path.write_text(json.dumps(plan))
+        row = engine_row("fr-generation", run_id="lang-ios", cell="fr")
+        row["notes"]["samplingSeed"] = str(plan["takes"][0]["seed"])
+        row["notes"]["languageHint"] = "french"
+        sentinel_dir = self.root / "diagnostics" / "lang-ios--fr"
+        sentinel_dir.mkdir(parents=True)
+        output_path = sentinel_dir / "output.wav"
+        self.make_wave(output_path)
+        sentinel = language_sentinel(output_path=output_path, seed=plan["takes"][0]["seed"])
+        (sentinel_dir / "device-diagnostics-done.json").write_text(json.dumps(sentinel))
+        with wave.open(str(output_path), "rb") as stream:
+            duration = stream.getnframes() / stream.getframerate()
+        wav_digest = publisher.digest_file(output_path)
+        recognitions = independent_evidence(
+            self.root / "independent-asr.json", run_id="lang-ios", platform="ios",
+            cells={"fr": {
+                "generationID": "fr-generation", "audioSHA256": wav_digest, "expectedLanguage": "french",
+                "expectedOutcome": "pass",
+                "recognitions": [independent_recognition(
+                    audio_sha256=wav_digest, script=reference_script, duration=duration,
+                )],
+            }},
+        )
+        args = SimpleNamespace(
+            matrix=matrix, corpus=corpus, subset="quick", diagnostics=self.root / "diagnostics",
+            plan=plan_path, recognitions=recognitions,
+            crash_diagnostics=None, run_id="lang-ios", output_gate="pass", platform="ios",
+            started_at="2026-09-12T12:00:00Z", finished_at="2026-09-12T12:01:00Z",
+            label="fixture", artifact_dir=self.root, snapshot=self.root / "snapshot.json",
+            design_fixture_digest=None,
+        )
+        captured, write_patch = self.capture_manifest()
+        patches = (
+            mock.patch.object(publisher, "load_engine_rows", return_value=[row]),
+            mock.patch.object(publisher, "load_app_rows", return_value=[app_row("fr-generation")]),
+            mock.patch.object(publisher, "qualify_memory_rows", return_value=qualified_memory_fixture(["fr-generation"])),
+            mock.patch.object(publisher, "source_from_snapshot", return_value=source_fixture()),
+            mock.patch.object(publisher, "crash_delta_from_snapshot", return_value={"passed": True, "count": 0}),
+            self.hardware_patch(),
+            write_patch,
+        )
+        with contextlib.ExitStack() as stack:
+            for item in patches:
+                stack.enter_context(item)
+            publisher.language_command(args)
+        record = captured["manifest"]["historyRecord"]
+        verification = record["evidence"]["languageVerification"]
+        self.assertEqual(verification["families"], ["apple-speech", "whisper"])
+        self.assertEqual(verification["recognitionAlgorithm"], "apple-speech-file-consensus-v2")
+        self.assertEqual(verification["independentRecognitionAlgorithm"], publisher.INDEPENDENT_ASR_ALGORITHM)
+        metrics = record["takes"][0]["metrics"]
+        self.assertEqual(metrics["wordErrorRate"], 0.125)
+        self.assertEqual(metrics["independentWordErrorRate"], 0.0)
+        self.assertEqual(metrics["recognitionPassCount"], 3.0)
+        profile_takes = captured["manifest"]["historyRecord"]["inputs"]
+        self.assertRegex(profile_takes["analysisProfileHash"], r"^[0-9a-f]{64}$")
+
+        payload = json.loads(recognitions.read_text())
+        payload["cells"]["fr"]["recognitions"][0]["transcript"] = "des mots entièrement différents ici présents"
+        disagreeing = self.root / "disagree.json"
+        disagreeing.write_text(json.dumps(payload))
+        args.recognitions = disagreeing
+        with contextlib.ExitStack() as stack:
+            for item in patches:
+                stack.enter_context(item)
+            with self.assertRaisesRegex(publisher.PublicationError, "did not agree"):
+                publisher.language_command(args)
+
     def test_language_publication_rejects_mode_fixture_tampering(self) -> None:
         custom_take = {
             "mode": "custom",
@@ -1697,12 +1897,7 @@ class PublisherTests(unittest.TestCase):
                 self.assertEqual(evidence["primaryAccuracyScore"], 0.0)
 
     def test_language_character_metrics_preserve_japanese_dakuten(self) -> None:
-        metrics = publisher.language_edit_metrics(
-            "かきくけこ",
-            "がきくけこ",
-            characters=True,
-            expected_language="japanese",
-        )
+        _word, metrics = publisher.recomputed_accuracy("かきくけこ", "がきくけこ", "japanese")
         self.assertEqual(metrics["substitutions"], 1)
         self.assertEqual(metrics["errorRate"], 0.2)
 

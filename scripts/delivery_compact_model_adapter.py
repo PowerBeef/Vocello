@@ -31,7 +31,7 @@ import delivery_resource_supervisor
 
 
 SCHEMA_VERSION = 1
-PERMITTED_ADAPTERS = ("sensevoice-small-q8", "distilhubert")
+PERMITTED_ADAPTERS = ("sensevoice-small-q8", "distilhubert", "whisper-small-mlx")
 EXECUTION_IDENTITY_VERSION = 2
 SENSEVOICE_OUTPUT = re.compile(
     r"^<\|(?P<language>[^|]+)\|><\|(?P<emotion>[^|]+)\|>"
@@ -96,7 +96,7 @@ def validate_adapter_config(config: dict[str, Any]) -> dict[str, Any]:
             if not isinstance(config.get(field), str) or not config[field].strip():
                 raise CompactAdapterError(f"v2 compact adapter requires {field}")
         output_format = config.get("outputFormat")
-        if output_format not in {"json", "sensevoice-tagged-text"}:
+        if output_format not in {"json", "sensevoice-tagged-text", "whisper-json"}:
             raise CompactAdapterError("v2 compact adapter output format is unsupported")
         label_map = config.get("labelMap")
         if not isinstance(label_map, dict) or digest(label_map) != label_digest:
@@ -173,6 +173,8 @@ def _parse_output(config: dict[str, Any], output: bytes) -> dict[str, Any]:
         raise CompactAdapterError("compact adapter output must be an object")
     if config["adapterID"] == "sensevoice-small-q8":
         required = ("transcript", "languageTag", "emotionTag", "eventTag")
+    elif config["adapterID"] == "whisper-small-mlx":
+        required = ("transcript", "language", "detectedLanguage", "segments")
     else:
         required = ("embedding",)
     for field in required:

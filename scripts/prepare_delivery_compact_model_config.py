@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -22,6 +23,9 @@ DEFAULT_MODEL_ROOT = REPO / "build/cache/delivery-analysis/external-models"
 RUNTIME_SOURCE = REPO / "scripts/delivery_compact_model_runtime.py"
 ADAPTER_LAYER_SOURCE = REPO / "scripts/delivery_compact_model_adapter.py"
 SUPERVISOR_SOURCE = REPO / "scripts/delivery_resource_supervisor.py"
+INDEPENDENT_ASR_SOURCE = REPO / "scripts/independent_asr.py"
+CANDIDATE_ORDER = ("sensevoice-small-q8", "distilhubert", "whisper-small-mlx")
+WHISPER_RUNTIME_PINS = ("mlx", "mlx-whisper", "numpy")
 
 
 class PreparationError(ValueError):
@@ -38,7 +42,7 @@ def _sha(value: Any, label: str) -> str:
 
 
 def validate_candidate_contract(contract: dict[str, Any]) -> dict[str, Any]:
-    expected_order = ["sensevoice-small-q8", "distilhubert"]
+    expected_order = list(CANDIDATE_ORDER)
     if (
         contract.get("schemaVersion") != 1
         or contract.get("kind") != "delivery-evaluator-v2-external-candidates"
@@ -84,6 +88,27 @@ def validate_candidate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         "python", "torch", "transformers", "safetensors", "numpy"
     } or any(not isinstance(value, str) or not value for value in dependencies.values()):
         raise PreparationError("DistilHuBERT runtime dependency pins are incomplete")
+    whisper = candidates["whisper-small-mlx"]
+    whisper_files = whisper.get("supportingFiles")
+    if not isinstance(whisper_files, dict) or set(whisper_files) != {"config.json"}:
+        raise PreparationError("whisper supporting-file identity is missing")
+    _sha(whisper_files["config.json"], "whisper.config.json")
+    whisper_dependencies = whisper.get("runtimeDependencies")
+    if not isinstance(whisper_dependencies, dict) or set(whisper_dependencies) != set(WHISPER_RUNTIME_PINS) or any(
+        not isinstance(value, str) or not value for value in whisper_dependencies.values()
+    ):
+        raise PreparationError("whisper runtime dependency pins are incomplete")
+    decode = whisper.get("decodeOptions")
+    if not isinstance(decode, dict) or (
+        decode.get("temperature") != 0 or decode.get("conditionOnPreviousText") is not False
+        or decode.get("languageLock") != "expected-language"
+    ):
+        raise PreparationError("whisper decode options must lock the language and decode greedily")
+    languages = whisper["labelMap"].get("languages")
+    if not isinstance(languages, dict) or not languages or any(
+        not isinstance(code, str) or not code.isalpha() for code in languages.values()
+    ):
+        raise PreparationError("whisper label map must name the corpus languages")
     required_gates = {
         "two-clean-eight-gib-host-runs", "serial-process-isolation",
         "post-exit-memory-recovery", "untouched-independent-reference-holdout-gain",
@@ -108,6 +133,42 @@ def _verified(path: Path, expected: str, label: str) -> Path:
     if not path.is_file() or file_sha256(path) != expected:
         raise PreparationError(f"{label} is missing or its SHA-256 digest changed")
     return path
+
+
+def _whisper_runtime_versions(python: Path) -> dict[str, str]:
+    """Installed distribution versions without importing MLX into any process."""
+    command = [str(python), "-c", (
+        "import json;from importlib import metadata;"
+        "print(json.dumps({name: metadata.version(name) for name in "
+        + repr(list(WHISPER_RUNTIME_PINS)) + "}, sort_keys=True))"
+    )]
+    result = subprocess.run(command, check=False, capture_output=True, text=True, timeout=30)
+    if result.returncode != 0:
+        raise PreparationError("whisper runtime dependencies are not installed for this interpreter")
+    try:
+        value = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise PreparationError("whisper runtime dependency output is invalid") from error
+    if not isinstance(value, dict) or any(not isinstance(item, str) for item in value.values()):
+        raise PreparationError("whisper runtime dependency inventory is invalid")
+    return value
+
+
+def whisper_snapshot_dir(candidate: dict[str, Any], model_root: Path) -> Path:
+    """The pinned local snapshot; never downloads.
+
+    A copy under the owned model root wins; otherwise the Hugging Face hub
+    cache's exact revision directory is accepted (its files are verified by
+    digest below, so the cache layout is not trusted by itself).
+    """
+    owned = model_root / "whisper-small-mlx"
+    if owned.is_dir():
+        return owned
+    hub = os.environ.get("HF_HUB_CACHE")
+    if not hub:
+        hub = str(Path(os.environ.get("HF_HOME", str(Path.home() / ".cache/huggingface"))) / "hub")
+    repo = "models--" + str(candidate["modelID"]).replace("/", "--")
+    return Path(hub) / repo / "snapshots" / str(candidate["sourceRevision"])
 
 
 def _runtime_versions(python: Path) -> dict[str, str]:
@@ -188,6 +249,24 @@ def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
             "{binary}", str(RUNTIME_SOURCE), "distilhubert",
             "--weights", "{weights}", "--audio", "{audio}",
         ]
+    elif adapter_id == "whisper-small-mlx":
+        model_dir = whisper_snapshot_dir(candidate, model_root)
+        weights = _verified(
+            model_dir / candidate["weightsFile"], candidate["weightsSHA256"],
+            "whisper-small MLX weights (cached snapshot; nothing is downloaded)",
+        )
+        for name, expected in candidate["supportingFiles"].items():
+            _verified(model_dir / name, expected, f"whisper-small {name}")
+        binary = Path(sys.executable).resolve()
+        dependencies = _whisper_runtime_versions(binary)
+        if dependencies != candidate["runtimeDependencies"]:
+            raise PreparationError("whisper runtime dependency versions drifted from the contract pins")
+        source_digest = file_sha256(INDEPENDENT_ASR_SOURCE)
+        output_format = "whisper-json"
+        command = [
+            "{binary}", str(INDEPENDENT_ASR_SOURCE), "worker",
+            "--weights", "{weights}", "--audio", "{audio}",
+        ]
     else:  # pragma: no cover - contract owns this branch
         raise PreparationError("unsupported candidate")
     dependency_digest = digest(dependencies)
@@ -230,12 +309,13 @@ def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
         "offlineAfterAcquisition": True,
         "outputFormat": output_format,
         "commandTemplate": command,
+        **({"decodeOptions": candidate["decodeOptions"]} if adapter_id == "whisper-small-mlx" else {}),
     }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("adapter", nargs="?", choices=("sensevoice-small-q8", "distilhubert"))
+    parser.add_argument("adapter", nargs="?", choices=CANDIDATE_ORDER)
     parser.add_argument("--contract", type=Path, default=DEFAULT_CONTRACT)
     parser.add_argument("--model-root", type=Path, default=DEFAULT_MODEL_ROOT)
     parser.add_argument("--output", type=Path)

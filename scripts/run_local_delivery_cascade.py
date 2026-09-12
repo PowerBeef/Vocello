@@ -35,7 +35,7 @@ from delivery_compact_model_adapter import run_compact_adapter
 from delivery_evaluator import atomic_json
 from delivery_evaluator_v2 import evaluate_v2
 from delivery_temporal_features import analyze_temporal, paired_temporal_delta
-from check_language_output import recomputed_accuracy, MAX_ACCURACY_ERROR_RATE
+from lib.language_metrics import consensus as family_consensus, recognition_issues, score_recognition
 from prosody_quality_gate import evaluate_metrics
 import delivery_acoustic_reference as acoustic_reference
 
@@ -108,52 +108,20 @@ def review_automated_audio(row: dict[str, Any], role: str, duration: float) -> d
         if not isinstance(recognition, dict):
             reasons.append("invalid-recognition-evidence")
             continue
-        family = recognition.get("modelFamily")
-        provenance = recognition.get("provenance", {})
-        duration_read = recognition.get("processedDurationSeconds")
-        valid = (
-            isinstance(family, str) and family in ("apple-speech", "whisper", "sensevoice")
-            and recognition.get("audioSHA256") == expected
-            and recognition.get("inputTextSHA256") == row.get("scriptSHA256")
-            and recognition.get("status") == "complete"
-            and recognition.get("outputLanguage") == language
-            and recognition.get("fullFileProcessed") is True
-            and type(duration_read) in (int, float) and math.isfinite(duration_read)
-            and abs(duration_read - duration) <= max(0.001, duration * 0.001)
-            and isinstance(provenance, dict)
-            and set(provenance) == {'runtimeSHA256', 'modelIdentitySHA256', 'configSHA256'}
-            and all(isinstance(provenance.get(key), str) and len(provenance[key]) == 64
-                    and all(char in "0123456789abcdef" for char in provenance[key])
-                    for key in ("runtimeSHA256", "modelIdentitySHA256", "configSHA256"))
-            and isinstance(script, str) and 0 < len(script.strip()) <= 4096
-            and hashlib.sha256(script.encode()).hexdigest() == row.get("scriptSHA256")
-            and isinstance(recognition.get("transcript"), str) and 0 < len(recognition["transcript"].strip()) <= 4096
-        )
-        # SenseVoice's language set cannot be enlarged by an input attestation.
-        if family == "sensevoice" and language not in ("english", "chinese", "japanese", "korean", "cantonese"):
-            valid = False
-        if not valid:
+        if recognition_issues(
+            recognition, audio_sha256=expected, script=script,
+            script_sha256=row.get("scriptSHA256"), language=language, duration_seconds=duration,
+        ):
             reasons.append("unqualified-recognition-evidence")
             continue
-        words, characters = recomputed_accuracy(script, recognition["transcript"], language)
-        use_cer = language in ("chinese", "japanese", "korean", "cantonese")
-        score = (characters if use_cer else words)["errorRate"]
-        passed = score <= MAX_ACCURACY_ERROR_RATE and recognition.get("detectedLanguage") == language
-        families.setdefault(family, []).append(passed)
-        metrics.append({"modelFamily": family, "metric": "CER" if use_cer else "WER",
-                        "errorRate": score, "passed": passed, "provenance": provenance})
-    language_status = "inconclusive"
-    if len(families) < 2:
-        reasons.append("independent-full-file-asr-missing")
-    elif not all(len(set(votes)) == 1 for votes in families.values()):
-        reasons.append("asr-repeatability-disagreement")
-    elif all(all(votes) for votes in families.values()):
-        language_status = "pass"
-    elif all(not any(votes) for votes in families.values()):
-        language_status = "fail"
-        reasons.append("independent-asr-content-failure")
-    else:
-        reasons.append("independent-asr-disagreement")
+        verdict = score_recognition(recognition, script=script, language=language)
+        families.setdefault(verdict["modelFamily"], []).append(verdict["passed"])
+        metrics.append({"modelFamily": verdict["modelFamily"], "metric": verdict["metric"],
+                        "errorRate": verdict["errorRate"], "passed": verdict["passed"],
+                        "provenance": recognition["provenance"]})
+    agreement = family_consensus(families)
+    language_status = agreement["status"]
+    reasons.extend(agreement["reasons"])
     if any(reason in reasons for reason in ("unqualified-recognition-evidence", "invalid-recognition-evidence")):
         language_status = "inconclusive"
     status = ("fail" if "fail" in (safety, language_status) else

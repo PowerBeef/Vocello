@@ -1452,6 +1452,28 @@ PY
       | tee "$artifacts/output-gate.txt" || output_st=$?
   fi
 
+  # Second recognizer family on the Mac. The phone generated every take and the
+  # Mac runs no engine, so the pinned whisper-small model may load now: one
+  # supervised subprocess over the collected output.wav files, cached by audio
+  # and model identity. Apple Speech (in-app) plus whisper gives the publisher
+  # two independent witnesses; their agreement is required for a record.
+  local asr_st=0 asr_config="$ROOT_DIR/build/cache/delivery-analysis/whisper-small-mlx.json"
+  if [[ -z "$cohort" && $collect_st -eq 0 ]]; then
+    python3 "$ROOT_DIR/scripts/prepare_delivery_compact_model_config.py" whisper-small-mlx \
+      --output "$asr_config" >/dev/null \
+      || die "lang-bench: the pinned whisper-small MLX recognizer is not prepared on this host (nothing is downloaded automatically)"
+    python3 "$ROOT_DIR/scripts/independent_asr.py" manifest --platform ios \
+      --diagnostics "$diag" --run-id "$run_id" --plan "$plan" --corpus "$corpus" \
+      --generation-process-exited \
+      --output "$artifacts/independent-asr-manifest.json" >/dev/null || asr_st=$?
+    if (( asr_st == 0 )); then
+      python3 "$ROOT_DIR/scripts/independent_asr.py" transcribe \
+        --manifest "$artifacts/independent-asr-manifest.json" --adapter-config "$asr_config" \
+        --output "$artifacts/independent-asr.json" \
+        | tee "$artifacts/independent-asr.txt" || asr_st=$?
+    fi
+  fi
+
   {
     echo "lang-bench runID=$run_id subset=$subset takes=$cell_count diagnostics_fail=$cell_fail"
     echo "classification=$([[ -n $cohort ]] && echo diagnostic-cohort || echo benchmark)"
@@ -1462,22 +1484,27 @@ PY
     else
       echo "output_gate=SKIPPED"
     fi
+    if [[ -z "$cohort" ]]; then
+      echo "independent_asr=$([[ $asr_st -eq 0 ]] && echo PASS || echo FAIL)"
+    fi
   } | tee "$artifacts/verdict.txt"
 
-  if (( cell_fail > 0 || collect_st != 0 || hint_st != 0 || output_st != 0 )); then
+  if (( cell_fail > 0 || collect_st != 0 || hint_st != 0 || output_st != 0 || asr_st != 0 )); then
     die "lang-bench FAIL · $artifacts"
   fi
   if [[ -n "$cohort" ]]; then
     note "lang-bench diagnostic cohort PASS · all $cell_count predeclared takes passed · no history record created"
     return 0
   fi
+  # Apple Speech verified in-app plus whisper on the Mac: two families. When the
+  # in-app pass was skipped, whisper alone publishes an explicit one-witness record.
   local output_gate="pass"
-  [[ "${QVOICE_LANG_BENCH_SKIP_OUTPUT:-0}" == "1" ]] && output_gate="not-performed"
+  [[ "${QVOICE_LANG_BENCH_SKIP_OUTPUT:-0}" == "1" ]] && output_gate="independent"
   python3 "$ROOT_DIR/scripts/publish_benchmark_history.py" language \
     --artifact-dir "$artifacts" --snapshot "$artifacts/benchmark-source.json" \
     --platform ios --run-id "$run_id" --diagnostics "$diag" --crash-diagnostics "$dest" \
     --matrix "$matrix" --corpus "$corpus" --subset "$subset" \
-    --plan "$plan" \
+    --plan "$plan" --recognitions "$artifacts/independent-asr.json" \
     --output-gate "$output_gate" --started-at "$started_at" --defer-record \
     ${label:+--label "$label"} \
     || die "language benchmark passed but evidence validation failed; artifacts are preserved in $artifacts"

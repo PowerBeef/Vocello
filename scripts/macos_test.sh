@@ -936,6 +936,10 @@ PY
   export QWENVOICE_DEBUG=1
   export QVOICE_MAC_BENCH_RUN_ID="$run_id"
   note "lang-bench: runID=$run_id subset=$subset (macOS in-process CLI)"
+  # Every take is written to a run-owned path so the independent recognizer can
+  # bind each cell's bytes to the digest the engine published in telemetry.
+  local wav_dir="$artifacts/wav"
+  mkdir -p "$wav_dir"
 
   local cell_json cell_count=0 cell_fail=0 voice_brief="A clear, steady narrator with a natural conversational tone."
   while IFS= read -r cell_json; do
@@ -960,7 +964,7 @@ PY
     export QVOICE_MAC_BENCH_CELL="$cell_id"
     local -a generate_command=(
       "$QVOICE_BUILD_ROOT/vocello" generate --mode "$mode" --variant "$variant"
-      --seed "$seed" --variation expressive
+      --seed "$seed" --variation expressive --out "$wav_dir/$cell_id.wav"
     )
     if [[ "$mode" == "design" ]]; then
       generate_command+=(--voice-brief "$voice_brief")
@@ -1006,19 +1010,43 @@ PY
     --run-id "$run_id" --matrix "$matrix" --corpus "$corpus" --subset "$subset" \
     | tee "$artifacts/hint-gate.txt" || hint_st=$?
 
+  # Independent spoken-content verification. The CLI process has exited for
+  # every cell, so the pinned whisper-small model may load now: one supervised
+  # subprocess, model loaded once, results cached by audio and model identity.
+  # A single family is one witness; the record says so (families: [whisper]).
+  local asr_st=0 asr_config="$ROOT_DIR/build/cache/delivery-analysis/whisper-small-mlx.json"
+  python3 "$SCRIPT_DIR/prepare_delivery_compact_model_config.py" whisper-small-mlx \
+    --output "$asr_config" >/dev/null \
+    || die "lang-bench: the pinned whisper-small MLX recognizer is not prepared on this host (nothing is downloaded automatically)"
+  python3 "$SCRIPT_DIR/independent_asr.py" manifest --platform macos \
+    --diagnostics "$diag_root" --run-id "$run_id" --matrix "$matrix" --corpus "$corpus" \
+    --subset "$subset" --wav-dir "$wav_dir" --generation-process-exited \
+    --output "$artifacts/independent-asr-manifest.json" >/dev/null || asr_st=$?
+  if (( asr_st == 0 )); then
+    python3 "$SCRIPT_DIR/independent_asr.py" transcribe \
+      --manifest "$artifacts/independent-asr-manifest.json" --adapter-config "$asr_config" \
+      --output "$artifacts/independent-asr.json" \
+      | tee "$artifacts/independent-asr.txt" || asr_st=$?
+  fi
+
   {
     echo "lang-bench runID=$run_id subset=$subset cells=$cell_count generate_fail=$cell_fail"
     echo "hint_gate=$([[ $hint_st -eq 0 ]] && echo PASS || echo FAIL)"
+    echo "independent_asr=$([[ $asr_st -eq 0 ]] && echo PASS || echo FAIL)"
   } | tee "$artifacts/verdict.txt"
 
-  if (( cell_fail > 0 || hint_st != 0 )); then
+  if (( cell_fail > 0 || hint_st != 0 || asr_st != 0 )); then
     die "lang-bench FAIL · $artifacts"
   fi
+  # The publisher re-qualifies and re-scores every recognition against the
+  # corpus; a cell whose whisper transcript misses the 15 % gate or whose
+  # detected language differs from the expected one refuses publication.
   python3 "$SCRIPT_DIR/publish_benchmark_history.py" language \
     --artifact-dir "$artifacts" --snapshot "$artifacts/benchmark-source.json" \
     --platform macos --run-id "$run_id" --diagnostics "$diag_root" \
     --matrix "$matrix" --corpus "$corpus" --subset "$subset" \
-    --output-gate not-performed --started-at "$started_at" \
+    --output-gate independent --recognitions "$artifacts/independent-asr.json" \
+    --started-at "$started_at" \
     --design-fixture-digest "$(string_sha256 "$voice_brief")" --defer-record \
     ${label:+--label "$label"} \
     || die "language benchmark passed but evidence validation failed; artifacts are preserved in $artifacts"

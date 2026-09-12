@@ -198,6 +198,33 @@ LANGUAGE_VERIFICATION_KEYS = {
     # as identical constants on every take's metrics.
     "hintCellsPassed", "hintCellsExpected", "outputCellsPassed", "outputCellsExpected",
     "negativeControlsConfirmed", "families",
+    # Independent (whisper-family) recognizer identity, records since 2026-09-12.
+    "independentRecognitionAlgorithm", "independentModelIdentitySHA256",
+}
+RECOGNITION_FAMILIES = ("apple-speech", "whisper", "sensevoice")
+# Records before 2026-09-12 carry no `families`; every one of them was verified
+# by the in-app Apple Speech consensus.
+LEGACY_LANGUAGE_FAMILIES = ["apple-speech"]
+APPLE_SPEECH_VERIFICATION_IDENTITY = {
+    "outputSchemaVersion": 3,
+    "outputAlgorithm": "language-output-verifier-v3",
+    "recognitionSchemaVersion": 2,
+    "recognitionAlgorithm": "apple-speech-file-consensus-v2",
+    "accuracyMetricVersion": "normalized-edit-rate-v1",
+    "requiredPassCount": 3,
+}
+INDEPENDENT_VERIFICATION_IDENTITY = {
+    "outputSchemaVersion": 1,
+    "outputAlgorithm": "independent-asr-output-v1",
+    "recognitionSchemaVersion": 1,
+    "recognitionAlgorithm": "mlx-whisper-locked-decode-v1",
+    "accuracyMetricVersion": "normalized-edit-rate-v1",
+    "requiredPassCount": 1,
+}
+INDEPENDENT_ACCURACY_METRIC_KEYS = {
+    "independentWordErrorRate", "independentCharacterErrorRate", "independentPrimaryAccuracyScore",
+    "independentLanguageMatchScore", "independentLanguagePass", "independentAccuracyPass",
+    "independentRecognitionDurationSeconds",
 }
 LANGUAGE_VERIFICATION_IDENTITY_KEYS = {
     "outputSchemaVersion", "outputAlgorithm", "recognitionSchemaVersion",
@@ -343,6 +370,10 @@ METRIC_KEYS = {
     "impliedProcessLimitMB", "totalDeviceRAMMB",
     "loadAverage1M", "freeStorageBytes", "uptimeSeconds", "lowPowerMode",
     "chunksReceived", "continuityFailures", "underruns", "startBufferDepth",
+    # Independent (whisper-family) recognition of language takes, since 2026-09-12.
+    "independentWordErrorRate", "independentCharacterErrorRate", "independentPrimaryAccuracyScore",
+    "independentLanguageMatchScore", "independentLanguagePass", "independentAccuracyPass",
+    "independentRecognitionDurationSeconds",
     "chunksForwarded", "transportChunkGaps", "transportDuplicateChunks", "transportOutOfOrderChunks",
     "minimumQueueDurationMS", "hintCellsPassed", "hintCellsExpected",
     "outputCellsPassed", "outputCellsExpected", "medianRTF", "medianTTFCMS",
@@ -1684,6 +1715,22 @@ def require_digest(value: Any, location: str, *, allow_na: bool = True) -> None:
         raise HistoryError(f"{location} must be a SHA-256 digest")
 
 
+def language_families(record: dict[str, Any]) -> list[str]:
+    """The recognizer families a language record cites; legacy records are Apple Speech."""
+    evidence = record.get("evidence") if isinstance(record.get("evidence"), dict) else {}
+    verification = evidence.get("languageVerification")
+    if not isinstance(verification, dict) or "families" not in verification:
+        return list(LEGACY_LANGUAGE_FAMILIES)
+    families = verification["families"]
+    if (
+        not isinstance(families, list) or not families
+        or any(family not in RECOGNITION_FAMILIES for family in families)
+        or families != sorted(set(families))
+    ):
+        raise HistoryError("evidence.languageVerification.families must list known families once, sorted")
+    return list(families)
+
+
 def validate_machine_codes(values: Any, location: str) -> None:
     if not isinstance(values, list) or not all(
         isinstance(value, str) and SAFE_WARNING_RE.fullmatch(value) for value in values
@@ -2357,7 +2404,32 @@ def validate_record(
             expected_memory_status = "qualifiedWithWarnings" if has_memory_warning else "qualified"
             if take["memoryStatus"] != expected_memory_status:
                 raise HistoryError("take memory status does not match its memory warnings")
-        if "accuracyMetric" in take:
+        if "accuracyMetric" in take and "whisper" in language_families(record):
+            metrics = take["metrics"]
+            if missing := sorted(INDEPENDENT_ACCURACY_METRIC_KEYS - set(metrics)):
+                raise HistoryError(
+                    "independent recognition metrics are incomplete: " + ", ".join(missing)
+                )
+            metric = take["accuracyMetric"]
+            independent_score = metrics["independent" + metric[0].upper() + metric[1:]]
+            if (
+                not math.isclose(
+                    float(metrics["independentPrimaryAccuracyScore"]), float(independent_score),
+                    rel_tol=1e-9, abs_tol=1e-12,
+                )
+                or float(independent_score) > float(take["accuracyThreshold"])
+                or metrics["independentLanguagePass"] != 1.0
+                or metrics["independentAccuracyPass"] != 1.0
+                or not 0.0 <= float(metrics["independentLanguageMatchScore"]) <= 1.0
+                or float(metrics["independentRecognitionDurationSeconds"]) <= 0
+            ):
+                raise HistoryError("independent recognition gate metrics are inconsistent")
+        if "accuracyMetric" in take and "apple-speech" not in language_families(record):
+            if present := sorted((LANGUAGE_ACCURACY_METRIC_KEYS - {"accuracyThreshold"}) & set(take["metrics"])):
+                raise HistoryError(
+                    "in-app recognizer metrics without the apple-speech family: " + ", ".join(present)
+                )
+        if "accuracyMetric" in take and "apple-speech" in language_families(record):
             metrics = take["metrics"]
             if missing := sorted(LANGUAGE_ACCURACY_METRIC_KEYS - set(metrics)):
                 raise HistoryError(
@@ -2444,20 +2516,25 @@ def validate_record(
             language_verification, LANGUAGE_VERIFICATION_KEYS,
             "evidence.languageVerification",
         )
-    expected_language_verification = {
-        "outputSchemaVersion": 3,
-        "outputAlgorithm": "language-output-verifier-v3",
-        "recognitionSchemaVersion": 2,
-        "recognitionAlgorithm": "apple-speech-file-consensus-v2",
-        "accuracyMetricVersion": "normalized-edit-rate-v1",
-        "requiredPassCount": 3,
-    }
+    families = language_families(record)
+    expected_language_verification = (
+        APPLE_SPEECH_VERIFICATION_IDENTITY if "apple-speech" in families
+        else INDEPENDENT_VERIFICATION_IDENTITY
+    )
     if accuracy_evidence_required and (
         run["kind"] != "language" or language_verification is None
         or {key: language_verification.get(key) for key in LANGUAGE_VERIFICATION_IDENTITY_KEYS}
         != expected_language_verification
     ):
         raise HistoryError("language accuracy takes require exact verifier provenance")
+    if language_verification is not None:
+        has_independent = "independentRecognitionAlgorithm" in language_verification
+        if has_independent != ("whisper" in families) or (has_independent and (
+            language_verification["independentRecognitionAlgorithm"]
+            != INDEPENDENT_VERIFICATION_IDENTITY["recognitionAlgorithm"]
+            or not re.fullmatch(r"[0-9a-f]{64}", str(language_verification.get("independentModelIdentitySHA256")))
+        )):
+            raise HistoryError("independent recognizer provenance does not match the declared families")
     if language_verification is not None and run["kind"] != "language":
         raise HistoryError("language verifier provenance belongs only to language records")
 

@@ -43,7 +43,10 @@ acceptance, not a population estimate of language quality.
 
 Requires Built-in Voice and Voice Design **Speed** installed on the paired iPhone.
 
-**Speech Recognition (app):** Phase 3 transcribes each output WAV in the app process. Grant
+**Speech Recognition (app):** Phase 3 transcribes each output WAV in the app process; after the run
+the Mac adds the whisper family over the collected `output.wav` files (`scripts/independent_asr.py`),
+and the publisher requires the two families to agree (`languageVerification.families:
+["apple-speech", "whisper"]`). Grant
 **Settings → Privacy → Speech Recognition → Vocello** once before the first output-gated run.
 
 ### Phase 3 prerequisites (on-device Speech assets)
@@ -203,10 +206,17 @@ Requires test models (`scripts/macos_test.sh models ensure`).
 scripts/macos_test.sh lang-bench --subset quick
 ```
 
-Uses `QWENVOICE_DEBUG=1`, `vocello generate --language …`, and the hint gate against
-`~/Library/Application Support/QwenVoice-Debug/diagnostics/`. CLI Speech is **not** used
-(TCC); output verification is available through the iOS device-diagnostics lane only. Successful
-macOS hint-only evidence is therefore explicitly `partial` in benchmark history.
+Uses `QWENVOICE_DEBUG=1`, `vocello generate --language … --seed … --out …`, and the hint gate
+against `~/Library/Application Support/QwenVoice-Debug/diagnostics/`. Apple Speech is **not**
+available to the CLI (TCC). Spoken content is instead verified after every CLI process has exited by
+`scripts/independent_asr.py`: the pinned `whisper-small` MLX model
+(`config/delivery-evaluator-v2-candidates.json`, `whisper-small-mlx`) is loaded once in a supervised
+subprocess, decodes each take with the language locked to the expected language, detects the language
+from the first 30 s, and the publisher re-scores every transcript against the corpus with the same
+15 % edit-rate gate. The record is `focused` with `languageVerification.families: ["whisper"]`: one
+independent witness, explicitly not a two-family consensus. The recognizer is prepared from the local
+Hugging Face cache by `scripts/prepare_delivery_compact_model_config.py whisper-small-mlx`; nothing
+downloads automatically.
 
 ## Offline gate tests
 

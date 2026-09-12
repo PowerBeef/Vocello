@@ -62,6 +62,7 @@ RESEARCH_PREFIXES = (
     "check_language", "clone_", "emotion_", "mos_", "bench_", "run_local_delivery", "qualify_delivery",
     "prepare_delivery", "build_emotion", "separability", "characterization", "voice_identity",
     "language_bench", "angry_bilingual", "custom_delivery", "secret_sauce", "sampling_promotion",
+    "independent_asr",
 )
 RESEARCH_CONFIG = ("delivery-", "prosody-", "ios-control-audit", "ios-startup-reliability", "language-bench",
                    "voice-identity", "characterization-fixtures", "audio-cadence", "ui-perf-thresholds")

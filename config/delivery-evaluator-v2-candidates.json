@@ -6,7 +6,8 @@
   "normalCIPrerequisite": false,
   "candidateOrder": [
     "sensevoice-small-q8",
-    "distilhubert"
+    "distilhubert",
+    "whisper-small-mlx"
   ],
   "candidates": {
     "sensevoice-small-q8": {
@@ -78,6 +79,47 @@
         "projectionDimensions": 128,
         "projectionVersion": "signed-gaussian-mean-std-five-region-v1",
         "backend": "cpu"
+      }
+    },
+    "whisper-small-mlx": {
+      "modelID": "mlx-community/whisper-small-mlx",
+      "sourceRevision": "45f3915923c7a79a5a5b5a7d909d39aeb0e5630e",
+      "sourceURI": "https://huggingface.co/mlx-community/whisper-small-mlx/tree/45f3915923c7a79a5a5b5a7d909d39aeb0e5630e",
+      "weightsFile": "weights.npz",
+      "weightsSHA256": "55b6674c9b339702d486e2b1573839a66f8ec8f821ed2886993ef717a86b09f5",
+      "supportingFiles": {
+        "config.json": "e8f58e638208af66d5d5d67801259dc7a12d199e971967a9f9d33a8e3635668e"
+      },
+      "license": "Apache-2.0 (OpenAI Whisper weights converted by mlx-community; MIT-licensed mlx-whisper runtime)",
+      "commercialUseCompatible": true,
+      "trainingDataDeclaration": "OpenAI's Whisper paper declares 680,000 hours of weakly supervised multilingual web audio (117,000 hours non-English across 96 languages); the small checkpoint is the 244M-parameter multilingual model, converted to MLX without quantization.",
+      "trainingDataSourceURI": "https://github.com/openai/whisper",
+      "role": "independent-asr-family",
+      "labelMap": {
+        "type": "locked-language-transcript",
+        "languages": {"english": "en", "french": "fr", "german": "de", "spanish": "es", "chinese": "zh", "japanese": "ja"}
+      },
+      "runtimeDependencies": {
+        "mlx": "0.32.0",
+        "mlx-whisper": "0.4.3",
+        "numpy": "2.4.6"
+      },
+      "decodeOptions": {
+        "temperature": 0.0,
+        "conditionOnPreviousText": false,
+        "fp16": true,
+        "wordTimestamps": false,
+        "languageLock": "expected-language",
+        "languageDetection": "first-30-seconds-mel-argmax"
+      },
+      "preprocessingConfig": {
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "format": "pcm-s16le",
+        "normalization": "divide-by-32768",
+        "backend": "mlx",
+        "modelLoadsPerRun": 1,
+        "runsAfterGenerationExit": true
       }
     }
   },

@@ -25,7 +25,6 @@ import shlex
 import subprocess
 import sys
 import tempfile
-import unicodedata
 import wave
 from typing import Any, Iterable
 import xml.etree.ElementTree as ET
@@ -46,6 +45,23 @@ from benchmark_memory import (  # noqa: E402
     qualify_memory_rows,
 )
 from language_bench_evidence import stable_default_seed  # noqa: E402
+from lib.language_metrics import (  # noqa: E402
+    INDEPENDENT_ASR_ALGORITHM,
+    INDEPENDENT_OUTPUT_ALGORITHM,
+    INDEPENDENT_OUTPUT_SCHEMA,
+    INDEPENDENT_RECOGNITION_SCHEMA,
+    INDEPENDENT_REQUIRED_PASS_COUNT,
+    MAX_ACCURACY_ERROR_RATE,
+    MIN_LANGUAGE_MATCH_SCORE,
+    consensus as family_consensus,
+    is_sha256,
+    locale_matches_expected_language,
+    primary_accuracy_metric,
+    recognition_issues,
+    recomputed_accuracy,
+    score_recognition,
+    text_sha256,
+)
 SUCCESS_FINISH = {"eos", "max_tokens", "maxtokens", "completed", "complete", "success", "ok"}
 TRIM_SEVERITY = {"softTrim": 1, "hardTrim": 2, "fullUnload": 3}
 UINT64_MAX = (1 << 64) - 1
@@ -58,23 +74,6 @@ ASR_REQUIRED_PASS_COUNT = 3
 LANGUAGE_ACCURACY_METRIC_VERSION = "normalized-edit-rate-v1"
 LANGUAGE_SEED_POLICY = "sha256-v1-mode-script-language-63bit"
 LANGUAGE_SAMPLING_VARIATION = "expressive"
-LANGUAGE_PASS_SCORE = 0.5
-LANGUAGE_ACCURACY_THRESHOLDS = {
-    "wordErrorRate": 0.15,
-    "characterErrorRate": 0.15,
-}
-LANGUAGE_LOCALE_CODES = {
-    "english": "en",
-    "chinese": "zh",
-    "german": "de",
-    "french": "fr",
-    "russian": "ru",
-    "portuguese": "pt",
-    "spanish": "es",
-    "italian": "it",
-    "japanese": "ja",
-    "korean": "ko",
-}
 SAFE_LOCALE = re.compile(r"^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$")
 SAFE_CUSTOM_SPEAKER = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
 SAFE_DIGEST = re.compile(r"^[0-9a-f]{64}$")
@@ -1765,87 +1764,6 @@ def language_corpus_fixtures(corpus_path: Path) -> dict[str, dict[str, str]]:
     return fixtures
 
 
-def locale_matches_expected_language(identifier: str, expected_language: str) -> bool:
-    expected_code = LANGUAGE_LOCALE_CODES.get(expected_language)
-    if expected_code is None:
-        return False
-    return re.split(r"[-_]", identifier, maxsplit=1)[0].lower() == expected_code
-
-
-def normalized_language_word_tokens(
-    text: str, *, preserve_diacritics: bool = False
-) -> list[str]:
-    """Mirror Swift's language-aware POSIX lowercasing and tokenization."""
-    if preserve_diacritics:
-        folded = unicodedata.normalize("NFKC", text)
-    else:
-        folded = unicodedata.normalize("NFKD", text)
-        folded = "".join(
-            character for character in folded
-            if unicodedata.category(character) != "Mn"
-        )
-    folded = folded.lower()
-    tokens: list[str] = []
-    current: list[str] = []
-    for character in folded:
-        if character.isalnum():
-            current.append(character)
-        elif current:
-            tokens.append("".join(current))
-            current = []
-    if current:
-        tokens.append("".join(current))
-    return tokens
-
-
-def language_edit_metrics(
-    reference: str,
-    hypothesis: str,
-    *,
-    characters: bool,
-    expected_language: str,
-) -> dict[str, Any]:
-    preserve_diacritics = characters and expected_language in {"chinese", "japanese"}
-    lhs_words = normalized_language_word_tokens(
-        reference, preserve_diacritics=preserve_diacritics
-    )
-    rhs_words = normalized_language_word_tokens(
-        hypothesis, preserve_diacritics=preserve_diacritics
-    )
-    lhs: list[Any] = list("".join(lhs_words)) if characters else lhs_words
-    rhs: list[Any] = list("".join(rhs_words)) if characters else rhs_words
-    # Stable tie policy matches VoiceClipTranscriber: diagonal, deletion, insertion.
-    previous = [(0, index, 0) for index in range(len(rhs) + 1)]
-    for left_index, left in enumerate(lhs):
-        current = [(0, 0, left_index + 1)]
-        for right_index, right in enumerate(rhs):
-            diagonal = list(previous[right_index])
-            if left != right:
-                diagonal[0] += 1
-            deletion = list(previous[right_index + 1])
-            deletion[2] += 1
-            insertion = list(current[right_index])
-            insertion[1] += 1
-            candidates = (tuple(diagonal), tuple(deletion), tuple(insertion))
-            best = candidates[0]
-            for candidate in candidates[1:]:
-                if sum(candidate) < sum(best):
-                    best = candidate
-            current.append(best)
-        previous = current
-    substitutions, insertions, deletions = previous[len(rhs)]
-    distance = substitutions + insertions + deletions
-    error_rate = (distance / len(lhs)) if lhs else (0.0 if not rhs else 1.0)
-    return {
-        "referenceCount": len(lhs),
-        "hypothesisCount": len(rhs),
-        "substitutions": substitutions,
-        "insertions": insertions,
-        "deletions": deletions,
-        "errorRate": error_rate,
-    }
-
-
 def uint64_value(value: Any) -> int | None:
     if isinstance(value, bool):
         return None
@@ -2153,7 +2071,7 @@ def sanitized_asr_evidence(
     expect_failure = cell.get("expectedOutcome") == "fail"
     if (
         language_score is None or not 0.0 <= language_score <= 1.0
-        or (language_score < LANGUAGE_PASS_SCORE and not expect_failure)
+        or (language_score < MIN_LANGUAGE_MATCH_SCORE and not expect_failure)
         or word_error_rate is None or word_error_rate < 0.0
         or character_error_rate is None or character_error_rate < 0.0
         or count_fields["referenceTokenCount"] <= 0
@@ -2259,17 +2177,8 @@ def sanitized_asr_evidence(
         or not math.isclose(recognition_duration, pass_duration, rel_tol=1e-9, abs_tol=1e-9)
     ):
         raise PublicationError(f"language cell {cell_id} recognition consensus is inconsistent")
-    word_metrics = language_edit_metrics(
-        reference_script,
-        transcripts[0],
-        characters=False,
-        expected_language=str(expected_language),
-    )
-    character_metrics = language_edit_metrics(
-        reference_script,
-        transcripts[0],
-        characters=True,
-        expected_language=str(expected_language),
+    word_metrics, character_metrics = recomputed_accuracy(
+        reference_script, transcripts[0], str(expected_language),
     )
     recomputed_fields = {
         "referenceTokenCount": word_metrics["referenceCount"],
@@ -2289,15 +2198,11 @@ def sanitized_asr_evidence(
         character_error_rate, character_metrics["errorRate"], rel_tol=1e-9, abs_tol=1e-12
     ):
         raise PublicationError(f"language cell {cell_id} metrics do not match corpus and consensus")
-    expected_accuracy_metric = (
-        "characterErrorRate"
-        if expected_language in {"chinese", "japanese"}
-        else "wordErrorRate"
-    )
+    expected_accuracy_metric = primary_accuracy_metric(str(expected_language))
     accuracy_metric = verification.get("accuracyMetric")
     accuracy_threshold = finite_number(verification.get("accuracyThreshold"))
     accuracy_value = finite_number(verification.get("accuracyValue"))
-    expected_threshold = LANGUAGE_ACCURACY_THRESHOLDS[expected_accuracy_metric]
+    expected_threshold = MAX_ACCURACY_ERROR_RATE
     primary_score = (
         character_error_rate if expected_accuracy_metric == "characterErrorRate" else word_error_rate
     )
@@ -2389,11 +2294,132 @@ def language_output_evidence(
     }
 
 
+def load_independent_recognitions(path: Path, *, run_id: str, platform: str) -> dict[str, Any]:
+    """The producer's untracked evidence file, checked for identity and structure only.
+
+    Every recognition is re-qualified and re-scored per cell by
+    `sanitized_independent_evidence`; nothing in this file is trusted as a verdict.
+    """
+    payload = load_json(path)
+    if (
+        payload.get("schemaVersion") != 1
+        or payload.get("kind") != "independent-asr-language-evidence"
+        or payload.get("runID") != run_id
+        or payload.get("platform") != platform
+        or payload.get("generationProcessExited") is not True
+        or not isinstance(payload.get("cells"), dict)
+    ):
+        raise PublicationError("independent recognition evidence does not belong to this run")
+    producer = payload.get("producer")
+    if not isinstance(producer, dict) or producer.get("algorithmVersion") != INDEPENDENT_ASR_ALGORITHM:
+        raise PublicationError("independent recognition evidence names an unsupported recognizer")
+    envelope = producer.get("resourceEnvelope")
+    if producer.get("modelLaunches", 0) and (not isinstance(envelope, dict) or envelope.get("qualified") is not True):
+        raise PublicationError("independent recognizer ran outside a qualified resource envelope")
+    return payload
+
+
+def sanitized_independent_evidence(
+    *,
+    cell: dict[str, Any],
+    engine_row: dict[str, Any],
+    entry: dict[str, Any],
+    reference_script: str,
+    expected_audio_sha256: Any,
+    duration_seconds: Any,
+    apple_evidence: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Re-qualify and re-score one whisper-family recognition for one cell.
+
+    The audio digest must be the digest the engine published (macOS engine row)
+    or the digest the sentinel bound (iOS output evidence); WER/CER are
+    recomputed from the transcript; and the verdict is combined with the Apple
+    Speech verdict through the family-consensus rule when both exist.
+    """
+    cell_id = str(cell.get("id"))
+    expected_language = str(cell.get("expectedHint"))
+    if not is_sha256(expected_audio_sha256):
+        raise PublicationError(f"language cell {cell_id} has no published WAV digest to bind recognitions to")
+    duration = finite_number(duration_seconds)
+    if duration is None or duration <= 0:
+        raise PublicationError(f"language cell {cell_id} has no output duration to bind recognitions to")
+    if entry.get("generationID") != engine_row.get("generationID") or entry.get("audioSHA256") != expected_audio_sha256:
+        raise PublicationError(f"language cell {cell_id} independent recognition belongs to other audio")
+    recognitions = entry.get("recognitions")
+    if not isinstance(recognitions, list) or len(recognitions) != 1:
+        raise PublicationError(f"language cell {cell_id} needs exactly one independent recognition")
+    recognition = recognitions[0]
+    issues = recognition_issues(
+        recognition, audio_sha256=expected_audio_sha256, script=reference_script,
+        script_sha256=text_sha256(reference_script), language=expected_language,
+        duration_seconds=duration,
+    )
+    if recognition.get("modelFamily") != "whisper" or recognition.get("algorithmVersion") != INDEPENDENT_ASR_ALGORITHM:
+        issues.append("unexpected-family")
+    language_score = finite_number(recognition.get("languageMatchScore"))
+    if language_score is None or not 0.0 <= language_score <= 1.0:
+        issues.append("language-score-invalid")
+    recognition_duration = finite_number(recognition.get("recognitionDurationSeconds"))
+    if recognition_duration is None or recognition_duration <= 0:
+        issues.append("recognition-duration-invalid")
+    if issues:
+        raise PublicationError(
+            f"language cell {cell_id} independent recognition is unqualified: " + ", ".join(sorted(set(issues)))
+        )
+    verdict = score_recognition(recognition, script=reference_script, language=expected_language)
+    expect_failure = cell.get("expectedOutcome") == "fail"
+    votes: dict[str, list[bool]] = {"whisper": [verdict["passed"]]}
+    if apple_evidence is not None:
+        votes["apple-speech"] = [bool(apple_evidence.get("pass"))]
+    agreement = family_consensus(votes)
+    if len(votes) >= 2:
+        status = agreement["status"]
+        if status != ("fail" if expect_failure else "pass"):
+            raise PublicationError(
+                f"language cell {cell_id} recognizer families did not agree on a "
+                f"{'failure' if expect_failure else 'pass'}: {status} ({', '.join(agreement['reasons'])})"
+            )
+    elif verdict["passed"] == expect_failure:
+        raise PublicationError(
+            f"language cell {cell_id} independent recognition "
+            + ("did not fail the negative control" if expect_failure else
+               f"failed: {verdict['accuracyMetric']}={verdict['errorRate']:.3f} "
+               f"detected={recognition.get('detectedLanguage')}")
+        )
+    return {
+        "cell": cell_id,
+        "generationID": str(engine_row.get("generationID")),
+        "family": "whisper",
+        "expectedLanguage": expected_language,
+        "detectedLanguage": str(recognition.get("detectedLanguage")),
+        "languageMatchScore": language_score,
+        "wordErrorRate": verdict["wordErrorRate"],
+        "characterErrorRate": verdict["characterErrorRate"],
+        "accuracyMetric": verdict["accuracyMetric"],
+        "accuracyThreshold": verdict["accuracyThreshold"],
+        "primaryAccuracyScore": verdict["errorRate"],
+        "languagePass": verdict["languagePass"],
+        "accuracyPass": verdict["accuracyPass"],
+        "pass": verdict["passed"],
+        "fullFileProcessed": True,
+        "recognitionDurationSeconds": recognition_duration,
+        "consensus": agreement,
+        "provenance": dict(recognition["provenance"]),
+    }
+
+
 def language_command(args: argparse.Namespace) -> Path:
     cells = selected_language_cells(args.matrix, args.subset)
     output_verified = args.output_gate == "pass"
-    corpus_scripts = language_corpus_scripts(args.corpus) if output_verified else {}
-    if output_verified:
+    independent_gate = args.output_gate == "independent"
+    recognitions_path = getattr(args, "recognitions", None)
+    if independent_gate and recognitions_path is None:
+        raise PublicationError("--output-gate independent requires --recognitions")
+    if recognitions_path is not None and args.output_gate == "not-performed":
+        raise PublicationError("--recognitions contradicts --output-gate not-performed")
+    content_verified = output_verified or independent_gate
+    corpus_scripts = language_corpus_scripts(args.corpus) if content_verified else {}
+    if content_verified:
         missing_scripts = sorted({
             str(cell.get("scriptLang")) for cell in cells
             if not cell.get("skipOutputVerification")
@@ -2525,6 +2551,13 @@ def language_command(args: argparse.Namespace) -> Path:
         if unexpected:
             raise PublicationError(f"language run has unexpected cells: {', '.join(unexpected)}")
     takes = [minimal_take(index, cell_id, row) for index, (cell_id, row) in enumerate(zip(expected_ids, selected), start=1)]
+    if planned_takes is None:
+        # macOS runs have no immutable plan; the lane generates every cell with
+        # the stable per-cell seed and the hint gate has verified the telemetry.
+        for cell, row, take in zip(cells, selected, takes):
+            observed = uint64_value((row.get("notes") or {}).get("samplingSeed"))
+            if observed is not None and observed == stable_default_seed(cell):
+                take["seed"] = observed
     if planned_takes is not None:
         validate_prompt_equivalence(
             planned_takes=planned_takes,
@@ -2583,17 +2616,59 @@ def language_command(args: argparse.Namespace) -> Path:
                 "primaryAccuracyScore": evidence["primaryAccuracyScore"],
                 "accuracyThreshold": evidence["accuracyThreshold"],
             })
+    independent_evidence: list[dict[str, Any]] = []
+    independent_provenance: dict[str, str] | None = None
+    if recognitions_path is not None:
+        recognitions = load_independent_recognitions(
+            recognitions_path, run_id=args.run_id, platform=args.platform,
+        )
+        apple_by_cell = {evidence["cell"]: evidence for evidence in asr_evidence}
+        for cell, row, take in zip(cells, selected, takes):
+            if cell.get("skipOutputVerification"):
+                continue
+            cell_id = str(cell.get("id"))
+            entry = recognitions["cells"].get(cell_id)
+            if entry is None:
+                raise PublicationError(f"language cell {cell_id} lacks independent recognition evidence")
+            output = take.get("output") or {}
+            expected_digest = output.get("fileDigest") or (row.get("notes") or {}).get("samplingWAVDigest")
+            duration = output.get("durationSeconds")
+            evidence = sanitized_independent_evidence(
+                cell=cell, engine_row=row, entry=entry,
+                reference_script=corpus_scripts[str(cell["scriptLang"])],
+                expected_audio_sha256=expected_digest, duration_seconds=duration,
+                apple_evidence=apple_by_cell.get(cell_id),
+            )
+            if independent_provenance is None:
+                independent_provenance = evidence["provenance"]
+            elif independent_provenance != evidence["provenance"]:
+                raise PublicationError("independent recognitions come from more than one recognizer identity")
+            independent_evidence.append(evidence)
+            take.setdefault("accuracyMetric", evidence["accuracyMetric"])
+            take.setdefault("accuracyThreshold", evidence["accuracyThreshold"])
+            take["metrics"].update({
+                "independentWordErrorRate": evidence["wordErrorRate"],
+                "independentCharacterErrorRate": evidence["characterErrorRate"],
+                "independentPrimaryAccuracyScore": evidence["primaryAccuracyScore"],
+                "independentLanguageMatchScore": evidence["languageMatchScore"],
+                "independentLanguagePass": 1.0 if evidence["languagePass"] else 0.0,
+                "independentAccuracyPass": 1.0 if evidence["accuracyPass"] else 0.0,
+                "independentRecognitionDurationSeconds": evidence["recognitionDurationSeconds"],
+            })
+    families = sorted(
+        ({"apple-speech"} if asr_evidence else set()) | ({"whisper"} if independent_evidence else set())
+    )
     # Run-level counts live once in evidence.languageVerification (see
     # record_shell below); per-take metrics carry only that take's verdicts.
     output_cells = [cell for cell in cells if not cell.get("skipOutputVerification")]
     language_verification_counts = {
         "hintCellsPassed": len(cells),
         "hintCellsExpected": len(cells),
-        "outputCellsPassed": len(output_cells) if output_verified else 0,
-        "outputCellsExpected": len(output_cells) if output_verified else 0,
+        "outputCellsPassed": len(output_cells) if content_verified else 0,
+        "outputCellsExpected": len(output_cells) if content_verified else 0,
         "negativeControlsConfirmed": (
             sum(1 for cell in output_cells if cell.get("expectedOutcome") == "fail")
-            if output_verified else 0
+            if content_verified else 0
         ),
     }
     # Language benchmarks are generation benchmarks, not metadata-only checks.
@@ -2611,7 +2686,7 @@ def language_command(args: argparse.Namespace) -> Path:
     except MemoryEvidenceError as error:
         raise PublicationError(f"language memory qualification failed: {error}") from error
     apply_memory_qualification(takes, qualified_memory)
-    matrix_scope = "focused" if output_verified else "partial"
+    matrix_scope = "focused" if content_verified else "partial"
     started = args.started_at
     finished = args.finished_at or utc_now()
     fixture_digests: dict[str, str] = {}
@@ -2630,15 +2705,20 @@ def language_command(args: argparse.Namespace) -> Path:
         fixture_digests["design"] = args.design_fixture_digest
     require_fixture_cross_check(takes, fixture_digests, source=f"{args.platform} language runner")
     analysis_profile: dict[str, Any] | None = None
-    if asr_evidence:
+    if asr_evidence or independent_evidence:
         evidence_by_cell = {evidence["cell"]: evidence for evidence in asr_evidence}
+        independent_by_cell = {evidence["cell"]: evidence for evidence in independent_evidence}
         analysis_takes: list[dict[str, Any]] = []
-        for cell, take, planned in zip(cells, takes, planned_takes or []):
+        planned_by_cell = {
+            str(planned.get("cellID")): planned for planned in (planned_takes or [])
+        }
+        for cell, take in zip(cells, takes):
             cell_id = str(cell["id"])
+            planned = planned_by_cell.get(cell_id, {})
             entry: dict[str, Any] = {
                 "cell": cell_id,
                 "seed": take.get("seed"),
-                "samplingVariation": planned.get("samplingVariation"),
+                "samplingVariation": planned.get("samplingVariation", LANGUAGE_SAMPLING_VARIATION),
                 "promptEquivalenceGroup": planned.get("promptEquivalenceGroup"),
                 "outputVerificationRequired": not bool(cell.get("skipOutputVerification")),
                 "customSpeakerID": planned.get("customSpeakerID"),
@@ -2658,12 +2738,23 @@ def language_command(args: argparse.Namespace) -> Path:
                     "recognitionAlgorithm": evidence["recognitionAlgorithm"],
                     "requiredPassCount": evidence["recognitionPassCount"],
                 })
+            independent = independent_by_cell.get(cell_id)
+            if independent is not None:
+                entry["independentRecognition"] = {
+                    "family": "whisper",
+                    "algorithm": INDEPENDENT_ASR_ALGORITHM,
+                    "provenance": independent["provenance"],
+                    "accuracyMetric": independent["accuracyMetric"],
+                    "accuracyThreshold": independent["accuracyThreshold"],
+                }
             analysis_takes.append(entry)
         analysis_profile = {
-            "contract": "autonomous-language-output-v3",
-            "seedPolicy": plan.get("seedPolicy") if isinstance(plan, dict) else None,
+            "contract": "autonomous-language-output-v3" if asr_evidence else INDEPENDENT_OUTPUT_ALGORITHM,
+            "seedPolicy": plan.get("seedPolicy") if isinstance(plan, dict) else LANGUAGE_SEED_POLICY,
             "takes": analysis_takes,
         }
+        if independent_evidence:
+            analysis_profile["families"] = families
     selected_digest_payload: dict[str, Any] = {
         "telemetry": selected,
         "outputVerification": asr_evidence,
@@ -2671,6 +2762,8 @@ def language_command(args: argparse.Namespace) -> Path:
     }
     if selected_app:
         selected_digest_payload["appTelemetry"] = selected_app
+    if independent_evidence:
+        selected_digest_payload["independentRecognition"] = independent_evidence
     if analysis_profile is not None:
         selected_digest_payload["analysisProfile"] = analysis_profile
     inputs = {"matrixHash": digest_file(args.matrix), "corpusHash": digest_file(args.corpus)}
@@ -2712,7 +2805,23 @@ def language_command(args: argparse.Namespace) -> Path:
             "recognitionAlgorithm": ASR_EVIDENCE_ALGORITHM,
             "accuracyMetricVersion": LANGUAGE_ACCURACY_METRIC_VERSION,
             "requiredPassCount": ASR_REQUIRED_PASS_COUNT,
-            "families": ["apple-speech"],
+        })
+    elif independent_evidence:
+        # Single independent family: an honest one-witness record, never consensus.
+        language_verification.update({
+            "outputSchemaVersion": INDEPENDENT_OUTPUT_SCHEMA,
+            "outputAlgorithm": INDEPENDENT_OUTPUT_ALGORITHM,
+            "recognitionSchemaVersion": INDEPENDENT_RECOGNITION_SCHEMA,
+            "recognitionAlgorithm": INDEPENDENT_ASR_ALGORITHM,
+            "accuracyMetricVersion": LANGUAGE_ACCURACY_METRIC_VERSION,
+            "requiredPassCount": INDEPENDENT_REQUIRED_PASS_COUNT,
+        })
+    if families:
+        language_verification["families"] = families
+    if independent_evidence and independent_provenance is not None:
+        language_verification.update({
+            "independentRecognitionAlgorithm": INDEPENDENT_ASR_ALGORITHM,
+            "independentModelIdentitySHA256": independent_provenance["modelIdentitySHA256"],
         })
     manifest["historyRecord"]["evidence"]["languageVerification"] = language_verification
     return write_and_record(
@@ -3661,7 +3770,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     language.add_argument("--corpus", type=Path, required=True)
     language.add_argument("--plan", type=Path)
     language.add_argument("--subset", choices=("quick", "full"), required=True)
-    language.add_argument("--output-gate", choices=("pass", "not-performed"), required=True)
+    language.add_argument(
+        "--output-gate", choices=("pass", "independent", "not-performed"), required=True,
+        help="pass: in-app Apple Speech verification; independent: whisper-family recognitions only",
+    )
+    language.add_argument(
+        "--recognitions", type=Path,
+        help="untracked independent-asr language evidence (required for independent, optional with pass)",
+    )
     language.add_argument("--started-at", required=True)
     language.add_argument("--finished-at")
     language.add_argument("--label", default="")

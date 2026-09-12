@@ -57,6 +57,41 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(PreparationError, "adoption requirements"):
             validate_candidate_contract(gate_drift)
 
+    def test_whisper_candidate_prepares_from_the_local_snapshot_without_downloading(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            contract = copy.deepcopy(self.contract)
+            candidate = contract["candidates"]["whisper-small-mlx"]
+            snapshot = root / "whisper-small-mlx"
+            snapshot.mkdir()
+            (snapshot / "weights.npz").write_bytes(b"fixture whisper weights")
+            (snapshot / "config.json").write_text('{"n_mels": 80}')
+            candidate["weightsSHA256"] = file_sha256(snapshot / "weights.npz")
+            candidate["supportingFiles"]["config.json"] = file_sha256(snapshot / "config.json")
+            contract_path = root / "contract.json"
+            contract_path.write_text(json.dumps(contract))
+            pins = candidate["runtimeDependencies"]
+            with patch("prepare_delivery_compact_model_config._whisper_runtime_versions", return_value=dict(pins)):
+                config = prepare("whisper-small-mlx", contract_path=contract_path, model_root=root)
+            self.assertEqual(config["outputFormat"], "whisper-json")
+            self.assertEqual(config["decodeOptions"]["languageLock"], "expected-language")
+            self.assertEqual(config["weightsPath"], str(snapshot / "weights.npz"))
+            self.assertIn("independent_asr.py", config["commandTemplate"][1])
+            self.assertIs(validate_adapter_config(config), config)
+
+            drifted = dict(pins, **{"mlx-whisper": "0.0.1"})
+            with patch("prepare_delivery_compact_model_config._whisper_runtime_versions", return_value=drifted):
+                with self.assertRaisesRegex(PreparationError, "dependency versions drifted"):
+                    prepare("whisper-small-mlx", contract_path=contract_path, model_root=root)
+            (snapshot / "weights.npz").write_bytes(b"tampered")
+            with patch("prepare_delivery_compact_model_config._whisper_runtime_versions", return_value=dict(pins)):
+                with self.assertRaisesRegex(PreparationError, "digest changed"):
+                    prepare("whisper-small-mlx", contract_path=contract_path, model_root=root)
+            unlocked = copy.deepcopy(contract)
+            unlocked["candidates"]["whisper-small-mlx"]["decodeOptions"]["languageLock"] = "auto"
+            with self.assertRaisesRegex(PreparationError, "lock the language"):
+                validate_candidate_contract(unlocked)
+
     def test_prepared_config_cache_adapter_and_cascade_agree_on_actual_model_input(self) -> None:
         # Only the external model process is a fixture. Exercise the real config
         # producer, validators, canonical writer, compact adapter and composer.

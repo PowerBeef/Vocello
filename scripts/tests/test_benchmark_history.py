@@ -443,6 +443,60 @@ class BenchmarkHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(history.HistoryError, "playbackStartSource"):
             self.publish(invalid, "playback-source-invalid")
 
+    def test_language_independent_family_has_its_own_identity_and_metrics(self) -> None:
+        valid = record_fixture(run_id="independent-valid", kind="language")
+        valid["evidence"]["languageVerification"] = {
+            **history.INDEPENDENT_VERIFICATION_IDENTITY,
+            "families": ["whisper"],
+            "independentRecognitionAlgorithm": "mlx-whisper-locked-decode-v1",
+            "independentModelIdentitySHA256": "2" * 64,
+            "hintCellsPassed": 1, "hintCellsExpected": 1,
+            "outputCellsPassed": 1, "outputCellsExpected": 1, "negativeControlsConfirmed": 0,
+        }
+        valid["takes"][0].update({"accuracyMetric": "wordErrorRate", "accuracyThreshold": 0.15})
+        valid["takes"][0]["metrics"].update({
+            "independentWordErrorRate": 0.125, "independentCharacterErrorRate": 0.1,
+            "independentPrimaryAccuracyScore": 0.125, "independentLanguageMatchScore": 0.97,
+            "independentLanguagePass": 1.0, "independentAccuracyPass": 1.0,
+            "independentRecognitionDurationSeconds": 0.4,
+        })
+        self.publish(valid, "independent-valid")
+
+        mutations = {
+            "apple identity for a whisper-only record": lambda record: record["evidence"]["languageVerification"].update(
+                {"recognitionAlgorithm": "apple-speech-file-consensus-v2"}),
+            "provenance without the family": lambda record: record["evidence"]["languageVerification"].__setitem__(
+                "families", ["apple-speech"]),
+            "missing model identity": lambda record: record["evidence"]["languageVerification"].pop(
+                "independentModelIdentitySHA256"),
+            "score above the gate": lambda record: record["takes"][0]["metrics"].update(
+                {"independentWordErrorRate": 0.2, "independentPrimaryAccuracyScore": 0.2}),
+            "in-app metrics without apple-speech": lambda record: record["takes"][0]["metrics"].update(
+                {"wordErrorRate": 0.1}),
+            "unsorted families": lambda record: record["evidence"]["languageVerification"].__setitem__(
+                "families", ["whisper", "apple-speech"]),
+        }
+        for index, (label, mutate) in enumerate(mutations.items()):
+            record = copy.deepcopy(valid)
+            record["run"]["id"] = f"independent-invalid-{index}"
+            mutate(record)
+            with self.subTest(label=label), self.assertRaises(history.HistoryError):
+                self.publish(record, f"independent-invalid-{index}")
+
+        legacy = record_fixture(run_id="apple-legacy", kind="language")
+        legacy["evidence"]["languageVerification"] = dict(history.APPLE_SPEECH_VERIFICATION_IDENTITY)
+        legacy["takes"][0].update({"accuracyMetric": "wordErrorRate", "accuracyThreshold": 0.15})
+        legacy["takes"][0]["metrics"].update({
+            "wordErrorRate": 0.125, "characterErrorRate": 0.125, "primaryAccuracyScore": 0.125,
+            "accuracyThreshold": 0.15, "languageMatchScore": 0.9, "outputLanguagePass": 1.0,
+            "outputAccuracyPass": 1.0, "referenceTokenCount": 8.0, "hypothesisTokenCount": 8.0,
+            "referenceCharacterCount": 32.0, "hypothesisCharacterCount": 32.0, "substitutions": 1.0,
+            "insertions": 0.0, "deletions": 0.0, "characterSubstitutions": 4.0,
+            "characterInsertions": 0.0, "characterDeletions": 0.0, "recognitionPassCount": 3.0,
+            "recognitionDurationSeconds": 0.3,
+        })
+        self.publish(legacy, "apple-legacy")
+
     def test_language_take_accuracy_gate_is_bounded_and_paired(self) -> None:
         valid = record_fixture(run_id="accuracy-valid", kind="language")
         provenance = {

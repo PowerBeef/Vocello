@@ -221,33 +221,80 @@
         "languageVerification": {
           "additionalProperties": false,
           "properties": {
+            "outputSchemaVersion": {
+              "enum": [
+                3,
+                1
+              ]
+            },
+            "outputAlgorithm": {
+              "enum": [
+                "language-output-verifier-v3",
+                "independent-asr-output-v1"
+              ]
+            },
+            "recognitionSchemaVersion": {
+              "enum": [
+                2,
+                1
+              ]
+            },
+            "recognitionAlgorithm": {
+              "enum": [
+                "apple-speech-file-consensus-v2",
+                "mlx-whisper-locked-decode-v1"
+              ]
+            },
             "accuracyMetricVersion": {
               "const": "normalized-edit-rate-v1"
             },
-            "outputAlgorithm": {
-              "const": "language-output-verifier-v3"
-            },
-            "outputSchemaVersion": {
-              "const": 3
-            },
-            "recognitionAlgorithm": {
-              "const": "apple-speech-file-consensus-v2"
-            },
-            "recognitionSchemaVersion": {
-              "const": 2
-            },
             "requiredPassCount": {
-              "const": 3
+              "enum": [
+                3,
+                1
+              ]
+            },
+            "hintCellsPassed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "hintCellsExpected": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "outputCellsPassed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "outputCellsExpected": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "negativeControlsConfirmed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "families": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "apple-speech",
+                  "whisper",
+                  "sensevoice"
+                ]
+              }
+            },
+            "independentRecognitionAlgorithm": {
+              "const": "mlx-whisper-locked-decode-v1"
+            },
+            "independentModelIdentitySHA256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
             }
           },
-          "required": [
-            "outputSchemaVersion",
-            "outputAlgorithm",
-            "recognitionSchemaVersion",
-            "recognitionAlgorithm",
-            "accuracyMetricVersion",
-            "requiredPassCount"
-          ],
+          "required": [],
           "type": "object"
         },
         "trace": {

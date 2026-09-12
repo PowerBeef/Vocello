@@ -26,7 +26,6 @@ import re
 import subprocess
 import sys
 from typing import Any
-import unicodedata
 
 sys.path.insert(0, os.path.dirname(__file__))
 from check_language_hints import load_json, select_cells
@@ -39,20 +38,15 @@ from language_bench_evidence import (
 )
 
 
-MAX_ACCURACY_ERROR_RATE = 0.15
-MIN_LANGUAGE_MATCH_SCORE = 0.5
-LANGUAGE_LOCALE_CODES = {
-    "english": "en",
-    "chinese": "zh",
-    "german": "de",
-    "french": "fr",
-    "russian": "ru",
-    "portuguese": "pt",
-    "spanish": "es",
-    "italian": "it",
-    "japanese": "ja",
-    "korean": "ko",
-}
+from lib.language_metrics import (  # noqa: E402
+    MAX_ACCURACY_ERROR_RATE,
+    MIN_LANGUAGE_MATCH_SCORE,
+    edge_allowance_seconds,
+    edit_metrics,
+    locale_matches_expected_language,
+    normalized_word_tokens,
+    recomputed_accuracy,
+)
 
 # Optional operator-side diagnostic only. No CI/release installation, automatic
 # acquisition, homophone folding or connection to validate_structured_verification.
@@ -200,98 +194,6 @@ def nonnegative_int(value: Any) -> int | None:
     return value
 
 
-def locale_matches_expected_language(identifier: str, expected_language: str) -> bool:
-    expected_code = LANGUAGE_LOCALE_CODES.get(expected_language)
-    if expected_code is None:
-        return False
-    base_code = re.split(r"[-_]", identifier, maxsplit=1)[0].lower()
-    return base_code == expected_code
-
-
-def normalized_word_tokens(text: str, *, preserve_diacritics: bool = False) -> list[str]:
-    # Swift uses diacritic+width folding with en_US_POSIX, lowercase, then
-    # Unicode CharacterSet.alphanumerics boundaries. NFKD + mark removal and
-    # Unicode isalnum reproduce that contract for this tracked corpus.
-    if preserve_diacritics:
-        # CJK CER must distinguish Japanese dakuten/handakuten while still
-        # normalizing full-width compatibility forms.
-        folded = unicodedata.normalize("NFKC", text)
-    else:
-        folded = unicodedata.normalize("NFKD", text)
-        folded = "".join(
-            character for character in folded
-            if unicodedata.category(character) != "Mn"
-        )
-    folded = folded.lower()
-    tokens: list[str] = []
-    current: list[str] = []
-    for character in folded:
-        if character.isalnum():
-            current.append(character)
-        elif current:
-            tokens.append("".join(current))
-            current = []
-    if current:
-        tokens.append("".join(current))
-    return tokens
-
-
-def edit_metrics(reference: list[str], hypothesis: list[str]) -> dict[str, int | float]:
-    # Match the Swift stable tie policy: diagonal/substitution, then deletion,
-    # then insertion. Retaining operation counts prevents a forged aggregate WER.
-    previous = [
-        {"substitutions": 0, "insertions": index, "deletions": 0}
-        for index in range(len(hypothesis) + 1)
-    ]
-    for left_index, left in enumerate(reference):
-        current = [{"substitutions": 0, "insertions": 0, "deletions": left_index + 1}]
-        for right_index, right in enumerate(hypothesis):
-            diagonal = dict(previous[right_index])
-            if left != right:
-                diagonal["substitutions"] += 1
-            deletion = dict(previous[right_index + 1])
-            deletion["deletions"] += 1
-            insertion = dict(current[right_index])
-            insertion["insertions"] += 1
-
-            def distance(value: dict[str, int]) -> int:
-                return value["substitutions"] + value["insertions"] + value["deletions"]
-
-            best = diagonal
-            if distance(deletion) < distance(best):
-                best = deletion
-            if distance(insertion) < distance(best):
-                best = insertion
-            current.append(best)
-        previous = current
-    final = previous[-1]
-    distance = final["substitutions"] + final["insertions"] + final["deletions"]
-    rate = (distance / len(reference)) if reference else (0.0 if not hypothesis else 1.0)
-    return {
-        **final,
-        "referenceCount": len(reference),
-        "hypothesisCount": len(hypothesis),
-        "errorRate": rate,
-    }
-
-
-def recomputed_accuracy(
-    reference: str, hypothesis: str, expected_language: str
-) -> tuple[dict[str, int | float], dict[str, int | float]]:
-    reference_words = normalized_word_tokens(reference)
-    hypothesis_words = normalized_word_tokens(hypothesis)
-    word = edit_metrics(reference_words, hypothesis_words)
-    preserve_diacritics = expected_language in {"chinese", "japanese"}
-    reference_characters = "".join(
-        normalized_word_tokens(reference, preserve_diacritics=preserve_diacritics)
-    )
-    hypothesis_characters = "".join(
-        normalized_word_tokens(hypothesis, preserve_diacritics=preserve_diacritics)
-    )
-    character = edit_metrics(list(reference_characters), list(hypothesis_characters))
-    return word, character
-
-
 def audio_edge_evidence_issues(
     verification: dict[str, Any], *, output_evidence: Any = None,
 ) -> list[str]:
@@ -325,7 +227,7 @@ def audio_edge_evidence_issues(
     if not isinstance(repetitions, list) or len(repetitions) != 3:
         return ["output-audio-edge-evidence-missing"]
     # Same min/max/proportion and end tolerance as the shipping Swift policy.
-    allowance = min(2.5, max(1.0, duration * 0.15))
+    allowance = edge_allowance_seconds(duration)
     for repetition in repetitions:
         if not isinstance(repetition, dict):
             return ["output-audio-edge-evidence-missing"]

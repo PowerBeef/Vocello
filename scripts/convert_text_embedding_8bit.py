@@ -33,6 +33,7 @@ import os
 import shutil
 import subprocess
 import sys
+from lib import jsonio  # noqa: E402
 
 EMBEDDING_KEY = "talker.model.text_embedding.weight"
 EXPECTED_SHAPE = (151936, 2048)
@@ -55,12 +56,7 @@ MIRRORED_FILES = [
 ]
 
 
-def sha256_file(path: str) -> str:
-    digest = hashlib.sha256()
-    with open(path, "rb") as handle:
-        for chunk in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+sha256_file = jsonio.sha256_file
 
 
 def clone_or_copy(source: str, target: str) -> None:

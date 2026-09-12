@@ -62,3 +62,35 @@ else:
     print(value)
 PY
 }
+
+
+# --- Lane helpers shared by macos_test.sh, ui_test.sh and ios_device.sh -----------------
+# Coloured progress lines on stderr; `die` exits 1. Byte-identical to the copies the
+# three lane scripts carried until 2026-09-12.
+note() { printf '\033[0;36m==>\033[0m %s\n' "$*" >&2; }
+warn() { printf '\033[0;33m[warn]\033[0m %s\n' "$*" >&2; }
+die()  { printf '\033[0;31m[error]\033[0m %s\n' "$*" >&2; exit 1; }
+
+# `--label` values are opaque record identifiers, never free text.
+validate_benchmark_label() {
+  local value="$1"
+  [[ -z "$value" || "$value" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$ ]] \
+    || die "--label must be an opaque 1-96 character ID using letters, digits, dot, underscore, or hyphen"
+}
+
+benchmark_nonce() {
+  python3 -c 'import secrets; print(secrets.token_hex(4))'
+}
+
+# Publish one qualified artifact directory into benchmarks/runs; the evidence is
+# preserved and the exact repair command printed when publication fails.
+record_benchmark_history() {
+  local artifacts="$1"
+  local scripts_dir
+  scripts_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  python3 "$scripts_dir/benchmark_history.py" record --artifact-dir "$artifacts" || {
+    warn "benchmark passed, but history publication failed; evidence is preserved in $artifacts"
+    warn "repair: python3 scripts/benchmark_history.py record --artifact-dir '$artifacts'"
+    return 1
+  }
+}

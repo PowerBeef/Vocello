@@ -20,6 +20,10 @@ import shutil
 import sys
 import tempfile
 from typing import Any
+try:  # imported as `lib.<module>` from scripts/, or by bare name from scripts/lib
+    from lib import jsonio
+except ImportError:  # pragma: no cover - bare-name import path
+    import jsonio  # type: ignore[no-redef]
 
 
 GIB = 1024 ** 3
@@ -48,35 +52,18 @@ class RetentionError(RuntimeError):
 
 
 def utc_now() -> str:
-    return dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+    return jsonio.utc_now(whole_seconds=False)
 
 
 def load_json(path: Path) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise RetentionError(f"could not read {path.name}: {error}") from error
-    if not isinstance(value, dict):
-        raise RetentionError(f"{path.name} must contain a JSON object")
-    return value
+    return jsonio.load_json(path, error=RetentionError, redact="name")
 
 
 def digest_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    try:
-        with path.open("rb") as stream:
-            for block in iter(lambda: stream.read(1024 * 1024), b""):
-                digest.update(block)
-    except OSError as error:
-        raise RetentionError(f"could not hash {path}: {error}") from error
-    return digest.hexdigest()
+    return jsonio.sha256_file(path, error=RetentionError)
 
 
-def canonical_bytes(value: Any) -> bytes:
-    return json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
-        allow_nan=False,
-    ).encode("utf-8")
+canonical_bytes = jsonio.canonical_bytes
 
 
 def trace_directory_digest(trace: Path) -> str:
@@ -106,21 +93,7 @@ def retention_projection(trace: dict[str, Any]) -> dict[str, Any]:
     return {key: trace.get(key) for key in keys}
 
 
-def atomic_json_write(path: Path, value: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-            json.dump(value, stream, indent=2, sort_keys=True, ensure_ascii=True)
-            stream.write("\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    finally:
-        try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
+atomic_json_write = jsonio.atomic_json
 
 
 def safe_relative(path: Path, root: Path) -> str:

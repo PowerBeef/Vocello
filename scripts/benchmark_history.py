@@ -38,6 +38,7 @@ if str(SCRIPT_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIRECTORY))
 from build_output_policy import load_policy
 from lib import rtf as rtf_semantics
+from lib import jsonio  # noqa: E402
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -465,10 +466,7 @@ class HistoryError(RuntimeError):
     pass
 
 
-def canonical_bytes(value: Any) -> bytes:
-    return json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
-    ).encode("utf-8")
+canonical_bytes = jsonio.canonical_bytes
 
 
 def stored_json_bytes(value: Any) -> bytes:
@@ -487,12 +485,7 @@ def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def file_digest(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+file_digest = jsonio.sha256_file
 
 
 def record_digest(record: dict[str, Any]) -> str:
@@ -511,39 +504,15 @@ def run_command(arguments: list[str], *, check: bool = True) -> str:
     return result.stdout.strip()
 
 
-def reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    value: dict[str, Any] = {}
-    for key, child in pairs:
-        if key in value:
-            raise HistoryError(f"duplicate JSON key: {key}")
-        value[key] = child
-    return value
-
-
 def load_json(path: Path) -> Any:
-    try:
-        return json.loads(
-            path.read_text(encoding="utf-8"), object_pairs_hook=reject_duplicate_json_keys
-        )
-    except (OSError, json.JSONDecodeError) as error:
-        raise HistoryError(f"cannot read JSON {path}: {error}") from error
+    return jsonio.load_json(path, error=HistoryError, require_object=False, reject_duplicate_keys=True)
 
 
 def atomic_json_write(path: Path, value: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
     encoded = stored_json_bytes(value)
     if len(encoded) > MAX_RECORD_BYTES:
         raise HistoryError(f"record exceeds {MAX_RECORD_BYTES} bytes ({len(encoded)} bytes)")
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    try:
-        with os.fdopen(descriptor, "wb") as handle:
-            handle.write(encoded)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+    jsonio.atomic_write_bytes(path, encoded)
 
 
 def atomic_text_write(path: Path, text: str) -> None:

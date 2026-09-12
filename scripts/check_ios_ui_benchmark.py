@@ -34,6 +34,7 @@ from benchmark_memory import (  # noqa: E402
     REQUIRED_TELEMETRY_SCHEMA,
     qualify_memory_rows,
 )
+from lib import jsonio  # noqa: E402
 
 DEFAULT_MODES = ["custom", "design", "clone"]
 DEFAULT_LENGTHS = ["short", "medium", "long"]
@@ -560,21 +561,7 @@ def history_record_schema_version(history_takes: list) -> int:
         raise SystemExit(str(error)) from error
 
 
-def write_json_atomic(path: Path, payload: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2, sort_keys=True)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    finally:
-        try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
+write_json_atomic = jsonio.atomic_json
 
 
 def main() -> int:

@@ -41,6 +41,7 @@ from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa:
 from lib.audio_qc import (  # noqa: E402
     SUCCESS_FINISH,
     AudioQCError,
+    finite_number as audio_qc_finite_number,
     qc_record,
     quality_identity_fields,
 )
@@ -69,6 +70,7 @@ from lib.language_metrics import (  # noqa: E402
     score_recognition,
     text_sha256,
 )
+from lib import jsonio  # noqa: E402
 TRIM_SEVERITY = {"softTrim": 1, "hardTrim": 2, "fullUnload": 3}
 UINT64_MAX = (1 << 64) - 1
 LANGUAGE_SENTINEL_SCHEMA = 2
@@ -100,13 +102,7 @@ def _load_history_module():
 
 
 def load_json(path: Path) -> dict[str, Any]:
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise PublicationError(f"cannot read JSON {path}: {error}") from error
-    if not isinstance(payload, dict):
-        raise PublicationError(f"expected a JSON object: {path}")
-    return payload
+    return jsonio.load_json(path, error=PublicationError)
 
 
 def canonical_hardware_profile(platform: str) -> dict[str, Any]:
@@ -255,25 +251,14 @@ def ios_run_hardware_evidence(diagnostics: Path, run_id: str) -> list[dict[str, 
     }]
 
 
-def canonical_bytes(value: Any) -> bytes:
-    return json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
-    ).encode("utf-8")
+canonical_bytes = jsonio.canonical_bytes
 
 
-def digest_bytes(value: bytes) -> str:
-    return hashlib.sha256(value).hexdigest()
+digest_bytes = jsonio.sha256_bytes
 
 
 def digest_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    try:
-        with path.open("rb") as handle:
-            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-                digest.update(chunk)
-    except OSError as error:
-        raise PublicationError(f"cannot hash {path}: {error}") from error
-    return digest.hexdigest()
+    return jsonio.sha256_file(path, error=PublicationError)
 
 
 IOS_APP_EXECUTABLE = ROOT / "build/cache/xcode/ios-device/Build/Products/Release-iphoneos/Vocello.app/Vocello"
@@ -372,23 +357,11 @@ def validated_macos_cli_optimization(
     return "-O"
 
 
-def utc_now() -> str:
-    return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+utc_now = jsonio.utc_now
 
 
 def atomic_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    encoded = (json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=True, allow_nan=False) + "\n").encode("utf-8")
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    try:
-        with os.fdopen(descriptor, "wb") as handle:
-            handle.write(encoded)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+    jsonio.atomic_json(path, payload, allow_nan=False)
 
 
 def history_git_state() -> dict[str, Any]:
@@ -460,10 +433,7 @@ def crash_delta_from_snapshot(
     return {"passed": True, "count": 0}
 
 
-def finite_number(value: Any) -> float | None:
-    if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value)):
-        return float(value)
-    return None
+finite_number = audio_qc_finite_number
 
 
 def find_engine_files(diagnostics: Path) -> list[Path]:

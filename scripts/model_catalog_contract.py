@@ -19,6 +19,7 @@ import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import unquote, urlsplit
+from lib import jsonio  # noqa: E402
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -56,7 +57,7 @@ class CatalogContractError(RuntimeError):
 
 
 def canonical_bytes(value: Any) -> bytes:
-    return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode()
+    return jsonio.canonical_bytes(value, ascii=False, newline=True, allow_nan=True)
 
 
 def pretty_bytes(value: Any) -> bytes:
@@ -77,10 +78,7 @@ def canonical_identity_digest(domain: str, fields: list[str]) -> str:
 
 
 def load_json(path: Path) -> Any:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise CatalogContractError(f"cannot read {path}: {error}") from error
+    return jsonio.load_json(path, error=CatalogContractError, require_object=False)
 
 
 def is_safe_relative_path(value: object) -> bool:

@@ -12,6 +12,7 @@ import re
 import sys
 import tempfile
 from urllib.parse import urlparse
+from lib import jsonio  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,8 +27,7 @@ class ContractError(ValueError):
     pass
 
 
-def digest(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
+digest = jsonio.sha256_bytes
 
 
 def read_bytes(root: Path, relative: str | Path) -> bytes:

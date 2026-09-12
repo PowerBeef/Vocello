@@ -45,6 +45,7 @@ from delivery_experiment import (
     validate_contract,
     validate_corpus,
 )
+from lib import jsonio  # noqa: E402
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -85,29 +86,11 @@ def classify_cli_failure(stderr: str) -> str:
     return "unclassified-cli-error"
 
 
-def file_sha256(path: Path) -> str:
-    hasher = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            hasher.update(block)
-    return hasher.hexdigest()
+file_sha256 = jsonio.sha256_file
 
 
 def atomic_json(path: Path, value: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}-", dir=path.parent)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(value, handle, indent=2, sort_keys=True, ensure_ascii=False)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    finally:
-        try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
+    jsonio.atomic_json(path, value, ascii=False)
 
 
 def _json_stdout(result: subprocess.CompletedProcess[str], label: str) -> Any:

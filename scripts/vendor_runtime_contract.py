@@ -12,6 +12,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from lib import jsonio  # noqa: E402
 
 
 RUNTIME_RELATIVE = Path("Packages/VocelloQwen3Core")
@@ -537,14 +538,7 @@ def git_tree_relative_paths(repo_root: Path, commit: str, root: Path) -> set[str
 def canonical_record_digest(record: dict) -> str:
     unsigned = dict(record)
     unsigned.pop("digest", None)
-    encoded = json.dumps(
-        unsigned,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=True,
-        allow_nan=False,
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+    return jsonio.sha256_json(unsigned)
 
 
 def benchmark_record_is_eligible(record: dict) -> bool:

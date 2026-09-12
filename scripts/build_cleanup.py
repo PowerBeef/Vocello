@@ -37,6 +37,7 @@ from profile_trace_retention import (
     profile_capture_time,
     valid_failed_profile_for_compaction,
 )
+from lib import jsonio  # noqa: E402
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -57,13 +58,7 @@ class CleanupError(RuntimeError):
 
 
 def load_json(path: Path) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise CleanupError(f"could not read {path}: {error}") from error
-    if not isinstance(value, dict):
-        raise CleanupError(f"{path} must contain a JSON object")
-    return value
+    return jsonio.load_json(path, error=CleanupError)
 
 
 def load_policy() -> dict[str, Any]:
@@ -177,19 +172,10 @@ def human_bytes(value: int) -> str:
     return f"{amount:.0f}{units[index]}" if index == 0 else f"{amount:.2f}{units[index]}"
 
 
-def canonical_digest(value: Any) -> str:
-    encoded = json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+canonical_digest = jsonio.sha256_json
 
 
-def file_digest(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+file_digest = jsonio.sha256_file
 
 
 def trace_digest(trace: Path) -> str:
@@ -201,21 +187,7 @@ def trace_digest(trace: Path) -> str:
     return canonical_digest(rows)
 
 
-def atomic_json(path: Path, value: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-            json.dump(value, stream, indent=2, sort_keys=True, ensure_ascii=True)
-            stream.write("\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    finally:
-        try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
+atomic_json = jsonio.atomic_json
 
 
 def tracked_paths_below(path: Path) -> list[str]:

@@ -23,6 +23,7 @@ import wave
 from typing import Any
 
 from check_language_output import audio_edge_evidence_issues
+from lib import jsonio  # noqa: E402
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -37,27 +38,14 @@ class ReliabilityError(ValueError):
 
 
 def load_json(path: Path) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise ReliabilityError(f"cannot read {path.name}: {error}") from error
-    if not isinstance(value, dict):
-        raise ReliabilityError(f"{path.name} must contain a JSON object")
-    return value
+    return jsonio.load_json(path, error=ReliabilityError, redact="name")
 
 
 def canonical_digest(value: Any) -> str:
-    return hashlib.sha256(json.dumps(
-        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")).hexdigest()
+    return jsonio.sha256_json(value, ascii=False, allow_nan=True)
 
 
-def file_digest(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+file_digest = jsonio.sha256_file
 
 
 def text_digest(text: str) -> str:
@@ -65,18 +53,7 @@ def text_digest(text: str) -> str:
 
 
 def atomic_json(path: Path, value: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(value, handle, ensure_ascii=False, indent=2, sort_keys=True)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+    jsonio.atomic_json(path, value, ascii=False)
 
 
 def append_jsonl(path: Path, value: dict[str, Any]) -> None:

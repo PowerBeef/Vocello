@@ -39,6 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from delivery_matrix_report import build_report, load_matrix
 from delivery_separability import records_from_sidecar
 from delivery_statistics import wilson_interval
+from lib import jsonio  # noqa: E402
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -80,15 +81,10 @@ class MatrixError(RuntimeError):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return jsonio.utc_now(whole_seconds=False)
 
 
-def file_sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+file_sha256 = jsonio.sha256_file
 
 
 def profile_digest(profile: dict[str, Any]) -> str:
@@ -102,22 +98,7 @@ def profile_digest(profile: dict[str, Any]) -> str:
     ).hexdigest()
 
 
-def atomic_json(path: Path, value: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}-", dir=path.parent)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(value, handle, indent=2, sort_keys=True)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    except BaseException:
-        try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
-        raise
+atomic_json = jsonio.atomic_json
 
 
 def parse_json_command(command: list[str], *, env: dict[str, str]) -> Any:

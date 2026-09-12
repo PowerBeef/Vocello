@@ -20,6 +20,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from delivery_statistics import required_pairs
+from lib import jsonio  # noqa: E402
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -56,13 +57,11 @@ class ExperimentError(ValueError):
 
 
 def canonical_json(value: Any) -> bytes:
-    return json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
+    return jsonio.canonical_bytes(value, ascii=False, allow_nan=True)
 
 
 def digest(value: Any) -> str:
-    return hashlib.sha256(canonical_json(value)).hexdigest()
+    return jsonio.sha256_json(value, ascii=False, allow_nan=True)
 
 
 def _load(path: Path) -> Any:

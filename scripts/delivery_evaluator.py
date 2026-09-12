@@ -26,6 +26,7 @@ import tempfile
 from typing import Any
 
 import numpy as np
+from lib import jsonio  # noqa: E402
 
 
 SCHEMA_VERSION = 1
@@ -44,30 +45,15 @@ class EvaluatorError(ValueError):
 
 
 def canonical_json(value: Any) -> bytes:
-    return json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
+    return jsonio.canonical_bytes(value, ascii=False, allow_nan=True)
 
 
 def digest(value: Any) -> str:
-    return hashlib.sha256(canonical_json(value)).hexdigest()
+    return jsonio.sha256_json(value, ascii=False, allow_nan=True)
 
 
 def atomic_json(path: Path, value: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}-", dir=path.parent)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(value, handle, indent=2, sort_keys=True, ensure_ascii=False)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    finally:
-        try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
+    jsonio.atomic_json(path, value, ascii=False)
 
 
 def _finite_number(value: Any, label: str) -> float:

@@ -25,6 +25,7 @@ import tempfile
 import time
 import wave
 from typing import Callable
+from lib import jsonio  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 BUNDLES = ("mlx-swift_Cmlx.bundle", "swift-transformers_Hub.bundle",
@@ -37,23 +38,11 @@ MACHO = {bytes.fromhex(value) for value in ("cffaedfe", "cefaedfe", "feedface",
                                           "feedfacf", "cafebabe", "bebafeca", "cafebabf")}
 
 
-def digest(path: Path) -> str:
-    with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
+digest = jsonio.sha256_file
 
 
 def atomic_json(path: Path, value: dict) -> None:
-    descriptor, temporary = tempfile.mkstemp(prefix=".cli-json-", dir=path.parent)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-            json.dump(value, stream, indent=2, sort_keys=True, allow_nan=False)
-            stream.write("\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+    jsonio.atomic_json(path, value, allow_nan=False, mkdir=False)
 
 
 def identity(version: str, build: str, commit: str) -> dict:

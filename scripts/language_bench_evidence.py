@@ -22,6 +22,7 @@ import tempfile
 from typing import Any, Iterable
 import unicodedata
 import wave
+from lib import jsonio  # noqa: E402
 
 
 SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,159}\Z")
@@ -42,26 +43,14 @@ class EvidenceError(RuntimeError):
 
 
 def load_json(path: Path) -> dict[str, Any]:
-    with path.open(encoding="utf-8") as handle:
-        value = json.load(handle)
-    if not isinstance(value, dict):
-        raise EvidenceError(f"{path}: expected a JSON object")
-    return value
+    return jsonio.load_json(path, error=EvidenceError)
 
 
 def canonical_digest(value: Any) -> str:
-    encoded = json.dumps(
-        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+    return jsonio.sha256_json(value, ascii=False, allow_nan=True)
 
 
-def file_digest(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+file_digest = jsonio.sha256_file
 
 
 def selected_matrix_cells(
@@ -758,19 +747,7 @@ def collect(
 
 
 def write_json_atomic(path: Path, value: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, raw_temp = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    temp = Path(raw_temp)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(value, handle, ensure_ascii=False, indent=2, sort_keys=True)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temp, path)
-    except Exception:
-        temp.unlink(missing_ok=True)
-        raise
+    jsonio.atomic_json(path, value, ascii=False)
 
 
 def main() -> int:

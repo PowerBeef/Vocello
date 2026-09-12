@@ -94,11 +94,8 @@ PROFILES_DIR="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
 # Reuse the shared storage-bloat advisory (warn-only; never deletes).
 . "$ROOT_DIR/scripts/lib/build_cache.sh"
 . "$ROOT_DIR/scripts/lib/host_preflight.sh"
+. "$ROOT_DIR/scripts/lib/shared.sh"
 . "$ROOT_DIR/scripts/lib/ios_device_state.sh"
-
-note() { printf '\033[0;36m==>\033[0m %s\n' "$*" >&2; }
-warn() { printf '\033[0;33m[warn]\033[0m %s\n' "$*" >&2; }
-die()  { printf '\033[0;31m[error]\033[0m %s\n' "$*" >&2; exit 1; }
 
 uuid_set() {
   /usr/bin/dwarfdump --uuid "$1" 2>/dev/null \
@@ -116,16 +113,6 @@ validate_dsym_identity() {
   dsym_uuids="$(uuid_set "$dwarf")"
   [[ -n "$binary_uuids" && "$binary_uuids" == "$dsym_uuids" ]] \
     || die "dSYM UUID mismatch for $binary (binary=${binary_uuids:-none}, dsym=${dsym_uuids:-none})"
-}
-
-validate_benchmark_label() {
-  local value="$1"
-  [[ -z "$value" || "$value" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$ ]] \
-    || die "--label must be an opaque 1-96 character ID using letters, digits, dot, underscore, or hyphen"
-}
-
-benchmark_nonce() {
-  python3 -c 'import secrets; print(secrets.token_hex(4))'
 }
 
 # Canonical history/telemetry cell for every one-take physical-device diagnostic.
@@ -146,15 +133,6 @@ capture_benchmark_source() {
     --output "$artifacts/benchmark-source.json" --crash-scope ios \
     --crash-diagnostics "$crash_before" >/dev/null \
     || die "could not capture pre-run benchmark provenance"
-}
-
-record_benchmark_history() {
-  local artifacts="$1"
-  python3 "$ROOT_DIR/scripts/benchmark_history.py" record --artifact-dir "$artifacts" || {
-    warn "benchmark passed, but history publication failed; evidence is preserved in $artifacts"
-    warn "repair: python3 scripts/benchmark_history.py record --artifact-dir '$artifacts'"
-    return 1
-  }
 }
 
 # Bash 3.2 unwinds function-local variables before an EXIT trap executes. Keep

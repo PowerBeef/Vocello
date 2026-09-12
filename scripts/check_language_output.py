@@ -35,6 +35,7 @@ from language_bench_evidence import (
 )
 
 
+from lib.audio_qc import finite_number as audio_qc_finite_number  # noqa: E402
 from lib.language_metrics import (  # noqa: E402
     MAX_ACCURACY_ERROR_RATE,
     MIN_LANGUAGE_MATCH_SCORE,
@@ -62,11 +63,7 @@ def find_sentinels(diag: str, run_id: str) -> dict[str, list[dict[str, Any]]]:
     return out
 
 
-def finite_number(value: Any) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    number = float(value)
-    return number if math.isfinite(number) else None
+finite_number = audio_qc_finite_number
 
 
 def nonnegative_int(value: Any) -> int | None:

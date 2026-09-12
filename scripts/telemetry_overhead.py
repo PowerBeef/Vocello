@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 import wave
+from lib import jsonio  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -109,8 +110,7 @@ def latency_regression(candidate: float, baseline: float) -> float:
     return 0.0 if baseline <= 0 else ((candidate / baseline) - 1.0) * 100.0
 
 
-def utc_now() -> str:
-    return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+utc_now = jsonio.utc_now
 
 
 def machine_context() -> dict:

@@ -18,6 +18,7 @@ import re
 import subprocess
 import tempfile
 from typing import Any
+from lib import jsonio  # noqa: E402
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -43,7 +44,7 @@ class SafetyMatrixError(RuntimeError):
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return jsonio.utc_now(whole_seconds=False)
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -54,30 +55,11 @@ def sha256_text(value: str) -> str:
     return sha256_bytes(value.encode("utf-8"))
 
 
-def file_sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+file_sha256 = jsonio.sha256_file
 
 
 def atomic_json(path: Path, value: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}-", dir=path.parent)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(value, handle, indent=2, sort_keys=True, ensure_ascii=False)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    except BaseException:
-        try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
-        raise
+    jsonio.atomic_json(path, value, ascii=False)
 
 
 def _load_json(path: Path) -> Any:

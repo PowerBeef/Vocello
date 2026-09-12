@@ -16,6 +16,7 @@ from typing import Any
 
 import release_sbom
 import required_step_ledger
+from lib import jsonio  # noqa: E402
 
 
 SCHEMA_VERSION = 2
@@ -30,20 +31,14 @@ IOS_ARTIFACT_VERIFICATION_NAME = "ios-release-artifact-verification.json"
 DIGEST = re.compile(r"[0-9a-f]{64}")
 
 
-def digest_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+digest_file = jsonio.sha256_file
 
 
-def canonical_bytes(value: Any) -> bytes:
-    return (json.dumps(value, indent=2, sort_keys=True, ensure_ascii=True) + "\n").encode("utf-8")
+canonical_bytes = jsonio.pretty_bytes
 
 
 def compact_canonical_bytes(value: Any) -> bytes:
-    return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n").encode("utf-8")
+    return jsonio.canonical_bytes(value, newline=True, allow_nan=True)
 
 
 def canonical_digest(value: Any) -> str:
@@ -67,13 +62,7 @@ def atomic_write(path: Path, data: bytes) -> None:
 
 
 def load_json(path: Path) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise ValueError(f"cannot read JSON from {path}: {error}") from error
-    if not isinstance(value, dict):
-        raise ValueError(f"{path} must contain a JSON object")
-    return value
+    return jsonio.load_json(path, error=ValueError)
 
 
 def project_version(root: Path) -> tuple[str, str]:

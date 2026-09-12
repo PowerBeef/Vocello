@@ -16,6 +16,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from lib import jsonio  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,8 +30,7 @@ class PolicyError(ValueError):
     pass
 
 
-def canonical_bytes(value: Any) -> bytes:
-    return (json.dumps(value, indent=2, sort_keys=True, ensure_ascii=True) + "\n").encode("utf-8")
+canonical_bytes = jsonio.pretty_bytes
 
 
 def _read_object(path: Path) -> dict[str, Any]:

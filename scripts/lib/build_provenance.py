@@ -14,6 +14,10 @@ import hashlib
 import json
 from pathlib import Path
 from typing import Any
+try:  # imported as `lib.<module>` from scripts/, or by bare name from scripts/lib
+    from lib import jsonio
+except ImportError:  # pragma: no cover - bare-name import path
+    import jsonio  # type: ignore[no-redef]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OPTIMIZATIONS = {"O": "-O", "Onone": "-Onone"}
@@ -23,12 +27,7 @@ class ProvenanceError(ValueError):
     pass
 
 
-def digest_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+digest_file = jsonio.sha256_file
 
 
 def load_build_provenance(

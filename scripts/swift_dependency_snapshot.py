@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import quote, urlsplit
+from lib import jsonio  # noqa: E402
 
 
 DETECTOR_NAME = "qwenvoice-swift-package-resolved"
@@ -44,8 +45,7 @@ ROOT_LOCK = Path("QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/P
 OWNED_CORE_LOCK = Path("Packages/VocelloQwen3Core/Package.resolved")
 
 
-def canonical_bytes(value: Any) -> bytes:
-    return (json.dumps(value, indent=2, sort_keys=True, ensure_ascii=True) + "\n").encode("utf-8")
+canonical_bytes = jsonio.pretty_bytes
 
 
 def _read_json_object(path: Path) -> dict[str, Any]:

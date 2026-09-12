@@ -8,6 +8,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT_DIR/scripts/lib/build_paths.sh"
 . "$ROOT_DIR/scripts/lib/build_cache.sh"
 . "$ROOT_DIR/scripts/lib/host_preflight.sh"
+. "$ROOT_DIR/scripts/lib/shared.sh"
 . "$ROOT_DIR/scripts/lib/required_steps.sh"
 PROJECT="$ROOT_DIR/QwenVoice.xcodeproj"
 MAC_DERIVED="$QVOICE_XCODE_MACOS_DERIVED"
@@ -21,16 +22,6 @@ MAC_ENGINE_EXECUTABLES=(
 )
 . "$ROOT_DIR/scripts/lib/test_models.sh"
 test_models_init "$ROOT_DIR"
-
-note() { printf '\033[0;36m==>\033[0m %s\n' "$*" >&2; }
-warn() { printf '\033[0;33m[warn]\033[0m %s\n' "$*" >&2; }
-die()  { printf '\033[0;31m[error]\033[0m %s\n' "$*" >&2; exit 1; }
-
-validate_benchmark_label() {
-  local value="$1"
-  [[ -z "$value" || "$value" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$ ]] \
-    || die "--label must be an opaque 1-96 character ID using letters, digits, dot, underscore, or hyphen"
-}
 
 usage() {
   cat >&2 <<'EOF'

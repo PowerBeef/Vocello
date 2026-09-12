@@ -14,14 +14,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
+from lib import jsonio  # noqa: E402
 
 
 SWIFT_LOCK = Path("QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved")
 NPM_LOCK = Path("website/package-lock.json")
 
 
-def canonical_bytes(value: Any) -> bytes:
-    return (json.dumps(value, indent=2, sort_keys=True, ensure_ascii=True) + "\n").encode("utf-8")
+canonical_bytes = jsonio.pretty_bytes
 
 
 def sha256(path: Path) -> str:

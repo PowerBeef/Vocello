@@ -20,6 +20,7 @@ HELPER = REPO_ROOT / "scripts" / "build_cleanup.py"
 POLICY = REPO_ROOT / "config" / "build-output-policy.json"
 RETENTION = REPO_ROOT / "scripts" / "lib" / "build_artifact_retention.py"
 PROFILE_RETENTION = REPO_ROOT / "scripts" / "lib" / "profile_trace_retention.py"
+JSONIO = REPO_ROOT / "scripts" / "lib" / "jsonio.py"
 
 
 class CleanBuildCachesTests(unittest.TestCase):
@@ -34,6 +35,7 @@ class CleanBuildCachesTests(unittest.TestCase):
         shutil.copy2(HELPER, self.root / "scripts" / HELPER.name)
         shutil.copy2(POLICY, self.root / "config" / POLICY.name)
         shutil.copy2(RETENTION, self.root / "scripts" / "lib" / RETENTION.name)
+        shutil.copy2(JSONIO, self.root / "scripts" / "lib" / JSONIO.name)
         shutil.copy2(
             PROFILE_RETENTION,
             self.root / "scripts" / "lib" / PROFILE_RETENTION.name,

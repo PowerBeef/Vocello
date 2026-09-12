@@ -16,6 +16,7 @@ import wave
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from lib import jsonio  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_VERSION = 1
@@ -60,25 +61,10 @@ class ContractError(ValueError):
     pass
 
 
-def digest_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
+digest_bytes = jsonio.sha256_bytes
 
 
-def atomic_json(path: Path, payload: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2, sort_keys=True)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(tmp, path)
-    finally:
-        try:
-            os.unlink(tmp)
-        except FileNotFoundError:
-            pass
+atomic_json = jsonio.atomic_json
 
 
 def load_plan(path: Path) -> dict[str, Any]:

@@ -21,6 +21,7 @@ import wave
 
 import numpy as np
 from audio_resampling import INPUT_BLOCK_FRAMES, RationalFIR, RESAMPLER_VERSION as FIR_VERSION
+from lib import jsonio  # noqa: E402
 
 
 SCHEMA_VERSION = 1
@@ -43,21 +44,14 @@ class AnalysisCacheError(ValueError):
 
 
 def canonical_json(value: Any) -> bytes:
-    return json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
+    return jsonio.canonical_bytes(value, ascii=False, allow_nan=True)
 
 
 def digest(value: Any) -> str:
-    return hashlib.sha256(canonical_json(value)).hexdigest()
+    return jsonio.sha256_json(value, ascii=False, allow_nan=True)
 
 
-def file_sha256(path: Path) -> str:
-    hasher = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            hasher.update(block)
-    return hasher.hexdigest()
+file_sha256 = jsonio.sha256_file
 
 
 def canonicalization_identity(version: str) -> dict[str, str]:
@@ -126,9 +120,7 @@ def atomic_bytes(path: Path, value: bytes) -> None:
 
 
 def atomic_json(path: Path, value: Any) -> None:
-    atomic_bytes(path, json.dumps(
-        value, indent=2, sort_keys=True, ensure_ascii=False
-    ).encode("utf-8") + b"\n")
+    jsonio.atomic_json(path, value, ascii=False, fsync_dir=True)
 
 
 def _read_json(path: Path) -> dict[str, Any]:

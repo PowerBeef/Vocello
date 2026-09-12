@@ -15,6 +15,7 @@ import signal
 import subprocess
 import tempfile
 from typing import Any
+from lib import jsonio  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,18 +37,11 @@ class ManagedTermination(BaseException):
         self.signum = signum
 
 
-def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+utc_now = jsonio.utc_now
 
 
 def load_json(path: Path) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise LedgerError(f"cannot read JSON from {path}: {error}") from error
-    if not isinstance(value, dict):
-        raise LedgerError(f"{path} must contain a JSON object")
-    return value
+    return jsonio.load_json(path, error=LedgerError)
 
 
 def atomic_write(path: Path, payload: dict[str, Any]) -> None:
@@ -68,7 +62,7 @@ def atomic_write(path: Path, payload: dict[str, Any]) -> None:
 
 
 def canonical_bytes(value: Any) -> bytes:
-    return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True) + "\n").encode("utf-8")
+    return jsonio.canonical_bytes(value, newline=True, allow_nan=True)
 
 
 def payload_digest(payload: dict[str, Any], *, digest_field: str | None = None) -> str:
@@ -78,12 +72,7 @@ def payload_digest(payload: dict[str, Any], *, digest_field: str | None = None) 
     return hashlib.sha256(canonical_bytes(unsigned)).hexdigest()
 
 
-def file_digest(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+file_digest = jsonio.sha256_file
 
 
 def source_identity_digest(path: Path) -> str:

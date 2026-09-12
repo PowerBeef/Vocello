@@ -17,6 +17,7 @@ import tempfile
 from typing import Any
 
 import benchmark_history
+from lib import jsonio  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,41 +35,21 @@ class PromotionError(ValueError):
 
 
 def canonical_bytes(value: Any) -> bytes:
-    return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode()
+    return jsonio.canonical_bytes(value, ascii=False, newline=True, allow_nan=True)
 
 
 def digest_value(value: Any) -> str:
     return hashlib.sha256(canonical_bytes(value)).hexdigest()
 
 
-def file_digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+file_digest = jsonio.sha256_file
 
 
 def read_json(path: Path) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise PromotionError(f"cannot read {path}: {error}") from error
-    if not isinstance(value, dict):
-        raise PromotionError(f"{path} must contain a JSON object")
-    return value
+    return jsonio.load_json(path, error=PromotionError)
 
 
-def atomic_json(path: Path, value: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    try:
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(json.dumps(value, indent=2, sort_keys=True).encode() + b"\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    finally:
-        try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
+atomic_json = jsonio.atomic_json
 
 
 def load_contract(root: Path = ROOT) -> dict[str, Any]:

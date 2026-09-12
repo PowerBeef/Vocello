@@ -12,6 +12,7 @@ import subprocess
 
 import release_evidence
 import ios_startup_reliability
+from lib import jsonio  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 BUNDLE_ID = "com.patricedery.vocello"
@@ -51,8 +52,7 @@ def crash_delta(before: Path, after: Path, output: Path) -> dict:
             "status": "passed" if not current.keys() - old else "requires-review"}
 
 
-def digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+digest = jsonio.sha256_file
 
 
 def read_json(path: Path) -> dict:

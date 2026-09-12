@@ -12,9 +12,14 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import sys
 from pathlib import Path
 
 import pytest
+
+SCRIPTS = Path(__file__).resolve().parents[1]
+if str(SCRIPTS) not in sys.path:  # modules loaded by path import `lib.*`
+    sys.path.insert(0, str(SCRIPTS))
 
 ROOT = Path(__file__).resolve().parents[2]
 DARWIN_ONLY_MODULES = {"test_benchmark_history"}

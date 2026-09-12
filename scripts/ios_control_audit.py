@@ -22,6 +22,7 @@ import wave
 import zlib
 from dataclasses import dataclass
 from typing import Any, Iterable
+from lib import jsonio  # noqa: E402
 
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -72,19 +73,16 @@ class AuditError(RuntimeError):
 
 
 def canonical_bytes(value: Any) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    return jsonio.canonical_bytes(value, ascii=False, allow_nan=True)
 
 
 def digest(value: Any) -> str:
-    return hashlib.sha256(canonical_bytes(value)).hexdigest()
+    return jsonio.sha256_json(value, ascii=False, allow_nan=True)
 
 
 def load_json(path: pathlib.Path) -> Any:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        # Collection errors must not expose private host/device paths.
-        raise AuditError(f"cannot read {path.name}: {type(error).__name__}") from error
+    # Collection errors must not expose private host/device paths.
+    return jsonio.load_json(path, error=AuditError, require_object=False, redact="type")
 
 
 def load_contract(path: pathlib.Path = CONTRACT_PATH) -> dict[str, Any]:

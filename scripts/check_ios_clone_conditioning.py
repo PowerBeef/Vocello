@@ -28,6 +28,7 @@ from publish_benchmark_history import (
     source_from_snapshot,
     successful_row,
 )
+from lib import jsonio  # noqa: E402
 
 
 DIGEST = re.compile(r"^[0-9a-f]{64}$")
@@ -92,12 +93,7 @@ def load_object(path: Path) -> dict[str, Any]:
     return value
 
 
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+sha256_file = jsonio.sha256_file
 
 
 def require_digest(value: Any, field: str) -> str:
@@ -231,18 +227,7 @@ def validate_result_contract(
 
 
 def atomic_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    encoded = (json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n").encode()
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    try:
-        with os.fdopen(descriptor, "wb") as handle:
-            handle.write(encoded)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+    jsonio.atomic_json(path, payload, allow_nan=False)
 
 
 def validate(args: argparse.Namespace) -> dict[str, Any]:

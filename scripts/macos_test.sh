@@ -37,6 +37,7 @@ SCRIPT_DIR="$ROOT_DIR/scripts"
 # shellcheck source=lib/build_cache.sh
 . "$SCRIPT_DIR/lib/build_cache.sh"
 . "$SCRIPT_DIR/lib/host_preflight.sh"
+. "$SCRIPT_DIR/lib/shared.sh"
 . "$SCRIPT_DIR/lib/required_steps.sh"
 . "$SCRIPT_DIR/lib/test_models.sh"
 test_models_init "$ROOT_DIR"
@@ -46,20 +47,6 @@ APP_BUNDLE="$QVOICE_BUILD_ROOT/$APP_NAME.app"
 APP_BINARY="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 XPC_BUNDLE="$APP_BUNDLE/Contents/XPCServices/QwenVoiceEngineService.xpc"
 DSYM_DIR="$QVOICE_SYMBOLS_MACOS"
-
-note() { printf '\033[0;36m==>\033[0m %s\n' "$*" >&2; }
-warn() { printf '\033[0;33m[warn]\033[0m %s\n' "$*" >&2; }
-die()  { printf '\033[0;31m[error]\033[0m %s\n' "$*" >&2; exit 1; }
-
-validate_benchmark_label() {
-  local value="$1"
-  [[ -z "$value" || "$value" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$ ]] \
-    || die "--label must be an opaque 1-96 character ID using letters, digits, dot, underscore, or hyphen"
-}
-
-benchmark_nonce() {
-  python3 -c 'import secrets; print(secrets.token_hex(4))'
-}
 
 string_sha256() {
   VALUE="$1" python3 -c 'import hashlib,os; print(hashlib.sha256(os.environ["VALUE"].encode()).hexdigest())'
@@ -78,15 +65,6 @@ require_profile_model() {
   case "$variant" in speed|quality) ;; *) die "profile variant must be speed or quality" ;; esac
   require_mac_benchmark_models "pro_${mode}_${variant}"
   [[ "$mode" != "clone" ]] || require_mac_benchmark_clone_fixture
-}
-
-record_benchmark_history() {
-  local artifacts="$1"
-  python3 "$SCRIPT_DIR/benchmark_history.py" record --artifact-dir "$artifacts" || {
-    warn "benchmark passed, but history publication failed; evidence is preserved in $artifacts"
-    warn "repair: python3 scripts/benchmark_history.py record --artifact-dir '$artifacts'"
-    return 1
-  }
 }
 
 # Bash 3.2 has no timed `wait`. Treat a disappeared or zombie child as

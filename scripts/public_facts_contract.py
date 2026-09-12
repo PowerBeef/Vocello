@@ -13,15 +13,13 @@ import json
 import re
 import sys
 from pathlib import Path
+from lib import jsonio  # noqa: E402
 
 PUBLIC_FACTS = Path("config/public-product-facts.json")
 
 
 def load_json(path: Path) -> dict:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise ValueError(f"cannot read {path}: {error}") from error
+    return jsonio.load_json(path, error=ValueError, require_object=False)
 
 
 def validate_release_identity(public: dict, project: str) -> list[str]:

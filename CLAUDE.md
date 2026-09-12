@@ -21,7 +21,7 @@ invalidates documentation, fix the documentation in the same change. Versions an
 
 ```sh
 scripts/dev.sh check [--dry-run]     # lint, contracts, selected tests, the native lanes the dirty tree touches
-scripts/dev.sh test | py | lint | ios   # one lane at a time while editing (py --lane product|research|darwin)
+scripts/dev.sh test | py | lint | contracts | ios | status   # one lane at a time (py --lane product|research|darwin)
 scripts/dev.sh ci                    # exactly what push CI runs, serially
 scripts/dev.sh regen                 # regenerate roadmap render, model catalog, package inventories, charts
 ./scripts/regenerate_project.sh --fast   # after editing project.yml (never edit the .xcodeproj)
@@ -62,7 +62,7 @@ publication and device consent are always explicit; ordinary work never needs a 
 | **Exact model delivery** | The production catalog is generated from `config/model-artifact-receipts.json` and activates only complete, digest-verified artifacts. |
 | **Privacy** | Never track PII, private paths, prompts, transcripts, credentials or raw diagnostics; `scripts/privacy_scan.py` enforces it. |
 | **Owned output** | `config/build-output-policy.json` owns `build/`; reuse `build/cache/xcode/{macos,macos-tsan,ios-device}`; no ad hoc DerivedData or whole-cache deletion. |
-| **Evidence retention** | Only qualified privacy-safe PASS enters `benchmarks/runs/`; raw WAV, telemetry, screenshots and xcresult stay untracked. |
+| **Evidence retention** | Only qualified privacy-safe PASS enters `benchmarks/runs/`; raw WAV, telemetry, screenshots and xcresult stay untracked. `rtf` is the standard real-time factor (synthesis wall ÷ audio, lower is faster; `decodeSpeedupX` is the old inverted figure) and `toolchain.optimization` comes from a hash-bound build receipt, never a literal. |
 | **Exact-source releases** | Candidates need a GitHub-verified annotated tag on `origin/main` with green `CI required`; `scripts/release_source_authority.py` fails closed and the release workflow runs Security on the tagged commit. |
 | **One work authority** | `config/roadmap.json` owns open work and generates `docs/ROADMAP.md`; finished work lives in `config/roadmap-archive.json`. |
 
@@ -70,7 +70,7 @@ publication and device consent are always explicit; ordinary work never needs a 
 
 | Tier | When | What |
 | --- | --- | --- |
-| Inner loop | while editing | `dev.sh test --only Class`, `dev.sh py --changed`, `dev.sh lint` |
+| Inner loop | while editing | `dev.sh test --only Class`, `dev.sh py --changed`, `dev.sh lint`. The XCUITest bundles compile only inside `scripts/ui_test.sh`; after editing `Tests/*UITests` or `Tests/UIAutomationSupport`, run `xcodebuild build-for-testing` for `VocelloMacUI` and `VocelloiOSUI` (generic iOS destination, unsigned, `-skipPackagePluginValidation`) before committing. |
 | Commit | `git commit` | `scripts/hooks/commit_lint.sh`: branch `main`, clean whitespace, no private path or credential in staged files. Nothing else blocks a commit. |
 | Push CI | every push to `main` | `.github/workflows/ci.yml`: routed lanes, cached native builds, Linux Python suite, `CI required` aggregate |
 | Nightly | 04:00 UTC | TSan subset, complete Python suite, cold compiles of both platforms; opens a `nightly` issue on failure |
@@ -84,7 +84,7 @@ never clear caches to evade contention.
 
 `.claude/settings.json` wires `commit_lint.sh`, `policy_guard.sh` (Simulator destinations, whole-cache
 deletion, force pushes, new branches, `project.pbxproj` writes), `generated_file_guard.sh` (generated
-files) and `session_start.sh`. Behaviour is pinned by `scripts/tests/test_claude_hooks.py`. Personal
+files), `project_yml_reminder.sh` (regenerate after editing `project.yml`) and `session_start.sh`. Behaviour is pinned by `scripts/tests/test_claude_hooks.py`. Personal
 overrides live in the untracked `settings.local.json` under `.claude/`.
 
 Optional assists, verified before relying on them: user-invoked skills `/ios-lane`, `/macos-ui-lane`,

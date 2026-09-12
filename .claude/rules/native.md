@@ -16,7 +16,9 @@ References, read only what the change needs: `docs/reference/mlx-guide.md`,
 `docs/reference/macos-app-guide.md`, `docs/reference/ios-app-guide.md`,
 `docs/reference/localization.md`, `docs/reference/delivery-harness.md`, `docs/ARCHITECTURE.md`.
 Verification: `scripts/dev.sh test` (macOS unit, XPC and owned-runtime tests), `scripts/dev.sh ios`
-(generic device-SDK compile). Physical-device and macOS XCUITest lanes only when explicitly requested.
+(generic device-SDK compile). The XCUITest bundles compile only in `scripts/ui_test.sh` or an explicit
+`xcodebuild build-for-testing`, so compile them after touching `Tests/*UITests`. Physical-device and macOS
+XCUITest lanes only when explicitly requested.
 
 ## Engine and runtime (owned package `Packages/VocelloQwen3Core`, `Sources/QwenVoiceCore`)
 
@@ -56,6 +58,10 @@ Verification: `scripts/dev.sh test` (macOS unit, XPC and owned-runtime tests), `
   Speed/Quality artifacts; hosts use exact delivery plans; shared components are reused only after exact
   store verification and installed as hard links, never symlinks. No live repository enumeration,
   inferred digests or partial catalogs. Model eligibility changes update `scripts/check_ios_catalog.sh`.
+- **RTF is the standard real-time factor.** `derivedMetrics.realTimeFactor` = request wall seconds
+  (prepare entry to the final WAV write, minus model load and prewarm, on the monotonic stage recorder)
+  ÷ audio seconds, lower is faster; `audioSecondsPerWallSecond` is the decode-loop speedup and is never
+  called RTF. Wall time for any throughput figure comes from `ContinuousClock`, never `Date()`.
 - **Telemetry semantics are typed.** Schema-v8 frontend latency stops at playback scheduling; process
   memory belongs to the process that measured it; a macOS UI benchmark is authoritative only when app,
   XPC and engine layers are complete.

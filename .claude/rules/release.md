@@ -64,6 +64,11 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   each, strict allowlist), then `benchmarks/HISTORY.md` is regenerated. Raw JSONL, WAV, screenshots,
   xcresult and traces stay untracked; publication never stages, commits or pushes. Successful profiles
   publish their digest and summary before the raw trace is deleted (`--keep-trace` is explicit).
+- **Records measure what they claim.** `rtf` is wall ÷ audio (lower is faster) and every record since
+  2026-09-12 declares `run.rtfDefinition`; legacy records are never rewritten and never share a comparison
+  key with new ones. `toolchain.optimization` comes from the build receipt (`last-build.json`, executable
+  digest bound) via `scripts/lib/build_provenance.py`; the gate bench compares medians of three warm takes
+  and reports a loaded or throttled host as inconclusive (exit 3), never as pass or fail.
 - **Memory-qualified publication.** Telemetry v8, manifest v2, exact sidecar digests, ≥95% coverage, zero
   capture failures, no critical pressure, warning, `hardTrim` or `fullUnload`; 95–<100% coverage is
   `passedWithWarnings`. Marking evidence keeps the take peak (`config/marking-peak-equality.json`).

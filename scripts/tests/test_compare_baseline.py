@@ -327,3 +327,20 @@ def test_legacy_baseline_identity_without_host_keys_still_compares():
         assert "identity differs" in str(error)
     else:
         raise AssertionError("a different Xcode must not compare")
+
+
+def test_states_restricts_the_verdict_to_the_named_warm_states():
+    warm = ("custom", "Qwen3-TTS-12Hz-1.7B-4bit", "warm", "medium")
+    cold = ("custom", "Qwen3-TTS-12Hz-1.7B-4bit", "cold", "medium")
+    baseline = [_make_cell(warm, 0.58, 23.6, 420.0, 2273.0, "pass"),
+                _make_cell(cold, 1.57, 8.8, 6379.0, 2454.0, "pass")]
+    # The single cold take regressed on footprint; the warm medians did not.
+    current = [_make_cell(warm, 0.58, 23.6, 421.0, 2270.0, "pass"),
+               _make_cell(cold, 0.75, 9.0, 1540.0, 2586.5, "pass")]
+    assert [r["metric"] for r in sgt.compare_summaries(baseline, current)] == ["physFootMB"]
+    assert sgt.compare_summaries(baseline, current, states=("warm",)) == []
+    # A warm regression is still reported, and a cold cell missing from either
+    # side is not a coverage failure when only warm cells carry the verdict.
+    worse = [_make_cell(warm, 0.70, 23.6, 421.0, 2270.0, "pass")]
+    reported = sgt.compare_summaries(baseline, worse, states=("warm",))
+    assert [(r["metric"], tuple(r["cellKey"])) for r in reported] == [("rtf", warm)]

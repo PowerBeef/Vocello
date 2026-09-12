@@ -1255,9 +1255,9 @@ PY
     python3 "$ROOT_DIR/scripts/summarize_generation_telemetry.py" "$run_diag" \
         --run-id "$run_id" --evidence-manifest "$artifacts/benchmark-evidence.json" \
         --engine-only --compare-baseline "$GATE_BENCH_BASELINE" \
-        --require-baseline-identity >>"$log" 2>&1 || compare_status=$?
+        --compare-states warm --require-baseline-identity >>"$log" 2>&1 || compare_status=$?
     case "$compare_status" in
-      0) echo "gate bench: no regression vs $(basename "$GATE_BENCH_BASELINE")" >>"$log" ;;
+      0) echo "gate bench: no regression vs $(basename "$GATE_BENCH_BASELINE") (warm medians)" >>"$log" ;;
       1) echo "gate bench: BASELINE INVALID — $GATE_BENCH_BASELINE does not match this run's optimization/topology/host identity; re-save it with summarize_generation_telemetry.py <run-diag> --engine-only --save-baseline (see bench.log)" >>"$log"; return 1 ;;
       2) echo "gate bench: REGRESSION vs $GATE_BENCH_BASELINE (see bench.log)" >>"$log"; return 1 ;;
       3) echo "gate bench: INCONCLUSIVE — host load or thermal state invalidated the comparison (see bench.log)" >>"$log"; return 1 ;;

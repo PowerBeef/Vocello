@@ -1303,9 +1303,13 @@ def baseline_lacks_host_identity(payload):
 
 def compare_summaries(
     baseline, current, threshold=0.05, migrations=(),
-    baseline_definition=rtf_semantics.STANDARD_RTF_DEFINITION,
+    baseline_definition=rtf_semantics.STANDARD_RTF_DEFINITION, states=None,
 ):
     """Return regression entries where current is worse than baseline by > threshold.
+
+    `states` restricts the verdict to cells in those warm states (the gate bench
+    compares its three-take warm medians only; the single cold take stays
+    informational). None compares every cell.
 
     A regression is:
       - rtf increased by > threshold (standard RTF = request wall ÷ audio; lower is better);
@@ -1328,6 +1332,10 @@ def compare_summaries(
         migrated = dict(baseline_by_key.pop(old_key))
         migrated["cellKey"] = list(new_key)
         baseline_by_key[new_key] = migrated
+    if states is not None:
+        wanted = set(states)
+        baseline_by_key = {key: cell for key, cell in baseline_by_key.items() if key[2] in wanted}
+        current_by_key = {key: cell for key, cell in current_by_key.items() if key[2] in wanted}
     regressions = []
     for key in sorted(baseline_by_key.keys() - current_by_key.keys()):
         regressions.append(
@@ -1508,6 +1516,9 @@ def main():
     )
     parser.add_argument("--regress-threshold", type=float, default=0.05,
                         help="relative delta threshold for regression (default 0.05)")
+    parser.add_argument("--compare-states", metavar="STATE[,STATE]",
+                        help="restrict the baseline verdict to these warm states (e.g. warm); "
+                             "other cells are informational")
     args = parser.parse_args()
     diag_dir = args.diag_dir
     generation_ids = None
@@ -1837,9 +1848,13 @@ def main():
                     "comparing it with the current decodeSpeedupX. Re-save the baseline to compare "
                     "standard RTF (wall/audio)."
                 )
+            compare_states = None
+            if args.compare_states:
+                compare_states = tuple(s for s in args.compare_states.split(",") if s)
+                print(f"\n(verdict on {', '.join(compare_states)} cells only; other cells are informational)")
             regressions = compare_summaries(
                 baseline, current, threshold=args.regress_threshold, migrations=migrations,
-                baseline_definition=baseline_definition,
+                baseline_definition=baseline_definition, states=compare_states,
             )
         except (OSError, ValueError, json.JSONDecodeError) as error:
             print(f"FAIL: baseline comparison contract is invalid: {error}")

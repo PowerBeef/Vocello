@@ -45,9 +45,12 @@ shared shell helpers into `scripts/lib/shared.sh`. This commit rewrites CONTRIBU
 runbook to the current loop, deletes three unlinked dated docs, marks six dated docs historical,
 removes the 32 "removed 2026-09-11" stubs and corrects the release-QA, benchmarks and privacy docs.
 
-Observed, not fixed: `test_delivery_experiment_runner.py::test_screen_summary_requires_one_factor`
-failed once under xdist with "another generator or heavy delivery analyzer is already active" (the
-default serial lock root is shared across workers) and passed on every later run.
+Fixed afterwards: `test_delivery_experiment_runner.py::test_screen_summary_requires_one_factor`
+failed once under xdist with "another generator or heavy delivery analyzer is already active"
+because `run_execution_plan` defaulted `lock_root` to the real `build/cache/delivery-analysis`
+lock and five test calls omitted it. `lock_root` is now a required keyword: the runner CLI and
+`delivery_prompt_remediation.py execute-stage` pass the shared `DEFAULT_SERIAL_LOCK_ROOT`
+explicitly, every test passes a private temporary root, and an omitted root is a `TypeError`.
 
 ### Audio and delivery QC streamlining (September 12)
 

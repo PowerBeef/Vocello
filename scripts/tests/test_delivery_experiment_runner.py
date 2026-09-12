@@ -197,12 +197,14 @@ class DeliveryExperimentRunnerTests(unittest.TestCase):
         plan = self._single_row_plan()
         run_dir = self.root / "run"
         first = run_execution_plan(
-            plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir
+            plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir,
+            lock_root=self.root / "lock",
         )
         self.assertEqual(first["counts"]["complete"], 1)
         self.assertEqual(self.counter.read_text(), "2")
         second = run_execution_plan(
-            plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir
+            plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir,
+            lock_root=self.root / "lock",
         )
         self.assertEqual(second["counts"]["complete"], 1)
         self.assertEqual(self.counter.read_text(), "2")
@@ -255,7 +257,10 @@ class DeliveryExperimentRunnerTests(unittest.TestCase):
     def test_paired_analyzer_emits_evaluator_compatible_rows(self) -> None:
         plan = self._single_row_plan()
         run_dir = self.root / "run"
-        state = run_execution_plan(plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir)
+        state = run_execution_plan(
+            plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir,
+            lock_root=self.root / "lock",
+        )
         report = analyze_execution(plan, run_dir)
         self.assertEqual(report["kind"], "paired-acoustic-delta")
         self.assertEqual(len(report["rows"]), 1)
@@ -275,7 +280,10 @@ class DeliveryExperimentRunnerTests(unittest.TestCase):
     def test_analysis_reuses_identical_audio_and_rejects_changed_bytes(self) -> None:
         plan = self._single_row_plan()
         run_dir = self.root / "analysis-cache"
-        state = run_execution_plan(plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir)
+        state = run_execution_plan(
+            plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir,
+            lock_root=self.root / "lock",
+        )
         import delivery_experiment_runner as runner
         # The fake generator produces byte-identical instructed/reference WAVs.
         with mock.patch.object(runner, "analyze", wraps=runner.analyze) as global_analysis, \
@@ -326,7 +334,10 @@ class DeliveryExperimentRunnerTests(unittest.TestCase):
                 conditions=("neutral",),
             )
             run_dir = self.root / label
-            run_execution_plan(plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir)
+            run_execution_plan(
+                plan=plan, binary=self.binary, data_dir=None, run_dir=run_dir,
+                lock_root=self.root / "lock",
+            )
             analyze_execution(plan, run_dir)
             runs[label] = run_dir
         report = summarize_screen(runs, baseline_label="baseline")

@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from delivery_experiment import EXPECTED_PRESETS, digest  # noqa: E402
 from delivery_experiment_runner import (  # noqa: E402
+    DEFAULT_SERIAL_LOCK_ROOT,
     REPO,
     RunnerError,
     _reference_key,
@@ -950,7 +951,7 @@ def decide(
 
 def execute_stage(
     *, root: Path, binary: Path, data_dir: Path | None, contract: dict[str, Any],
-    candidate_id: str, stage_name: str, variant: str,
+    candidate_id: str, stage_name: str, variant: str, lock_root: Path,
 ) -> dict[str, Any]:
     baseline_dir = root / candidate_id / stage_name / variant / "baseline"
     candidate_dir = root / candidate_id / stage_name / variant / "candidate"
@@ -964,6 +965,7 @@ def execute_stage(
     )
     run_execution_plan(
         plan=baseline_plan, binary=binary, data_dir=data_dir, run_dir=baseline_dir,
+        lock_root=lock_root,
     )
     analyze_execution(baseline_plan, baseline_dir)
     seed_reference_controls(
@@ -973,6 +975,7 @@ def execute_stage(
     )
     run_execution_plan(
         plan=candidate_plan, binary=binary, data_dir=data_dir, run_dir=candidate_dir,
+        lock_root=lock_root,
     )
     analyze_execution(candidate_plan, candidate_dir)
     result = decide(
@@ -1045,6 +1048,7 @@ def main() -> int:
                 root=args.root, binary=args.binary.resolve(), data_dir=args.data_dir,
                 contract=contract, candidate_id=args.candidate,
                 stage_name=args.stage, variant=args.variant,
+                lock_root=DEFAULT_SERIAL_LOCK_ROOT,
             )
         elif args.command in {"decide", "recompose-legacy"}:
             result = decide(

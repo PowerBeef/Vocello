@@ -567,7 +567,7 @@
       "plan": "autonomous-validation-remediation-2026-08",
       "title": "P2 — independently validate prosody thresholds",
       "status": "in-flight",
-      "gate": "Freeze source-bound independent reference labels before fitting and pass the existing 95% confusion/noise targets on an untouched speaker/script/translation/source-group holdout with length/language/severity coverage. Human listening is optional. Byte-verified controlled defects qualify signal detection only, never general usability or semantic emotion. Pinned external labels qualify only their documented rubric/cohort. Require provenance/corpus digests, frozen feature/profile, holdout uncertainty, repeatability, no self-labels/leakage, retained failures and actual consumer integration.",
+      "gate": "Freeze source-bound independent reference labels before fitting and pass the existing 95% confusion/noise targets on an untouched speaker/script/translation/source-group holdout with length/language/severity coverage. Human listening is optional. Byte-verified controlled defects qualify signal detection only, never general usability or semantic emotion. Pinned external labels qualify only their documented rubric/cohort. Require provenance/corpus digests, frozen feature/profile, holdout uncertainty, repeatability, no self-labels/leakage, retained failures and actual consumer integration. Also recalibrate the click detector: the September 7 reference-base pilot flagged 3 of 45 professional recordings as native QC failures on `clicks` alone (716 to 1,327 adjacent-sample jumps above 0.42 full scale), which are signal observations, not confirmed audible clicks; split the limiter's click statistic from the QC verdict, measure the false-positive rate on the pinned reference base, and change the threshold only under the threshold-change authority in docs/reference/audio-qc-engineering.md.",
       "evidence": [
         "commit:ae446132",
         "doc:docs/reference/audio-qc-engineering.md"
@@ -585,28 +585,34 @@
         "config/delivery-acoustic-reference-base.json",
         "config/delivery-evaluator-v2-contract.json",
         "scripts/delivery_acoustic_reference.py",
-        "scripts/tests/test_delivery_acoustic_reference.py"
+        "scripts/tests/test_delivery_acoustic_reference.py",
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift"
       ],
-      "updated": "2026-09-11",
-      "notes": "September 11 reconciliation: config/prosody-holdout-policy.json approvedExternalCatalogSHA256 is an empty list, so the September 7 licensed-reference pilot (CREMA-D, Thorsten) cannot be consumed by holdout validation until the exact catalog digests are re-derived from retained material and pinned; the pilot is inventory, not usable labels. Also recorded here: config/audio-cadence-qc-contract.json carried listener-count constructs from before the September 6 listening-optional decision; the contract and its evaluator were retired on 2026-09-12 and the threshold-change authority now lives in docs/reference/audio-qc-engineering.md. September 7 reference-base adoption implemented: existing evaluator contract pins the 45-clip numerical manifest; existing cascade defaults to same-language descriptive ranges, complete warnings and flagged-exclusion sensitivity. No independent quality labels or thresholds inferred. Existing CLI processed all 64 historical takes: 10 reference contexts, 54 explicit missing coverage; all 64 quality verdicts remain inconclusive. All 45 originals verified. Separate cache replay 512 hits/zero misses, 0.42 s/45.22 MB sampled RSS, zero swap delta and clean recovery; first sandboxed extraction resource capture retained as unqualified. (Earlier history: git log -p -- config/roadmap.json.)"
+      "updated": "2026-09-12",
+      "notes": "September 12: click-detector recalibration added to this item from the audio-QC audit (evidence in docs/reference/audio-qc-engineering.md, reference-base pilot table). September 11 reconciliation: config/prosody-holdout-policy.json approvedExternalCatalogSHA256 is an empty list, so the September 7 licensed-reference pilot (CREMA-D, Thorsten) cannot be consumed by holdout validation until the exact catalog digests are re-derived from retained material and pinned; the pilot is inventory, not usable labels. Also recorded here: config/audio-cadence-qc-contract.json carried listener-count constructs from before the September 6 listening-optional decision; the contract and its evaluator were retired on 2026-09-12 and the threshold-change authority now lives in docs/reference/audio-qc-engineering.md. September 7 reference-base adoption implemented: existing evaluator contract pins the 45-clip numerical manifest; existing cascade defaults to same-language descriptive ranges, complete warnings and flagged-exclusion sensitivity. No independent quality labels or thresholds inferred. Existing CLI processed all 64 historical takes: 10 reference contexts, 54 explicit missing coverage; all 64 quality verdicts remain inconclusive. All 45 originals verified. Separate cache replay 512 hits/zero misses, 0.42 s/45.22 MB sampled RSS, zero swap delta and clean recovery; first sandboxed extraction resource capture retained as unqualified. (Earlier history: git log -p -- config/roadmap.json.)"
     },
     {
       "id": "AV-08",
       "plan": "autonomous-validation-remediation-2026-08",
       "title": "P2 — qualify multilingual output beyond a single cohort",
       "status": "in-flight",
-      "gate": "Language evidence must separate ASR repeatability from independent generation variance and cover multiple scripts, lengths, speakers/voices, and seeds per claimed language/tier/mode or label the dimension advisory. Required closure evidence: privacy-safe corpus/matrix manifests, independent generated cohorts, WER/CER/language-ID uncertainty, ignored-sample accounting, and language record validation on every claimed cell.",
+      "gate": "Language evidence must separate ASR repeatability from independent generation variance and cover multiple scripts, lengths, speakers/voices, and seeds per claimed language/tier/mode or label the dimension advisory. Required closure evidence: privacy-safe corpus/matrix manifests, independent generated cohorts, WER/CER/language-ID uncertainty, ignored-sample accounting, and language record validation on every claimed cell. Second recognizer family: qualify the whisper-small MLX producer (scripts/independent_asr.py) with two clean 8 GB host runs (peak RSS and footprint under its 2.5 GiB ceiling, post-exit memory recovery, no swap growth) and publish the first two-family iOS language records; until then macOS language records are explicitly single-family (`languageVerification.families: [\"whisper\"]`) and never consensus.",
       "evidence": [
-        "commit:ae446132"
+        "commit:ae446132",
+        "file:scripts/tests/test_independent_asr.py",
+        "file:scripts/tests/test_language_metrics.py"
       ],
       "sourceOfTruth": [
         "config/language-bench-corpus.json",
         "config/language-bench-matrix.json",
         "scripts/ios_device.sh",
-        "scripts/macos_test.sh"
+        "scripts/macos_test.sh",
+        "scripts/independent_asr.py",
+        "scripts/lib/language_metrics.py",
+        "config/delivery-evaluator-v2-candidates.json"
       ],
-      "updated": "2026-09-11",
-      "notes": "September 11 reconciliation: the cited run mac-lang-bench-20260902-024501-bd2df074 is recorded as classification exploratory, matrixScope partial, source.dirty true with 17 changed paths, and every one of its 19 cells is passedWithWarnings (cadence excess, soft memory trim, written-output warning); it has no Korean cell. It is exploratory evidence, not the source-bound full pass described below. DP-29 supplies the split-safe native-language corpus structure and fixed cross-language sentinels. A source-bound full Mac language run on 2026-09-01 passed 19/19 cells across six languages and both CustomVoice and VoiceDesign and is published as mac-lang-bench-20260902-024501-bd2df074. This is one generated cohort, not population evidence. AV-08 remains open until fluent review, multiple independent scripts/seeds/voices per claimed cell, ASR/CER/language-ID uncertainty, and complete ignored/dropped-sample accounting satisfy the broader language gate. September 6: one predeclared independent SenseVoice comparison processed the original 18.8-second Chinese WAV using pinned v2 preprocessing, after serial resource qualification. (Earlier history: git log -p -- config/roadmap.json.)"
+      "updated": "2026-09-12",
+      "notes": "September 12: the whisper family landed (producer, shared metrics module, publisher `--output-gate independent` / `--recognitions`, both lanes wired); a two-clip smoke on local Japanese takes measured 0.85 GB peak RSS, 2 to 4 s wall, language detected at 0.996 and CER 0.062 / 0.156 against the corpus script. The consent-bound qualification runs and the first records remain open. September 11 reconciliation: the cited run mac-lang-bench-20260902-024501-bd2df074 is recorded as classification exploratory, matrixScope partial, source.dirty true with 17 changed paths, and every one of its 19 cells is passedWithWarnings (cadence excess, soft memory trim, written-output warning); it has no Korean cell. It is exploratory evidence, not the source-bound full pass described below. DP-29 supplies the split-safe native-language corpus structure and fixed cross-language sentinels. A source-bound full Mac language run on 2026-09-01 passed 19/19 cells across six languages and both CustomVoice and VoiceDesign and is published as mac-lang-bench-20260902-024501-bd2df074. This is one generated cohort, not population evidence. AV-08 remains open until fluent review, multiple independent scripts/seeds/voices per claimed cell, ASR/CER/language-ID uncertainty, and complete ignored/dropped-sample accounting satisfy the broader language gate. September 6: one predeclared independent SenseVoice comparison processed the original 18.8-second Chinese WAV using pinned v2 preprocessing, after serial resource qualification. (Earlier history: git log -p -- config/roadmap.json.)"
     },
     {
       "id": "AV-09",
@@ -1063,16 +1069,17 @@
       "title": "re-baseline the benchmark harness under the standard RTF definition (consent-bound runs)",
       "status": "planned",
       "blockedBy": [],
-      "gate": "After the 2026-09-12 harness fixes: (1) run `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` and re-save `benchmarks/baselines/mac-gate-bench.json` from a three-take run so it carries `rtfDefinition`, `rtfMAD`, n=3 and the host OS/Xcode identity; (2) one canonical `scripts/ui_test.sh macos benchmark` and one `scripts/ui_test.sh ios benchmark` run publish the first records with `run.rtfDefinition`, validate the provenance-bound optimization label, the iOS cell-length check and the sleep hold; (3) one macOS and one iOS `perf` run re-derive the warn-only thresholds under the clipped window arithmetic and the macOS environment row; (4) repin `scripts/generate_readme_charts.py` and the website chart to the new canonical macOS record. Each run needs explicit consent (model download, phone).",
+      "gate": "After the 2026-09-12 harness fixes: (1) run `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` and re-save `benchmarks/baselines/mac-gate-bench.json` from a three-take run so it carries `rtfDefinition`, `rtfMAD`, n=3 and the host OS/Xcode identity; (2) one canonical `scripts/ui_test.sh macos benchmark` and one `scripts/ui_test.sh ios benchmark` run publish the first records with `run.rtfDefinition`, validate the provenance-bound optimization label, the iOS cell-length check and the sleep hold; (3) one macOS and one iOS `perf` run re-derive the warn-only thresholds under the clipped window arithmetic and the macOS environment row; (4) repin `scripts/generate_readme_charts.py` and the website chart to the new canonical macOS record. (5) one macOS `scripts/macos_test.sh lang-bench --subset quick` run publishes the first whisper-verified (`focused`, single-family) macOS language record and exercises the producer on generated audio under the host-quiet preflight. Each run needs explicit consent (model download, phone).",
       "sourceOfTruth": [
         "scripts/summarize_generation_telemetry.py",
         "scripts/publish_benchmark_history.py",
         "scripts/generate_readme_charts.py",
         "config/ui-perf-thresholds.json",
-        "config/ui-perf-thresholds-ios.json"
+        "config/ui-perf-thresholds-ios.json",
+        "scripts/lib/host_preflight.sh"
       ],
       "updated": "2026-09-12",
-      "notes": "Until (1) runs, the gate compares the legacy baseline's decode speedup with the current `decodeSpeedupX` and says so on every run. Until (2) runs, the README and website charts show a derived RTF from the 2026-09-05 record's app submit-to-completed span, labelled as such. Also watch `Qwen3DecoderPartitionTests.testReplayCachePolicyPreservesBothPartitionsAndBoundsObservations`, which failed once on the CI runner (run 34663845404) and passed on the next commit without a related change."
+      "notes": "Until (1) runs, the gate compares the legacy baseline's decode speedup with the current `decodeSpeedupX` and says so on every run. Until (2) runs, the README and website charts show a derived RTF from the 2026-09-05 record's app submit-to-completed span, labelled as such. Also watch `Qwen3DecoderPartitionTests.testReplayCachePolicyPreservesBothPartitionsAndBoundsObservations`, which failed once on the CI runner (run 34663845404) and passed on the next commit without a related change. Since 2026-09-12 every timing lane refuses to start when the 1-minute load exceeds twice the core count or the kernel reports memory pressure (`require_quiet_host`; `QVOICE_ALLOW_BUSY_HOST=1` records an exploratory run instead)."
     }
   ]
 }

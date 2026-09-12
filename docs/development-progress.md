@@ -17,6 +17,43 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Audio and delivery QC streamlining (September 12)
+
+The maintainer asked whether the audio and voice-delivery QC harness could be improved and
+streamlined for the 8 GB M2 Mac mini. Three read-only audits (in-process Swift QC, the 46-script
+delivery harness, the speech-recognition lanes) found the load-bearing core sound: thresholds live once
+in Swift and judge the published bytes, extraction is NumPy-only with a bounded working set, holdouts
+are frozen, and every heavy step runs after the engine has exited. The cost was elsewhere: fail-open
+edges, a single Apple Speech family behind every language verdict (the Mac transcribed nothing), the
+same logic copied three times, 2,784 lines of a listening lane the September 6 decision had retired,
+and ~260 interpreter launches per language run. Maintainer decisions: delete the listening lane (keep
+the schema-1 reader), remove the dead scaffolding, build the second recognizer family now with
+`mlx-whisper` and a pinned `whisper-small` model.
+
+Four commits: `1f0b1c9c` closes the fail-open edges (published-WAV format assertion, a streaming
+continuity gate that judges the channel it is handed, unknown finish reasons and missing QC fail the
+hint gate, the macOS language lane is seeded, the separability null defaults to 1,000 iterations, the
+marking gate always runs, the language negative control must fail, run-level counts leave the takes).
+`90152cb6` adds `scripts/lib/language_metrics.py` (one tokenizer, edit distance, locale table,
+thresholds and family-consensus rule) and `scripts/independent_asr.py`: a manifest of digest-bound
+rows, refused unless the generator has exited, one supervised subprocess that loads the pinned
+whisper-small MLX model once, cached under audio, model, runtime and per-language decode identity.
+The publisher gained `--output-gate independent` and `--recognitions`; macOS language records are now
+`focused` single-family (`families: ["whisper"]`), iOS records require the Apple Speech and whisper
+families to agree. A two-clip smoke on local Japanese takes measured 0.85 GB peak RSS, 2 to 4 s wall,
+language detected at 0.996 and CER 0.062 / 0.156 against the corpus script. `053a7dc7` deduplicates
+the audio-QC take mapping (`scripts/lib/audio_qc.py`), moves the prosody-effect and arousal weights
+into `prosody_profile.py`, merges the two `AudioQualityGate.swift` copies into `SharedSupport`,
+removes producer-less registry types, gives the analysis cache `prune --keep-newest N`, collapses the
+iOS per-take extractions to one interpreter, and deletes 22 files (listening lane, closed-fixture
+checkers, cadence contract triad, adherence bench, ICU diagnostic; 6,533 lines). This commit adds
+`require_quiet_host` to every timing lane (load within twice the cores, no kernel memory pressure).
+
+Consent-bound follow-ups are on the roadmap: AV-08 (two clean 8 GB qualification runs of the whisper
+producer, then the first two-family iOS records), AV-14 item (5) (the first macOS
+`lang-bench --subset quick` under the producer) and AV-07 (click-detector recalibration against the
+reference base, where 3 of 45 professional recordings fail on `clicks`).
+
 ### Benchmark harness and XCUITest review (September 11 to 12)
 
 Three read-only audits of the XCUITest suites (20 files, 7,747 lines), the benchmark harness

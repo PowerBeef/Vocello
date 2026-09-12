@@ -36,6 +36,7 @@ SCRIPT_DIR="$ROOT_DIR/scripts"
 . "$SCRIPT_DIR/lib/build_paths.sh"
 # shellcheck source=lib/build_cache.sh
 . "$SCRIPT_DIR/lib/build_cache.sh"
+. "$SCRIPT_DIR/lib/host_preflight.sh"
 . "$SCRIPT_DIR/lib/required_steps.sh"
 . "$SCRIPT_DIR/lib/test_models.sh"
 test_models_init "$ROOT_DIR"
@@ -1423,6 +1424,7 @@ main() {
     memory)
       require_build_free_space memory-qualification \
         || die "macOS memory qualification storage preflight failed"
+      require_quiet_host macos-memory || die "macOS memory qualification needs a quiet host"
       cmd_memory "$@"
       ;;
     preflight) cmd_preflight "$@" ;;
@@ -1436,6 +1438,7 @@ main() {
       ;;
     lang-bench)
       require_build_free_space language-benchmark || die "language benchmark storage preflight failed"
+      require_quiet_host macos-lang-bench || die "language benchmark needs a quiet host"
       cmd_lang_bench "$@"
       ;;
     test)
@@ -1444,10 +1447,12 @@ main() {
       ;;
     telemetry-overhead)
       require_build_free_space telemetry-overhead || die "telemetry-overhead storage preflight failed"
+      require_quiet_host macos-telemetry-overhead || die "telemetry-overhead parity needs a quiet host"
       cmd_telemetry_overhead "$@"
       ;;
     gate)
       require_build_free_space runtime-tests || die "macOS gate storage preflight failed"
+      require_quiet_host macos-gate || die "macOS gate bench needs a quiet host"
       cmd_gate "$@"
       ;;
     release-readiness)

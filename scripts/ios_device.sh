@@ -93,6 +93,7 @@ PROFILES_DIR="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
 
 # Reuse the shared storage-bloat advisory (warn-only; never deletes).
 . "$ROOT_DIR/scripts/lib/build_cache.sh"
+. "$ROOT_DIR/scripts/lib/host_preflight.sh"
 . "$ROOT_DIR/scripts/lib/ios_device_state.sh"
 
 note() { printf '\033[0;36m==>\033[0m %s\n' "$*" >&2; }
@@ -2906,10 +2907,12 @@ main() {
     pull)    cmd_pull "$@" ;;
     bench)
       require_build_free_space memory-qualification || die "iOS benchmark storage preflight failed"
+      require_quiet_host ios-bench || die "iOS benchmark needs a quiet Mac host"
       cmd_bench "$@"
       ;;
     lang-bench)
       require_build_free_space language-benchmark || die "iOS language benchmark storage preflight failed"
+      require_quiet_host ios-lang-bench || die "iOS language benchmark needs a quiet Mac host"
       cmd_lang_bench "$@"
       ;;
     delivery-reliability)
@@ -2932,6 +2935,7 @@ main() {
     profile) cmd_profile "$@" ;;
     memory)
       require_build_free_space memory-qualification || die "iOS memory qualification storage preflight failed"
+      require_quiet_host ios-memory || die "iOS memory qualification needs a quiet Mac host"
       cmd_memory "$@"
       ;;
     clone-conditioning)
@@ -2942,6 +2946,7 @@ main() {
     preflight) cmd_preflight "$@" ;;
     gate)
       require_build_free_space memory-qualification || die "iOS gate storage preflight failed"
+      require_quiet_host ios-gate || die "iOS gate needs a quiet Mac host"
       cmd_gate "$@"
       ;;
     help|-h|--help)

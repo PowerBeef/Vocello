@@ -7,6 +7,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT_DIR/scripts/lib/build_paths.sh"
 . "$ROOT_DIR/scripts/lib/build_cache.sh"
+. "$ROOT_DIR/scripts/lib/host_preflight.sh"
 . "$ROOT_DIR/scripts/lib/required_steps.sh"
 PROJECT="$ROOT_DIR/QwenVoice.xcodeproj"
 MAC_DERIVED="$QVOICE_XCODE_MACOS_DERIVED"
@@ -292,6 +293,12 @@ if [[ "$platform" == "ios" ]]; then
 fi
 require_build_free_space "ui-$lane" \
   || die "$platform $lane storage preflight failed before build or target launch"
+if [[ "$lane" == "benchmark" || "$lane" == "perf" ]]; then
+  # Timing lanes: the summarizer would reject a run on a loaded host afterwards;
+  # refuse before the build instead.
+  require_quiet_host "ui-$platform-$lane" \
+    || die "$platform $lane needs a quiet host (load within 2x cores, no memory pressure)"
+fi
 
 if [[ "$platform" == "macos" && "$lane" == "benchmark" && ",${modes}," == *",clone,"* ]]; then
   mac_test_clone_fixture_current \

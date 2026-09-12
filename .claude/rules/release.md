@@ -74,12 +74,17 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   capture failures, no critical pressure, warning, `hardTrim` or `fullUnload`; 95–<100% coverage is
   `passedWithWarnings`. Marking evidence keeps the take peak (`config/marking-peak-equality.json`).
 - **Audio QA is autonomous.** Fixed seeds, byte-bound PCM QC, locale-locked full-WAV ASR and
-  prosody/delivery evidence are required; listening is optional and never clears a machine failure.
+  prosody/delivery evidence are required; listening is optional, has no lane, and never clears a
+  machine failure. Language verdicts name their recognizer families: Apple Speech in the iPhone app,
+  the pinned whisper-small MLX producer (`scripts/independent_asr.py`) on the Mac after the generator
+  has exited; one family is one witness, two must agree for consensus. Shared metrics live in
+  `scripts/lib/language_metrics.py` and `scripts/lib/audio_qc.py`; thresholds stay in Swift.
   Prompt comparisons use a run-time frozen holdout judged by `scripts/delivery_promotion_decision.py`.
 - **Consent-bound lanes.** `scripts/ui_test.sh`, `scripts/ios_device.sh`, `scripts/macos_test.sh
-  memory|lang-bench` and `release.yml` run only on explicit request. Runner PASS requires diagnostics,
-  crash deltas and restoration; no retries; a failed run keeps its artifacts; changed source needs new
-  run IDs. XCUITest is never a packaging, notarization or upload prerequisite.
+  memory|lang-bench` and `release.yml` run only on explicit request. Timing lanes refuse to start on a
+  busy host (`require_quiet_host`: load within twice the cores, no kernel memory pressure). Runner PASS
+  requires diagnostics, crash deltas and restoration; no retries; a failed run keeps its artifacts;
+  changed source needs new run IDs. XCUITest is never a packaging, notarization or upload prerequisite.
 - **TSan.** `config/tsan-policy.json` names the subset and the tests that skip under the sanitizer;
   the nightly lane runs it; never weaken deterministic or MLX runtime coverage to make it pass.
 - **Claude Code state stays external.** Sessions, memory and `settings.local.json` never enter Git,

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck disable=SC2034  # read by matrix_read in lib/shared.sh
 MATRIX_PATH="$SCRIPT_DIR/../config/apple-platform-capability-matrix.json"
 
 # shellcheck source=./lib/shared.sh

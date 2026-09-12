@@ -330,7 +330,8 @@ cmd_crashes() {
     sleep 5   # let macOS write the .ips
   fi
 
-  local dest="$QVOICE_ARTIFACTS_MACOS/crashes/crashes-$(date +%Y%m%d-%H%M%S)"
+  local dest
+  dest="$QVOICE_ARTIFACTS_MACOS/crashes/crashes-$(date +%Y%m%d-%H%M%S)"
   mkdir -p "$dest"
   note "collecting .ips from $dr (app: Vocello*, service: QwenVoiceEngineService* / *engine-service*)"
   local n=0 f
@@ -383,7 +384,8 @@ cmd_debug() {
 # logs: retain the app + XPC service os_log (subsystem com.qwenvoice.app) to a file
 # under build/artifacts/macos/logs/<run>.log. Ctrl-C to stop.
 cmd_logs() {
-  local out="$QVOICE_ARTIFACTS_MACOS/logs/macos-logs-$(date +%Y%m%d-%H%M%S).log"
+  local out
+  out="$QVOICE_ARTIFACTS_MACOS/logs/macos-logs-$(date +%Y%m%d-%H%M%S).log"
   mkdir -p "$(dirname "$out")"
   note "streaming os_log (subsystem $BUNDLE_ID) → $out (Ctrl-C to stop)"
   /usr/bin/log stream --info --style compact --predicate "subsystem == \"$BUNDLE_ID\"" 2>&1 | tee "$out"
@@ -669,7 +671,8 @@ cmd_memory() {
   require_mac_benchmark_models pro_custom_speed pro_design_speed pro_clone_speed
   require_mac_benchmark_clone_fixture
 
-  local run_id="mac-memory-qualification-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
+  local run_id
+  run_id="mac-memory-qualification-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
   local artifacts="$QVOICE_ARTIFACTS_MACOS/memory/$run_id"
   local runtime="$artifacts/runtime"
   local debug_voices="$HOME/Library/Application Support/QwenVoice-Debug/voices"
@@ -840,7 +843,8 @@ cmd_core_test() {
 # policy records characterization status.
 cmd_tsan() {
   [[ $# -eq 0 ]] || die "tsan accepts no arguments"
-  local run_id="tsan-$(date +%Y%m%d-%H%M%S)"
+  local run_id
+  run_id="tsan-$(date +%Y%m%d-%H%M%S)"
   local artifacts="$QVOICE_ARTIFACTS_MACOS/tests/$run_id"
   local build_st=0 core_st=0 transport_st=0
   mkdir -p "$artifacts"
@@ -1049,7 +1053,8 @@ cmd_test() {
       *) die "unknown test argument '$1' (try --coverage)" ;;
     esac
   done
-  local run_id="mac-test-$(date +%Y%m%d-%H%M%S)"
+  local run_id
+  run_id="mac-test-$(date +%Y%m%d-%H%M%S)"
   local artifacts="$QVOICE_ARTIFACTS_MACOS/tests/$run_id"
   mkdir -p "$artifacts"
   local test_build_st=0 core_st=0 transport_st=0 runtime_st=0 coverage_st=0
@@ -1191,7 +1196,8 @@ GATE_BENCH_BASELINE="$ROOT_DIR/benchmarks/baselines/mac-gate-bench.json"
 run_gate_bench() {
   local gate_dir="$1"
   local log="$gate_dir/bench.log"
-  local run_id="mac-gate-bench-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
+  local run_id
+  run_id="mac-gate-bench-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
   local artifacts="$gate_dir/engine-benchmark"
   local runtime="$artifacts/runtime"
   local run_diag="$runtime/diagnostics"
@@ -1276,7 +1282,8 @@ gate_crash_delta() {
 }
 
 cmd_gate() {
-  local run_id="mac-gate-$(date +%Y%m%d-%H%M%S)"
+  local run_id
+  run_id="mac-gate-$(date +%Y%m%d-%H%M%S)"
   local gate_dir="$QVOICE_ARTIFACTS_MACOS/gates/gate-$run_id"
   local verdict="$gate_dir/verdict.txt"
   local step_ledger="$gate_dir/required-steps.json"
@@ -1363,7 +1370,8 @@ cmd_gate() {
 
 cmd_release_readiness() {
   [[ $# -eq 0 ]] || die "release-readiness accepts no arguments"
-  local run_id="release-readiness-$(date +%Y%m%d-%H%M%S)"
+  local run_id
+  run_id="release-readiness-$(date +%Y%m%d-%H%M%S)"
   local out="$QVOICE_ARTIFACTS_MACOS/release-readiness/$run_id"
   local crash_marker="$out/.crash-marker"
   local step_ledger="$out/required-steps.json"

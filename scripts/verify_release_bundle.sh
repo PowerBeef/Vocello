@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck disable=SC2034  # read by matrix_read in lib/shared.sh
 MATRIX_PATH="$SCRIPT_DIR/../config/apple-platform-capability-matrix.json"
 EXPECT_SIGNED_RELEASE="${QWENVOICE_EXPECT_SIGNED_RELEASE:-0}"
 # A local operator without a GUI session may explicitly skip step [3/4].
@@ -173,9 +174,10 @@ mkdir -p \
 
 pkill -x "$APP_EXECUTABLE_NAME" 2>/dev/null || true
 
+RESOLVED_USER="${USER:-$(id -un)}"
 HOME="$TMP_UI_HOME" \
-USER="${USER:-$(id -un)}" \
-LOGNAME="${LOGNAME:-${USER:-$(id -un)}}" \
+USER="$RESOLVED_USER" \
+LOGNAME="${LOGNAME:-$RESOLVED_USER}" \
 QWENVOICE_DEBUG=1 \
 QWENVOICE_APP_SUPPORT_DIR="$TMP_UI_FIXTURE" \
 /usr/bin/open -n "$APP_PATH" \

@@ -2,7 +2,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 # shellcheck source=lib/build_paths.sh
 . "$SCRIPT_DIR/lib/build_paths.sh"
 RELEASE_DIR="$QVOICE_DIST_MACOS"

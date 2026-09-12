@@ -133,6 +133,12 @@ def lint_commands(paths: list[str]) -> list[list[str]]:
     shell = [p for p in paths if p.endswith(".sh") and (ROOT / p).is_file()]
     if shell and _which("shellcheck"):
         commands.append(["shellcheck", "-x", "-S", "warning", *shell])
+    elif shell:
+        print(
+            f"==> [dev] shellcheck is not on PATH; {len(shell)} changed shell script(s) are not linted "
+            "(config/toolchain.json pins the version; scripts/install_pinned_tools.sh installs it)",
+            file=sys.stderr, flush=True,
+        )
     swift = [p for p in paths if p.endswith(".swift") and (ROOT / p).is_file()
              and p.startswith(("Sources/", "Tests/"))]
     if swift and _which("swiftlint"):

@@ -598,7 +598,8 @@ cmd_enroll_clone_fixture() {
     || die "enroll-clone-fixture requires --transcript <existing .txt> (transcript-backed identity is mandatory)"
   [[ -n "$name" ]] || name="$(basename "$wav" .wav)"
 
-  local run_id="ios-enroll-voice-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
+  local run_id
+  run_id="ios-enroll-voice-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
   local artifacts="$QVOICE_ARTIFACTS_DIAGNOSTICS/ios/enroll-voice/$run_id"
   local pulled="$artifacts/pulled"
   local timeout="${QVOICE_IOS_ENROLL_TIMEOUT:-600}"
@@ -661,7 +662,8 @@ PY
 cmd_speech_assets() {
   [[ $# -eq 0 ]] || die "speech-assets accepts no arguments"
   local locales="de_DE,es_419,ja_JP,zh_CN"
-  local run_id="ios-speech-assets-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
+  local run_id
+  run_id="ios-speech-assets-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
   local artifacts="$QVOICE_ARTIFACTS_DIAGNOSTICS/ios/speech-assets/$run_id"
   local pulled="$artifacts/pulled"
   local timeout="${QVOICE_IOS_SPEECH_ASSET_TIMEOUT:-1800}"
@@ -768,7 +770,8 @@ cmd_console() {
   [[ "$spec" == *:* ]] || spec="custom:speed:$spec"
   require_diagnostic_clone_voice "$spec"
   local dev; dev="$(resolve_device)"
-  local run_id="ios-console-$(date +%Y%m%d-%H%M%S)"
+  local run_id
+  run_id="ios-console-$(date +%Y%m%d-%H%M%S)"
   note "attached launch ($spec), runID=$run_id — Ctrl-C to detach"
   local env_json
   env_json="$(device_diagnostics_env_json "$spec" "$run_id")"
@@ -821,7 +824,6 @@ probe_device_sentinel() {
 wait_device_diagnostics_sentinel() {
   local run_id="$1" timeout="${2:-300}" dest="$3"
   local waited=0 sentinel=""
-  local interference_streak=0 interference_state=""
   while (( waited < timeout )); do
     sleep 10
     waited=$((waited + 10))
@@ -844,9 +846,7 @@ wait_device_diagnostics_sentinel() {
       DEVICE_UNREACHABLE)
         die "run doomed at ${waited}s — $verdict: $(device_state_advice "$verdict") (${state#*|})"
         ;;
-      *)
-        interference_streak=0
-        ;;
+      *) ;;
     esac
     note "…still generating (${waited}s / runID=$run_id)"
   done
@@ -1888,7 +1888,8 @@ cmd_bench() {
   export QVOICE_LAUNCH_RUN_ID="$run_id"
   export QVOICE_MAC_BENCH_RUN_ID="$run_id"
   export QVOICE_MAC_BENCH_TAKE_INDEX=1
-  export QVOICE_MAC_BENCH_CELL="$(device_benchmark_cell "$spec")"
+  QVOICE_MAC_BENCH_CELL="$(device_benchmark_cell "$spec")"
+  export QVOICE_MAC_BENCH_CELL
   export QWENVOICE_NATIVE_TELEMETRY_MODE=verbose
   local launched_run_id; launched_run_id="$(cmd_launch "$spec" | tail -1)"
   unset QVOICE_LAUNCH_RUN_ID QVOICE_MAC_BENCH_RUN_ID QVOICE_MAC_BENCH_TAKE_INDEX \
@@ -1900,7 +1901,6 @@ cmd_bench() {
   rm -rf "$dest"
   note "waiting for device-diagnostics sentinel (runID=$run_id, timeout=${timeout}s)…"
   local waited=0 sentinel=""
-  local interference_streak=0 interference_state=""
   while (( waited < timeout )); do
     sleep 10; waited=$((waited + 10))
     # Sentinel-only probe: the measured take must not share the device with a
@@ -1923,9 +1923,7 @@ cmd_bench() {
       DEVICE_UNREACHABLE)
         die "run doomed at ${waited}s — $verdict: $(device_state_advice "$verdict") (${state#*|})"
         ;;
-      *)
-        interference_streak=0
-        ;;
+      *) ;;
     esac
     note "…still generating (${waited}s)"
   done
@@ -2067,7 +2065,8 @@ cmd_logs() {
   [[ "$spec" == *:* ]] || spec="custom:speed:$spec"
   require_diagnostic_clone_voice "$spec"
   local dev; dev="$(resolve_device)"
-  local run_id="ios-logs-$(date +%Y%m%d-%H%M%S)"
+  local run_id
+  run_id="ios-logs-$(date +%Y%m%d-%H%M%S)"
   local out="$QVOICE_ARTIFACTS_DIAGNOSTICS/ios/logs/${run_id}.log"
   mkdir -p "$(dirname "$out")"
   note "capturing attached launch logs → $out (Ctrl-C to stop)"
@@ -2163,7 +2162,8 @@ cmd_profile() {
   local env_json
   export QVOICE_MAC_BENCH_RUN_ID="$run_id"
   export QVOICE_MAC_BENCH_TAKE_INDEX=1
-  export QVOICE_MAC_BENCH_CELL="$(device_benchmark_cell "$spec")"
+  QVOICE_MAC_BENCH_CELL="$(device_benchmark_cell "$spec")"
+  export QVOICE_MAC_BENCH_CELL
   local previous_telemetry_mode="${QWENVOICE_NATIVE_TELEMETRY_MODE:-}"
   export QWENVOICE_NATIVE_TELEMETRY_MODE=verbose
   env_json="$(device_diagnostics_env_json "$spec" "$run_id")"
@@ -2318,7 +2318,8 @@ cmd_memory() {
   [[ -n "$voice_id" ]] || die "memory qualification requires --voice-id <exact-prepared-saved-voice-id>"
   local policy="$ROOT_DIR/config/memory-qualification-policy.json"
   [[ -f "$policy" ]] || die "memory qualification policy is missing: $policy"
-  local run_id="ios-memory-qualification-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
+  local run_id
+  run_id="ios-memory-qualification-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
   local artifacts="$QVOICE_ARTIFACTS_IOS/memory/$run_id"
   local dest="$artifacts/device-diagnostics"
   local launch_json="$artifacts/launch.json"
@@ -2369,6 +2370,7 @@ print(json.dumps(env, sort_keys=True))')"
   printf -v cleanup_command \
     'xcrun devicectl device process terminate --device %q --pid %q --quiet >/dev/null 2>&1 || true' \
     "$dev" "$target_pid"
+  # shellcheck disable=SC2064  # expanded now on purpose: the %q-quoted device and PID are fixed at arm time
   trap "$cleanup_command" EXIT
   unset QVOICE_IOS_DEVICE_MEMORY_QUALIFICATION_SPEC \
     QVOICE_IOS_DEVICE_DIAGNOSTICS_CLONE_VOICE_ID QVOICE_IOS_DEVICE_RUN_ID \
@@ -2401,7 +2403,8 @@ PY
   local engine_jsonl
   engine_jsonl="$(find "$dest" -path '*/engine/generations.jsonl' 2>/dev/null | head -1)"
   [[ -n "$engine_jsonl" ]] && diag="$(dirname "$(dirname "$engine_jsonl")")"
-  local output_dir="$(dirname "$sentinel")/outputs"
+  local output_dir
+  output_dir="$(dirname "$sentinel")/outputs"
   python3 "$ROOT_DIR/scripts/publish_benchmark_history.py" memory-qualification \
     --artifact-dir "$artifacts" --snapshot "$artifacts/benchmark-source.json" \
     --platform ios --run-id "$run_id" --results "$sentinel" --diagnostics "$diag" \
@@ -2436,7 +2439,8 @@ cmd_clone_conditioning() {
   [[ "$timeout" =~ ^[1-9][0-9]*$ ]] \
     || die "QVOICE_IOS_CLONE_CONDITIONING_TIMEOUT must be a positive whole number of seconds"
 
-  local run_id="ios-clone-conditioning-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
+  local run_id
+  run_id="ios-clone-conditioning-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
   local artifacts="$QVOICE_ARTIFACTS_IOS/clone-conditioning/$run_id"
   local dest="$artifacts/device-diagnostics"
   local launch_json="$artifacts/launch.json"
@@ -2479,6 +2483,7 @@ print(json.dumps({"QWENVOICE_DEBUG": "1", **{key: os.environ[key] for key in key
   printf -v cleanup_command \
     'xcrun devicectl device process terminate --device %q --pid %q --quiet >/dev/null 2>&1 || true' \
     "$dev" "$target_pid"
+  # shellcheck disable=SC2064  # expanded now on purpose: the %q-quoted device and PID are fixed at arm time
   trap "$cleanup_command" EXIT
   unset QVOICE_IOS_DEVICE_CLONE_CONDITIONING_ACCEPTANCE \
     QVOICE_IOS_DEVICE_DIAGNOSTICS_CLONE_VOICE_ID \
@@ -2529,7 +2534,8 @@ cmd_delivery_reliability() {
   [[ "$timeout" =~ ^[1-9][0-9]*$ ]] \
     || die "QVOICE_IOS_DELIVERY_RELIABILITY_TIMEOUT must be a positive whole number of seconds"
 
-  local run_id="ios-startup-reliability-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
+  local run_id
+  run_id="ios-startup-reliability-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
   local artifacts="$QVOICE_ARTIFACTS_DIAGNOSTICS/ios/startup-reliability/$run_id"
   local pulled="$artifacts/device-diagnostics"
   local launch_spec launch_json dev env_json target_pid="" cleanup_command="" wait_status=0
@@ -2549,7 +2555,8 @@ cmd_delivery_reliability() {
     || { rm -f "$launch_spec"; die "could not establish the pre-run systemCrashLogs baseline"; }
   rm -rf "$artifacts/system-crashes-before/pull"
   dev="$(resolve_device)"
-  export QVOICE_IOS_DEVICE_DELIVERY_RELIABILITY_SPEC="$(<"$launch_spec")"
+  QVOICE_IOS_DEVICE_DELIVERY_RELIABILITY_SPEC="$(<"$launch_spec")"
+  export QVOICE_IOS_DEVICE_DELIVERY_RELIABILITY_SPEC
   export QVOICE_IOS_DEVICE_RUN_ID="$run_id"
   export QVOICE_MAC_BENCH_RUN_ID="$run_id"
   export QWENVOICE_NATIVE_TELEMETRY_MODE=verbose
@@ -2581,6 +2588,7 @@ print(json.dumps({"QWENVOICE_DEBUG": "1", **{key: os.environ[key] for key in key
   printf -v cleanup_command \
     'xcrun devicectl device process terminate --device %q --pid %q --quiet >/dev/null 2>&1 || true' \
     "$dev" "$target_pid"
+  # shellcheck disable=SC2064  # expanded now on purpose: the %q-quoted device and PID are fixed at arm time
   trap "$cleanup_command" EXIT
 
   set +e
@@ -2717,14 +2725,16 @@ _gate_generation_check() {
   # the diagnostic generation starts.
   cmd_build
   cmd_install >/dev/null
-  local run_id="ios-gate-bench-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
+  local run_id
+  run_id="ios-gate-bench-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
   local artifacts="$gate_dir/engine-benchmark"
   mkdir -p "$artifacts"
   capture_benchmark_source "$artifacts"
   export QVOICE_LAUNCH_RUN_ID="$run_id"
   export QVOICE_MAC_BENCH_RUN_ID="$run_id"
   export QVOICE_MAC_BENCH_TAKE_INDEX=1
-  export QVOICE_MAC_BENCH_CELL="$(device_benchmark_cell "custom:speed:Gate generation smoke.")"
+  QVOICE_MAC_BENCH_CELL="$(device_benchmark_cell "custom:speed:Gate generation smoke.")"
+  export QVOICE_MAC_BENCH_CELL
   export QWENVOICE_NATIVE_TELEMETRY_MODE=verbose
   local launched_run_id
   launched_run_id="$(cmd_launch "custom:speed:Gate generation smoke." | tail -1)"
@@ -2735,13 +2745,12 @@ _gate_generation_check() {
   local dest="$artifacts/device-diagnostics"
   rm -rf "$dest"
   local waited=0 sentinel=""
-  local interference_streak=0
   while (( waited < timeout )); do
     sleep 10; waited=$((waited + 10))
     ( cmd_pull "$dest" ) >/dev/null 2>&1 || true
     sentinel="$(find "$dest" -name device-diagnostics-done.json -path "*/${run_id}/*" 2>/dev/null | head -1)"
     [[ -n "$sentinel" && -f "$sentinel" ]] && break
-    # Fast-abort on interference (same policy as cmd_bench's poll loop).
+    # Abort as soon as the device becomes unreachable (cmd_bench's poll policy).
     local state verdict
     state="$(probe_device_state 2>/dev/null || true)"
     verdict="${state%%|*}"
@@ -2750,7 +2759,7 @@ _gate_generation_check() {
         echo "aborted at ${waited}s — $verdict: $(device_state_advice "$verdict")"
         return 1
         ;;
-      *) interference_streak=0 ;;
+      *) ;;
     esac
   done
   [[ -n "$sentinel" && -f "$sentinel" ]] || { echo "no device-diagnostics sentinel after ${timeout}s (device state: $(probe_device_state 2>/dev/null || echo unknown))"; return 1; }
@@ -2778,7 +2787,8 @@ PY
 }
 
 cmd_gate() {
-  local run_id="ios-gate-$(date +%Y%m%d-%H%M%S)"
+  local run_id
+  run_id="ios-gate-$(date +%Y%m%d-%H%M%S)"
   local gate_dir="$QVOICE_ARTIFACTS_IOS/gates/$run_id"
   local verdict="$gate_dir/verdict.txt"
   local step_ledger="$gate_dir/required-steps.json"

@@ -4,8 +4,8 @@
 # GitHub's macOS runner pools serve mixed image generations during an image
 # roll, so `brew install <tool>` yields whichever formula index the drawn
 # runner carries — flapping the exact-version toolchain validation. This
-# script makes the drifting tools (xcodegen, ripgrep, xcbeautify,
-# shellcheck) deterministic: it
+# script makes the drifting tools deterministic (xcodegen, ripgrep,
+# xcbeautify and shellcheck): it
 # downloads the release artifact recorded in config/toolchain.json
 # `artifactPins`, verifies the pinned SHA-256, and installs the binary into
 # an install prefix ahead of the image's copies on PATH.
@@ -72,7 +72,8 @@ install_pin() {
     mkdir -p "$(dirname "$tool_home")"
     mv "$extract" "$tool_home"
     chmod +x "$tool_home/$archive_path"
-    local wrapper="$PREFIX/$(basename "$archive_path")"
+    local wrapper
+    wrapper="$PREFIX/$(basename "$archive_path")"
     printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$tool_home/$archive_path" > "$wrapper"
     chmod +x "$wrapper"
     echo "installed $tool $version -> $wrapper"

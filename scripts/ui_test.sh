@@ -557,7 +557,7 @@ terminate_owned_processes() {
   local name="$1"
   shift
   local -a expected=("$@") pids=()
-  local pid path attempt alive candidates
+  local pid path alive candidates
   candidates="$(pgrep -x "$name" 2>/dev/null || true)"
   while IFS= read -r pid; do
     [[ -n "$pid" ]] || continue
@@ -569,7 +569,7 @@ terminate_owned_processes() {
   ((${#pids[@]} > 0)) || return 0
 
   kill "${pids[@]}" 2>/dev/null || true
-  for attempt in {1..40}; do
+  for _ in {1..40}; do
     alive=false
     for pid in "${pids[@]}"; do
       if kill -0 "$pid" 2>/dev/null; then
@@ -597,7 +597,7 @@ terminate_owned_processes() {
       kill -9 "$pid" 2>/dev/null || true
     fi
   done
-  for attempt in {1..20}; do
+  for _ in {1..20}; do
     alive=false
     for pid in "${pids[@]}"; do
       kill -0 "$pid" 2>/dev/null && alive=true
@@ -1065,8 +1065,8 @@ validate_macos_ui_perf() {
 validate_macos_benchmark() {
   local diagnostics="$HOME/Library/Application Support/QwenVoice-Debug/diagnostics"
   local evidence="$out/benchmark-evidence.json"
-  local status=1 attempt
-  for attempt in {1..60}; do
+  local status=1
+  for _ in {1..60}; do
     if python3 "$ROOT_DIR/scripts/check_macos_xpc_bench.py" "$diagnostics" \
         --run-id "$run_id" --modes "$modes" --lengths "$lengths" --warm "$warm" \
         --label "${label:-$run_id}" --evidence-manifest "$evidence" \
@@ -1453,13 +1453,15 @@ else
     export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_RUN_ID="$run_id"
     export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_SOURCE_ID="$audit_source_id"
     export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_SCENARIO="$control_scenario"
-    export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_PLAN_B64="$(<"$out/control-audit-plan.zlib.b64")"
+    TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_PLAN_B64="$(<"$out/control-audit-plan.zlib.b64")"
+    export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_PLAN_B64
     export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_TAKE_START="$control_resume_take_start"
     export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_TAKE_LIMIT="$control_take_limit"
     # Test-runner metadata only; never added to spoken text or application state.
     export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_CARRIERS_B64="W10="
     if [[ -n "$control_resume" ]]; then
-      export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_CARRIERS_B64="$(python3 -c 'import base64,json,sys; print(base64.b64encode(json.dumps(json.load(open(sys.argv[1]))["seedCarriers"]).encode()).decode())' "$out/control-resume-state.json")"
+      TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_CARRIERS_B64="$(python3 -c 'import base64,json,sys; print(base64.b64encode(json.dumps(json.load(open(sys.argv[1]))["seedCarriers"]).encode()).decode())' "$out/control-resume-state.json")"
+      export TEST_RUNNER_QVOICE_IOS_CONTROL_AUDIT_CARRIERS_B64
     fi
   else
     only_test="VocelloiOSUITests/VocelloiOSModelDownloadUITests/testConfiguredModelManagementScenario"

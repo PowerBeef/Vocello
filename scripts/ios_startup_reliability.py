@@ -477,8 +477,8 @@ def validate_audio_qc(value: Any, field: str) -> None:
             if type(cadence[key]) is not int or cadence[key] < 0:
                 raise ContractError(f"{field}.cadence.{key} is invalid")
         pauses = cadence["recordedInteriorPausesMS"]
-        # Match the bounded native limiter and audio_cadence_qc consumer. These
-        # are all recorded interior runs, not only cadence-threshold pauses.
+        # Match the bounded native limiter: these are all recorded interior
+        # runs, not only cadence-threshold pauses.
         if not isinstance(pauses, list) or len(pauses) > 256 or any(
             type(pause) is not int or pause < 0 for pause in pauses
         ):

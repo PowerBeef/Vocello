@@ -106,7 +106,6 @@ final class GenerationQualityReportProducerTests: XCTestCase {
                 outcome: .pass,
                 algorithmVersion: 2,
                 measurements: [
-                    .init(key: .medianPitchSemitones, value: 3.1),
                     .init(key: .pitchRangeSemitones, value: 7.4),
                 ]
             ),

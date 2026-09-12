@@ -5,12 +5,11 @@ import QwenVoiceCore
 /// and the natural-language instruction each one sends to the model. Static +
 /// instant (no engine boot), reading `EmotionPreset` (the single source of truth).
 ///
-/// This is the DRY feed for the objective delivery-adherence measurement
-/// (`scripts/delivery_adherence.py`, which generates a neutral + instructed take
-/// per seed and compares their acoustics with `scripts/analyze_delivery.py`) and a
+/// This is the roster the delivery harness reads (`--shipped-only --json`) and a
 /// way to discover the `bench --delivery <id>` cell ids. Delivery adherence is
-/// judged by acoustics, not by an external model ear (see benchmarks/OPTIMIZATION.md
-/// section I.3).
+/// measured by `vocello bench --delivery` plus `scripts/bench_delivery_prosody.py`,
+/// which pairs each instructed take with its same-seed neutral take and compares
+/// their acoustics; adherence is judged by acoustics, not by an external model ear.
 enum DeliveriesCommand {
     struct DeliveryJSON: Encodable {
         let id: String          // "<preset>.<intensity>"
@@ -64,7 +63,7 @@ enum DeliveriesCommand {
 
         if args.flag("json") { emitJSON(rows); return }
         for r in rows { print("\(r.id)\t\(r.instruction)") }
-        note("ids are the `bench --delivery <id>` cells; measure adherence objectively with scripts/delivery_adherence.py")
+        note("ids are the `bench --delivery <id>` cells; measure adherence objectively with `vocello bench --delivery <ids>`")
     }
 
     static func printHelp() {
@@ -77,7 +76,7 @@ enum DeliveriesCommand {
         Each row is `<preset>.<intensity>` and the natural-language instruction the
         model receives. These ids are the `bench --delivery <id>` cells. Reference-free
         delivery adherence is measured objectively from the audio (F0 / rate / duration)
-        — see scripts/delivery_adherence.py + scripts/analyze_delivery.py.
+        by `vocello bench --delivery <ids>` and scripts/bench_delivery_prosody.py.
 
         Options:
           --json           emit JSON instead of a table

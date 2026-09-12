@@ -511,7 +511,7 @@ final class WordErrorRateTests: XCTestCase {
         )
 
         XCTAssertFalse(
-            VoiceClipTranscriber.hasCompleteTemporalCoverage(
+            VoiceClipTranscriber.hasAudioEdgeCoverage(
                 recognition,
                 sourceAudioDurationSeconds: 16
             )
@@ -554,7 +554,7 @@ final class WordErrorRateTests: XCTestCase {
         )
 
         XCTAssertTrue(
-            VoiceClipTranscriber.hasCompleteTemporalCoverage(
+            VoiceClipTranscriber.hasAudioEdgeCoverage(
                 recognition,
                 sourceAudioDurationSeconds: 16
             )
@@ -593,7 +593,7 @@ final class WordErrorRateTests: XCTestCase {
             return repetition
         }
         XCTAssertFalse(
-            VoiceClipTranscriber.hasCompleteTemporalCoverage(
+            VoiceClipTranscriber.hasAudioEdgeCoverage(
                 trailingOnly,
                 sourceAudioDurationSeconds: 16
             )

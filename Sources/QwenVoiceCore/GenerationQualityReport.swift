@@ -11,7 +11,6 @@ public enum GenerationQualityOutcome: String, Codable, Hashable, Sendable {
     case warning
     case fail
     case unavailable
-    case notApplicable = "not_applicable"
 }
 
 public enum GenerationQualityGateID: String, CaseIterable, Codable, Hashable, Sendable {
@@ -22,9 +21,7 @@ public enum GenerationQualityGateID: String, CaseIterable, Codable, Hashable, Se
     case streamingContinuity = "streaming_continuity"
     case prosody
     case languageASR = "language_asr"
-    case criticalTokens = "critical_tokens"
     case delivery
-    case speakerOnset = "speaker_onset"
     case longFormContinuity = "long_form_continuity"
 }
 
@@ -42,10 +39,8 @@ public enum GenerationQualityMeasurementKey: String, Codable, Hashable, Sendable
     case channelHighWaterFrames = "channel_high_water_frames"
     case wordErrorRate = "word_error_rate"
     case consensusPassCount = "consensus_pass_count"
-    case medianPitchSemitones = "median_pitch_semitones"
     case pitchRangeSemitones = "pitch_range_semitones"
     case boundaryDiscontinuity = "boundary_discontinuity"
-    case analyzerPeakWorkingSetBytes = "analyzer_peak_working_set_bytes"
     case deliveryPitchShiftSemitones = "delivery_pitch_shift_semitones"
     case deliveryArousalScore = "delivery_arousal_score"
     // Analyzer-v3 voice-quality axes. Arousal alone cannot separate emotions
@@ -88,38 +83,22 @@ public struct GenerationQualityGateResult: Codable, Hashable, Sendable {
     }
 }
 
-public enum GenerationTransformationRiskCode: String, Codable, Hashable, Sendable {
-    case ambiguousNumber = "ambiguous_number"
-    case protectedURL = "protected_url"
-    case protectedEmail = "protected_email"
-    case protectedVersion = "protected_version"
-    case protectedAcronym = "protected_acronym"
-    case codeSwitch = "code_switch"
-    case criticalToken = "critical_token"
-}
-
 public struct QualityReviewPolicy: Codable, Hashable, Sendable {
     public let version: Int
     public let depth: GenerationQualityReviewDepth
     public let requiresLanguageASR: Bool
-    public let transformationRisks: [GenerationTransformationRiskCode]
     public let isLongForm: Bool
-    public let requiresSpeakerOnset: Bool
 
     public init(
         version: Int = 1,
         depth: GenerationQualityReviewDepth,
         requiresLanguageASR: Bool,
-        transformationRisks: [GenerationTransformationRiskCode] = [],
-        isLongForm: Bool = false,
-        requiresSpeakerOnset: Bool = false
+        isLongForm: Bool = false
     ) {
         self.version = version
         self.depth = depth
         self.requiresLanguageASR = requiresLanguageASR
-        self.transformationRisks = Array(Set(transformationRisks)).sorted { $0.rawValue < $1.rawValue }
         self.isLongForm = isLongForm
-        self.requiresSpeakerOnset = requiresSpeakerOnset
     }
 }
 
@@ -205,13 +184,9 @@ public enum QualityGateRegistry {
         if policy.depth == .standard || policy.depth == .canonical {
             gates.insert(.prosody)
             if policy.requiresLanguageASR { gates.insert(.languageASR) }
-            if policy.transformationRisks.contains(.criticalToken) {
-                gates.insert(.criticalTokens)
-            }
         }
         if policy.depth == .canonical {
             gates.insert(.delivery)
-            if policy.requiresSpeakerOnset { gates.insert(.speakerOnset) }
             if policy.isLongForm { gates.insert(.longFormContinuity) }
         }
         return gates.sorted { $0.rawValue < $1.rawValue }
@@ -269,13 +244,6 @@ public enum QualityGateRegistry {
             switch result.outcome {
             case .pass:
                 break
-            case .notApplicable:
-                // A gate is added to `required` only when it is applicable to
-                // this review policy. Treating it as not-applicable here would
-                // allow a mandatory Fast/Standard/Canonical proof to disappear
-                // while the aggregate report still claimed PASS.
-                outcome = .fail
-                issues.append("quality_gate_not_applicable.\(gate.rawValue)")
             case .warning:
                 if outcome == .pass { outcome = .warning }
                 issues.append("quality_gate_warning.\(gate.rawValue)")
@@ -299,38 +267,5 @@ public enum QualityGateRegistry {
             (48 ... 57).contains(scalar.value)
                 || (97 ... 102).contains(scalar.value)
         }
-    }
-}
-
-public struct QualityCandidateAttemptIdentity: Codable, Hashable, Sendable {
-    public let attemptIndex: Int
-    public let operationLeaseID: UUID
-    public let derivedSeed: UInt64
-    public let evidenceDigest: String
-
-    public init(
-        attemptIndex: Int,
-        operationLeaseID: UUID,
-        derivedSeed: UInt64,
-        evidenceDigest: String
-    ) {
-        self.attemptIndex = attemptIndex
-        self.operationLeaseID = operationLeaseID
-        self.derivedSeed = derivedSeed
-        self.evidenceDigest = evidenceDigest
-    }
-}
-
-public enum QualityCandidateRetryPolicy {
-    public static let maximumAlternativeCount = 2
-
-    public static func validate(
-        _ attempts: [QualityCandidateAttemptIdentity]
-    ) -> Bool {
-        guard attempts.count <= maximumAlternativeCount + 1 else { return false }
-        return Set(attempts.map(\.attemptIndex)).count == attempts.count
-            && Set(attempts.map(\.operationLeaseID)).count == attempts.count
-            && Set(attempts.map(\.derivedSeed)).count == attempts.count
-            && attempts.map(\.attemptIndex) == Array(0 ..< attempts.count)
     }
 }

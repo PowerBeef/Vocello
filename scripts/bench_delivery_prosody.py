@@ -36,7 +36,7 @@ from typing import Any
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from delivery_quality_gate import evaluate_delivery
-from prosody_profile import builtin_profile, delivery_weight, load_profile
+from prosody_profile import builtin_profile, load_profile, prosody_effect
 from prosody_quality_gate import evaluate_metrics
 
 
@@ -326,18 +326,6 @@ def find_neutral(parsed: list[dict[str, Any]], target: dict[str, Any]) -> dict[s
         return None
     candidates.sort(key=lambda item: (abs(item["n"] - target["n"]), item["n"]))
     return candidates[0]
-
-
-def prosody_effect(metrics: dict[str, float], profile: dict[str, Any] | None = None) -> float:
-    """Replicate the signed effect score from ``delivery_adherence.py``."""
-    resolved = profile if profile is not None else builtin_profile()
-    return (
-        metrics["f0_std_hz"] / delivery_weight(resolved, "prosody_effect", "f0_std_divisor")
-        + metrics["rate_cv"] / delivery_weight(resolved, "prosody_effect", "rate_cv_divisor")
-        - metrics["pause_ratio"] / delivery_weight(resolved, "prosody_effect", "pause_ratio_divisor")
-        + metrics["energy_roughness"]
-        / delivery_weight(resolved, "prosody_effect", "energy_roughness_divisor")
-    )
 
 
 def analyze_run(

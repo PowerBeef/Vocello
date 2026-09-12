@@ -812,7 +812,8 @@ Punctuation-aware pause budget avoids false positives on natural delivery.
 
 ### Layer 2 — Prosody scripts (optional)
 
-`scripts/prosody_quality_gate.py`, `scripts/delivery_adherence.py` on bench WAVs when using `--delivery`.
+`scripts/prosody_quality_gate.py` on individual takes; `vocello bench --delivery` runs the paired
+`scripts/bench_delivery_prosody.py` analysis itself.
 
 ### Layer 2.5 — Language hint contract (Phase 2)
 

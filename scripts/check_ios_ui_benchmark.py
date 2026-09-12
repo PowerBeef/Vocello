@@ -18,6 +18,16 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from lib import rtf as rtf_semantics  # noqa: E402
 from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
+from lib.audio_qc import (  # noqa: E402
+    SUCCESS_FINISH,
+    AudioQCError,
+    output_failure,
+    qc_algorithm_version,
+    qc_metrics as shared_qc_metrics,
+    quality_identity_fields,
+    raw_audio_qc,
+)
+from lib.audio_qc import history_record_schema_version as shared_record_schema_version  # noqa: E402
 
 from benchmark_memory import (  # noqa: E402
     MemoryEvidenceError,
@@ -27,7 +37,6 @@ from benchmark_memory import (  # noqa: E402
 
 DEFAULT_MODES = ["custom", "design", "clone"]
 DEFAULT_LENGTHS = ["short", "medium", "long"]
-SUCCESS_FINISH = {"eos", "max_tokens", "maxTokens", "completed"}
 THERMAL_RANK = {"unknown": -1, "nominal": 0, "fair": 1, "serious": 2, "critical": 3}
 TRIM_SEVERITY = {"softTrim": 1, "hardTrim": 2, "fullUnload": 3}
 
@@ -142,25 +151,6 @@ def filter_run(rows: list[dict], run_id: str) -> list[dict]:
     return [row for row in rows if (row.get("notes") or {}).get("benchRunID") == run_id]
 
 
-def output_failure(row: dict) -> str | None:
-    output = row.get("outputMetrics") or {}
-    qc = row.get("audioQC") or output.get("audioQC") or {}
-    if row.get("finishReason") not in SUCCESS_FINISH:
-        return f"unsuccessful finishReason={row.get('finishReason')!r}"
-    if output.get("readableWAV") is not True:
-        return "outputMetrics.readableWAV is not true"
-    if output.get("atomicallyPublished") is not True:
-        return "outputMetrics.atomicallyPublished is not true"
-    if not isinstance(output.get("durationSeconds"), (int, float)) or output["durationSeconds"] <= 0:
-        return "output duration is missing or non-positive"
-    verdict = qc.get("verdict")
-    if verdict not in {"pass", "warn"}:
-        if verdict == "fail":
-            return f"audioQC failed: {qc.get('flags') or []}"
-        return f"audioQC verdict is missing or invalid: {verdict!r}"
-    return None
-
-
 def _number(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
@@ -255,7 +245,7 @@ def validate_layer(
             f"{layer} generationID set mismatch: missing={missing} unexpected={unexpected}"
         )
     for row in rows:
-        if row.get("finishReason") not in SUCCESS_FINISH:
+        if str(row.get("finishReason")).lower() not in SUCCESS_FINISH:
             failures.append(
                 f"{layer} generation {row.get('generationID', '?')} has unsuccessful "
                 f"finishReason={row.get('finishReason')!r}"
@@ -437,13 +427,7 @@ def build_manifest(
         (int(row.get("schemaVersion", 0)) for rows in selected_telemetry.values() for row in rows),
         default=0,
     )
-    qc_algorithm = max(
-        (
-            int(((row.get("audioQC") or (row.get("outputMetrics") or {}).get("audioQC") or {})).get("algorithmVersion", 1))
-            for row in engine_rows
-        ),
-        default=1,
-    )
+    qc_algorithm = qc_algorithm_version(engine_rows)
     history_takes = []
     app_by_id = {row.get("generationID"): row for row in app_rows}
     for take, row in zip(takes, engine_rows, strict=True):
@@ -456,18 +440,8 @@ def build_manifest(
             "playbackStartSource"
         )
         qc = take["audioQC"]
-        raw_qc = row.get("audioQC") or (row.get("outputMetrics") or {}).get("audioQC") or {}
-        qc_metrics = {}
-        for source, destination in (
-            ("nonFiniteSamples", "nonFiniteCount"),
-            ("clippedSamples", "clipCount"),
-            ("clickEvents", "discontinuityCount"),
-            ("longestSilenceMS", "longestSilenceMS"),
-            ("dcOffset", "dcOffset"),
-        ):
-            value = raw_qc.get(source)
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
-                qc_metrics[destination] = value
+        raw_qc = raw_audio_qc(row)
+        qc_metrics = shared_qc_metrics(raw_qc)
         take_warnings = sorted(set(
             (qc["flags"] if qc["verdict"] == "warn" else []) + list(memory.warnings)
         ))
@@ -575,37 +549,15 @@ def build_manifest(
 
 
 def take_quality_identity(row: dict) -> dict:
-    """Phase 13 fold: the typed quality-registry identity this engine row
-    published with, from its open telemetry notes (mirrors
-    publish_benchmark_history.quality_identity_fields; keep in lockstep).
-    Empty when the row predates the phase-12 registry; the record then
-    publishes at schema v2."""
-    notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
-    outcome = notes.get("quality_registry_outcome")
-    gates = notes.get("quality_registry_required_gates")
-    if not isinstance(outcome, str) or not isinstance(gates, str) or not gates:
-        return {}
-    fields = {
-        "qualityRegistryOutcome": outcome,
-        "qualityRegistryRequiredGates": sorted(set(gates.split(","))),
-    }
-    issues = notes.get("quality_registry_issues")
-    if isinstance(issues, str) and issues:
-        fields["qualityRegistryIssues"] = sorted(set(issues.split(",")))
-    return fields
+    """The typed quality-registry identity this engine row published with (shared fold)."""
+    return quality_identity_fields(row)
 
 
 def history_record_schema_version(history_takes: list) -> int:
-    """3 when every take carries the quality identity, 2 when none does.
-    A mix would publish a record silently missing evidence for some takes."""
-    carrying = sum(1 for take in history_takes if "qualityRegistryOutcome" in take)
-    if carrying == 0:
-        return 2
-    if carrying == len(history_takes):
-        return 3
-    raise SystemExit(
-        "takes mix quality-registry identity presence; refusing a partial schema-v3 record"
-    )
+    try:
+        return shared_record_schema_version(history_takes)
+    except AudioQCError as error:
+        raise SystemExit(str(error)) from error
 
 
 def write_json_atomic(path: Path, payload: dict) -> None:

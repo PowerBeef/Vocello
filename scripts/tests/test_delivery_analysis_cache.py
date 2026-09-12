@@ -23,6 +23,7 @@ from delivery_analysis_cache import (  # noqa: E402
     LayerIdentity,
     NO_MODEL_DIGEST,
     digest,
+    prune,
 )
 
 
@@ -60,6 +61,37 @@ class DeliveryAnalysisCacheTests(unittest.TestCase):
         }
         values.update(changes)
         return LayerIdentity(**values)
+
+    def test_prune_keeps_the_newest_derivatives_and_their_layers(self) -> None:
+        import os
+        older = self.root / "older.wav"
+        self._write_wav(older, [int(3000 * ((index % 17) / 17.0 - 0.5)) for index in range(2400)])
+        first = self.cache.canonicalize(older)
+        second = self.cache.canonicalize(self.wav)
+        identities = []
+        for canonical in (first, second):
+            identity = LayerIdentity(
+                original_wav_sha256=canonical.original_wav_sha256,
+                canonical_derivative_sha256=canonical.canonical_derivative_sha256,
+                layer_id="global-acoustics", layer_version="1", binary_sha256=NO_MODEL_DIGEST,
+                model_id="none", model_revision="none", weights_sha256=NO_MODEL_DIGEST,
+                preprocessing_config_digest=digest({"fixture": True}),
+            )
+            self.cache.store(identity, {"value": 1.0})
+            identities.append(identity)
+        os.utime(first.derivative_path, (1_000_000, 1_000_000))
+        os.utime(second.derivative_path, (2_000_000, 2_000_000))
+
+        report = prune(self.cache.root, keep_newest=1)
+        self.assertEqual(report, {"retainedDerivatives": 1, "removedDerivatives": 1, "removedLayerRecords": 1})
+        self.assertFalse(first.derivative_path.exists())
+        self.assertTrue(second.derivative_path.exists())
+        self.assertIsNone(self.cache.load(identities[0]))
+        self.assertEqual(self.cache.load(identities[1]), {"value": 1.0})
+        # A pruned derivative is simply recomputed on its next use.
+        self.assertEqual(self.cache.canonicalize(older).canonical_derivative_sha256, first.canonical_derivative_sha256)
+        with self.assertRaisesRegex(AnalysisCacheError, "nonnegative"):
+            prune(self.cache.root, keep_newest=-1)
 
     def test_hit_avoids_compute_and_neutral_can_be_reused(self) -> None:
         identity = self._identity()

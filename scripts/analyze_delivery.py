@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Delivery-analysis v2 compatibility projection of the bounded v3 analyzer.
 
-Retains legacy field names for delivery_adherence and longform_carryover_probe,
+Retains the legacy field names longform_carryover_probe and the bench sidecar consume,
 but explicitly versions histogram percentiles and the shared cadence definition.
 Historical v1 reports stay historical: do not merge or recalibrate them as v2.
 Acoustic proxies do not establish emotion, listener preference or promotion.

@@ -1,11 +1,10 @@
 import Foundation
 import QwenVoiceCore
 
-/// App-level adapter over QwenVoiceCore's canonical persisted-WAV QC algorithm.
-/// The iOS twin of the macOS `Sources/Services/AudioQualityGate.swift` adapter
-/// (target layout keeps app-level services per-platform): long-form segment and
-/// joined-output verification use the same versioned thresholds and the same
-/// file-backed evidence as the macOS runner.
+/// App-level adapter over QwenVoiceCore's canonical persisted-WAV QC algorithm,
+/// shared by the macOS batch runner and the iOS long-form project. Both use the
+/// same versioned thresholds and the same file-backed evidence; there is no
+/// per-platform analyzer.
 enum AudioQualityGate {
     struct Report: Codable, Equatable {
         let passed: Bool

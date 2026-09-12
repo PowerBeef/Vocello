@@ -38,6 +38,13 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from lib import rtf as rtf_semantics  # noqa: E402
 from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
+from lib.audio_qc import (  # noqa: E402
+    SUCCESS_FINISH,
+    AudioQCError,
+    qc_record,
+    quality_identity_fields,
+)
+from lib.audio_qc import history_record_schema_version as shared_record_schema_version  # noqa: E402
 
 from benchmark_memory import (  # noqa: E402
     MemoryEvidenceError,
@@ -62,7 +69,6 @@ from lib.language_metrics import (  # noqa: E402
     score_recognition,
     text_sha256,
 )
-SUCCESS_FINISH = {"eos", "max_tokens", "maxtokens", "completed", "complete", "success", "ok"}
 TRIM_SEVERITY = {"softTrim": 1, "hardTrim": 2, "fullUnload": 3}
 UINT64_MAX = (1 << 64) - 1
 LANGUAGE_SENTINEL_SCHEMA = 2
@@ -731,40 +737,6 @@ def row_metrics(row: dict[str, Any], take: dict[str, Any] | None = None) -> dict
     }
 
 
-def qc_record(row: dict[str, Any]) -> dict[str, Any]:
-    qc = row["audioQC"]
-    verdicts = [
-        str(qc.get(key)).lower()
-        for key in ("verdict", "instabilityVerdict", "writtenOutputVerdict")
-        if qc.get(key) is not None
-    ]
-    rank = {"pass": 0, "warn": 1, "fail": 2}
-    verdict = max(verdicts or ["pass"], key=lambda item: rank.get(item, 99))
-    flags = [str(item) for item in qc.get("flags", []) if isinstance(item, str)]
-    if str(qc.get("instabilityVerdict", "pass")).lower() == "warn":
-        flags.append("instability-warn")
-    if str(qc.get("writtenOutputVerdict", "pass")).lower() == "warn":
-        flags.append("written-output-warn")
-    metrics: dict[str, float] = {}
-    for source, target in (
-        ("clickEvents", "discontinuityCount"),
-        ("clippedSamples", "clipCount"),
-        ("nonFiniteSamples", "nonFiniteCount"),
-        ("longestSilenceMS", "longestSilenceMS"),
-        ("dcOffset", "dcOffset"),
-    ):
-        if (value := finite_number(qc.get(source))) is not None:
-            metrics[target] = value
-    return {
-        "algorithmVersion": int(qc.get("algorithmVersion", 1)),
-        "verdict": verdict,
-        "instabilityVerdict": str(qc.get("instabilityVerdict", qc.get("verdict", "pass"))).lower(),
-        "writtenOutputVerdict": str(qc.get("writtenOutputVerdict", qc.get("verdict", "pass"))).lower(),
-        "warningCodes": sorted(set(flags)) if verdict == "warn" else [],
-        "metrics": metrics,
-    }
-
-
 def thermal_state(row: dict[str, Any]) -> str:
     thermal = row.get("thermalState")
     if isinstance(thermal, dict):
@@ -1055,37 +1027,11 @@ def fold_delivery_prosody(
             tracked_take["status"] = "passedWithWarnings"
 
 
-def quality_identity_fields(row: dict[str, Any]) -> dict[str, Any]:
-    """Phase 13: typed quality-registry identity from the engine row's open
-    telemetry notes. Empty when the row predates the phase-12 registry —
-    the record then publishes at schema v2; a run mixing both is an error
-    resolved by the record-version chooser."""
-    notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
-    outcome = notes.get("quality_registry_outcome")
-    gates = notes.get("quality_registry_required_gates")
-    if not isinstance(outcome, str) or not isinstance(gates, str) or not gates:
-        return {}
-    fields: dict[str, Any] = {
-        "qualityRegistryOutcome": outcome,
-        "qualityRegistryRequiredGates": sorted(set(gates.split(","))),
-    }
-    issues = notes.get("quality_registry_issues")
-    if isinstance(issues, str) and issues:
-        fields["qualityRegistryIssues"] = sorted(set(issues.split(",")))
-    return fields
-
-
 def history_record_schema_version(takes: list[dict[str, Any]]) -> int:
-    """3 when every take carries the quality identity, 2 when none does.
-    A mix would publish a record silently missing evidence for some takes."""
-    carrying = sum(1 for take in takes if "qualityRegistryOutcome" in take)
-    if carrying == 0:
-        return 2
-    if carrying == len(takes):
-        return 3
-    raise PublicationError(
-        "takes mix quality-registry identity presence; refusing a partial schema-v3 record"
-    )
+    try:
+        return shared_record_schema_version(takes)
+    except AudioQCError as error:
+        raise PublicationError(str(error)) from error
 
 
 def engine_take(

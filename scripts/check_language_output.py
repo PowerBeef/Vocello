@@ -17,13 +17,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import math
 import os
 from pathlib import Path
 import re
-import subprocess
 import sys
 from typing import Any
 
@@ -34,7 +32,6 @@ from language_bench_evidence import (
     exact_sentinels,
     load_json as load_evidence_json,
     validate_plan_against_sources,
-    write_json_atomic,
 )
 
 
@@ -47,122 +44,6 @@ from lib.language_metrics import (  # noqa: E402
     normalized_word_tokens,
     recomputed_accuracy,
 )
-
-# Optional operator-side diagnostic only. No CI/release installation, automatic
-# acquisition, homophone folding or connection to validate_structured_verification.
-CHINESE_SCRIPT_CONVERTER = {
-    "id": "icu-traditional-simplified-78.3-v1",
-    "version": "uconv v2.1  ICU 78.3",
-    "transform": "Traditional-Simplified",
-    "files": {
-        "bin/uconv": "90fcc7d137746f43673eede8e4a84cad9773d82adbe107ed3cb0bd421755082f",
-        "lib/libicudata.78.dylib": "cd7bfc3af59bc6766d4fa50c7afe50b2ec009dd665b23bcc6b467978e22acf77",
-        "lib/libicuuc.78.dylib": "a78b3424a391c7afad52c0d69df9cdb7818b6c20f909a14d193ae0c66a5c1119",
-        "lib/libicui18n.78.dylib": "b950df7ced46bf344ed5970c50a3c751f310ad61c4a1ec170a748127aea84bf0",
-    },
-}
-
-
-class ChineseScriptDiagnosticError(ValueError):
-    """Sanitized diagnostic failure; never include private text or paths."""
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
-def _pinned_chinese_script_transform(texts: tuple[str, str], icu_root: Path) -> tuple[str, str]:
-    """Use only the audited binary/data, without shell or environment overrides."""
-    def check_files():
-        for relative, expected in CHINESE_SCRIPT_CONVERTER["files"].items():
-            if _sha256_file(icu_root / relative) != expected:
-                raise ChineseScriptDiagnosticError("converter-digest-mismatch")
-
-    environment = {"PATH": "/usr/bin:/bin", "LANG": "en_US.UTF-8"}
-    try:
-        check_files()
-        binary = str((icu_root / "bin/uconv").resolve())
-        version = subprocess.run([binary, "--version"], capture_output=True, check=False,
-                                 timeout=5, env=environment, text=True, encoding="utf-8")
-        if version.returncode or version.stdout.strip() != CHINESE_SCRIPT_CONVERTER["version"]:
-            raise ChineseScriptDiagnosticError("converter-version-mismatch")
-        output = []
-        for text in texts:
-            converted = subprocess.run(
-                [binary, "-x", CHINESE_SCRIPT_CONVERTER["transform"], "-f", "UTF-8", "-t", "UTF-8"],
-                input=text, capture_output=True, check=False, timeout=5, env=environment,
-                text=True, encoding="utf-8",
-            )
-            if converted.returncode or converted.stderr or not converted.stdout.strip():
-                raise ChineseScriptDiagnosticError("converter-output-invalid")
-            output.append(converted.stdout)
-        check_files()
-    except (OSError, subprocess.TimeoutExpired, UnicodeError) as error:
-        raise ChineseScriptDiagnosticError("converter-unavailable") from error
-    return output[0], output[1]
-
-
-def chinese_script_diagnostic(
-    reference: str, hypothesis: str, language: str, *, audio_sha256: str, icu_root: Path,
-) -> dict[str, Any]:
-    """Supplement strict CER; neither score here grants semantic/promotion authority."""
-    if language != "chinese":
-        raise ChineseScriptDiagnosticError("unsupported-language")
-    if (any(not isinstance(text, str) or not text.strip() or len(text) > 100_000
-            for text in (reference, hypothesis))
-            or not isinstance(audio_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", audio_sha256)):
-        raise ChineseScriptDiagnosticError("invalid-diagnostic-input")
-    # Freeze provenance before launching the optional converter. The governed
-    # function still computes the raw score; no production normalization changes.
-    config_bytes = json.dumps(CHINESE_SCRIPT_CONVERTER, sort_keys=True, separators=(",", ":")).encode()
-    canonical = _pinned_chinese_script_transform((reference, hypothesis), icu_root)
-    raw = recomputed_accuracy(reference, hypothesis, language)[1]
-    supplemental = recomputed_accuracy(*canonical, language)[1]
-    def identity(text):
-        return {"sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(), "characterCount": len(text)}
-    return {
-        "schemaVersion": 1, "algorithmVersion": "chinese-script-diagnostic-v1",
-        "language": language, "sourceAudioSHA256": audio_sha256,
-        "reference": identity(reference), "hypothesis": identity(hypothesis),
-        "rawMetricVersion": "normalized-edit-rate-v1", "rawCharacterMetrics": raw,
-        "scriptCanonicalCharacterMetrics": supplemental,
-        "canonicalReference": identity(canonical[0]), "canonicalHypothesis": identity(canonical[1]),
-        "converter": json.loads(config_bytes), "converterConfigSHA256": hashlib.sha256(config_bytes).hexdigest(),
-        "homophoneNormalization": False, "promotionAuthority": False,
-        "limitations": ["diagnostic-only", "not-phoneme-proof", "not-independent-recognition",
-                        "contextual-meaning-not-verified", "governed-raw-CER-unchanged"],
-    }
-
-
-def chinese_script_diagnostic_main() -> int:
-    parser = argparse.ArgumentParser(description="Supplementary Chinese script comparison; never a quality gate")
-    parser.add_argument("--reference-file", type=Path, required=True)
-    parser.add_argument("--transcript-file", type=Path, required=True)
-    parser.add_argument("--audio-file", type=Path, required=True)
-    parser.add_argument("--icu-root", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    args = parser.parse_args(sys.argv[2:])
-    try:
-        if args.output.exists():
-            raise ChineseScriptDiagnosticError("output-already-exists")
-        report = chinese_script_diagnostic(
-            args.reference_file.read_text(encoding="utf-8"), args.transcript_file.read_text(encoding="utf-8"),
-            "chinese", audio_sha256=_sha256_file(args.audio_file), icu_root=args.icu_root,
-        )
-        write_json_atomic(args.output, report)
-    except ChineseScriptDiagnosticError as error:
-        print(f"Diagnostic unavailable: {error}", file=sys.stderr)
-        return 1
-    except (OSError, UnicodeError):
-        print("Diagnostic unavailable: input-or-output-unavailable", file=sys.stderr)
-        return 1
-    print("Diagnostic written; governed language verdict unchanged.")
-    return 0
-
 
 def find_sentinels(diag: str, run_id: str) -> dict[str, list[dict[str, Any]]]:
     out: dict[str, list[dict[str, Any]]] = {}
@@ -660,4 +541,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(chinese_script_diagnostic_main() if sys.argv[1:2] == ["chinese-script-diagnostic"] else main())
+    sys.exit(main())

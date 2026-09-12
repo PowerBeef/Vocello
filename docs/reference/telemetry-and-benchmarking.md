@@ -221,7 +221,7 @@ older rows stay readable but are marked memory-contract-incomplete and excluded 
 | `derivedMetrics` | `[String: Double]?` | Headline KPIs (see §7). Includes `kvCacheEstimatedPeakMB` (2026‑07‑01, audit P1‑2) — the peak of the per‑chunk KV‑cache footprint estimates, surfaced at row level so regression tooling doesn't walk the chunk timeline. |
 | `mlxMemoryByStage` | `[String: {activeMB, cacheMB, peakMB}]?` | MLX GPU memory at each stage (see §8). |
 | `chunkTimeline` | `[GenerationChunkTelemetry]?` | Per‑chunk decode substages, with `arrivalNS` (v5) and optional `mimiDecoderBreakdownMS` (v5) (see §6.3). |
-| `audioQC` | `AudioQCReport?` | Versioned reference‑free overall, model-instability, and written-output verdicts plus flags, defect offsets, and optional per‑chunk QC. Algorithm v3 preserves chunk-spanning silence state and derives written-output evidence from the atomically published WAV frames. |
+| `audioQC` | `AudioQCReport?` | Versioned reference‑free overall, model-instability, and written-output verdicts plus flags, defect offsets, and optional per‑chunk QC. Algorithm v6 (`makeAudioQCReport`) judges the atomically published WAV frames and, since 2026-09-12, also asserts the file's sample rate, channel count and frame count against the request. |
 | `summary` | `TelemetrySummary?` | Owning-process resident/physical-footprint/compressed/headroom/Metal start, end, delta, peak/min and aligned extrema snapshots; total RAM and implied process limit; independent memory/thread/headroom/Metal coverage; sampler cadence/boundaries; and process CPU/page-fault/context-switch/block-I/O deltas. `timeToPeakMS` tracks the physical-footprint peak. |
 | `streamingTelemetryV9` | `GenerationStreamingTelemetryTransitionV9?` | Nested partial v9 transition projection carried by new schema-v8 rows. Invalid generation IDs may omit it; otherwise missing producer domains are explicit `unavailable` entries and never inferred as zero. It is not a publishable schema-v9 envelope. |
 | `notes` | `[String: String]` | Bounded compatibility metadata such as `deviceClass`, `promptChars`, privacy-safe `promptDigest` (script text only — never the delivery instruction), the bench `delivery` cell stamp, the delivery-instruction receipt `instructChars`/`instructDigest` on instructed takes (verified fail-closed by the delivery harness; [`delivery-harness.md`](delivery-harness.md) §4), and memory pressure. Raw script, transcript, voice description, file path, and failure message are forbidden; prompts/failures/instructions use SHA-256 identity rather than content. |
@@ -597,33 +597,24 @@ dropouts, garbled words, "sounds worse"). Three layers, increasing in what they 
    (chunk-boundary discontinuities — the decoder-drift class), `dropout` (interior silence),
    `near_silent` (dead output). Surfaced as the summarizer's **`QC`** column. **Any `fail` blocks
    promoting a backend change.** Thresholds are conservative + tunable (`makeAudioQCReport`).
-   **Dropout is punctuation-aware** (calibrated 2026-05-31): the model emits a prosodic pause at each
-   sentence/clause boundary, so on long, slow content interior silences legitimately reach ~800 ms — a
-   fixed ≥400 ms fail line cried wolf on natural delivery (every long-content silence mapped to a
-   punctuation mark). Instead the detector counts *long pauses* (≥350 ms) against the text's **pause
-   budget** (interior punctuation boundaries, including CJK full-width marks, from `request.text`)
-   and flags only an **excess** beyond it
-   (`dropout:excessN(long/budget)` — ≥2 = fail, 1 = warn) or a single **egregious** gap no natural pause
-   reaches (≥1200 ms = fail `dropout:Nms`; ≥900 ms = warn). A genuine mid-phrase gap that merely *replaces*
-   a punctuation pause (same count, ~same length) is positionally indistinguishable from a comma pause by
-   amplitude alone. Promotion therefore requires the remaining automated cohort, ASR, and prosody
-   evidence to be clean; a warning is not cleared by a subjective waiver.
+   **Dropout is punctuation-aware.** Long interior pauses (≥350 ms) count against the text's
+   punctuation pause budget; an excess (`dropout:excessN(long/budget)`, ≥2 fail, 1 warn) or a
+   single egregious gap (≥1200 ms fail, ≥900 ms warn) flags. The regimes, their calibration history
+   and the threshold-change authority live in `makeAudioQCReport` and
+   [`audio-qc-engineering.md`](audio-qc-engineering.md#threshold-change-authority); a warning is
+   never cleared by a subjective waiver.
    In v5 `audioQC` also reports **defect sample offsets** for debugging: `firstNonFiniteSample`,
    `firstClipSample`, and `longestSilenceStartMS`. In verbose mode the streaming path captures
-   `chunkQC: [AudioQCChunkReport]` so defects can be tied to an individual output chunk. QC
-   algorithm v2 introduced persistence of the absolute start of an open silence run across chunk
-   appends, so a chunk-spanning dropout keeps its correct start and duration. Algorithm v3 retains
-   pre-limiter instability evidence but reopens the atomically published WAV and computes level,
-   DC-offset, and dropout evidence from its exact persisted frames. It reports separate
-   `instabilityVerdict` and `writtenOutputVerdict` values in addition to the worst overall verdict;
-   the algorithm version is stored with tracked evidence.
+   `chunkQC: [AudioQCChunkReport]` so defects can be tied to an individual output chunk. The report
+   carries separate `instabilityVerdict` (pre-limiter evidence) and `writtenOutputVerdict` (the
+   persisted WAV's exact frames) values in addition to the worst overall verdict; the algorithm
+   version is stored with tracked evidence.
 2. **Prosody analysis — conditional or explicit, no external model.** `vocello bench --delivery`
    automatically analyzes only its manifest-selected neutral/instructed pairs before final
    aggregation; the summarizer then surfaces `prosEff` / `dF0Std` / `dRateCV` / `dPauseR` /
    `dRough` in the delivery table. A benchmark without `--delivery` does not run that paired gate.
    `scripts/prosody_quality_gate.py` analyzes individual takes for monotone, rushed, flat, and
-   pause-issue signatures only when invoked explicitly, and `scripts/delivery_adherence.py` is an
-   explicit corpus workflow. Analyzer algorithm v2 reads the persisted PCM16 in exactly two
+   pause-issue signatures only when invoked explicitly. Analyzer algorithm v2 reads the persisted PCM16 in exactly two
    fixed-block passes, retains no whole-file PCM or frame matrix, adds semitone-relative pitch and
    caller-declared boundary continuity summaries, and reports bounded managed-buffer/working-set
    evidence. Its fixed-bin quantiles may differ slightly from the legacy full-array algorithm, so

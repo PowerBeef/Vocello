@@ -465,6 +465,52 @@ class DeliveryAnalysisCache:
         return self.store(identity, compute()), False
 
 
+def prune(root: Path, *, keep_newest: int) -> dict[str, int]:
+    """Bound the cache on the 8 GB host: keep the newest canonical derivatives.
+
+    Derivatives (16 kHz PCM plus their metadata) are ordered by modification
+    time; the newest `keep_newest` stay together with every layer record bound
+    to them, everything older is removed. The cache is not evidence, so pruning
+    never changes a verdict: a pruned entry is recomputed on its next use.
+    """
+    if isinstance(keep_newest, bool) or not isinstance(keep_newest, int) or keep_newest < 0:
+        raise AnalysisCacheError("keep-newest must be a nonnegative integer")
+    audio_root = root / "audio"
+    layers_root = root / "layers"
+    derivatives = sorted(
+        audio_root.rglob("*.pcm"), key=lambda path: (path.stat().st_mtime, path.name), reverse=True,
+    ) if audio_root.is_dir() else []
+    removed_layers = 0
+    removed_derivatives = 0
+    for pcm_path in derivatives[keep_newest:]:
+        metadata_path = pcm_path.with_suffix(".json")
+        derivative_digest = None
+        if metadata_path.is_file():
+            try:
+                derivative_digest = _read_json(metadata_path).get("canonicalDerivativeSHA256")
+            except AnalysisCacheError:
+                derivative_digest = None
+        if isinstance(derivative_digest, str) and len(derivative_digest) == 64:
+            layer_dir = layers_root / derivative_digest[:2] / derivative_digest
+            if layer_dir.is_dir():
+                for record in layer_dir.glob("*.json"):
+                    record.unlink()
+                    removed_layers += 1
+                try:
+                    layer_dir.rmdir()
+                except OSError:
+                    pass
+        for path in (pcm_path, metadata_path):
+            if path.exists():
+                path.unlink()
+        removed_derivatives += 1
+    return {
+        "retainedDerivatives": min(len(derivatives), keep_newest),
+        "removedDerivatives": removed_derivatives,
+        "removedLayerRecords": removed_layers,
+    }
+
+
 def _assert_report_safe(value: Any, trail: str = "report") -> None:
     if isinstance(value, bytes):
         raise AnalysisCacheError(f"{trail} contains raw bytes")
@@ -499,10 +545,14 @@ def main() -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     canonical = commands.add_parser("canonicalize")
     canonical.add_argument("wav", type=Path)
+    pruner = commands.add_parser("prune", help="keep only the newest N canonical derivatives and their layers")
+    pruner.add_argument("--keep-newest", type=int, required=True)
     args = parser.parse_args()
     try:
         if args.command == "canonicalize":
             result = DeliveryAnalysisCache(args.root, resampler_version=args.resampler).canonicalize(args.wav).report()
+        elif args.command == "prune":
+            result = prune(args.root, keep_newest=args.keep_newest)
         else:  # pragma: no cover - argparse owns this branch
             raise AnalysisCacheError("unknown command")
         print(json.dumps(result, indent=2, sort_keys=True))

@@ -237,10 +237,10 @@ vocello deliveries [--json]
 Lists every built-in delivery preset as a preset id and the natural-language instruction
 the model receives in its canonical English form (the source of truth is `EmotionPreset`). Static
 and instant. These ids are the
-`bench --delivery <id>` cells, and `--json` is the DRY feed for `scripts/delivery_adherence.py` — the
-objective, reference-free delivery-adherence measurement (F0 / speaking-rate / duration deltas vs a
-same-seed neutral take). See `scripts/analyze_delivery.py` + the §I.3 writeup in
-[`../../benchmarks/OPTIMIZATION.md`](../../benchmarks/OPTIMIZATION.md).
+`bench --delivery <id>` cells, and `--shipped-only --json` is the roster the delivery harness reads.
+Objective, reference-free delivery adherence (F0 / speaking-rate / duration deltas against a
+same-seed neutral take) is measured by `vocello bench --delivery` with
+`scripts/bench_delivery_prosody.py`; see [`delivery-harness.md`](delivery-harness.md).
 
 `generate` and `batch` accept `--delivery-cell <preset>.<intensity>` for repository-owned
 CustomVoice selections. That identity fails closed if its accompanying copy drifts. It also enables
@@ -320,8 +320,7 @@ installed; a saved clone voice when clone is in the matrix.
 
 The deterministic `audioQC` gate runs for every benchmark take. `--delivery` additionally runs the
 paired delivery-prosody analysis before aggregation. The standalone
-`scripts/prosody_quality_gate.py` per-clip check and `scripts/delivery_adherence.py` corpus workflow
-run only when invoked explicitly.
+`scripts/prosody_quality_gate.py` per-clip check runs only when invoked explicitly.
 Engine promotion is autonomous: required cells must have clean audioQC plus the applicable
 fixed-seed language/prosody evidence. Optional listening may be recorded later, but cannot clear a
 machine failure or warning and never blocks ordinary development publishing.

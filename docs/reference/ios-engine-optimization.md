@@ -299,12 +299,9 @@ nonfinite/clipping/clicks/dropout/near_silent) is the first objective gate. Prom
 requires exact fixed-seed WAV identity and the applicable locale-locked ASR/prosody evidence. Human
 listening is optional annotation and cannot clear a deterministic failure or warning.
 
-- **`dropout` is punctuation-aware** (OPTIMIZATION.md §B/§C, `ac86b8a`). The original ~586 ms
-  "dropout" was root-caused as the model's **natural prosodic pauses** at sentence/comma boundaries on
-  long slow narration; the detector now counts long interior silences against the text's punctuation
-  **pause budget** and flags only an *excess* (≥2 → fail, 1 → warn) or a single egregious ≥1200 ms gap.
-  A sampling-side "fix" was rejected — it would suppress real prosody without repeatable
-  fixed-seed, chunk, WAV, and ASR evidence of a defect.
+- **`dropout` is punctuation-aware** (`ac86b8a`): the original ~586 ms "dropout" was the model's
+  natural prosodic pauses on long slow narration. The regimes are defined once in
+  `makeAudioQCReport` and documented in [`audio-qc-engineering.md`](audio-qc-engineering.md).
 - **Latest canonical result:** all 29 takes in the clean schema-v2 iPhone UI record passed audioQC.
   Earlier accumulated rows with Design dropout/click warnings remain historical diagnostic leads;
   they are not the current acceptance verdict and cannot override the run-scoped canonical record.

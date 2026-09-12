@@ -35,6 +35,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from prosody_profile import (
+    arousal_score,
     builtin_profile,
     delivery_expectation,
     delivery_weight,
@@ -156,16 +157,7 @@ def delivery_features(instructed, neutral, profile):
     features["voiced_fraction_delta"] = (
         instructed["f0_voiced_frac"] - neutral["f0_voiced_frac"]
     )
-    features["arousal_score"] = (
-        (instructed["f0_median_hz"] - neutral["f0_median_hz"])
-        / delivery_weight(profile, "arousal", "f0_median_divisor")
-        + (instructed["rate_syllable_rate_hz"] - neutral["rate_syllable_rate_hz"])
-        / delivery_weight(profile, "arousal", "syllable_rate_divisor")
-        + (instructed["f0_range_hz"] - neutral["f0_range_hz"])
-        / delivery_weight(profile, "arousal", "f0_range_divisor")
-        - (instructed["durationSec"] - neutral["durationSec"])
-        / delivery_weight(profile, "arousal", "duration_divisor")
-    )
+    features["arousal_score"] = arousal_score(instructed, neutral, profile)
     if neutral["durationSec"] > 0:
         features["duration_ratio"] = instructed["durationSec"] / neutral["durationSec"]
 

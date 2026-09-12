@@ -376,15 +376,6 @@ enum VoiceClipTranscriber {
         return .recognizerUnavailable
     }
 
-    /// Compatibility surface for callers that need only a transcript. Unlike enrollment, output
-    /// verification requires three consistent passes and never chooses the most favorable result.
-    static func transcribeForVerification(
-        url: URL,
-        expectedLanguage: Qwen3SupportedLanguage
-    ) async -> String? {
-        await verificationEvidence(url: url, expectedLanguage: expectedLanguage).transcript
-    }
-
     /// Captures deterministic, bounded ASR evidence for output verification. One locale is selected
     /// once, then the exact same URL and locale are used for up to three sequential passes. Success
     /// requires all three; a terminal failure or disagreement stops immediately.
@@ -595,11 +586,6 @@ enum VoiceClipTranscriber {
                 && end >= latestRequiredEnd
                 && end <= latestPermittedEnd
         }
-    }
-
-    /// Compatibility name for retained test/diagnostic callers; edge-only semantics.
-    static func hasCompleteTemporalCoverage(_ evidence: VerificationEvidence, sourceAudioDurationSeconds: Double) -> Bool {
-        hasAudioEdgeCoverage(evidence, sourceAudioDurationSeconds: sourceAudioDurationSeconds)
     }
 
     /// NaturalLanguage probability mass that the text is in `expected` (handles script/region
@@ -837,21 +823,6 @@ enum VoiceClipTranscriber {
                     supportsOnDeviceRecognition: $0.supportsOnDeviceRecognition
                 )
             }
-    }
-
-    private static func recognizeForEnrollment(
-        url: URL,
-        candidate: CandidateLocale
-    ) async -> (text: String, confidence: Float)? {
-        let pass = await recognizeDetailed(
-            url: url,
-            candidate: candidate,
-            authorizationStatus: .authorized,
-            passIndex: 1
-        )
-        guard pass.finalResultStatus == .finalResult,
-              let text = pass.transcript else { return nil }
-        return (text, Float(pass.averageConfidence ?? 0))
     }
 
     private static func recognizeDetailed(

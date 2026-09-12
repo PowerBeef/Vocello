@@ -459,10 +459,8 @@
       "sourceOfTruth": [
         "config/delivery-evaluator-v2-contract.json",
         "config/delivery-evaluator-v2-candidates.json",
-        "scripts/delivery_calibration_session.py",
         "scripts/delivery_evaluator.py",
         "scripts/delivery_evaluator_v2.py",
-        "scripts/delivery_listener_calibration_v2.py",
         "scripts/delivery_analysis_cache.py",
         "scripts/delivery_temporal_features.py",
         "scripts/delivery_resource_supervisor.py",
@@ -470,15 +468,12 @@
         "scripts/delivery_compact_model_runtime.py",
         "scripts/prepare_delivery_compact_model_config.py",
         "scripts/qualify_delivery_compact_models.py",
-        "scripts/prepare_delivery_listener_anchors.py",
         "scripts/run_local_delivery_cascade.py",
         "scripts/emotion_advisory.py",
         "scripts/analyze_prosody.py"
       ],
       "evidence": [
-        "file:scripts/tests/test_delivery_calibration_session.py",
         "file:scripts/tests/test_delivery_evaluator.py",
-        "file:scripts/tests/test_delivery_listener_calibration_v2.py",
         "file:scripts/tests/test_delivery_evaluator_v2.py",
         "file:scripts/tests/test_delivery_analysis_cache.py",
         "file:scripts/tests/test_delivery_temporal_features.py",
@@ -487,13 +482,12 @@
         "file:scripts/tests/test_delivery_compact_model_runtime.py",
         "file:scripts/tests/test_prepare_delivery_compact_model_config.py",
         "file:scripts/tests/test_qualify_delivery_compact_models.py",
-        "file:scripts/tests/test_prepare_delivery_listener_anchors.py",
         "file:scripts/tests/test_run_local_delivery_cascade.py",
         "file:scripts/tests/test_emotion_advisory.py",
         "commit:ae446132"
       ],
-      "updated": "2026-09-11",
-      "notes": "September 11 reconciliation: config/delivery-evaluator-v2-contract.json now names polyphase-kaiser5-v2 as deterministicResampling, matching scripts/audio_resampling.py; the field had kept the retired linear-rational-v1 name since the September 6 migration (no script read it). September 6 maintainer decision: human listening is no longer required. Byte-bound native QC, independent-family full-file ASR, explicit uncertainty and frozen independent-reference calibration/holdouts replace mandatory listening. Controlled fixtures are signal-only; automatic metric gains are not listener-proven improvements. No production threshold, prompt, model, seed or release acceptance changed; the item remains open. Historical evidence and superseded next actions follow: The evaluator, cache, temporal contour, compact-model, resource-supervisor, cascade, listener-session, qualification, and promotion-decision infrastructure remains deterministic and source-bound. Automatic layers still abstain without calibrated tiny heads; closure requires qualified independent listening and untouched confirmation beating ridge-v1 without a preset, VAD, speaker, or script-group regression. (Earlier history: git log -p -- config/roadmap.json.)"
+      "updated": "2026-09-12",
+      "notes": "September 12: the listening-lane scripts (calibration sessions, listener anchors, 2AFC/identification sessions, spot-check protocol) were deleted; git history retains them and delivery_promotion_decision.py still reads schema-1 listener results. September 11 reconciliation: config/delivery-evaluator-v2-contract.json now names polyphase-kaiser5-v2 as deterministicResampling, matching scripts/audio_resampling.py; the field had kept the retired linear-rational-v1 name since the September 6 migration (no script read it). September 6 maintainer decision: human listening is no longer required. Byte-bound native QC, independent-family full-file ASR, explicit uncertainty and frozen independent-reference calibration/holdouts replace mandatory listening. Controlled fixtures are signal-only; automatic metric gains are not listener-proven improvements. No production threshold, prompt, model, seed or release acceptance changed; the item remains open. Historical evidence and superseded next actions follow: The evaluator, cache, temporal contour, compact-model, resource-supervisor, cascade, listener-session, qualification, and promotion-decision infrastructure remains deterministic and source-bound. Automatic layers still abstain without calibrated tiny heads; closure requires qualified independent listening and untouched confirmation beating ridge-v1 without a preset, VAD, speaker, or script-group regression. (Earlier history: git log -p -- config/roadmap.json.)"
     },
     {
       "id": "DP-29",
@@ -519,16 +513,15 @@
       "status": "planned",
       "gate": "Confirm surviving Speed/Quality candidates on one predeclared untouched holdout per candidate family across all nine speakers, eight presets, native-language scripts and sentinels. Use named frozen automatic metrics, at least two independent judge families with reverse-order consistency, paired improvement/2AFC, Holm correction and distributed speaker/script gains. Preserve PCM, WER/CER, identity, UTMOS, memory, cancellation, seed and receipt guardrails. Listening is optional; automatic metric qualification is not listener-proven semantic improvement.",
       "sourceOfTruth": [
-        "scripts/delivery_listening_session.py",
         "scripts/delivery_promotion_decision.py",
         "scripts/delivery_statistics.py"
       ],
       "evidence": [
-        "file:scripts/tests/test_delivery_listening_session.py",
         "file:scripts/tests/test_delivery_promotion_decision.py",
         "file:scripts/tests/test_delivery_statistics.py"
       ],
-      "updated": "2026-08-22"
+      "updated": "2026-09-12",
+      "notes": "September 12: the optional listening-session script was deleted with the listening lane; the automated schema-2 decision path is the only route."
     },
     {
       "id": "DP-32",
@@ -595,7 +588,7 @@
         "scripts/tests/test_delivery_acoustic_reference.py"
       ],
       "updated": "2026-09-11",
-      "notes": "September 11 reconciliation: config/prosody-holdout-policy.json approvedExternalCatalogSHA256 is an empty list, so the September 7 licensed-reference pilot (CREMA-D, Thorsten) cannot be consumed by holdout validation until the exact catalog digests are re-derived from retained material and pinned; the pilot is inventory, not usable labels. Also recorded here: config/audio-cadence-qc-contract.json still carries listener-count constructs from before the September 6 listening-optional decision; they are dormant, not a gate. September 7 reference-base adoption implemented: existing evaluator contract pins the 45-clip numerical manifest; existing cascade defaults to same-language descriptive ranges, complete warnings and flagged-exclusion sensitivity. No independent quality labels or thresholds inferred. Existing CLI processed all 64 historical takes: 10 reference contexts, 54 explicit missing coverage; all 64 quality verdicts remain inconclusive. All 45 originals verified. Separate cache replay 512 hits/zero misses, 0.42 s/45.22 MB sampled RSS, zero swap delta and clean recovery; first sandboxed extraction resource capture retained as unqualified. (Earlier history: git log -p -- config/roadmap.json.)"
+      "notes": "September 11 reconciliation: config/prosody-holdout-policy.json approvedExternalCatalogSHA256 is an empty list, so the September 7 licensed-reference pilot (CREMA-D, Thorsten) cannot be consumed by holdout validation until the exact catalog digests are re-derived from retained material and pinned; the pilot is inventory, not usable labels. Also recorded here: config/audio-cadence-qc-contract.json carried listener-count constructs from before the September 6 listening-optional decision; the contract and its evaluator were retired on 2026-09-12 and the threshold-change authority now lives in docs/reference/audio-qc-engineering.md. September 7 reference-base adoption implemented: existing evaluator contract pins the 45-clip numerical manifest; existing cascade defaults to same-language descriptive ranges, complete warnings and flagged-exclusion sensitivity. No independent quality labels or thresholds inferred. Existing CLI processed all 64 historical takes: 10 reference contexts, 54 explicit missing coverage; all 64 quality verdicts remain inconclusive. All 45 originals verified. Separate cache replay 512 hits/zero misses, 0.42 s/45.22 MB sampled RSS, zero swap delta and clean recovery; first sandboxed extraction resource capture retained as unqualified. (Earlier history: git log -p -- config/roadmap.json.)"
     },
     {
       "id": "AV-08",
@@ -934,7 +927,6 @@
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
         "config/ios-startup-reliability-result-schema-v2.json",
         "scripts/ios_startup_reliability.py",
-        "config/audio-cadence-qc-contract.json",
         "docs/reference/ios-device-testing.md"
       ],
       "evidence": [

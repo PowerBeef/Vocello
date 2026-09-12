@@ -21,7 +21,7 @@ sourceOfTruth:
 Vocello already has three audio QA layers:
 
 1. **Signal-level QC** (`AudioQualityGate.swift` / `AudioQCReport`): deterministic, reference-free checks for clipping, DC offset, dropouts, discontinuities, silence, and duration.
-2. **Delivery adherence** (`scripts/analyze_delivery.py` + `scripts/delivery_adherence.py`): deterministic, paired neutral-vs-instructed A/B using median F0, F0 range, syllable rate, and duration deltas.
+2. **Delivery adherence** (`vocello bench --delivery` + `scripts/bench_delivery_prosody.py`): deterministic, paired neutral-vs-instructed A/B using median F0, F0 range, syllable rate, and duration deltas.
 3. **Optional listening annotation**: records subjective timbre/naturalness impressions without changing the automated verdict. An earlier external-model listening pass was removed after proving unreliable.
 
 The gap: none of the automated layers reliably catches **monotone delivery**, **rushed/slurred cadence**, **unnatural pauses**, or **weak emotional differentiation** within a single take.
@@ -111,7 +111,7 @@ those specialized gates remain authoritative and one-pass ASR remains diagnostic
 
 ### Updated scripts
 
-- **`scripts/delivery_adherence.py`** — now computes paired deltas on the richer prosody feature set and reports `prosodyEffect` + `prosodyPosRate` alongside the existing arousal score. Added `--data-dir` for non-default model locations.
+- **`scripts/prosody_profile.py`** — owns the `prosody_effect` and `arousal_score` weights that the bench sidecar and the delivery gate share (the standalone adherence bench was removed on 2026-09-12).
 - **`scripts/summarize_generation_telemetry.py`** — reads `bench-prosody.json` and renders `prosN`, `prosEff`, `dF0Std`, `dRateCV`, `dPauseR`, `dRough` in the delivery-cells table.
 - **`Sources/VocelloCLI/BenchCommand.swift`** — `vocello bench --delivery` invokes `scripts/bench_delivery_prosody.py` from the immutable current-run manifest **before** final aggregation, so the summary includes the delivery block and stale `--keep` WAVs cannot enter it.
 
@@ -120,9 +120,6 @@ those specialized gates remain authoritative and one-pass ASR remains diagnostic
 ```bash
 # Per-clip prosody gate
 scripts/prosody_quality_gate.py outputs/some_take.wav
-
-# Delivery A/B with richer prosody deltas
-scripts/delivery_adherence.py --presets happy,sad --seeds 4 --data-dir ~/Library/Application\ Support/QwenVoice
 
 # Bench with delivery cells + automatic prosody analysis
 build/vocello bench --delivery happy,calm --modes custom,design
@@ -134,7 +131,7 @@ listening note cannot waive a machine failure or warning.
 
 ### Calibration note
 
-Thresholds in `prosody_quality_gate.py` and weights in `delivery_adherence.py` are intentionally conservative defaults. They should be calibrated against a labeled corpus of good/bad Vocello takes once enough examples are collected.
+Thresholds in `prosody_quality_gate.py` and weights in `prosody_profile.py` are intentionally conservative defaults. They should be calibrated against a labeled corpus of good/bad Vocello takes once enough examples are collected.
 
 Analyzer algorithm v2 preserves the established consumer keys, but its p10, median, and p90 values
 come from deterministic fixed-width histograms instead of duration-sized arrays. F0 quantiles can

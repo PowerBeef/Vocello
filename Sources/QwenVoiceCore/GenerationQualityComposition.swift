@@ -159,7 +159,7 @@ public enum GenerationQualityComposition {
         switch outcome {
         case .pass: return 0
         case .warning: return 1
-        case .notApplicable, .unavailable, .fail: return 2
+        case .unavailable, .fail: return 2
         }
     }
 }

@@ -170,29 +170,18 @@ public enum GenerationQualityReportProducer {
         }
     }
 
-    public static func standardPolicy(
-        requiresLanguageASR: Bool,
-        transformationRisks: [GenerationTransformationRiskCode] = []
-    ) -> QualityReviewPolicy {
-        QualityReviewPolicy(
-            depth: .standard,
-            requiresLanguageASR: requiresLanguageASR,
-            transformationRisks: transformationRisks
-        )
+    public static func standardPolicy(requiresLanguageASR: Bool) -> QualityReviewPolicy {
+        QualityReviewPolicy(depth: .standard, requiresLanguageASR: requiresLanguageASR)
     }
 
     public static func canonicalPolicy(
         requiresLanguageASR: Bool,
-        transformationRisks: [GenerationTransformationRiskCode] = [],
-        isLongForm: Bool = false,
-        requiresSpeakerOnset: Bool = false
+        isLongForm: Bool = false
     ) -> QualityReviewPolicy {
         QualityReviewPolicy(
             depth: .canonical,
             requiresLanguageASR: requiresLanguageASR,
-            transformationRisks: transformationRisks,
-            isLongForm: isLongForm,
-            requiresSpeakerOnset: requiresSpeakerOnset
+            isLongForm: isLongForm
         )
     }
 

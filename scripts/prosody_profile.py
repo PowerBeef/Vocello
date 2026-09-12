@@ -5,9 +5,8 @@ A profile is a plain JSON file with a schema version so future calibrations can
 be migrated. It is consumed by:
 
   - scripts/prosody_quality_gate.py      (pass/fail thresholds)
-  - scripts/delivery_quality_gate.py     (per-preset delivery expectations)
-  - scripts/delivery_adherence.py        (arousal / prosody-effect weights)
-  - scripts/bench_delivery_prosody.py    (prosody-effect weights + delivery gate)
+  - scripts/delivery_quality_gate.py     (per-preset delivery expectations, arousal score)
+  - scripts/bench_delivery_prosody.py    (prosody-effect score + delivery gate)
 
 Usage:
   from prosody_profile import builtin_profile, load_profile
@@ -390,6 +389,39 @@ def delivery_weight(profile, section, key, default=None):
     builtin_section = BUILTIN_PROFILE["delivery_weights"][section]
     return profile["delivery_weights"].get(section, {}).get(
         key, default if default is not None else builtin_section[key]
+    )
+
+
+def prosody_effect(delta_metrics, profile=None):
+    """Signed prosodic expressiveness of an instructed take against its same-seed neutral.
+
+    `delta_metrics` are instructed-minus-neutral deltas of `f0_std_hz`, `rate_cv`,
+    `pause_ratio` and `energy_roughness`. High-arousal deliveries raise F0 dynamics
+    and rate variability while trimming pauses; roughness is gain-normalized. The
+    divisors are the profile's `prosody_effect` weights.
+    """
+    resolved = profile if profile is not None else builtin_profile()
+    return (
+        delta_metrics["f0_std_hz"] / delivery_weight(resolved, "prosody_effect", "f0_std_divisor")
+        + delta_metrics["rate_cv"] / delivery_weight(resolved, "prosody_effect", "rate_cv_divisor")
+        - delta_metrics["pause_ratio"] / delivery_weight(resolved, "prosody_effect", "pause_ratio_divisor")
+        + delta_metrics["energy_roughness"]
+        / delivery_weight(resolved, "prosody_effect", "energy_roughness_divisor")
+    )
+
+
+def arousal_score(instructed, neutral, profile=None):
+    """Signed arousal proxy of a paired instructed/neutral pair from the profile's `arousal` weights."""
+    resolved = profile if profile is not None else builtin_profile()
+    return (
+        (instructed["f0_median_hz"] - neutral["f0_median_hz"])
+        / delivery_weight(resolved, "arousal", "f0_median_divisor")
+        + (instructed["rate_syllable_rate_hz"] - neutral["rate_syllable_rate_hz"])
+        / delivery_weight(resolved, "arousal", "syllable_rate_divisor")
+        + (instructed["f0_range_hz"] - neutral["f0_range_hz"])
+        / delivery_weight(resolved, "arousal", "f0_range_divisor")
+        - (instructed["durationSec"] - neutral["durationSec"])
+        / delivery_weight(resolved, "arousal", "duration_divisor")
     )
 
 

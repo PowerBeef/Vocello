@@ -71,8 +71,9 @@ or publication, and does not delete or automatically repair a corrupt journal.
 The acceptance arc calibrated the joined-output gates: the app-side audio gate consumes the plan's
 expected pause count (a zero budget rejects healthy narration), and dropout thresholds are
 duration-aware. Current thresholds and rejected-audio retention are owned by the engine's
-audio-QC implementation and `config/audio-cadence-qc-contract.json`, not historical numbers in
-this guide. Diagnostic rejected audio stays untracked and is not an accepted History clip.
+audio-QC implementation (`makeAudioQCReport`; threshold-change authority in
+[`audio-qc-engineering.md`](audio-qc-engineering.md#threshold-change-authority)), not historical
+numbers in this guide. Diagnostic rejected audio stays untracked and is not an accepted History clip.
 
 ## Measured performance
 

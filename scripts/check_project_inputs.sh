@@ -76,7 +76,6 @@ python3 "$SCRIPT_DIR/generate_readme_charts.py" --check
 
 # Delivery and prosody research contracts (text-level; audio never gates ordinary CI).
 python3 "$SCRIPT_DIR/check_delivery_instructions.py"
-python3 "$SCRIPT_DIR/audio_cadence_qc.py" validate-contract
 python3 "$SCRIPT_DIR/delivery_experiment.py" validate
 python3 "$SCRIPT_DIR/delivery_evaluator.py" validate-v2-contract \
     --contract "$PROJECT_DIR/config/delivery-evaluator-v2-contract.json"

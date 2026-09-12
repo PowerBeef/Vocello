@@ -1352,21 +1352,20 @@ cmd_lang_bench() {
     cell_count=$((cell_count + 1))
     local cell_id mode variant ui_hint text child_run_id spec sentinel seed sampling_variation
     local custom_speaker design_instruction st
-    cell_id="$(CELL="$cell_json" python3 -c 'import json,os; print(json.loads(os.environ["CELL"])["cellID"])')"
-    mode="$(CELL="$cell_json" python3 -c 'import json,os; print(json.loads(os.environ["CELL"])["mode"])')"
-    variant="$(CELL="$cell_json" python3 -c 'import json,os; print(json.loads(os.environ["CELL"]).get("variant","speed"))')"
-    ui_hint="$(CELL="$cell_json" python3 -c 'import json,os; print(json.loads(os.environ["CELL"]).get("uiHint","auto"))')"
-    text="$(CELL="$cell_json" CORPUS="$corpus" python3 -c '
+    # One interpreter per take: the planned fields arrive unit-separated on one
+    # line (scripts and instructions are single lines; the plan row already
+    # carries the script text).
+    IFS=$'\x1f' read -r cell_id mode variant ui_hint text child_run_id seed sampling_variation \
+      custom_speaker design_instruction < <(CELL="$cell_json" python3 - <<'PY'
 import json, os
 cell = json.loads(os.environ["CELL"])
-corpus = json.load(open(os.environ["CORPUS"]))
-scripts = {e["id"]: e["script"] for e in corpus["languages"]}
-print(scripts[cell["scriptLang"]], end="")')"
-    child_run_id="$(CELL="$cell_json" python3 -c 'import json,os; print(json.loads(os.environ["CELL"])["childRunID"])')"
-    seed="$(CELL="$cell_json" python3 -c 'import json,os; print(json.loads(os.environ["CELL"])["seed"])')"
-    sampling_variation="$(CELL="$cell_json" python3 -c 'import json,os; print(json.loads(os.environ["CELL"])["samplingVariation"])')"
-    custom_speaker="$(CELL="$cell_json" python3 -c 'import json,os; print(json.loads(os.environ["CELL"]).get("customSpeakerID") or "", end="")')"
-    design_instruction="$(CELL="$cell_json" python3 -c 'import json,os; print(json.loads(os.environ["CELL"]).get("designInstruction") or "", end="")')"
+print("\x1f".join([
+    cell["cellID"], cell["mode"], cell.get("variant", "speed"), cell.get("uiHint", "auto"),
+    cell["script"], cell["childRunID"], str(cell["seed"]), cell["samplingVariation"],
+    cell.get("customSpeakerID") or "", cell.get("designInstruction") or "",
+]))
+PY
+    )
     spec="${mode}:${variant}:${text}"
 
     note "lang-bench take $cell_count: $cell_id ($mode, uiHint=$ui_hint, seed=$seed, variation=$sampling_variation)"
@@ -1790,17 +1789,19 @@ print(json.dumps({"QWENVOICE_DEBUG":"1", **{key:os.environ[key] for key in keys}
     row_count=$((row_count + 1))
     local take_id child_run_id mode text target_language language_selection seed variation
     local reference_alias voice_id delivery brief spec sentinel wait_st
-    take_id="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["takeID"])')"
-    child_run_id="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["childRunID"])')"
-    mode="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["mode"])')"
-    text="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["script"], end="")')"
-    target_language="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["targetLanguage"])')"
-    language_selection="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["languageSelection"])')"
-    seed="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["seed"])')"
-    variation="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"])["variation"])')"
-    reference_alias="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"]).get("referenceAlias") or "", end="")')"
-    delivery="$(ROW="$row_json" python3 -c 'import json,os; print(json.loads(os.environ["ROW"]).get("deliveryInstruction") or "", end="")')"
-    brief="$(python3 -c 'import json; print(json.load(open("config/voice-identity-language-reliability.json"))["voiceDesign"]["voiceBrief"], end="")')"
+    # One interpreter per row: every planned field on one unit-separated line.
+    IFS=$'\x1f' read -r take_id child_run_id mode text target_language language_selection seed \
+      variation reference_alias delivery brief < <(ROW="$row_json" python3 - <<'PY'
+import json, os
+row = json.loads(os.environ["ROW"])
+brief = json.load(open("config/voice-identity-language-reliability.json"))["voiceDesign"]["voiceBrief"]
+print("\x1f".join([
+    row["takeID"], row["childRunID"], row["mode"], row["script"], row["targetLanguage"],
+    row["languageSelection"], str(row["seed"]), row["variation"],
+    row.get("referenceAlias") or "", row.get("deliveryInstruction") or "", brief,
+]))
+PY
+    )
 
     local represented_count launched_before
     represented_count="$(find "$dest" -type f \

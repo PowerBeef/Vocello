@@ -15,7 +15,6 @@ sourceOfTruth:
   - scripts/run_local_delivery_cascade.py
   - scripts/prosody_quality_gate.py
   - scripts/check_language_output.py
-  - config/audio-cadence-qc-contract.json
   - config/prosody-holdout-policy.json
   - scripts/prosody_corpus_inventory.py
   - scripts/prosody_holdout_validation.py
@@ -667,8 +666,9 @@ pitch/cadence and transcript accuracy. [SpeechBERTScore evaluation](https://www.
 ### Legacy and orchestration debt
 
 `analyze_delivery.py` is now a small **deliveryAnalysisVersion 2** projection of the existing
-bounded v3 engine. Both `delivery_adherence.py` and `longform_carryover_probe.py` record that version.
-The adherence caller reuses one extraction for both projections instead of analyzing each WAV twice.
+bounded v3 engine; `longform_carryover_probe.py` records that version. The standalone adherence
+bench was removed on 2026-09-12: `vocello bench --delivery` plus `bench_delivery_prosody.py` own
+paired adherence, and `prosody_profile.py` owns the prosody-effect and arousal weights.
 Legacy keys remain, including raw-voiced RMS/count measured during the shared anchor pass.
 Histogram percentiles and the shared cadence definition are explicitly versioned changes, not
 byte-equivalent old scores. Original v1 reports and baseline source remain historical; the resource
@@ -744,6 +744,21 @@ it does not authorize script conversion, a quality PASS, or RF-06 closure. No TT
 The 14 retained French Design comparisons already include independent Apple/Whisper evidence.
 SenseVoice does not support French and DistilHuBERT does not transcribe; running either as a French
 judge would be invalid. French disagreement remains open; no extra recognizer was downloaded.
+
+### Threshold-change authority
+
+The Fast-QC cadence and dropout boundaries (`makeAudioQCReport`, algorithm v6) change only under
+this policy, carried over verbatim from the retired `config/audio-cadence-qc-contract.json` on
+2026-09-12:
+
+- an untouched confirmation cohort is required (`requiresUntouchedConfirmation`);
+- independent reference evidence is required, independent human labels are not
+  (`requiresIndependentReferenceEvidence`, `requiresIndependentHumanLabels: false`);
+- automatic metrics may screen candidates only, never qualify a change
+  (`automaticMetricsMayScreenOnly`);
+- a source change requires an explicit review (`sourceChangeRequiresExplicitReview`);
+- the current boundary remains authoritative until a change is qualified
+  (`currentBoundaryRemainsUntilQualified`).
 
 ### Speech/defect calibration: independent references, no required listening
 

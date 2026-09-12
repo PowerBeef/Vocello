@@ -52,54 +52,6 @@ final class GenerationQualityReportTests: XCTestCase {
         }
     }
 
-    func testUnavailableRequiredSpeakerGateBlocksCanonicalPromotion() throws {
-        let policy = QualityReviewPolicy(
-            depth: .canonical,
-            requiresLanguageASR: true,
-            isLongForm: true,
-            requiresSpeakerOnset: true
-        )
-        var results = passingResults(for: policy)
-        let index = try XCTUnwrap(results.firstIndex(where: { $0.gate == .speakerOnset }))
-        results[index] = GenerationQualityGateResult(
-            gate: .speakerOnset,
-            outcome: .unavailable,
-            algorithmVersion: 1
-        )
-
-        let verdict = try QualityGateRegistry.evaluate(GenerationQualityReport(
-            generationID: UUID(),
-            policy: policy,
-            results: results
-        ))
-
-        XCTAssertEqual(verdict.outcome, .fail)
-        XCTAssertEqual(verdict.issues, ["quality_gate_unavailable.speaker_onset"])
-    }
-
-    func testRequiredGateCannotClaimNotApplicableAndStillPass() throws {
-        let policy = QualityReviewPolicy(
-            depth: .fast,
-            requiresLanguageASR: false
-        )
-        var results = passingResults(for: policy)
-        let index = try XCTUnwrap(results.firstIndex(where: { $0.gate == .persistedWAV }))
-        results[index] = GenerationQualityGateResult(
-            gate: .persistedWAV,
-            outcome: .notApplicable,
-            algorithmVersion: 1
-        )
-
-        let verdict = try QualityGateRegistry.evaluate(GenerationQualityReport(
-            generationID: UUID(),
-            policy: policy,
-            results: results
-        ))
-
-        XCTAssertEqual(verdict.outcome, .fail)
-        XCTAssertEqual(verdict.issues, ["quality_gate_not_applicable.persisted_wav"])
-    }
-
     func testEvidenceDigestAndMeasurementKeysAreFailClosed() throws {
         let policy = QualityReviewPolicy(
             depth: .fast,
@@ -153,16 +105,6 @@ final class GenerationQualityReportTests: XCTestCase {
         }
     }
 
-    func testCriticalRiskAddsCriticalTokenGate() {
-        let policy = QualityReviewPolicy(
-            depth: .standard,
-            requiresLanguageASR: false,
-            transformationRisks: [.protectedURL, .criticalToken]
-        )
-
-        XCTAssertTrue(QualityGateRegistry.requiredGates(for: policy).contains(.criticalTokens))
-    }
-
     func testConstrainedScheduleReleasesTTSBeforeHeavyReview() {
         let schedule = QualityResourceSchedule(
             policy: QualityReviewPolicy(
@@ -180,19 +122,6 @@ final class GenerationQualityReportTests: XCTestCase {
             .advancedAnalysis,
         ])
         XCTAssertFalse(schedule.permitsConcurrentHeavyReviewerAndSynthesis)
-    }
-
-    func testCandidateRetriesRequireDistinctSequentialLeasesAndSeeds() {
-        let attempts = (0 ... 2).map { index in
-            QualityCandidateAttemptIdentity(
-                attemptIndex: index,
-                operationLeaseID: UUID(),
-                derivedSeed: UInt64(100 + index),
-                evidenceDigest: String(repeating: String(index), count: 64)
-            )
-        }
-        XCTAssertTrue(QualityCandidateRetryPolicy.validate(attempts))
-        XCTAssertFalse(QualityCandidateRetryPolicy.validate(attempts + [attempts[0]]))
     }
 
     private func passingResults(

@@ -22,7 +22,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from delivery_statistics import holm_bonferroni, paired_bootstrap_delta
 
 
-SCHEMA_VERSION = 1
+# Automated measured-claim decisions. Schema 1 is the historical listener-session
+# reader retained for old evidence files; nothing produces it any more.
+SCHEMA_VERSION = 2
 PRESETS = ("neutral", "happy", "sad", "angry", "fearful", "surprised", "calm", "whisper")
 
 

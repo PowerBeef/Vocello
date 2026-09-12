@@ -41,13 +41,6 @@ class AnalyzeDeliveryTests(unittest.TestCase):
         self.assertTrue(report['analysisWorkingSetDurationBounded'])
         self.assertEqual(report['rms_voiced_db'], full['deliveryProjection']['rms_voiced_db'])
         self.assertEqual(report['syllable_rate_hz'], full['rate_syllable_rate_hz'])
-        from delivery_adherence import analyze_features
-        from unittest.mock import patch
-        with patch('delivery_adherence.analyze_prosody', return_value=full) as extract:
-            projection, retained = analyze_features(path)
-        extract.assert_called_once_with(path, delivery_projection=True)
-        self.assertEqual(projection, report)
-        self.assertIs(retained, full)
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

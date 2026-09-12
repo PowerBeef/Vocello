@@ -17,6 +17,38 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Workflow and harness scar removal (September 12)
+
+The maintainer asked whether other parts of the development workflow or the remaining test harnesses
+still carried the scars of earlier coding agents. Three read-only audits (workflow scripts, CI and
+hooks; Python and Swift harnesses; docs and configs) found the load-bearing loop sound and every layer
+carrying retired machinery that gated nothing or the wrong thing. Maintainer decisions: keep only the
+release-time quality-promotion validation and fold path routing into its contract; move the product
+invariants out of the source-text tests and delete every text assertion; delete the unlinked dated
+docs and mark the linked ones historical; consolidate the duplicated helpers.
+
+Five commits. `cb786c92` (+ `0327121d`) retires the evidence-impact router, the closed convergence
+gate and characterization fixtures, five fp16-decoder research scripts, four reader-less configs and
+the tracked third-party critique; `config/quality-promotion-contract.json` now carries
+`promotionRouting` and `quality_promotion.py classify` replaces the deleted module. `72dae52c` moves
+the monetization, export-boundary, StoreKit-fixture, clone-consent and candidate-acceptance invariants
+into `scripts/repo_invariants.sh`, binds the StoreKit fixture to `IOSExportAccessPolicy` in a Swift
+test, teaches `localization_contract.py` and `supply_chain_contract.py` the checks that had lived in
+tests, moves three device helpers into `scripts/lib/ios_device_state.sh`, then deletes three test
+modules and the text assertions in ten more (ICA-21 records the two invariants that still need Swift
+tests). `4c0e07ff` removes the `plan|focused|checkpoint` shim, makes `regenerate_project.sh` fast by
+default (`--verify` runs the gate), restores `dev.sh ci` to exactly the push-CI command list, derives
+the CI cache keys from `config/toolchain.json` and corrects the skills, agents and hook wording.
+`40d03135` adds `scripts/lib/jsonio.py` (load, canonical and pretty bytes, digests, atomic writes as
+keyword options; every persisted digest re-validated byte-identical) and moves the lane scripts'
+shared shell helpers into `scripts/lib/shared.sh`. This commit rewrites CONTRIBUTING and the testing
+runbook to the current loop, deletes three unlinked dated docs, marks six dated docs historical,
+removes the 32 "removed 2026-09-11" stubs and corrects the release-QA, benchmarks and privacy docs.
+
+Observed, not fixed: `test_delivery_experiment_runner.py::test_screen_summary_requires_one_factor`
+failed once under xdist with "another generator or heavy delivery analyzer is already active" (the
+default serial lock root is shared across workers) and passed on every later run.
+
 ### Audio and delivery QC streamlining (September 12)
 
 The maintainer asked whether the audio and voice-delivery QC harness could be improved and

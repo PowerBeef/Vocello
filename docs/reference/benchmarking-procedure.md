@@ -285,9 +285,7 @@ also receives the per-preset adherence verdict (`deliveryGate` beside `qualityGa
 ### 4.6b Fidelity lanes (engine/artifact promotion battery)
 
 Every engine or artifact promotion runs the three fidelity lanes introduced with the
-2026-08-01 delivery-fidelity program (findings:
-`delivery-fidelity-report-2026-08-01.md` (removed 2026-09-11; history: `docs/reference/delivery-fidelity-report-2026-08-01.md` at 30becbdd);
-tracks: `delivery-remediation-plan-2026-08.md` (removed 2026-09-11; history: `docs/reference/delivery-remediation-plan-2026-08.md` at 3ed09cbe)):
+2026-08-01 delivery-fidelity programme:
 
 ```sh
 # 1. Preset adherence — paired delivery matrix; canonical composed verdicts.

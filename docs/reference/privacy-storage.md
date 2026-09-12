@@ -246,8 +246,7 @@ unowned root or a tracked command that bypasses the contract.
 
 Claude Code session transcripts, auto-memory and personal settings are separate user-scoped
 developer-tool data under `~/.claude/`, not Vocello app data or repository build output. Nothing in
-the repository reads, edits or prunes them; the retired Codex storage runbook is pinned in
-`codex-session-storage.md` (removed 2026-09-11; history: `docs/reference/codex-session-storage.md` at 152273a4) as history only.
+the repository reads, edits or prunes them.
 
 The table below is rendered from the manifest by
 `python3 scripts/build_output_policy.py status --markdown`. Policy validation compares the marked

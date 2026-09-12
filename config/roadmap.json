@@ -128,7 +128,7 @@
       ],
       "updated": "2026-09-11",
       "evidence": [
-        "doc:docs/reference/release-first-execution-2026-09.md#rf-06-retained-evidence-review-and-bounded-follow-up-september-4",
+        "doc:docs/reference/release-first-execution-2026-09.md#historical-programme-checkpoints",
         "commit:5029a348",
         "doc:docs/reference/audio-qc-engineering.md#retained-audio-failure-follow-up--september-7",
         "doc:docs/reference/audio-qc-engineering.md#token-limit-diagnostic-records-and-replay",

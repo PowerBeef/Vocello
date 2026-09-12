@@ -31,15 +31,13 @@ upload depend on deterministic release-readiness and artifact checks.
 
 ## Gate sequence
 
-1. **Static gates** (always):
+1. **Deterministic gate** (always): exactly what push CI runs, serially.
    ```sh
-   ./scripts/check_project_inputs.sh
-   ./scripts/build.sh build
-   ./scripts/build_foundation_targets.sh macos && ./scripts/build_foundation_targets.sh ios
+   scripts/dev.sh ci
    ```
 2. **Deterministic release readiness** (always):
    ```sh
-   scripts/macos_test.sh test
+   ./scripts/build.sh build
    scripts/macos_test.sh release-readiness
    ```
    The packaging entry point invokes `release-readiness` before signing. It must remain independent

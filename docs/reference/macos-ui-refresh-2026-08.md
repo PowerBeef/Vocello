@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: macos
 summary: The 2026-08 macOS UI review — measured frame-health baseline, ranked audit findings, the staged refresh proposal (wave 1 refinements, wave 2 re-engineering), and what already landed. Roadmap authority for the macos-ui-2026-08 plan.
 sourceOfTruth:

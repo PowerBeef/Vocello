@@ -33,7 +33,7 @@ class SwiftDependencyUpdateTests(unittest.TestCase):
         (self.root / ".github/workflows/swift-dependency-watch.yml").write_text("name: fixture\n")
         (self.root / "config").mkdir()
         (self.root / "config/toolchain.json").write_text("{}\n")
-        (self.root / "config/evidence-impact.json").write_text("{}\n")
+        (self.root / "config/quality-promotion-contract.json").write_text("{}\n")
         (self.root / "docs/reference").mkdir(parents=True)
         (self.root / "docs/reference/mlx-guide.md").write_text("fixture\n")
         (self.root / "Packages/VocelloQwen3Core").mkdir(parents=True)
@@ -81,7 +81,7 @@ let package = Package(name: "Fixture", dependencies: [
             "workflow": ".github/workflows/swift-dependency-watch.yml",
             "governanceSurfaces": [
                 "config/toolchain.json",
-                "config/evidence-impact.json",
+                "config/quality-promotion-contract.json",
                 "docs/reference/mlx-guide.md",
             ],
             "packages": [

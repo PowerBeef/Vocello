@@ -15,8 +15,7 @@ sourceOfTruth:
 > same session showed where naive banks fail: three of four single-shot
 > VoiceDesign references never audibly carried their emotion, so their clones
 > read as neutral. The lossy hop is instruct→reference; curation closes it.
-> Decision record: `delivery-control-audit-2026-08.md` (removed 2026-09-11; history: `docs/reference/delivery-control-audit-2026-08.md` at 60adde4d)
-> (F8/R3) and the preserved `docs/development-history-2026-09-06.md` findings 13–15.
+> Decision record: the August 2026 delivery-control audit (F8/R3), now in git history.
 
 ## What a bank is
 

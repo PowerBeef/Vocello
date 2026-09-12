@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: ios
 reviewed: 2026-09-04
 summary: Evidence-driven remediation plan for the generation, model-progress, accessibility, playback-performance, and XCUITest bootstrap findings from the August 2026 physical-iPhone control audit.

@@ -249,7 +249,6 @@ Coding agents should also read [`CLAUDE.md`](CLAUDE.md). Deeper references:
 
 - [`docs/development-progress.md`](docs/development-progress.md): current implementation checkpoint and open acceptance work
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): runtime topology and engine invariants
-- `docs/project-map.html` (removed 2026-09-11; history: `docs/project-map.html` at 152273a4): interactive feature, target, dependency, and workflow map
 - [`docs/reference/testing-runbook.md`](docs/reference/testing-runbook.md): deterministic and explicit frontend test lanes
 - [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md): benchmark protocol and PASS-only publication
 

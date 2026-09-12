@@ -25,9 +25,8 @@ sourceOfTruth:
 Keep early first/later codec frames, the preview-vs-lossless split, request-local sampling v2, tiered
 `Memory.cacheLimit` with soft relief (no hard production `memoryLimit`), XPC engine isolation on
 macOS, and the 1.7B Speed/Quality matrix. Do not chase A100 first-packet figures, reopen 0.6B, or
-add Core ML / custom Metal during convergence. Latency/memory cells are named in
-`config/characterization-fixtures.json` (`secretSauceCells`); roadmap cross-check:
-`docs/reference/qwen3-apple-silicon-roadmap-review.md` (removed 2026-09-11; history: `docs/reference/qwen3-apple-silicon-roadmap-review.md` at 9bceede5).
+add Core ML / custom Metal during convergence. The characterization fixtures that
+named the latency/memory cells were retired on 2026-09-12, after every phase had closed.
 
 ## Context
 

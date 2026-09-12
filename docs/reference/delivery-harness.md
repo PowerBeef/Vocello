@@ -45,10 +45,8 @@ their completion statuses into an unconditional audio-quality PASS.
 > Listening tools are optional; their historical evidence retains its original meaning.
 > The program's item-by-item status and pre-registered results live in
 > [`config/roadmap.json`](../../config/roadmap.json) (`delivery-prompting-2026-08` plan);
-> the adversarial audit that shaped this harness is pinned at
-> `delivery-control-audit-2026-08.md` (removed 2026-09-11; history: `docs/reference/delivery-control-audit-2026-08.md` at 60adde4d), and the current Qwen
-> prompting/evaluator research snapshot is
-> `qwen3-tts-emotion-tone-research-2026-08-22.md` (removed 2026-09-11; history: `docs/reference/qwen3-tts-emotion-tone-research-2026-08-22.md` at 0f595447).
+> the adversarial audit that shaped this harness (August 2026) and the Qwen prompting/evaluator
+> research snapshot (2026-08-22) are in git history.
 
 ## 1. Tool inventory
 
@@ -175,17 +173,13 @@ prerequisite blocks, and 10 hard failures. All 294 Design receipts had the expec
 language. Serial analysis covered 220 passing Clone rows with no weak speaker-similarity result;
 prosody findings remain advisory under AV-07. A bounded Clone-only leading-edge gate now requires
 three active 20 ms windows, retains up to 80 ms of pre-roll, and trims only the preceding sub-floor
-edge. Three fresh Auto/explicit Mac cohorts passed 6/6 without retries. The pinned privacy-safe
-details are in
-`voice-identity-language-reliability-macos-2026-09-01.md` (removed 2026-09-11; history: `docs/reference/voice-identity-language-reliability-macos-2026-09-01.md` at de5712af).
+edge. Three fresh Auto/explicit Mac cohorts passed 6/6 without retries.
 
 The corrected-source physical-iPhone campaign then completed two distinct 14-row closure runs and
 one complete 122-row characterization. Both closure runs passed 14/14. The characterization
 represented every row but retained two mandatory product-QC rejections and 14 locale-verification
 failures, so overall VLR closure remains open. The Clone leading-edge correction and terminal-tail
-rejection separately met their bounded physical-device gates. The privacy-safe result and exact
-remaining boundary are pinned in
-`voice-identity-language-reliability-ios-2026-09-02.md` (removed 2026-09-11; history: `docs/reference/voice-identity-language-reliability-ios-2026-09-02.md` at a919f3c3).
+rejection separately met their bounded physical-device gates. The remaining boundary is tracked in `config/roadmap.json`.
 
 The complete 84-row French Design block passed current Neutral 26/28, no-delivery 22/28, and Calm
 strong 19/28. One no-delivery row is a replay-confirmed sampled-output dropout; 16 rows failed
@@ -683,8 +677,7 @@ the engine. The chain:
 
 `notes.promptChars` cannot prove any of this — it counts only the script text, which
 never includes the instruction. The original guard compared prompt lengths and could
-never pass live; it was replaced with the receipt on 2026-08-04
-(preserved development history (removed 2026-09-11; history: `docs/development-history-2026-09-06.md` at 5029a348) finding 21). The lesson is
+never pass live; it was replaced with the receipt on 2026-08-04. The lesson is
 codified in §7: exercise every new fail-closed check live in the arc that lands it.
 
 ## 5. Statistics the separability scorer reports

@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: ios
 summary: Standing record of iPhone engine bring-up and optimization — measured memory/latency work, shipped changes, Jetsam posture, and the prioritized future items.
 sourceOfTruth:

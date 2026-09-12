@@ -19,15 +19,15 @@ Models, a physical iPhone, and UI automation are not required for ordinary sourc
 Repository scripts are the authoritative interface:
 
 ```sh
-scripts/dev.sh plan                  # discover path-required checks
-scripts/dev.sh focused               # repeat during the edit loop
-./scripts/regenerate_project.sh        # required after project.yml changes
-scripts/dev.sh checkpoint            # one coherent deterministic checkpoint
+scripts/dev.sh check                     # lint, contracts, selected tests, the native lanes the dirty tree touches
+./scripts/regenerate_project.sh --fast   # after editing project.yml (never edit the .xcodeproj)
+scripts/dev.sh ci                        # exactly what push CI runs, serially
 ```
 
-The router selects the required derived, Python, native and website checks without scheduling
-model generation, UI acceptance or release operations. Use the [development workflow](docs/reference/development-workflow.md)
-for direct commands and cache policy. State exactly what ran and any deferred acceptance in the pull request.
+`scripts/dev.sh check` is advisory: it routes the dirty tree into the Python, native and website lanes
+without scheduling model generation, UI acceptance or release operations. The commit lint is the only
+local block and CI on `main` is the gate. Use the [development workflow](docs/reference/development-workflow.md)
+for the single-lane commands and cache policy. State exactly what ran and any deferred acceptance in the pull request.
 Pull requests need the single green `CI required` check; jobs skipped by
 path routing (for example docs-only changes) count as passing.
 
@@ -64,7 +64,7 @@ See [`docs/reference/testing-runbook.md`](docs/reference/testing-runbook.md) for
 
 - [ ] The change has one clear purpose.
 - [ ] `project.yml` was regenerated if needed.
-- [ ] Relevant deterministic checks pass.
+- [ ] `scripts/dev.sh check` ran, and the pull request says what it skipped.
 - [ ] Public facts and active documentation match the implementation.
 - [ ] No generated build output or private evidence is tracked.
 - [ ] The pull request explains test coverage and any intentionally deferred device, model, or UI acceptance.

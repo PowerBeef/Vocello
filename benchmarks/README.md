@@ -13,12 +13,13 @@ before the raw trace is discarded. `--keep-trace` is an explicit local diagnosti
 - **`LEGACY_HISTORY.md`** — the former hand-maintained ledger, preserved verbatim as incomplete historical
   context. It is not schema-v1 benchmark evidence.
 - **`hardware-profiles.json`** — the canonical Mac mini M2 8 GB and iPhone 17 Pro profiles.
-- **`schema-v2.json`** — the current memory-complete record shape. **`schema-v1.json`** remains the
-  read-only compatibility schema; `scripts/benchmark_history.py` is the executable validator.
+- **`schema-v3.json`** — the current record shape (v2 plus the typed quality-registry identity on every
+  generation take). **`schema-v2.json`** and **`schema-v1.json`** remain read-only compatibility
+  schemas; `scripts/benchmark_history.py` is the executable validator.
 - **`OPTIMIZATION.md`** — a dated historical optimization decision ledger. Current performance truth
   comes from validated records in `runs/`, the generated `HISTORY.md`, and current telemetry documentation.
 - Existing dated Markdown/JSON snapshots and `benchmarks/baselines/` remain preserved reference
-  artifacts. They are not silently converted into complete schema-v2 evidence. New successful runs
+  artifacts. They are not silently converted into complete schema-v3 evidence. New successful runs
   use `runs/<kind>/`; optional baseline comparisons remain local model-dependent QA and never an
   ordinary CI or packaging gate.
 
@@ -64,7 +65,7 @@ New native comparisons use the profiles in `hardware-profiles.json`:
 - macOS: Mac mini `Mac14,3`, Apple M2, 8 GB (`mac-mini-m2-8gb`)
 - iOS: iPhone 17 Pro `iPhone18,1` (`iphone-17-pro`)
 
-Schema v2 accepts `ui-generation`, `engine-generation`, `language`, `instrument-profile`,
+Schemas v2 and v3 accept `ui-generation`, `engine-generation`, `language`, `instrument-profile`,
 `memory-qualification`, and `prosody-calibration`. Schema-v1 `telemetry-overhead` records remain
 readable but memory-contract-incomplete; new overhead verdicts stay local because sampling the
 `off` lane would change the observer-effect experiment. An unfiltered 29-take UI matrix on the matching

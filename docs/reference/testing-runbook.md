@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-11
+reviewed: 2026-09-12
 summary: Testing entry point and evidence boundaries; platform guides own execution, the development workflow owns the edit loop, and delivery research stays opt-in.
 sourceOfTruth:
   - scripts/check_project_inputs.sh
@@ -16,17 +16,16 @@ Start with the [current checkpoint](../development-progress.md) and primary road
 run command. Source, project settings, contracts, and repository scripts outrank this guide.
 This page routes work; it does not duplicate platform procedures or establish another gate.
 
-All routes follow the replacement and retirement procedure (removed 2026-09-11; history: `docs/reference/repository-self-verification.md` at 93ec2821).
-Preserve tested user protections and evidence, not legacy implementation details or unsupported
-scores. A passing inherited suite does not prove correctness; a newer suite is not exempt from
-independent validation. Replace or consolidate demonstrated weaknesses within their existing owner,
-then retire obsolete execution paths. This is a working policy, not a claim of a completed suite-wide audit.
+When a lane is replaced or retired, preserve tested user protections and evidence, not legacy
+implementation details or unsupported scores. A passing inherited suite does not prove correctness;
+a newer suite is not exempt from independent validation. Replace or consolidate demonstrated
+weaknesses within their existing owner, then retire the obsolete execution path.
 
 ## Choose the route
 
 | Task | Authoritative procedure | Boundary |
 | --- | --- | --- |
-| Routine edit / coherent checkpoint | [Development workflow](development-workflow.md) | `scripts/dev.sh plan`, `focused`, then one `checkpoint`; no UI/model/phone |
+| Routine edit | [Development workflow](development-workflow.md) | `scripts/dev.sh check`, commit on `main`, push; CI is the gate; no UI/model/phone |
 | macOS UI / XPC acceptance | [macOS testing](macos-testing.md) | Existing `scripts/ui_test.sh macos` lanes only when requested |
 | Generic iOS SDK compile | [Host prerequisite](ios-device-testing.md#host-toolchain-prerequisite) | No phone or Simulator; matching Xcode components required |
 | iPhone control / generation / candidate checks | [iOS testing](ios-device-testing.md) | Physical-device XCUITest; candidate proof remains distinct from diagnostics |
@@ -36,18 +35,18 @@ then retire obsolete execution paths. This is a working policy, not a claim of a
 | Telemetry fields / schema / knobs | [Telemetry reference](telemetry-and-benchmarking.md) | Interpretation, not another operator runbook |
 | Delivery / emotion research | [Delivery harness](delivery-harness.md) | Serial local analyzers after TTS exits; frozen independent-reference automated holdouts, measured claims only; listening optional |
 | Release / submission programme | [Release-first plan](release-first-execution-2026-09.md) | Implementation, candidate verification, publication approval are separate |
-| Gate changes / deliberate-failure fixtures | Repository self-verification (removed 2026-09-11; history: `docs/reference/repository-self-verification.md` at 93ec2821) | Prove rejection as well as success; preserve deterministic coverage |
+| Gate or contract changes | [Development workflow](development-workflow.md), `.claude/rules/release.md` | Add a check only for a product invariant; prove rejection as well as success; never assert another file's wording |
 
 ## Claude Code routes
 
 Claude Code sessions reach the same procedures through repository-owned skills and subagents
 (`CLAUDE.md`, Hooks and assists). They add no gate and change no evidence rule: a skill runs the
-named script, and a subagent only reads what the run produced.
+named script, and a subagent only reads what the run produced. Routine edits, derived files and the
+roadmap need no skill: `scripts/dev.sh check`, `scripts/dev.sh regen` and
+`python3 scripts/roadmap.py validate` are the commands.
 
-| Route | Skill (user-invoked unless noted) | Triage | Evidence owner |
+| Route | Skill (user-invoked) | Triage | Evidence owner |
 | --- | --- | --- | --- |
-| Routine edit / checkpoint | `/checkpoint` (Claude may invoke) | `gate-runner` subagent summarizes failures | [Development workflow](development-workflow.md) |
-| Derived docs, re-pins, roadmap | `/refresh-docs`, `/roadmap-checkpoint` (Claude may invoke) | `doc-governance-reviewer` | Repository self-verification (removed 2026-09-11; history: `docs/reference/repository-self-verification.md` at 93ec2821) |
 | macOS UI lanes | `/macos-ui-lane <lane>` | `xcresult-triage` | [macOS testing](macos-testing.md) |
 | iPhone XCUITest lanes | `/ios-lane <lane>` | `xcresult-triage`, then `axiom:test-failure-analyzer` for interruption patterns | [iOS testing](ios-device-testing.md) |
 | iPhone headless diagnostics | `/device-diagnostics <verb>` | `axiom:crash-analyzer` for `.ips` | [iOS testing](ios-device-testing.md) |
@@ -87,17 +86,18 @@ never an implicit smoke/benchmark bootstrap. Restart the affected lane after rep
 Use `scripts/clean_build_caches.sh --routine --dry-run` before bounded cleanup; never assume all
 artifacts or caches are disposable. Multi-run evidence is pinned before launch.
 Serialize native Xcode commands under the existing shared lock. On the 8 GB Mac, generation and
-heavy analyzers also run serially; neural evaluators start only after the TTS process exits.
+heavy analyzers also run serially; timing lanes refuse to start on a busy host, and neural
+evaluators start only after the TTS process exits.
 
 ## CI and release
 
-Ordinary CI and checkpoints are deterministic. Models, a phone and UI tests never block commits,
-pushes or candidate packaging. Public promotion separately requires all applicable exact-source
-acceptance lanes. Consult the platform release guide for command-bound evidence, signing and
-artifact verification; a development build is not a processed distribution candidate.
+Ordinary CI and `scripts/dev.sh check` are deterministic. Models, a phone and UI tests never block
+commits, pushes or candidate packaging. Public promotion separately requires all applicable
+exact-source acceptance lanes. Consult the platform release guide for command-bound evidence, signing
+and artifact verification; a development build is not a processed distribution candidate.
 
 ## Historical procedures
 
-The pre-cleanup runbook (removed 2026-09-11; history: `docs/reference/testing-runbook-history-2026-09-06.md` at 5029a348) preserves all former recipes,
-including operator-local ML setup, without treating dated pins or commands as current authority.
-For current analyzer configuration use the delivery harness and its checked-in contracts.
+Former recipes, including operator-local ML setup, are in git history (the runbook before
+2026-09-06). Dated pins and commands there are not current authority. For current analyzer
+configuration use the delivery harness and its checked-in contracts.

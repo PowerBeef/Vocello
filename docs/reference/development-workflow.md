@@ -1,3 +1,14 @@
+---
+status: active
+owner: release-qa
+reviewed: 2026-09-12
+summary: The local edit loop, the commit lint and how push CI routes lanes; scripts/dev.sh is the interface and CI on main is the gate.
+sourceOfTruth:
+  - scripts/dev.sh
+  - scripts/development_workflow.py
+  - scripts/ci/classify_changes.py
+  - .github/workflows/ci.yml
+---
 # Development workflow
 
 Local verification is fast and advisory; CI on `main` is the gate. Nothing blocks a commit except a

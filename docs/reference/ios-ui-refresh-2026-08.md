@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: ios
 reviewed: 2026-08-29
 summary: The 2026-08 iOS UI review — the planned frame-health lane, measured baseline, ranked audit findings, maintainer pick-list, and fix waves. Roadmap authority for the ios-ui-2026-08 plan.

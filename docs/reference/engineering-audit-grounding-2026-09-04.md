@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
 reviewed: 2026-09-04
 summary: Current-source disposition of the September 4 external engineering audit, with bounded pre-freeze corrections under the existing 3.0 release programme.

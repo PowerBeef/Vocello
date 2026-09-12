@@ -164,23 +164,9 @@ An accounted-for failed campaign is not a passing campaign.
 
 ## Historical programme checkpoints
 
-All earlier dispositions, measurements, source identities and commands are preserved in
-the pinned programme history (removed 2026-09-11; history: `docs/reference/release-first-execution-history-2026-09-06.md` at 5029a348).
-Use [the current checkpoint](../development-progress.md) for next work, not those dated commands.
-
-### Audit finding disposition
-
-Historical mapping of VRA-001 through VRA-022 to existing owners:
-preserved disposition (removed 2026-09-11; history: `docs/reference/release-first-execution-history-2026-09-06.md` at 5029a348).
-Current item status remains in the roadmap.
-
-### Preserved September 4 device boundary
-
-preserved original attempts (removed 2026-09-11; history: `docs/reference/release-first-execution-history-2026-09-06.md` at 5029a348).
-Seven correlated passes, one product failure and five unverified attempts remain historical;
-none is silently replayed or promoted.
-
-### RF-06 retained-evidence review and bounded follow-up (September 4)
-
-preserved causal review (removed 2026-09-11; history: `docs/reference/release-first-execution-history-2026-09-06.md` at 5029a348).
-Later evidence does not rewrite the original results or make these old next commands current.
+The earlier dispositions, measurements, source identities and commands, the mapping of audit
+findings VRA-001 through VRA-022 to their owners, the September 4 device boundary (seven correlated
+passes, one product failure and five unverified attempts) and the RF-06 retained-evidence review
+live in git history. None of it is replayed or promoted; later evidence does not rewrite the original
+results. Current item status is in the roadmap; use
+[the current checkpoint](../development-progress.md) for next work, not dated commands.

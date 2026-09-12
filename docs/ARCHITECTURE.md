@@ -184,7 +184,7 @@ SPM dependencies are declared in `project.yml` and **pinned to exact versions**
 for backend determinism. `mlx-swift` and `mlx-swift-lm` must move **in lockstep**
 (never one alone); don't float pins without a benchmark-gated review. The Qwen3 runtime
 is an **owned monorepo core package** under `Packages/VocelloQwen3Core/` (see
-[`reference/mlx-audio-swift-patching.md`](reference/mlx-audio-swift-patching.md)).
+[`reference/qwen3-core-maintenance.md`](reference/qwen3-core-maintenance.md)).
 
 Resolved versions (`QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`):
 
@@ -1198,4 +1198,4 @@ Most-frequent imports across `Sources/**/*.swift`:
   [`ios-app-guide.md`](reference/ios-app-guide.md),
   [`privacy-storage.md`](reference/privacy-storage.md),
   [`macos-permissions.md`](reference/macos-permissions.md),
-  [`mlx-audio-swift-patching.md`](reference/mlx-audio-swift-patching.md).
+  [`qwen3-core-maintenance.md`](reference/qwen3-core-maintenance.md).

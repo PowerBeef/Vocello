@@ -13,7 +13,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SPEC = importlib.util.spec_from_file_location("vendor_runtime_contract", ROOT / "scripts/vendor_runtime_contract.py")
+SPEC = importlib.util.spec_from_file_location("qwen3_core_contract", ROOT / "scripts/qwen3_core_contract.py")
 assert SPEC and SPEC.loader
 MODULE = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = MODULE
@@ -220,7 +220,7 @@ public func stableFacadeEntryPoint() -> Bool { true }
         runtime = ROOT / MODULE.RUNTIME_RELATIVE
         inventory = MODULE.load_json(runtime / MODULE.CURRENT_INVENTORY_NAME)
         capabilities = MODULE.load_json(runtime / MODULE.CAPABILITIES_NAME)
-        patches = MODULE.load_json(runtime / MODULE.PATCHES_NAME)
+        patches = MODULE.load_json(runtime / MODULE.DELTAS_NAME)
         capability_patterns = [
             pattern
             for capability in capabilities["capabilities"]
@@ -228,7 +228,7 @@ public func stableFacadeEntryPoint() -> Bool { true }
         ]
         patch_patterns = [
             pattern
-            for patch in patches["patches"]
+            for patch in patches["deltas"]
             for pattern in patch["files"]
         ]
         impacted = [
@@ -246,7 +246,7 @@ public func stableFacadeEntryPoint() -> Bool { true }
             [path for path in impacted if not MODULE.matches(path, patch_patterns)],
             [],
         )
-        patches_by_id = {entry["id"]: entry for entry in patches["patches"]}
+        patches_by_id = {entry["id"]: entry for entry in patches["deltas"]}
         unlinked = [
             path
             for path in impacted
@@ -263,11 +263,11 @@ public func stableFacadeEntryPoint() -> Bool { true }
 
     def test_semantic_delta_entries_have_controlled_live_references(self) -> None:
         runtime = ROOT / MODULE.RUNTIME_RELATIVE
-        ledger = MODULE.load_json(runtime / MODULE.PATCHES_NAME)
+        ledger = MODULE.load_json(runtime / MODULE.DELTAS_NAME)
         states = set(ledger["allowedStates"])
         dispositions = set(ledger["allowedUpstreamDispositions"])
         evidence_classes = set(ledger["allowedEvidenceClasses"])
-        for entry in ledger["patches"]:
+        for entry in ledger["deltas"]:
             self.assertIn(entry["state"], states)
             self.assertIn(entry["upstreamDisposition"], dispositions)
             self.assertIn(entry["evidenceClass"], evidence_classes)

@@ -15,7 +15,7 @@
     "currentInventory": "CURRENT_INVENTORY.json",
     "relocationInventory": "RELOCATION_INVENTORY.json",
     "facadeAPIBaseline": "FACADE_API_BASELINE.json",
-    "semanticDeltas": "PATCHES.json",
+    "semanticDeltas": "SEMANTIC_DELTAS.json",
     "origins": "ORIGINS.md",
     "notices": "NOTICES.md"
   },

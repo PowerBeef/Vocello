@@ -42,9 +42,9 @@ case "$relative" in
   QwenVoice.xcodeproj/*)
     block "edit project.yml, then ./scripts/regenerate_project.sh --fast" ;;
   Packages/VocelloQwen3Core/CURRENT_INVENTORY.json)
-    block "python3 scripts/vendor_runtime_contract.py rebuild-current-inventory" ;;
+    block "python3 scripts/qwen3_core_contract.py rebuild-current-inventory" ;;
   Packages/VocelloQwen3Core/FACADE_API_BASELINE.json)
-    block "python3 scripts/vendor_runtime_contract.py rebuild-facade-api-baseline" ;;
+    block "python3 scripts/qwen3_core_contract.py rebuild-facade-api-baseline" ;;
 esac
 
 exit 0

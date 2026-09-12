@@ -250,7 +250,7 @@
         "Tests/Qwen3RuntimeTests/AudioSealParityTests.swift"
       ],
       "documentation": [
-        "PATCHES.json"
+        "SEMANTIC_DELTAS.json"
       ],
       "evidenceClass": "static",
       "upstreamDeltaIDs": [

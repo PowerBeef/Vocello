@@ -16,14 +16,12 @@ from lib import jsonio  # noqa: E402
 
 
 RUNTIME_RELATIVE = Path("Packages/VocelloQwen3Core")
-# Compatibility for existing repository tooling that imports this module.
-VENDOR_RELATIVE = RUNTIME_RELATIVE
-MANIFEST_NAME = "VENDOR_MANIFEST.json"
+MANIFEST_NAME = "RUNTIME_MANIFEST.json"
 BASELINE_NAME = "UPSTREAM_BASELINE.json"
 CURRENT_INVENTORY_NAME = "CURRENT_INVENTORY.json"
 RELOCATION_INVENTORY_NAME = "RELOCATION_INVENTORY.json"
 FACADE_API_BASELINE_NAME = "FACADE_API_BASELINE.json"
-PATCHES_NAME = "PATCHES.json"
+DELTAS_NAME = "SEMANTIC_DELTAS.json"
 LINEAGE_NAME = "LINEAGE.json"
 COMPATIBILITY_NAME = "COMPATIBILITY.json"
 CAPABILITIES_NAME = "RUNTIME_CAPABILITIES.json"
@@ -74,7 +72,7 @@ FORBIDDEN_FACADE_API_TYPES = re.compile(
 )
 LEGACY_COMPATIBILITY_SPI = "VocelloQwen3LegacyCompatibility"
 LEGACY_COMPATIBILITY_SPI_ATTRIBUTE = f"@_spi({LEGACY_COMPATIBILITY_SPI})"
-LEGACY_COMPATIBILITY_SPI_ENFORCEMENT = "scripts/vendor_runtime_contract.py::legacy_compatibility_consumer_errors"
+LEGACY_COMPATIBILITY_SPI_ENFORCEMENT = "scripts/qwen3_core_contract.py::legacy_compatibility_consumer_errors"
 LEGACY_COMPATIBILITY_SPI_ATTRIBUTE_PATTERN = re.compile(
     rf"@_spi\(\s*{re.escape(LEGACY_COMPATIBILITY_SPI)}\s*\)"
 )
@@ -811,7 +809,7 @@ def validate(repo_root: Path) -> list[str]:
         runtime / CURRENT_INVENTORY_NAME,
         runtime / RELOCATION_INVENTORY_NAME,
         runtime / FACADE_API_BASELINE_NAME,
-        runtime / PATCHES_NAME,
+        runtime / DELTAS_NAME,
         runtime / "ORIGINS.md",
         runtime / "NOTICES.md",
         runtime / "LICENSE",
@@ -834,7 +832,7 @@ def validate(repo_root: Path) -> list[str]:
     current_inventory = load_json(runtime / CURRENT_INVENTORY_NAME)
     relocation_inventory = load_json(runtime / RELOCATION_INVENTORY_NAME)
     facade_api_baseline = load_json(runtime / FACADE_API_BASELINE_NAME)
-    delta_ledger = load_json(runtime / PATCHES_NAME)
+    delta_ledger = load_json(runtime / DELTAS_NAME)
 
     expected_versions = {
         MANIFEST_NAME: (manifest, 3),
@@ -846,7 +844,7 @@ def validate(repo_root: Path) -> list[str]:
         CURRENT_INVENTORY_NAME: (current_inventory, 1),
         RELOCATION_INVENTORY_NAME: (relocation_inventory, 1),
         FACADE_API_BASELINE_NAME: (facade_api_baseline, 1),
-        PATCHES_NAME: (delta_ledger, 2),
+        DELTAS_NAME: (delta_ledger, 3),
     }
     for name, (document, version) in expected_versions.items():
         if document.get("schemaVersion") != version:
@@ -854,7 +852,7 @@ def validate(repo_root: Path) -> list[str]:
 
     component_id = manifest.get("componentID")
     if component_id != "vocello-qwen3-core":
-        errors.append("VENDOR_MANIFEST componentID must be vocello-qwen3-core")
+        errors.append("RUNTIME_MANIFEST componentID must be vocello-qwen3-core")
     for name, document in (
         (LINEAGE_NAME, lineage),
         (COMPATIBILITY_NAME, compatibility),
@@ -863,15 +861,15 @@ def validate(repo_root: Path) -> list[str]:
         (BASELINE_NAME, baseline),
         (CURRENT_INVENTORY_NAME, current_inventory),
         (RELOCATION_INVENTORY_NAME, relocation_inventory),
-        (PATCHES_NAME, delta_ledger),
+        (DELTAS_NAME, delta_ledger),
         (FACADE_API_BASELINE_NAME, facade_api_baseline),
     ):
         if document.get("componentID") != component_id:
-            errors.append(f"{name} componentID differs from VENDOR_MANIFEST")
+            errors.append(f"{name} componentID differs from RUNTIME_MANIFEST")
     if manifest.get("path") != RUNTIME_RELATIVE.as_posix():
-        errors.append("VENDOR_MANIFEST path differs from the owned runtime path")
+        errors.append("RUNTIME_MANIFEST path differs from the owned runtime path")
     if manifest.get("maintenanceModel") != "owned-monorepo-runtime":
-        errors.append("VENDOR_MANIFEST must classify the runtime as owned-monorepo-runtime")
+        errors.append("RUNTIME_MANIFEST must classify the runtime as owned-monorepo-runtime")
 
     project = (repo_root / "project.yml").read_text(encoding="utf-8")
     if "path: Packages/VocelloQwen3Core" not in project:
@@ -894,19 +892,19 @@ def validate(repo_root: Path) -> list[str]:
         "currentInventory": CURRENT_INVENTORY_NAME,
         "relocationInventory": RELOCATION_INVENTORY_NAME,
         "facadeAPIBaseline": FACADE_API_BASELINE_NAME,
-        "semanticDeltas": PATCHES_NAME,
+        "semanticDeltas": DELTAS_NAME,
         "origins": "ORIGINS.md",
         "notices": "NOTICES.md",
     }
     if manifest.get("contracts") != expected_contracts:
-        errors.append("VENDOR_MANIFEST contract index is missing or stale")
+        errors.append("RUNTIME_MANIFEST contract index is missing or stale")
     if manifest.get("historicalEvidence") != {"upstreamBaseline": BASELINE_NAME}:
-        errors.append("VENDOR_MANIFEST historical evidence must contain only the immutable baseline")
+        errors.append("RUNTIME_MANIFEST historical evidence must contain only the immutable baseline")
     expected_facade_api = make_facade_api_baseline(runtime)
     if facade_api_baseline != expected_facade_api:
         errors.append(
             "FACADE_API_BASELINE is stale; run "
-            "python3 scripts/vendor_runtime_contract.py rebuild-facade-api-baseline"
+            "python3 scripts/qwen3_core_contract.py rebuild-facade-api-baseline"
         )
     declarations = facade_api_baseline.get("publicDeclarations", [])
     if not declarations:
@@ -1048,9 +1046,9 @@ def validate(repo_root: Path) -> list[str]:
         if declaration not in package or f'name: "{target}"' not in package:
             errors.append(f"Package.swift target missing: {target}")
     if manifest.get("products") != package_contract.get("products"):
-        errors.append("VENDOR_MANIFEST products differ from COMPATIBILITY")
+        errors.append("RUNTIME_MANIFEST products differ from COMPATIBILITY")
     if manifest.get("targets") != package_contract.get("targets"):
-        errors.append("VENDOR_MANIFEST targets differ from COMPATIBILITY")
+        errors.append("RUNTIME_MANIFEST targets differ from COMPATIBILITY")
 
     target_contracts = ownership.get("targets", {})
     if set(target_contracts) != set(package_contract.get("products", [])):
@@ -1100,26 +1098,26 @@ def validate(repo_root: Path) -> list[str]:
                 f"{sorted(allowed_internal_dependencies)}"
             )
 
-    patches = delta_ledger.get("patches", [])
+    patches = delta_ledger.get("deltas", [])
     patch_id_list = [item.get("id") for item in patches]
     patch_ids = {item.get("id") for item in patches if item.get("id")}
     patches_by_id = {str(item.get("id")): item for item in patches if item.get("id")}
     if len(patch_id_list) != len(patch_ids) or any(not value for value in patch_id_list):
-        errors.append("PATCHES entries require unique non-empty ids")
+        errors.append("SEMANTIC_DELTAS entries require unique non-empty ids")
     if delta_ledger.get("status") != "active-semantic-delta-ledger":
-        errors.append("PATCHES must be classified as the active semantic delta ledger")
+        errors.append("SEMANTIC_DELTAS must be classified as the active semantic delta ledger")
     patch_states = set(delta_ledger.get("allowedStates", []))
     patch_dispositions = set(delta_ledger.get("allowedUpstreamDispositions", []))
     patch_evidence_classes = set(delta_ledger.get("allowedEvidenceClasses", []))
     benchmark_statuses = set(delta_ledger.get("allowedBenchmarkEvidenceStatuses", []))
     if patch_states != EXPECTED_PATCH_STATES:
-        errors.append("PATCHES allowedStates differs from the controlled vocabulary")
+        errors.append("SEMANTIC_DELTAS allowedStates differs from the controlled vocabulary")
     if patch_dispositions != EXPECTED_UPSTREAM_DISPOSITIONS:
-        errors.append("PATCHES allowedUpstreamDispositions differs from the controlled vocabulary")
+        errors.append("SEMANTIC_DELTAS allowedUpstreamDispositions differs from the controlled vocabulary")
     if patch_evidence_classes != EXPECTED_EVIDENCE_CLASSES:
-        errors.append("PATCHES allowedEvidenceClasses differs from the controlled vocabulary")
+        errors.append("SEMANTIC_DELTAS allowedEvidenceClasses differs from the controlled vocabulary")
     if benchmark_statuses != EXPECTED_BENCHMARK_EVIDENCE_STATUSES:
-        errors.append("PATCHES benchmark evidence statuses differ from the controlled vocabulary")
+        errors.append("SEMANTIC_DELTAS benchmark evidence statuses differ from the controlled vocabulary")
     known_records = benchmark_records(repo_root)
     patch_patterns: list[str] = []
     for item in patches:
@@ -1281,7 +1279,7 @@ def validate(repo_root: Path) -> list[str]:
     if current_inventory != expected_inventory:
         errors.append(
             "CURRENT_INVENTORY is stale; run "
-            "python3 scripts/vendor_runtime_contract.py rebuild-current-inventory"
+            "python3 scripts/qwen3_core_contract.py rebuild-current-inventory"
         )
     current_entries = current_inventory.get("entries", [])
     current_paths = [entry.get("path") for entry in current_entries]

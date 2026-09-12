@@ -16,7 +16,7 @@ memory, telemetry, cancellation, codec, and clone-artifact behavior.
 Reviewing or selectively adopting a newer upstream commit does not change the historical import
 identity. Upstream reviews are recorded separately in `LINEAGE.json`; owned capabilities are
 recorded in [`RUNTIME_CAPABILITIES.json`](RUNTIME_CAPABILITIES.json). The active semantic delta
-ledger in [`PATCHES.json`](PATCHES.json) owns every changed or added implementation file and names
+ledger in [`SEMANTIC_DELTAS.json`](SEMANTIC_DELTAS.json) owns every changed or added implementation file and names
 its tests, documentation, evidence status, upstream disposition, and removal criteria.
 
 The relocation from `third_party_patches/mlx-audio-swift` combined a path move with pre-existing

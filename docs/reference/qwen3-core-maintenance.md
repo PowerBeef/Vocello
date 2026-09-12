@@ -5,7 +5,7 @@ reviewed: 2026-09-12
 summary: Maintaining the owned Qwen3 core package — first-party monorepo posture, facade vs compatibility identities, and the vendor-runtime contract that guards the boundary.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Package.swift
-  - scripts/vendor_runtime_contract.py
+  - scripts/qwen3_core_contract.py
 ---
 # Maintaining Vocello Qwen3 Core
 
@@ -25,7 +25,7 @@ Use these sources in order:
 1. Runtime source and deterministic tests.
 2. `LINEAGE.json`, `COMPATIBILITY.json`, and `OWNERSHIP.json` for provenance and boundaries.
 3. `RUNTIME_CAPABILITIES.json` for current behavior and evidence.
-4. `UPSTREAM_BASELINE.json` and `PATCHES.json` for historical upstream comparison.
+4. `UPSTREAM_BASELINE.json` and `SEMANTIC_DELTAS.json` for historical upstream comparison.
 5. `PERFORMANCE.md` and the Qwen/Mimi subsystem guides for design narrative.
 6. Historical audits only for dated research context.
 
@@ -79,7 +79,7 @@ read-only for comparison; it is not a development branch or an alternate source 
    `./scripts/regenerate_project.sh` regenerates only (`--fast` is the historical spelling of that
    default); `--verify` also runs the contract gate afterwards.
 5. Run `scripts/dev.sh check` (advisory: lint, contracts, selected tests and the native lanes the
-   dirty tree touches; `python3 scripts/vendor_runtime_contract.py validate` runs inside its contract
+   dirty tree touches; `python3 scripts/qwen3_core_contract.py validate` runs inside its contract
    lane), or `scripts/dev.sh ci` to reproduce push CI serially. Commit on `main`; the commit lint hook
    is the only local block and CI on `main` is the gate.
 

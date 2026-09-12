@@ -640,7 +640,7 @@ committed bounded quality summaries and baselines remain permitted.
 
 - **New backend substage timing:** add a `ContinuousClock` accumulator in the Qwen3TTS
   decode loop (`Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift`) and store it into
-  the model's preparation‑timings dict — see [`mlx-audio-swift-patching.md`](mlx-audio-swift-patching.md)
+  the model's preparation‑timings dict — see [`qwen3-core-maintenance.md`](qwen3-core-maintenance.md)
   for the patch + validation gates. It will surface automatically in the engine row's
   `timingsMS` (the session re‑reads the model post‑loop). Avoid adding `eval()`/`.item()`
   syncs purely to measure — they distort the very thing you're measuring.
@@ -662,6 +662,6 @@ committed bounded quality summaries and baselines remain permitted.
 
 ## 13. See also
 
-- [`mlx-audio-swift-patching.md`](mlx-audio-swift-patching.md) — owned core runtime procedure and validation gates.
+- [`qwen3-core-maintenance.md`](qwen3-core-maintenance.md) — owned core runtime procedure and validation gates.
 - [`privacy-storage.md`](privacy-storage.md) — where diagnostics live; deletion paths.
 - [`.claude/rules/native.md`](../../.claude/rules/native.md) — telemetry summary + engine invariants (bounded measured event delivery, typed cancellation, prewarm reentrancy, per-tier memory).

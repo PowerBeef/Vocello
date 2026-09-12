@@ -13,7 +13,7 @@ Development is main-only: `ci.yml` has no pull-request trigger, so the `CI requi
 ## Documentation impact
 
 - [ ] Active docs and role guidance still match source, `project.yml`, scripts, and machine-readable contracts.
-- [ ] Vendor-runtime changes update `VENDOR_MANIFEST.json`, `PATCHES.json`, tests, and current guidance as applicable.
+- [ ] Vendor-runtime changes update `RUNTIME_MANIFEST.json`, `SEMANTIC_DELTAS.json`, tests, and current guidance as applicable.
 - [ ] Telemetry or benchmark schema changes received backend, affected-platform, and release/QA review.
 - [ ] Public product claims were checked against `config/public-product-facts.json`, the model contract, hardware profiles, and tracked benchmark evidence.
 - [ ] Historical snapshots remain clearly labelled and were not rewritten as active runbooks.

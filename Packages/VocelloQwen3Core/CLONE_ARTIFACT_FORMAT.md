@@ -70,4 +70,4 @@ be reused across modes, even when they share the same source-audio fingerprint.
 Deterministic coverage lives in
 `Tests/Qwen3RuntimeTests/Qwen3CloneArtifactIntegrityTests.swift`; semantic ownership is
 the `clone-artifacts` entry in `RUNTIME_CAPABILITIES.json`; `CLONE-001` and `CLONE-002` in
-`PATCHES.json` are the active semantic delta entries with explicit removal criteria.
+`SEMANTIC_DELTAS.json` are the active semantic delta entries with explicit removal criteria.

@@ -2,7 +2,7 @@
 
 This document explains the causal performance and memory design of the owned Qwen3 runtime. It
 does not turn every experiment into a shipped optimization: `RUNTIME_CAPABILITIES.json` is
-authoritative for current behavior and evidence freshness. `PATCHES.json` is the active semantic
+authoritative for current behavior and evidence freshness. `SEMANTIC_DELTAS.json` is the active semantic
 delta ledger, while `UPSTREAM_BASELINE.json` remains the immutable imported-byte inventory.
 Benchmark records remain diagnostic after a runtime-impacting source change until a clean record
 matches the current capability sources.

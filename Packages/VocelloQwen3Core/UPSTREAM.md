@@ -15,11 +15,11 @@ Current ownership and capabilities are authoritative in:
 The immutable import and current semantic delta are deliberately separate:
 
 - [`UPSTREAM_BASELINE.json`](UPSTREAM_BASELINE.json)
-- [`PATCHES.json`](PATCHES.json)
+- [`SEMANTIC_DELTAS.json`](SEMANTIC_DELTAS.json)
 
 `UPSTREAM_BASELINE.json` never stores null hashes or absorbs current additions.
 `CURRENT_INVENTORY.json` is regenerated from current retained files and computes the exact
-identical, modified, added, and removed counts. `PATCHES.json` maps every changed or added
+identical, modified, added, and removed counts. `SEMANTIC_DELTAS.json` maps every changed or added
 implementation file to a controlled semantic delta with source, test, documentation, evidence,
 upstream-disposition, and removal references.
 
@@ -60,7 +60,7 @@ remain useful for explicit offline/diagnostic paths; they are not the universal 
 Sampling follows the checkpoint’s official talker defaults. The Code Predictor/subtalker inherits
 the effective talker temperature, top-k, and top-p unless a controlled diagnostic override is set.
 See [`PERFORMANCE.md`](PERFORMANCE.md) for the design narrative; `RUNTIME_CAPABILITIES.json` records
-each capability's production, diagnostic, internal or retired state and `PATCHES.json` each patch's
+each capability's production, diagnostic, internal or retired state and `SEMANTIC_DELTAS.json` each delta's
 active, diagnostic, dormant, shared, superseded or removed state.
 
 ## Selective upstream intake
@@ -71,12 +71,12 @@ Future upstream intake is selective engineering, not a rebase:
 2. Compare it with the pinned baseline and current semantic ledger.
 3. Port only behavior that preserves Vocello’s model, artifact, streaming, cancellation, memory,
    output, and telemetry contracts.
-4. Update `RUNTIME_CAPABILITIES.json` and the active `PATCHES.json` semantic entries for affected
+4. Update `RUNTIME_CAPABILITIES.json` and the active `SEMANTIC_DELTAS.json` semantic entries for affected
    implementation files.
-5. Run `python3 scripts/vendor_runtime_contract.py rebuild-current-inventory`. Benchmark evidence
+5. Run `python3 scripts/qwen3_core_contract.py rebuild-current-inventory`. Benchmark evidence
    remains `diagnostic` or `unverified` after runtime-impacting changes until a matching clean
    record exists.
-6. Run `scripts/dev.sh check` (its contract lane runs `python3 scripts/vendor_runtime_contract.py
+6. Run `scripts/dev.sh check` (its contract lane runs `python3 scripts/qwen3_core_contract.py
    validate`) and let CI on `main` gate the push. A runtime-impacting intake needs new validated
    benchmark records (schema v3 for generation lanes; `rtf` = wall ÷ audio, lower is faster, with `run.rtfDefinition`;
    `toolchain.optimization` from the hash-bound build receipt) before its evidence leaves `diagnostic`.

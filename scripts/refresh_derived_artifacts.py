@@ -32,15 +32,15 @@ ARTIFACTS: tuple[DerivedArtifact, ...] = (
     DerivedArtifact(
         artifact_id="vendor-current-inventory",
         description="Packages/VocelloQwen3Core/CURRENT_INVENTORY.json",
-        check=("python3", "scripts/vendor_runtime_contract.py", "validate"),
-        rebuild=("python3", "scripts/vendor_runtime_contract.py", "rebuild-current-inventory"),
+        check=("python3", "scripts/qwen3_core_contract.py", "validate"),
+        rebuild=("python3", "scripts/qwen3_core_contract.py", "rebuild-current-inventory"),
         stale_markers=("CURRENT_INVENTORY is stale",),
     ),
     DerivedArtifact(
         artifact_id="vendor-facade-api-baseline",
         description="Packages/VocelloQwen3Core/FACADE_API_BASELINE.json",
-        check=("python3", "scripts/vendor_runtime_contract.py", "validate"),
-        rebuild=("python3", "scripts/vendor_runtime_contract.py", "rebuild-facade-api-baseline"),
+        check=("python3", "scripts/qwen3_core_contract.py", "validate"),
+        rebuild=("python3", "scripts/qwen3_core_contract.py", "rebuild-facade-api-baseline"),
         stale_markers=("FACADE_API_BASELINE is stale",),
     ),
     DerivedArtifact(
@@ -94,7 +94,7 @@ def check_status(root: Path) -> list[tuple[DerivedArtifact, str, str]]:
     # Share one vendor validate when both inventory artifacts need it.
     vendor_result: subprocess.CompletedProcess[str] | None = None
     for artifact in ARTIFACTS:
-        if artifact.check[1:3] == ("scripts/vendor_runtime_contract.py", "validate"):
+        if artifact.check[1:3] == ("scripts/qwen3_core_contract.py", "validate"):
             if vendor_result is None:
                 vendor_result = run_command(artifact.check, cwd=root)
             result = vendor_result
@@ -165,7 +165,7 @@ def print_status(root: Path) -> int:
 
 def validate_all(root: Path) -> int:
     commands = (
-        ("python3", "scripts/vendor_runtime_contract.py", "validate"),
+        ("python3", "scripts/qwen3_core_contract.py", "validate"),
         ("python3", "scripts/model_catalog_contract.py", "rebuild", "--check"),
         ("python3", "scripts/roadmap.py", "render", "--check"),
     )

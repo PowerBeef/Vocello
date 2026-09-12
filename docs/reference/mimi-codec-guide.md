@@ -168,7 +168,7 @@ The decoder has two distinct upsampling stages:
 
 ---
 
-## 4. Vendored Swift implementation
+## 4. Owned Swift implementation
 
 The implementation lives under `Packages/VocelloQwen3Core/`. Vocello's owned runtime retains only the codec surface needed by Qwen3-TTS and adds product-specific quality and reliability behavior, most notably around streaming state.
 

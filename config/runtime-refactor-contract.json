@@ -51,7 +51,7 @@
     "normalPublicMutationAuthority": "VocelloQwen3Engine",
     "legacyShippingSPI": "VocelloQwen3LegacyCompatibility",
     "legacyShippingSPIConsumers": [],
-    "consumerAllowlistEnforcement": "scripts/vendor_runtime_contract.py::legacy_compatibility_consumer_errors",
+    "consumerAllowlistEnforcement": "scripts/qwen3_core_contract.py::legacy_compatibility_consumer_errors",
     "combinedCompatibilitySession": "retired-2026-07-23-phase14a-classified-session-is-sole-generation-session",
     "actorCorrectnessClosure": {
       "abortLifecycle": "reserved-generating-aborting-single-owner-with-duplicate-abort-join",

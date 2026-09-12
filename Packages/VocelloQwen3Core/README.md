@@ -15,7 +15,7 @@ upstream model families remain recoverable from Git history or the recorded upst
 - **`MLXAudioCodecs`** — the Mimi codec subset used by the Qwen3 speech tokenizer.
 - **`MLXAudioTTS`** — Qwen3-TTS only.
 - **`MLXAudioMark`** — the AudioSeal audio-marking target consumed inside the package through the
-  facade (`audio-marking` capability; `PATCHES.json` MARK-001).
+  facade (`audio-marking` capability; `SEMANTIC_DELTAS.json` MARK-001).
 - **`Qwen3RuntimeTests`** — deterministic coverage for the runtime behavior Vocello owns.
 
 There are no checked-in STT, speech-to-speech, VAD/diarization, UI, or non-Qwen TTS targets. Do not use
@@ -109,12 +109,12 @@ ordinary development work.
 ## Provenance and license
 
 The contract index, immutable import lineage, package compatibility, ownership boundary, and current
-capabilities are recorded in [`VENDOR_MANIFEST.json`](VENDOR_MANIFEST.json),
+capabilities are recorded in [`RUNTIME_MANIFEST.json`](RUNTIME_MANIFEST.json),
 [`LINEAGE.json`](LINEAGE.json), [`COMPATIBILITY.json`](COMPATIBILITY.json),
 [`OWNERSHIP.json`](OWNERSHIP.json), and
 [`RUNTIME_CAPABILITIES.json`](RUNTIME_CAPABILITIES.json). `UPSTREAM_BASELINE.json` is the immutable
 non-null import inventory; `CURRENT_INVENTORY.json` is the derived retained-file/delta inventory;
-and `PATCHES.json` is the active semantic delta ledger. Benchmark-backed capability claims become
+and `SEMANTIC_DELTAS.json` is the active semantic delta ledger. Benchmark-backed capability claims become
 diagnostic or unverified whenever their source differs from the recorded run. Active performance design is in
 [`PERFORMANCE.md`](PERFORMANCE.md). Attribution and notices are in [`ORIGINS.md`](ORIGINS.md),
 [`NOTICES.md`](NOTICES.md), and [`LICENSE`](LICENSE).

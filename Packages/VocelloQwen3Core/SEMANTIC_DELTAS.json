@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "componentID": "vocello-qwen3-core",
   "component": "Vocello Qwen3 audio runtime",
   "status": "active-semantic-delta-ledger",
@@ -33,7 +33,7 @@
     "diagnostic",
     "unverified"
   ],
-  "patches": [
+  "deltas": [
     {
       "id": "PKG-001",
       "title": "Qwen3-only package and deterministic product surface",
@@ -404,7 +404,7 @@
         "Tests/Qwen3RuntimeTests/AudioSealParityTests.swift"
       ],
       "documentation": [
-        "PATCHES.json"
+        "SEMANTIC_DELTAS.json"
       ],
       "evidenceClass": "static",
       "benchmarkRecordIDs": [],

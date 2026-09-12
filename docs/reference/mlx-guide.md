@@ -353,7 +353,7 @@ Cacheing dtype-keyed `-inf` rows, zero rows, EOS rows, and the code-predictor pa
 
 The streaming decode loop replays a per-pass compiled code predictor on every frame: the 15
 code-predictor passes are compiled once per generation per pass index
-(`Qwen3TTSCodePredictorCompiled.swift`; `PATCHES.json` DECODE-001, state `active`). The per-frame
+(`Qwen3TTSCodePredictorCompiled.swift`; `SEMANTIC_DELTAS.json` DECODE-001, state `active`). The per-frame
 position sequence is identical, so the pass-indexed traces are exact and fixed-seed output stays
 byte-identical (`Qwen3CodePredictorCompiledTests`). Its same-day A/B measured +8.3% to +10.6% warm
 decode speedup with 12/12 fixed-seed byte identity; the benchmark evidence stays classed
@@ -529,7 +529,7 @@ Do not regress these without a maintainer decision:
 - **No hard `Memory.memoryLimit` in production.** Use `cacheLimit`, explicit clears, and pressure bands.
 - **No Quality→Speed OOM fallback.** iPhone is Speed-only by contract; load the chosen variant and surface the real error.
 - **No TTS KV quantization by default.** It saves memory but slows decode (−8.6% `decodeSpeedupX`, §7.5).
-- **No `compile()` that declares quantized parameters as `inputs:`.** It was measured and regressed (§7.4). The pass-indexed compiled code predictor (`PATCHES.json` DECODE-001) is the shipped exception and must keep fixed-seed byte identity (`Qwen3CodePredictorCompiledTests`).
+- **No `compile()` that declares quantized parameters as `inputs:`.** It was measured and regressed (§7.4). The pass-indexed compiled code predictor (`SEMANTIC_DELTAS.json` DECODE-001) is the shipped exception and must keep fixed-seed byte identity (`Qwen3CodePredictorCompiledTests`).
 - **No output-side silence gating.** Suppressing natural pauses masks real defects.
 - **Do not revert the input-side decoder-drift fix (`4fab110`).**
 - **Do not pipeline the 15-pass Code Predictor loop.** It is autoregressive; pipelining would change sampling semantics.
@@ -617,7 +617,7 @@ scripts/macos_test.sh profile custom:speed:
 - [mlx-audio-swift upstream](https://github.com/Blaizzy/mlx-audio-swift)
 - [Qwen3-TTS Hugging Face](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice)
 - Vocello docs:
-  - [`mlx-audio-swift-patching.md`](mlx-audio-swift-patching.md)
+  - [`qwen3-core-maintenance.md`](qwen3-core-maintenance.md)
   - [`ios-engine-optimization.md`](ios-engine-optimization.md) (historical)
   - [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md)
   - [`benchmarks/OPTIMIZATION.md`](../../benchmarks/OPTIMIZATION.md)

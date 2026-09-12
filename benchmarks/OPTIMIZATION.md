@@ -171,7 +171,7 @@ uses standard 2D RoPE, so it *could* swap in. Realistic ceiling **~2–3 % RTF (
 A):** the wall-clock breakdown can't decide if CP compute is a worthwhile slice of the fused `stepEval`, so
 D should only be attempted **after an Instruments os_signpost capture** of one long/quality generation shows
 the "Code Predictor Loop" interval is a meaningful fraction of "Step Eval Flush" GPU time. Vendored edit →
-follow [`../docs/reference/mlx-audio-swift-patching.md`](../docs/reference/mlx-audio-swift-patching.md);
+follow [`../docs/reference/qwen3-core-maintenance.md`](../docs/reference/qwen3-core-maintenance.md);
 must preserve exact numerics (KV precision).
 
 ## E — MLXSwift / mlx-swift-lm version pin (deferred; **stay pinned**)

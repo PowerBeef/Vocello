@@ -50,7 +50,7 @@ python3 "$SCRIPT_DIR/attribution_manifest.py" validate
 
 # Runtime, concurrency and backend contracts.
 python3 "$SCRIPT_DIR/runtime_security_contract.py"
-python3 "$SCRIPT_DIR/vendor_runtime_contract.py" validate
+python3 "$SCRIPT_DIR/qwen3_core_contract.py" validate
 "$SCRIPT_DIR/check_backend_resource_contract.sh" --project
 "$SCRIPT_DIR/check_qwen3_backend_only.sh"
 python3 "$SCRIPT_DIR/validate_backend_risk_spine.py" --root "$PROJECT_DIR"

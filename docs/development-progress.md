@@ -35,6 +35,14 @@ vocabulary, and pointers to deleted documents or rules. Reported and left in cod
 `sensevoice` family id in `scripts/lib/language_metrics.py` that no document names, six archive
 evidence anchors to the deleted September 6 history, and two surviving experiment branches.
 
+A follow-up removed the last patch-stack vocabulary around the owned runtime, which the maintainer
+noticed while the pass ran: the maintenance guide is now `docs/reference/qwen3-core-maintenance.md`,
+the semantic-delta ledger `Packages/VocelloQwen3Core/SEMANTIC_DELTAS.json` (schema 3, key `deltas`),
+the component manifest `RUNTIME_MANIFEST.json`, and the validator `scripts/qwen3_core_contract.py`
+with its test; the Mimi guide's "vendored" heading reads "owned". The relocation inventory, the
+benchmark records and the dated ADR keep the historical names, and the upstream module names behind
+the `VocelloQwen3Core` facade stay as compatibility identities by design.
+
 ### Workflow and harness scar removal (September 12)
 
 The maintainer asked whether other parts of the development workflow or the remaining test harnesses

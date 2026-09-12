@@ -6,18 +6,24 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-# shellcheck source=lib/build_paths.sh
-. "$ROOT_DIR/scripts/lib/build_paths.sh"
-
 case "${1:-}" in
-  check|lint|contracts|py|test|ios|build|run|regen|ci|status|plan|focused|checkpoint)
+  check|lint|contracts|py|test|ios|build|run|regen|ci)
+    # The lane scripts compute their own build paths; exporting them here keeps
+    # one policy answer for every child of this invocation.
+    # shellcheck source=lib/build_paths.sh
+    . "$ROOT_DIR/scripts/lib/build_paths.sh"
+    exec python3 "$ROOT_DIR/scripts/development_workflow.py" "$@"
+    ;;
+  status)
+    # Read-only and run by the SessionStart hook: no build-path policy subprocess.
     exec python3 "$ROOT_DIR/scripts/development_workflow.py" "$@"
     ;;
   *)
     cat >&2 <<'EOF'
 usage: scripts/dev.sh <command>
 
-  check [--dry-run]        lint, contracts, selected tests, native lanes the dirty tree touches
+  check [--dry-run] [--paths P...]
+                           lint, contracts, selected tests, native lanes the dirty tree touches
   lint                     git diff --check, privacy scan, shellcheck on changed shell
   contracts                product and repository contracts
   py [--all | --lane product|research|darwin | tests...]

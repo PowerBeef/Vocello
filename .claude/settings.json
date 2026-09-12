@@ -68,7 +68,6 @@
       "Bash(scripts/regenerate_project.sh*)",
       "Bash(./scripts/regenerate_project.sh*)",
       "Bash(./scripts/check_project_inputs.sh*)",
-      "Bash(python3 -m unittest *)",
       "Bash(xcrun xcresulttool *)",
       "Bash(xcrun xccov *)",
       "Bash(xcrun devicectl list *)",

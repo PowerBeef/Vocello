@@ -348,13 +348,19 @@ jobs:
           head -1 "$KEY_PATH" | grep -q "BEGIN PRIVATE KEY" \
             || { echo "::error::APPLE_NOTARY_PRIVATE_KEY_P8 does not look like a PKCS#8 private key (first line is not 'BEGIN PRIVATE KEY')" >&2; exit 1; }
 
+      - name: Compute SwiftPM cache prefix
+        id: spm_key
+        run: |
+          xcode="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
+          echo "prefix=spm-${{ runner.os }}-xcode${xcode}-" >> "$GITHUB_OUTPUT"
+
       - name: Cache SwiftPM dependencies
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: build/cache/xcode/source-packages
-          key: spm-${{ runner.os }}-xcode26-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          key: ${{ steps.spm_key.outputs.prefix }}${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: |
-            spm-${{ runner.os }}-xcode26-
+            ${{ steps.spm_key.outputs.prefix }}
 
       - name: Run scripts/release.sh (Developer ID + notarized DMG)
         # QWENVOICE_SIGNING_MODE / SIGNING_IDENTITY / DEVELOPMENT_TEAM /
@@ -626,13 +632,19 @@ jobs:
           python3 -c 'import numpy; print(numpy.__version__)'
           python3 scripts/supply_chain_contract.py --installed native
 
+      - name: Compute SwiftPM cache prefix
+        id: spm_key
+        run: |
+          xcode="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
+          echo "prefix=spm-ios-${{ runner.os }}-xcode${xcode}-" >> "$GITHUB_OUTPUT"
+
       - name: Cache SwiftPM dependencies
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: build/cache/xcode/source-packages
-          key: spm-ios-${{ runner.os }}-xcode26-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          key: ${{ steps.spm_key.outputs.prefix }}${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: |
-            spm-ios-${{ runner.os }}-xcode26-
+            ${{ steps.spm_key.outputs.prefix }}
 
       - name: Regenerate Xcode project
         # project.yml is authoritative; regeneration refreshes and verifies the
@@ -729,13 +741,19 @@ jobs:
             --run-id "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             --source-identity "$RELEASE_SOURCE_IDENTITY"
 
+      - name: Compute SwiftPM cache prefix
+        id: spm_key
+        run: |
+          xcode="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
+          echo "prefix=spm-ios-archive-${{ runner.os }}-xcode${xcode}-" >> "$GITHUB_OUTPUT"
+
       - name: Cache SwiftPM dependencies
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: build/cache/xcode/source-packages
-          key: spm-ios-archive-${{ runner.os }}-xcode26-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          key: ${{ steps.spm_key.outputs.prefix }}${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: |
-            spm-ios-archive-${{ runner.os }}-xcode26-
+            ${{ steps.spm_key.outputs.prefix }}
 
       - name: Regenerate Xcode project
         env:

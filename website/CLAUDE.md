@@ -23,10 +23,11 @@ build outputs are generated; do not hand-edit them.
 
 - Read `PRODUCT.md` and `DESIGN.md` before visual or copy work.
 - Use current primary React/Vite/library documentation; Context7 may assist when callable.
-- Use `browser:control-in-app-browser` against the local dev or preview server for visual,
-  responsive, interactive, and accessibility inspection. Browser evidence supplements rather
-  than replaces `npm run check`.
-- Use Chrome only when existing signed-in browser state is explicitly needed.
+- For visual, responsive, interactive and accessibility inspection, drive the local dev or preview
+  server with the Chrome browser tools this harness provides (Claude in Chrome or the chrome-devtools
+  MCP) when they are connected; otherwise rely on Playwright output from `npm run check`. Browser
+  evidence supplements rather than replaces `npm run check`. Prefer a fresh tab; reuse an existing
+  signed-in tab only when that state is explicitly needed.
 - Image generation is optional and only appropriate when the user requests new bitmap artwork.
 - Never use computer-use, Xcode, Simulator, or native UI automation to validate the site.
 

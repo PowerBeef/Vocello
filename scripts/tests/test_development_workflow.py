@@ -93,12 +93,18 @@ class CommandRunnerTests(unittest.TestCase):
                 MODULE.run_commands([["false"], ["true"]])
         self.assertEqual(calls, [["false"]])
 
-    def test_retired_subcommands_route_to_check(self) -> None:
-        with mock.patch.object(MODULE, "check_plan", return_value={"changedPaths": [], "lanes": {}, "commands": []}) as plan, \
-             mock.patch.object(MODULE, "run_commands") as run:
-            self.assertEqual(MODULE.main(["checkpoint"]), 0)
-            plan.assert_called_once()
-            run.assert_called_once_with([])
+    def test_ci_commands_mirror_the_push_workflow(self) -> None:
+        joined = [" ".join(command) for command in MODULE.CI_COMMANDS]
+        for expected in (
+            "python3 scripts/roadmap.py validate",
+            "python3 scripts/roadmap.py render --check",
+            "python3 scripts/supply_chain_contract.py --installed website",
+            "./scripts/check_project_inputs.sh",
+            "scripts/macos_test.sh test",
+            "./scripts/build_foundation_targets.sh ios --incremental",
+        ):
+            self.assertIn(expected, joined)
+        self.assertNotIn("checkpoint", " ".join(joined))
 
     def test_dry_run_prints_the_plan_without_running(self) -> None:
         buffer = io.StringIO()

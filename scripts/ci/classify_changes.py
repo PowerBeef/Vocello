@@ -42,7 +42,6 @@ MACOS_ONLY = (
     "Sources/ViewModels/*",
     "Sources/Models/*",
     "Sources/Services/*",
-    "Sources/App/*",
     "Sources/VocelloCLI/*",
     "Sources/QwenVoiceNative/*",
     "Sources/QwenVoiceEngineService/*",
@@ -60,7 +59,7 @@ PYTHON = ("scripts/*", "config/*", "benchmarks/*", "Sources/Resources/*")
 RESEARCH_PREFIXES = (
     "delivery_", "prosody_", "analyze_", "audio_", "ios_control_audit", "ios_startup_reliability",
     "check_language", "clone_", "emotion_", "mos_", "bench_", "run_local_delivery", "qualify_delivery",
-    "prepare_delivery", "build_emotion", "separability", "voice_identity",
+    "prepare_delivery", "build_emotion", "voice_identity",
     "language_bench", "angry_bilingual", "custom_delivery", "independent_asr",
 )
 RESEARCH_CONFIG = ("delivery-", "prosody-", "ios-control-audit", "ios-startup-reliability", "language-bench",

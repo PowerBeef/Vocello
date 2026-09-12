@@ -172,8 +172,12 @@ jobs:
       - name: Compute cache key
         id: key
         run: |
-          echo "value=macos-xcode26.6-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          echo "graph=macos-xcode26.6-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}-" >> "$GITHUB_OUTPUT"
+          # The Xcode segment comes from config/toolchain.json so a pin bump starts a new cache namespace.
+          xcode="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
+          graph="${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}"
+          echo "prefix=macos-xcode${xcode}-" >> "$GITHUB_OUTPUT"
+          echo "graph=macos-xcode${xcode}-${graph}-" >> "$GITHUB_OUTPUT"
+          echo "value=macos-xcode${xcode}-${graph}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore build caches
         id: cache
@@ -187,7 +191,7 @@ jobs:
           key: ${{ steps.key.outputs.value }}
           restore-keys: |
             ${{ steps.key.outputs.graph }}
-            macos-xcode26.6-
+            ${{ steps.key.outputs.prefix }}
 
       - name: Restore tracked-file mtimes from history
         run: python3 scripts/ci/restore_mtimes.py
@@ -253,8 +257,12 @@ jobs:
       - name: Compute cache key
         id: key
         run: |
-          echo "value=ios-xcode26.6-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
-          echo "graph=ios-xcode26.6-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}-" >> "$GITHUB_OUTPUT"
+          # The Xcode segment comes from config/toolchain.json so a pin bump starts a new cache namespace.
+          xcode="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
+          graph="${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}"
+          echo "prefix=ios-xcode${xcode}-" >> "$GITHUB_OUTPUT"
+          echo "graph=ios-xcode${xcode}-${graph}-" >> "$GITHUB_OUTPUT"
+          echo "value=ios-xcode${xcode}-${graph}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore build caches
         id: cache
@@ -267,7 +275,7 @@ jobs:
           key: ${{ steps.key.outputs.value }}
           restore-keys: |
             ${{ steps.key.outputs.graph }}
-            ios-xcode26.6-
+            ${{ steps.key.outputs.prefix }}
 
       - name: Restore tracked-file mtimes from history
         run: python3 scripts/ci/restore_mtimes.py

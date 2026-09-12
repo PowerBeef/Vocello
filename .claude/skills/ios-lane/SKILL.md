@@ -33,5 +33,5 @@ and the final aggregate verdict are the result. Do not rerun on failure.
 
 Delegate the run directory to the `xcresult-triage` subagent. Report: run id, verdict, required-step
 ledger summary, whether the failure (if any) is product, infrastructure bootstrap, interruption or a
-restoration gap, and the attachment paths a human should open. Then run `/roadmap-checkpoint` if the
-lane closes or reopens a roadmap item.
+restoration gap, and the attachment paths a human should open. If the lane closes or reopens a
+roadmap item, update `config/roadmap.json` and re-render with `python3 scripts/roadmap.py render`.

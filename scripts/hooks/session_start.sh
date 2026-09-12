@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Claude Code SessionStart hook: branch and dirty state, dev.sh status, the "Resume now"
-# head of the checkpoint, paired-iPhone reachability. Read-only, bounded, never fails.
+# head of docs/development-progress.md, paired-iPhone reachability. Read-only, bounded, never fails.
 
 root="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 cd "$root" 2>/dev/null || exit 0

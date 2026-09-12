@@ -169,14 +169,20 @@ def check_plan(paths: list[str]) -> dict:
     return {"changedPaths": paths, "lanes": lanes, "commands": commands}
 
 
+# Mirrors .github/workflows/ci.yml: contracts, routing-independent lanes, then
+# the three native/website lanes. Order follows the workflow's job graph.
 CI_COMMANDS: list[list[str]] = [
     ["python3", "scripts/supply_chain_contract.py"],
     ["scripts/repo_invariants.sh"],
+    ["python3", "scripts/privacy_scan.py"],
+    ["python3", "scripts/roadmap.py", "validate"],
+    ["python3", "scripts/roadmap.py", "render", "--check"],
     ["./scripts/regenerate_project.sh", "--fast"],
     ["./scripts/check_project_inputs.sh"],
     ["scripts/macos_test.sh", "test"],
     ["./scripts/build.sh", "cli", "--version"],
     ["./scripts/build_foundation_targets.sh", "ios", "--incremental"],
+    ["python3", "scripts/supply_chain_contract.py", "--installed", "website"],
     ["npm", "--prefix", "website", "run", "check"],
 ]
 
@@ -225,9 +231,6 @@ def print_status() -> None:
               + (" …" if len(open_items) > 6 else ""))
 
 
-DEPRECATED = {"plan": "check --dry-run", "focused": "check", "checkpoint": "check"}
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -249,18 +252,10 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("regen", help="regenerate derived artifacts (and the project if project.yml changed)")
     sub.add_parser("ci", help="exactly what push CI runs, serially")
     sub.add_parser("status", help="branch, dirty paths, lanes, primary plan")
-    for old, new in DEPRECATED.items():
-        legacy = sub.add_parser(old, help=argparse.SUPPRESS)
-        legacy.add_argument("rest", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
 
     try:
         command = args.command
-        if command in DEPRECATED:
-            replacement = DEPRECATED[command]
-            print(f"==> scripts/dev.sh {command} is retired; running `scripts/dev.sh {replacement}` (no receipt is needed to commit)",
-                  file=sys.stderr)
-            return main(replacement.split())
         if command == "status":
             print_status()
         elif command == "check":

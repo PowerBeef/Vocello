@@ -23,8 +23,8 @@ print(json.dumps({
     "hookSpecificOutput": {
         "hookEventName": "PostToolUse",
         "additionalContext": (
-            "project.yml changed: run ./scripts/regenerate_project.sh --fast before verifying. "
-            "The checkpoint regenerates too, but the generation stamp must match project.yml or the project gate fails."
+            "project.yml changed: run ./scripts/regenerate_project.sh --fast before verifying and commit "
+            "the regenerated QwenVoice.xcodeproj; the generation stamp must match project.yml or the project gate fails."
         ),
     }
 }))

@@ -1,6 +1,6 @@
 ---
 name: vocello-design
-description: Historical Vocello 2.0 prototype reference only; not a current production or user-scoped Codex skill.
+description: Historical Vocello 2.0 prototype reference only; not a current production skill or acceptance source.
 user-invocable: false
 status: historical
 owner: backend-and-platform

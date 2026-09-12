@@ -7,12 +7,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-MODE="checkpoint"
+# Regeneration alone by default; --verify also runs the contract gate afterwards.
+# --fast is accepted as the historical spelling of the default.
+MODE="regenerate"
 case "${1:-}" in
-    "") ;;
-    --fast) MODE="fast" ;;
+    ""|--fast) ;;
+    --verify) MODE="verify" ;;
     *)
-        echo "usage: ./scripts/regenerate_project.sh [--fast]" >&2
+        echo "usage: ./scripts/regenerate_project.sh [--fast|--verify]" >&2
         exit 2
         ;;
 esac
@@ -57,18 +59,17 @@ python3 "$SCRIPT_DIR/generate_ios_logic_scheme.py"
 # Project generation and repository validation have different invalidation
 # domains. Persist the source digest as soon as XcodeGen and both narrow scheme
 # renderers succeed so a later build never regenerates the same project merely
-# because an unrelated documentation or governance check failed.
+# because an unrelated repository check failed.
 mkdir -p "$GENERATION_CACHE_DIR"
 generation_digest="$(/usr/bin/shasum -a 256 project.yml | awk '{print $1}')"
 generation_stamp_next="$(mktemp "$GENERATION_CACHE_DIR/project.yml.sha256.next.XXXXXX")"
 printf '%s\n' "$generation_digest" > "$generation_stamp_next"
 mv -f "$generation_stamp_next" "$GENERATION_STAMP"
 
-if [[ "$MODE" == "checkpoint" ]]; then
+if [[ "$MODE" == "verify" ]]; then
     bash "$SCRIPT_DIR/check_project_inputs.sh"
 else
-    echo "==> Fast regeneration complete; checkpoint validation intentionally deferred."
-    echo "==> Run ./scripts/check_project_inputs.sh --local (or scripts/dev.sh checkpoint) before commit."
+    echo "==> Project regenerated; run scripts/dev.sh check (or --verify) to validate the tree."
 fi
 
 echo "==> Done. Project regenerated at QwenVoice.xcodeproj"

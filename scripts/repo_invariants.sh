@@ -192,6 +192,11 @@ out="$(rg -n 'QWENVOICE_DEBUG|VOCELLO_INTERNAL_DIAGNOSTICS|appDataContainer' \
   Tests/VocelloiOSUITests/VocelloiOSCandidateAcceptanceUITests.swift 2>/dev/null || true)"
 [[ -z "$out" ]] || fail "candidate acceptance must not enable diagnostics or reach into the app container:\n$out"
 
+# One Python test root: pytest collects scripts/tests/test_*.py only, so a module
+# anywhere else or named otherwise would be silently unrun.
+out="$(find scripts -name 'test_*.py' -not -path 'scripts/tests/*' -print; find scripts/tests -maxdepth 1 -name '*.py' ! -name 'test_*.py' ! -name 'conftest.py' -print)"
+[[ -z "$out" ]] || fail "Python tests live only in scripts/tests as test_*.py (pytest collects nothing else):\n$out"
+
 # Evidence retention: benchmarks/ holds compact summaries only, each at most 256 KB.
 if [[ -d benchmarks ]]; then
   raw="$(find benchmarks \

@@ -223,3 +223,36 @@ class DevStatusTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SettingsWiringTests(unittest.TestCase):
+    """The hooks in .claude/settings.json point at executable scripts with the pinned matchers."""
+
+    EXPECTED = {
+        ("SessionStart", "startup|resume|clear"): {"session_start.sh"},
+        ("PreToolUse", "Bash"): {"commit_lint.sh", "policy_guard.sh"},
+        ("PreToolUse", "Edit|Write|MultiEdit|NotebookEdit"): {"generated_file_guard.sh"},
+        ("PostToolUse", "Edit|Write|MultiEdit"): {"project_yml_reminder.sh"},
+    }
+
+    def test_every_hook_resolves_to_an_executable_and_the_matrix_is_exact(self) -> None:
+        import json
+        import os
+        root = Path(__file__).resolve().parents[2]
+        settings = json.loads((root / ".claude/settings.json").read_text(encoding="utf-8"))
+        wired: dict[tuple[str, str], set[str]] = {}
+        referenced: set[str] = set()
+        for event, entries in settings["hooks"].items():
+            for entry in entries:
+                matcher = entry.get("matcher", "")
+                for hook in entry["hooks"]:
+                    command = hook["command"].replace('"$CLAUDE_PROJECT_DIR"', str(root)).replace("$CLAUDE_PROJECT_DIR", str(root))
+                    path = Path(command.split()[0])
+                    self.assertTrue(path.is_file() and os.access(path, os.X_OK), f"{event}/{matcher}: {command}")
+                    self.assertEqual(path.parent, root / "scripts/hooks", command)
+                    self.assertLessEqual(hook.get("timeout", 0), 15, command)
+                    wired.setdefault((event, matcher), set()).add(path.name)
+                    referenced.add(path.name)
+        self.assertEqual(wired, self.EXPECTED)
+        on_disk = {p.name for p in (root / "scripts/hooks").glob("*.sh")}
+        self.assertEqual(referenced, on_disk, "every hook script must be wired and every wired hook must exist")

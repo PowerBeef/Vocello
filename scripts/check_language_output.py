@@ -307,6 +307,10 @@ def audio_edge_evidence_issues(
         duration = finite_number(verification["sourceAudioDurationSeconds"])
         if duration is None or duration <= 0:
             return ["output-audio-duration-invalid"]
+    elif verification.get("schemaVersion") == 3:
+        # The live verifier (schema 3) always binds the WAV duration; a schema-3
+        # report without it would silently bypass the edge-coverage check.
+        return ["output-audio-duration-missing"]
     if output_evidence is not None:
         observed = finite_number(output_evidence.get("durationSeconds")) if isinstance(output_evidence, dict) else None
         if observed is None or observed <= 0:
@@ -334,9 +338,15 @@ def audio_edge_evidence_issues(
     return []
 
 
+def expects_failure(cell: dict[str, Any]) -> bool:
+    """A negative-control cell: verification must run and must fail."""
+    return cell.get("expectedOutcome") == "fail"
+
+
 def validate_structured_verification(
     verification: dict[str, Any], expected_language: str, expected_script: str, identity: str,
     *, output_evidence: Any = None,
+    expect_failure: bool = False,
 ) -> list[str]:
     failures: list[str] = []
     failures.extend(f"{identity}: {issue}" for issue in audio_edge_evidence_issues(
@@ -511,12 +521,22 @@ def validate_structured_verification(
     language_score = finite_number(verification.get("languageMatchScore"))
     if language_score is None or not 0 <= language_score <= 1:
         failures.append(f"{identity}: invalid languageMatchScore")
-    if verification.get("languagePass") is not True or (
-        language_score is not None and language_score < MIN_LANGUAGE_MATCH_SCORE
-    ):
-        failures.append(f"{identity}: structured language verdict does not pass its threshold")
-    if verification.get("pass") is not True:
-        failures.append(f"{identity}: structured output verdict is not true")
+    if expect_failure:
+        # The control proves the harness can see a wrong-language output: the
+        # verification must have run (no skip) and failed on language or accuracy.
+        if verification.get("skipReason") is not None:
+            failures.append(f"{identity}: negative control was skipped, not verified")
+        if verification.get("pass") is not False:
+            failures.append(f"{identity}: negative control did not fail verification")
+        if verification.get("languagePass") is not False and verification.get("accuracyPass") is not False:
+            failures.append(f"{identity}: negative control failed on neither language nor accuracy")
+    else:
+        if verification.get("languagePass") is not True or (
+            language_score is not None and language_score < MIN_LANGUAGE_MATCH_SCORE
+        ):
+            failures.append(f"{identity}: structured language verdict does not pass its threshold")
+        if verification.get("pass") is not True:
+            failures.append(f"{identity}: structured output verdict is not true")
     if recomputed_word is not None and recomputed_character is not None:
         expected_counts = {
             "referenceTokenCount": recomputed_word["referenceCount"],
@@ -612,11 +632,13 @@ def main() -> int:
             plan_failure = str(error)
     expected = planned_takes if planned_takes is not None else cells
     output_cells = [c for c in expected if not c.get("skipOutputVerification")]
+    negative_controls = [c for c in output_cells if expects_failure(c)]
 
     failures: list[str] = []
     print(
         f"language-output gate: runID={args.run_id} subset={args.subset} "
-        f"expected={len(output_cells)} sentinels={len(exact) if args.plan else sum(map(len, legacy_sentinels.values()))}"
+        f"expected={len(output_cells)} negativeControls={len(negative_controls)} "
+        f"sentinels={len(exact) if args.plan else sum(map(len, legacy_sentinels.values()))}"
     )
 
     if plan_failure:
@@ -678,21 +700,14 @@ def main() -> int:
                 "(set QVOICE_IOS_DEVICE_DIAGNOSTICS_VERIFY_OUTPUT=1)"
             )
             continue
+        expect_failure = expects_failure(cell)
         failures.extend(
             validate_structured_verification(
                 verification, expected_hint, expected_script, identity,
                 output_evidence=record.get("outputEvidence"),
+                expect_failure=expect_failure,
             )
         )
-        if not verification.get("languagePass"):
-            failures.append(
-                f"{identity}: languagePass=false score={verification.get('languageMatchScore')}"
-            )
-        if verification.get("accuracyPass") is not True:
-            failures.append(
-                f"{identity}: accuracyPass={verification.get('accuracyPass')!r} "
-                f"{verification.get('accuracyMetric')}={verification.get('accuracyValue')}"
-            )
         passed = verification.get("pass")
         if passed is None:
             passed = (
@@ -700,14 +715,27 @@ def main() -> int:
                 and verification.get("accuracyPass")
                 and not verification.get("skipReason")
             )
-        if not passed:
-            failures.append(f"{identity}: pass=false")
+        if expect_failure:
+            if passed:
+                failures.append(f"{identity}: negative control unexpectedly passed verification")
+        else:
+            if not verification.get("languagePass"):
+                failures.append(
+                    f"{identity}: languagePass=false score={verification.get('languageMatchScore')}"
+                )
+            if verification.get("accuracyPass") is not True:
+                failures.append(
+                    f"{identity}: accuracyPass={verification.get('accuracyPass')!r} "
+                    f"{verification.get('accuracyMetric')}={verification.get('accuracyValue')}"
+                )
+            if not passed:
+                failures.append(f"{identity}: pass=false")
         print(
             f"  {cell_id:<28} lang={verification.get('languagePass')} "
             f"locale={(verification.get('recognition') or {}).get('selectedLocaleIdentifier')} "
             f"accuracy={verification.get('accuracyMetric')}:{verification.get('accuracyValue')} "
             f"score={verification.get('languageMatchScore')} "
-            f"pass={passed}"
+            f"pass={passed}{' (expected failure confirmed)' if expect_failure and not passed else ''}"
         )
 
     for (group, seed), members in sorted(equivalence.items()):

@@ -106,17 +106,35 @@ public enum GenerationQualityReportProducer {
             ))
         }
 
-        // Streaming continuity: the lossless suspending channel enforces
-        // no-drop delivery structurally on both paths; the channel summary,
-        // when telemetry captured one, contributes the backpressure counters.
-        let continuityMeasurements: [GenerationQualityMeasurement] = [
+        // Streaming continuity: the lossless suspending channel cannot drop
+        // audio, so the gate judges the evidence that it behaved as one on a
+        // completed take: a streamed take delivered at least one chunk, the
+        // channel never exceeded its capacity, and no producer was woken by
+        // cancellation (a cancelled producer cannot own a completed output).
+        // Player underruns are not observable from the engine; that
+        // measurement stays zero by construction rather than by assertion.
+        // The channel summary exists only when telemetry captured it; its
+        // absence is not a failure, so production without telemetry is
+        // unaffected, but its contents can fail this gate.
+        var continuityFailures = 0
+        if usedStreaming && chunkCount == 0 { continuityFailures += 1 }
+        if let audioChannel {
+            if audioChannel.highWaterFrames > audioChannel.capacityFrames { continuityFailures += 1 }
+            if audioChannel.cancellationWakeups > 0 { continuityFailures += 1 }
+        }
+        var continuityMeasurements: [GenerationQualityMeasurement] = [
             .init(key: .underrunCount, value: 0),
-            .init(key: .continuityFailureCount, value: 0),
+            .init(key: .continuityFailureCount, value: Double(continuityFailures)),
+            .init(key: .chunkCount, value: Double(chunkCount)),
         ]
-        _ = audioChannel // counters live in the v9 sidecar; the gate asserts the contract
+        if let audioChannel {
+            continuityMeasurements.append(
+                .init(key: .channelHighWaterFrames, value: Double(audioChannel.highWaterFrames))
+            )
+        }
         results.append(GenerationQualityGateResult(
             gate: .streamingContinuity,
-            outcome: .pass,
+            outcome: continuityFailures == 0 ? .pass : .fail,
             algorithmVersion: mappingAlgorithmVersion,
             measurements: continuityMeasurements
         ))

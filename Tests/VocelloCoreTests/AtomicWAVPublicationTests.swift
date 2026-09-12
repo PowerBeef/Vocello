@@ -98,6 +98,47 @@ final class AtomicWAVPublicationTests: XCTestCase {
         XCTAssertEqual(combined.durationSeconds, 1, accuracy: 0.001)
     }
 
+    func testPersistedWAVQCFailsAFileInTheWrongFormatOrLength() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-persisted-qc-format-\(UUID().uuidString)", isDirectory: true)
+        let output = directory.appendingPathComponent("take.wav")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let samples = (0..<16_000).map { index -> Int16 in
+            let value = sin(2 * Double.pi * 440 * Double(index) / 16_000) * 0.1
+            return Int16((value * Double(Int16.max)).rounded())
+        }
+        // A 16 kHz file is self-consistent and used to pass; the engine writes 24 kHz mono.
+        try AtomicPCM16WAVWriter.write(pcmSamples: samples, sampleRate: 16_000, outputURL: output)
+
+        let unchecked = try StreamingExecutionContext.makePersistedWAVAudioQCReport(
+            at: output, expectedPauseCount: 0
+        )
+        XCTAssertEqual(unchecked.writtenOutputVerdict, .pass)
+
+        let wrongRate = try StreamingExecutionContext.makePersistedWAVAudioQCReport(
+            at: output, expectedPauseCount: 0,
+            expectedSampleRate: 24_000, expectedChannelCount: 1, expectedFrameCount: 16_000
+        )
+        XCTAssertEqual(wrongRate.writtenOutputVerdict, .fail)
+        XCTAssertEqual(wrongRate.verdict, .fail)
+        XCTAssertTrue(wrongRate.flags.contains("format:sample_rate:16000/24000"), "\(wrongRate.flags)")
+
+        let shortFile = try StreamingExecutionContext.makePersistedWAVAudioQCReport(
+            at: output, expectedPauseCount: 0,
+            expectedSampleRate: 16_000, expectedChannelCount: 1, expectedFrameCount: 24_000
+        )
+        XCTAssertEqual(shortFile.writtenOutputVerdict, .fail)
+        XCTAssertTrue(shortFile.flags.contains("format:frames:16000/24000"), "\(shortFile.flags)")
+
+        let exact = try StreamingExecutionContext.makePersistedWAVAudioQCReport(
+            at: output, expectedPauseCount: 0,
+            expectedSampleRate: 16_000, expectedChannelCount: 1, expectedFrameCount: 16_000
+        )
+        XCTAssertEqual(exact.writtenOutputVerdict, .pass)
+        XCTAssertFalse(exact.flags.contains { $0.hasPrefix("format:") })
+    }
+
     func testPersistedWAVQCDerivesDCOffsetFromFile() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("vocello-persisted-dc-\(UUID().uuidString)", isDirectory: true)

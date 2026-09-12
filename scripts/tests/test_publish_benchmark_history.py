@@ -1320,14 +1320,28 @@ class PublisherTests(unittest.TestCase):
             manifest["historyRecord"]["inputs"]["analysisProfileHash"],
             publisher.digest_bytes(publisher.canonical_bytes(expected_analysis_profile)),
         )
-        self.assertEqual(manifest["historyRecord"]["evidence"]["languageVerification"], {
+        language_verification = manifest["historyRecord"]["evidence"]["languageVerification"]
+        self.assertEqual({
+            key: language_verification[key] for key in (
+                "outputSchemaVersion", "outputAlgorithm", "recognitionSchemaVersion",
+                "recognitionAlgorithm", "accuracyMetricVersion", "requiredPassCount", "families",
+            )
+        }, {
             "outputSchemaVersion": 3,
             "outputAlgorithm": "language-output-verifier-v3",
             "recognitionSchemaVersion": 2,
             "recognitionAlgorithm": "apple-speech-file-consensus-v2",
             "accuracyMetricVersion": "normalized-edit-rate-v1",
             "requiredPassCount": 3,
+            "families": ["apple-speech"],
         })
+        # Run-level counts live here once, never as constants on every take.
+        self.assertEqual(language_verification["hintCellsPassed"], language_verification["hintCellsExpected"])
+        self.assertEqual(language_verification["outputCellsPassed"], language_verification["outputCellsExpected"])
+        self.assertEqual(language_verification["negativeControlsConfirmed"], 0)
+        for take in manifest["historyRecord"]["takes"]:
+            self.assertNotIn("hintCellsPassed", take["metrics"])
+            self.assertNotIn("outputCellsPassed", take["metrics"])
         sanitized = publisher.sanitized_asr_evidence(
             cell={"id": "fr", "expectedHint": "french"},
             planned_take=plan["takes"][0],

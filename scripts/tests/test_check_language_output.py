@@ -50,8 +50,14 @@ def verification(
     transcript_override: str | None = None,
     inconsistent: bool = False,
     missing_metrics: bool = False,
+    failing: bool = False,
 ) -> dict:
+    """A structured verification; `failing` renders the negative control's
+    genuine outcome (English-locked recognition of a French take: wrong words,
+    accuracy failed, verdict false)."""
     locale = LOCALES[expected_language]
+    if failing and transcript_override is None:
+        transcript_override = "the train has quit the guard a lobe"
     if script is None:
         script = (
             "The train left the station at dawn."
@@ -90,11 +96,12 @@ def verification(
     value = {
         "schemaVersion": 3,
         "algorithmVersion": "language-output-verifier-v3",
+        "sourceAudioDurationSeconds": 1.5,
         "expectedLanguage": expected_language,
         "detectedLanguage": expected_language,
         "transcript": transcript,
         "languagePass": True,
-        "accuracyPass": True,
+        "accuracyPass": not failing,
         "languageMatchScore": 1.0,
         "wordErrorRate": word["errorRate"],
         "characterErrorRate": character["errorRate"],
@@ -112,7 +119,7 @@ def verification(
         "accuracyMetric": accuracy_metric,
         "accuracyThreshold": 0.15,
         "accuracyValue": character["errorRate"] if accuracy_metric == "characterErrorRate" else word["errorRate"],
-        "pass": True,
+        "pass": not failing,
         "recognition": {
             "schemaVersion": 2,
             "algorithmVersion": "apple-speech-file-consensus-v2",
@@ -160,6 +167,7 @@ def write_fixture(
                 script=scripts[cell["scriptLang"]],
                 inconsistent=inconsistent and index == 0,
                 missing_metrics=missing_metrics and index == 0,
+                failing=cell.get("expectedOutcome") == "fail",
             ),
         }
         with open(os.path.join(directory, "device-diagnostics-done.json"), "w", encoding="utf-8") as fh:
@@ -202,7 +210,8 @@ def write_planned_fixture(diag: str, run_id: str, plan_path: str) -> dict:
         }
         if not take.get("skipOutputVerification"):
             record["outputVerification"] = verification(
-                expected, script=scripts[take["scriptLang"]]
+                expected, script=scripts[take["scriptLang"]],
+                failing=take.get("expectedOutcome") == "fail",
             )
         with open(os.path.join(directory, "device-diagnostics-done.json"), "w", encoding="utf-8") as handle:
             json.dump(record, handle)
@@ -210,11 +219,51 @@ def write_planned_fixture(diag: str, run_id: str, plan_path: str) -> dict:
 
 
 class CheckLanguageOutputTests(unittest.TestCase):
+    def test_negative_control_must_run_and_fail(self) -> None:
+        """The pinned-English-over-French cell is evidence only when its
+        verification ran and failed; a pass, or a skip, fails the gate."""
+        run_id = "fixture-negative-control"
+        with tempfile.TemporaryDirectory() as diag:
+            plan_path = os.path.join(diag, "plan.json")
+            plan = write_planned_fixture(diag, run_id, plan_path)
+            control = next(take for take in plan["takes"] if take.get("expectedOutcome") == "fail")
+            sentinel = os.path.join(diag, "runs", control["childRunID"], "device-diagnostics-done.json")
+            command = [
+                sys.executable, CHECK, diag, "--run-id", run_id, "--plan", plan_path,
+                "--matrix", MATRIX, "--corpus", CORPUS, "--subset", "quick",
+            ]
+            baseline = subprocess.run(command, capture_output=True, text=True, check=False)
+            self.assertEqual(baseline.returncode, 0, baseline.stdout + baseline.stderr)
+            self.assertIn("expected failure confirmed", baseline.stdout)
+            self.assertIn("negativeControls=1", baseline.stdout)
+
+            with open(sentinel, encoding="utf-8") as handle:
+                record = json.load(handle)
+            with open(CORPUS, encoding="utf-8") as handle:
+                scripts = {entry["id"]: entry["script"] for entry in json.load(handle)["languages"]}
+            # The control unexpectedly passing (the model obeyed the pinned hint) is a gate failure.
+            record["outputVerification"] = verification("english", script=scripts["french"])
+            with open(sentinel, "w", encoding="utf-8") as handle:
+                json.dump(record, handle)
+            passed = subprocess.run(command, capture_output=True, text=True, check=False)
+            self.assertNotEqual(passed.returncode, 0)
+            self.assertIn("negative control", (passed.stdout + passed.stderr).lower())
+            # A skipped verification is not a confirmed control either.
+            record["outputVerification"] = {"schemaVersion": 3, "skipReason": "source_audio_duration_unavailable", "pass": False}
+            with open(sentinel, "w", encoding="utf-8") as handle:
+                json.dump(record, handle)
+            skipped = subprocess.run(command, capture_output=True, text=True, check=False)
+            self.assertNotEqual(skipped.returncode, 0)
+
+
     def test_cli_checks_separate_wav_duration_instead_of_trusting_pass(self) -> None:
         with tempfile.TemporaryDirectory() as diag:
             write_fixture(diag, "edge-fixture")
             path = next(Path(diag).rglob("device-diagnostics-done.json"))
             record = json.loads(path.read_text(encoding="utf-8"))
+            # The verifier and the separate WAV evidence agree on a 16 s file,
+            # but the passes only covered its first 1.5 s.
+            record["outputVerification"]["sourceAudioDurationSeconds"] = 16.0
             record["outputEvidence"] = {"durationSeconds": 16.0}
             path.write_text(json.dumps(record), encoding="utf-8")
             result = self.run_checker(diag, "edge-fixture")
@@ -243,10 +292,16 @@ class CheckLanguageOutputTests(unittest.TestCase):
             output_evidence={"durationSeconds": 1.5})
         self.assertTrue(failures, "Full edge coverage must never waive word errors")
 
-    def test_duration_requires_all_pass_timestamps_but_legacy_remains_valid(self) -> None:
+    def test_schema_three_report_must_bind_its_duration_and_every_pass_timestamp(self) -> None:
         value = verification("french")
         self.assertEqual(validate_structured_verification(
-            value, "french", "Le train a quitté la gare à l'aube.", "legacy"), [])
+            value, "french", "Le train a quitté la gare à l'aube.", "bound"), [])
+        # A schema-3 report that omits the WAV duration would silently bypass the
+        # edge-coverage check; the live verifier always binds it, so its absence fails.
+        value.pop("sourceAudioDurationSeconds")
+        failures = validate_structured_verification(
+            value, "french", "Le train a quitté la gare à l'aube.", "missing")
+        self.assertTrue(any("audio-duration-missing" in f for f in failures), failures)
         value["sourceAudioDurationSeconds"] = 1.5
         value["recognition"]["repetitions"][1].pop("segmentEndSeconds")
         failures = validate_structured_verification(

@@ -1872,7 +1872,10 @@ struct StreamingExecutionContext: Sendable {
                     in: (try? SpokenTextPlanner.plan(originalText: request.text).spokenText)
                         ?? request.text
                 ),
-                chunkQC: chunkQCActive && !chunkQCReports.isEmpty ? chunkQCReports : nil
+                chunkQC: chunkQCActive && !chunkQCReports.isEmpty ? chunkQCReports : nil,
+                expectedSampleRate: sampleRate,
+                expectedChannelCount: 1,
+                expectedFrameCount: Int(totalFramesWritten)
             )
             await telemetrySampler?.captureBoundary("after_audio_qc")
             guard finalAudioQC.verdict != .fail else {
@@ -2538,11 +2541,23 @@ struct StreamingExecutionContext: Sendable {
     /// of the QC report from those exact persisted frames. Pre-limiter
     /// instability counters are retained from generation, while energy, DC and
     /// dropout evidence is replaced by the file that downstream consumers read.
+    /// - Parameters:
+    ///   - expectedSampleRate: the engine's output rate; a file whose header
+    ///     says otherwise is self-consistent (duration, silence and level all
+    ///     scale together) and would pass every other check, so the format
+    ///     itself is a written-output failure.
+    ///   - expectedChannelCount: the engine writes mono; a second channel
+    ///     would otherwise be judged on its first channel only.
+    ///   - expectedFrameCount: frames the writer actually produced; a header
+    ///     rewritten to a shorter, consistent length is caught here.
     static func makePersistedWAVAudioQCReport(
         at url: URL,
         preWriteMetrics: PCM16StreamLimiter.Metrics? = nil,
         expectedPauseCount: Int,
-        chunkQC: [AudioQCChunkReport]? = nil
+        chunkQC: [AudioQCChunkReport]? = nil,
+        expectedSampleRate: Int? = nil,
+        expectedChannelCount: Int? = nil,
+        expectedFrameCount: Int? = nil
     ) throws -> AudioQCReport {
         let file = try AVAudioFile(forReading: url)
         let frameCount = Int(file.length)
@@ -2550,6 +2565,18 @@ struct StreamingExecutionContext: Sendable {
             throw MLXTTSEngineError.generationFailed(
                 "The finalized WAV contains no readable audio frames."
             )
+        }
+        var formatIssues: [String] = []
+        let fileSampleRate = Int(file.processingFormat.sampleRate.rounded())
+        if let expectedSampleRate, fileSampleRate != expectedSampleRate {
+            formatIssues.append("format:sample_rate:\(fileSampleRate)/\(expectedSampleRate)")
+        }
+        let channelCount = Int(file.processingFormat.channelCount)
+        if let expectedChannelCount, channelCount != expectedChannelCount {
+            formatIssues.append("format:channels:\(channelCount)/\(expectedChannelCount)")
+        }
+        if let expectedFrameCount, frameCount != expectedFrameCount {
+            formatIssues.append("format:frames:\(frameCount)/\(expectedFrameCount)")
         }
         // Keep persisted-output verification bounded for long clips. The
         // limiter owns cross-block continuity and silence-run state, so the
@@ -2607,10 +2634,11 @@ struct StreamingExecutionContext: Sendable {
 
         return makeAudioQCReport(
             metrics: combined,
-            sampleRate: Int(file.processingFormat.sampleRate.rounded()),
+            sampleRate: fileSampleRate,
             durationSeconds: Double(observedFrameCount) / file.processingFormat.sampleRate,
             expectedPauseCount: expectedPauseCount,
-            chunkQC: chunkQC
+            chunkQC: chunkQC,
+            formatIssues: formatIssues
         )
     }
 
@@ -2624,7 +2652,8 @@ struct StreamingExecutionContext: Sendable {
         sampleRate: Int,
         durationSeconds: Double,
         expectedPauseCount: Int,
-        chunkQC: [AudioQCChunkReport]? = nil
+        chunkQC: [AudioQCChunkReport]? = nil,
+        formatIssues: [String] = []
     ) -> AudioQCReport {
         let n = metrics.processedSamples
         let rms = n > 0 ? (metrics.outputSumOfSquares / Double(n)).squareRoot() : 0
@@ -2725,6 +2754,11 @@ struct StreamingExecutionContext: Sendable {
 
         if metrics.nonFiniteSamples > 0 {
             flags.append("nonfinite"); raise(.fail, &instabilityVerdict)
+        }
+        // A published file in the wrong format is a written-output failure
+        // regardless of its samples (see makePersistedWAVAudioQCReport).
+        for issue in formatIssues {
+            flags.append(issue); raise(.fail, &writtenOutputVerdict)
         }
         if n == 0 { flags.append("empty"); raise(.fail, &writtenOutputVerdict) }
         if let db = rmsDBFS {

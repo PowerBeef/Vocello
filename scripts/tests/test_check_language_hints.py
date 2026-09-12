@@ -11,7 +11,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from language_bench_evidence import build_plan, write_json_atomic
+from language_bench_evidence import build_plan, stable_default_seed, write_json_atomic
 
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -23,17 +23,19 @@ CORPUS = os.path.join(ROOT, "config", "language-bench-corpus.json")
 def write_fixture(diag: str, run_id: str) -> None:
     engine_dir = os.path.join(diag, "engine")
     os.makedirs(engine_dir, exist_ok=True)
+    # (cell, mode, resolved hint, script language): the macOS lane seeds each
+    # cell with the stable per-cell seed and samples expressively.
     quick_cells = [
-        ("custom-en-pinned", "custom", "english"),
-        ("custom-en-auto", "custom", "english"),
-        ("design-en-pinned", "design", "english"),
-        ("custom-fr-pinned", "custom", "french"),
-        ("custom-fr-auto", "custom", "french"),
-        ("design-fr-pinned", "design", "french"),
-        ("custom-fr-text-en-pinned", "custom", "english"),
+        ("custom-en-pinned", "custom", "english", "english"),
+        ("custom-en-auto", "custom", "english", "english"),
+        ("design-en-pinned", "design", "english", "english"),
+        ("custom-fr-pinned", "custom", "french", "french"),
+        ("custom-fr-auto", "custom", "french", "french"),
+        ("design-fr-pinned", "design", "french", "french"),
+        ("custom-fr-text-en-pinned", "custom", "english", "french"),
     ]
     rows = []
-    for cell_id, mode, hint in quick_cells:
+    for cell_id, mode, hint, script_lang in quick_cells:
         rows.append(
             {
                 "mode": mode,
@@ -42,6 +44,8 @@ def write_fixture(diag: str, run_id: str) -> None:
                     "benchRunID": run_id,
                     "benchCell": cell_id,
                     "languageHint": hint,
+                    "samplingSeed": str(stable_default_seed({"mode": mode, "scriptLang": script_lang})),
+                    "samplingVariation": "expressive",
                 },
                 "audioQC": {"verdict": "pass"},
             }
@@ -171,6 +175,30 @@ class CheckLanguageHintsTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_unknown_finish_reason_and_missing_qc_fail_closed(self) -> None:
+        for mutate, needle in (
+            (lambda row: row.__setitem__("finishReason", "exploded"), "finishReason"),
+            (lambda row: row.pop("audioQC"), "missing-audioQC"),
+            (lambda row: row["notes"].__setitem__("samplingSeed", "7"), "samplingSeed"),
+            (lambda row: row["notes"].__setitem__("samplingVariation", "balanced"), "samplingVariation"),
+        ):
+            with self.subTest(needle), tempfile.TemporaryDirectory() as diag:
+                write_fixture(diag, "fixture-run")
+                path = os.path.join(diag, "engine", "generations.jsonl")
+                with open(path, encoding="utf-8") as handle:
+                    rows = [json.loads(line) for line in handle if line.strip()]
+                mutate(rows[0])
+                with open(path, "w", encoding="utf-8") as handle:
+                    for row in rows:
+                        handle.write(json.dumps(row) + "\n")
+                result = subprocess.run(
+                    [sys.executable, CHECK, diag, "--run-id", "fixture-run",
+                     "--matrix", MATRIX, "--corpus", CORPUS, "--subset", "quick"],
+                    capture_output=True, text=True, check=False,
+                )
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn(needle, result.stdout + result.stderr)
 
     def test_wrong_hint_fails(self) -> None:
         run_id = "fixture-bad"

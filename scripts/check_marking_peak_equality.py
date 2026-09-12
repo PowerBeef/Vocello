@@ -87,19 +87,43 @@ def check_take(take: dict, sidecar: Path, pct: float, floor: float,
             f"not raise the take peak")
 
 
+DEFAULT_POLICY = Path(__file__).resolve().parents[1] / "config" / "marking-peak-equality.json"
+
+
+def load_tolerances(policy_path: Path) -> tuple[float, float]:
+    """tolerancePercent and toleranceMB from the tracked policy; a missing or
+    malformed policy is a failure, never a silent default."""
+    try:
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+        percent = float(policy["tolerancePercent"])
+        megabytes = float(policy["toleranceMB"])
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise SystemExit(f"marking peak equality: policy {policy_path} is unusable: {error}")
+    return percent, megabytes
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("evidence", type=Path,
                         help="fresh memory-qualification benchmark-evidence.json "
                              "(sample sidecars are resolved beside it)")
-    parser.add_argument("--tolerance-percent", type=float, default=5.0)
-    parser.add_argument("--tolerance-mb", type=float, default=48.0,
-                        help="floor absorbing sampler cadence noise; the marking "
-                             "pass itself measures +9 to +18 MB")
+    parser.add_argument("--policy", type=Path, default=DEFAULT_POLICY,
+                        help="config/marking-peak-equality.json; owns the tolerances")
+    parser.add_argument("--tolerance-percent", type=float, default=None,
+                        help="override the policy's tolerancePercent")
+    parser.add_argument("--tolerance-mb", type=float, default=None,
+                        help="override the policy's toleranceMB (floor absorbing sampler "
+                             "cadence noise; the marking pass itself measures +9 to +18 MB)")
     parser.add_argument("--sidecar-dir", type=Path, default=None,
                         help="override the sidecar directory (default: "
                              "runtime/diagnostics/engine beside the manifest)")
     args = parser.parse_args(argv)
+
+    policy_percent, policy_mb = load_tolerances(args.policy)
+    if args.tolerance_percent is None:
+        args.tolerance_percent = policy_percent
+    if args.tolerance_mb is None:
+        args.tolerance_mb = policy_mb
 
     record = unwrap_record(json.loads(args.evidence.read_text(encoding="utf-8")))
     sidecar_dir = args.sidecar_dir or (

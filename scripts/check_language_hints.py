@@ -31,6 +31,7 @@ from language_bench_evidence import (
     load_json as load_evidence_json,
     seed_value,
     validate_plan_against_sources,
+    stable_default_seed,
 )
 
 
@@ -59,9 +60,12 @@ def select_cells(matrix: dict[str, Any], subset: str) -> list[dict[str, Any]]:
 
 
 def qc_verdict(row: dict[str, Any]) -> str:
+    """The row's Fast QC verdict. A row with no QC block is a failure: every
+    shipping generation carries one, so its absence means the evidence is not
+    the engine's, not that the audio was clean."""
     qc = row.get("audioQC")
     if not isinstance(qc, dict):
-        return "-"
+        return "fail:missing-audioQC"
     verdict = qc.get("verdict")
     if isinstance(verdict, str):
         return verdict
@@ -83,8 +87,10 @@ def finish_ok(row: dict[str, Any]) -> bool:
         return True
     if normalized in {"failed", "cancelled", "canceled", "superseded"}:
         return False
-    # Unknown reasons: treat as ok when audioQC passed (lang bench is hint-focused).
-    return True
+    # An unknown terminal reason is not a completed generation until the
+    # vocabulary above learns it; guessing here would let a new failure mode
+    # pass the hint gate silently.
+    return False
 
 
 def read_engine_rows(diag: str, run_id: str) -> list[dict[str, Any]]:
@@ -300,6 +306,14 @@ def main() -> int:
                 failures.append(
                     f"{cell_id}: finishReason={row.get('finishReason')!r}"
                 )
+            # The macOS lane seeds every cell with the same stable per-cell seed
+            # the iOS plan uses and samples expressively; a row without that
+            # identity is not a reproducible benchmark take.
+            expected_seed = stable_default_seed(cell)
+            if seed_value(notes.get("samplingSeed")) != expected_seed:
+                failures.append(f"{cell_id}: engine samplingSeed {notes.get('samplingSeed')!r} != stable seed {expected_seed}")
+            if notes.get("samplingVariation") != "expressive":
+                failures.append(f"{cell_id}: engine samplingVariation {notes.get('samplingVariation')!r} != expressive")
             verdict = qc_verdict(row)
             if verdict.startswith("fail"):
                 failures.append(f"{cell_id}: audioQC {verdict}")

@@ -38,6 +38,8 @@ public enum GenerationQualityMeasurementKey: String, Codable, Hashable, Sendable
     case dropoutMilliseconds = "dropout_milliseconds"
     case continuityFailureCount = "continuity_failure_count"
     case underrunCount = "underrun_count"
+    case chunkCount = "chunk_count"
+    case channelHighWaterFrames = "channel_high_water_frames"
     case wordErrorRate = "word_error_rate"
     case consensusPassCount = "consensus_pass_count"
     case medianPitchSemitones = "median_pitch_semitones"

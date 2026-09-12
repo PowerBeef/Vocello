@@ -111,7 +111,10 @@ final class AtomicWAVGenerationOutputSink: VocelloQwen3ProductOutputSink, Sendab
             let report = try StreamingExecutionContext.makePersistedWAVAudioQCReport(
                 at: stagingURL,
                 preWriteMetrics: scratch.limiterMetrics,
-                expectedPauseCount: expectedPauseCount
+                expectedPauseCount: expectedPauseCount,
+                expectedSampleRate: sampleRate,
+                expectedChannelCount: 1,
+                expectedFrameCount: frameCount
             )
             guard report.verdict != .fail else {
                 writer.discard()

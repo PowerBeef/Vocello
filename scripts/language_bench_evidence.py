@@ -304,6 +304,7 @@ def build_plan(
                 ),
                 "promptEquivalenceGroup": cell.get("promptEquivalenceGroup"),
                 "skipOutputVerification": bool(cell.get("skipOutputVerification")),
+                "expectedOutcome": cell.get("expectedOutcome", "pass"),
             }
         )
 

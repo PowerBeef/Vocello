@@ -1931,6 +1931,7 @@ def load_language_plan(
             or take.get("expectedHint") != cell.get("expectedHint")
             or bool(take.get("skipOutputVerification"))
             != bool(cell.get("skipOutputVerification"))
+            or take.get("expectedOutcome", "pass") != cell.get("expectedOutcome", "pass")
             or take.get("promptEquivalenceGroup") != cell.get("promptEquivalenceGroup")
         ):
             raise PublicationError(f"language cell {cell['id']} plan identity does not match the matrix")
@@ -2149,9 +2150,10 @@ def sanitized_asr_evidence(
     boolean_fields = {
         key: verification.get(key) for key in ("languagePass", "accuracyPass", "pass")
     }
+    expect_failure = cell.get("expectedOutcome") == "fail"
     if (
         language_score is None or not 0.0 <= language_score <= 1.0
-        or language_score < LANGUAGE_PASS_SCORE
+        or (language_score < LANGUAGE_PASS_SCORE and not expect_failure)
         or word_error_rate is None or word_error_rate < 0.0
         or character_error_rate is None or character_error_rate < 0.0
         or count_fields["referenceTokenCount"] <= 0
@@ -2160,7 +2162,18 @@ def sanitized_asr_evidence(
         raise PublicationError(f"language cell {cell_id} has non-finite ASR scores")
     if any(not isinstance(value, bool) for value in boolean_fields.values()):
         raise PublicationError(f"language cell {cell_id} has malformed ASR verdicts")
-    if verification.get("skipReason") is not None or not all(boolean_fields.values()):
+    if verification.get("skipReason") is not None:
+        raise PublicationError(
+            f"language cell {cell_id} failed output verification (skipped: {verification.get('skipReason')})"
+        )
+    if expect_failure:
+        # Negative control: the English-locked verification of a French take
+        # must have run and failed; a pass would mean the control is blind.
+        if boolean_fields["pass"] is not False or (
+            boolean_fields["languagePass"] is not False and boolean_fields["accuracyPass"] is not False
+        ):
+            raise PublicationError(f"language cell {cell_id} negative control did not fail verification")
+    elif not all(boolean_fields.values()):
         raise PublicationError(f"language cell {cell_id} failed output verification")
     edit_count = sum(count_fields[key] for key in ("substitutions", "insertions", "deletions"))
     if not math.isclose(
@@ -2296,7 +2309,7 @@ def sanitized_asr_evidence(
         or accuracy_value is None
         or not math.isclose(accuracy_value, primary_score, rel_tol=1e-9, abs_tol=1e-12)
         or verification.get("accuracyPass") != (primary_score <= expected_threshold)
-        or primary_score > expected_threshold
+        or (primary_score > expected_threshold and not expect_failure)
     ):
         raise PublicationError(f"language cell {cell_id} has an invalid primary accuracy gate")
     return {
@@ -2553,8 +2566,8 @@ def language_command(args: argparse.Namespace) -> Path:
                 "wordErrorRate": evidence["wordErrorRate"],
                 "characterErrorRate": evidence["characterErrorRate"],
                 "languageMatchScore": evidence["languageMatchScore"],
-                "outputLanguagePass": 1.0,
-                "outputAccuracyPass": 1.0,
+                "outputLanguagePass": 1.0 if evidence.get("languagePass", True) else 0.0,
+                "outputAccuracyPass": 1.0 if evidence.get("accuracyPass", True) else 0.0,
                 "referenceTokenCount": float(evidence["referenceTokenCount"]),
                 "hypothesisTokenCount": float(evidence["hypothesisTokenCount"]),
                 "referenceCharacterCount": float(evidence["referenceCharacterCount"]),
@@ -2570,13 +2583,19 @@ def language_command(args: argparse.Namespace) -> Path:
                 "primaryAccuracyScore": evidence["primaryAccuracyScore"],
                 "accuracyThreshold": evidence["accuracyThreshold"],
             })
-    for take in takes:
-        take["metrics"]["hintCellsPassed"] = float(len(cells))
-        take["metrics"]["hintCellsExpected"] = float(len(cells))
-        if output_verified:
-            expected_output = sum(not bool(cell.get("skipOutputVerification")) for cell in cells)
-            take["metrics"]["outputCellsPassed"] = float(expected_output)
-            take["metrics"]["outputCellsExpected"] = float(expected_output)
+    # Run-level counts live once in evidence.languageVerification (see
+    # record_shell below); per-take metrics carry only that take's verdicts.
+    output_cells = [cell for cell in cells if not cell.get("skipOutputVerification")]
+    language_verification_counts = {
+        "hintCellsPassed": len(cells),
+        "hintCellsExpected": len(cells),
+        "outputCellsPassed": len(output_cells) if output_verified else 0,
+        "outputCellsExpected": len(output_cells) if output_verified else 0,
+        "negativeControlsConfirmed": (
+            sum(1 for cell in output_cells if cell.get("expectedOutcome") == "fail")
+            if output_verified else 0
+        ),
+    }
     # Language benchmarks are generation benchmarks, not metadata-only checks.
     # New schema-v2 publication therefore binds the same exact schema-v8 raw
     # memory sidecars as UI and engine lanes. iOS is a single process, so its
@@ -2684,15 +2703,18 @@ def language_command(args: argparse.Namespace) -> Path:
         classification=("exploratory" if uses_forced_memory_profile(selected) else None),
         memory_evidence=compact_memory_evidence(memory_run),
     )
+    language_verification: dict[str, Any] = dict(language_verification_counts)
     if asr_evidence:
-        manifest["historyRecord"]["evidence"]["languageVerification"] = {
+        language_verification.update({
             "outputSchemaVersion": LANGUAGE_OUTPUT_SCHEMA,
             "outputAlgorithm": LANGUAGE_OUTPUT_ALGORITHM,
             "recognitionSchemaVersion": ASR_EVIDENCE_SCHEMA,
             "recognitionAlgorithm": ASR_EVIDENCE_ALGORITHM,
             "accuracyMetricVersion": LANGUAGE_ACCURACY_METRIC_VERSION,
             "requiredPassCount": ASR_REQUIRED_PASS_COUNT,
-        }
+            "families": ["apple-speech"],
+        })
+    manifest["historyRecord"]["evidence"]["languageVerification"] = language_verification
     return write_and_record(
         args.artifact_dir, manifest,
         defer_record=bool(getattr(args, "defer_record", False)),

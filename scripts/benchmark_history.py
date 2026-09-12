@@ -194,6 +194,14 @@ TRACE_SUMMARY_KEYS = {
 LANGUAGE_VERIFICATION_KEYS = {
     "outputSchemaVersion", "outputAlgorithm", "recognitionSchemaVersion",
     "recognitionAlgorithm", "accuracyMetricVersion", "requiredPassCount",
+    # Run-level counts (records since 2026-09-12); older records carried these
+    # as identical constants on every take's metrics.
+    "hintCellsPassed", "hintCellsExpected", "outputCellsPassed", "outputCellsExpected",
+    "negativeControlsConfirmed", "families",
+}
+LANGUAGE_VERIFICATION_IDENTITY_KEYS = {
+    "outputSchemaVersion", "outputAlgorithm", "recognitionSchemaVersion",
+    "recognitionAlgorithm", "accuracyMetricVersion", "requiredPassCount",
 }
 LANGUAGE_ACCURACY_METRIC_KEYS = {
     "wordErrorRate", "characterErrorRate", "primaryAccuracyScore", "accuracyThreshold",
@@ -2445,7 +2453,9 @@ def validate_record(
         "requiredPassCount": 3,
     }
     if accuracy_evidence_required and (
-        run["kind"] != "language" or language_verification != expected_language_verification
+        run["kind"] != "language" or language_verification is None
+        or {key: language_verification.get(key) for key in LANGUAGE_VERIFICATION_IDENTITY_KEYS}
+        != expected_language_verification
     ):
         raise HistoryError("language accuracy takes require exact verifier provenance")
     if language_verification is not None and run["kind"] != "language":

@@ -68,8 +68,8 @@
       "scriptLang": "french",
       "expectedHint": "english",
       "quick": true,
-      "skipOutputVerification": true,
-      "note": "negative control — hint gate only; pinned English vs French script (output still French today)"
+      "expectedOutcome": "fail",
+      "note": "negative control: a pinned English hint over a French script must fail output verification (the model still speaks French); the cell passes only when the English-locked verification ran and failed"
     },
     {
       "id": "custom-de-pinned",

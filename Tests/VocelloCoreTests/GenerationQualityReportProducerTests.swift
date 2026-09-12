@@ -31,7 +31,8 @@ final class GenerationQualityReportProducerTests: XCTestCase {
         qc: AudioQCReport?,
         hitTokenCap: Bool = false,
         usedStreaming: Bool = true,
-        chunkCount: Int = 9
+        chunkCount: Int = 9,
+        audioChannel: AudioChannelSummaryV9? = nil
     ) -> GenerationQualityReport {
         GenerationQualityReportProducer.fastReport(
             generationID: UUID(),
@@ -41,8 +42,40 @@ final class GenerationQualityReportProducerTests: XCTestCase {
             wavDigest: String(repeating: "a", count: 64),
             usedStreaming: usedStreaming,
             chunkCount: chunkCount,
-            audioChannel: nil
+            audioChannel: audioChannel
         )
+    }
+
+    func testStreamingContinuityGateJudgesTheChannelItWasHanded() throws {
+        func channel(highWater: UInt64, wakeups: Int) -> AudioChannelSummaryV9 {
+            AudioChannelSummaryV9(
+                capacityFrames: 48_000, highWaterFrames: highWater,
+                producerSuspensionNS: 0, producerSuspensionCount: 0,
+                cancellationWakeups: wakeups
+            )
+        }
+        func continuity(_ report: GenerationQualityReport) -> GenerationQualityGateResult {
+            report.results.first { $0.gate == .streamingContinuity }!
+        }
+        // A healthy streamed take: within capacity, no cancellation wakeups.
+        let healthy = continuity(makeReport(qc: makeQC(verdict: .pass), audioChannel: channel(highWater: 12_000, wakeups: 0)))
+        XCTAssertEqual(healthy.outcome, .pass)
+        XCTAssertEqual(healthy.measurements.first { $0.key == .continuityFailureCount }?.value, 0)
+        XCTAssertEqual(healthy.measurements.first { $0.key == .channelHighWaterFrames }?.value, 12_000)
+        // No summary (telemetry off) is not evidence against the take.
+        XCTAssertEqual(continuity(makeReport(qc: makeQC(verdict: .pass))).outcome, .pass)
+        // A streamed take that delivered no chunk cannot be continuous.
+        XCTAssertEqual(continuity(makeReport(qc: makeQC(verdict: .pass), chunkCount: 0)).outcome, .fail)
+        // A producer woken by cancellation, or a channel past its capacity, fails.
+        XCTAssertEqual(continuity(makeReport(qc: makeQC(verdict: .pass), audioChannel: channel(highWater: 100, wakeups: 1))).outcome, .fail)
+        let overflow = continuity(makeReport(qc: makeQC(verdict: .pass), audioChannel: channel(highWater: 60_000, wakeups: 0)))
+        XCTAssertEqual(overflow.outcome, .fail)
+        XCTAssertEqual(overflow.measurements.first { $0.key == .continuityFailureCount }?.value, 1)
+        // The registry now fails closed on that evidence.
+        let verdict = try QualityGateRegistry.evaluate(
+            makeReport(qc: makeQC(verdict: .pass), audioChannel: channel(highWater: 100, wakeups: 1))
+        )
+        XCTAssertEqual(verdict.outcome, .fail)
     }
 
     private func makeDeepReport(

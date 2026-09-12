@@ -730,14 +730,11 @@ cmd_memory() {
   # after the marking interval may exceed the take's pre-marking peak, and
   # the marking boundaries must be present (marking actually ran). Fail
   # closed before the record may publish.
-  local equality_policy="$ROOT_DIR/config/marking-peak-equality.json"
-  if [[ -f "$equality_policy" ]]; then
-    python3 "$SCRIPT_DIR/check_marking_peak_equality.py" \
-      "$artifacts/benchmark-evidence.json" \
-      --tolerance-percent "$(python3 -c "import json;print(json.load(open('$equality_policy')).get('tolerancePercent',5.0))")" \
-      --tolerance-mb "$(python3 -c "import json;print(json.load(open('$equality_policy')).get('toleranceMB',48.0))")" \
-      || die "marking peak-equality assertion failed; the qualification record was not published"
-  fi
+  # The policy file owns the tolerances; the checker reads it itself and a
+  # missing policy is a failure, never a skipped gate.
+  python3 "$SCRIPT_DIR/check_marking_peak_equality.py" \
+    "$artifacts/benchmark-evidence.json" \
+    || die "marking peak-equality assertion failed; the qualification record was not published"
   record_benchmark_history "$artifacts" >/dev/null \
     || die "memory qualification history publication failed"
   note "memory qualification PASS · $artifacts"
@@ -944,15 +941,26 @@ PY
   while IFS= read -r cell_json; do
     [[ -n "$cell_json" ]] || continue
     cell_count=$((cell_count + 1))
-    local cell_id mode variant ui_hint text
-    cell_id="$(CELL="$cell_json" python3 -c 'import json,os; print(json.loads(os.environ["CELL"])["id"])')"
-    mode="$(CELL="$cell_json" python3 -c 'import json,os; print(json.loads(os.environ["CELL"])["mode"])')"
-    variant="$(CELL="$cell_json" python3 -c 'import json,os; print(json.loads(os.environ["CELL"]).get("variant","speed"))')"
-    ui_hint="$(CELL="$cell_json" python3 -c 'import json,os; print(json.loads(os.environ["CELL"]).get("uiHint","auto"))')"
-    text="$(CELL="$cell_json" python3 -c 'import json,os; print(json.loads(os.environ["CELL"])["script"], end="")')"
+    local cell_id mode variant ui_hint text seed
+    # One interpreter per cell: the fields arrive unit-separated on one line
+    # (scripts are single lines). The seed is the same stable per-cell seed the
+    # iOS plan uses, so a macOS take is reproducible and comparable.
+    IFS=$'\x1f' read -r cell_id mode variant ui_hint seed text < <(
+      ROOT_DIR="$ROOT_DIR" CELL="$cell_json" python3 - <<'PY'
+import json, os, sys
+sys.path.insert(0, os.path.join(os.environ["ROOT_DIR"], "scripts"))
+from language_bench_evidence import stable_default_seed
+cell = json.loads(os.environ["CELL"])
+print("\x1f".join([
+    cell["id"], cell["mode"], cell.get("variant", "speed"), cell.get("uiHint", "auto"),
+    str(stable_default_seed(cell)), cell["script"],
+]))
+PY
+    )
     export QVOICE_MAC_BENCH_CELL="$cell_id"
     local -a generate_command=(
       "$QVOICE_BUILD_ROOT/vocello" generate --mode "$mode" --variant "$variant"
+      --seed "$seed" --variation expressive
     )
     if [[ "$mode" == "design" ]]; then
       generate_command+=(--voice-brief "$voice_brief")

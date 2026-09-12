@@ -681,9 +681,9 @@ def main():
         help="'cell' keeps intensity distinct (default); 'preset' pools intensities",
     )
     parser.add_argument(
-        "--null-iters", type=int, default=0, metavar="N",
-        help="label-permutation null iterations (0 = off; 200 gives a stable "
-             "band and p-value at ~seconds of cost)",
+        "--null-iters", type=int, default=1000, metavar="N",
+        help="label-permutation null iterations (default 1000, the confirmatory "
+             "norm; 0 switches the null off and is refused for confirmatory runs)",
     )
     parser.add_argument(
         "--designation", choices=("exploratory", "confirmatory"), default="exploratory",
@@ -700,6 +700,11 @@ def main():
     parser.add_argument("--json", action="store_true", help="emit the verdict as JSON")
     arguments = parser.parse_args()
 
+    if arguments.designation == "confirmatory" and arguments.null_iters < 1000:
+        parser.error("a confirmatory run needs --null-iters of at least 1000; "
+                     "a verdict without its permutation null is exploratory at best")
+    if arguments.null_iters < 0:
+        parser.error("--null-iters must be non-negative")
     profile = load_profile(arguments.profile) if arguments.profile else builtin_profile()
     with open(arguments.sidecar or arguments.records, "r", encoding="utf-8") as handle:
         payload = json.load(handle)

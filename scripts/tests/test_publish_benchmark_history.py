@@ -293,7 +293,7 @@ def language_sentinel(
 
 def independent_recognition(*, audio_sha256: str, script: str, transcript: str | None = None,
                             language: str = "french", detected: str | None = None,
-                            duration: float = 2.0) -> dict:
+                            duration: float = 2.0, provenance: dict | None = None) -> dict:
     """One whisper-family recognition as `scripts/independent_asr.py` emits it."""
     return {
         "schemaVersion": 1,
@@ -314,7 +314,7 @@ def independent_recognition(*, audio_sha256: str, script: str, transcript: str |
         "lastSegmentEndSeconds": duration,
         "recognitionDurationSeconds": 0.4,
         "transcript": script if transcript is None else transcript,
-        "provenance": {
+        "provenance": provenance or {
             "runtimeSHA256": "1" * 64, "modelIdentitySHA256": "2" * 64, "configSHA256": "3" * 64,
         },
     }
@@ -1443,6 +1443,77 @@ class PublisherTests(unittest.TestCase):
             successful_asr_verification()["transcript"],
             json.dumps(manifest, sort_keys=True),
         )
+
+    def _publish_two_language_cells(self, *, english_provenance: dict) -> dict:
+        matrix = self.root / "matrix.json"
+        corpus = self.root / "corpus.json"
+        matrix.write_text(json.dumps({"cells": [
+            {"id": "fr", "quick": True, "expectedHint": "french", "scriptLang": "french"},
+            {"id": "en", "quick": True, "expectedHint": "english", "scriptLang": "english"},
+        ]}))
+        french = "un deux trois quatre cinq six sept huit"
+        english = "one two three four five six seven eight"
+        corpus.write_text(json.dumps({"languages": [
+            {"id": "french", "script": french}, {"id": "english", "script": english},
+        ]}))
+        rows = []
+        cells = {}
+        for cell_id, digest, language, script, provenance in (
+            ("fr", "a" * 64, "french", french, None),
+            ("en", "b" * 64, "english", english, english_provenance),
+        ):
+            row = engine_row(f"{cell_id}-id", run_id="lang-run", cell=cell_id)
+            row["notes"]["languageHint"] = language
+            row["notes"]["samplingWAVDigest"] = digest
+            rows.append(row)
+            cells[cell_id] = {
+                "generationID": f"{cell_id}-id", "audioSHA256": digest, "expectedLanguage": language,
+                "expectedOutcome": "pass",
+                "recognitions": [independent_recognition(
+                    audio_sha256=digest, script=script, language=language, provenance=provenance,
+                )],
+            }
+        recognitions = independent_evidence(
+            self.root / "independent-asr.json", run_id="lang-run", platform="macos", cells=cells,
+        )
+        args = SimpleNamespace(
+            matrix=matrix, corpus=corpus, subset="quick", diagnostics=self.root,
+            run_id="lang-run", output_gate="independent", recognitions=recognitions, platform="macos",
+            started_at="2026-09-12T12:00:00Z", finished_at="2026-09-12T12:01:00Z",
+            label="fixture", artifact_dir=self.root, snapshot=self.root / "snapshot.json",
+        )
+        captured, write_patch = self.capture_manifest()
+        patches = (
+            mock.patch.object(publisher, "load_engine_rows", return_value=rows),
+            mock.patch.object(publisher, "qualify_memory_rows",
+                              return_value=qualified_memory_fixture(["fr-id", "en-id"])),
+            mock.patch.object(publisher, "source_from_snapshot", return_value=source_fixture()),
+            mock.patch.object(publisher, "crash_delta_from_snapshot", return_value={"passed": True, "count": 0}),
+            self.hardware_patch(),
+            write_patch,
+        )
+        with contextlib.ExitStack() as stack:
+            for item in patches:
+                stack.enter_context(item)
+            publisher.language_command(args)
+        return captured["manifest"]["historyRecord"]
+
+    def test_cells_of_different_languages_share_one_recognizer_identity(self) -> None:
+        # The producer locks the decode language per row, so configSHA256 differs
+        # between a French and an English cell while the runtime and model do not.
+        record = self._publish_two_language_cells(english_provenance={
+            "runtimeSHA256": "1" * 64, "modelIdentitySHA256": "2" * 64, "configSHA256": "4" * 64,
+        })
+        verification = record["evidence"]["languageVerification"]
+        self.assertEqual(verification["independentModelIdentitySHA256"], "2" * 64)
+        self.assertEqual(verification["outputCellsPassed"], 2)
+
+    def test_two_recognizer_models_in_one_run_refuse_publication(self) -> None:
+        with self.assertRaises(publisher.PublicationError) as raised:
+            self._publish_two_language_cells(english_provenance={
+                "runtimeSHA256": "1" * 64, "modelIdentitySHA256": "9" * 64, "configSHA256": "3" * 64,
+            })
+        self.assertIn("more than one recognizer identity", str(raised.exception))
 
     def test_macos_language_publishes_a_single_whisper_witness_as_focused(self) -> None:
         matrix = self.root / "matrix.json"

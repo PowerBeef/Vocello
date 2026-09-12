@@ -2555,9 +2555,15 @@ def language_command(args: argparse.Namespace) -> Path:
                 expected_audio_sha256=expected_digest, duration_seconds=duration,
                 apple_evidence=apple_by_cell.get(cell_id),
             )
+            # One recognizer for the whole run: the runtime and model digests must
+            # agree across cells. `configSHA256` is per row by design (it binds the
+            # locked decode language), so cells of different languages differ there.
+            recognizer_identity = {
+                key: evidence["provenance"][key] for key in ("runtimeSHA256", "modelIdentitySHA256")
+            }
             if independent_provenance is None:
-                independent_provenance = evidence["provenance"]
-            elif independent_provenance != evidence["provenance"]:
+                independent_provenance = recognizer_identity
+            elif independent_provenance != recognizer_identity:
                 raise PublicationError("independent recognitions come from more than one recognizer identity")
             independent_evidence.append(evidence)
             take.setdefault("accuracyMetric", evidence["accuracyMetric"])

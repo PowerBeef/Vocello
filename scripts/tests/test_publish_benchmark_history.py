@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import contextlib
+import hashlib
 import json
 from pathlib import Path
 import plistlib
@@ -367,13 +369,23 @@ class PublisherTests(unittest.TestCase):
         return captured, mock.patch.object(publisher, "write_and_record", side_effect=fake_write)
 
     def hardware_patch(self):
-        return mock.patch.object(
+        """Live-host evidence the fixtures cannot supply: canonical hardware and
+        the hash-bound build receipts that prove the optimization label."""
+        stack = contextlib.ExitStack()
+        stack.enter_context(mock.patch.object(
             publisher,
             "verify_canonical_hardware",
             side_effect=lambda platform, **_kwargs: {
                 "profileID": "mac-mini-m2-8gb" if platform == "macos" else "iphone-17-pro"
             },
-        )
+        ))
+        stack.enter_context(mock.patch.object(
+            publisher, "validated_ios_app_optimization", return_value="-O",
+        ))
+        stack.enter_context(mock.patch.object(
+            publisher, "validated_macos_cli_optimization", return_value="-O",
+        ))
+        return stack
 
     def make_wave(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -432,6 +444,7 @@ class PublisherTests(unittest.TestCase):
             "telemetryMode": "verbose",
             "seed": 42,
             "streaming": True,
+            "executableSHA256": "a" * 64,
             "fixtureDigests": {},
             "takes": [{
                 "takeIndex": 1,
@@ -493,6 +506,63 @@ class PublisherTests(unittest.TestCase):
         )
         self.assertEqual(record["toolchain"]["optimization"], "-O")
         self.assertEqual(record["evidence"]["actualTakeCount"], 1)
+
+    def test_engine_matrix_scope_is_canonical_only_for_the_full_speed_matrix(self) -> None:
+        def take(cell: str, delivery: str | None = None) -> dict:
+            return {"cell": cell, "delivery": delivery}
+
+        full = []
+        for mode in ("custom", "design", "clone"):
+            if mode != "clone":
+                full.append(take(f"{mode}/speed/medium/cold#0"))
+            for length in ("short", "medium", "long"):
+                for repetition in range(3):
+                    full.append(take(f"{mode}/speed/{length}/warm#{repetition}"))
+        self.assertEqual(len(full), 29)
+        self.assertEqual(publisher.canonical_engine_matrix_scope(full), "canonical")
+        self.assertEqual(publisher.canonical_engine_matrix_scope(full[:-1]), "focused")
+        self.assertEqual(publisher.canonical_engine_matrix_scope([take("custom/speed/medium/warm#0")]), "focused")
+        with_delivery = [dict(item) for item in full]
+        with_delivery[3]["delivery"] = "happy.strong"
+        self.assertEqual(publisher.canonical_engine_matrix_scope(with_delivery), "focused")
+
+    def test_macos_cli_optimization_binds_the_executed_digest(self) -> None:
+        binary = self.root / "vocello"
+        self.write_cli_provenance(binary)
+        recorded = json.loads(binary.with_name("vocello.provenance.json").read_text())["executableSHA256"]
+        with mock.patch.object(publisher, "ROOT", self.root):
+            self.assertEqual(
+                publisher.validated_macos_cli_optimization(binary, executed_sha256=recorded), "-O",
+            )
+            with self.assertRaisesRegex(publisher.PublicationError, "executedSHA256"):
+                publisher.validated_macos_cli_optimization(binary, executed_sha256="0" * 64)
+
+    def test_ios_app_optimization_requires_a_receipt_for_the_installed_binary(self) -> None:
+        executable = self.root / "Vocello.app" / "Vocello"
+        executable.parent.mkdir()
+        executable.write_bytes(b"ios app")
+        receipt = self.root / "last-build.json"
+        payload = {
+            "schemaVersion": 1, "producer": "scripts/ios_device.sh build --optimized",
+            "status": "passed", "platform": "ios", "optimization": "O",
+            "executableRelativePath": str(executable.relative_to(self.root)),
+            "executableSHA256": hashlib.sha256(b"ios app").hexdigest(),
+        }
+        receipt.write_text(json.dumps(payload))
+        original = publisher.load_build_provenance
+        rooted = lambda path, **kw: original(path, root=self.root, **kw)  # noqa: E731
+        with mock.patch.object(publisher, "load_build_provenance", side_effect=rooted):
+            self.assertEqual(publisher.validated_ios_app_optimization(receipt, executable), "-O")
+            payload["producer"] = "scripts/ui_test.sh ios benchmark"
+            receipt.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(publisher.PublicationError, "unproven"):
+                publisher.validated_ios_app_optimization(receipt, executable)
+            payload["producer"] = "scripts/ios_device.sh build"
+            receipt.write_text(json.dumps(payload))
+            other = self.root / "other"
+            other.write_bytes(b"x")
+            with self.assertRaisesRegex(publisher.PublicationError, "different executable"):
+                publisher.validated_ios_app_optimization(receipt, other)
 
     def test_engine_take_refuses_a_row_without_a_measurable_request_span(self) -> None:
         row = engine_row("no-wall")

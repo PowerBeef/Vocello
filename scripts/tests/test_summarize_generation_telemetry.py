@@ -501,39 +501,6 @@ def test_mad_filters_non_numeric():
     assert sgt.mad([1, 2, "x", 3, 4]) == 1.0
 
 
-def test_reject_outliers():
-    vals = [1.0, 2.0, 3.0, 4.0, 5.0, 100.0]
-    filtered = sgt.reject_outliers(vals)
-    assert 100.0 not in filtered
-    assert filtered == [1.0, 2.0, 3.0, 4.0, 5.0]
-
-
-def test_reject_outliers_custom_factor():
-    vals = [1.0, 2.0, 3.0, 4.0, 5.0, 100.0]
-    # A very wide factor keeps the extreme value inside the fence.
-    assert 100.0 in sgt.reject_outliers(vals, factor=100.0)
-
-
-def test_reject_outliers_too_few():
-    vals = [1.0, 2.0, 3.0]
-    assert sgt.reject_outliers(vals) == vals
-
-
-def test_reject_outliers_minimum_four():
-    # With exactly 4 samples the upper quartile includes the extreme value, so the
-    # Tukey fence engulfs it; the function should still run without error and return
-    # the sorted input unchanged.
-    vals = [1.0, 2.0, 3.0, 100.0]
-    assert sgt.reject_outliers(vals) == sorted(vals)
-
-
-def test_reject_outliers_zero_iqr():
-    vals = [5.0, 5.0, 5.0, 5.0, 5.0, 100.0]
-    filtered = sgt.reject_outliers(vals)
-    # Zero IQR collapses the fence to Q1 == Q3, so the non-equal value is rejected.
-    assert 100.0 not in filtered
-
-
 def test_show_variance_integration(monkeypatch):
     """Run the summarizer end-to-end with --show-variance and verify columns appear."""
     fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "telemetry_variants.jsonl")

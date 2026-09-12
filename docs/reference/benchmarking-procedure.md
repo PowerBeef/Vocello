@@ -498,9 +498,11 @@ python3 scripts/check_macos_xpc_bench.py ~/Library/Application\ Support/QwenVoic
 
 For the strict contract, use `scripts/ui_test.sh macos benchmark`. Internally it passes the exact
 `--modes`, `--lengths`, `--warm`, and `--label` values plus
-`--evidence-manifest <run-artifact-dir>/benchmark-evidence.json --crash-delta-passed`. Never add the
-crash-delta assertion to a manual command unless the caller actually captured and compared the
-pre/post crash snapshots.
+`--evidence-manifest <run-artifact-dir>/benchmark-evidence.json --crash-delta-passed
+--build-provenance <run-artifact-dir>/last-build.json`. The build receipt names the app executable
+and its digest, and the gate copies its optimization level into `toolchain.optimization` only after
+re-hashing that executable. Never add the crash-delta assertion to a manual command unless the
+caller actually captured and compared the pre/post crash snapshots.
 
 **One-time machine setup:** configure Xcode UI-test runner signing, build the native test host, and
 install the required models.
@@ -623,7 +625,7 @@ Useful flags:
 | `--show-variance` | IQR / outlier hints per cell |
 | `--merged` | Cross-layer first-chunk table from `generations-merged.jsonl` |
 | `--save-baseline PATH` | Write the current per-cell summary as a **JSON** baseline |
-| `--compare-baseline BASELINE.json` | Fail-closed regression/coverage comparison against a **JSON** baseline from `--save-baseline` (exit 2 on >5% regression, removed/added cells, missing required metrics, or QC worsening; RTF **drop**, tok/s drop, TTFC/physFoot rise). Markdown snapshots cannot be fed to this flag — diff those with `git diff`. |
+| `--compare-baseline BASELINE.json` | Fail-closed regression/coverage comparison against a **JSON** baseline from `--save-baseline`. Exit 2 on regression (RTF **rise**, tok/s drop, TTFC/physFoot rise beyond the threshold), removed/added cells, a missing sample count or required metric, or QC worsening; exit 3 (inconclusive) when the evidence shows a host load average above 2× the core count or a serious/critical thermal state. The RTF threshold is `max(--regress-threshold, 3 × baseline MAD ÷ median)` once the baseline cell has n ≥ 3, so a one-take baseline keeps the flat 5%. A baseline saved before 2026-09-12 stores the decode speedup under `rtf` and is compared with the current `decodeSpeedupX`; re-save it to compare standard RTF. Markdown snapshots cannot be fed to this flag — diff those with `git diff`. |
 | `--baseline-migrations PATH` | Use a reviewed schema-v1 old-cell → new-cell migration map. Defaults to `config/benchmark-baseline-migrations.json`; ambiguous mappings and empty reasons fail. |
 | `--run-id ID` | Reject rows from other benchmark runs. |
 | `--evidence-manifest PATH` | Select the manifest's exact ordered generations and cells. |
@@ -763,10 +765,14 @@ python3 scripts/summarize_generation_telemetry.py <diag-dir> \
 
 The committed **`benchmarks/baselines/mac-gate-bench.json`** (custom/speed/medium,
 cold+warm) is a schema-v2 baseline binding the hardware profile, `-O` optimization,
-matrix/corpus, model artifact, and evidence semantics. It is what
-`QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` compares against —
-the gate uses an isolated runtime directory, rejects rows outside its collision-resistant run ID,
-and freezes the exact ordered generation selection in `benchmark-evidence.json` before comparing.
+matrix/corpus, model artifact, evidence semantics and, since 2026-09-12, the host OS and Xcode
+versions and the RTF definition. It is what `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate`
+compares against — the gate runs three warm takes and compares medians, uses an isolated runtime
+directory, rejects rows outside its collision-resistant run ID, freezes the exact ordered generation
+selection in `benchmark-evidence.json` before comparing, and reports a loaded or throttled host as
+inconclusive rather than pass or fail. The committed baseline predates the cutover (one take, decode
+speedup, no host identity); the comparer says so on every run until it is re-saved from a
+three-take gate run.
 Markdown snapshots (`benchmarks/baseline-*.md`) remain the human-readable full-matrix references;
 diff them with `git diff`, not `--compare-baseline`.
 

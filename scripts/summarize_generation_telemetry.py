@@ -29,6 +29,7 @@ import argparse
 import datetime
 import json
 import os
+import platform as platform_module
 import re
 import statistics
 import subprocess
@@ -755,6 +756,7 @@ class CellAccumulator:
             "gpuWsRatioPeak": med(self.gpu_ws_ratio_peaks),
             "thermalWorst": _worst_thermal(self.thermal_worsts),
             "rtfIQR": iqr(self.rtfs),
+            "rtfMAD": mad(self.rtfs),
             "physFootIQR": iqr(self.phys_foot_mb),
             "trims": med(self.trims),
             "worstTrim": worst_trim,
@@ -1040,24 +1042,6 @@ def mad(values):
     return statistics.median(abs(x - median_value) for x in nums)
 
 
-def reject_outliers(values, factor=1.5):
-    """Return sorted values inside the Tukey fence (factor * IQR beyond Q1/Q3).
-
-    factor=1.5 is the conventional Tukey fence for outlier detection.
-    A minimum of 4 numeric samples is required before filtering; below that the
-    sorted input is returned unchanged because quartiles are unstable.
-    """
-    nums = sorted(v for v in values if isinstance(v, (int, float)))
-    if len(nums) < 4:
-        # Too few samples for a stable IQR-based filter.
-        return nums
-    q1, q3 = _quartiles(nums)
-    spread = q3 - q1
-    lo = q1 - factor * spread
-    hi = q3 + factor * spread
-    return [x for x in nums if lo <= x <= hi]
-
-
 def fmt(value, places=2):
     if value is None:
         return "-"
@@ -1102,6 +1086,7 @@ def build_summary(cells):
                 "lenBucket": lb,
                 "n": s["n"],
                 "rtf": s["rtf"],
+                "rtfMAD": s.get("rtfMAD"),
                 "decodeSpeedupX": s.get("decodeSpeedupX"),
                 "tokps": s["tokps"],
                 "ttfcMS": s["ttfcMS"],
@@ -1177,6 +1162,7 @@ def baseline_identity_from_evidence(payload):
         "platform": run.get("platform"),
         "matrixScope": run.get("matrixScope"),
         "hardwareProfile": hardware.get("profileID"),
+        **host_identity(),
         "optimization": optimization,
         "matrixHash": inputs.get("matrixHash"),
         "corpusHash": inputs.get("corpusHash"),
@@ -1198,6 +1184,59 @@ def baseline_identity_from_evidence(payload):
     if missing:
         raise ValueError("baseline identity is missing: " + ", ".join(sorted(missing)))
     return identity
+
+
+HOST_IDENTITY_KEYS = ("osVersion", "xcodeVersion")
+
+
+def host_identity():
+    """OS and Xcode versions of the machine doing the measuring.
+
+    A baseline captured on one OS/Xcode pair is not evidence about another; the
+    identity carries both so a toolchain update forces a fresh baseline."""
+    os_version = platform_module.mac_ver()[0] or "unknown"
+    try:
+        xcode = subprocess.run(
+            ["xcodebuild", "-version"], capture_output=True, text=True, check=False, timeout=30,
+        ).stdout.splitlines()
+    except (OSError, subprocess.SubprocessError):
+        xcode = []
+    xcode_version = xcode[0].removeprefix("Xcode ").strip() if xcode else "unknown"
+    return {"osVersion": os_version, "xcodeVersion": xcode_version}
+
+
+def host_load_verdict(evidence_payload, *, cpu_count=None):
+    """Reasons the host was too busy or too hot for a regression judgement.
+
+    Load average and thermal state are captured in every take's run
+    environment and folded into the evidence hardware block; a comparison
+    under heavy load or thermal throttling is inconclusive, not a regression."""
+    if not isinstance(evidence_payload, dict):
+        return []
+    hardware = ((evidence_payload.get("historyRecord") or {}).get("hardware")) or {}
+    reasons = []
+    cores = cpu_count or os.cpu_count() or 1
+    load = hardware.get("loadAverage1M")
+    if isinstance(load, (int, float)) and not isinstance(load, bool) and load > 2.0 * cores:
+        reasons.append(f"load average {load:.2f} exceeds 2x{cores} cores")
+    thermal = str(hardware.get("thermalState", "nominal")).lower()
+    if thermal in {"serious", "critical"}:
+        reasons.append(f"thermal state {thermal}")
+    return reasons
+
+
+def effective_threshold(base_cell, threshold):
+    """Widen the flat threshold to three median absolute deviations when the
+    baseline has at least three samples; one-take baselines keep the flat value."""
+    n = base_cell.get("n")
+    mad_value = base_cell.get("rtfMAD")
+    median = base_cell.get("rtf")
+    if (
+        isinstance(n, int) and n >= 3
+        and isinstance(mad_value, (int, float)) and isinstance(median, (int, float)) and median
+    ):
+        return max(threshold, 3.0 * float(mad_value) / abs(float(median)))
+    return threshold
 
 
 def baseline_document(cells, evidence_payload=None):
@@ -1246,9 +1285,20 @@ def baseline_cells(payload, *, current_identity=None, require_identity=False):
         raise ValueError("schema-v2 baseline has no identity")
     if current_identity is None:
         raise ValueError("schema-v2 baseline comparison requires current evidence identity")
-    if identity != current_identity:
+    comparable_current = dict(current_identity)
+    if not any(key in identity for key in HOST_IDENTITY_KEYS):
+        # Baseline saved before host identity was recorded: compare the rest and
+        # let the caller say so.
+        for key in HOST_IDENTITY_KEYS:
+            comparable_current.pop(key, None)
+    if identity != comparable_current:
         raise ValueError("baseline optimization/topology identity differs from current evidence")
     return cells
+
+
+def baseline_lacks_host_identity(payload):
+    identity = payload.get("identity") if isinstance(payload, dict) else None
+    return isinstance(identity, dict) and not any(key in identity for key in HOST_IDENTITY_KEYS)
 
 
 def compare_summaries(
@@ -1302,6 +1352,14 @@ def compare_summaries(
         base = baseline_by_key.get(key)
         if base is None:
             continue
+        # A cell without a sample count is not evidence on either side.
+        if any(not isinstance(cell.get("n"), int) or cell["n"] < 1 for cell in (base, cur)):
+            regressions.append({
+                "cellKey": key, "metric": "coverage.n",
+                "baseline": base.get("n"), "current": cur.get("n"),
+            })
+            continue
+        cell_threshold = effective_threshold(base, threshold)
         for metric, direction in [
             ("rtf", "down" if legacy_baseline else "up"),
             ("ttfcMS", "up"),
@@ -1323,9 +1381,10 @@ def compare_summaries(
                 )
                 continue
             delta = (c - b) / b
+            metric_threshold = cell_threshold if metric == "rtf" else threshold
             is_regression = (
-                (direction == "up" and delta > threshold)
-                or (direction == "down" and -delta > threshold)
+                (direction == "up" and delta > metric_threshold)
+                or (direction == "down" and -delta > metric_threshold)
             )
             if is_regression:
                 regressions.append(
@@ -1758,6 +1817,19 @@ def main():
             )
             migrations = load_baseline_migrations(args.baseline_migrations)
             current = build_summary(cells)
+            load_reasons = host_load_verdict(evidence_payload)
+            if load_reasons:
+                print(
+                    "\nINCONCLUSIVE: the host was not quiet during this run ("
+                    + "; ".join(load_reasons)
+                    + "); no regression verdict. Rerun on an idle, cool machine."
+                )
+                return 3
+            if baseline_lacks_host_identity(baseline_payload):
+                print(
+                    "\nnote: legacy baseline has no OS/Xcode identity; "
+                    "re-save it to bind the comparison to this toolchain."
+                )
             baseline_definition = baseline_rtf_definition(baseline_payload)
             if baseline_definition != rtf_semantics.STANDARD_RTF_DEFINITION:
                 print(

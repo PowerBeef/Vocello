@@ -16,6 +16,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from lib import rtf as rtf_semantics  # noqa: E402
+from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
 
 from benchmark_memory import (  # noqa: E402
     MemoryEvidenceError,
@@ -511,6 +512,8 @@ def build_manifest(
     service_rows: list[dict],
     app_rows: list[dict],
     merged_rows: list[dict],
+    *,
+    optimization: str,
 ) -> dict:
     memory_evidence, memory_run = qualify_memory_rows(
         rows=engine_rows,
@@ -674,7 +677,7 @@ def build_manifest(
             "rtfDefinition": rtf_semantics.STANDARD_RTF_DEFINITION,
         },
         "hardware": hardware,
-        "toolchain": {"optimization": "-O"},
+        "toolchain": {"optimization": optimization},
         "inputs": {"corpusHash": prompt_corpus_digest(engine_rows)},
         "evidence": {
             "validatorPassed": True,
@@ -785,6 +788,11 @@ def main() -> int:
     parser.add_argument("--label", default="")
     parser.add_argument("--evidence-manifest", type=Path, metavar="PATH")
     parser.add_argument(
+        "--build-provenance", type=Path, metavar="PATH",
+        help="last-build.json written by the lane's build step; binds toolchain.optimization "
+             "to the executable that ran (required with --evidence-manifest)",
+    )
+    parser.add_argument(
         "--crash-delta-passed",
         action="store_true",
         help="assert that the caller completed its pre/post crash-delta gate",
@@ -797,8 +805,17 @@ def main() -> int:
         parser.error("--evidence-manifest requires --run-id")
     if args.evidence_manifest and not args.crash_delta_passed:
         parser.error("--evidence-manifest requires --crash-delta-passed")
+    if args.evidence_manifest and not args.build_provenance:
+        parser.error("--evidence-manifest requires --build-provenance")
     if args.warm < 1:
         parser.error("--warm must be at least 1")
+    optimization = "unverified"
+    if args.build_provenance:
+        try:
+            optimization = load_build_provenance(args.build_provenance, platform="macos")["optimization"]
+        except ProvenanceError as error:
+            print(f"FAIL: build provenance: {error}")
+            return 1
     try:
         modes = parse_list(args.modes, DEFAULT_MODES)
         lengths = parse_list(args.lengths, DEFAULT_LENGTHS)
@@ -1002,6 +1019,7 @@ def main() -> int:
             service_rows,
             app_rows,
             merged_rows,
+            optimization=optimization,
         )
         write_json_atomic(args.evidence_manifest, manifest)
         print(f"evidence={args.evidence_manifest}")

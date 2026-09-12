@@ -441,7 +441,11 @@ and publishes a platform-`ios` `ui-perf` record — the macOS UI-7 twin
 ## Headless device diagnostics
 
 `bench`, `lang-bench`, `speech-assets`, `profile`, `memory`, and the deliberate crash diagnostic launch
-`IOSDeviceDiagnosticsRunner` through purpose-specific `QVOICE_IOS_*` environment contracts.
+`IOSDeviceDiagnosticsRunner` through purpose-specific `QVOICE_IOS_*` environment contracts. `bench`
+builds the app with `build --optimized` (`-O`, the shipped topology); every build writes a receipt
+naming the app executable and its digest, and publication binds `toolchain.optimization` to that
+receipt instead of a literal. While a headless take runs, the host copies only the run's completion
+sentinel from the device every ten seconds and pulls the full diagnostics tree once it appears.
 Generation lanes write `device-diagnostics-done.json`; `speech-assets` writes its distinct
 `speech-assets-done.json` completion barrier. The runner never drives or inspects the app UI. Clone
 diagnostics require the exact prepared voice ID, and `--memory-profile` can apply a

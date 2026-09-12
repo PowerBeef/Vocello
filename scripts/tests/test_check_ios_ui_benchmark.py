@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import shlex
@@ -20,6 +21,25 @@ from test_benchmark_memory import ENGINE_BOUNDARIES, row as memory_row, samples 
 CHECK = ROOT / "scripts" / "check_ios_ui_benchmark.py"
 RUNNER = ROOT / "scripts" / "ui_test.sh"
 RUN_ID = "ios-ui-order-fixture"
+
+
+def write_provenance_fixture(directory: Path, *, optimization: str = "O") -> Path:
+    """A build receipt bound to a real tracked file, exactly as write_build_provenance emits it."""
+    executable = ROOT / "scripts" / "dev.sh"
+    payload = {
+        "schemaVersion": 1,
+        "producer": "scripts/ui_test.sh ios benchmark",
+        "status": "passed",
+        "platform": "ios",
+        "scheme": "fixture",
+        "configuration": "Release",
+        "optimization": optimization,
+        "executableRelativePath": "scripts/dev.sh",
+        "executableSHA256": hashlib.sha256(executable.read_bytes()).hexdigest(),
+    }
+    path = directory / "last-build.json"
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    return path
 
 
 def make_row(index: int, mode: str, length: str, warm_state: str) -> dict:
@@ -210,6 +230,8 @@ class CheckIOSUIBenchmarkTests(unittest.TestCase):
                     "--evidence-manifest",
                     str(manifest_path),
                     "--crash-delta-passed",
+                    "--build-provenance",
+                    str(write_provenance_fixture(diagnostics)),
                     "--label",
                     "fixture",
                 ])

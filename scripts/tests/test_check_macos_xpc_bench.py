@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -18,6 +19,25 @@ if str(TEST_HELPERS) not in sys.path:
 from test_benchmark_memory import ENGINE_BOUNDARIES, row as memory_row, samples as memory_samples
 CHECK = ROOT / "scripts" / "check_macos_xpc_bench.py"
 RUN_ID = "mac-ui-order-fixture"
+
+
+def write_provenance_fixture(directory: Path, *, optimization: str = "O") -> Path:
+    """A build receipt bound to a real tracked file, exactly as write_build_provenance emits it."""
+    executable = ROOT / "scripts" / "dev.sh"
+    payload = {
+        "schemaVersion": 1,
+        "producer": "scripts/ui_test.sh macos benchmark",
+        "status": "passed",
+        "platform": "macos",
+        "scheme": "fixture",
+        "configuration": "Release",
+        "optimization": optimization,
+        "executableRelativePath": "scripts/dev.sh",
+        "executableSHA256": hashlib.sha256(executable.read_bytes()).hexdigest(),
+    }
+    path = directory / "last-build.json"
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    return path
 
 
 def make_engine_row(index: int, cell: str) -> dict:
@@ -255,6 +275,8 @@ class CheckMacOSXPCBenchmarkTests(unittest.TestCase):
                     "--evidence-manifest",
                     str(manifest_path),
                     "--crash-delta-passed",
+                    "--build-provenance",
+                    str(write_provenance_fixture(diagnostics)),
                     "--label",
                     "fixture",
                 ])

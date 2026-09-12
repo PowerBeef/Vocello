@@ -1179,7 +1179,7 @@ run_gate_bench() {
   local artifacts="$gate_dir/engine-benchmark"
   local runtime="$artifacts/runtime"
   local run_diag="$runtime/diagnostics"
-  note "gate bench: custom/speed/medium warm×1 (engine in-process)"
+  note "gate bench: custom/speed/medium warm×3, median compared (engine in-process)"
   "$ROOT_DIR/scripts/build.sh" cli-optimized >>"$log" 2>&1 || return 1
   require_mac_benchmark_models pro_custom_speed >>"$log" 2>&1 || return 1
   mkdir -p "$runtime"
@@ -1187,7 +1187,7 @@ run_gate_bench() {
   capture_benchmark_source "$artifacts"
 
   QWENVOICE_DEBUG=1 "$QVOICE_BUILD_ROOT/vocello" bench --modes custom --variants speed \
-    --lengths medium --warm 1 --run-id "$run_id" --label "mac-gate-bench" \
+    --lengths medium --warm 3 --run-id "$run_id" --label "mac-gate-bench" \
     --data-dir "$runtime" --force --no-summary >>"$log" 2>&1 || return 1
   [[ -s "$run_diag/engine/generations.jsonl" ]] \
     || { echo "gate bench: bench produced no run-scoped telemetry rows" >>"$log"; return 1; }
@@ -1225,16 +1225,20 @@ PY
     --run-id "$run_id" --evidence-manifest "$artifacts/benchmark-evidence.json" \
     --engine-only --label "mac-gate-bench" >>"$log" 2>&1 || return 1
 
-  # Regression compare vs the committed baseline (exit 2 on >5% regression).
+  # Regression compare vs the committed baseline: medians of three warm takes,
+  # threshold max(5%, 3 MAD of the baseline); exit 2 on regression, exit 3 when
+  # the host was loaded or throttled (inconclusive, never a pass).
   if [[ -f "$GATE_BENCH_BASELINE" ]]; then
-    if ! python3 "$ROOT_DIR/scripts/summarize_generation_telemetry.py" "$run_diag" \
+    local compare_status=0
+    python3 "$ROOT_DIR/scripts/summarize_generation_telemetry.py" "$run_diag" \
         --run-id "$run_id" --evidence-manifest "$artifacts/benchmark-evidence.json" \
         --engine-only --compare-baseline "$GATE_BENCH_BASELINE" \
-        --require-baseline-identity >>"$log" 2>&1; then
-      echo "gate bench: REGRESSION vs $GATE_BENCH_BASELINE (see bench.log)" >>"$log"
-      return 1
-    fi
-    echo "gate bench: no regression vs $(basename "$GATE_BENCH_BASELINE")" >>"$log"
+        --require-baseline-identity >>"$log" 2>&1 || compare_status=$?
+    case "$compare_status" in
+      0) echo "gate bench: no regression vs $(basename "$GATE_BENCH_BASELINE")" >>"$log" ;;
+      3) echo "gate bench: INCONCLUSIVE — host load or thermal state invalidated the comparison (see bench.log)" >>"$log"; return 1 ;;
+      *) echo "gate bench: REGRESSION vs $GATE_BENCH_BASELINE (see bench.log)" >>"$log"; return 1 ;;
+    esac
   else
     echo "gate bench: no committed baseline at $GATE_BENCH_BASELINE — compare skipped" >>"$log"
     echo "  (seed one: run the gate bench, then summarize_generation_telemetry.py <run-diag> --save-baseline $GATE_BENCH_BASELINE)" >>"$log"

@@ -492,13 +492,16 @@ cmd_build() {
   require_ios_xcode_platform || die "iOS build is blocked by the selected Xcode toolchain"
   require_build_free_space device-build || die "iOS build storage preflight failed"
   local diagnostics_build=0
-  case "${1:-}" in
-    --device-diagnostics|--device-diagnostics-crash-test)
-      diagnostics_build=1
-      shift
-      ;;
-  esac
-  [[ $# -eq 0 ]] || die "unknown build argument: $1"
+  local optimized_build=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --device-diagnostics|--device-diagnostics-crash-test) diagnostics_build=1; shift ;;
+      # Benchmarks build optimized so the published label matches the shipped
+      # topology; the fast local loop stays -Onone.
+      --optimized) optimized_build=1; shift ;;
+      *) die "unknown build argument: $1" ;;
+    esac
+  done
   require_team
   local team; team="$(derive_team)"
   require_development_identity "$team"
@@ -509,7 +512,11 @@ cmd_build() {
   local dev; dev="$(resolve_device)"
   local producer="scripts/ios_device.sh build"
   (( diagnostics_build == 0 )) || producer+=" --device-diagnostics"
-  note "building $SCHEME ($CONFIG, -Onone) for $dev (team $team)"
+  local swift_optimization="-Onone" optimization_label="Onone"
+  if (( optimized_build )); then
+    producer+=" --optimized"; swift_optimization="-O"; optimization_label="O"
+  fi
+  note "building $SCHEME ($CONFIG, $swift_optimization) for $dev (team $team)"
   mkdir -p "$DERIVED"
   local log="$DERIVED/device-build.log"
 
@@ -535,7 +542,7 @@ cmd_build() {
     fi
     command+=(
       ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
-      SWIFT_OPTIMIZATION_LEVEL=-Onone SWIFT_COMPILATION_MODE=incremental
+      SWIFT_OPTIMIZATION_LEVEL="$swift_optimization" SWIFT_COMPILATION_MODE=incremental
       build
     )
     set +e
@@ -554,9 +561,12 @@ cmd_build() {
   fi
 
   [[ -d "$APP_PATH" ]] || die "build finished but $APP_PATH is missing"
+  # The receipt names the app executable and its digest so publication can
+  # bind toolchain.optimization to the installed binary.
   write_build_provenance "$DERIVED/last-build.json" \
     "$producer" "$SCHEME" "$CONFIG" "id=$dev" arm64 \
-    Onone "$mode" "$DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES"
+    "$optimization_label" "$mode" "$DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES" \
+    "$APP_PATH/Vocello"
 
   # Preserve this build's dSYM so `crashes` can symbolicate MetricKit/.ips payloads.
   local dsym_src="$DERIVED/Build/Products/Release-iphoneos/Vocello.app.dSYM"
@@ -567,7 +577,7 @@ cmd_build() {
       > "$(dirname "$dsym_dst")/build-version.txt" 2>/dev/null || true
     write_build_provenance "$QVOICE_SYMBOLS_IOS/last-build.json" \
       "$producer" "$SCHEME" "$CONFIG" "id=$dev" arm64 \
-      Onone "$mode" "$DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES"
+      "$optimization_label" "$mode" "$DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES"
     note "preserved dSYM → $dsym_dst (for crash symbolication)"
   else
     warn "no dSYM produced — crash symbolication won't be available for this build"
@@ -857,8 +867,28 @@ cmd_pull() {
   printf '%s\n' "$dest"
 }
 
+# probe_device_sentinel RUN_ID DEST
+# Copies only `diagnostics/<RUN_ID>/device-diagnostics-done.json` from the app
+# container. Polling with a full container copy every ten seconds competed with
+# the generation it was measuring; the sentinel is a few hundred bytes, and the
+# complete tree is pulled once after it appears.
+probe_device_sentinel() {
+  local run_id="$1" dest="$2"
+  [[ "$run_id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,191}$ ]] \
+    || die "diagnostic run ID is not safe for a device-container path"
+  local dev; dev="$(resolve_device)"
+  local run_destination="$dest/$run_id"
+  mkdir -p "$run_destination"
+  xcrun devicectl device copy from --device "$dev" \
+    --domain-type appDataContainer --domain-identifier "$BUNDLE_ID" \
+    --source "Library/Caches/Vocello/diagnostics/$run_id/device-diagnostics-done.json" \
+    --destination "$run_destination/device-diagnostics-done.json" --timeout 30 --quiet \
+    >/dev/null 2>&1
+}
+
 # wait_device_diagnostics_sentinel RUN_ID TIMEOUT DEST
-# Polls pulled diagnostics until device-diagnostics-done.json exists for RUN_ID.
+# Polls the sentinel only until device-diagnostics-done.json exists for RUN_ID,
+# then pulls the complete run once.
 # Returns 0 and prints the sentinel path on success; dies on timeout/interference.
 wait_device_diagnostics_sentinel() {
   local run_id="$1" timeout="${2:-300}" dest="$3"
@@ -867,13 +897,15 @@ wait_device_diagnostics_sentinel() {
   while (( waited < timeout )); do
     sleep 10
     waited=$((waited + 10))
-    pull_device_diagnostics_run "$run_id" "$dest" >/dev/null 2>&1 || true
+    probe_device_sentinel "$run_id" "$dest" || true
     # Require RUN_ID to be the sentinel's immediate parent. Profile artifacts
     # also contain RUN_ID higher in their path, so a broad */RUN_ID/* match can
     # otherwise select an unrelated historical sentinel from the pulled tree.
     sentinel="$(find "$dest" -type f -path "*/${run_id}/device-diagnostics-done.json" 2>/dev/null | head -1)"
     if [[ -n "$sentinel" && -f "$sentinel" ]]; then
       note "sentinel found after ${waited}s (runID=$run_id)"
+      pull_device_diagnostics_run "$run_id" "$dest" >/dev/null 2>&1 \
+        || die "sentinel appeared but the run could not be pulled (runID=$run_id)"
       printf '%s\n' "$sentinel"
       return 0
     fi
@@ -1894,7 +1926,7 @@ cmd_bench() {
   local artifacts="$QVOICE_ARTIFACTS_IOS/engine-bench/$run_id"
   mkdir -p "$artifacts"
 
-  cmd_build
+  cmd_build --optimized
   cmd_install
   capture_benchmark_source "$artifacts"
   export QVOICE_LAUNCH_RUN_ID="$run_id"
@@ -1915,11 +1947,15 @@ cmd_bench() {
   local interference_streak=0 interference_state=""
   while (( waited < timeout )); do
     sleep 10; waited=$((waited + 10))
-    cmd_pull "$dest" >/dev/null 2>&1 || true
-    # devicectl nesting varies, so locate the sentinel by name+runID rather than a fixed path.
+    # Sentinel-only probe: the measured take must not share the device with a
+    # full container copy every ten seconds. The whole tree is pulled once below.
+    probe_device_sentinel "$run_id" "$dest" || true
     sentinel="$(find "$dest" -name device-diagnostics-done.json -path "*/${run_id}/*" 2>/dev/null | head -1)"
     if [[ -n "$sentinel" && -f "$sentinel" ]]; then
       note "sentinel found after ${waited}s"
+      rm -rf "$dest"
+      cmd_pull "$dest" >/dev/null 2>&1 || die "sentinel appeared but diagnostics could not be pulled"
+      sentinel="$(find "$dest" -name device-diagnostics-done.json -path "*/${run_id}/*" 2>/dev/null | head -1)"
       break
     fi
     # Interference probe: abort fast instead of polling to the full timeout.

@@ -229,7 +229,10 @@ class IOSDeviceBenchmarkContractTests(unittest.TestCase):
     def test_device_build_is_safe_when_optional_diagnostic_flags_are_empty(self) -> None:
         build = shell_function(self.text, "cmd_build")
         self.assertIn("local -a command=(", build)
-        self.assertIn("SWIFT_OPTIMIZATION_LEVEL=-Onone", build)
+        # -Onone is the default fast loop; `bench` passes --optimized for -O.
+        self.assertIn('local swift_optimization="-Onone" optimization_label="Onone"', build)
+        self.assertIn('SWIFT_OPTIMIZATION_LEVEL="$swift_optimization"', build)
+        self.assertIn('--optimized) optimized_build=1', build)
         self.assertIn("SWIFT_COMPILATION_MODE=incremental", build)
         self.assertRegex(build, r"command\+=\([\s\S]*?\n\s+build\n\s+\)")
         self.assertIn('"${command[@]}" 2>&1 | tee "$log"', build)

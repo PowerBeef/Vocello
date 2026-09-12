@@ -1057,6 +1057,7 @@ validate_macos_benchmark() {
     if python3 "$ROOT_DIR/scripts/check_macos_xpc_bench.py" "$diagnostics" \
         --run-id "$run_id" --modes "$modes" --lengths "$lengths" --warm "$warm" \
         --label "${label:-$run_id}" --evidence-manifest "$evidence" \
+        --build-provenance "$out/last-build.json" \
         --crash-delta-passed \
         >"$out/benchmark-gate.txt" 2>&1; then
       status=0
@@ -1100,6 +1101,7 @@ PY
       --run-id "$run_id" --modes "$modes" --lengths "$lengths" --warm "$warm" \
       --generation-map "$generation_map" \
       --label "${label:-$run_id}" --evidence-manifest "$evidence" \
+      --build-provenance "$out/last-build.json" \
       --crash-delta-passed \
       | tee "$out/benchmark-gate.txt"; then
     return 1
@@ -1353,14 +1355,16 @@ WAV
   preserve_macos_dsyms "$MAC_DERIVED/Build/Products/Release" \
     "$MAC_DERIVED/Build/Products/Release/Vocello.app" "$QVOICE_SYMBOLS_MACOS" \
     || warn "could not preserve macOS UI-lane dSYMs"
+  # The receipt names the app executable and its digest so the benchmark gate
+  # can bind toolchain.optimization to the binary that produced the evidence.
   write_build_provenance "$MAC_DERIVED/last-build.json" \
     "scripts/ui_test.sh macos $lane" VocelloMacUI Release \
     "platform=macOS,arch=arm64" arm64 O ad-hoc \
-    "$MAC_DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES"
+    "$MAC_DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES" "$MAC_APP_EXECUTABLE"
   write_build_provenance "$out/last-build.json" \
     "scripts/ui_test.sh macos $lane" VocelloMacUI Release \
     "platform=macOS,arch=arm64" arm64 O ad-hoc \
-    "$MAC_DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES"
+    "$MAC_DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES" "$MAC_APP_EXECUTABLE"
   [[ "$lane" != "benchmark" ]] || required_step_run "$step_ledger" \
     benchmark-validation validate_macos_benchmark \
     || die "macOS benchmark telemetry gate failed"
@@ -1683,10 +1687,12 @@ PY
   fi
   write_build_provenance "$IOS_DERIVED/last-build.json" \
     "scripts/ui_test.sh ios $lane" VocelloiOSUI Release "id=$device" arm64 \
-    O automatic "$IOS_DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES"
+    O automatic "$IOS_DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES" \
+    "$IOS_DERIVED/Build/Products/Release-iphoneos/Vocello.app/Vocello"
   write_build_provenance "$out/last-build.json" \
     "scripts/ui_test.sh ios $lane" VocelloiOSUI Release "id=$device" arm64 \
-    O automatic "$IOS_DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES"
+    O automatic "$IOS_DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES" \
+    "$IOS_DERIVED/Build/Products/Release-iphoneos/Vocello.app/Vocello"
   [[ "$lane" != "benchmark" ]] || required_step_run "$step_ledger" \
     benchmark-validation validate_ios_benchmark \
     || die "iOS benchmark telemetry gate failed"

@@ -108,6 +108,10 @@ enum BenchCommand {
         let telemetryMode: String
         let seed: UInt64?
         let streaming: Bool
+        /// SHA-256 of the executable that ran this matrix. The publisher requires
+        /// it to match the hash-bound build receipt, so an optimization label can
+        /// never be attached to a binary other than the one that produced the rows.
+        let executableSHA256: String?
         let fixtureDigests: [String: String]
         let memoryQualification: BenchMemoryQualification?
         let takes: [BenchTakeResult]
@@ -563,6 +567,7 @@ enum BenchCommand {
                 telemetryMode: telemetryRaw,
                 seed: seed,
                 streaming: !noStream,
+                executableSHA256: Self.currentExecutableSHA256(),
                 fixtureDigests: fixtureDigests,
                 memoryQualification: memoryQualification,
                 takes: takeResults,
@@ -761,6 +766,15 @@ enum BenchCommand {
             outputFileName: URL(fileURLWithPath: out).lastPathComponent,
             environment: environment
         )
+    }
+
+    /// Digest of the running executable (symlinks resolved), or nil when it
+    /// cannot be read; the publisher then refuses to bind an optimization label.
+    static func currentExecutableSHA256() -> String? {
+        guard let path = Bundle.main.executablePath else { return nil }
+        let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath()
+        guard let data = try? Data(contentsOf: resolved) else { return nil }
+        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     private static func captureEnvironment() -> BenchTakeEnvironment {

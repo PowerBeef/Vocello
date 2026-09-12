@@ -38,6 +38,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from lib import rtf as rtf_semantics  # noqa: E402
+from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
 
 from benchmark_memory import (  # noqa: E402
     MemoryEvidenceError,
@@ -270,8 +271,68 @@ def digest_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def validated_macos_cli_optimization(binary: Path | None = None) -> str:
-    """Return the optimization identity only when it is bound to the exact CLI bytes."""
+IOS_APP_EXECUTABLE = ROOT / "build/cache/xcode/ios-device/Build/Products/Release-iphoneos/Vocello.app/Vocello"
+IOS_BUILD_PROVENANCE = ROOT / "build/cache/xcode/ios-device/last-build.json"
+
+
+def validated_ios_app_optimization(
+    provenance: Path | None = None,
+    executable: Path | None = None,
+) -> str:
+    """Optimization of the installed iOS app, bound to the build receipt and its bytes.
+
+    `scripts/ios_device.sh build` writes the receipt with the app executable's
+    digest; publication refuses a label the receipt cannot prove (missing
+    receipt, failed build, other platform, or a binary rebuilt since).
+    """
+    try:
+        receipt = load_build_provenance(
+            provenance or IOS_BUILD_PROVENANCE,
+            platform="ios",
+            producer_prefix="scripts/ios_device.sh build",
+        )
+    except ProvenanceError as error:
+        raise PublicationError(f"iOS app optimization is unproven: {error}") from error
+    expected = (executable or IOS_APP_EXECUTABLE).resolve()
+    if receipt["executable"] != expected:
+        raise PublicationError(
+            "iOS build receipt describes a different executable than the installed app"
+        )
+    return str(receipt["optimization"])
+
+
+def canonical_engine_matrix_scope(result_takes: list[dict[str, Any]]) -> str:
+    """`canonical` when a `vocello bench` run covered the full Speed matrix.
+
+    The canonical engine matrix mirrors the XCUITest one: Custom, Design and
+    Clone Speed models, short/medium/long prompts, three warm repetitions per
+    length and one cold medium take for the two non-clone modes; delivery
+    cells or any other shape publish as `focused`.
+    """
+    cells = {str(take.get("cell", "")) for take in result_takes}
+    if any(take.get("delivery") for take in result_takes):
+        return "focused"
+    expected: set[str] = set()
+    for mode in ("custom", "design", "clone"):
+        if mode != "clone":
+            expected.add(f"{mode}/speed/medium/cold#0")
+        for length in ("short", "medium", "long"):
+            for repetition in range(3):
+                expected.add(f"{mode}/speed/{length}/warm#{repetition}")
+    return "canonical" if cells == expected and len(result_takes) == len(expected) else "focused"
+
+
+def validated_macos_cli_optimization(
+    binary: Path | None = None,
+    *,
+    executed_sha256: str | None = None,
+) -> str:
+    """Return the optimization identity only when it is bound to the exact CLI bytes.
+
+    `executed_sha256` is the digest the bench stamped into its results manifest
+    from its own executable; when given it must equal the receipt's digest, so
+    the label describes the process that produced the rows, not a file path.
+    """
     resolved = (binary or (ROOT / "build" / "vocello")).resolve()
     provenance_path = resolved.with_name(resolved.name + ".provenance.json")
     provenance = load_json(provenance_path)
@@ -296,6 +357,8 @@ def validated_macos_cli_optimization(binary: Path | None = None) -> str:
         mismatches.append("executableRelativePath")
     if provenance.get("executableSHA256") != digest_file(resolved):
         mismatches.append("executableSHA256")
+    if executed_sha256 is not None and provenance.get("executableSHA256") != executed_sha256.lower():
+        mismatches.append("executedSHA256")
     if mismatches:
         raise PublicationError(
             "macOS engine benchmark requires a hash-bound optimized CLI build; "
@@ -1484,15 +1547,24 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
     raw_digest = digest_bytes(canonical_bytes(raw_digest_payload))
     started_at = str(results.get("startedAt"))
     finished_at = str(results.get("finishedAt"))
-    matrix_scope = "instrumented" if kind == "instrument-profile" else "focused"
+    matrix_scope = (
+        "instrumented" if kind == "instrument-profile"
+        else canonical_engine_matrix_scope(result_takes)
+    )
     fixture_digests = results.get("fixtureDigests")
     if not isinstance(fixture_digests, dict):
         raise PublicationError("bench-results fixtureDigests must be an object")
     require_fixture_cross_check(takes, fixture_digests, source="bench-results")
-    optimization = (
-        validated_macos_cli_optimization()
-        if args.platform == "macos" else "-Onone"
-    )
+    if args.platform == "macos":
+        executed = results.get("executableSHA256")
+        if not isinstance(executed, str) or len(executed) != 64:
+            raise PublicationError(
+                "bench-results.json lacks executableSHA256; rebuild the CLI "
+                "(scripts/build.sh cli-optimized) and rerun the bench"
+            )
+        optimization = validated_macos_cli_optimization(executed_sha256=executed)
+    else:
+        optimization = validated_ios_app_optimization()
     manifest = record_shell(
         kind=kind, platform=args.platform, run_id=args.run_id,
         label=str(results.get("label") or args.label or args.run_id),
@@ -1613,7 +1685,7 @@ def ios_engine_command(
             if getattr(args, "crash_diagnostics", None) is None else args.crash_diagnostics
         ),
         executable_paths={"Vocello": "build/cache/xcode/ios-device/Build/Products/Release-iphoneos/Vocello.app/Vocello"},
-        optimization="-Onone",
+        optimization=validated_ios_app_optimization(),
         classification=(
             "instrumented" if kind == "instrument-profile"
             else "exploratory" if uses_forced_memory_profile(rows)
@@ -2605,7 +2677,10 @@ def language_command(args: argparse.Namespace) -> Path:
             if args.platform == "ios" else None,
         ),
         executable_paths={"vocello": "build/vocello"} if args.platform == "macos" else {"Vocello": "build/cache/xcode/ios-device/Build/Products/Release-iphoneos/Vocello.app/Vocello"},
-        optimization="-Onone",
+        optimization=(
+            validated_macos_cli_optimization() if args.platform == "macos"
+            else validated_ios_app_optimization()
+        ),
         classification=("exploratory" if uses_forced_memory_profile(selected) else None),
         memory_evidence=compact_memory_evidence(memory_run),
     )

@@ -284,3 +284,46 @@ def load_tests(_loader, _tests, _pattern):
         if name.startswith("test_") and inspect.isfunction(function):
             suite.addTest(unittest.FunctionTestCase(function, description=name))
     return suite
+
+
+def test_threshold_widens_with_baseline_dispersion_and_n_is_required():
+    key = ("custom", "Qwen3-TTS-12Hz-1.7B-4bit", "warm", "medium")
+    baseline = [_make_cell(key, rtf=0.60, tokps=1000.0, ttfc=300.0, phys=4000.0, qc="pass")]
+    baseline[0].update({"n": 3, "rtfMAD": 0.03})  # 3 MAD / median = 15 %
+    current = [_make_cell(key, rtf=0.68, tokps=1000.0, ttfc=300.0, phys=4000.0, qc="pass")]
+    assert sgt.compare_summaries(baseline, current, threshold=0.05) == []
+    current = [_make_cell(key, rtf=0.70, tokps=1000.0, ttfc=300.0, phys=4000.0, qc="pass")]
+    assert [r["metric"] for r in sgt.compare_summaries(baseline, current, threshold=0.05)] == ["rtf"]
+    # A one-take baseline keeps the flat threshold even with a recorded MAD.
+    baseline[0].update({"n": 1})
+    current = [_make_cell(key, rtf=0.64, tokps=1000.0, ttfc=300.0, phys=4000.0, qc="pass")]
+    assert [r["metric"] for r in sgt.compare_summaries(baseline, current, threshold=0.05)] == ["rtf"]
+    # No sample count is a coverage failure, never a silent pass.
+    baseline[0]["n"] = None
+    assert [r["metric"] for r in sgt.compare_summaries(baseline, current, threshold=0.05)] == ["coverage.n"]
+
+
+def test_host_load_makes_the_comparison_inconclusive():
+    quiet = {"historyRecord": {"hardware": {"loadAverage1M": 2.1, "thermalState": "nominal"}}}
+    assert sgt.host_load_verdict(quiet, cpu_count=8) == []
+    busy = {"historyRecord": {"hardware": {"loadAverage1M": 17.0, "thermalState": "nominal"}}}
+    assert any("load average" in reason for reason in sgt.host_load_verdict(busy, cpu_count=8))
+    hot = {"historyRecord": {"hardware": {"loadAverage1M": 1.0, "thermalState": "serious"}}}
+    assert any("thermal" in reason for reason in sgt.host_load_verdict(hot, cpu_count=8))
+    assert sgt.host_load_verdict(None) == []
+
+
+def test_legacy_baseline_identity_without_host_keys_still_compares():
+    identity = {"kind": "engine-generation", "optimization": "-O"}
+    payload = {"schemaVersion": 2, "identity": identity, "cells": [{"cellKey": ["a", "b", "c", "d"], "n": 1}]}
+    current = {**identity, "osVersion": "26.6.2", "xcodeVersion": "26.6"}
+    assert sgt.baseline_cells(payload, current_identity=current, require_identity=True) == payload["cells"]
+    assert sgt.baseline_lacks_host_identity(payload)
+    bound = {"schemaVersion": 2, "identity": current, "cells": payload["cells"]}
+    assert not sgt.baseline_lacks_host_identity(bound)
+    try:
+        sgt.baseline_cells(bound, current_identity={**current, "xcodeVersion": "27.0"}, require_identity=True)
+    except ValueError as error:
+        assert "identity differs" in str(error)
+    else:
+        raise AssertionError("a different Xcode must not compare")

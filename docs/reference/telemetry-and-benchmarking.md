@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-08-29
+reviewed: 2026-09-12
 summary: The single telemetry and benchmarking reference — per-generation typed telemetry across frontend/transport/backend, schema versions, knobs, artifacts, and how evidence stays cheap.
 sourceOfTruth:
   - Sources/QwenVoiceCore/NativeTelemetrySampler.swift
@@ -68,7 +68,7 @@ resolved once per process:
 | `QWENVOICE_NATIVE_TELEMETRY_MODE=lightweight\|verbose` (aliases: `light`, `full`, `deep`) | Forces sampling/persistence on regardless of the gate. |
 
 The engine runs **out of process on macOS** (XPC service) and **in process on iOS**
-(the ExtensionKit extension was removed; see `CLAUDE.md` / commit `aed617c`). The
+(the ExtensionKit extension was removed; see [`ARCHITECTURE.md`](../ARCHITECTURE.md) / commit `aed617c`). The
 separate process does not automatically inherit the app's resolved mode; the initialize handshake
 carries it. Telemetry opt-in is distinct from production-affecting overrides, which additionally
 require the registered internal-diagnostics build capability and debug gate. Do not claim that
@@ -99,7 +99,7 @@ machine-readable takes per mode. PCM SHA-256 must match across off, lightweight,
 Median RTF and TTFC regression limits are 5% for lightweight and 10% for verbose. Raw evidence and
 load/thermal context stay under `build/artifacts/macos/`. The verdict is deliberately local-only: the
 `off` lane cannot supply mandatory v8 memory evidence without changing the observer-effect
-experiment, so new schema-v2 history publication fails closed. Existing schema-v1 overhead
+experiment, so new tracked history publication fails closed. Existing schema-v1 overhead
 records remain readable and memory-contract-incomplete.
 
 Typical backend‑optimization invocation:
@@ -120,7 +120,7 @@ values without retaining raw launch input. Never add an undocumented environment
 |---|---|
 | `QWENVOICE_SUPPRESS_WARMUP=1` | Skips proactive prewarm/clone‑priming so the first generation records its own **cold** load (`MacGenerationWarmupCoordinator`). App‑process only. |
 | `QWENVOICE_FORCE_MEMORY_CLASS=floor_8gb_mac` | Forces the device-memory tier (`NativeDeviceClassGate`), propagated to the engine over `initialize`. Runs constrained-tier code paths for diagnostic comparison. See §11 "Memory and pressure interpretation". Accepts the `NativeDeviceMemoryClass` raw values + aliases `8gb`/`16gb`. |
-| `QWENVOICE_MAC_WARM_GATE=off\|records\|enforce` | macOS warm‑admission gate (`MacWarmupAdmissionPolicy`): defers **proactive** warms while the app‑process kernel pressure level is soft/hardTrim on floor/mid tiers. Default `enforce` (validated 2026‑06‑09); `records` logs verdicts without blocking; user generations are never gated. Events land in `diagnostics/app/native-events.jsonl`. |
+| `QWENVOICE_MAC_WARM_GATE=off\|records\|enforce` | macOS warm‑admission gate (`MacWarmupAdmissionPolicy`): defers **proactive** warms while the app‑process kernel pressure level is soft/hardTrim on floor/mid tiers. Default `enforce` (validated 2026‑06‑09); `records` logs verdicts without blocking; user generations are never gated. Events land in the app layer's `native-events.jsonl`. |
 | `QWENVOICE_ENGINE_RETIRE_DWELL_SECONDS=<n>` | Dev override for the XPC service retirement idle dwell (default 300 s) so retirement‑to‑reclaim can be exercised without the full wait. App‑process only. |
 | `QVOICE_TALKER_KV_QUANT=8\|4` | **Dev-only** opt‑in talker KV‑cache quantization (QuantizedKVCache, group 64). Measured (P4, §H): clone/long −271 MB physFoot but **−8.6% RTF** — not shipped on any tier; insurance knob only. Never combined with `QVOICE_TALKER_KV_WINDOW`. |
 | `QVOICE_IOS_MLX_CACHE_LIMIT_MB=<n>` | **Dev-only** override of the MLX `Memory.cacheLimit` for the iPhone tier. Useful for sweeps; production uses the tier default. |
@@ -174,7 +174,7 @@ folder when DebugMode is on, so real data is never polluted):
 | `engine-service/generations.jsonl` | middle | XPC transport: request acceptance→first chunk, chunks forwarded, gaps, and forwarding span. |
 | `app/generations.jsonl` | frontend | Submit→first chunk→playback scheduled→completed, delayed-heartbeat coverage, and playback health. It does not claim acoustic audibility or inherit engine memory. |
 | `generations-merged.jsonl` | merged | Layers joined per `generationID`, with explicit `requiredLayers`, `missingLayers`, and `complete`. |
-| `engine/samples-<generationID>.jsonl` | backend (verbose only) | Raw per‑sample memory/timing series. |
+| `engine/samples-*.jsonl` | backend (verbose only) | Raw per‑sample memory/timing series, one file per `generationID`. |
 | `*/native-events.jsonl` | engine/middle/app | Chunk‑sequence gaps + encode drops; the **app** file also carries `mac_warm_admission_observed` / `mac_warm_blocked` (warm‑admission gate) and `engine_service_retired` (XPC retirement) events. **Written only when telemetry is enabled** (`TelemetryGate.resolvedEnabled` / app-process intended mode). |
 | `<documents>/generation-failures.jsonl` | debug | Append-only failure log when telemetry is on (see `GenerationFailureDiagnosticLogger`). |
 
@@ -318,7 +318,7 @@ backend throughput:
 |---|---|---|
 | `audioSeconds` | Generated audio duration (frames ÷ sample rate). | Output length. |
 | `requestWallSeconds` | Whole request on the per-generation monotonic recorder: prepare entry → `streamCompleted` (after the final WAV write), minus the one-time `startup.model_load_*` and `startup.prewarm_*` intervals. | Synthesis wall time; the wall side of RTF on cold and warm takes alike. |
-| `realTimeFactor` | `requestWallSeconds ÷ audioSeconds`. | **Standard real-time factor (RTF): lower is faster, <1 = faster than real time.** Primary throughput KPI since 2026-09-12; published as `rtf`. |
+| `realTimeFactor` | `requestWallSeconds ÷ audioSeconds`. | **Standard real-time factor (RTF): lower is faster, <1 = faster than real time.** Primary throughput KPI since 2026-09-12; published as `rtf`. Every record since then declares `run.rtfDefinition: "wall/audio"`; a record without that field predates the cutover, stores the decode speedup under `rtf`, and never shares a comparison key with a new one. |
 | `decodeWallSeconds` | Decode wall time (`qwen_token_loop_total` when present, else model `.info.generateTime`, else `streamStartup→streamGenerationEnded` span). Excludes WAV finalize I/O. | Compute cost — **same time base as the summarizer `decode ms` column.** |
 | `audioSecondsPerWallSecond` | `audioSeconds ÷ decodeWallSeconds`. | **Decode-loop speedup** (higher is faster), published as `decodeSpeedupX`. Records before 2026-09-12 stored it under `rtf`; it is not an RTF. |
 | `tokensPerSecond` | Codec tokens ÷ decode wall seconds (from `.info` when present). | Decode throughput; compare across model variants / patches. |
@@ -517,10 +517,11 @@ GPU compute: `talker`/`codePred` measure graph‑*build* time, the single per‑
 stage, capture the os_signpost intervals under Instruments `xctrace`. Read‑only; joins `engine/` +
 `app/` rows by `generationID`.
 New benchmark history is one allowlisted JSON record per successful run under
-`benchmarks/runs/<kind>/` (≤256 KB), with a generated `HISTORY.md` index. Existing Markdown/JSON
+`benchmarks/runs/` (one directory per kind, ≤256 KB per record), with a generated `HISTORY.md` index. Existing Markdown/JSON
 baselines remain reference artifacts; they are not silently upgraded into complete records.
-Schema-v1 history remains readable; new memory-qualified records use schema v2 and cannot be mixed
-into memory trends with v1. Raw telemetry, audio, screenshots, result bundles, and traces remain untracked. A successful
+Schema-v1 history remains readable; new records publish as schema v3 when every take carries the
+quality-registry identity and as schema v2 otherwise (`ui-perf` records are v2), and memory-qualified (v2+)
+records are never mixed into memory trends with v1. Raw telemetry, audio, screenshots, result bundles, and traces remain untracked. A successful
 profile record captures the original trace digest/path, capture settings, extracted summary, and
 retention policy; the raw trace is discarded after publication unless `--keep-trace` was explicit. Registry
 validation is deterministic CI work, but model/device/UI execution is not an ordinary CI or
@@ -560,8 +561,8 @@ warm by design.
 
 ### Tracking performance over time
 
-Each successful publishable runner creates one canonical, privacy-safe schema-v2 record under one
-of seven kinds: UI generation, engine generation, language, instrument profile, retained-memory
+Each successful publishable runner creates one canonical, privacy-safe record (schema v3 when every take
+carries the quality-registry identity, schema v2 otherwise) under one of seven kinds: UI generation, engine generation, language, instrument profile, retained-memory
 qualification, prosody calibration, or UI frame health (`ui-perf`, from the macOS and iOS perf lanes). `scripts/benchmark_history.py` validates these records and regenerates
 `benchmarks/HISTORY.md`; direct Markdown append is unsupported. A strict allowlist rejects
 identifiers and content that could expose serials, UDIDs/ECIDs, host/device/user names, absolute
@@ -598,7 +599,7 @@ dropouts, garbled words, "sounds worse"). Three layers, increasing in what they 
    `near_silent` (dead output). Surfaced as the summarizer's **`QC`** column. **Any `fail` blocks
    promoting a backend change.** Thresholds are conservative + tunable (`makeAudioQCReport`).
    **Dropout is punctuation-aware.** Long interior pauses (≥350 ms) count against the text's
-   punctuation pause budget; an excess (`dropout:excessN(long/budget)`, ≥2 fail, 1 warn) or a
+   punctuation pause budget; an excess (flag `dropout:excessN`, followed by the long-pause count over the budget in parentheses; ≥2 fail, 1 warn) or a
    single egregious gap (≥1200 ms fail, ≥900 ms warn) flags. The regimes, their calibration history
    and the threshold-change authority live in `makeAudioQCReport` and
    [`audio-qc-engineering.md`](audio-qc-engineering.md#threshold-change-authority); a warning is
@@ -654,9 +655,8 @@ committed bounded quality summaries and baselines remain permitted.
   and merge the resulting key into `timingsMS`.
 - **New field on the record:** add an optional field to `GenerationTelemetryRecord` (so old
   rows still decode) and bump `currentSchemaVersion`.
-- **Naming:** do **not** introduce symbols containing `Probe`/`Benchmark` or the other tokens
-  in `scripts/check_project_inputs.sh` — that guard fails the build. Use the `NativeTelemetry…`
-  / `GenerationTelemetry…` families.
+- **Naming:** use the `NativeTelemetry…` / `GenerationTelemetry…` families for new telemetry
+  types.
 
 ---
 

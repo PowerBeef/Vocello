@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-04
+reviewed: 2026-09-12
 summary: The vocello CLI — user-facing generation surface and deterministic benchmark/test driver over the same in-process MLX engine as the app.
 sourceOfTruth:
   - project.yml
@@ -14,9 +14,10 @@ sourceOfTruth:
 ---
 # The `vocello` CLI
 
-> **Distribution checkpoint (2026-09-04):** RF-08 adds CLI packaging to the existing macOS
-> release workflow for the upcoming 3.0.0 programme. No new public CLI release is implied;
-> signed/notarized real-generation qualification remains under RF-10/F-17. The current configured
+> **Distribution status:** the macOS release workflow already stages a separate
+> `<output-name>-cli.dmg` (the F-17 packaging RF-08 owns). Public CLI release and signed/notarized
+> real-generation qualification stay under RF-08/RF-10, which are parked behind the iOS submission
+> critical path in `config/roadmap.json`; no public CLI release is implied. The current configured
 > source identity is 3.0.0/build 24 in `project.yml`; it is not a published or frozen candidate.
 
 `vocello` is a headless macOS command-line surface over the same in-process MLX engine the app uses.
@@ -41,10 +42,16 @@ bench in debug context, see [`testing-runbook.md`](testing-runbook.md) "Model re
 
 ```sh
 ./scripts/build.sh cli                 # build build/vocello (single config, -Onone)
+./scripts/build.sh cli-optimized [args...]   # -O build for shipping-performance benchmark evidence
 ./scripts/build.sh cli --version       # prints the project MARKETING_VERSION
 ./scripts/build.sh cli generate --text "Hello." --variant speed   # build + run with args
 build/vocello <command> [options]      # run the already-built binary
 ```
+
+Benchmark records take `toolchain.optimization` from the executable-digest-bound build receipt
+(the `<binary>.provenance.json` that `scripts/build.sh` writes beside the CLI, verified by
+`scripts/publish_benchmark_history.py`), so only a `cli-optimized` binary can publish CLI benchmark
+records; the -Onone `cli` build is for development and functional runs.
 
 `build/vocello` is the public symlink to the real binary under the policy-owned
 `build/cache/xcode/macos/…` product tree; macOS resolves it so the adjacent MLX shader bundle
@@ -98,7 +105,7 @@ each attempt. Timeouts terminate and await the process group before any next mod
 progress detection handles output without a newline. This is package execution/QC proof, not a
 perceptual Clone-fidelity or multilingual accuracy claim.
 
-RF-10 runs this check on the copied, signed candidate. Development/ad-hoc qualification can diagnose
+RF-10 (currently parked in `config/roadmap.json`) will run this check on the copied, signed candidate. Development/ad-hoc qualification can diagnose
 the packaging contract but cannot substitute for Developer ID, notarization, or candidate evidence.
 The existing two-argument app-only verifier remains available for historical candidates; the current
 release workflow requires both DMGs.
@@ -294,7 +301,7 @@ CLI is run from a Vocello checkout (skipped when `--telemetry off` or repository
 | `--telemetry` | `off` · `lightweight` · `verbose` (default; raw per-sample sidecars) |
 | `--seed` | deterministic sampling seed applied to every benchmark take |
 | `--no-stream` | accumulate the full result before decoding (old bench behavior) |
-| `--ttfc` | add an engine first-chunk-latency probe per cell → table + `diagnostics/bench-ttfc.json` |
+| `--ttfc` | add an engine first-chunk-latency probe per cell → table + `bench-ttfc.json` in the diagnostics directory |
 | `--keep` / `--force` | append to existing diagnostics / allow clearing even the real app data dir |
 | `--data-dir` / `--manifest` | override the runtime data dir (default: the debug-isolated folder) / the `qwenvoice_contract.json` path |
 | `--no-summary` | skip the aggregator and standalone registry publication because a parent diagnostic/profile lane owns evidence and publication; do not use for a normal standalone benchmark |
@@ -329,8 +336,15 @@ machine failure or warning and never blocks ordinary development publishing.
 an atomic `benchmark-evidence.json`, publishes one allowlisted record under
 `benchmarks/runs/engine-generation/`, and regenerates `benchmarks/HISTORY.md`. It never stages,
 commits, or pushes. Failed/incomplete runs and `--telemetry off` diagnostics do not modify tracked
-history. When the CLI runs outside a checkout it retains local WAVs and the immutable
-`diagnostics/benchmark-runs/<runID>/bench-results.json`, skips unavailable repository summary/history
+history. Records are validated against benchmark schema v3 (`vocello bench` takes carry the quality-registry
+identity; v1 stays read-only), must declare
+`run.rtfDefinition` (`rtf` = wall ÷ audio, lower is faster) and take `toolchain.optimization` from
+the build receipt: the macOS publisher accepts only a `scripts/build.sh cli-optimized` receipt whose
+digest matches the executed binary, so a record from an -Onone `cli` build, an unreceipted binary
+or a rebuilt one is refused; see [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md).
+When the CLI runs outside a
+checkout it retains local WAVs and the immutable per-run `bench-results.json` under
+`diagnostics/benchmark-runs/`, skips unavailable repository summary/history
 tools without turning a successful generation into a failure, and prints the retained manifest path.
 If publication alone fails, rerun the printed idempotent
 `python3 scripts/benchmark_history.py record --artifact-dir <dir>` repair command.

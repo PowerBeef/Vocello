@@ -1,6 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
+reviewed: 2026-09-12
 summary: The shipping long-form v4 path on both platforms — planner-owned segmentation, sequential streaming execution, manifest/resume, grouped History — and what remains open.
 sourceOfTruth:
   - Sources/QwenVoiceCore/LongFormPlanning.swift
@@ -79,15 +80,18 @@ numbers in this guide. Diagnostic rejected audio stays untracked and is not an a
 
 First instrumented project (2026-07-23, canonical Mac mini M2 8 GB, smoke lane): a 2,280-character
 script planned three ~50–60 s segments, streamed them sequentially, and joined 161.5 s of audio in
-92.0 s wall — project RTF 1.76, inside the canonical gated single-take band. The smoke lane
+92.0 s wall — project rtf 0.57 (wall ÷ audio, the standard since 2026-09-12; the figure originally
+recorded as 1.76 was the inverted audio ÷ wall ratio now reported as `decodeSpeedupX`), inside the
+then-canonical gated single-take band of that legacy figure. The smoke lane
 summarizes each long-form run (`long-form-project-summary.txt`). Registry publication for
 long-form project records would need a benchmark-pipeline schema review first; current evidence is
 local/lane-level only.
 
 Scaled memory evidence (2026-07-25, same hardware, smoke run
 `macos-xcui-smoke-20260725-062451-8f15c1fd` with `--long-form-segments 10`): a ~9,900-character
-script planned twelve segments, streamed and joined 627.5 s of audio in 348.7 s wall (project RTF
-1.80). Engine end-of-segment physical footprint oscillated within a flat 2,300–2,510 MB band with
+script planned twelve segments, streamed and joined 627.5 s of audio in 348.7 s wall (project rtf
+0.56, wall ÷ audio; 1.80 was the inverted audio ÷ wall figure now reported as `decodeSpeedupX`).
+Engine end-of-segment physical footprint oscillated within a flat 2,300–2,510 MB band with
 per-segment peaks steady near 3,040 MB and a first→last delta of −1.13% — steady-state memory does
 not scale with total audio duration at this size. The scaled journey is available to any
 acceptance run via `scripts/ui_test.sh macos smoke --long-form-segments N` (2–12; the lane then

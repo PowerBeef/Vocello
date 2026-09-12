@@ -1,6 +1,7 @@
 ---
 status: active
 owner: backend-mlx
+reviewed: 2026-09-12
 summary: The Phase 2-3 language bench — hint-contract and on-device output verification matrices, subset semantics, Speech asset prerequisites, and how to read hint_gate/output_gate verdicts.
 sourceOfTruth:
   - scripts/check_language_hints.py
@@ -36,8 +37,9 @@ The paired Custom pinned/Auto cells intentionally generate the same prompt with 
 seed, and sampling policy. They prove that Auto resolves equivalently to the pinned hint; they are
 not independent audio samples. Likewise, the three sequential Speech recognitions prove that the
 on-device recognizer reproduced one transcript for one WAV. They do not provide three statistically
-independent accuracy observations. The 18 output cells remain strict per-cell multilingual smoke
-acceptance, not a population estimate of language quality.
+independent accuracy observations. The 18 positive output cells (plus the expected-fail negative
+control) remain strict per-cell multilingual smoke acceptance, not a population estimate of
+language quality.
 
 ## iOS (on-device)
 
@@ -164,7 +166,9 @@ state. Current PASS evidence must exist in `benchmarks/runs/language/` and appea
 `benchmarks/HISTORY.md`, while the active resume status lives in
 [`../development-progress.md`](../development-progress.md). The current tracked registry contains
 a clean physical-iPhone quick PASS record covering the seven EN/FR cells, historical macOS
-hint-only records, and the exploratory full PASS described below. Run
+hint-only records, the exploratory full PASS described below, and a later dirty-worktree macOS
+full run (`mac-lang-bench-20260902-024501-bd2df074`, partial, exploratory). Generated
+`benchmarks/HISTORY.md` is the authoritative list. Run
 `ios-speech-assets-20260716-164115-e8b16d82` resolved `de_DE`, `es_ES` (for requested `es_419`),
 `ja_JP`, and `zh_CN`; every DictationTranscriber asset and Vocello's legacy on-device recognition
 gate passed. That result establishes prerequisites only.
@@ -216,14 +220,15 @@ from the first 30 s, and the publisher re-scores every transcript against the co
 15 % edit-rate gate. The record is `focused` with `languageVerification.families: ["whisper"]`: one
 independent witness, explicitly not a two-family consensus. The recognizer is prepared from the local
 Hugging Face cache by `scripts/prepare_delivery_compact_model_config.py whisper-small-mlx`; nothing
-downloads automatically.
+downloads automatically. `scripts/lib/language_metrics.py` also accepts `sensevoice` as a family
+identifier (the compact-model cascade's SenseVoice adapter, limited to English, Chinese, Japanese,
+Korean and Cantonese); publication today cites only `apple-speech` and `whisper`.
 
 ## Offline gate tests
 
 ```sh
-python3 -m unittest scripts.tests.test_check_ios_speech_assets
-python3 -m unittest scripts.tests.test_check_language_hints
-python3 -m unittest scripts.tests.test_check_language_output
+python3 -m pytest scripts/tests/test_check_ios_speech_assets.py scripts/tests/test_check_language_hints.py scripts/tests/test_check_language_output.py
+# or, after editing a gate: scripts/dev.sh py
 ```
 
 ## Related

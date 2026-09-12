@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-08-29
+reviewed: 2026-09-12
 summary: Operator runbook for performance and quality benchmarks — when to bench, the macOS CLI/app-XPC and iOS device paths, expected artifacts, and how to read results.
 sourceOfTruth:
   - scripts/macos_test.sh
@@ -45,7 +45,7 @@ A benchmark pass requires **all** of the following:
 | Gate | Criterion |
 |------|-----------|
 | **audioQC** | Publication accepts `pass` or `warn`; promotion requires `pass` in every required cell. Any `fail` blocks both. |
-| **RTF** | `derivedMetrics.realTimeFactor` (request wall ÷ audio, lower is faster) reviewed against the nearest compatible clean record in generated [`benchmarks/HISTORY.md`](../../benchmarks/HISTORY.md); records before 2026-09-12 stored the inverted decode speedup under `rtf` and never share a comparison key with new ones. |
+| **RTF** | `derivedMetrics.realTimeFactor` (request wall ÷ audio, lower is faster) reviewed against the nearest compatible clean record in generated [`benchmarks/HISTORY.md`](../../benchmarks/HISTORY.md); records before 2026-09-12 stored the inverted decode speedup under `rtf` and never share a comparison key with new ones. New records declare `run.rtfDefinition: "wall/audio"`; a record without that field stores the legacy decode speedup under `rtf`. |
 | **Memory** | No rising `physFoot` peak or non-zero `hardTrim` in `trims` on floor-tier runs. |
 | **Automated output proof** | Fixed-seed cohort, exact WAV identity, and applicable locale-locked ASR/prosody gates pass. Human listening is optional annotation and is never inferred. |
 
@@ -57,8 +57,13 @@ summarizer's `xRT` column.
 
 1. **Primary backend driver is headless** — `vocello bench` drives the matrix in-process with exact
    cold/warm control. **`scripts/ui_test.sh macos benchmark`** is the supplementary XPC integration net (§4.10).
-2. **Telemetry is runtime-gated** — identical code in Release; off unless debug env/toggle/handshake.
+2. **Telemetry is runtime-gated** — identical code in Release; off unless `QWENVOICE_DEBUG=1`,
+   `QWENVOICE_NATIVE_TELEMETRY_MODE`, or the app-to-engine handshake enables it.
 3. **No CI execution gate** — model-dependent benchmarks are local and explicitly requested. CI validates the compact registry and reproducible index but does not run models, devices, XCUITest, or Instruments.
+   The consent-bound lanes, never run unasked, are `scripts/macos_test.sh memory|lang-bench`, every
+   `scripts/ui_test.sh` lane and every `scripts/ios_device.sh` verb; `scripts/macos_test.sh gate` and
+   `telemetry-overhead` are ordinary local lanes; `telemetry-overhead` needs the model fixture, `gate`
+   only when `QWENVOICE_GATE_BENCH=1` adds its bounded bench.
 4. **Lazy MLX caveat** — decode breakdown columns measure Swift wall-clock around lazy graph
    ops, not per-stage GPU compute. Use Instruments signposts for GPU attribution (§6.3).
 5. **PASS-only publication** — a successful repository benchmark publishes one allowlisted JSON
@@ -90,8 +95,8 @@ UI heartbeat        —                       yes                    yes
 | **macOS profile** | `scripts/macos_test.sh profile --kind cpu|memory` | In-process via CLI inside exact-PID trace | CPU/signpost or allocation/VM validation |
 | **iOS device** | `scripts/ios_device.sh bench` | In-process | iPhone tier, Jetsam, on-device RTF (headless diagnostics, single take) |
 | **iOS UI benchmark** | `scripts/ui_test.sh ios benchmark` | In-process | Full UI matrix through XCUITest on the paired physical iPhone; telemetry gated per take |
-| **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Nine scripted SwiftUI scenarios with the in-app frame probe; warn-only ceilings; canonical-hardware runs publish `ui-perf` registry records ([`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md)) |
-| **iOS UI frame health** | `scripts/ui_test.sh ios perf` | No engine claims (UI-only) | Nine scripted scenarios on the paired physical iPhone with the pinned-60 Hz in-app probe; `check_ios_ui_perf.py` structural + canonical-hardware gate with warn-only ceilings from [`config/ui-perf-thresholds-ios.json`](../../config/ui-perf-thresholds-ios.json); canonical-iPhone runs publish platform-`ios` `ui-perf` registry records (IUI-6, [`ios-ui-refresh-2026-08.md`](ios-ui-refresh-2026-08.md)) |
+| **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Nine scripted SwiftUI scenarios with the in-app frame probe; warn-only ceilings; canonical-hardware runs publish `ui-perf` registry records; lane contract in [`macos-testing.md`](macos-testing.md) (history: [`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md)) |
+| **iOS UI frame health** | `scripts/ui_test.sh ios perf` | No engine claims (UI-only) | Nine scripted scenarios on the paired physical iPhone with the pinned-60 Hz in-app probe; `check_ios_ui_perf.py` structural + canonical-hardware gate with warn-only ceilings from [`config/ui-perf-thresholds-ios.json`](../../config/ui-perf-thresholds-ios.json); canonical-iPhone runs publish platform-`ios` `ui-perf` registry records; lane contract in [`ios-device-testing.md`](ios-device-testing.md) (history: IUI-6, [`ios-ui-refresh-2026-08.md`](ios-ui-refresh-2026-08.md)) |
 
 **Important:** CLI bench numbers are **not** identical to macOS XPC UI numbers. Compare like with
 like (CLI vs CLI, UI vs UI). Use CLI for backend optimization; use UI/XPC for integration regressions.
@@ -142,13 +147,16 @@ This installs (or symlinks into debug context):
   Design reference with a distinctive mature feminine alto. `models ensure` replaces the retired
   Custom/Aiden-derived short fixture when it detects that stale transcript.
 
-Set `QVOICE_REQUIRE_TEST_MODELS=1` is automatic on script paths; bare `xcodebuild` may skip tests.
+The `scripts/macos_test.sh` model lanes verify the fixture themselves before running
+(`scripts/macos_test.sh preflight --strict-models` fails when anything is missing; `models check`
+prints read-only status); bare `xcodebuild` performs no such check.
 
 ### Environment hygiene
 
 | Check | Action |
 |-------|--------|
-| Quiet machine | Quit heavy apps; watch thermals (see §6.4). |
+| Quiet machine | Timing lanes refuse to start on a busy host (`require_quiet_host` in `scripts/lib/host_preflight.sh`: a 1-minute load average above 2× the core count or kernel memory pressure above normal exits 1 before any model loads; it guards `macos_test.sh gate|memory|lang-bench|telemetry-overhead`, `ios_device.sh bench|lang-bench|memory|gate` and the `ui_test.sh` benchmark and perf lanes). `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues, and the run's own load sample then classifies it. Quit heavy apps and watch thermals (see §6.4). |
+| Free disk | Heavy lanes check the floors in `config/build-output-policy.json` before building or launching (`require_build_free_space`, `scripts/lib/storage_preflight.py`): 15 GiB for `ui_test.sh … benchmark`, macOS/iOS `memory`, `lang-bench` and iOS `bench`/`gate`; 12 GiB for `telemetry-overhead` and `ui_test.sh … perf`; 8 GiB for `macos_test.sh gate`. A shortfall stops the lane before any work starts. |
 | Single Vocello session | Quit any separately installed Vocello first. The XCUITest runner verifies exact executable paths and signals only its own Release products. |
 | Debug data dir | `QWENVOICE_DEBUG=1` → `~/Library/Application Support/QwenVoice-Debug/` |
 | Floor-tier simulation | `QWENVOICE_FORCE_MEMORY_CLASS=floor_8gb_mac` (propagates to engine via handshake) |
@@ -395,8 +403,8 @@ friction, use the headless §4.7 `ios_device.sh bench` lane.
 | UI failure | `.xcresult` activities, failure diagnostics, and screenshot attachments |
 | Crash post-mortem | Xcode Organizer; optional `xcsym` on `PATH` |
 
-Use `$axiom-tools` for workflow selection. Physical-device setup is documented in
-[`ios-device-testing.md`](ios-device-testing.md).
+The optional `axiom-tools` plugin skill can help choose an Instruments workflow; the procedure in
+[`ios-device-testing.md`](ios-device-testing.md) is authoritative, including physical-device setup.
 
 The iOS profile command resolves Instruments' UDID independently from CoreDevice's device ID and
 stops before launching Vocello if the phone is listed under `Devices Offline`. Reconnect and unlock
@@ -535,7 +543,7 @@ machine-readable measured takes per mode. It requires identical PCM, records the
 and gates median RTF/TTFC at 5% (lightweight) and 10% (verbose) versus off. It never repairs or
 downloads models; missing fixtures stop the run. Its verdict stays under `build/artifacts/macos/`
 and is not
-published to schema-v2 history: adding the in-process memory sampler to the `off` lane would change
+published to tracked history: adding the in-process memory sampler to the `off` lane would change
 the observer whose overhead is being measured. This fail-closed exception preserves the experiment
 without admitting memory-incomplete records.
 
@@ -644,7 +652,7 @@ Useful flags:
 ### 6.2a Memory qualification contract
 
 New publishable generation benchmarks require telemetry schema v8 and benchmark-evidence manifest
-v2. For every selected generation, the exact `engine/samples-<generationID>.jsonl` sidecar must
+v2. For every selected generation, the exact `engine/samples-*.jsonl` sidecar for that `generationID` must
 begin with one `start`, end with one `stop`, retain monotonic elapsed and absolute-uptime clocks,
 and contain the required preparation/model-load/session/first-output/final-WAV/terminal boundaries.
 iOS additionally requires finite headroom samples. macOS UI/XPC runs require a matching app sidecar;
@@ -699,7 +707,7 @@ python3 scripts/benchmark_history.py validate --all
 python3 scripts/benchmark_history.py rebuild-index --check
 ```
 
-Publication creates `benchmarks/runs/<kind>/<run-id>.json` and regenerates
+Publication creates one `<kind>/<run-id>.json` record under `benchmarks/runs/` and regenerates
 `benchmarks/HISTORY.md`; it never stages, commits, or pushes. Re-recording byte-identical evidence
 is idempotent. A conflicting run ID, duplicate evidence digest, privacy violation, oversized
 record, failed QC, failed finish, crash delta, missing layer, wrong take order, or unreadable WAV
@@ -710,9 +718,10 @@ command after repairing the exporter.
 An accepted QC warning produces `passedWithWarnings` and remains visible in run/cell warning
 counts and worst-QC fields. A QC failure is never downgraded or published.
 
-Schema-v2 tracked benchmark kinds are `ui-generation`, `engine-generation`, `language`,
-`instrument-profile`, `memory-qualification`, `prosody-calibration`, and `ui-perf`
-(registered 2026-08 with the macOS frame-health lane). Schema-v1
+Tracked benchmark kinds (schema v3 when every take carries the quality-registry identity, schema v2
+otherwise; v1 is read-only) are `ui-generation`,
+`engine-generation`, `language`, `instrument-profile`, `memory-qualification`,
+`prosody-calibration`, and `ui-perf` (registered 2026-08 with the macOS frame-health lane). Schema-v1
 `telemetry-overhead` records remain readable historical evidence, but new overhead runs are local
 observer-effect diagnostics and do not publish. Delivery/prosody cells from
 `vocello bench --delivery` remain inside their parent engine-generation record. Smoke, unit tests,
@@ -726,7 +735,7 @@ crash inspection, preflight, and standalone analysis tools do not publish benchm
 | `instrument-profile` | macOS/iOS profile commands | Memory-qualified target generation PASS, exact PID, tracer success, valid trace TOC, non-empty exported performance rows, and run/generation/take/cell-correlated signposts |
 | `memory-qualification` | macOS/iOS `memory` commands | Fixed policy topology, v8 sidecar qualification, output/QC success, and within-mode retained-footprint growth ≤5% of physical RAM |
 | `prosody-calibration` | `prosody_calibration.py` | Required corpus coverage with no analysis failure |
-| `ui-perf` | `ui_test.sh macos perf` via `check_macos_ui_perf.py` | Structural gate PASS (nine scenarios once each, coverage/refresh sanity), canonical hardware profile, and crash delta; threshold breaches are warn-only (`passedWithWarnings`). The iOS perf lane joins this kind only at IUI-6 (platform-aware relaxation); until then its reports stay local-only |
+| `ui-perf` | `ui_test.sh macos|ios perf` via `check_macos_ui_perf.py` / `check_ios_ui_perf.py` | Structural gate PASS (nine scenarios once each, coverage/refresh sanity), canonical hardware profile, and crash delta; threshold breaches are warn-only (`passedWithWarnings`); iOS records carry the platform-aware ceilings from `config/ui-perf-thresholds-ios.json` |
 
 `HISTORY.md` is a generated index grouped by kind, platform, hardware, and comparable
 configuration. It computes a delta against the nearest earlier compatible clean record; a delta is
@@ -782,10 +791,13 @@ regression signal:
 | Lane | Build | Topology | Headline custom/speed/medium warm |
 |------|-------|----------|-----------------------------------|
 | `build.sh cli-optimized` CLI bench | hash-bound `-O` | in-process | Shipping-optimization backend result; compare only with the same optimization identity |
-| local release / `-O` CLI | optimized | in-process | RTF ≈ 1.7 |
-| macOS `ui_test.sh macos benchmark` | Release app | app + XPC service | RTF ≈ 1.7 |
-| iOS `ios_device.sh bench` | `-Onone` device | in-process on iPhone | RTF ≈ 1.6–1.9 |
+| local release / `-O` CLI | optimized | in-process | legacy `decodeSpeedupX` ≈ 1.7 (records before 2026-09-12) |
+| macOS `ui_test.sh macos benchmark` | Release app | app + XPC service | legacy `decodeSpeedupX` ≈ 1.7 (records before 2026-09-12) |
+| iOS `ios_device.sh bench` | `-Onone` device | in-process on iPhone | legacy `decodeSpeedupX` ≈ 1.6–1.9 (records before 2026-09-12) |
 | iOS `ui_test.sh ios benchmark` | `-O` Release app | in-process, real Studio UI | optimized frontend/device result; do not compare with the `-Onone` headless lane |
+
+The speedup figures above are the inverted pre-cutover measure (audio ÷ decode seconds, higher is
+faster); headline standard `rtf` values live in generated `HISTORY.md` and are never compared with them.
 
 Tracked comparison keys include the exact optimization identity, executable UUID/hash, toolchain,
 source inputs, model identity, matrix, and hardware profile. Consequently a historical `-Onone`
@@ -818,7 +830,8 @@ Punctuation-aware pause budget avoids false positives on natural delivery.
 Headless matrix (`scripts/ios_device.sh lang-bench` or `scripts/macos_test.sh lang-bench`)
 stamps `notes.languageHint` (resolved Qwen3 token, not raw UI picker). Gate with
 `scripts/check_language_hints.py` against `config/language-bench-matrix.json`.
-Offline fixture self-test: `python3 -m unittest scripts.tests.test_check_language_hints`.
+Offline fixture self-test: `python3 -m pytest scripts/tests/test_check_language_hints.py` (or
+`scripts/dev.sh py` after editing the gate).
 
 ### Layer 2.6 — Output language + WER/CER (Phase 3, iOS device diagnostics)
 
@@ -844,12 +857,12 @@ an automated gate and does not authorize overriding a deterministic failure or w
 | Path | Contents |
 |------|----------|
 | `~/Library/Application Support/QwenVoice-Debug/diagnostics/engine/generations.jsonl` | Richest backend rows |
-| `.../engine-service/generations.jsonl` | XPC transport (macOS app path) |
-| `.../app/generations.jsonl` | UI timings |
-| `.../generations-merged.jsonl` | Joined layers (macOS) |
-| `.../engine/samples-<UUID>.jsonl` | Verbose per-sample series |
+| `…/engine-service/generations.jsonl` | XPC transport (macOS app path) |
+| `…/app/generations.jsonl` | UI timings |
+| `…/generations-merged.jsonl` | Joined layers (macOS) |
+| `…/engine/samples-<UUID>.jsonl` | Verbose per-sample series |
 | `QwenVoice-Debug/outputs/bench/*.wav` | Bench WAV outputs (fixed per-cell filenames — overwritten across seeds) |
-| `QwenVoice-Debug/outputs/bench-archive/<runID>/` | Durable per-run evidence for every `--delivery` run: all take WAVs plus `bench-results.json`, `bench-prosody.json`, `bench-quality-composed.json`. Fail-closed for required files, written before the sidecar analysis; unbounded, prune manually. Successful diagnostics run dirs are cleaned after publication, so multi-run scoring reads from this archive ([`delivery-harness.md`](delivery-harness.md) §3) |
+| `…/outputs/bench-archive/<runID>/` | Durable per-run evidence for every `--delivery` run: all take WAVs plus `bench-results.json`, `bench-prosody.json`, `bench-quality-composed.json`. Fail-closed for required files, written before the sidecar analysis; unbounded, prune manually. Successful diagnostics run dirs are cleaned after publication, so multi-run scoring reads from this archive ([`delivery-harness.md`](delivery-harness.md) §3) |
 | `<run-artifact-dir>/benchmark-evidence.json` | Atomic run-scoped validator selection and verdict used for publication |
 | `build/**/*.xcresult`, screenshots | UI evidence retained locally under bounded lane retention |
 | `build/**/profiles/` | Compact local profile summaries; raw `*.trace` is success-ephemeral unless `--keep-trace` was explicit |
@@ -860,10 +873,10 @@ Auto-pruned: `generations.jsonl` ~8 MB cap; verbose sidecars newest-48 / 64 MB.
 
 | Path | Rule |
 |------|------|
-| `benchmarks/runs/<kind>/<run-id>.json` | One canonical allowlisted record per successful run, ≤ 256 KB; only `annotate` may update listening review |
-| `benchmarks/HISTORY.md` | Generated registry index; never edit by hand |
+| `benchmarks/runs/` | One canonical allowlisted `<kind>/<run-id>.json` record per successful run, ≤ 256 KB; only `annotate` may update listening review |
+| `benchmarks/HISTORY.md` | Generated registry index (`scripts/benchmark_history.py rebuild-index`, run by publication; `rebuild-index --check` runs in the contract gate); the generated-file guard hook refuses hand edits |
 | `benchmarks/LEGACY_HISTORY.md` | Preserved incomplete manual history; never promoted to complete registry evidence |
-| `benchmarks/hardware-profiles.json`, `schema-v1.json`, `schema-v2.json` | Canonical hardware identities plus compatibility/current record contracts |
+| `benchmarks/hardware-profiles.json`, `schema-v3.json`, `schema-v2.json` (both published today), `schema-v1.json` (read-only) | Canonical hardware identities plus the record contracts |
 | `benchmarks/baseline-*`, `OPTIMIZATION.md` | Existing reference snapshots and historical optimization narrative |
 
 The exporter uses a strict allowlist and rejects serials/UDIDs/ECIDs, host/device/user names,
@@ -872,13 +885,14 @@ labels. **Never commit raw JSONL, WAVs, screenshots, result bundles, or traces**
 
 ### CI / automation
 
-- `.github/workflows/ci.yml` — `ios-compile-check` (compile-only; no attended UI, no bench)
+- `.github/workflows/ci.yml` — `ios-compile` job (generic device-SDK compile of `VocelloiOS` and the policy-test bundle; no UI, no bench, no device)
 - `.github/workflows/release.yml` — deterministic signing and packaging; UI lanes remain explicit/local
 - `scripts/check_project_inputs.sh` — validates all compact records and checks that `HISTORY.md` is reproducible
 - Explicit frontend acceptance: `scripts/ui_test.sh macos smoke|benchmark`
 - Deterministic macOS platform gate: `scripts/macos_test.sh gate` (does not consume UI results)
 
-Engine regression net remains **manual local** until a self-hosted macOS bench job exists.
+The engine regression net is a consent-bound local lane by design; ordinary CI never runs a model, a
+device or XCUITest.
 
 ---
 

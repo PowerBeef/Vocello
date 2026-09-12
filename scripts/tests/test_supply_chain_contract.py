@@ -89,6 +89,14 @@ class SupplyChainContractTests(unittest.TestCase):
         (self.root / "website/package.json").write_text(json.dumps({"scripts": {"lint": "x"}}))
         self.assertTrue(any("missing the deterministic check script" in e for e in module.validate(self.root)))
 
+    def test_toolchain_numpy_matches_the_whisper_adapter_runtime_pin(self) -> None:
+        # The language producer is qualified under one numpy; CI installs the toolchain pin.
+        root = Path(__file__).resolve().parents[2]
+        toolchain = json.loads((root / "config/toolchain.json").read_text(encoding="utf-8"))
+        candidates = json.loads((root / "config/delivery-evaluator-v2-candidates.json").read_text(encoding="utf-8"))
+        whisper = candidates["candidates"]["whisper-small-mlx"]["runtimeDependencies"]["numpy"]
+        self.assertEqual(toolchain["native"]["numpy"]["version"], whisper)
+
     def test_installed_tool_versions_are_checked_exactly(self) -> None:
         self.write_toolchain(
             {"actions/checkout": {"version": "v4", "sha": self.sha},

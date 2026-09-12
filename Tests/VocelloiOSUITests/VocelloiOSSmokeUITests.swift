@@ -4,9 +4,12 @@ import XCTest
 /// seed adoption. A successful observation is not a speech-quality verdict.
 @MainActor
 final class VocelloiOSHistoryObservationUITests: VocelloiOSUITestCase {
-    override func tearDown() {
+    // The async override is main-actor isolated like the class, so the session
+    // is released without crossing an isolation boundary (the synchronous
+    // tearDown is nonisolated by XCTest's declaration).
+    override func tearDown() async throws {
         endSession()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     func testRetainedHistoryTranscript() throws {

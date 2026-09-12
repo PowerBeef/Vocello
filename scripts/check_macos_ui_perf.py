@@ -59,7 +59,9 @@ EXPECTED_SCENARIOS = [
 # drain lands deterministically inside history-scroll's window
 # (baseline-v2: 456 +/- 3 ms/s), so the number tracks harness+app, never
 # the app alone.
-EXPLORATORY = {"window-resize", "generation-active", "history-filter", "history-scroll"}
+# The confirmatory/exploratory designation lives in the thresholds contract
+# (`confirmatoryScenarios`); `exploratory_scenarios()` derives the rest so the
+# checker and the config cannot disagree.
 COVERAGE_FLOOR = 0.90
 REFRESH_INTERVAL_SANE_MS = (1000.0 / 140.0, 1000.0 / 30.0)
 # Gap-histogram bucket upper bounds, in multiples of the refresh interval;
@@ -142,7 +144,11 @@ def approximate_p95_gap_ms(histogram: list[int], refresh_ms: float) -> float | N
     return None
 
 
-def summarize_scenario(marker: dict, rows: list[dict]) -> dict:
+def exploratory_scenarios(thresholds: dict) -> set[str]:
+    return set(EXPECTED_SCENARIOS) - set(thresholds["confirmatoryScenarios"])
+
+
+def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str]) -> dict:
     start = int(marker["windowStartEpochMS"])
     end = int(marker["windowEndEpochMS"])
     if end <= start:
@@ -159,28 +165,45 @@ def summarize_scenario(marker: dict, rows: list[dict]) -> dict:
         b for b in blocks
         if b["endEpochMS"] > start and b["startEpochMS"] < end
     ]
+    # A probe block that straddles the window edge contributes only its
+    # in-window fraction to every additive quantity, and the denominator is
+    # the covered span, so a 500 ms block outside the window can neither
+    # inflate nor dilute the scenario. maxGapMS stays unclipped: a gap cannot
+    # be apportioned, so it is the worst gap of any block touching the window.
+    def fraction(block: dict) -> float:
+        span = int(block["endEpochMS"]) - int(block["startEpochMS"])
+        if span <= 0:
+            return 0.0
+        overlap = min(int(block["endEpochMS"]), end) - max(int(block["startEpochMS"]), start)
+        return max(0.0, min(1.0, overlap / span))
+
+    fractions = {id(b): fraction(b) for b in window}
     covered_ms = sum(
         min(int(b["endEpochMS"]), end) - max(int(b["startEpochMS"]), start)
         for b in window
     )
     coverage = covered_ms / (end - start)
     refresh_values = [b["refreshIntervalMS"] for b in window if b.get("refreshIntervalMS")]
-    refresh_ms = refresh_values[0] if refresh_values else 0.0
-    if refresh_ms and not (
-        REFRESH_INTERVAL_SANE_MS[0] <= refresh_ms <= REFRESH_INTERVAL_SANE_MS[1]
-    ):
+    if not refresh_values:
+        raise GateError(
+            f"scenario '{marker['scenario']}': no probe block reports a refresh interval "
+            "(the display link never delivered a positive frame duration)"
+        )
+    refresh_ms = refresh_values[0]
+    if not (REFRESH_INTERVAL_SANE_MS[0] <= refresh_ms <= REFRESH_INTERVAL_SANE_MS[1]):
         raise GateError(
             f"scenario '{marker['scenario']}': refresh interval {refresh_ms:.2f} ms "
             "outside the 30-140 Hz sanity band"
         )
-    frames = sum(b["framesDelivered"] for b in window)
-    expected = sum(b.get("expectedFrames", 0) for b in window)
-    excess_ms = sum(b["sumExcessMS"] for b in window)
+    frames = int(round(sum(b["framesDelivered"] * fractions[id(b)] for b in window)))
+    expected = int(round(sum(b.get("expectedFrames", 0) * fractions[id(b)] for b in window)))
+    excess_ms = sum(b["sumExcessMS"] * fractions[id(b)] for b in window)
     max_gap = max((b["maxGapMS"] for b in window), default=0.0)
-    histogram = [0] * 7
+    histogram_raw = [0.0] * 7
     for b in window:
         for index, count in enumerate(b.get("gapHistogram", [])):
-            histogram[index] += count
+            histogram_raw[index] += count * fractions[id(b)]
+    histogram = [int(round(value)) for value in histogram_raw]
     duration_ms = end - start
     cpu_rows = sorted(window, key=lambda b: b["startEpochMS"])
     cpu_user = cpu_rows[-1]["cpuUserMS"] - cpu_rows[0]["cpuUserMS"] if len(cpu_rows) > 1 else 0
@@ -193,13 +216,13 @@ def summarize_scenario(marker: dict, rows: list[dict]) -> dict:
     scenario = marker["scenario"]
     return {
         "scenario": scenario,
-        "designation": "exploratory" if scenario in EXPLORATORY else "confirmatory",
+        "designation": "exploratory" if scenario in exploratory else "confirmatory",
         "durationMS": duration_ms,
         "probeCoverage": round(coverage, 4),
         "framesDelivered": frames,
         "expectedFrames": expected,
-        "hitchTimeMSPerS": round(excess_ms / (duration_ms / 1000.0), 3)
-        if duration_ms else None,
+        "hitchTimeMSPerS": round(excess_ms / (covered_ms / 1000.0), 3)
+        if covered_ms else None,
         "maxGapMS": round(max_gap, 2),
         "p95GapMSApprox": approximate_p95_gap_ms(histogram, refresh_ms),
         "gapHistogram": histogram,
@@ -224,7 +247,48 @@ def load_thresholds(path: Path) -> dict:
     thresholds = json.loads(path.read_text(encoding="utf-8"))
     if thresholds.get("schemaVersion") != 1 or thresholds.get("warnOnly") is not True:
         raise GateError(f"unsupported thresholds contract: {path}")
+    confirmatory = thresholds.get("confirmatoryScenarios")
+    if not isinstance(confirmatory, list) or not set(confirmatory) <= set(EXPECTED_SCENARIOS):
+        raise GateError(f"thresholds contract names unknown confirmatory scenarios: {path}")
+    for key in ("hitchCeilingMSPerS", "maxGapCeilingMS"):
+        if set(thresholds.get(key, {})) != set(confirmatory):
+            raise GateError(f"thresholds contract {key} must cover exactly the confirmatory scenarios: {path}")
     return thresholds
+
+
+THERMAL_RANK = {"nominal": 0, "fair": 1, "serious": 2, "critical": 3}
+
+
+def run_hardware_context(
+    environment_rows: list[dict], scenarios: list[dict], profile_id: str
+) -> dict:
+    """Host-truth runtime context for the registry record, from the probes'
+    one-per-launch environment snapshots (mirrors the iOS lane). Fail-closed:
+    a probe without the snapshot predates this checker."""
+    if not environment_rows:
+        raise GateError(
+            "probe files carry no environment snapshot; the built app predates "
+            "the environment-aware probe (probe and checker move together)"
+        )
+    hardware: dict = {"profileID": profile_id}
+    loads = [r["loadAverage1Minute"] for r in environment_rows
+             if isinstance(r.get("loadAverage1Minute"), (int, float))]
+    free = [r["freeStorageBytes"] for r in environment_rows if isinstance(r.get("freeStorageBytes"), int)]
+    uptime = [r["uptimeSeconds"] for r in environment_rows
+              if isinstance(r.get("uptimeSeconds"), (int, float))]
+    low_power = [r["lowPowerModeEnabled"] for r in environment_rows
+                 if isinstance(r.get("lowPowerModeEnabled"), bool)]
+    if loads: hardware["loadAverage1M"] = max(loads)
+    if free: hardware["freeStorageBytes"] = min(free)
+    if uptime: hardware["uptimeSeconds"] = min(uptime)
+    if low_power: hardware["lowPowerMode"] = any(low_power)
+    thermal = [str(r.get("thermalState", "")).lower() for r in environment_rows] + [
+        state for summary in scenarios for state in summary.get("thermalStates", [])
+    ]
+    known = [state for state in thermal if state in THERMAL_RANK]
+    if known:
+        hardware["thermalState"] = max(known, key=THERMAL_RANK.get)
+    return hardware
 
 
 def evaluate_thresholds(summary: dict, thresholds: dict) -> list[str]:
@@ -279,6 +343,7 @@ def build_evidence_manifest(
     scenario_warnings: dict[str, list[str]],
     probe_digest: str,
     profile_id: str,
+    hardware: dict | None = None,
 ) -> dict:
     takes = []
     for index, summary in enumerate(scenarios, start=1):
@@ -318,7 +383,7 @@ def build_evidence_manifest(
                 "matrixScope": "canonical",
                 "warnings": run_warnings,
             },
-            "hardware": {"profileID": profile_id},
+            "hardware": {**(hardware or {}), "profileID": profile_id},
             "models": [],
             "evidence": {
                 "validatorPassed": True,
@@ -370,19 +435,22 @@ def main() -> int:
         if unexpected:
             raise GateError(f"unexpected scenario markers: {', '.join(unexpected)}")
 
+        exploratory = exploratory_scenarios(thresholds)
         scenarios = []
         scenario_warnings: dict[str, list[str]] = {}
+        environment_rows: list[dict] = []
         probe_hash = hashlib.sha256()
         for name in EXPECTED_SCENARIOS:
             probe_path = find_probe_file(ui_perf_dir, name, args.run_started_epoch_ms)
             rows = load_probe_rows(probe_path)
+            environment_rows += [r for r in rows if r.get("kind") == "environment"]
             env_scenarios = {r.get("scenario") for r in rows}
             if env_scenarios - {name}:
                 raise GateError(
                     f"scenario '{name}': probe rows carry mismatched scenario names "
                     f"{sorted(env_scenarios)}"
                 )
-            summary, coverage = summarize_scenario(markers[name], rows)
+            summary, coverage = summarize_scenario(markers[name], rows, exploratory=exploratory)
             if coverage < COVERAGE_FLOOR:
                 raise GateError(
                     f"scenario '{name}': probe coverage {coverage:.0%} below "
@@ -398,6 +466,7 @@ def main() -> int:
                 destination = Path(args.copy_probe_files_to)
                 destination.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(probe_path, destination / probe_path.name)
+        hardware_context = run_hardware_context(environment_rows, scenarios, "pending")
     except GateError as error:
         print(f"ui-perf gate FAILED: {error}", file=sys.stderr)
         return 1
@@ -406,6 +475,7 @@ def main() -> int:
     report = {
         "schemaVersion": 1,
         "evidence": "registry" if args.emit_evidence else "local-only",
+        "hardwareContext": {k: v for k, v in hardware_context.items() if k != "profileID"},
         "runID": args.run_id,
         "status": "passedWithWarnings" if run_warnings else "passed",
         "thresholds": {"path": str(args.thresholds), "warnOnly": True, "warnings": run_warnings},
@@ -442,6 +512,7 @@ def main() -> int:
                 scenario_warnings=scenario_warnings,
                 probe_digest=probe_hash.hexdigest(),
                 profile_id=profile_id,
+                hardware={k: v for k, v in hardware_context.items() if k != "profileID"},
             )
             evidence_path = output.parent / "benchmark-evidence.json"
             evidence_path.write_text(

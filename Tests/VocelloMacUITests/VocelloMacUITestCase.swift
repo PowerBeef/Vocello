@@ -148,58 +148,6 @@ class VocelloMacUITestCase: XCTestCase {
         restorePendingAutoplayPreference()
     }
 
-    /// Diagnostic counterpart of `ensureAutoplayEnabled`: drives the same
-    /// visible Settings toggle OFF so a benchmark run can isolate the cost
-    /// of live-preview playback/UI during generation. Returns the original
-    /// state so the caller can restore it.
-    @discardableResult
-    func ensureAutoplayDisabled() -> Bool {
-        navigate(to: .settings)
-        let toggle = element("preferences_autoPlayToggle")
-        XCTAssertTrue(VocelloUIWait.exists(toggle, timeout: 20))
-        guard let wasEnabled = VocelloUIToggle.state(of: toggle) else {
-            XCTFail("Could not read the visible Auto-play toggle state")
-            return true
-        }
-        if wasEnabled {
-            scrollSettingsIfNeeded(toReveal: toggle)
-            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: toggle, timeout: 20))
-            XCTAssertTrue(
-                VocelloUIWait.condition("Auto-play toggle to become disabled", timeout: 15) {
-                    VocelloUIToggle.state(of: toggle) == false
-                }
-            )
-        }
-        return wasEnabled
-    }
-
-    /// The Settings pane can leave lower rows outside the visible region, and
-    /// the primary-action helper deliberately never scrolls. Nudge the visible
-    /// scroll area until the element reports hittable (bounded attempts).
-    private func scrollSettingsIfNeeded(toReveal element: XCUIElement) {
-        guard !element.isHittable else { return }
-        // Settings is a sidebar destination in the main window, so the
-        // content scroll view is not necessarily `scrollViews.firstMatch`
-        // (the sidebar exposes one too). Nudge every visible scroll view.
-        let scrollViews = app.scrollViews.allElementsBoundByIndex
-        for delta in [-400.0, -400.0, -400.0, 1600.0, -400.0, -400.0] {
-            for scrollView in scrollViews where scrollView.exists {
-                scrollView.scroll(byDeltaX: 0, deltaY: CGFloat(delta))
-                if element.isHittable { return }
-            }
-            if element.isHittable { return }
-        }
-    }
-
-    func restoreAutoplayAfterDiagnostic(originallyEnabled: Bool) {
-        guard originallyEnabled else { return }
-        navigate(to: .settings)
-        let toggle = element("preferences_autoPlayToggle")
-        guard VocelloUIWait.exists(toggle, timeout: 20),
-              VocelloUIToggle.state(of: toggle) == false else { return }
-        _ = VocelloUIPrimaryAction.perform(on: toggle, timeout: 20)
-    }
-
     /// Establish the persistent Clone consent through the same visible
     /// Settings control users operate. This is deliberately not a launch
     /// environment shortcut or seeded application state.

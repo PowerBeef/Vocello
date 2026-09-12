@@ -410,7 +410,7 @@ publication. Guarded pressure or `softTrim` is `passedWithWarnings`. iOS additio
 physical footprint ≥5.2 GB, minimum headroom <384 MB, or Metal working-set ratio ≥0.8; footprint
 ≥4.5 GB or headroom <768 MB is a warning. The iOS record retains start/end/min headroom and peak
 process-budget utilization. macOS UI/XPC totals pair app and engine samples by absolute uptime within
-one 500 ms cadence; they never add independent process maxima. Headless CLI/profile evidence reports
+one sampler cadence (the larger of the two processes' target intervals: 500 ms on the 8 GB Mac and iPhone tiers, 250 ms on 16 GB, 100 ms above); they never add independent process maxima. Headless CLI/profile evidence reports
 only its owning engine process.
 
 The separate `memory` commands run policy `retained-memory-v1`: fixed Custom→Design→Clone
@@ -562,7 +562,7 @@ warm by design.
 
 Each successful publishable runner creates one canonical, privacy-safe schema-v2 record under one
 of seven kinds: UI generation, engine generation, language, instrument profile, retained-memory
-qualification, prosody calibration, or UI frame health (`ui-perf`, from the macOS perf lane). `scripts/benchmark_history.py` validates these records and regenerates
+qualification, prosody calibration, or UI frame health (`ui-perf`, from the macOS and iOS perf lanes). `scripts/benchmark_history.py` validates these records and regenerates
 `benchmarks/HISTORY.md`; direct Markdown append is unsupported. A strict allowlist rejects
 identifiers and content that could expose serials, UDIDs/ECIDs, host/device/user names, absolute
 paths, prompts/transcripts/voice descriptions, raw errors, email addresses, URLs, or secrets. Run

@@ -508,6 +508,9 @@ public struct VocelloUIPerfScenarioMarker: Codable {
     public func emit() {
         guard let data = try? JSONEncoder().encode(self) else { return }
         print("VOCELLO_UIPERF_SCENARIO=\(data.base64EncodedString())")
+        // stdout is fully buffered under the runner's pipe; a crash later in
+        // the run must not take the markers of completed scenarios with it.
+        fflush(stdout)
     }
 }
 

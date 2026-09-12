@@ -735,6 +735,7 @@ def main() -> int:
         failures.append("engine generationIDs are not unique")
 
     actual_cells: list[tuple[str, str, str, int]] = []
+    seeds_by_mode: dict[str, set[str]] = {}
     for index, row in enumerate(engine_rows):
         notes = row.get("notes") or {}
         mapped_cell = expected_cells[index] if index < expected_count else ("?", "?", "?", 0)
@@ -747,6 +748,23 @@ def main() -> int:
                     f"take {index + 1} telemetry identity mismatch: actual={inferred} "
                     f"expected={(expected_cell[0], expected_cell[2])}"
                 )
+            # Cells are assigned by attachment order, so the prompt the engine
+            # actually received must match the cell's length bucket; otherwise a
+            # short prompt could publish under a long cell unnoticed.
+            prompt_chars = notes.get("promptChars")
+            try:
+                bucket = length_bucket(int(prompt_chars))
+            except (TypeError, ValueError):
+                failures.append(f"take {index + 1} engine row has no promptChars to prove its length cell")
+            else:
+                if bucket != expected_cell[1]:
+                    failures.append(
+                        f"take {index + 1} prompt length {prompt_chars} chars is a {bucket} prompt, "
+                        f"not the {expected_cell[1]} cell it was recorded under"
+                    )
+            seed = notes.get("samplingSeed")
+            if seed is not None:
+                seeds_by_mode.setdefault(str(expected_cell[0]), set()).add(str(seed))
             explicit_cell = notes.get("benchCell")
             if explicit_cell is not None and explicit_cell != cell_name(expected_cell):
                 failures.append(
@@ -768,6 +786,9 @@ def main() -> int:
         identity = row.get("modelRuntimeIdentity") or {}
         if row.get("schemaVersion", 0) >= 7:
             failures.extend(validate_v7_engine_telemetry(row))
+    for mode, seeds in sorted(seeds_by_mode.items()):
+        if len(seeds) > 1:
+            failures.append(f"mode {mode} used {len(seeds)} different sampling seeds; the matrix freezes one seed per mode")
             if not isinstance(row.get("backendMetrics"), dict):
                 failures.append(f"{row.get('generationID', '?')}: missing typed backend metrics")
             if identity.get("resolvedModelID") != row.get("modelID"):

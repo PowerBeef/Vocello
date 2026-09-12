@@ -82,7 +82,16 @@ class UIPerfFixture(unittest.TestCase):
             window_end = window_start + 5_000
             log_lines.append(make_marker(scenario, window_start, window_end))
             per_block = hitch_by_scenario.get(scenario, 0.0) * 0.5  # ms/s -> ms per 500 ms block
-            rows = [{"kind": "meta", "scenario": scenario}]
+            rows = [{"kind": "meta", "scenario": scenario}, {
+                "kind": "environment",
+                "scenario": scenario,
+                "capturedEpochMS": launch + offset * 20_000,
+                "uptimeSeconds": 7_200.0 + offset,
+                "lowPowerModeEnabled": False,
+                "loadAverage1Minute": 2.0 + offset * 0.1,
+                "freeStorageBytes": 90_000_000_000 + offset,
+                "thermalState": "nominal",
+            }]
             rows += [dict(block, scenario=scenario) for block in make_blocks(
                 window_start - 1_000, 16, hitch_ms_per_block=per_block)]
             probe = self.diagnostics / "ui-perf" / f"frames-{launch + offset * 20_000}-{scenario}.jsonl"
@@ -187,6 +196,60 @@ class UIPerfFixture(unittest.TestCase):
         idle = takes[0]
         self.assertEqual(idle["status"], "passedWithWarnings")
         self.assertEqual(takes[1]["status"], "passed")
+
+
+
+class WindowArithmeticTests(unittest.TestCase):
+    def marker(self, start: int, end: int) -> dict:
+        return {"scenario": "idle-baseline", "windowStartEpochMS": start, "windowEndEpochMS": end,
+                "actionCount": 1}
+
+    def test_edge_blocks_contribute_only_their_in_window_fraction(self):
+        # Blocks at 0-500, 500-1000, 1000-1500; window 250-1250 straddles both edges.
+        blocks = make_blocks(0, 3, hitch_ms_per_block=100.0)
+        summary, coverage = checker.summarize_scenario(
+            self.marker(250, 1_250), blocks, exploratory=set())
+        self.assertEqual(coverage, 1.0)
+        self.assertEqual(summary["framesDelivered"], 60)      # 15 + 30 + 15
+        self.assertEqual(summary["gapHistogram"][0], 60)
+        self.assertAlmostEqual(summary["hitchTimeMSPerS"], 200.0)  # 200 ms over 1.0 s covered
+        self.assertEqual(summary["maxGapMS"], 16.67)           # unclipped worst gap
+
+    def test_hitch_rate_uses_the_covered_span_not_the_marker_length(self):
+        # Only the first 1.0 s of a 2.0 s window has probe blocks.
+        blocks = make_blocks(0, 2, hitch_ms_per_block=50.0)
+        summary, coverage = checker.summarize_scenario(
+            self.marker(0, 2_000), blocks, exploratory=set())
+        self.assertEqual(coverage, 0.5)
+        self.assertAlmostEqual(summary["hitchTimeMSPerS"], 100.0)
+
+    def test_a_missing_refresh_interval_fails_closed(self):
+        blocks = make_blocks(0, 4)
+        for block in blocks:
+            block["refreshIntervalMS"] = 0.0
+        with self.assertRaisesRegex(checker.GateError, "refresh interval"):
+            checker.summarize_scenario(self.marker(0, 2_000), blocks, exploratory=set())
+
+
+class ThresholdsContractTests(unittest.TestCase):
+    def test_shipped_contract_owns_the_confirmatory_designation(self):
+        contract = checker.load_thresholds(checker.DEFAULT_THRESHOLDS_PATH)
+        exploratory = checker.exploratory_scenarios(contract)
+        self.assertEqual(
+            exploratory, {"window-resize", "generation-active", "history-filter", "history-scroll"})
+        self.assertEqual(set(contract["hitchCeilingMSPerS"]), set(contract["confirmatoryScenarios"]))
+
+    def test_contract_with_a_ceiling_for_an_undesignated_scenario_is_refused(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "thresholds.json"
+            path.write_text(json.dumps({
+                "schemaVersion": 1, "warnOnly": True,
+                "confirmatoryScenarios": ["idle-baseline"],
+                "hitchCeilingMSPerS": {"idle-baseline": 5.0, "window-resize": 5.0},
+                "maxGapCeilingMS": {"idle-baseline": 40.0},
+            }))
+            with self.assertRaisesRegex(checker.GateError, "exactly the confirmatory"):
+                checker.load_thresholds(path)
 
 
 if __name__ == "__main__":

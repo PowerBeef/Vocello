@@ -57,7 +57,7 @@ final class UIPerfFrameProbe: NSObject {
     /// Gap histogram in multiples of the refresh interval:
     /// ≤1.25×, ≤1.75×, ≤2.75×, ≤4.75×, ≤8×, ≤16×, >16×.
     private var gapHistogram = [0, 0, 0, 0, 0, 0, 0]
-    private var baselineCPU = UIPerfFrameProbe.cpuTimesMS()
+    private var finished = false
 
     private init(scenario: String) {
         self.scenario = scenario
@@ -75,6 +75,7 @@ final class UIPerfFrameProbe: NSObject {
             "frames-\(launchEpochMS)-\(scenario).jsonl")
         FileManager.default.createFile(atPath: fileURL.path, contents: nil)
         writer = try? FileHandle(forWritingTo: fileURL)
+        appendEnvironmentSnapshot()
         watchdog.begin()
         blockStartEpochMS = Int64(Date().timeIntervalSince1970 * 1000)
 
@@ -84,24 +85,65 @@ final class UIPerfFrameProbe: NSObject {
         NotificationCenter.default.addObserver(
             self, selector: #selector(willTerminate(_:)),
             name: NSApplication.willTerminateNotification, object: nil)
+        // `terminate()` from XCUITest does not always deliver willTerminate;
+        // resigning active is the last reliable point to flush the tail block
+        // and the stall summary (mirrors the iOS probe's didEnterBackground).
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(willResignActive(_:)),
+            name: NSApplication.willResignActiveNotification, object: nil)
         if let window = NSApp.keyWindow ?? NSApp.windows.first {
             attach(to: window)
         }
     }
 
+    /// One privacy-safe row per launch with the host context the registry's
+    /// hardware block needs (load average, free storage, uptime, Low Power
+    /// Mode, thermal state). No host names, paths or hardware identifiers.
+    private func appendEnvironmentSnapshot() {
+        var loadValues = [Double](repeating: 0, count: 3)
+        let loadCount = loadValues.withUnsafeMutableBufferPointer { buffer -> Int in
+            guard let baseAddress = buffer.baseAddress else { return 0 }
+            return Int(getloadavg(baseAddress, Int32(buffer.count)))
+        }
+        let freeStorageBytes = (try? FileManager.default.attributesOfFileSystem(
+            forPath: NSHomeDirectory()
+        )).flatMap { ($0[.systemFreeSize] as? NSNumber)?.uint64Value }
+        let processInfo = ProcessInfo.processInfo
+        var row: [String: Any] = [
+            "kind": "environment",
+            "scenario": scenario,
+            "capturedEpochMS": launchEpochMS,
+            "uptimeSeconds": processInfo.systemUptime,
+            "lowPowerModeEnabled": processInfo.isLowPowerModeEnabled,
+            "thermalState": thermalStateName(),
+        ]
+        if loadCount > 0 { row["loadAverage1Minute"] = loadValues[0] }
+        if let freeStorageBytes { row["freeStorageBytes"] = freeStorageBytes }
+        append(row)
+    }
+
     @objc private func windowBecameKey(_ notification: Notification) {
-        guard displayLink == nil, let window = notification.object as? NSWindow else { return }
+        guard let window = notification.object as? NSWindow else { return }
         attach(to: window)
     }
 
+    /// Follows the key window: a display link stays bound to the window it
+    /// was created for, so a move to another display would otherwise keep
+    /// measuring the old one with a stale refresh interval.
+    private var attachedWindow: NSWindow?
+
     private func attach(to window: NSWindow) {
-        guard displayLink == nil else { return }
+        guard attachedWindow !== window else { return }
+        displayLink?.invalidate()
+        previousTimestamp = nil
+        refreshIntervalMS = 0
         let link = window.displayLink(target: self, selector: #selector(tick(_:)))
         // `.common` mode is load-bearing: during scroll, menu tracking, and
         // window resize the main run loop leaves `.default`, and those are
         // exactly the windows this probe exists to measure.
         link.add(to: .main, forMode: .common)
         displayLink = link
+        attachedWindow = window
     }
 
     @objc private func tick(_ link: CADisplayLink) {
@@ -164,10 +206,19 @@ final class UIPerfFrameProbe: NSObject {
         sumExcessMS = 0
         maxGapMS = 0
         gapHistogram = [0, 0, 0, 0, 0, 0, 0]
-        _ = baselineCPU
     }
 
     @objc private func willTerminate(_ notification: Notification) {
+        finish()
+    }
+
+    @objc private func willResignActive(_ notification: Notification) {
+        finish()
+    }
+
+    private func finish() {
+        guard !finished else { return }
+        finished = true
         let endEpochMS = Int64(Date().timeIntervalSince1970 * 1000)
         if framesDelivered > 0 {
             flushBlock(endEpochMS: endEpochMS)
@@ -187,6 +238,7 @@ final class UIPerfFrameProbe: NSObject {
         writerQueue.sync { }
         try? writer?.close()
         displayLink?.invalidate()
+        displayLink = nil
     }
 
     private func append(_ row: [String: Any]) {

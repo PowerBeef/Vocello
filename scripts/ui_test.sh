@@ -327,6 +327,11 @@ fi
 out="$QVOICE_ARTIFACTS_UI_TESTS/$platform/$run_id"
 result="$out/result.xcresult"
 mkdir -p "$out"
+# Every lane runs unattended and can outlast the display-sleep timer; a
+# benchmark that loses its visible window mid-matrix changes what it measures
+# (window compositing is ~23% of the macOS take, OPTIMIZATION.md §K), and the
+# host sleeping kills a device run outright. caffeinate follows this process.
+caffeinate -dimsuw $$ &
 step_ledger="$out/required-steps.json"
 step_workflow="ui-$platform-$lane"
 [[ "$scenario_argument" != "history-transcript" ]] || step_workflow="ui-ios-history-transcript"
@@ -1269,12 +1274,9 @@ elif [[ "$platform" == "macos" ]]; then
       export TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS="$long_form_segments"
     fi
   elif [[ "$lane" == "perf" ]]; then
-    # UI-performance scenarios (frame probe + marked windows). Runs
-    # unattended: caffeinate holds off display/system sleep for the
-    # lifetime of this script.
+    # UI-performance scenarios (frame probe + marked windows).
     only_test="VocelloMacUITests/VocelloMacPerfUITests"
     perf_run_started_epoch_ms="$(($(date +%s) * 1000))"
-    caffeinate -dimsuw $$ &
   else
     only_test="VocelloMacUITests/VocelloMacBenchmarkUITests/testOrderedConfigurableMatrix"
     rm -f "$MAC_TAKE_MANIFEST" "$MAC_TAKE_MANIFEST.next"

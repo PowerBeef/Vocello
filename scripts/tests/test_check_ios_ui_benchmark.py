@@ -377,6 +377,39 @@ class CheckIOSUIBenchmarkTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("malformed JSON", result.stdout + result.stderr)
 
+    FULL_CELLS = [
+        ("custom", "medium", "cold"), ("custom", "short", "warm"), ("custom", "medium", "warm"),
+        ("clone", "short", "warm"), ("clone", "medium", "warm"),
+    ]
+
+    def test_prompt_length_must_match_the_positional_cell(self) -> None:
+        cells = self.FULL_CELLS
+
+        def short_prompt_under_medium_cell(rows):
+            rows[2]["notes"]["promptChars"] = "36"
+
+        result = self.run_checker(cells, mutate_rows=short_prompt_under_medium_cell)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("is a short prompt, not the medium cell", result.stdout + result.stderr)
+
+        def no_prompt_length(rows):
+            rows[1]["notes"].pop("promptChars", None)
+
+        result = self.run_checker(cells, mutate_rows=no_prompt_length)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("no promptChars", result.stdout + result.stderr)
+
+    def test_each_mode_freezes_one_sampling_seed(self) -> None:
+        cells = self.FULL_CELLS
+
+        def two_seeds(rows):
+            rows[1]["notes"]["samplingSeed"] = "42"
+            rows[2]["notes"]["samplingSeed"] = "43"
+
+        result = self.run_checker(cells, mutate_rows=two_seeds)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("different sampling seeds", result.stdout + result.stderr)
+
     def test_schema_v8_complete_accuracy_evidence_passes(self) -> None:
         result = self.run_checker(
             self.expected_order,

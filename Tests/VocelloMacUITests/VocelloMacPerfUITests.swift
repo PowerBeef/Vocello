@@ -24,9 +24,12 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
         continueAfterFailure = false
     }
 
-    override func tearDown() {
+    // The async override is main-actor isolated like the class, so the session
+    // is released without crossing an isolation boundary (the synchronous
+    // tearDown is nonisolated by XCTest's declaration).
+    override func tearDown() async throws {
         endSession()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     // MARK: - Scenario driver
@@ -252,6 +255,9 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
         prepare(mode: .custom)
         let nonce = String(UUID().uuidString.prefix(8))
         replaceScript(with: VocelloUIBenchMatrix.text(for: .short) + " Marker \(nonce).")
+        // Readiness polling is harness work; the window opens once the app is
+        // ready and closes when the take completes.
+        assertReadyToGenerate(mode: .custom)
         let start = Int64(Date().timeIntervalSince1970 * 1000)
         generateAndWaitForCompletion(mode: .custom, timeout: 300)
         let end = Int64(Date().timeIntervalSince1970 * 1000)

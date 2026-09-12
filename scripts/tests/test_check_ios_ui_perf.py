@@ -204,8 +204,9 @@ class IOSUIPerfFixture(unittest.TestCase):
             (Path(checker.REPO_ROOT) / "config" / "ui-perf-thresholds-ios.json").read_text())
         self.assertEqual(contract["schemaVersion"], 1)
         self.assertTrue(contract["warnOnly"])
-        confirmatory = set(checker.EXPECTED_SCENARIOS) - checker.EXPLORATORY
+        confirmatory = set(checker.EXPECTED_SCENARIOS) - checker.exploratory_scenarios(contract)
         self.assertEqual(set(contract["confirmatoryScenarios"]), confirmatory)
+        self.assertEqual(checker.exploratory_scenarios(contract), {"ios-player-scrub", "ios-generation-active"})
         self.assertEqual(set(contract["hitchCeilingMSPerS"]), confirmatory)
         self.assertEqual(set(contract["maxGapCeilingMS"]), confirmatory)
 

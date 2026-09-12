@@ -72,7 +72,8 @@ EXPECTED_SCENARIOS = [
 # DragGesture surface (per-event accessibility re-query executes on the
 # app's main thread — the macOS history-scroll lesson), and generation
 # duration is model-dependent; both are exploratory by design.
-EXPLORATORY = {"ios-player-scrub", "ios-generation-active"}
+# The confirmatory/exploratory designation lives in the thresholds contract
+# (`confirmatoryScenarios`); `exploratory_scenarios()` derives the rest.
 COVERAGE_FLOOR = 0.90
 REFRESH_INTERVAL_SANE_MS = (1000.0 / 140.0, 1000.0 / 30.0)
 # Observed-cadence band around the probe's pinned 60 Hz link. Fail-closed on
@@ -173,7 +174,11 @@ def median_block_cadence_hz(window: list[dict]) -> float | None:
     return round(statistics.median(cadences), 2)
 
 
-def summarize_scenario(marker: dict, rows: list[dict]) -> tuple[dict, float]:
+def exploratory_scenarios(thresholds: dict) -> set[str]:
+    return set(EXPECTED_SCENARIOS) - set(thresholds["confirmatoryScenarios"])
+
+
+def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str]) -> tuple[dict, float]:
     start = int(marker["windowStartEpochMS"])
     end = int(marker["windowEndEpochMS"])
     if end <= start:
@@ -190,29 +195,46 @@ def summarize_scenario(marker: dict, rows: list[dict]) -> tuple[dict, float]:
         b for b in blocks
         if b["endEpochMS"] > start and b["startEpochMS"] < end
     ]
+    # A probe block that straddles the window edge contributes only its
+    # in-window fraction to every additive quantity, and the denominator is
+    # the covered span, so a 500 ms block outside the window can neither
+    # inflate nor dilute the scenario. maxGapMS stays unclipped: a gap cannot
+    # be apportioned, so it is the worst gap of any block touching the window.
+    def fraction(block: dict) -> float:
+        span = int(block["endEpochMS"]) - int(block["startEpochMS"])
+        if span <= 0:
+            return 0.0
+        overlap = min(int(block["endEpochMS"]), end) - max(int(block["startEpochMS"]), start)
+        return max(0.0, min(1.0, overlap / span))
+
+    fractions = {id(b): fraction(b) for b in window}
     covered_ms = sum(
         min(int(b["endEpochMS"]), end) - max(int(b["startEpochMS"]), start)
         for b in window
     )
     coverage = covered_ms / (end - start)
     refresh_values = [b["refreshIntervalMS"] for b in window if b.get("refreshIntervalMS")]
-    refresh_ms = refresh_values[0] if refresh_values else 0.0
-    if refresh_ms and not (
-        REFRESH_INTERVAL_SANE_MS[0] <= refresh_ms <= REFRESH_INTERVAL_SANE_MS[1]
-    ):
+    if not refresh_values:
+        raise GateError(
+            f"scenario '{marker['scenario']}': no probe block reports a refresh interval "
+            "(the display link never delivered a positive frame duration)"
+        )
+    refresh_ms = refresh_values[0]
+    if not (REFRESH_INTERVAL_SANE_MS[0] <= refresh_ms <= REFRESH_INTERVAL_SANE_MS[1]):
         raise GateError(
             f"scenario '{marker['scenario']}': refresh interval {refresh_ms:.2f} ms "
             "outside the 30-140 Hz sanity band"
         )
     cadence = median_block_cadence_hz(window)
-    frames = sum(b["framesDelivered"] for b in window)
-    expected = sum(b.get("expectedFrames", 0) for b in window)
-    excess_ms = sum(b["sumExcessMS"] for b in window)
+    frames = int(round(sum(b["framesDelivered"] * fractions[id(b)] for b in window)))
+    expected = int(round(sum(b.get("expectedFrames", 0) * fractions[id(b)] for b in window)))
+    excess_ms = sum(b["sumExcessMS"] * fractions[id(b)] for b in window)
     max_gap = max((b["maxGapMS"] for b in window), default=0.0)
-    histogram = [0] * 7
+    histogram_raw = [0.0] * 7
     for b in window:
         for index, count in enumerate(b.get("gapHistogram", [])):
-            histogram[index] += count
+            histogram_raw[index] += count * fractions[id(b)]
+    histogram = [int(round(value)) for value in histogram_raw]
     duration_ms = end - start
     cpu_rows = sorted(window, key=lambda b: b["startEpochMS"])
     cpu_user = cpu_rows[-1]["cpuUserMS"] - cpu_rows[0]["cpuUserMS"] if len(cpu_rows) > 1 else 0
@@ -225,14 +247,14 @@ def summarize_scenario(marker: dict, rows: list[dict]) -> tuple[dict, float]:
     scenario = marker["scenario"]
     return {
         "scenario": scenario,
-        "designation": "exploratory" if scenario in EXPLORATORY else "confirmatory",
+        "designation": "exploratory" if scenario in exploratory else "confirmatory",
         "durationMS": duration_ms,
         "probeCoverage": round(coverage, 4),
         "framesDelivered": frames,
         "expectedFrames": expected,
         "medianBlockCadenceHz": cadence,
-        "hitchTimeMSPerS": round(excess_ms / (duration_ms / 1000.0), 3)
-        if duration_ms else None,
+        "hitchTimeMSPerS": round(excess_ms / (covered_ms / 1000.0), 3)
+        if covered_ms else None,
         "maxGapMS": round(max_gap, 2),
         "p95GapMSApprox": approximate_p95_gap_ms(histogram, refresh_ms),
         "gapHistogram": histogram,
@@ -280,6 +302,12 @@ def load_thresholds(path: Path) -> dict:
     thresholds = json.loads(path.read_text(encoding="utf-8"))
     if thresholds.get("schemaVersion") != 1 or thresholds.get("warnOnly") is not True:
         raise GateError(f"unsupported thresholds contract: {path}")
+    confirmatory = thresholds.get("confirmatoryScenarios")
+    if not isinstance(confirmatory, list) or not set(confirmatory) <= set(EXPECTED_SCENARIOS):
+        raise GateError(f"thresholds contract names unknown confirmatory scenarios: {path}")
+    for key in ("hitchCeilingMSPerS", "maxGapCeilingMS"):
+        if set(thresholds.get(key, {})) != set(confirmatory):
+            raise GateError(f"thresholds contract {key} must cover exactly the confirmatory scenarios: {path}")
     return thresholds
 
 
@@ -498,7 +526,8 @@ def main() -> int:
     ui_perf_dir = diagnostics / "ui-perf"
     profile_id = None
     try:
-        thresholds = load_thresholds(args.thresholds) if args.thresholds else None
+        thresholds = load_thresholds(args.thresholds or DEFAULT_THRESHOLDS_PATH)
+        exploratory = exploratory_scenarios(thresholds)
         if args.require_canonical:
             profile_id = verify_canonical_iphone(diagnostics, args.run_id)
         markers = parse_markers(Path(args.xcodebuild_log))
@@ -523,7 +552,7 @@ def main() -> int:
                     f"scenario '{name}': probe rows carry mismatched scenario names "
                     f"{sorted(env_scenarios)}"
                 )
-            summary, coverage = summarize_scenario(markers[name], rows)
+            summary, coverage = summarize_scenario(markers[name], rows, exploratory=exploratory)
             if coverage < COVERAGE_FLOOR:
                 raise GateError(
                     f"scenario '{name}': probe coverage {coverage:.0%} below "

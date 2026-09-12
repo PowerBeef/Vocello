@@ -651,6 +651,10 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: NO
         SWIFT_STRICT_CONCURRENCY: minimal
+        # This bundle imports StoreKitTest, whose Apple headers deprecate their
+        # own API; with warnings as errors the clang module fails to build, so
+        # the test bundle (never shipped) keeps warnings visible instead.
+        SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
 
   # Standalone runner for an already installed distribution app. Deliberately
   # no VocelloiOS dependency or TEST_TARGET_NAME: it must not build the app.

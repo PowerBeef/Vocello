@@ -14,10 +14,10 @@ extension ContinuousClock.Instant {
 }
 
 extension Duration {
-    /// Fractional seconds.
+    /// Fractional seconds (attoseconds are 1e-18 s; the millisecond helper below divides by 1e15).
     public var seconds: Double {
         let components = components
-        return Double(components.seconds) + Double(components.attoseconds) / 1_000_000_000_000_000
+        return Double(components.seconds) + Double(components.attoseconds) / 1_000_000_000_000_000_000
     }
 
     var roundedMilliseconds: Int {

@@ -1,13 +1,16 @@
 {
   "schemaVersion": 2,
+  "rtfDefinition": "wall/audio",
   "identity": {
     "kind": "engine-generation",
     "platform": "macos",
     "matrixScope": "focused",
     "hardwareProfile": "mac-mini-m2-8gb",
+    "osVersion": "26.6.2",
+    "xcodeVersion": "26.6",
     "optimization": "-O",
-    "matrixHash": "473d23758cbabbbc8dfb872964c7ee74af45d3e2fc3fc59e67c2cca9d460c406",
-    "corpusHash": "0300d72c6a9cc11e43253d87a90712181b304d574b3ccc513732c66a2792be84",
+    "matrixHash": "2b93d8edbc798e8401ca1cad32c10d2968fc3d3bf596939d9e67afcad7d034a6",
+    "corpusHash": "20c76a33775f3a669fa9096cb40b1b025f4f7f2da82a1d06001f97a8628c4859",
     "models": [
       {
         "mode": "custom",
@@ -37,10 +40,12 @@
       "warmState": "cold",
       "lenBucket": "medium",
       "n": 1,
-      "rtf": 1.7604456824512535,
-      "tokps": 22.004620936969133,
+      "rtf": 1.5705985915492957,
+      "rtfMAD": 0.0,
+      "decodeSpeedupX": 0.7053272072519556,
+      "tokps": 8.817150577403131,
       "ttfcMS": null,
-      "physFootMB": 2477.533676147461,
+      "physFootMB": 2453.970901489258,
       "qcVerdict": "pass"
     },
     {
@@ -54,11 +59,13 @@
       "modelID": "pro_custom_speed",
       "warmState": "warm",
       "lenBucket": "medium",
-      "n": 1,
-      "rtf": 1.8771225686940414,
-      "tokps": 23.47491765072537,
+      "n": 3,
+      "rtf": 0.5782467532467532,
+      "rtfMAD": 0.0012987012987013546,
+      "decodeSpeedupX": 1.891891891891892,
+      "tokps": 23.657556747470785,
       "ttfcMS": null,
-      "physFootMB": 2635.283676147461,
+      "physFootMB": 2272.9865493774414,
       "qcVerdict": "pass"
     }
   ]

@@ -1252,8 +1252,10 @@ PY
         --require-baseline-identity >>"$log" 2>&1 || compare_status=$?
     case "$compare_status" in
       0) echo "gate bench: no regression vs $(basename "$GATE_BENCH_BASELINE")" >>"$log" ;;
+      1) echo "gate bench: BASELINE INVALID — $GATE_BENCH_BASELINE does not match this run's optimization/topology/host identity; re-save it with summarize_generation_telemetry.py <run-diag> --engine-only --save-baseline (see bench.log)" >>"$log"; return 1 ;;
+      2) echo "gate bench: REGRESSION vs $GATE_BENCH_BASELINE (see bench.log)" >>"$log"; return 1 ;;
       3) echo "gate bench: INCONCLUSIVE — host load or thermal state invalidated the comparison (see bench.log)" >>"$log"; return 1 ;;
-      *) echo "gate bench: REGRESSION vs $GATE_BENCH_BASELINE (see bench.log)" >>"$log"; return 1 ;;
+      *) echo "gate bench: summarizer exited $compare_status before producing a verdict (see bench.log)" >>"$log"; return 1 ;;
     esac
   else
     echo "gate bench: no committed baseline at $GATE_BENCH_BASELINE — compare skipped" >>"$log"

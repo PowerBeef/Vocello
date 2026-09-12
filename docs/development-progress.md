@@ -26,7 +26,7 @@ reading every line, an independent verifier per slice, one cross-document consis
 217 verified discrepancies in 55 files (13 high, 73 medium, 131 low) and 58 operational facts no
 living document stated. Maintainer decisions: document the main-only reality rather than add a
 pull-request lane; make `benchmarks/OPTIMIZATION.md` historical with a `decodeSpeedupX` banner; fill
-the gaps in their owning documents. Five commits (four listed here plus this one: `9392f5c9`, `1e3dcbdd`, `e7824453`, `e34f5a66`, `__E__`) apply
+the gaps in their owning documents. Five commits (`9392f5c9`, `1e3dcbdd`, `e7824453`, `e34f5a66`, `db152b5e`) apply
 the corrections by area: entry points and permissions; workflow, testing and release guides;
 benchmarks, telemetry and CLI; audio QC, delivery and the Qwen guides; architecture, engine guides,
 decisions and ledgers. Recurrent findings were the retired verbs and receipts, `python3 -m unittest`

@@ -109,10 +109,7 @@
       "Bash(scripts/release.sh*)",
       "Bash(gh release create*)",
       "Bash(gh release edit*)",
-      "Edit(QwenVoice.xcodeproj/**)",
-      "Write(QwenVoice.xcodeproj/**)",
-      "Edit(QwenVoice.xcodeproj/project.pbxproj)",
-      "Write(QwenVoice.xcodeproj/project.pbxproj)"
+      "Edit(QwenVoice.xcodeproj/**)"
     ]
   }
 }

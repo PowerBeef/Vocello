@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-09-10
+reviewed: 2026-09-12
 summary: Compact iOS screen and accessibility-identifier map for physical-device XCUITest — states, stable identifiers, and expectations per screen.
 sourceOfTruth:
   - Sources/iOS
@@ -114,12 +114,12 @@ successful read. Destructive History actions are outside the minimal smoke and b
 ## Settings
 
 iOS Settings has a compact localized heading (`iosSettings_title`) above its six-entry hub
-(`screen_settings`) in three flat groups: Audio and
+(`screen_settings`) in three flat groups: Audio, App Language and
 Models & Files; the restrained gold Design & Clone Export entry; Privacy & Permissions,
-Accessibility, and About. Five detail pages use the existing tab navigation stack and compact
+Accessibility, and About. Six detail pages use the existing tab navigation stack and compact
 44-point Back headers. Root links are `iosSettings_<category>Row`, headers are
 `screen_settings_<category>`, and Back is `iosSettings_<category>BackButton`, for categories
-`audio`, `modelsFiles`, `privacyPermissions`, `accessibility`, and `about`.
+`audio`, `appLanguage`, `modelsFiles`, `privacyPermissions`, `accessibility`, and `about`.
 Preference keys/defaults, model operations and outward export policy are unchanged. The tab dock keeps
 its identifiers and layout but its Dynamic Type growth is capped at the first accessibility size
 (ISU-5) so Settings rows stay reachable at AX-XXXL; its icon is hidden from VoiceOver.

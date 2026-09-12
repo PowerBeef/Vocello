@@ -1,6 +1,7 @@
 ---
 status: active
 owner: ios
+reviewed: 2026-09-12
 summary: iOS physical-device testing — deterministic compile lanes, explicit on-device acceptance (smoke/benchmark/perf with the frame-health protocol), headless diagnostics, and burn-in safety.
 sourceOfTruth:
   - scripts/ios_device.sh
@@ -21,20 +22,32 @@ and UI automation are unsupported. XCUITest is the sole autonomous iOS app UI dr
 ## Ordinary development
 
 ```sh
-./scripts/check_project_inputs.sh
-./scripts/build_foundation_targets.sh ios
+scripts/dev.sh check                # advisory local loop; the commit lint is the only local block
+scripts/dev.sh ios                  # ./scripts/build_foundation_targets.sh ios --incremental (phone-free generic compile)
+./scripts/check_project_inputs.sh   # the deterministic contract gate on its own
 ```
 
 The ordinary macOS deterministic lane executes the Foundation-level iOS policy assertions in
 `VocelloCoreTests`. The generic physical-device SDK compile then builds both the app and a duplicate,
 standalone `VocelloiOSLogicTests` policy bundle without executing that iOS bundle. Neither route
-requires a connected phone, and together they are sufficient for routine commits, pushes, pull
-requests, ordinary merges, and ordinary CI. Missing models, a phone, or UI results must not block
-preserving and sharing development work.
+requires a connected phone, and together they are what routine commits, pushes and push CI rely on
+(push CI's `ios-compile` lane runs the same incremental compile). Missing models, a phone, or UI
+results must not block preserving and sharing development work.
+
+Everything below the compile is consent-bound: `scripts/ui_test.sh` and `scripts/ios_device.sh` are
+`ask` in `.claude/settings.json`, are never run unasked, and only an explicit QA or device request
+authorizes them. The timing verbs (`ios_device.sh gate`, `bench`, `lang-bench`, `memory`, and
+`ui_test.sh ios benchmark|perf`) additionally refuse to start on a busy Mac host:
+`require_quiet_host` in `scripts/lib/host_preflight.sh` rejects a one-minute load above twice the
+core count or a kernel memory-pressure level above normal before the phone is touched, and
+`QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues only for an explicitly exploratory run.
+Claude Code sessions reach these lanes through the user-invoked `/ios-lane` and
+`/device-diagnostics` skills and read the results with the `xcresult-triage` subagent; they are
+optional assists that add no gate and change no evidence rule.
 
 ### Host toolchain prerequisite
 
-`generic/platform=iOS` does not launch or execute a Simulator. Current Xcode 26 toolchains still
+`-destination 'generic/platform=iOS'` does not launch or execute a Simulator. Current Xcode 26 toolchains still
 require the selected Xcode installation to expose usable iOS Platform Support and a compatible iOS
 runtime component before that physical-device SDK destination becomes eligible. An `iphoneos`
 entry in `xcodebuild -showsdks` is not sufficient proof. Repository build routes run this read-only
@@ -134,6 +147,32 @@ visible Settings → Voice models section; neither device scripts nor normal UI 
 The sole exception is the separately selected `scripts/ui_test.sh ios model-download` lifecycle
 diagnostic, which uses an isolated app-support root and is never part of smoke or benchmark.
 
+The remaining plain verbs are the pieces the lanes above compose: `doctor` is the environment and
+device preflight, `build` the signed device build (`-Onone`; `--optimized` is the shipped topology),
+`install` installs that build, `launch [spec]` starts it (with the diagnostics runner when a spec is
+given), `console [spec]` is an attached launch streaming the diagnostics stdout live, `logs [spec]`
+tees the same stream to `build/artifacts/diagnostics/ios/logs/<run>.log`, `debug [spec]` is an
+attached launch with LLDB attach guidance (the `get-task-allow` build), `pull [dest]` copies the
+app-container diagnostics mirror back, and `device-state --json|--json-v2 [watch [--interval N]
+[--count N]]` emits machine-readable reachability, optionally polling. A diagnostics spec is
+`<mode>:<variant>:<text>` with mode `custom|design|clone` and variant `speed` (iPhone is speed-only).
+
+### Device gate (`scripts/ios_device.sh gate`)
+
+```sh
+scripts/ios_device.sh gate                            # project inputs → device preflight → headless generation → crashes → verdict
+QVOICE_GATE_SKIP_GENERATION=1 scripts/ios_device.sh gate   # same gate without the generation step or history publication
+```
+
+The gate is the explicit physical-device deterministic/runtime diagnostic, not part of `scripts/dev.sh
+check` or push CI. Its required steps are `project-inputs` (`check_project_inputs.sh`),
+`device-preflight` (the `preflight` verb above), `generation` (a fresh `build` and `install` of the
+exact local binary, then one headless Speed take through the diagnostics runner; it needs the Speed
+model installed on the phone) and `crash-delta` (`crashes`), followed by history publication of the
+generation take; every step lands in a required-step ledger with the verdict under
+`build/artifacts/ios/gates/<run>/`. It requires 15 GiB of host free space and a quiet
+host (`require_quiet_host ios-gate`), and it is consent-bound like every other device verb.
+
 ### Explicit screen protection after device work
 
 When the maintainer authorizes Auto-Lock restoration, use the existing physical-device XCUITest
@@ -177,15 +216,18 @@ Smoke diagnostics are collected before the aggregate failure exit, including whe
 A passing memory-pressure diagnostic subset cannot override a failed UI or long-form test.
 If an older runner omitted collection, preserve its failed ledger and put any recovered telemetry
 in a separate supplemental bundle with original run identity and digests; never rewrite the run
-as PASS. The September 5 production-stanza fixtures cover failed XCTest, failed collection,
-both failures, success, and non-smoke routes without rerunning device work.
+as PASS. Collection ordering is owned by `scripts/ui_test.sh` itself; the 2026-09-05 shell fixture
+that reproduced the missing-collection failure was a source-text test and was removed on
+2026-09-12.
 
 Serialize macOS and iOS `xcodebuild` commands: the governed shared SwiftPM-store lock is held
 throughout XCTest, not just build/package resolution. Concurrent native commands can time out
 waiting for that lock. Run read-only analysis or Python fixtures alongside a device lane instead;
 do not bypass the lock or clear a cache to resolve legitimate contention.
 
-Index membership and derived-refresh ordering follow [development-workflow.md](development-workflow.md).
+After adding, moving or deleting files under a globbed Xcode target, regenerate the project with
+`./scripts/regenerate_project.sh` in the same commit (see
+[development-workflow.md](development-workflow.md)).
 
 ```sh
 scripts/ui_test.sh ios smoke
@@ -212,7 +254,22 @@ scripts/ui_test.sh ios model-download --scenario queue
 scripts/ui_test.sh ios model-download --scenario acceptance
 scripts/ui_test.sh ios model-download --scenario soak --iterations 3
 scripts/ui_test.sh ios model-download --scenario recover
+scripts/ui_test.sh ios model-download --scenario acceptance --engine-profile legacy|chunked|chunked-multisession
+
+# Opt-in diagnostic and acceptance lanes that never run in smoke, benchmark, CI, or release:
+scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
+scripts/ui_test.sh ios purchase [--scenario lifecycle|exports] --retain-result
 ```
+
+`--engine-profile` selects the download engine the lifecycle proof exercises; `delivery-cohort`
+runs N identical Neutral Custom takes through the production UI as a delivery-consistency
+diagnostic and never publishes benchmark history; `purchase` is the focused local StoreKit lane
+(`VocelloiOSPurchaseUITests` over an `SKTestSession` on the bundled test fixture, never a live
+account; `--scenario exports` additionally exercises the export surfaces) and its documented
+invocation always passes `--retain-result` (the script does not refuse a run without it).
+`--retain-result` on any lane writes an untracked `retention-pin.json`
+into the run artifact so routine UI-result pruning keeps it; remove the pin only after the
+evidence set is retired.
 
 The iPhone matrix keeps the shared short/medium/long ordering; its long script is the historical
 150-character text from the era of the 150-character limit, kept fixed for benchmark-history
@@ -288,7 +345,7 @@ Do not repeat completed phases merely for a green aggregate or reuse a token aft
    and confirm required runs are `explicitly-pinned`. Retire pins only after explicit closure.
 4. **Frozen source:** record run IDs, source/build/device/plan identities, outcomes, remaining
    rows and the validated next command in the existing untracked run checkpoints. Do not edit
-   the roadmap, this guide, AGENTS, or any tracked file between shards.
+   the roadmap, this guide, `CLAUDE.md`, or any tracked file between shards.
 5. **Deliberate source checkpoint:** incorporate collected results into `config/roadmap.json`
    and the current narrative. A changed full-tree identity requires new acceptance identity;
    previous results remain history, never merged current-source PASS.
@@ -413,7 +470,7 @@ runs do not qualify new source or guarantee Xcode bootstrap reliability.
 ### UI-performance lane (`ios perf`)
 
 The probe writes `frames-<launchEpochMS>-<scenario>.jsonl` to the devicectl-pullable
-`Library/Caches/Vocello/diagnostics/ui-perf/` tree; markers travel through the on-device test
+`<app container>/Library/Caches/Vocello/diagnostics/ui-perf/` tree; markers travel through the on-device test
 runner's stdout into `xcodebuild.log`, so marker and probe share the device clock. The
 `perf-validation` step pulls diagnostics and runs `scripts/check_ios_ui_perf.py`, which
 fail-closes on a missing/duplicate scenario, probe coverage below 90% of a marked window,
@@ -489,8 +546,9 @@ When a device wipe removes the benchmark clone voice,
 re-enrolls it through the headless diagnostics runner. (The visible Files-import flow returned
 2026-08-15 and has its own opt-in `scripts/ui_test.sh ios enroll-clone-fixture` UI lane; the
 headless command remains the no-UI, hash-pinned wipe-recovery route.)
-The command stages the exact WAV plus the mandatory `.txt` transcript sidecar (from the macOS
-fixture store `~/Library/Application Support/QwenVoice-Debug/voices/`) into the app's Documents,
+The command stages the exact WAV plus the mandatory `.txt` transcript sidecar (any local paths; the
+macOS app's saved-voice store under `~/Library/Application Support/QwenVoice/voices/`, or
+`QwenVoice-Debug/` when `QWENVOICE_DEBUG=1`, is one source) into the app's Documents,
 launches with `QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME`, and validates the enrollment sentinel
 (staged digests, voice ID, quality warnings). The runner deletes the staged inputs after a clean
 enrollment. The command is opt-in and never runs in smoke, benchmark, CI, or release.
@@ -576,6 +634,14 @@ completion and History persistence, plus the runner's device/crash checks. It do
 benchmark's per-take telemetry matrix or synthesize an operating-system pressure event. Headless `bench`, `lang-bench`, `profile`,
 `crashes`, logs, and console operations remain supported physical-device diagnostics.
 
+A published `ui-generation` or `engine-generation` record is schema v3 (every take carries the
+quality-registry identity); `ui-perf` records are schema v2. Since 2026-09-12 every new
+record declares `run.rtfDefinition: "wall/audio"` (`rtf` is synthesis wall time divided by audio
+duration, lower is faster; the older inverted figure is `decodeSpeedupX`) and binds
+`toolchain.optimization` to the build receipt rather than a literal; `scripts/benchmark_history.py
+validate` rejects a newer record without the definition, and pre-cutover records never share a
+comparison key with a new one.
+
 Profile commands launch or attach to the exact target PID, record CPU Profiler and `os_signpost`
 rows in one trace, require a successful tracer exit, and verify the trace using exported
 table-of-contents data plus non-empty performance-row and correlated-signpost exports. Traces remain local; a successful profile
@@ -610,9 +676,11 @@ history publication, the raw trace is discarded by default while its digest/sett
 summary and retention status remain in compact evidence; `--keep-trace` opts into local retention.
 Raw traces and sample rows remain untracked.
 
-Device builds require 10 GiB of host free space before compilation. Language, generation benchmark,
+Device builds require 10 GiB of host free space before compilation (the same floor as the generic
+foundation compile; the macOS development build uses 8 GiB). Language, generation benchmark,
 memory, clone-conditioning, and gate lanes require 15 GiB; UI smoke, benchmark, and isolated model
-download require 12, 15, and 18 GiB respectively. These host-side checks run before adding another
+download require 12, 15, and 18 GiB respectively, and the control audit requires 24 GiB
+(`ui-control-audit` in `config/build-output-policy.json`). These host-side checks run before adding another
 cache/result tree and do not contact, pair, or alter the phone. The exact-PID profile lane retains
 its separate tracer-stage 5/15 GiB CPU/memory check. Because every profile rebuilds the exact app,
 the full CPU-profile command is also subject to the 10 GiB device-build floor; memory remains
@@ -675,8 +743,9 @@ Physical-device development and UI lanes reuse only `build/cache/xcode/ios-devic
 checkouts are shared under `build/cache/xcode/source-packages/`. Pulled diagnostics, UI results,
 profiles, gates, and current UUID-matched symbols live under `build/artifacts/`, never inside the
 incremental cache. Archive/export products live only under `build/dist/ios/`. Local release
-DerivedData is isolated under `build/scratch/derived-data/release-ios/`; CI uses its
-own `build/scratch/derived-data/ci/ios-archive/` leaf. See the authoritative owner/lifetime table in
+DerivedData is isolated under `build/scratch/derived-data/release-ios/`; the release workflow's
+`archive-ios` job uses its own `build/scratch/derived-data/ci/ios-archive/` leaf, while push CI's
+`ios-compile` lane reuses `build/cache/xcode/ios-device/`. See the authoritative owner/lifetime table in
 [`privacy-storage.md`](privacy-storage.md).
 
 ## Release boundary

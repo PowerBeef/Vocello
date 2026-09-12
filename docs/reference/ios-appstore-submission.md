@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-07
+reviewed: 2026-09-12
 summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
 sourceOfTruth:
   - project.yml
@@ -20,8 +20,8 @@ those gates are closed.
 
 Source-of-truth rule: if this disagrees with the code, the code wins.
 
-This runbook is release-only. Commits, pushes, pull requests, merges, CI, archive, and internal
-TestFlight packaging/upload use deterministic verification and do not require a phone, models, or
+This runbook is release-only. Commits, pushes, CI, archive, and internal TestFlight
+packaging/upload use deterministic verification and do not require a phone, models, or
 XCUITest evidence. External TestFlight distribution, App Review submission, and public App Store
 release require the exact-tag iOS manifest in
 [`quality-promotion.md`](quality-promotion.md).
@@ -31,7 +31,8 @@ end-to-end. `scripts/ios_device.sh` now **auto-derives the signing team** from t
 Development certificate (no `QWENVOICE_DEVELOPMENT_TEAM` needed for local dev builds; it also falls back to
 offline manual signing if no Apple ID is in Xcode). The development provisioning profile already carries
 `increased-memory-limit`, and that dated run passed its generation and audio-QC checks. Current performance
-and memory truth comes from the schema-v2 records in `benchmarks/HISTORY.md`, not these historical figures.
+and memory truth comes from the tracked records in `benchmarks/HISTORY.md` (`rtf` = synthesis wall ÷ audio,
+lower is faster), not these historical figures.
 Physical-device XCUITest can be run independently when explicit frontend acceptance is requested;
 ordinary GitHub CI and archive packaging are deterministic-only — see
 [`testing-runbook.md`](testing-runbook.md); and the UI holds with no clipping at the largest
@@ -101,8 +102,9 @@ provides the StoreKit-localized price, Restore, status, privacy/support links an
 See the [app guide](ios-app-guide.md#ios-export-purchase) for routes and compatibility.
 
 Phone-independent checks: `scripts/macos_test.sh core-test --only IOSExportPurchaseTests` executes
-production state/policy with deterministic StoreKit-boundary fixtures; `python3 -m unittest
-scripts.tests.test_ios_export_contract` checks route wiring, fixture isolation and platform separation.
+production state/policy with deterministic StoreKit-boundary fixtures, including StoreKit-fixture
+parity; `scripts/repo_invariants.sh` (run by `scripts/dev.sh contracts` and by CI) holds the
+one-StoreKit-owner, one-export-boundary and fixture-ownership greps.
 These **do not execute an Apple transaction**. Generic iOS compilation checks the real adapter/UI.
 For explicitly authorized **local** physical-device transaction testing, run:
 

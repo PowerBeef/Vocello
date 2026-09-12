@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-09-10
+reviewed: 2026-09-12
 summary: Consolidated iPhone app map — every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.
 sourceOfTruth:
   - Sources/iOS
@@ -476,8 +476,10 @@ named emotion may not land on every take, and selecting one shows the shared adv
 cross-preset separability, so neither was a control a listener could act on.
 The user-facing **intensity** control was retired 2026-08-02: DP-3 measured the `strong` copy at
 nearly double the recognisability of `normal` (mean per-preset recall 0.278 against 0.157, chance
-0.053) and showed the two tiers are not separable from each other, so every preset now ships its
-strong copy. `EmotionIntensity` survives internally so the delivery matrix harness can still address
+0.053) and showed the two tiers are not separable from each other, so a fresh preset selection ships
+one tier per preset: Happy and Angry ship their normal copy (DP-22 measured the happy/angry
+distinction only at the normal tier; `EmotionPreset.normalTierShippedIDs`) and every other preset
+ships its strong copy. `EmotionIntensity` survives internally so the delivery matrix harness can still address
 both texts and drafts saved earlier resolve to exactly what they stored. Or write a **custom tone** (free text, 500-char cap) — see
 [`../qwen_tone.md`](../qwen_tone.md) for the prompt-writing rules (combine emotion + pace +
 pitch + timbre; negative constraints like "without laughing" work; write instructions in

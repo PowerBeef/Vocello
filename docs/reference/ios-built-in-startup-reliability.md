@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-08-29
+reviewed: 2026-09-12
 summary: Governed diagnosis of the reported iOS Built-in Voice startup failure, including conservative historical classification, typed request receipts, startup boundaries, physical-device plans, and closure requirements.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,16 +17,16 @@ sourceOfTruth:
 ---
 # iOS Built-in Voice startup reliability
 
-> **Currency review (2026-08-27):** request receipts now include resolved instruction language and
+> **Currency review (2026-08-29):** request receipts now include resolved instruction language and
 > the latest diagnostics include codec replay, complete QC evidence, crash-log classification, and
 > unload-quiescence proof. ISR-05's false-startup-message fix remains closed; staged characterization
 > and the exact-script closure gate (ISR-04/ISR-06) remain open.
 
 This investigation covers the reported `vivian × calm.strong × english` Built-in Voice startup
-failure with a 285-character script. The external *Vocello Built-in Voice Startup Reliability —
-Codex Handout Revision 2.0* was reviewed as descriptive input. It correctly separates a pre-audio
-startup defect from the post-generation delivery evaluator, but it was prepared against an older
-public revision and does not override this checkout, the runtime, or `config/roadmap.json`.
+failure with a 285-character script. An earlier external handout (Codex era) was reviewed as
+descriptive input only. It correctly separated a pre-audio startup defect from the post-generation
+delivery evaluator, but it was prepared against an older public revision and does not override this
+checkout, the runtime, or `config/roadmap.json`.
 
 Fresh physical-iPhone evidence localized one source-proven defect: the engine's outer catch labeled
 a fully generated audio-QC rejection as a failure to start audio generation. That presentation bug

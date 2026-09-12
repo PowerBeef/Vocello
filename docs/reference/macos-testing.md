@@ -1,11 +1,13 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-09-11
+reviewed: 2026-09-12
 summary: macOS test lanes — deterministic development verification, the platform gate, model fixtures, explicit XCUITest smoke/benchmark/perf acceptance with the ui-perf baseline protocol (copy reports out between runs; discard-and-replace on concurrent use), and crash/profile evidence.
 sourceOfTruth:
   - scripts/macos_test.sh
   - scripts/ui_test.sh
+  - scripts/lib/xctest_summary.py
+  - scripts/lib/host_preflight.sh
   - Tests/VocelloCoreTests/MacStudioGenerationRequestFactoryTests.swift
   - Tests/VocelloCoreTests/VoiceClipEnrollmentEvidenceTests.swift
 ---
@@ -24,14 +26,14 @@ interaction acceptance remains the explicitly requested XCUITest lane below.
 ## Ordinary development
 
 ```sh
-./scripts/check_project_inputs.sh
-scripts/macos_test.sh test
-./scripts/build.sh build
+scripts/dev.sh check        # lint, contracts, selected tests, native lanes the dirty tree touches
+scripts/macos_test.sh test  # the three deterministic macOS bundles when you want them all
+scripts/dev.sh ci           # exactly what push CI runs, serially
 ```
 
-These checks are sufficient to commit, push, open a pull request, merge ordinary development, and
-run ordinary CI. They do not require UI execution, installed generation models, or release
-evidence.
+These are advisory; the commit lint is the only local block and CI on `main` is the gate
+(development is main-only, so there is no pull-request or merge step). None of them needs UI
+execution, installed generation models, or release evidence.
 
 `scripts/macos_test.sh test` writes each bundle's raw log plus a structured summary next to it
 (`core.test-results.json`, `transport.test-results.json`, `runtime.test-results.json`, produced by
@@ -42,11 +44,40 @@ hostless bundles through `xcodebuild`, so no `.xcresult` is produced for this la
 
 `scripts/macos_test.sh test --coverage` is opt-in and non-blocking: it builds the bundles with
 `-enableCodeCoverage YES` (which flips the shared macOS cache and forces a rebuild, so it is never
-part of an ordinary checkpoint), runs them with `LLVM_PROFILE_FILE` under the run directory, and
+part of `scripts/dev.sh check` or push CI), runs them with `LLVM_PROFILE_FILE` under the run directory, and
 exports `coverage.json` (llvm-cov, summary only), `coverage-summary.txt` (line coverage per source
 root) and `coverage-runtime.json` (SwiftPM export for `Qwen3RuntimeTests`). The verdict gains a
-`coverage=` line; no threshold exists yet. A future floor belongs in a dedicated policy file named in
-the release-qa gate map, not in this lane.
+`coverage=` line; no threshold exists yet. A future floor belongs in a dedicated `config/` policy
+file validated from `scripts/check_project_inputs.sh`, not in this lane.
+
+## Platform gate (`scripts/macos_test.sh gate`)
+
+```sh
+scripts/macos_test.sh gate                         # project inputs → foundation build → core-test → deterministic tests → crash delta
+QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate  # adds a bounded vocello bench step; a PASS publishes its benchmark history
+scripts/macos_test.sh release-readiness            # project inputs → exact-path app build → deterministic tests → crash delta
+scripts/macos_test.sh preflight [--strict-models]  # Xcode, app, dSYM, XPC and model-fixture status; --strict-models fails on a missing fixture
+scripts/macos_test.sh crashes [--test]             # collect and symbolicate .ips for the app and the XPC service
+scripts/macos_test.sh telemetry-overhead           # model-dependent on/off telemetry parity diagnostic
+```
+
+The gate is release tooling, not the daily loop: `.github/workflows/release.yml` runs it in the
+`archive-ios` job as the `platform-readiness` step (`scripts/macos_test.sh gate &&
+./scripts/build_foundation_targets.sh ios`). Its five ledgered required steps are `project-inputs`
+(`check_project_inputs.sh`, step 0), `foundation-build` (`build_foundation_targets.sh macos`), `core-tests`
+(`VocelloCoreTests`), `deterministic-tests` (the same three bundles as `test`) and the gate-fatal
+`crash-delta` over `.ips` files newer than the run's marker. Every step lands in a
+required-step ledger with the verdict under `build/artifacts/macos/gates/`, and
+`QWENVOICE_GATE_BENCH=1` appends a fifth bounded `vocello bench` step whose PASS publishes one
+benchmark record. `release-readiness` is the packaging prerequisite `scripts/release.sh` invokes
+before signing; it needs no model fixture and no UI evidence.
+
+`gate`, `telemetry-overhead`, `lang-bench` and `memory` refuse to start on a busy host:
+`require_quiet_host` in `scripts/lib/host_preflight.sh` rejects a one-minute load above twice the
+core count or a kernel memory-pressure level above normal before any model loads, and
+`QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues only for an explicitly exploratory run.
+`memory` and `lang-bench` are consent-bound (`ask` in `.claude/settings.json`) and are never run
+unasked; the storage floors every lane checks first are listed under Instruments profiles below.
 
 ## Scheduled ThreadSanitizer characterization
 
@@ -62,8 +93,8 @@ still compile linked MLX targets while building the test host. The driver launch
 Mach-O files remain arm64-only, while only the named Xcode sanitizer dylib may retain its universal
 toolchain slices.
 
-The weekly/manual workflow is non-blocking only during the bounded characterization period in
-`config/tsan-policy.json`. It preserves every failed run, performs no automatic retry, and requires
+The nightly workflow (`nightly.yml`, job `tsan`, 04:00 UTC and on dispatch) is non-blocking only
+during the bounded characterization period in `config/tsan-policy.json`. It preserves every failed run, performs no automatic retry, and requires
 three consecutive clean runs plus explicit maintainer review before it may become blocking. The
 first corrected physical-host run on 2026-08-26 passed all 460 core and 18 XPC tests with no TSan
 warning or race summary.

@@ -1,15 +1,17 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-08-29
+reviewed: 2026-09-12
 summary: Enablement and readiness guide for the increased-memory entitlement on the in-process iOS app, with verification steps and the kept-for-fallback justification text.
 sourceOfTruth:
   - Sources/iOS/VocelloiOS.entitlements
+  - Sources/iOS/VocelloiOSRelease.entitlements
   - project.yml
+  - scripts/verify_ios_release_archive.sh
 ---
 # iOS Increased-Memory Entitlement — Enablement & Readiness Guide
 
-> **Currency review (2026-08-27):** the latest project manifest adds the iOS license screen/resource
+> **Currency review (2026-08-29):** the latest project manifest adds the iOS license screen/resource
 > and does not change entitlement selection. A fresh Distribution profile and signed archive still
 > must prove the increased-memory and App Group entitlements under ASR-10.
 
@@ -17,7 +19,8 @@ This is the source of truth for enabling Apple's increased-memory entitlement on
 and the (kept-for-fallback) justification text. The engine runs **in-process** in the app (`MLXTTSEngine`),
 so the **app** process is the one that needs the raised limit — there is no separate engine-extension App ID.
 
-Status context: [`../../CLAUDE.md`](../../CLAUDE.md) § "What this is".
+Status context: [`../../CLAUDE.md`](../../CLAUDE.md) § "Product and authority" and roadmap item
+ASR-10 in `config/roadmap.json`.
 
 > **TL;DR — there is most likely no "request to Apple" to make.** `com.apple.developer.kernel.increased-memory-limit`
 > is a **self-serve Additional Capability** (Apple DTS confirms it follows the same flow as Multicast
@@ -118,13 +121,10 @@ security cms -D -i /path/to/Vocello.app/embedded.mobileprovision | plutil -p - |
 For a full archive/export check, `scripts/verify_ios_release_archive.sh` validates the app entitlements
 against `config/apple-platform-capability-matrix.json` (which declares the expected bundle ID, App Group, and
 `increased-memory-limit = true`) **and asserts the app embeds zero `.appex` bundles** (the engine is
-in-process). Pass condition:
-
-```text
-app:                 com.patricedery.vocello   com.apple.developer.kernel.increased-memory-limit=true
-embedded extensions: 0
-status:              entitlement-ready
-```
+in-process). The script fails closed if the archived (or exported) app lacks
+`com.apple.developer.kernel.increased-memory-limit=true` or embeds any `.appex`; a pass prints
+`[1/3] Archive bundle verification OK`, `[2/3] Export and metadata verification OK` and a
+`[3/3] Summary` of the device-validation and TestFlight-upload metadata fields.
 
 **Confirmed against Apple's official documentation** ([entitlement reference](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.kernel.increased-memory-limit), [Enable app capabilities](https://developer.apple.com/help/account/identifiers/enable-app-capabilities/), and DTS [thread 685084](https://developer.apple.com/forums/thread/685084)): the entitlement is self-serve and enabled **per App ID** and raises the **process** that carries it (here the in-process app — which is exactly why the dead extension App ID is unnecessary); `increased-debugging-memory-limit` is the **dev-only** variant (correctly left off for distribution); changing a capability **invalidates provisioning profiles** (regenerate them); it's supported on **iOS/iPadOS** (no visionOS target here, so the documented visionOS ambiguity doesn't apply); and the raised limit is **best-effort** — the app must gate on `os_proc_available_memory()` and fall back safely (already implemented).
 
@@ -183,15 +183,15 @@ Current identity and entitlement source of truth:
 
 - `config/apple-platform-capability-matrix.json` declares the iOS app bundle ID, App Group, and the required increased-memory entitlement (no extension block — the engine is in-process).
 - `project.yml` signs `VocelloiOS` as `com.patricedery.vocello`.
-- `Sources/iOS/VocelloiOS.entitlements` includes `com.apple.developer.kernel.increased-memory-limit` for approved-profile builds.
-- `Sources/iOS/VocelloiOSLocalDevice.entitlements` intentionally omits the entitlement for ordinary local Debug installs (before you've enabled the capability on the App ID).
+- `project.yml` signs every build with `Sources/iOS/VocelloiOS.entitlements` (`QVOICE_IOS_APP_ENTITLEMENTS`), overridable to `Sources/iOS/VocelloiOSRelease.entitlements` for App Store archive/export; both declare the increased-memory key (the former also carries `get-task-allow` for the `ios_device.sh debug` lane, the latter omits it). There is no Debug configuration.
+- `Sources/iOS/VocelloiOSLocalDevice.entitlements` (App Group only) is not referenced by any build route.
 
 Process measurement and guardrails:
 
 - `Sources/QwenVoiceCore/IOSMemoryMetricsBridge.m` calls `os_proc_available_memory()` on physical iOS.
 - `Sources/QwenVoiceCore/IOSMemorySnapshot.swift` stores process headroom, physical footprint, resident size, compressed memory, Metal allocation, and implied process limit.
 - `Sources/iOS/TTSEngineStore.swift` captures the app-process memory snapshot, blocks model admission under per-process critical pressure, records peak generation context, cancels active generation under critical pressure, and requests full unload.
-- `Sources/iOSSupport/Services/IOSDeviceDiagnosticsRecorder.swift` persists memory-context JSONL with app-process headroom, footprint, implied process limit, pressure band, and `likelyEntitlementBlocked`. (Residual always-nil `engineExtension*` fields remain in the record schema pending a cosmetic cleanup; they no longer carry data.)
+- `Sources/iOSSupport/Services/IOSDeviceDiagnosticsRecorder.swift` persists memory-context JSONL (`memory-contexts.jsonl`) with app-process headroom, physical footprint, implied process limit, pressure band, trim level and the typed `event`/`reason` (for example `model_admission_blocked`).
 
 Memory-reduction behavior already implemented:
 
@@ -220,14 +220,13 @@ jq -r '
       (.appPhysFootprintMB | floor),
       (.appAvailableHeadroomMB | floor),
       (.appImpliedProcessLimitMB | floor),
-      .pressureBand,
-      .likelyEntitlementBlocked, .entitlementBlockedReason ]
+      .pressureBand, .trimLevel ]
   | @tsv
 ' <pulled>/diagnostics/memory-contexts.jsonl
 ```
 
-Look for: app-process headroom critically low, implied process limit low, `likelyEntitlementBlocked=true`,
-and `model_admission_blocked` recorded instead of a crash — then the same rows showing headroom rising
+Look for: app-process headroom critically low, implied process limit low, `pressureBand` critical, and a
+`model_admission_blocked` event recorded instead of a crash — then the same rows showing headroom rising
 materially once entitled.
 
 ## Caveats / things not to claim

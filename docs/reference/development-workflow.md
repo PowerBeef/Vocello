@@ -20,14 +20,19 @@ Local verification is fast and advisory; CI on `main` is the gate. Nothing block
 scripts/dev.sh check --dry-run       # what the dirty tree needs
 scripts/dev.sh check                 # lint, contracts, selected Python tests, native lanes touched
 scripts/dev.sh test --only FooTests  # one XCTest class on the incremental test build
-scripts/dev.sh py --changed          # Python tests that consume the changed tooling
+scripts/dev.sh py                    # Python tests that consume the changed tooling (default selection; --all, --lane product|research|darwin, or module paths)
+scripts/dev.sh contracts             # the contract gate alone (check_project_inputs.sh --local)
 scripts/dev.sh ios                   # generic device-SDK compile (incremental, no phone)
 scripts/dev.sh regen                 # regenerate roadmap render, catalog, inventories, charts
+scripts/dev.sh ci                    # what push CI runs, serially, when you want the push green first time
 git add -A && git commit && git push
 ```
 
 Routing is `scripts/ci/classify_changes.py`, the same file CI uses, so the local plan and the CI lanes
-agree. On a push, CI diffs each lane against the last run on the branch in which that lane's job
+agree. Neither `scripts/dev.sh check` nor push CI compiles the XCUITest bundles: after editing
+`Tests/*UITests` or `Tests/UIAutomationSupport`, run `xcodebuild build-for-testing` for `VocelloMacUI`
+and `VocelloiOSUI` (generic iOS destination, unsigned, `-skipPackagePluginValidation`) before
+committing. On a push, CI diffs each lane against the last run on the branch in which that lane's job
 passed (not against the previous push), because `cancel-in-progress` can drop a superseded push's run
 and the lanes it owed must still run on the next push; a lane with no prior green run always runs.
 Locally the lanes come from the dirty tree: `swift` runs the macOS test bundles (`scripts/macos_test.sh test`, or `core-test --only` when
@@ -55,8 +60,14 @@ model catalog and host availability, App Store readiness, supply chain, release 
 history, README charts, the text-level delivery and prosody contracts, the roadmap, the exact
 product-invariant greps in `scripts/repo_invariants.sh`, the privacy scan, and the Python suite.
 
-`--local` selects Python tests by the dirty tree; `--python darwin-only` runs only the modules that need
-the macOS host (CI runs the rest on Linux); the default runs everything.
+`--python all|darwin-only|selected|none` picks the Python lane: `all` (the default) runs the whole
+suite; `darwin-only` runs only the modules that need the macOS host (CI runs the rest on Linux);
+`selected` runs the modules the dirty tree affects; `none` runs the contracts without the suite.
+`--local` is `selected` plus a refusal to run when `CI` or `GITHUB_ACTIONS` is set. This is also how
+`scripts/dev.sh check` gets its Python tests: it never calls pytest itself but runs
+`./scripts/check_project_inputs.sh --local`, whose `selected` lane calls
+`scripts/development_workflow.py py`. `QVOICE_GATES=quick` makes the `all` lane skip the suite outside
+CI while nothing under `scripts/` or `config/` is dirty.
 
 ## Lint and warnings
 
@@ -86,18 +97,34 @@ it does not slow every push.
 | `macos-tests` | macos-26 | Swift, config, scripts or workflow paths | cached DerivedData; contract gate (darwin-only Python), macOS bundles, CLI identity |
 | `ios-compile` | macos-26 | iOS-relevant paths | cached DerivedData; `build_foundation_targets.sh ios --incremental` |
 | `website` | ubuntu | `website/` | about 4 min |
+| `dependency-submission` | ubuntu | push only (skipped on dispatch) | seconds: `scripts/swift_dependency_snapshot.py` submitted to the GitHub dependency graph; needed by `CI required` |
 | `CI required` | ubuntu | always | the branch-protection context; skipped lanes count as passed |
+
+`ci.yml` triggers on `push` to `main` and on `workflow_dispatch` only; it has no `pull_request`
+trigger, so `CI required` is always produced by a maintainer's push to `main`. `scripts/dev.sh ci`
+replays that job graph serially: the supply-chain contract, `scripts/repo_invariants.sh`, the privacy
+scan, `roadmap.py validate` and `render --check`, project regeneration, the complete
+`check_project_inputs.sh`, `scripts/macos_test.sh test`, the CLI version identity,
+`build_foundation_targets.sh ios --incremental`, the website supply-chain check and
+`npm --prefix website run check`. It is a superset rather than a byte-identical replay: it skips no
+lane by routing, and it runs the whole Python suite inside the gate in one process where CI splits it
+into `-m "not research and not darwin_only"` plus an optional `-m research` on Linux and
+`--python darwin-only` in the macOS job.
 
 Caches are keyed on the toolchain and dependency graph and saved after every run on `main`;
 `scripts/ci/restore_mtimes.py` gives tracked files their commit mtimes so Xcode's task signatures hit.
-Dispatch with `cold: true` to skip the restore. `nightly.yml` runs the TSan subset, the complete Python
-suite and cold compiles of both platforms and files one `nightly` issue on failure; `security.yml`
-(CodeQL, npm audit) runs weekly, on dispatch and inside `release.yml` on the tagged commit.
+Dispatch with `cold: true` to skip the restore. `nightly.yml` (04:00 UTC and on dispatch) runs the TSan
+subset (`tsan`), the complete Python suite (`python-full`) and cold compiles of both platforms
+(`foundation-cold`, which also compiles the macOS app optimized with warnings as errors); a failure
+keeps one open issue labelled `nightly`, titled "Nightly lane failing", commenting on it rather than
+filing a second. `security.yml` (CodeQL, npm audit) runs weekly, on dispatch and inside `release.yml`
+on the tagged commit.
 
 ## Cache and generation policy
 
-- `./scripts/regenerate_project.sh --fast` runs XcodeGen and the two scheme renderers; the plain form
-  also runs the contract gate afterwards.
+- `./scripts/regenerate_project.sh` (`--fast` is the historical spelling of the same default) runs
+  XcodeGen and the two scheme renderers; `--verify` also runs the contract gate afterwards. Run it in
+  the same commit as any file added, moved or deleted under a globbed Xcode target.
 - `./scripts/build_foundation_targets.sh ios --incremental` reuses the governed
   `build/cache/xcode/ios-device` DerivedData and matches physical-device Release optimization.
 - Internal diagnostic flags are target settings, so diagnostics never rebuild MLX and the other

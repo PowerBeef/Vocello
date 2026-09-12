@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-05
+reviewed: 2026-09-12
 summary: The standing macOS release-QA checklist — deterministic gates, the per-candidate smoke step, release-notes and performance-surface obligations, packaging and verification.
 sourceOfTruth:
   - scripts/release.sh
@@ -21,13 +21,13 @@ release-candidate smoke lane and record its verdict (step 2b), and use the bench
 when frontend acceptance is explicitly requested. If this doc disagrees with the code,
 the code wins.
 
-This is a release-only gate, not a commit, push, pull-request, ordinary-merge, or ordinary-CI
-check. Missing model or XCUITest evidence never blocks a macOS package. Signing, notarization, and
-upload depend on deterministic release-readiness and artifact checks.
+This is a release-only gate, not a commit, push or push-CI check. Missing model or XCUITest
+evidence never blocks a macOS package. Signing, notarization, and upload depend on deterministic
+release-readiness and artifact checks.
 
-> For the macOS testing/debugging/profile lanes + the one-command `gate`, see
-> [`macos-testing.md`](macos-testing.md). For the macOS app map + test-driving, see
-> [`macos-app-guide.md`](macos-app-guide.md).
+> For the macOS testing/debugging/profile lanes and the one-command `gate`, see
+> [`macos-testing.md`](macos-testing.md#platform-gate-scriptsmacos_testsh-gate). For the macOS app
+> map + test-driving, see [`macos-app-guide.md`](macos-app-guide.md).
 
 ## Gate sequence
 
@@ -48,8 +48,8 @@ upload depend on deterministic release-readiness and artifact checks.
    ```
    This is deeper engine evidence when the model fixture is available; absence of the fixture does
    not block signing, notarization, or upload. Its three mode-order rotations, raw PCM/timing
-   evidence, verdict, and machine context stay local. It does not publish schema-v2 history because
-   instrumenting the `off` lane would invalidate the observer-effect comparison.
+   evidence, verdict, and machine context stay local. It does not publish benchmark history (schema
+   v3) because instrumenting the `off` lane would invalidate the observer-effect comparison.
 2b. **Standing release-candidate UI smoke + optional benchmark** (run and record; never
    packaging-blocking):
    ```sh
@@ -57,7 +57,7 @@ upload depend on deterministic release-readiness and artifact checks.
    scripts/ui_test.sh macos benchmark   # optional explicit frontend acceptance
    ```
    Run the smoke lane for every release candidate and record its run ID and verdict — or a
-   deliberate skip with the reason — in that release's `docs/releases/<version>.md` entry. The
+   deliberate skip with the reason — in that release's `<version>.md` entry under `docs/releases/`. The
    lane already writes `run.json` plus a per-run step ledger under the UI-test artifact tree; the
    release-notes line only references that run ID. A missing or skipped run never blocks signing,
    notarization, packaging, or upload — recording the skip keeps the omission visible instead of
@@ -167,7 +167,8 @@ from a working directory outside the checkout. Missing or newly dynamic non-syst
 fail closed and must be deliberately packaged and verified before release. No resource lookup
 rewrite was needed by the initial relocation proof.
 
-This deterministic smoke does not run synthesis. RF-10 additionally qualifies all three modes,
+This deterministic smoke does not run synthesis. RF-10 (parked until RF-09 clears the iOS critical
+path; RF-08 is parked and F-17 planned behind it) additionally qualifies all three modes,
 French Design with a pinned seed, Clone, one two-item batch in a single process, cancellation, generation-error exit status, and resource
 loading during real inference on the copied **signed candidate**. Record those results separately;
 neither a development CLI smoke nor a valid manifest closes F-17 or authorizes publication.
@@ -184,7 +185,7 @@ Failure retains raw batch rows alongside the ignored WAVs, never in the privacy-
 
 ## Release notes are a release artifact (both stores, fail-closed)
 
-`docs/releases/<tag>.md` is the single source of truth for user-facing release
+The `<tag>.md` file under `docs/releases/` is the single source of truth for user-facing release
 communication, written for both non-technical and technical readers:
 
 - The release workflow validates it **before any build work**
@@ -256,7 +257,11 @@ comparisons — uses the **standard real-time factor**: seconds of generation pe
 lower is faster, below 1.0 is faster than real time ("RTF 0.60"). Define it inline the first time
 it appears in public prose, and when a speed multiple helps the reader give it as a companion
 ("RTF 0.60, about 1.7× real time"), never as the headline. The decode-loop speedup that older
-records stored under `rtf` is `decodeSpeedupX` and is never called RTF. The README chart and its
+records stored under `rtf` is `decodeSpeedupX` and is never called RTF. Generation records are
+schema v3 and `ui-perf` records schema v2; every record published since 2026-09-12 declares
+`run.rtfDefinition: "wall/audio"` (`scripts/benchmark_history.py validate` rejects a newer record
+without it), and pre-cutover records never share a comparison key with a new one, so a promotion or release-QA
+comparison against a pre-cutover `rtf` is not a like-for-like comparison. The README chart and its
 alt text are generated by `scripts/generate_readme_charts.py` from the newest canonical record
 (`--check` fails on a stale pin); update the website chart's pin in the same change.
 

@@ -48,14 +48,20 @@ roadmap need no skill: `scripts/dev.sh check`, `scripts/dev.sh regen` and
 | Route | Skill (user-invoked) | Triage | Evidence owner |
 | --- | --- | --- | --- |
 | macOS UI lanes | `/macos-ui-lane <lane>` | `xcresult-triage` | [macOS testing](macos-testing.md) |
-| iPhone XCUITest lanes | `/ios-lane <lane>` | `xcresult-triage`, then `axiom:test-failure-analyzer` for interruption patterns | [iOS testing](ios-device-testing.md) |
-| iPhone headless diagnostics | `/device-diagnostics <verb>` | `axiom:crash-analyzer` for `.ips` | [iOS testing](ios-device-testing.md) |
+| iPhone XCUITest lanes | `/ios-lane <lane>` | `xcresult-triage`, then `axiom:test-failure-analyzer` (when installed) for interruption patterns | [iOS testing](ios-device-testing.md) |
+| iPhone headless diagnostics | `/device-diagnostics <verb>` | `axiom:crash-analyzer` (when installed) for `.ips` | [iOS testing](ios-device-testing.md) |
 | Release readiness (read-only) | `/release-evidence <tag>` | — | [Quality promotion](quality-promotion.md) |
 | Swift change review | `swift-review` subagent, `/code-review` | — | Domain rules under `.claude/rules/` |
 
 XcodeBuildMCP (`macos` and `ios-device` profiles) is an inner-loop assist for scratch builds and single
 XCTest classes; it never produces evidence and never drives the UI. Axiom's Simulator-only tools are not
 used. Physical-device and model lanes stay explicit and are never scheduled by a skill on its own.
+What actually stops a session from starting a consent-bound lane is the permission list in
+`.claude/settings.json`: `scripts/ui_test.sh`, `scripts/ios_device.sh`, `scripts/macos_test.sh
+memory|lang-bench`, `scripts/clean_build_caches.sh`, `git commit` and `git push` are `ask`;
+`scripts/release.sh`, `gh release create|edit`, Simulator lifecycle commands and `rm -rf build/cache`
+are `deny`. Independently of that list, the `scripts/hooks/policy_guard.sh` hook blocks Simulator
+destinations, whole-cache deletion, force pushes, new branches, worktrees and `project.pbxproj` writes.
 
 ## Model readiness
 
@@ -87,12 +93,18 @@ Use `scripts/clean_build_caches.sh --routine --dry-run` before bounded cleanup; 
 artifacts or caches are disposable. Multi-run evidence is pinned before launch.
 Serialize native Xcode commands under the existing shared lock. On the 8 GB Mac, generation and
 heavy analyzers also run serially; timing lanes refuse to start on a busy host, and neural
-evaluators start only after the TTS process exits.
+evaluators start only after the TTS process exits. The busy-host rule is `require_quiet_host` in
+`scripts/lib/host_preflight.sh`: a one-minute load above twice the core count or a kernel
+memory-pressure level above normal refuses the lane before any model loads.
+`QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues for an explicitly exploratory run, which
+the publisher then classifies from the run's own load sample.
 
 ## CI and release
 
 Ordinary CI and `scripts/dev.sh check` are deterministic. Models, a phone and UI tests never block
-commits, pushes or candidate packaging. Public promotion separately requires all applicable
+commits, pushes or candidate packaging. Neither compiles the XCUITest bundles, so an edit under
+`Tests/*UITests` or `Tests/UIAutomationSupport` is proven by `xcodebuild build-for-testing` for
+`VocelloMacUI` and `VocelloiOSUI` before it is committed. Public promotion separately requires all applicable
 exact-source acceptance lanes. Consult the platform release guide for command-bound evidence, signing
 and artifact verification; a development build is not a processed distribution candidate.
 

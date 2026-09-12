@@ -1,6 +1,7 @@
 ---
 status: active
 owner: release-qa
+reviewed: 2026-09-12
 summary: Source-bound quality promotion for making a verified macOS draft public or submitting an iOS candidate for external App Store review.
 sourceOfTruth:
   - config/quality-promotion-contract.json
@@ -36,9 +37,25 @@ an untrusted or unverified release source.
   by `scripts/benchmark_history.py`.
 
 Benchmark records must be clean, fingerprint-stable, no more than seven days old, and produced by
-the exact tag commit. The manifest never contains a UDID, serial number, personal device name,
-username, hostname, or absolute path. “Device identity” means the checked-in canonical hardware
-profile only.
+the exact tag commit. Generation records are schema v3 and `ui-perf` records schema v2; every record published since 2026-09-12 declares
+`run.rtfDefinition: "wall/audio"` (`rtf` is synthesis wall time divided by audio duration, lower is
+faster; `scripts/benchmark_history.py validate` rejects a newer record without the field), and the
+v1/v2 records already in `benchmarks/runs/` are read-only history that never share a comparison key
+with a fresh record, so a promotion record is always captured anew on the tag checkout rather than
+compared with or reused from a pre-cutover run. The manifest never contains a UDID, serial number,
+personal device name, username, hostname, or absolute path. “Device identity” means the checked-in
+canonical hardware profile only.
+
+Which lanes a candidate must prove is decided by the contract itself, not by a separate router:
+`promotionRouting.classes` in `config/quality-promotion-contract.json` pairs include/exclude path
+globs with the evidence ids and capabilities they add (`model-catalog-and-delivery`,
+`memory-runtime`, `platform-ui`, `audio-quality-and-evaluation`, `engine-runtime` and
+`benchmark-and-promotion-authority`), `platformMinimumEvidence` names the lane every platform always
+needs (the `ui-benchmark` matrix), and `validate-contract` fails a v3 contract whose routing names an
+undefined evidence id or capability. `python3 scripts/quality_promotion.py classify --base <tag>
+[--platform macos|ios]` runs the same classification over the paths changed since the previous
+release commit, and `create` embeds that result in the manifest, so the lanes it demands can be
+audited from the contract and the diff alone.
 
 Every platform requires its canonical 29-take Speed `ui-generation` matrix. Capability-sensitive
 changes add the smallest platform-specific set declared by the contract: applicable Quality

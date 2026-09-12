@@ -1,6 +1,7 @@
 ---
 status: active
 owner: release-qa
+reviewed: 2026-09-12
 summary: Finite release-first execution order for iOS, macOS, and the downloadable CLI; current scheduling and durable gates only; dated programme checkpoints are archived.
 sourceOfTruth:
   - config/roadmap.json
@@ -50,7 +51,7 @@ the approved ten-step execution sequence onto existing owners; it is not a secon
 
 | Order / class | Owner and next action | Required evidence / exit |
 | --- | --- | --- |
-| 1 — scheduling | RF-01: classify the existing queue and preserve historical outcomes | Roadmap, documentation and instruction validators agree; original gates retained |
+| 1 — scheduling | RF-01: classify the existing queue and preserve historical outcomes | `python3 scripts/roadmap.py validate` and `render --check` pass; original gates retained |
 | 2 — external dependency | RF-02 / ASR-02/04/08/10/11: use the consolidated rights/account packet | Qualified decisions or an explicit owner/service blocker; separate authorization for edits, candidate operations and uploads |
 | 3 — correction before freeze | ICA-15 / VLR-07 / F-16: severe gaps and cadence/recognition findings; RF-06 is retained as a known limitation per the September 7 scheduling amendment (explicit rejection, recovery and accepted-output preservation verified; incidence measured by RF-11) | Exact retained inputs, first divergent boundary, verified correction or explicit release blocker; for RF-06 no new research matrix and no PASS relabeling |
 | 3a — accessibility qualification before freeze | ISU-4 / ISU-5: Settings and App Language reachability at AX-XXXL and pseudo-AX-XXXL on post-ISU-5 source | One authorized `scripts/ui_test.sh ios localization` walk in English/French; existing identifiers, strict visibility predicates, no automatic retry |
@@ -81,7 +82,7 @@ End device work with the existing French-compatible three-minute Auto-Lock readb
 Candidate marketing overlays must retain genuine captures/aspect ratio and never claim native Pro Max
 testing. No uninstall, legal clearance, account mutation or upload is authorized by a roadmap update.
 
-Use focused verification after each coherent change and one complete checkpoint before freeze.
+Run `scripts/dev.sh check` after each coherent change and `scripts/dev.sh ci` once before freeze.
 While a campaign is frozen, keep resumable progress in its pinned, untracked run artifacts; do not
 edit unrelated source or documentation and then bypass the full-tree identity check. Incorporate
 results in the roadmap at the next source checkpoint. A changed product needs fresh applicable

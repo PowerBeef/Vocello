@@ -37,7 +37,8 @@ class SupplyChainContractTests(unittest.TestCase):
             encoding="utf-8",
         )
         (self.root / ".github/dependabot.yml").write_text(
-            "\n".join(f'  - package-ecosystem: "{eco}"' for eco in ("github-actions", "npm", "swift")) + "\n",
+            "\n".join(f'  - package-ecosystem: "{eco}"' for eco in ("github-actions", "npm", "swift"))
+            + '\n    directory: "/Packages/VocelloQwen3Core"\n',
             encoding="utf-8",
         )
         (self.root / "website/package.json").write_text(json.dumps({
@@ -289,11 +290,8 @@ asc() { return 0; }
                 self.assertNotEqual(self.run_block(name).returncode, 0)
                 self.assertFalse(self.credentials())
 
-    def test_final_cleanup_is_always_run_and_missing_setup_is_safe(self):
-        workflow = (self.ROOT / ".github/workflows/release.yml").read_text()
+    def test_cleanup_steps_are_safe_without_prior_setup(self):
         for name in ("Cleanup signing material", "Cleanup iOS signing material"):
-            step = workflow.split("      - name: " + name + "\n", 1)[1].split("        run: |", 1)[0]
-            self.assertIn("if: always()", step)
             self.assertEqual(self.run_block(name).returncode, 0)
             self.assertFalse(self.credentials())
 

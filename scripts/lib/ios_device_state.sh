@@ -82,3 +82,65 @@ guard_device_state() {
     "$verdict" "$(device_state_advice "$verdict")" "${line#*|}" >&2
   return "$(device_state_exit_code "$verdict")"
 }
+
+
+# --- Device-lane helpers shared with the tests (sourced, never sliced by text) ---
+
+# Canonical benchmark cell for a `<mode>:<variant>:<text>` launch spec.
+device_benchmark_cell() {
+  local spec="$1"
+  local mode="${spec%%:*}"
+  local remainder="${spec#*:}"
+  local variant="${remainder%%:*}"
+  printf '%s/%s/device' "$mode" "$variant"
+}
+
+# Reads `xcrun xctrace list devices` on stdin: prints the UDID and exits 0 when the
+# device is online, exits 20 when it is listed offline, 21 when it is absent.
+xctrace_inventory_status() {
+  local udid="$1"
+  python3 -c '
+import sys
+udid = sys.argv[1]
+section = None
+for raw in sys.stdin:
+    line = raw.replace("\u00a0", " ").strip()
+    if line == "== Devices ==":
+        section = "online"
+        continue
+    if line == "== Devices Offline ==":
+        section = "offline"
+        continue
+    if line.startswith("== "):
+        section = None
+        continue
+    if f"({udid})" not in line:
+        continue
+    if section == "online":
+        print(udid)
+        raise SystemExit(0)
+    if section == "offline":
+        raise SystemExit(20)
+raise SystemExit(21)
+' "$udid"
+}
+
+# A device-diagnostics sentinel counts only when it completed and saw no app-lifecycle
+# interruption: exit 1 on a failed run, 2 on an interrupted one.
+require_uninterrupted_success_sentinel() {
+  local sentinel="$1"
+  python3 - "$sentinel" <<'PY'
+import json
+import sys
+
+record = json.load(open(sys.argv[1]))
+if record.get("status") != "ok":
+    print(f"sentinel status is {record.get('status')!r}: {record.get('error')}", file=sys.stderr)
+    raise SystemExit(1)
+interruptions = record.get("interruptions") or []
+if interruptions:
+    kinds = ", ".join(str(event.get("type") or "unknown") for event in interruptions)
+    print(f"sentinel contains {len(interruptions)} interruption(s): {kinds}", file=sys.stderr)
+    raise SystemExit(2)
+PY
+}

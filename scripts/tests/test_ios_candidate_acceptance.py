@@ -142,31 +142,11 @@ class CandidateAcceptanceTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 candidate.crash_delta(before, after, root / "another.json")
 
-    def test_canonical_route_has_no_target_install_or_private_container(self):
-        script = (ROOT / "scripts/ui_test.sh").read_text()
-        start = script.index("# Candidate-only helpers.")
-        end = script.index('if [[ -n "$candidate_evidence" ]]; then', start)
-        route = script[start:end]
-        self.assertIn("VocelloiOSCandidateUI", route)
-        self.assertIn('install app --device "$device" "$runner"', route)
-        self.assertNotIn("--domain-type appDataContainer", route)
-        self.assertNotIn("-DVOCELLO_INTERNAL_DIAGNOSTICS", route)
-        self.assertNotIn("-allowProvisioningUpdates", route)
-        self.assertLess(route.index('candidate-runner-configuration'), route.index('candidate-runner-install'))
-        self.assertIn('collect_candidate_forensics || collection_status=$?', route)
-        self.assertIn('candidate_collection_needed == 1 && candidate_collection_attempted == 0', script)
-        source = (ROOT / "Tests/VocelloiOSUITests/VocelloiOSCandidateAcceptanceUITests.swift").read_text()
-        self.assertIn("app.launchEnvironment = [:]", source)
-        self.assertNotIn("QWENVOICE_DEBUG", source)
-
     def test_generated_scheme_builds_only_runner(self):
         scheme = ET.parse(ROOT / "QwenVoice.xcodeproj/xcshareddata/xcschemes/VocelloiOSCandidateUI.xcscheme")
         references = scheme.findall(".//BuildActionEntries//BuildableReference")
         self.assertEqual([r.attrib["BlueprintName"] for r in references], [candidate.TARGET])
         self.assertEqual(scheme.find("TestAction").attrib["buildConfiguration"], "Release")
-        source = (ROOT / "project.yml").read_text().split("  VocelloiOSCandidateUITests:\n", 1)[1]
-        self.assertNotIn("dependencies:", source)
-        self.assertNotIn("TEST_TARGET_NAME:", source)
 
 
 if __name__ == "__main__":

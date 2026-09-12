@@ -33,6 +33,7 @@
 		064757D9D01A90CB2FF04261 /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1C9AF9CA9731358DD0649B3 /* DatabaseService.swift */; };
 		071633B3268879BAB9172CCE /* IOSGenerationVariationPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D187C4B7DA7A21208083FA3 /* IOSGenerationVariationPreference.swift */; };
 		084BD168AB3E8F8B35A09B78 /* GenerationHistoryRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C3529E0076F8FBE3E3D0E22 /* GenerationHistoryRecovery.swift */; };
+		085B32C1F1FB8CB903440728 /* VocelloExports.storekit in Resources */ = {isa = PBXBuildFile; fileRef = C6B012FB532D3E7FF92C6680 /* VocelloExports.storekit */; };
 		08B80B32880C4F598A8135AD /* ReferenceClipRecordingStash.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26D256158C37672A02CAE3E /* ReferenceClipRecordingStash.swift */; };
 		08BBF5C76FE5E0903A7CD13B /* EngineServiceTransportAccumulator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DF0CD00D988A7520B168252 /* EngineServiceTransportAccumulator.swift */; };
 		09B73EC3E2501DDE3DE126FA /* GenerationStartupDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05D5B015B974945FD543659D /* GenerationStartupDiagnostics.swift */; };
@@ -254,6 +255,7 @@
 		6B1CA378BE6796ED13971FF0 /* StudioScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E0FED1EF94E06A5363542F9 /* StudioScreen.swift */; };
 		6BDD0CB174C5C132BAE1A861 /* IOSStorageProtectionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FDF43695D1DF90DD0DFE831 /* IOSStorageProtectionPolicy.swift */; };
 		6C10558CB1E9F8E9D4F98B36 /* CLIProcessSupervisor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0319BDB3EC4DB2FF5CDCEF82 /* CLIProcessSupervisor.swift */; };
+		6C22E2D23FF60D84F4F0A279 /* VocelloExports.storekit in Resources */ = {isa = PBXBuildFile; fileRef = C6B012FB532D3E7FF92C6680 /* VocelloExports.storekit */; };
 		6C329D9AE8AC56F1C930D32A /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B8174C5EB5C39242E7EF445 /* DatabaseService.swift */; };
 		6C51CFC163C64CE831D44BD3 /* VoicesCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D9DDDEEAEED933D8DB35472 /* VoicesCommand.swift */; };
 		6C72D281B2A7635A7EA895FE /* SpokenTextPlanningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01B42F5235213E8CA15A0803 /* SpokenTextPlanningTests.swift */; };
@@ -2578,6 +2580,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				96E8AA3667107E62F569DD00 /* Localizable.xcstrings in Resources */,
+				085B32C1F1FB8CB903440728 /* VocelloExports.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2655,6 +2658,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				8E5B3CD4E2DE21EAAA72A64C /* Localizable.xcstrings in Resources */,
+				6C22E2D23FF60D84F4F0A279 /* VocelloExports.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

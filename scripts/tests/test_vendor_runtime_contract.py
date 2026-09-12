@@ -20,19 +20,20 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
+def macos_ui_record_ids(records: dict) -> list[str]:
+    """Tracked macOS UI-generation records, oldest first; the tests pick by age, never by name."""
+    matching = [
+        identifier for identifier, record in records.items()
+        if record.get("run", {}).get("platform") == "macos"
+        and record.get("run", {}).get("kind") == "ui-generation"
+        and not record.get("source", {}).get("dirty")
+    ]
+    return sorted(matching, key=lambda identifier: records[identifier]["run"]["finishedAt"])
+
+
 class VendorRuntimeContractTests(unittest.TestCase):
     def test_repository_contract_is_valid(self) -> None:
         self.assertEqual(MODULE.validate(ROOT), [])
-
-    def test_generated_project_and_dependency_automation_use_owned_path(self) -> None:
-        self.assertIn(
-            "Packages/VocelloQwen3Core",
-            (ROOT / "QwenVoice.xcodeproj/project.pbxproj").read_text(encoding="utf-8"),
-        )
-        self.assertIn(
-            'directory: "/Packages/VocelloQwen3Core"',
-            (ROOT / ".github/dependabot.yml").read_text(encoding="utf-8"),
-        )
 
     def test_facade_api_baseline_is_canonical_and_hides_raw_runtime_types(self) -> None:
         runtime = ROOT / MODULE.RUNTIME_RELATIVE
@@ -370,9 +371,7 @@ public func stableFacadeEntryPoint() -> Bool { true }
             next(item for item in contract["capabilities"] if item.get("benchmarkRecordIDs"))
         )
         capability["evidenceClass"] = "benchmark"
-        capability["benchmarkRecordIDs"] = [
-            "macos-xcui-benchmark-20260713-185716-7f12cd35"
-        ]
+        capability["benchmarkRecordIDs"] = [macos_ui_record_ids(records)[0]]
         capability["benchmarkEvidenceStatus"] = "verified"
         errors = MODULE.capability_benchmark_evidence_errors(
             ROOT,
@@ -430,7 +429,7 @@ public func stableFacadeEntryPoint() -> Bool { true }
     def test_benchmark_neutral_security_dependency_drift_preserves_evidence(self) -> None:
         runtime = ROOT / MODULE.RUNTIME_RELATIVE
         records = MODULE.benchmark_records(ROOT)
-        record = records["macos-xcui-benchmark-20260801-182943-b0b5a448"]
+        record = records[macos_ui_record_ids(records)[-1]]
         git_blob = MODULE.git_blob
 
         # Tree-independence: synthesize the "historical" package manifest and
@@ -466,7 +465,7 @@ public func stableFacadeEntryPoint() -> Bool { true }
     def test_benchmark_neutral_dependency_source_drift_invalidates_evidence(self) -> None:
         runtime = ROOT / MODULE.RUNTIME_RELATIVE
         records = MODULE.benchmark_records(ROOT)
-        record = records["macos-xcui-benchmark-20260801-182943-b0b5a448"]
+        record = records[macos_ui_record_ids(records)[-1]]
         git_blob = MODULE.git_blob
 
         for field, value in (

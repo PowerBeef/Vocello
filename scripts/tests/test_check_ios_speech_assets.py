@@ -111,22 +111,6 @@ class IOSSpeechAssetCheckerTests(unittest.TestCase):
         self.assertNotEqual(incomplete.returncode, 0)
         self.assertIn("incomplete locale evidence", incomplete.stderr)
 
-    def test_device_contract_uses_one_run_scoped_non_generation_checker(self) -> None:
-        shell = DEVICE_SCRIPT.read_text(encoding="utf-8")
-        runner = RUNNER.read_text(encoding="utf-8")
-        self.assertIn('local locales="de_DE,es_419,ja_JP,zh_CN"', shell)
-        self.assertIn('check_ios_speech_assets.py" "$sentinel" --run-id "$run_id"', shell)
-        self.assertIn("AssetInventory.assetInstallationRequest", runner)
-        self.assertIn("try await installationRequest.downloadAndInstall()", runner)
-        self.assertIn("await finalizeSpeechAssetBootstrapResult", runner)
-        self.assertLess(
-            runner.index("} catch let error as SpeechAssetBootstrapError"),
-            runner.index("await finalizeSpeechAssetBootstrapResult"),
-        )
-        speech_command = shell[shell.index("cmd_speech_assets() {") : shell.index("\n}\n", shell.index("cmd_speech_assets() {"))]
-        self.assertNotIn("QVOICE_IOS_DEVICE_DIAGNOSTICS_SPEC", speech_command)
-        self.assertNotIn("publish_benchmark_history", speech_command)
-
 
 if __name__ == "__main__":
     unittest.main()

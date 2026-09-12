@@ -18,6 +18,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CATALOG = Path("Sources/Resources/Localizable.xcstrings")
 BASELINE = Path("config/localization-unlocalized-baseline.json")
 PRESENTATION_SOURCE = Path("Sources/SharedSupport/Services/VocelloPresentationText.swift")
+INTERFACE_DEFAULTS_SOURCE = Path("Sources/iOS/IOSRootNavigationModels.swift")
+COMMERCE_SOURCE = Path("Sources/iOS/Commerce/IOSCommercePresentationText.swift")
 UI_TEST_SOURCE = Path("Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift")
 MAC_UI_TEST_SOURCE = Path("Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift")
 SCAN_ROOTS = (Path("Sources/iOS"), Path("Sources/Views"), Path("Sources/SharedSupport"))
@@ -267,6 +269,45 @@ def _validate_typed_presentation(root: Path) -> None:
         for needle in needles:
             if needle not in text:
                 raise ContractError(f"{path} must use typed presentation value {needle}")
+
+    # Every typed interface default is the catalog's English value, and every
+    # vocello.ui / vocello.presentation catalog key is bound by exactly one default.
+    catalog = _read_json(root, CATALOG)["strings"]
+    default_binding = re.compile(
+        r'(?:String|localization\.string|IOSAppLanguage\.shared\.localized)\(localized:\s*"'
+        r'(?P<key>vocello\.(?:ui|presentation)\.[^"]+)",\s*defaultValue:\s*(?P<value>"(?:[^"\\]|\\.)*")'
+    )
+    matched: set[str] = set()
+    for relative in (INTERFACE_DEFAULTS_SOURCE, PRESENTATION_SOURCE):
+        text = _read_text(root, relative)
+        for match in default_binding.finditer(text):
+            key = match["key"]
+            if key in matched:
+                raise ContractError(f"{key} is bound to a typed default more than once")
+            matched.add(key)
+            entry = catalog.get(key)
+            if not isinstance(entry, dict):
+                raise ContractError(f"{relative} binds {key}, which is not in the catalog")
+            english = entry["localizations"]["en"]
+            unit = english.get("stringUnit") or english["variations"]["plural"]["other"]["stringUnit"]
+            if json.loads(match["value"]) != unit["value"]:
+                raise ContractError(f"{key} typed default differs from the catalog's English value")
+    expected = {key for key in catalog if key.startswith(("vocello.ui.", "vocello.presentation."))}
+    if matched != expected:
+        raise ContractError(
+            "typed interface defaults do not match the catalog's interface keys: "
+            + ", ".join(sorted(matched ^ expected))
+        )
+
+    # Commerce copy uses catalog entries translated for every required locale.
+    commerce = _read_text(root, COMMERCE_SOURCE)
+    for key in re.findall(r'String\(localized: "([^"]+)"', commerce):
+        entry = catalog.get(key)
+        if not isinstance(entry, dict):
+            raise ContractError(f"{COMMERCE_SOURCE} uses {key}, which is not in the catalog")
+        for locale in REQUIRED_LOCALES:
+            if locale not in entry.get("localizations", {}):
+                raise ContractError(f"{key} lacks the {locale} translation required by commerce copy")
 
 
 def scan_unlocalized_literals(root: Path) -> list[dict[str, Any]]:

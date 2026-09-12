@@ -478,6 +478,8 @@ targets:
     sources:
       - path: Sources/Resources/Localizable.xcstrings
         buildPhase: resources
+      - path: Tests/Fixtures/VocelloExports.storekit
+        buildPhase: resources
       - path: Tests/VocelloCoreTests
       - path: Tests/UIAutomationSupport/VocelloUIInteractionPolicy.swift
       - path: Tests/VocelloiOSLogicTests
@@ -544,6 +546,8 @@ targets:
     platform: iOS
     sources:
       - path: Sources/Resources/Localizable.xcstrings
+        buildPhase: resources
+      - path: Tests/Fixtures/VocelloExports.storekit
         buildPhase: resources
       - path: Tests/VocelloiOSLogicTests
       - path: Sources/iOSSupport/Models/PendingVoiceCloningHandoff.swift

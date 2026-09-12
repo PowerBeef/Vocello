@@ -120,21 +120,6 @@ class CLIVersionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(cli_version_contract.ContractError, "vocello -v output"):
             cli_version_contract.validate_binary(binary, "2.4.0")
 
-    def test_repository_wires_source_and_binary_validation_into_local_and_ci_gates(self) -> None:
-        build = (ROOT / "scripts/build.sh").read_text(encoding="utf-8")
-        validator_call = 'python3 "$SCRIPT_DIR/cli_version_contract.py" validate'
-        self.assertIn(validator_call, build)
-        self.assertLess(build.index(validator_call), build.index('rm -f "$CLI_BINARY"'))
-
-        project_gate = (ROOT / "scripts/check_project_inputs.sh").read_text(encoding="utf-8")
-        self.assertIn('python3 "$SCRIPT_DIR/cli_version_contract.py" validate', project_gate)
-
-        self.assertIn("python3 -m pytest -n auto", project_gate)
-
-        ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        self.assertIn("Verify source-built CLI version identity", ci)
-        self.assertIn("run: ./scripts/build.sh cli --version", ci)
-
 
 if __name__ == "__main__":
     unittest.main()

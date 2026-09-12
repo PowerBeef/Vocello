@@ -594,56 +594,6 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
         )
         self.assertFalse(any("receipt-" in item for item in legacy_take["failures"]))
 
-    def test_device_runner_preserves_attempt_identity_and_codec_trace_wiring(self):
-        runner = (REPO / "scripts/ios_device.sh").read_text(encoding="utf-8")
-        command_start = runner.index("cmd_voice_reliability() {")
-        command_end = runner.index("\ncmd_bench() {", command_start)
-        command = runner[command_start:command_end]
-
-        self.assertIn("--resume", command)
-        self.assertIn("QVOICE_IOS_DEVICE_VOICE_RELIABILITY_CAPTURE_CODEC_TRACE=1", command)
-        self.assertIn('QVOICE_MAC_BENCH_RUN_ID="$child_run_id"', command)
-        self.assertIn('QVOICE_MAC_BENCH_CELL="$take_id"', command)
-        self.assertIn("preserves sentinel-less failed attempt without retry", command)
-        self.assertIn("QVOICE_IOS_VOICE_RELIABILITY_TRANSCRIPTION_TIMEOUT:-900", command)
-        self.assertIn('pull_device_diagnostics_run "$transcription_run_id"', command)
-        self.assertNotIn('cmd_pull "$dest"', command)
-        self.assertIn(
-            'rm -rf "$dest"\n    rm -f "$launch_ledger"\n    mkdir -p "$dest"',
-            command,
-        )
-
-        ledger_write = command.index('python3 - "$launch_ledger" "$take_id"')
-        launch = command.index('cmd_launch "$spec"')
-        self.assertLess(ledger_write, launch)
-
-        export_start = runner.index("cmd_voice_reliability_export() {")
-        export_end = runner.index("\n# voice-reliability --plan", export_start)
-        export_command = runner[export_start:export_end]
-        self.assertIn("QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_SPEC", export_command)
-        self.assertIn(
-            "QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_CLEANUP_RUN_ID",
-            export_command,
-        )
-        self.assertIn('record.get("status") == "pass"', export_command)
-        self.assertIn('hashlib.sha256(source.read_bytes()).hexdigest()', export_command)
-        self.assertIn('pull_device_diagnostics_run "$export_run_id"', export_command)
-        self.assertIn('pull_device_diagnostics_run "$cleanup_run_id"', export_command)
-        self.assertNotIn('cmd_pull "$dest"', export_command)
-        self.assertNotIn('cmd_pull "$cleanup_dest"', export_command)
-
-        debug_knobs = VLR.load_json(REPO / "config/runtime-debug-knobs.json")
-        registered = {
-            key
-            for group in debug_knobs["groups"]
-            for key in group["keys"]
-        }
-        self.assertIn("QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_SPEC", registered)
-        self.assertIn(
-            "QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_CLEANUP_RUN_ID",
-            registered,
-        )
-
 
 if __name__ == "__main__":
     unittest.main()

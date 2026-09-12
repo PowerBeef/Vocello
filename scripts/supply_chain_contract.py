@@ -65,6 +65,8 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
     for ecosystem in ("github-actions", "npm", "swift"):
         if f'package-ecosystem: "{ecosystem}"' not in dependabot:
             errors.append(f"Dependabot does not cover {ecosystem}")
+    if 'directory: "/Packages/VocelloQwen3Core"' not in dependabot:
+        errors.append("Dependabot's swift ecosystem must watch the owned package at /Packages/VocelloQwen3Core")
 
     package_path = root / "website/package.json"
     if package_path.is_file():

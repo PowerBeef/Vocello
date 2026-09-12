@@ -3,6 +3,26 @@ import QwenVoiceCore
 
 @MainActor
 final class IOSExportPurchaseTests: XCTestCase {
+    /// The StoreKit test configuration and the shipping access policy name the
+    /// same single non-consumable product; the fixture is test-only by name.
+    func testStoreKitFixtureDeclaresTheOneProductThePolicyGates() throws {
+        let url = try XCTUnwrap(
+            Bundle(for: IOSExportPurchaseTests.self).url(forResource: "VocelloExports", withExtension: "storekit")
+        )
+        let configuration = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        )
+        let products = try XCTUnwrap(configuration["products"] as? [[String: Any]])
+        XCTAssertEqual(products.count, 1)
+        let product = try XCTUnwrap(products.first)
+        XCTAssertEqual(product["type"] as? String, "NonConsumable")
+        XCTAssertEqual(product["productID"] as? String, IOSExportAccessPolicy.productID)
+        // App Store product identifiers accept letters, digits, underscores and periods only.
+        XCTAssertNotNil(IOSExportAccessPolicy.productID.range(of: #"\A[A-Za-z0-9_.]+\z"#, options: .regularExpression))
+        let localizations = try XCTUnwrap(product["localizations"] as? [[String: Any]])
+        XCTAssertTrue((localizations.first?["displayName"] as? String ?? "").contains("TEST"))
+    }
+
     func testProvenanceComesFromOutputModeNotCurrentSelection() {
         for mode in ["custom", "CUSTOM"] {
             XCTAssertTrue(IOSExportAccessPolicy.permits([.init(generationMode: mode)], unlocked: false))

@@ -130,13 +130,6 @@ benchmark_nonce() {
 
 # Canonical history/telemetry cell for every one-take physical-device diagnostic.
 # The publisher reconstructs this same identity from the successful sentinel.
-device_benchmark_cell() {
-  local spec="$1"
-  local mode="${spec%%:*}"
-  local remainder="${spec#*:}"
-  local variant="${remainder%%:*}"
-  printf '%s/%s/device' "$mode" "$variant"
-}
 
 capture_benchmark_source() {
   local artifacts="$1"
@@ -388,33 +381,6 @@ PY
 # same physical phone. Resolve the Instruments UDID from CoreDevice's stable
 # JSON, then require that xctrace currently lists it in the online Devices
 # section before the profile lane launches or suspends Vocello.
-xctrace_inventory_status() {
-  local udid="$1"
-  python3 -c '
-import sys
-udid = sys.argv[1]
-section = None
-for raw in sys.stdin:
-    line = raw.replace("\u00a0", " ").strip()
-    if line == "== Devices ==":
-        section = "online"
-        continue
-    if line == "== Devices Offline ==":
-        section = "offline"
-        continue
-    if line.startswith("== "):
-        section = None
-        continue
-    if f"({udid})" not in line:
-        continue
-    if section == "online":
-        print(udid)
-        raise SystemExit(0)
-    if section == "offline":
-        raise SystemExit(20)
-raise SystemExit(21)
-' "$udid"
-}
 
 resolve_xctrace_device() {
   local dev="$1"
@@ -785,23 +751,6 @@ require_diagnostic_clone_voice() {
 # A completed generation is not publishable when the app lost foreground ownership
 # or CallKit observed an interruption. Keep this check in the runner script as a
 # defense for sentinels produced by older installed builds that reported status=ok.
-require_uninterrupted_success_sentinel() {
-  local sentinel="$1"
-  python3 - "$sentinel" <<'PY'
-import json
-import sys
-
-record = json.load(open(sys.argv[1]))
-if record.get("status") != "ok":
-    print(f"sentinel status is {record.get('status')!r}: {record.get('error')}", file=sys.stderr)
-    raise SystemExit(1)
-interruptions = record.get("interruptions") or []
-if interruptions:
-    kinds = ", ".join(str(event.get("type") or "unknown") for event in interruptions)
-    print(f"sentinel contains {len(interruptions)} interruption(s): {kinds}", file=sys.stderr)
-    raise SystemExit(2)
-PY
-}
 
 # launch [spec]: with a spec, set the non-UI diagnostics + telemetry env; otherwise, a plain launch.
 # Optional QVOICE_LAUNCH_RUN_ID overrides the per-launch diagnostics run id (lang-bench).

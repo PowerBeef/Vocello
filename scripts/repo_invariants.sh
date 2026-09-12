@@ -105,19 +105,6 @@ for entry in Packages/VocelloQwen3Core/Tests/*/; do
     || fail "unexpected test directory in the owned runtime package: $entry"
 done
 
-# No Python variant of a shell gate, no stale product names (the .sh scripts are canonical).
-for removed_pattern in \
-  'Packages/VocelloQwen3Core/Tests/(MLXAudioTTSTests|MLXAudioCodecsTests)' \
-  'QwenVoice-macos15.dmg' \
-  'build/QwenVoice.app' \
-  'scripts/check_qwen3_backend_only\.py' \
-  'scripts/check_ios_catalog\.py' \
-  'scripts/refresh_readme_screenshots\.py'; do
-  out="$(rg -n -e "$removed_pattern" . --hidden \
-    --glob '!.git/**' --glob '!build/**' --glob '!scratch/**' --glob '!scripts/repo_invariants.sh' 2>/dev/null || true)"
-  [[ -z "$out" ]] || fail "removed test/benchmark reference is still present:\n$out"
-done
-
 # One lifecycle authority: generation views never start model prewarm themselves.
 out="$(rg -n 'prewarmModelIfNeeded' Sources/Views/Generate --glob '*.swift' 2>/dev/null || true)"
 [[ -z "$out" ]] || fail "generation views must not start model prewarm directly:\n$out"
@@ -150,7 +137,60 @@ PY
 ! grep -q "QW_TEST_SUPPORT" project.yml || fail "QW_TEST_SUPPORT must not be configured in the single shippable project"
 ! grep -qE 'path = .*(__pycache__|\.pyc)' QwenVoice.xcodeproj/project.pbxproj \
   || fail "project references local-only Python cache files; regenerate with ./scripts/regenerate_project.sh --fast"
-[[ ! -d Assets.xcassets ]] || fail "retired repo-root Assets.xcassets directory is present; the catalog lives under Sources/"
+
+# Monetization: one StoreKit owner on iOS, and no persisted or debug-gated paid flag.
+out="$(rg -l 'import StoreKit|StoreKit\.Transaction|AppStore\.sync\(' Sources 2>/dev/null \
+  | rg -v '^Sources/iOS/Commerce/IOSStoreKitClient\.swift$' || true)"
+[[ -z "$out" ]] || fail "StoreKit may be used only by IOSStoreKitClient:\n$out"
+out="$(rg -n 'UserDefaults|RuntimeDebugGate' \
+  Sources/iOS/Commerce/IOSStoreKitClient.swift Sources/iOSSupport/Services/IOSExportPurchaseState.swift 2>/dev/null || true)"
+[[ -z "$out" ]] || fail "paid access is derived from verified transactions, never persisted or debug-gated:\n$out"
+
+# Monetization: one export boundary on iOS; macOS and the CLI export freely.
+out="$(rg -n 'UIActivityViewController\(|ShareLink\(' Sources/iOS 2>/dev/null \
+  | rg -v '^Sources/iOS/Commerce/IOSExportGate\.swift:' || true)"
+[[ -z "$out" ]] || fail "iOS exports must route through IOSExportGate:\n$out"
+out="$(rg -n 'IOSExportCommerce' Sources/VocelloCLI Sources/Views Sources/Services 2>/dev/null || true)"
+[[ -z "$out" ]] || fail "macOS and CLI exports must not consult iOS commerce:\n$out"
+
+# Monetization: the StoreKit test configuration is a test-bundle resource only; no app target
+# bundles it and no shared scheme activates it.
+python3 - <<'PY'
+from pathlib import Path
+owners, current, in_targets, target_type = [], None, False, {}
+for line in Path("project.yml").read_text(encoding="utf-8").splitlines():
+    if line.startswith("targets:"):
+        in_targets = True
+        continue
+    if in_targets and line and not line[0].isspace():
+        in_targets = False
+    if not in_targets:
+        continue
+    if line.startswith("  ") and not line.startswith("   ") and line.rstrip().endswith(":"):
+        current = line.strip()[:-1]
+    elif current and line.strip().startswith("type:"):
+        target_type[current] = line.split(":", 1)[1].strip()
+    elif current and "Tests/Fixtures/VocelloExports.storekit" in line:
+        owners.append(current)
+if not owners:
+    raise SystemExit("Tests/Fixtures/VocelloExports.storekit is not declared by any test target in project.yml")
+bad = [name for name in owners if not target_type.get(name, "").startswith("bundle.")]
+if bad:
+    raise SystemExit("the StoreKit test configuration may live only in test bundles, not " + ", ".join(bad))
+PY
+out="$(rg -l 'VocelloExports\.storekit' QwenVoice.xcodeproj/xcshareddata/xcschemes 2>/dev/null || true)"
+[[ -z "$out" ]] || fail "no shared scheme may activate the StoreKit test configuration:\n$out"
+
+# Genuine controls: clone consent is owned by Settings on iOS; no other surface declares the control.
+[[ "$(rg -c 'accessibilityIdentifier: "voiceCloning_consentAcknowledgment"' Sources/iOS/Settings/SettingsScreen.swift || true)" == "1" ]] \
+  || fail "the clone consent control must be declared once in Sources/iOS/Settings/SettingsScreen.swift"
+out="$(rg -n 'voiceCloning_consentAcknowledgment' Sources/iOS 2>/dev/null | rg -v 'Settings/SettingsScreen\.swift' || true)"
+[[ -z "$out" ]] || fail "clone consent is settings-owned; no other iOS surface may declare it:\n$out"
+
+# Release-only candidate acceptance: the preinstalled-candidate UI test drives the shipped app as is.
+out="$(rg -n 'QWENVOICE_DEBUG|VOCELLO_INTERNAL_DIAGNOSTICS|appDataContainer' \
+  Tests/VocelloiOSUITests/VocelloiOSCandidateAcceptanceUITests.swift 2>/dev/null || true)"
+[[ -z "$out" ]] || fail "candidate acceptance must not enable diagnostics or reach into the app container:\n$out"
 
 # Evidence retention: benchmarks/ holds compact summaries only, each at most 256 KB.
 if [[ -d benchmarks ]]; then

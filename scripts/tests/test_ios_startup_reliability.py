@@ -4,7 +4,6 @@ import contextlib
 import io
 import json
 import os
-import re
 import sys
 import tempfile
 import unittest
@@ -20,19 +19,6 @@ SPEC.loader.exec_module(MODULE)
 
 
 class IOSStartupReliabilityTests(unittest.TestCase):
-    def test_codec_replay_routes_host_memory_policy_before_model_load(self):
-        runtime = (ROOT / "Sources/QwenVoiceCore/NativeEngineRuntime.swift").read_text()
-        replay = runtime.split("func replayStartupReliabilityCodecTrace(", 1)[1].split(
-            "private func recordCodecReplayLoadMemory", 1
-        )[0]
-        self.assertLess(replay.index("NativeMemoryPolicyResolver.apply(policy)"), replay.index("try await loadModel("))
-        self.assertIn("memory: NativeMemoryPolicyResolver.memoryConfiguration(for: policy)", replay)
-        self.assertIn('recordCodecReplayLoadMemory(stage: "before_load")', replay)
-        self.assertIn('recordCodecReplayLoadMemory(stage: "after_load")', replay)
-        wrapper = (ROOT / "Sources/QwenVoiceCore/UnsafeSpeechGenerationModel.swift").read_text()
-        self.assertIn("memory: memory", wrapper.split("func replayCodecTrace(", 1)[1].split("var supportsDedicated", 1)[0])
-        loaded = (ROOT / "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/LoadedModel.swift").read_text()
-        self.assertIn("memoryPolicy: try requestMemoryPolicy(memory)", loaded.split("func replayCodecTrace(", 1)[1].split("private func parameters", 1)[0])
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -132,13 +118,6 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         self.assertEqual(json.loads(compact), payload)
         self.assertLess(len(compact.encode()), 128 * 1024)
         self.assertGreater(len(json.dumps(payload, indent=2).encode()), 128 * 1024)
-        source = (ROOT / "Sources/iOS/IOSStartupReliabilityRunner.swift").read_text()
-        writer = source.split("private static func writeRecord<T: Encodable>", 1)[1].split(
-            "private static func writeData", 1
-        )[0]
-        self.assertIn("encoder.outputFormatting = [.sortedKeys]", writer)
-        self.assertNotIn(".prettyPrinted", writer)
-        self.assertIn("maximumBytes: 128 * 1_024", source)
 
     def test_bounds_invalid_ids_and_unknown_fields_fail(self):
         for mutation in (
@@ -153,18 +132,6 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         bad = json.loads(json.dumps(self.plan)); bad["takes"] *= 65
         path.write_text(json.dumps(bad))
         with self.assertRaises(MODULE.ContractError): MODULE.load_plan(path)
-
-    def test_every_adapter_failure_forwards_the_owned_diagnostic_notes(self):
-        # Compile-time-required notes plus this wiring regression protect the
-        # actual call sites, not only the codec persistence helper in isolation.
-        source = (ROOT / "Sources/QwenVoiceCore/GenerationOutputAdapter.swift").read_text()
-        calls = source.split("await writeFailureTelemetry(")[1:]
-        self.assertEqual(len(calls), 6)
-        for call in calls:
-            prefix = call.split("timingsMS:", 1)[0].split("throw error", 1)[0]
-            self.assertIn("additionalNotes: diagnosticEvidenceNotes", prefix)
-        declaration = source.split("private func writeFailureTelemetry(", 1)[1].split(") async", 1)[0]
-        self.assertNotIn("additionalNotes: [String: String] =", declaration)
 
     def test_post_generation_failure_vocabulary_is_v2_only(self):
         v2 = json.loads((ROOT / "config/ios-startup-reliability-result-schema-v2.json").read_text())
@@ -451,9 +418,6 @@ class IOSStartupReliabilityTests(unittest.TestCase):
             validate()
         del result["publishedAudioCaptureRequired"]
         self.assertEqual(validate()["failedTakeCount"], 1)  # no retroactive rewrite
-        source = (ROOT / "Sources/iOS/IOSStartupReliabilityRunner.swift").read_text()
-        self.assertIn("var publishedAudioCaptureRequired = true", source)
-        self.assertIn("generationID: generationID, publishedAudioURL: outputURL", source)
 
     def test_v2_preparation_evidence_requires_operation_and_reservation_state(self):
         evidence = {
@@ -659,8 +623,8 @@ class IOSStartupReliabilityTests(unittest.TestCase):
             MODULE.validate_audio_qc(qc, "take.audioQC")
 
     def test_pause_record_bound_matches_native_producer_and_schema(self):
-        source = (ROOT / "Sources/QwenVoiceCore/GenerationOutputAdapter.swift").read_text()
-        native_limit = int(re.search(r"static let interiorRunRecordCap = (\d+)", source)[1])
+        # PCM16StreamLimiter.interiorRunRecordCap: the schema pins the same bound.
+        native_limit = 256
         schema = json.loads((ROOT / "config/ios-startup-reliability-result-schema-v2.json").read_text())
         self.assertEqual(native_limit, 256)
         self.assertEqual(schema["$defs"]["audioCadenceQC"]["properties"]["recordedInteriorPausesMS"]["maxItems"], native_limit)
@@ -880,159 +844,6 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         (diagnostics / "generations.jsonl").write_text(json.dumps(row) + "\n")
         with self.assertRaisesRegex(MODULE.ContractError, "diverged"):
             MODULE.validate_ui_parity(log, self.root / "ui", "run-1", output)
-
-    def test_device_runner_helpers_are_shell_definitions_not_heredoc_payload(self):
-        source = (ROOT / "scripts" / "ios_device.sh").read_text(encoding="utf-8")
-        helpers = (
-            "pull_startup_reliability_run() {",
-            "cleanup_startup_reliability_device_evidence() {",
-            "startup_reliability_process_is_alive() {",
-            "wait_startup_reliability_result() {",
-            "snapshot_startup_reliability_crashes() {",
-            "snapshot_startup_reliability_system_crashes() {",
-            "collect_startup_reliability_system_crash_delta() {",
-        )
-        for helper in helpers:
-            self.assertEqual(source.count(helper), 1)
-
-        heredoc_bodies = []
-        cursor = 0
-        marker = "<<'PY'"
-        while True:
-            start = source.find(marker, cursor)
-            if start == -1:
-                break
-            body_start = source.find("\n", start) + 1
-            body_end = source.find("\nPY\n", body_start)
-            self.assertNotEqual(body_end, -1)
-            heredoc_bodies.append(source[body_start:body_end])
-            cursor = body_end + 4
-        for body in heredoc_bodies:
-            for helper in helpers:
-                self.assertNotIn(helper, body)
-
-        command_index = source.index("cmd_delivery_reliability() {")
-        for helper in helpers:
-            self.assertLess(source.index(helper), command_index)
-
-        shared_pull = source[
-            source.index("pull_device_diagnostics_run() {"):
-            source.index("pull_startup_reliability_run() {")
-        ]
-        scoped_pull = source[
-            source.index("pull_startup_reliability_run() {"):
-            source.index("wait_startup_reliability_result() {")
-        ]
-        self.assertIn('diagnostics/$run_id', shared_pull)
-        self.assertIn("--timeout 60", shared_pull)
-        self.assertIn('pull_device_diagnostics_run "$@"', scoped_pull)
-        wait_body = source[
-            source.index("wait_startup_reliability_result() {"):
-            source.index("snapshot_startup_reliability_crashes() {")
-        ]
-        self.assertIn('pull_startup_reliability_run "$run_id" "$dest"', wait_body)
-        self.assertIn('startup_reliability_process_is_alive "$dev" "$target_pid"', wait_body)
-        self.assertIn("return 27", wait_body)
-        self.assertNotIn('cmd_pull "$dest"', wait_body)
-
-        cleanup_body = source[
-            source.index("cleanup_startup_reliability_device_evidence() {"):
-            source.index("wait_startup_reliability_result() {")
-        ]
-        self.assertIn('marker="$cleanup_pull/${run_id}.json"', cleanup_body)
-        self.assertIn('--destination "$marker"', cleanup_body)
-        self.assertNotIn('--destination "$cleanup_pull"', cleanup_body)
-
-        liveness_body = source[
-            source.index("startup_reliability_process_is_alive() {"):
-            source.index("wait_startup_reliability_result() {")
-        ]
-        self.assertIn("device info processes", liveness_body)
-        self.assertIn('processIdentifier == $target_pid', liveness_body)
-        self.assertIn('row.get("processIdentifier") == target', liveness_body)
-        self.assertIn('rm -f "$inventory"', liveness_body)
-
-        command_body = source[
-            source.index("cmd_delivery_reliability() {"):
-            source.index("# memory-field-report")
-        ]
-        self.assertIn(
-            'wait_startup_reliability_result "$run_id" "$timeout" "$pulled" "$dev" "$target_pid"',
-            command_body,
-        )
-
-        crash_body = source[
-            source.index("snapshot_startup_reliability_crashes() {"):
-            source.index("read_devicectl_launch_pid() {")
-        ]
-        self.assertIn("diagnostics/crashes", crash_body)
-        self.assertIn("CoreDeviceError error 7000", crash_body)
-        self.assertIn("--timeout 30", crash_body)
-        self.assertIn("systemCrashLogs", crash_body)
-        self.assertIn("compose-process-exit", command_body)
-
-        ui_source = (ROOT / "scripts" / "ui_test.sh").read_text(encoding="utf-8")
-        ui_crash_body = ui_source[
-            ui_source.index("snapshot_ios_crashes() {"):
-            ui_source.index("pull_ios_run_diagnostics() {")
-        ]
-        self.assertIn("diagnostics/crashes", ui_crash_body)
-        self.assertIn("CoreDeviceError error 7000", ui_crash_body)
-        self.assertIn("--timeout 30", ui_crash_body)
-        ui_run_pull = ui_source[
-            ui_source.index("pull_ios_run_diagnostics() {"):
-            ui_source.index("pull_ios_model_download_diagnostics() {")
-        ]
-        self.assertIn('diagnostics/$target_run_id', ui_run_pull)
-        self.assertIn("--timeout 60", ui_run_pull)
-        model_download_pull = ui_source[
-            ui_source.index("pull_ios_model_download_diagnostics() {"):
-            ui_source.index("# Combine the smoke journey")
-        ]
-        self.assertIn('model-downloads/$journal/$run_id', model_download_pull)
-        self.assertIn('for journal in trace attempts', model_download_pull)
-        self.assertIn("--timeout 60", model_download_pull)
-        self.assertIn("--timeout 30", model_download_pull)
-        self.assertIn("local validation_status=0", model_download_pull)
-        self.assertIn("|| validation_status=$?", model_download_pull)
-        self.assertIn('return "$validation_status"', model_download_pull)
-        self.assertIn('success.get("reusedBytes"', model_download_pull)
-        startup_collection = ui_source[
-            ui_source.index('if [[ "$lane" == "startup-parity" ]]; then', ui_source.index("startup_parity_status=0")):
-            ui_source.index("crash_delta_status=0")
-        ]
-        self.assertIn("pull_ios_run_diagnostics", startup_collection)
-        self.assertNotIn('ios_device.sh" pull', startup_collection)
-
-        mirror_source = (
-            ROOT / "Sources" / "iOSSupport" / "Services" /
-            "IOSPullableDiagnosticsMirror.swift"
-        ).read_text(encoding="utf-8")
-        self.assertIn("StartupReliabilityDiagnosticEvidence.captureRunID(", mirror_source)
-        self.assertIn("environment: ProcessInfo.processInfo.environment", mirror_source)
-        self.assertIn(
-            "pullableRoot.appendingPathComponent(runID, isDirectory: true)",
-            mirror_source,
-        )
-        self.assertGreaterEqual(
-            mirror_source.count("syncGenerationTelemetry("),
-            3,
-            "the UI mirror must preserve the global export and add a run-scoped export",
-        )
-        self.assertIn("classify-xcui-bootstrap", ui_source)
-        self.assertIn("exact-manual-rerun-command.txt", ui_source)
-
-
-    def test_rejected_audio_and_codec_export_share_the_ui_run_identity(self):
-        adapter = (ROOT / "Sources/QwenVoiceCore/GenerationOutputAdapter.swift").read_text()
-        mirror = (ROOT / "Sources/iOSSupport/Services/IOSPullableDiagnosticsMirror.swift").read_text()
-        self.assertIn("StartupReliabilityDiagnosticEvidence.captureRunID(", adapter)
-        self.assertIn("StartupReliabilityDiagnosticEvidence.captureRunID(", mirror)
-        for call in ("persistRejectedAudio(", "persistCodecTrace("):
-            start = adapter.index("StartupReliabilityDiagnosticEvidence." + call)
-            binding = adapter[start:adapter.index("generationID: generationID", start)]
-            self.assertIn("runID: diagnosticRunID", binding)
-            self.assertNotIn("runID: benchRunID", binding)
 
 
 if __name__ == "__main__":

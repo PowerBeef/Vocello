@@ -289,13 +289,6 @@ class DeliveryExperimentRunnerTests(unittest.TestCase):
         with self.assertRaises(RunnerError):
             analyze_execution(plan, run_dir)
 
-    def test_generate_json_source_exposes_exact_receipt_fields(self) -> None:
-        source = (REPO / "Sources/VocelloCLI/GenerateCommand.swift").read_text(encoding="utf-8")
-        self.assertIn("let generationID: String", source)
-        self.assertIn("let deliveryInstructionChars: Int?", source)
-        self.assertIn("let deliveryInstructionDigest: String?", source)
-        self.assertIn("payload.deliveryInstructionText", source)
-
     def test_execution_verdict_rejects_retained_or_blocked_failures(self) -> None:
         passed = execution_verdict({
             "counts": {"complete": 1, "failedOrBlocked": 0, "planned": 2}

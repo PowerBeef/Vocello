@@ -63,33 +63,6 @@ def valid_catalog() -> dict[str, object]:
     return {"sourceLanguage": "en", "strings": strings, "version": "1.0"}
 
 
-class ProductionInterfaceCatalogTests(unittest.TestCase):
-    def test_every_typed_interface_default_is_bound_to_catalog_english(self) -> None:
-        root = SCRIPTS.parent
-        catalog = json.loads((root / localization_contract.CATALOG).read_text())["strings"]
-        pattern = re.compile(
-            r'(?:String|localization\.string|IOSAppLanguage\.shared\.localized)\(localized:\s*"(?P<key>vocello\.(?:ui|presentation)\.[^"]+)",'
-            r'\s*defaultValue:\s*(?P<value>"(?:[^"\\]|\\.)*")'
-        )
-        matched = set()
-        for relative in (
-            "Sources/iOS/IOSRootNavigationModels.swift",
-            "Sources/SharedSupport/Services/VocelloPresentationText.swift",
-        ):
-            for match in pattern.finditer((root / relative).read_text()):
-                key = match["key"]
-                with self.subTest(key=key):
-                    self.assertNotIn(key, matched)
-                    matched.add(key)
-                    entry = catalog[key]["localizations"]["en"]
-                    unit = entry.get("stringUnit")
-                    if unit is None:
-                        unit = entry["variations"]["plural"]["other"]["stringUnit"]
-                    self.assertEqual(json.loads(match["value"]), unit["value"])
-        expected = {key for key in catalog if key.startswith(("vocello.ui.", "vocello.presentation."))}
-        self.assertEqual(matched, expected)
-
-
 class LocalizationContractTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
@@ -122,6 +95,9 @@ class LocalizationContractTests(unittest.TestCase):
         (self.root / localization_contract.PRESENTATION_SOURCE).write_text(
             presentation + "\n", encoding="utf-8"
         )
+        (self.root / localization_contract.INTERFACE_DEFAULTS_SOURCE).write_text("// fixture\n", encoding="utf-8")
+        (self.root / localization_contract.COMMERCE_SOURCE).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / localization_contract.COMMERCE_SOURCE).write_text("// fixture\n", encoding="utf-8")
         expected_sources = {
             "Sources/iOS/IOSGenerationModeViews.swift": (
                 "IOSAppLanguage.shared.presentation.installModel\n"
@@ -238,6 +214,29 @@ class LocalizationContractTests(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(localization_contract.ContractError):
                 localization_contract._validate_translations(entry, "fixture")
 
+    def test_typed_interface_default_must_match_catalog_english(self) -> None:
+        catalog_path = self.root / localization_contract.CATALOG
+        catalog = json.loads(catalog_path.read_text())
+        catalog["strings"]["vocello.ui.fixture"] = {
+            "comment": "fixture", "extractionState": "manual",
+            "localizations": {locale: {"stringUnit": {"state": "translated", "value": "Fixture"}} for locale in ("en", "fr")},
+        }
+        catalog_path.write_text(json.dumps(catalog))
+        source = self.root / localization_contract.INTERFACE_DEFAULTS_SOURCE
+        source.write_text('let x = String(localized: "vocello.ui.fixture", defaultValue: "Fixture")\n')
+        localization_contract.validate(self.root)
+        source.write_text('let x = String(localized: "vocello.ui.fixture", defaultValue: "Drifted")\n')
+        with self.assertRaisesRegex(localization_contract.ContractError, "differs from the catalog"):
+            localization_contract.validate(self.root)
+        source.write_text("// no binding\n")
+        with self.assertRaisesRegex(localization_contract.ContractError, "do not match the catalog"):
+            localization_contract.validate(self.root)
+        source.write_text('let x = String(localized: "vocello.ui.fixture", defaultValue: "Fixture")\n')
+        commerce = self.root / localization_contract.COMMERCE_SOURCE
+        commerce.write_text('let y = String(localized: "vocello.commerce.missing")\n')
+        with self.assertRaisesRegex(localization_contract.ContractError, "not in the catalog"):
+            localization_contract.validate(self.root)
+
     def test_permission_translation_preserves_source_and_is_bundled(self) -> None:
         path = self.root / "Sources/iOS/InfoPlist.xcstrings"
         catalog = json.loads(path.read_text())
@@ -245,19 +244,6 @@ class LocalizationContractTests(unittest.TestCase):
         path.write_text(json.dumps(catalog))
         with self.assertRaisesRegex(localization_contract.ContractError, "purpose string"):
             localization_contract.validate(self.root)
-
-    def test_production_onboarding_and_dock_use_catalog_without_changing_identity(self) -> None:
-        root = localization_contract.REPO_ROOT
-        dock = (root / "Sources/iOS/App/TabDock.swift").read_text()
-        for name in ("Studio", "Voices", "History", "Settings"):
-            self.assertIn(f"IOSInterfaceText.tab{name}", dock)
-        flow = (root / "Sources/iOS/Overlays/IOSOnboardingFlow.swift").read_text()
-        self.assertIn("IOSInterfaceText.page(page + 1, of: totalPages)", flow)
-        self.assertIn('accessibilityIdentifier("onboarding_cta")', flow)
-        self.assertIn("IOSAppDefaults.hasCompletedOnboarding = true", flow)
-        source = (root / "Sources/iOS/IOSRootNavigationModels.swift").read_text()
-        self.assertIn("var id: String { rawValue }", source)
-        self.assertNotIn("GenerationRequest(", source)
 
     def test_missing_setting_catalog_or_resource_fails(self) -> None:
         cases = (

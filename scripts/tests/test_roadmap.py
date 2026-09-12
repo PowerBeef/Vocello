@@ -11,7 +11,6 @@ import json
 import os
 import pathlib
 import sys
-import tempfile
 import unittest
 from unittest import mock
 
@@ -43,17 +42,13 @@ class Harness(unittest.TestCase):
         data = copy.deepcopy(MINIMAL)
         if mutate:
             mutate(data)
-        directory = pathlib.Path(tempfile.mkdtemp())
-        (directory / "config").mkdir()
-        (directory / "config" / "roadmap.json").write_text(json.dumps(data))
-        # Evidence must resolve against the real tree; only the data is synthetic.
-        real = REPO_ROOT / "config" / "roadmap.json"
-        backup = real.read_text(encoding="utf-8")
-        real.write_text(json.dumps(data), encoding="utf-8")
-        try:
+        # Evidence must resolve against the real tree; only the data is
+        # synthetic. Inject it through the loader rather than rewriting the
+        # tracked config/roadmap.json: parallel test workers read that file
+        # concurrently (ProgressTests), and an interrupted worker would leave
+        # the repository dirty.
+        with mock.patch.object(roadmap, "load", return_value=data):
             return roadmap.validate(REPO_ROOT, today=TODAY)
-        finally:
-            real.write_text(backup, encoding="utf-8")
 
     def errors_from(self, mutate):
         return " | ".join(self.check(mutate)["errors"])

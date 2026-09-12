@@ -801,8 +801,10 @@ public struct GenerationTelemetryRecord: Hashable, Codable, Sendable {
     public let summary: TelemetrySummary?
     public let thermalState: ThermalStateSnapshot?
     /// Headline derived throughput KPIs (engine layer): `audioSeconds`,
-    /// `decodeWallSeconds`, `audioSecondsPerWallSecond` (>1 = faster than realtime),
-    /// `tokensPerSecond`, `generatedTokenCount`. nil when not computed.
+    /// `requestWallSeconds`, `realTimeFactor` (standard RTF = request wall ÷ audio,
+    /// lower is faster, <1 = faster than real time), `decodeWallSeconds`,
+    /// `audioSecondsPerWallSecond` (decode-loop speedup, higher is faster; not an
+    /// RTF), `tokensPerSecond`, `generatedTokenCount`. nil when not computed.
     public let derivedMetrics: [String: Double]?
     /// Per-stage MLX GPU memory (active/cache/peak MB) — e.g. before_stream,
     /// first_chunk, after_stream, after_generation_trim. nil when not collected.

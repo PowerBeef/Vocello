@@ -29,7 +29,13 @@ def make_row(index: int, mode: str, length: str, warm_state: str) -> dict:
         "mode": mode,
         "warmState": warm_state,
         "finishReason": "completed",
-        "derivedMetrics": {"generatedTokenCount": 200 + index},
+        "derivedMetrics": {
+            "generatedTokenCount": 200 + index,
+            "audioSeconds": 4.0,
+            "requestWallSeconds": 2.5,
+            "realTimeFactor": 0.625,
+            "audioSecondsPerWallSecond": 1.8,
+        },
         "summary": {"stageMarks": []},
         "notes": {
             "benchRunID": RUN_ID,

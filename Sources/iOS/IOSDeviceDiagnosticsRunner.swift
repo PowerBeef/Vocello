@@ -683,7 +683,7 @@ enum IOSDeviceDiagnosticsRunner {
                 mode: spec.mode.rawValue
             )
             appTimelineSubmitted = true
-            let t0 = Date()
+            let started = ContinuousClock.now
             let result = try await engine.generate(request)
             await AppGenerationTimeline.shared.recordCompleted(
                 id: generationID,
@@ -693,8 +693,9 @@ enum IOSDeviceDiagnosticsRunner {
                 summary: result.telemetrySummary
             )
             appTimelineSubmitted = false
-            let wall = Date().timeIntervalSince(t0)
-            let rtf = wall > 0 ? result.durationSeconds / wall : 0
+            let wall = started.elapsedSeconds
+            // Standard real-time factor: wall ÷ audio, lower is faster.
+            let rtf = result.durationSeconds > 0 ? wall / result.durationSeconds : 0
 
             record.status = "ok"
             record.durationSeconds = result.durationSeconds
@@ -705,7 +706,7 @@ enum IOSDeviceDiagnosticsRunner {
                 stringFlags: result.diagnosticStringFlags
             )
             print(String(
-                format: "[device-diagnostics] ✓ %.2fs audio · rtf=%.2f · finish=%@",
+                format: "[device-diagnostics] ✓ %.2fs audio · rtf=%.2f (wall/audio) · finish=%@",
                 result.durationSeconds, rtf, result.finishReason?.rawValue ?? "?"
             ))
 
@@ -1075,7 +1076,7 @@ enum IOSDeviceDiagnosticsRunner {
                         mode: GenerationMode.clone.rawValue
                     )
                     appTimelineSubmitted = true
-                    let generationStartedAt = Date()
+                    let generationStartedAt = ContinuousClock.now
                     let result = try await engine.generate(request)
                     await AppGenerationTimeline.shared.recordCompleted(
                         id: generationID,
@@ -1158,7 +1159,7 @@ enum IOSDeviceDiagnosticsRunner {
                             preparedCloneCacheHit: booleans["prepared_clone_cache_hit"] == true,
                             referenceAudioSHA256: expectedAudioSHA256,
                             promptAssemblySHA256: promptAssemblyDigest,
-                            wallSeconds: Date().timeIntervalSince(generationStartedAt),
+                            wallSeconds: generationStartedAt.elapsedSeconds,
                             outputFileName: outputFileName,
                             outputEvidence: outputEvidence,
                             outputVerification: outputVerification
@@ -1322,7 +1323,7 @@ enum IOSDeviceDiagnosticsRunner {
                         mode: mode.rawValue
                     )
                     appTimelineSubmitted = true
-                    let started = Date()
+                    let started = ContinuousClock.now
                     let result = try await engine.generate(request)
                     await AppGenerationTimeline.shared.recordCompleted(
                         id: generationID,
@@ -1370,7 +1371,7 @@ enum IOSDeviceDiagnosticsRunner {
                         generationID: generationID
                     )
 
-                    let wallSeconds = Date().timeIntervalSince(started)
+                    let wallSeconds = started.elapsedSeconds
                     takeResults.append(
                         MemoryQualificationTakeResult(
                             takeIndex: plannedTake.takeIndex,

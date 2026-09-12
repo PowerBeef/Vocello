@@ -2982,7 +2982,22 @@ struct StreamingExecutionContext: Sendable {
         }
         if decodeWallSeconds > 0 {
             metrics["decodeWallSeconds"] = decodeWallSeconds
+            // Decode-loop speedup (audio seconds per decode second, higher is
+            // faster). Kept for the optimization ledger; it is NOT the real-time
+            // factor, which is `realTimeFactor` below.
             metrics["audioSecondsPerWallSecond"] = audioSeconds / decodeWallSeconds
+        }
+
+        // Standard real-time factor: request wall time ÷ generated audio seconds,
+        // lower is faster, below 1.0 is faster than real time. The wall side is
+        // the whole request on the recorder's monotonic clock (prepare entry to
+        // the final WAV write) minus one-time startup stages, so cold and warm
+        // takes both measure synthesis rather than loading.
+        if let requestWallSeconds = GenerationOutputAdapter.requestWallSeconds(stageMarks: stageMarks) {
+            metrics["requestWallSeconds"] = requestWallSeconds
+            if audioSeconds > 0 {
+                metrics["realTimeFactor"] = requestWallSeconds / audioSeconds
+            }
         }
 
         if let info {
@@ -3029,5 +3044,35 @@ public enum PersistedWAVAudioQCAnalyzer {
     /// excess dropout.
     public static func expectedPauseCount(in text: String) -> Int {
         StreamingExecutionContext.expectedPauseCount(in: text)
+    }
+}
+
+extension GenerationOutputAdapter {
+    /// Request span in seconds from the per-generation stage recorder, whose
+    /// clock starts at prepare entry: the terminal mark (`streamCompleted`,
+    /// recorded after the final WAV write; `streamGenerationEnded` as the
+    /// fallback) minus the one-time startup intervals (model load, prewarm).
+    /// nil when no terminal mark exists or the span is not positive.
+    static func requestWallSeconds(stageMarks: [NativeTelemetryStageMark]) -> Double? {
+        func firstMS(_ stage: String) -> Int? {
+            stageMarks.first { $0.stage == stage }?.tMS
+        }
+        guard let terminalMS = firstMS(NativeRuntimeStage.streamCompleted.rawValue)
+            ?? firstMS(NativeRuntimeStage.streamGenerationEnded.rawValue)
+        else { return nil }
+        let startupIntervals: [(GenerationStartupBoundary, GenerationStartupBoundary)] = [
+            (.modelLoadStarted, .modelLoaded),
+            (.prewarmStarted, .prewarmCompleted),
+        ]
+        var excludedMS = 0
+        for (start, end) in startupIntervals {
+            if let startMS = firstMS(start.telemetryStage),
+               let endMS = firstMS(end.telemetryStage),
+               endMS > startMS {
+                excludedMS += endMS - startMS
+            }
+        }
+        let wallMS = terminalMS - excludedMS
+        return wallMS > 0 ? Double(wallMS) / 1_000 : nil
     }
 }

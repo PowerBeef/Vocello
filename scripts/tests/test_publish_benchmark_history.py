@@ -71,6 +71,8 @@ def engine_row(generation_id: str, *, run_id: str = "run-one", cell: str = "cust
         },
         "derivedMetrics": {
             "audioSeconds": 2.0,
+            "requestWallSeconds": 1.5,
+            "realTimeFactor": 0.75,
             "audioSecondsPerWallSecond": 1.5,
             "tokensPerSecond": 20.0,
             "generatedTokenCount": 42,
@@ -478,12 +480,35 @@ class PublisherTests(unittest.TestCase):
         record = captured["manifest"]["historyRecord"]
         self.assertEqual([take["generationID"] for take in record["takes"]], ["selected"])
         self.assertEqual(record["takes"][0]["metrics"]["ttfcMS"], 100.0)
+        # Standard RTF comes from the engine row (request wall ÷ audio), never from
+        # the bench take's wall clock; the decode speedup keeps its own key.
+        metrics = record["takes"][0]["metrics"]
+        self.assertEqual(metrics["rtf"], 0.75)
+        self.assertEqual(metrics["requestWallSeconds"], 1.5)
+        self.assertEqual(metrics["decodeSpeedupX"], 1.5)
+        self.assertEqual(record["run"]["rtfDefinition"], "wall/audio")
         self.assertEqual(
             record["takes"][0]["runtimeProfileSignature"],
             "pro_custom_speed:fixture-v1",
         )
         self.assertEqual(record["toolchain"]["optimization"], "-O")
         self.assertEqual(record["evidence"]["actualTakeCount"], 1)
+
+    def test_engine_take_refuses_a_row_without_a_measurable_request_span(self) -> None:
+        row = engine_row("no-wall")
+        row["derivedMetrics"] = {"audioSeconds": 2.0, "audioSecondsPerWallSecond": 1.5}
+        take = {
+            "generationID": "no-wall", "cell": row["notes"]["benchCell"], "mode": "custom",
+            "modelID": "pro_custom_speed", "warmState": "warm", "wallSeconds": 1.0,
+        }
+        with self.assertRaisesRegex(publisher.PublicationError, "request wall time"):
+            publisher.engine_take(1, take, row, None, run_id=row["notes"]["benchRunID"])
+        row["backendMetrics"]["stages"] = [
+            {"stage": "startup.request_validated", "tMS": 0},
+            {"stage": "streamCompleted", "tMS": 1_600},
+        ]
+        recovered = publisher.engine_take(1, take, row, None, run_id=row["notes"]["benchRunID"])
+        self.assertEqual(recovered["metrics"]["rtf"], 0.8)
 
     def test_ios_app_correlation_is_exact_completed_and_engine_memory_owned(self) -> None:
         generation_id = "ios-correlation-generation"

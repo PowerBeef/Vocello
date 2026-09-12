@@ -6,1438 +6,1444 @@ result bundles, and traces remain untracked. Earlier manual results are preserve
 [`LEGACY_HISTORY.md`](LEGACY_HISTORY.md) and are not treated as structured evidence.
 Schema-v1 records remain readable but are marked memory-contract-incomplete and are excluded
 from schema-v2 memory trends.
-RTF here is audio seconds ÷ wall-clock seconds (`audioSecondsPerWallSecond`): higher is
-faster, 1.1 ≈ 1.1× realtime, and a positive RTF trend is an improvement. Much of the TTS
-ecosystem defines RTF as the inverse (wall-clock ÷ audio, lower is better); convert before
-cross-project comparisons.
+
+**RTF** is the standard real-time factor: synthesis wall seconds ÷ generated audio seconds,
+lower is faster, below 1.0 is faster than real time. Records published since 2026-09-12 declare
+`run.rtfDefinition: "wall/audio"` and measure the engine request span (prepare entry to the
+final WAV write, minus model load and prewarm). Older records stored the inverted decode-loop
+speedup (audio ÷ decode seconds, higher is faster) under `rtf`; they are never rewritten. The
+RTF column below shows a standard value for every record: measured for new records, and
+`~`-prefixed when derived from the legacy take's app submit→completed span (or the inverse of
+its end-to-end speedup for CLI records). The two lineages never share a comparison key, and
+trend percentages carry their direction in words.
 
 ## engine-generation / ios / iphone-17-pro / config `1f7856b56aef`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-02 | [`ios-engine-20260802-010645-909ebdd4`](runs/engine-generation/ios-engine-20260802-010645-909ebdd4.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `b6b2a028f1eb` | `excluded` | baseline | i14p-floor-clone |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-02 | [`ios-engine-20260802-010645-909ebdd4`](runs/engine-generation/ios-engine-20260802-010645-909ebdd4.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | ~0.65 | `b6b2a028f1eb` | `excluded` | baseline | i14p-floor-clone |
 
 ## engine-generation / ios / iphone-17-pro / config `29c4eb5a89c3`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-11 | [`ios-gate-bench-20260811-181532-fa8e90e1`](runs/engine-generation/ios-gate-bench-20260811-181532-fa8e90e1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 1 | `f497fb8bf477` | `29c4eb5a89c3` | baseline | ios-gate-bench |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-11 | [`ios-gate-bench-20260811-181532-fa8e90e1`](runs/engine-generation/ios-gate-bench-20260811-181532-fa8e90e1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 1 | ~1.30 | `f497fb8bf477` | `29c4eb5a89c3` | baseline | ios-gate-bench |
 
 ## engine-generation / ios / iphone-17-pro / config `3abbfd2f50ea`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-12 | [`ios-engine-20260712-204019-1f40cea8`](runs/engine-generation/ios-engine-20260712-204019-1f40cea8.json) | focused | exploratory | passed | memory-contract-incomplete | 1 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-headless-final |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-12 | [`ios-engine-20260712-204019-1f40cea8`](runs/engine-generation/ios-engine-20260712-204019-1f40cea8.json) | focused | exploratory | passed | memory-contract-incomplete | 1 | ~1.06 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-headless-final |
 
 ## engine-generation / ios / iphone-17-pro / config `4be5479ddc2d`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`ios-engine-20260801-144252-d6160fd7`](runs/engine-generation/ios-engine-20260801-144252-d6160fd7.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `1f9ebeccef8b` | `excluded` | baseline | i15p-floor-custom |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`ios-engine-20260801-144252-d6160fd7`](runs/engine-generation/ios-engine-20260801-144252-d6160fd7.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | ~0.55 | `1f9ebeccef8b` | `excluded` | baseline | i15p-floor-custom |
 
 ## engine-generation / ios / iphone-17-pro / config `528ba2c2cfe1`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-24 | [`ios-engine-20260724-060000-1cc8ef23`](runs/engine-generation/ios-engine-20260724-060000-1cc8ef23.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `f98537cd7115` dirty | `excluded` | baseline | limit-900-proof |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-24 | [`ios-engine-20260724-060000-1cc8ef23`](runs/engine-generation/ios-engine-20260724-060000-1cc8ef23.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | ~0.66 | `f98537cd7115` dirty | `excluded` | baseline | limit-900-proof |
 
 ## engine-generation / ios / iphone-17-pro / config `a15ad30a4677`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-02 | [`ios-engine-20260802-010526-ab1e3c8e`](runs/engine-generation/ios-engine-20260802-010526-ab1e3c8e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `b6b2a028f1eb` | `excluded` | baseline | i14p-floor-design |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-02 | [`ios-engine-20260802-010526-ab1e3c8e`](runs/engine-generation/ios-engine-20260802-010526-ab1e3c8e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | ~0.62 | `b6b2a028f1eb` | `excluded` | baseline | i14p-floor-design |
 
 ## engine-generation / ios / iphone-17-pro / config `a6ae7ce54378`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`ios-engine-20260801-144748-9d129b7c`](runs/engine-generation/ios-engine-20260801-144748-9d129b7c.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `1f9ebeccef8b` | `excluded` | baseline | i15p-floor-design2 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`ios-engine-20260801-144748-9d129b7c`](runs/engine-generation/ios-engine-20260801-144748-9d129b7c.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | ~0.54 | `1f9ebeccef8b` | `excluded` | baseline | i15p-floor-design2 |
 
 ## engine-generation / ios / iphone-17-pro / config `e8b9dd91c1fe`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-02 | [`ios-engine-20260802-010405-88d9f30e`](runs/engine-generation/ios-engine-20260802-010405-88d9f30e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `b6b2a028f1eb` | `excluded` | baseline | i14p-floor-custom |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-02 | [`ios-engine-20260802-010405-88d9f30e`](runs/engine-generation/ios-engine-20260802-010405-88d9f30e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | ~0.64 | `b6b2a028f1eb` | `excluded` | baseline | i14p-floor-custom |
 
 ## engine-generation / ios / iphone-17-pro / config `f1c8dc2684fb`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-19 | [`ios-gate-bench-20260719-232101-283a4b1c`](runs/engine-generation/ios-gate-bench-20260719-232101-283a4b1c.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `d07384473fe9` dirty | `excluded` | baseline | ios-gate-bench |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-19 | [`ios-gate-bench-20260719-232101-283a4b1c`](runs/engine-generation/ios-gate-bench-20260719-232101-283a4b1c.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | ~1.48 | `d07384473fe9` dirty | `excluded` | baseline | ios-gate-bench |
 
 ## engine-generation / ios / iphone-17-pro / config `f6a4d1af86a4`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-23 | [`ios-engine-20260723-121520-45ee4ab3`](runs/engine-generation/ios-engine-20260723-121520-45ee4ab3.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 1 | `bb4dae82d4be` | `f6a4d1af86a4` | baseline | ios-glass-check3 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-23 | [`ios-engine-20260723-121520-45ee4ab3`](runs/engine-generation/ios-engine-20260723-121520-45ee4ab3.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 1 | ~0.63 | `bb4dae82d4be` | `f6a4d1af86a4` | baseline | ios-glass-check3 |
 
 ## engine-generation / ios / iphone-17-pro / config `fc7d1a38082c`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-11 | [`ios-engine-20260811-180909-307642b3`](runs/engine-generation/ios-engine-20260811-180909-307642b3.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 1 | `f497fb8bf477` | `fc7d1a38082c` | baseline | marking-ios-acceptance |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-11 | [`ios-engine-20260811-180909-307642b3`](runs/engine-generation/ios-engine-20260811-180909-307642b3.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 1 | ~1.09 | `f497fb8bf477` | `fc7d1a38082c` | baseline | marking-ios-acceptance |
 
 ## engine-generation / ios / iphone-17-pro / config `fd4b7152c9e4`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-13 | [`ios-gate-bench-20260713-045258-6eeb9220`](runs/engine-generation/ios-gate-bench-20260713-045258-6eeb9220.json) | focused | exploratory | passed | memory-contract-incomplete | 1 | `04083b15a4e2` dirty | `excluded` | baseline | ios-gate-bench |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-13 | [`ios-gate-bench-20260713-045258-6eeb9220`](runs/engine-generation/ios-gate-bench-20260713-045258-6eeb9220.json) | focused | exploratory | passed | memory-contract-incomplete | 1 | ~1.17 | `04083b15a4e2` dirty | `excluded` | baseline | ios-gate-bench |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `00fd1d20405c`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-223033-0b2b66a2`](runs/engine-generation/macos-engine-20260805-223033-0b2b66a2.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `00fd1d20405c` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-223033-0b2b66a2`](runs/engine-generation/macos-engine-20260805-223033-0b2b66a2.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.91 | `caa59cd37e6b` | `00fd1d20405c` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `0152d0f36d57`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-204822-9a855bbb`](runs/engine-generation/macos-engine-20260804-204822-9a855bbb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `0152d0f36d57` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-204822-9a855bbb`](runs/engine-generation/macos-engine-20260804-204822-9a855bbb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.87 | `5c67ee1d3431` | `0152d0f36d57` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `05357e0de73c`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-223727-0fd126e1`](runs/engine-generation/macos-engine-20260805-223727-0fd126e1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `05357e0de73c` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-223727-0fd126e1`](runs/engine-generation/macos-engine-20260805-223727-0fd126e1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.91 | `caa59cd37e6b` | `05357e0de73c` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `067abef51b0b`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-220047-a44116c7`](runs/engine-generation/macos-engine-20260805-220047-a44116c7.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `067abef51b0b` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-220047-a44116c7`](runs/engine-generation/macos-engine-20260805-220047-a44116c7.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.91 | `caa59cd37e6b` | `067abef51b0b` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `075c5899177e`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-210303-f8c90cba`](runs/engine-generation/macos-engine-20260804-210303-f8c90cba.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `075c5899177e` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-210303-f8c90cba`](runs/engine-generation/macos-engine-20260804-210303-f8c90cba.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.87 | `5c67ee1d3431` | `075c5899177e` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `0836c83a962a`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-222816-335a006d`](runs/engine-generation/macos-engine-20260805-222816-335a006d.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `0836c83a962a` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-222816-335a006d`](runs/engine-generation/macos-engine-20260805-222816-335a006d.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.91 | `caa59cd37e6b` | `0836c83a962a` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `08537b5694f6`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-07 | [`macos-engine-20260807-023057-5275b724`](runs/engine-generation/macos-engine-20260807-023057-5275b724.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `46da18acdcd5` | `08537b5694f6` | baseline | marking-qc-marked |
-| 2026-08-07 | [`macos-engine-20260807-023242-fce41fcb`](runs/engine-generation/macos-engine-20260807-023242-fce41fcb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `517e69ea0617` | `08537b5694f6` | vs macos-engine-20260807-023057-5275b724: RTF +10.2%, TTFC +0.2%, RAM +0.0% | marking-qc-off |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-07 | [`macos-engine-20260807-023057-5275b724`](runs/engine-generation/macos-engine-20260807-023057-5275b724.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.99 | `46da18acdcd5` | `08537b5694f6` | baseline | marking-qc-marked |
+| 2026-08-07 | [`macos-engine-20260807-023242-fce41fcb`](runs/engine-generation/macos-engine-20260807-023242-fce41fcb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.90 | `517e69ea0617` | `08537b5694f6` | vs macos-engine-20260807-023057-5275b724: RTF +10.2% (faster), TTFC +0.2%, RAM +0.0% | marking-qc-off |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `08613eaf0dca`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`macos-engine-20260806-000240-6ce0744c`](runs/engine-generation/macos-engine-20260806-000240-6ce0744c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `08613eaf0dca` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`macos-engine-20260806-000240-6ce0744c`](runs/engine-generation/macos-engine-20260806-000240-6ce0744c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.94 | `d8e31ffe4957` | `08613eaf0dca` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `0ccb9deaa488`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-221650-67c4c106`](runs/engine-generation/macos-engine-20260805-221650-67c4c106.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `0ccb9deaa488` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-221650-67c4c106`](runs/engine-generation/macos-engine-20260805-221650-67c4c106.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.91 | `caa59cd37e6b` | `0ccb9deaa488` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `0e7fa82f75f6`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-205454-c52af04f`](runs/engine-generation/macos-engine-20260804-205454-c52af04f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `0e7fa82f75f6` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-205454-c52af04f`](runs/engine-generation/macos-engine-20260804-205454-c52af04f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.88 | `5c67ee1d3431` | `0e7fa82f75f6` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `11be98b7f400`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-213556-c564dbd3`](runs/engine-generation/macos-engine-20260804-213556-c564dbd3.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `11be98b7f400` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-213556-c564dbd3`](runs/engine-generation/macos-engine-20260804-213556-c564dbd3.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `11be98b7f400` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `13ce0b166fd6`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-222559-c754cb2a`](runs/engine-generation/macos-engine-20260805-222559-c754cb2a.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `13ce0b166fd6` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-222559-c754cb2a`](runs/engine-generation/macos-engine-20260805-222559-c754cb2a.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.91 | `caa59cd37e6b` | `13ce0b166fd6` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `14eb324207bc`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-043728-ce332882`](runs/engine-generation/macos-engine-20260801-043728-ce332882.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `3884622b632a` | `14eb324207bc` | baseline | r2a-sadstrong-20260828 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-043728-ce332882`](runs/engine-generation/macos-engine-20260801-043728-ce332882.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | ~0.83 | `3884622b632a` | `14eb324207bc` | baseline | r2a-sadstrong-20260828 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `153df60da3fc`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-213334-c132ddbe`](runs/engine-generation/macos-engine-20260804-213334-c132ddbe.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `153df60da3fc` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-213334-c132ddbe`](runs/engine-generation/macos-engine-20260804-213334-c132ddbe.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `153df60da3fc` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `172925ef53dd`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-204556-95a23e4a`](runs/engine-generation/macos-engine-20260804-204556-95a23e4a.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `172925ef53dd` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-204556-95a23e4a`](runs/engine-generation/macos-engine-20260804-204556-95a23e4a.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.88 | `5c67ee1d3431` | `172925ef53dd` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `18e0d6e87912`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-23 | [`macos-engine-20260723-171109-97f9e88e`](runs/engine-generation/macos-engine-20260723-171109-97f9e88e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | `394263b59d48` dirty | `excluded` | baseline | phase11-abc-qc-soak |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-23 | [`macos-engine-20260723-171109-97f9e88e`](runs/engine-generation/macos-engine-20260723-171109-97f9e88e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | ~0.97 | `394263b59d48` dirty | `excluded` | baseline | phase11-abc-qc-soak |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `193122b9cb08`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-23 | [`macos-engine-20260723-155000-b19a782f`](runs/engine-generation/macos-engine-20260723-155000-b19a782f.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | `2c3d162164b0` dirty | `excluded` | baseline | phase14b-qc-soak |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-23 | [`macos-engine-20260723-155000-b19a782f`](runs/engine-generation/macos-engine-20260723-155000-b19a782f.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | ~1.00 | `2c3d162164b0` dirty | `excluded` | baseline | phase14b-qc-soak |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `1c77a4e17141`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-041627-da6a5df3`](runs/engine-generation/macos-engine-20260801-041627-da6a5df3.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 10 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c1-s5 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-041627-da6a5df3`](runs/engine-generation/macos-engine-20260801-041627-da6a5df3.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 10 | ~0.84 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c1-s5 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `1f4e5adce975`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-043529-4418312a`](runs/engine-generation/macos-engine-20260801-043529-4418312a.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `3884622b632a` | `1f4e5adce975` | baseline | r2a-sadstrong-20260823 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-043529-4418312a`](runs/engine-generation/macos-engine-20260801-043529-4418312a.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | ~0.84 | `3884622b632a` | `1f4e5adce975` | baseline | r2a-sadstrong-20260823 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `2022a7a1e3e1`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-31 | [`macos-engine-20260731-192156-208e2873`](runs/engine-generation/macos-engine-20260731-192156-208e2873.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 29 | `9f12b8b2f44d` | `2022a7a1e3e1` | baseline | release-QA-2.3.0 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-31 | [`macos-engine-20260731-192156-208e2873`](runs/engine-generation/macos-engine-20260731-192156-208e2873.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 29 | ~0.83 | `9f12b8b2f44d` | `2022a7a1e3e1` | baseline | release-QA-2.3.0 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `20c15ef8c709`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-12 | [`macos-engine-20260712-204208-0cb5705c`](runs/engine-generation/macos-engine-20260712-204208-0cb5705c.json) | focused | exploratory | passed | memory-contract-incomplete | 2 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-cli-focused |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-12 | [`macos-engine-20260712-204208-0cb5705c`](runs/engine-generation/macos-engine-20260712-204208-0cb5705c.json) | focused | exploratory | passed | memory-contract-incomplete | 2 | ~1.79 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-cli-focused |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `27d67c5808ac`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-215829-a9bda111`](runs/engine-generation/macos-engine-20260805-215829-a9bda111.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `27d67c5808ac` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-215829-a9bda111`](runs/engine-generation/macos-engine-20260805-215829-a9bda111.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.91 | `caa59cd37e6b` | `27d67c5808ac` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `2a61f62b8731`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-221432-4c1d4726`](runs/engine-generation/macos-engine-20260805-221432-4c1d4726.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `2a61f62b8731` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-221432-4c1d4726`](runs/engine-generation/macos-engine-20260805-221432-4c1d4726.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.91 | `caa59cd37e6b` | `2a61f62b8731` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `2cd6a472aeff`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-205305-f7e3fc7d`](runs/engine-generation/macos-engine-20260804-205305-f7e3fc7d.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `2cd6a472aeff` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-205305-f7e3fc7d`](runs/engine-generation/macos-engine-20260804-205305-f7e3fc7d.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.87 | `5c67ee1d3431` | `2cd6a472aeff` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `2e864adbdc08`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-214046-7811a3a9`](runs/engine-generation/macos-engine-20260804-214046-7811a3a9.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `2e864adbdc08` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-214046-7811a3a9`](runs/engine-generation/macos-engine-20260804-214046-7811a3a9.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `2e864adbdc08` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `31f16259e54b`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-043703-99a2e02f`](runs/engine-generation/macos-engine-20260801-043703-99a2e02f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `3884622b632a` | `31f16259e54b` | baseline | r2a-sadstrong-20260827 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-043703-99a2e02f`](runs/engine-generation/macos-engine-20260801-043703-99a2e02f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | ~0.83 | `3884622b632a` | `31f16259e54b` | baseline | r2a-sadstrong-20260827 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `32de19d94a4e`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-220959-f94f7b0a`](runs/engine-generation/macos-engine-20260805-220959-f94f7b0a.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `32de19d94a4e` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-220959-f94f7b0a`](runs/engine-generation/macos-engine-20260805-220959-f94f7b0a.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.91 | `caa59cd37e6b` | `32de19d94a4e` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `32f2f6f86c82`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-030101-0a150ea0`](runs/engine-generation/macos-engine-20260801-030101-0a150ea0.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s6 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-030101-0a150ea0`](runs/engine-generation/macos-engine-20260801-030101-0a150ea0.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | ~0.84 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s6 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `3457f0674bfc`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-190904-96462e5b`](runs/engine-generation/macos-engine-20260805-190904-96462e5b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `f72bdb3a6b44` | `3457f0674bfc` | baseline | st133-delivery |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-190904-96462e5b`](runs/engine-generation/macos-engine-20260805-190904-96462e5b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.87 | `f72bdb3a6b44` | `3457f0674bfc` | baseline | st133-delivery |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `36e09e969fd5`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-043637-7ebef0f6`](runs/engine-generation/macos-engine-20260801-043637-7ebef0f6.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `3884622b632a` | `36e09e969fd5` | baseline | r2a-sadstrong-20260826 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-043637-7ebef0f6`](runs/engine-generation/macos-engine-20260801-043637-7ebef0f6.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | ~0.83 | `3884622b632a` | `36e09e969fd5` | baseline | r2a-sadstrong-20260826 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `3b0c1682b887`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-09-01 | [`mac-gate-bench-20260901-223657-866ddfb3`](runs/engine-generation/mac-gate-bench-20260901-223657-866ddfb3.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | `de5712afdc86` | `3b0c1682b887` | baseline | mac-gate-bench |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-01 | [`mac-gate-bench-20260901-223657-866ddfb3`](runs/engine-generation/mac-gate-bench-20260901-223657-866ddfb3.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | ~0.87 | `de5712afdc86` | `3b0c1682b887` | baseline | mac-gate-bench |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `3c41b6ebb9ad`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-23 | [`macos-engine-20260723-030444-1cc02ebd`](runs/engine-generation/macos-engine-20260723-030444-1cc02ebd.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | p7-cli-app-open |
-| 2026-07-23 | [`macos-engine-20260723-031416-ed258b6b`](runs/engine-generation/macos-engine-20260723-031416-ed258b6b.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | p7-cli-O |
-| 2026-07-23 | [`macos-engine-20260723-031603-47801d81`](runs/engine-generation/macos-engine-20260723-031603-47801d81.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | p7-cli-O-bg |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-23 | [`macos-engine-20260723-030444-1cc02ebd`](runs/engine-generation/macos-engine-20260723-030444-1cc02ebd.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.87 | `109559888e4d` dirty | `excluded` | baseline | p7-cli-app-open |
+| 2026-07-23 | [`macos-engine-20260723-031416-ed258b6b`](runs/engine-generation/macos-engine-20260723-031416-ed258b6b.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.56 | `109559888e4d` dirty | `excluded` | baseline | p7-cli-O |
+| 2026-07-23 | [`macos-engine-20260723-031603-47801d81`](runs/engine-generation/macos-engine-20260723-031603-47801d81.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.06 | `109559888e4d` dirty | `excluded` | baseline | p7-cli-O-bg |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `3c6031e6579a`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-025435-a5bddf69`](runs/engine-generation/macos-engine-20260801-025435-a5bddf69.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s3 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-025435-a5bddf69`](runs/engine-generation/macos-engine-20260801-025435-a5bddf69.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | ~0.84 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s3 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `3f20c80c9048`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-221913-7e787535`](runs/engine-generation/macos-engine-20260805-221913-7e787535.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `3f20c80c9048` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-221913-7e787535`](runs/engine-generation/macos-engine-20260805-221913-7e787535.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.92 | `caa59cd37e6b` | `3f20c80c9048` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `45be72cf37ef`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-221216-d5037847`](runs/engine-generation/macos-engine-20260805-221216-d5037847.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `45be72cf37ef` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-221216-d5037847`](runs/engine-generation/macos-engine-20260805-221216-d5037847.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.91 | `caa59cd37e6b` | `45be72cf37ef` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `495983598878`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-235456-bb8148bc`](runs/engine-generation/macos-engine-20260805-235456-bb8148bc.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `495983598878` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-235456-bb8148bc`](runs/engine-generation/macos-engine-20260805-235456-bb8148bc.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.93 | `d8e31ffe4957` | `495983598878` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `49c5267e9cfe`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-212738-afbf335e`](runs/engine-generation/macos-engine-20260804-212738-afbf335e.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `49c5267e9cfe` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-212738-afbf335e`](runs/engine-generation/macos-engine-20260804-212738-afbf335e.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `49c5267e9cfe` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `4a6ac27c9e60`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-26 | [`macos-engine-20260726-054111-e95e1285`](runs/engine-generation/macos-engine-20260726-054111-e95e1285.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 12 | `f97598a6c6a1` dirty | `excluded` | baseline | stage0-clone-silence-bench |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-26 | [`macos-engine-20260726-054111-e95e1285`](runs/engine-generation/macos-engine-20260726-054111-e95e1285.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 12 | ~0.99 | `f97598a6c6a1` dirty | `excluded` | baseline | stage0-clone-silence-bench |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `4afd7d1c52c8`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-041313-3b04b2bc`](runs/engine-generation/macos-engine-20260801-041313-3b04b2bc.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 10 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c1-s1 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-041313-3b04b2bc`](runs/engine-generation/macos-engine-20260801-041313-3b04b2bc.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 10 | ~0.84 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c1-s1 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `4ee0618f15ed`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-030511-fd13467e`](runs/engine-generation/macos-engine-20260801-030511-fd13467e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s8 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-030511-fd13467e`](runs/engine-generation/macos-engine-20260801-030511-fd13467e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | ~0.84 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s8 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `4f7d4a778003`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-040939-807949bf`](runs/engine-generation/macos-engine-20260801-040939-807949bf.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-cal-subtle-s4 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-040939-807949bf`](runs/engine-generation/macos-engine-20260801-040939-807949bf.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | ~0.83 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-cal-subtle-s4 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `50de185fbd54`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-025856-86923095`](runs/engine-generation/macos-engine-20260801-025856-86923095.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s5 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-025856-86923095`](runs/engine-generation/macos-engine-20260801-025856-86923095.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | ~0.84 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s5 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `5156739e1f76`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-041926-5df81bc3`](runs/engine-generation/macos-engine-20260801-041926-5df81bc3.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c2-s3 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-041926-5df81bc3`](runs/engine-generation/macos-engine-20260801-041926-5df81bc3.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.83 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c2-s3 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `527e97f33deb`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`macos-engine-20260805-235946-a96763b4`](runs/engine-generation/macos-engine-20260805-235946-a96763b4.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `527e97f33deb` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`macos-engine-20260805-235946-a96763b4`](runs/engine-generation/macos-engine-20260805-235946-a96763b4.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.97 | `d8e31ffe4957` | `527e97f33deb` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `57db9f5fefaa`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-041519-cddfbb19`](runs/engine-generation/macos-engine-20260801-041519-cddfbb19.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 10 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c1-s4 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-041519-cddfbb19`](runs/engine-generation/macos-engine-20260801-041519-cddfbb19.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 10 | ~0.84 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c1-s4 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `58c5504060f9`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-235654-f1a64776`](runs/engine-generation/macos-engine-20260805-235654-f1a64776.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `58c5504060f9` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-235654-f1a64776`](runs/engine-generation/macos-engine-20260805-235654-f1a64776.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.93 | `d8e31ffe4957` | `58c5504060f9` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `59788482751f`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-212959-9a8f4183`](runs/engine-generation/macos-engine-20260804-212959-9a8f4183.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `59788482751f` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-212959-9a8f4183`](runs/engine-generation/macos-engine-20260804-212959-9a8f4183.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `59788482751f` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `5aa6ca1571dc`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-205158-190e317e`](runs/engine-generation/macos-engine-20260804-205158-190e317e.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `5aa6ca1571dc` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-205158-190e317e`](runs/engine-generation/macos-engine-20260804-205158-190e317e.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.88 | `5c67ee1d3431` | `5aa6ca1571dc` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `5d3915a4be41`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-212022-f8da2aff`](runs/engine-generation/macos-engine-20260804-212022-f8da2aff.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `5d3915a4be41` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-212022-f8da2aff`](runs/engine-generation/macos-engine-20260804-212022-f8da2aff.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.91 | `5c67ee1d3431` | `5d3915a4be41` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `5fa6157d1c0f`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-042254-9832e5d4`](runs/engine-generation/macos-engine-20260801-042254-9832e5d4.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 10 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1final-s7 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-042254-9832e5d4`](runs/engine-generation/macos-engine-20260801-042254-9832e5d4.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 10 | ~0.84 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1final-s7 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `62c08c22d915`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-212629-419b7ad2`](runs/engine-generation/macos-engine-20260804-212629-419b7ad2.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `62c08c22d915` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-212629-419b7ad2`](runs/engine-generation/macos-engine-20260804-212629-419b7ad2.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `62c08c22d915` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `6640e0cb2fce`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-041414-c9d0c26b`](runs/engine-generation/macos-engine-20260801-041414-c9d0c26b.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 10 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c1-s3 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-041414-c9d0c26b`](runs/engine-generation/macos-engine-20260801-041414-c9d0c26b.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 10 | ~0.84 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c1-s3 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `68b19bba807e`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-220733-bea36cb1`](runs/engine-generation/macos-engine-20260805-220733-bea36cb1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `68b19bba807e` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-220733-bea36cb1`](runs/engine-generation/macos-engine-20260805-220733-bea36cb1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.91 | `caa59cd37e6b` | `68b19bba807e` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `6ddb8e885bd2`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-043751-9a7b804f`](runs/engine-generation/macos-engine-20260801-043751-9a7b804f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `3884622b632a` | `6ddb8e885bd2` | baseline | r2a-sadstrong-20260829 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-043751-9a7b804f`](runs/engine-generation/macos-engine-20260801-043751-9a7b804f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | ~0.83 | `3884622b632a` | `6ddb8e885bd2` | baseline | r2a-sadstrong-20260829 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `6ee36ce68e2f`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-220304-6335a346`](runs/engine-generation/macos-engine-20260805-220304-6335a346.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `6ee36ce68e2f` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-220304-6335a346`](runs/engine-generation/macos-engine-20260805-220304-6335a346.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.91 | `caa59cd37e6b` | `6ee36ce68e2f` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `703de4cf9d62`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-210410-840af10c`](runs/engine-generation/macos-engine-20260804-210410-840af10c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `703de4cf9d62` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-210410-840af10c`](runs/engine-generation/macos-engine-20260804-210410-840af10c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.87 | `5c67ee1d3431` | `703de4cf9d62` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `769db51ea1e0`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-190417-23dd97b0`](runs/engine-generation/macos-engine-20260805-190417-23dd97b0.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `f72bdb3a6b44` | `769db51ea1e0` | baseline | st133-delivery |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-190417-23dd97b0`](runs/engine-generation/macos-engine-20260805-190417-23dd97b0.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.86 | `f72bdb3a6b44` | `769db51ea1e0` | baseline | st133-delivery |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `7849dd8ff18e`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-043615-35444cb2`](runs/engine-generation/macos-engine-20260801-043615-35444cb2.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `3884622b632a` | `7849dd8ff18e` | baseline | r2a-sadstrong-20260825 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-043615-35444cb2`](runs/engine-generation/macos-engine-20260801-043615-35444cb2.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | ~0.84 | `3884622b632a` | `7849dd8ff18e` | baseline | r2a-sadstrong-20260825 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `78a1caf946b9`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-235751-2a6b02da`](runs/engine-generation/macos-engine-20260805-235751-2a6b02da.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `78a1caf946b9` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-235751-2a6b02da`](runs/engine-generation/macos-engine-20260805-235751-2a6b02da.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.92 | `d8e31ffe4957` | `78a1caf946b9` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `7a43472cdb6a`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-205929-6f5570aa`](runs/engine-generation/macos-engine-20260804-205929-6f5570aa.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `7a43472cdb6a` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-205929-6f5570aa`](runs/engine-generation/macos-engine-20260804-205929-6f5570aa.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.88 | `5c67ee1d3431` | `7a43472cdb6a` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `7e4aa45e3647`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-220521-dd568dad`](runs/engine-generation/macos-engine-20260805-220521-dd568dad.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `7e4aa45e3647` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-220521-dd568dad`](runs/engine-generation/macos-engine-20260805-220521-dd568dad.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.92 | `caa59cd37e6b` | `7e4aa45e3647` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `7ebaa3bd337a`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-155513-991ccaf6`](runs/engine-generation/macos-engine-20260801-155513-991ccaf6.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 19 | `49bd93a84893` dirty | `excluded` | baseline | pin-bump-control-0.30.6 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-155513-991ccaf6`](runs/engine-generation/macos-engine-20260801-155513-991ccaf6.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 19 | ~0.87 | `49bd93a84893` dirty | `excluded` | baseline | pin-bump-control-0.30.6 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `7f73a38f2a72`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-030304-f7aa595e`](runs/engine-generation/macos-engine-20260801-030304-f7aa595e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s7 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-030304-f7aa595e`](runs/engine-generation/macos-engine-20260801-030304-f7aa595e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | ~0.84 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s7 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `817164bfb96c`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-20 | [`macos-engine-20260720-052534-b9dcb26d`](runs/engine-generation/macos-engine-20260720-052534-b9dcb26d.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `0d4eac8b336b` | `817164bfb96c` | baseline | phase0-cli-control-1 |
-| 2026-07-20 | [`macos-engine-20260720-052721-ebbbbda7`](runs/engine-generation/macos-engine-20260720-052721-ebbbbda7.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `0d4eac8b336b` | `817164bfb96c` | vs macos-engine-20260720-052534-b9dcb26d: RTF +2.1%, TTFC -5.8%, RAM -0.4% | phase0-cli-control-2 |
-| 2026-07-20 | [`macos-engine-20260720-052856-845cd043`](runs/engine-generation/macos-engine-20260720-052856-845cd043.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `0d4eac8b336b` | `817164bfb96c` | vs macos-engine-20260720-052721-ebbbbda7: RTF +0.3%, TTFC -1.3%, RAM +2.4% | phase0-cli-control-3 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-20 | [`macos-engine-20260720-052534-b9dcb26d`](runs/engine-generation/macos-engine-20260720-052534-b9dcb26d.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.08 | `0d4eac8b336b` | `817164bfb96c` | baseline | phase0-cli-control-1 |
+| 2026-07-20 | [`macos-engine-20260720-052721-ebbbbda7`](runs/engine-generation/macos-engine-20260720-052721-ebbbbda7.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.06 | `0d4eac8b336b` | `817164bfb96c` | vs macos-engine-20260720-052534-b9dcb26d: RTF +2.1% (faster), TTFC -5.8%, RAM -0.4% | phase0-cli-control-2 |
+| 2026-07-20 | [`macos-engine-20260720-052856-845cd043`](runs/engine-generation/macos-engine-20260720-052856-845cd043.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.08 | `0d4eac8b336b` | `817164bfb96c` | vs macos-engine-20260720-052721-ebbbbda7: RTF +0.3% (faster), TTFC -1.3%, RAM +2.4% | phase0-cli-control-3 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `82fb367e35d8`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-235848-b30b5233`](runs/engine-generation/macos-engine-20260805-235848-b30b5233.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `82fb367e35d8` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-235848-b30b5233`](runs/engine-generation/macos-engine-20260805-235848-b30b5233.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.91 | `d8e31ffe4957` | `82fb367e35d8` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `837f98222e38`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-213821-30cdab10`](runs/engine-generation/macos-engine-20260804-213821-30cdab10.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `837f98222e38` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-213821-30cdab10`](runs/engine-generation/macos-engine-20260804-213821-30cdab10.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `837f98222e38` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `83b99eb199da`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-182014-e18ee022`](runs/engine-generation/macos-engine-20260801-182014-e18ee022.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 29 | `24cf629ca0cd` | `83b99eb199da` | baseline | release-QA-2.4.0 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-182014-e18ee022`](runs/engine-generation/macos-engine-20260801-182014-e18ee022.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 29 | ~0.83 | `24cf629ca0cd` | `83b99eb199da` | baseline | release-QA-2.4.0 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `840ab2654a69`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`macos-engine-20260806-000144-0882b146`](runs/engine-generation/macos-engine-20260806-000144-0882b146.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `840ab2654a69` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`macos-engine-20260806-000144-0882b146`](runs/engine-generation/macos-engine-20260806-000144-0882b146.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.94 | `d8e31ffe4957` | `840ab2654a69` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `8831965d9ebd`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-024556-e826c4ec`](runs/engine-generation/macos-engine-20260801-024556-e826c4ec.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | `52a0b9546c45` dirty | `excluded` | baseline | delivery-cal-s1 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-024556-e826c4ec`](runs/engine-generation/macos-engine-20260801-024556-e826c4ec.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | ~0.84 | `52a0b9546c45` dirty | `excluded` | baseline | delivery-cal-s1 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `8c254df7bfe5`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-190753-0dccefd2`](runs/engine-generation/macos-engine-20260805-190753-0dccefd2.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `f72bdb3a6b44` | `8c254df7bfe5` | baseline | st133-delivery |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-190753-0dccefd2`](runs/engine-generation/macos-engine-20260805-190753-0dccefd2.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.87 | `f72bdb3a6b44` | `8c254df7bfe5` | baseline | st133-delivery |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `8c8658d5e724`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-042152-79fbcd20`](runs/engine-generation/macos-engine-20260801-042152-79fbcd20.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 10 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1final-s6 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-042152-79fbcd20`](runs/engine-generation/macos-engine-20260801-042152-79fbcd20.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 10 | ~0.84 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1final-s6 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `8d988d33cf1a`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`macos-engine-20260806-000728-ca2884d4`](runs/engine-generation/macos-engine-20260806-000728-ca2884d4.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `8d988d33cf1a` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`macos-engine-20260806-000728-ca2884d4`](runs/engine-generation/macos-engine-20260806-000728-ca2884d4.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.91 | `d8e31ffe4957` | `8d988d33cf1a` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `8f7af63c2914`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-213445-822df4e8`](runs/engine-generation/macos-engine-20260804-213445-822df4e8.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `8f7af63c2914` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-213445-822df4e8`](runs/engine-generation/macos-engine-20260804-213445-822df4e8.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `8f7af63c2914` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `91f82d33a19f`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-23 | [`macos-engine-20260723-055840-a3dc8981`](runs/engine-generation/macos-engine-20260723-055840-a3dc8981.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 29 | `3a4378534195` | `91f82d33a19f` | baseline | o-capability-reference |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-23 | [`macos-engine-20260723-055840-a3dc8981`](runs/engine-generation/macos-engine-20260723-055840-a3dc8981.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 29 | ~0.56 | `3a4378534195` | `91f82d33a19f` | baseline | o-capability-reference |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `922fe8a1b555`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-222345-7110a251`](runs/engine-generation/macos-engine-20260805-222345-7110a251.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `922fe8a1b555` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-222345-7110a251`](runs/engine-generation/macos-engine-20260805-222345-7110a251.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.91 | `caa59cd37e6b` | `922fe8a1b555` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `9732f95e383c`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-212515-10928e14`](runs/engine-generation/macos-engine-20260804-212515-10928e14.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `9732f95e383c` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-212515-10928e14`](runs/engine-generation/macos-engine-20260804-212515-10928e14.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `9732f95e383c` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `98602c2b7cb2`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`macos-engine-20260806-001017-83c7381b`](runs/engine-generation/macos-engine-20260806-001017-83c7381b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `98602c2b7cb2` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`macos-engine-20260806-001017-83c7381b`](runs/engine-generation/macos-engine-20260806-001017-83c7381b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.92 | `d8e31ffe4957` | `98602c2b7cb2` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `999f685075aa`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-26 | [`macos-engine-20260726-055949-8e3c8639`](runs/engine-generation/macos-engine-20260726-055949-8e3c8639.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 25 | `b14ad022be73` dirty | `excluded` | baseline | stage1-p2a-pipelined |
-| 2026-07-26 | [`macos-engine-20260726-060659-99b59f93`](runs/engine-generation/macos-engine-20260726-060659-99b59f93.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 25 | `549b884d2405` dirty | `excluded` | baseline | stage1-p2aii-early-submit |
-| 2026-07-26 | [`macos-engine-20260726-063621-2378350e`](runs/engine-generation/macos-engine-20260726-063621-2378350e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 25 | `38f1eae583a8` dirty | `excluded` | baseline | stage1-p3-compiled-cp |
-| 2026-07-26 | [`macos-engine-20260726-070148-150cc5e8`](runs/engine-generation/macos-engine-20260726-070148-150cc5e8.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 25 | `13d56bdfe10a` dirty | `excluded` | baseline | stage1-p5b-codec-stream |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-26 | [`macos-engine-20260726-055949-8e3c8639`](runs/engine-generation/macos-engine-20260726-055949-8e3c8639.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 25 | ~0.97 | `b14ad022be73` dirty | `excluded` | baseline | stage1-p2a-pipelined |
+| 2026-07-26 | [`macos-engine-20260726-060659-99b59f93`](runs/engine-generation/macos-engine-20260726-060659-99b59f93.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 25 | ~0.98 | `549b884d2405` dirty | `excluded` | baseline | stage1-p2aii-early-submit |
+| 2026-07-26 | [`macos-engine-20260726-063621-2378350e`](runs/engine-generation/macos-engine-20260726-063621-2378350e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 25 | ~0.89 | `38f1eae583a8` dirty | `excluded` | baseline | stage1-p3-compiled-cp |
+| 2026-07-26 | [`macos-engine-20260726-070148-150cc5e8`](runs/engine-generation/macos-engine-20260726-070148-150cc5e8.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 25 | ~0.90 | `13d56bdfe10a` dirty | `excluded` | baseline | stage1-p5b-codec-stream |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `99bfcb9979cd`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-235214-7c9fb220`](runs/engine-generation/macos-engine-20260801-235214-7c9fb220.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 5 | `32be405a46d0` dirty | `excluded` | baseline | codec-f16-promotion |
-| 2026-08-01 | [`macos-engine-20260801-235401-e16dae33`](runs/engine-generation/macos-engine-20260801-235401-e16dae33.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 5 | `32be405a46d0` dirty | `excluded` | baseline | codec-f16-promotion |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-235214-7c9fb220`](runs/engine-generation/macos-engine-20260801-235214-7c9fb220.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 5 | ~0.92 | `32be405a46d0` dirty | `excluded` | baseline | codec-f16-promotion |
+| 2026-08-01 | [`macos-engine-20260801-235401-e16dae33`](runs/engine-generation/macos-engine-20260801-235401-e16dae33.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 5 | ~0.95 | `32be405a46d0` dirty | `excluded` | baseline | codec-f16-promotion |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `9b6eae19b3fa`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-213708-21da497a`](runs/engine-generation/macos-engine-20260804-213708-21da497a.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `9b6eae19b3fa` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-213708-21da497a`](runs/engine-generation/macos-engine-20260804-213708-21da497a.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `9b6eae19b3fa` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `9cc15a56384b`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`macos-engine-20260806-000919-8f0e767c`](runs/engine-generation/macos-engine-20260806-000919-8f0e767c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `9cc15a56384b` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`macos-engine-20260806-000919-8f0e767c`](runs/engine-generation/macos-engine-20260806-000919-8f0e767c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.91 | `d8e31ffe4957` | `9cc15a56384b` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `9ccbb95f35b8`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-22 | [`macos-engine-20260722-210927-3553c1b1`](runs/engine-generation/macos-engine-20260722-210927-3553c1b1.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 19 | `4c0713ee33a6` dirty | `excluded` | baseline | rtf-ab-c1 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-22 | [`macos-engine-20260722-210927-3553c1b1`](runs/engine-generation/macos-engine-20260722-210927-3553c1b1.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 19 | ~0.92 | `4c0713ee33a6` dirty | `excluded` | baseline | rtf-ab-c1 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `9ce42657e4e4`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`macos-engine-20260806-000438-f0c60824`](runs/engine-generation/macos-engine-20260806-000438-f0c60824.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `9ce42657e4e4` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`macos-engine-20260806-000438-f0c60824`](runs/engine-generation/macos-engine-20260806-000438-f0c60824.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.92 | `d8e31ffe4957` | `9ce42657e4e4` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `9d1f0fab80dc`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`macos-engine-20260806-000534-9b713efa`](runs/engine-generation/macos-engine-20260806-000534-9b713efa.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `9d1f0fab80dc` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`macos-engine-20260806-000534-9b713efa`](runs/engine-generation/macos-engine-20260806-000534-9b713efa.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.92 | `d8e31ffe4957` | `9d1f0fab80dc` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `9f7184673cf3`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`macos-engine-20260806-142908-12599e2c`](runs/engine-generation/macos-engine-20260806-142908-12599e2c.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | `a2f01c95b089` dirty | `excluded` | baseline | phase0-cli-control-1 |
-| 2026-08-06 | [`macos-engine-20260806-143035-941b0ea5`](runs/engine-generation/macos-engine-20260806-143035-941b0ea5.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | `a2f01c95b089` dirty | `excluded` | baseline | phase0-cli-control-2 |
-| 2026-08-06 | [`macos-engine-20260806-143201-f3512027`](runs/engine-generation/macos-engine-20260806-143201-f3512027.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | `a2f01c95b089` dirty | `excluded` | baseline | phase0-cli-control-3 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`macos-engine-20260806-142908-12599e2c`](runs/engine-generation/macos-engine-20260806-142908-12599e2c.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | ~0.95 | `a2f01c95b089` dirty | `excluded` | baseline | phase0-cli-control-1 |
+| 2026-08-06 | [`macos-engine-20260806-143035-941b0ea5`](runs/engine-generation/macos-engine-20260806-143035-941b0ea5.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | ~0.96 | `a2f01c95b089` dirty | `excluded` | baseline | phase0-cli-control-2 |
+| 2026-08-06 | [`macos-engine-20260806-143201-f3512027`](runs/engine-generation/macos-engine-20260806-143201-f3512027.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | ~0.95 | `a2f01c95b089` dirty | `excluded` | baseline | phase0-cli-control-3 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `9fa2f2bc02c8`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`macos-engine-20260806-000824-17240455`](runs/engine-generation/macos-engine-20260806-000824-17240455.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `9fa2f2bc02c8` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`macos-engine-20260806-000824-17240455`](runs/engine-generation/macos-engine-20260806-000824-17240455.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.92 | `d8e31ffe4957` | `9fa2f2bc02c8` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `a04760c875af`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-205605-e4c8fe9f`](runs/engine-generation/macos-engine-20260804-205605-e4c8fe9f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `a04760c875af` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-205605-e4c8fe9f`](runs/engine-generation/macos-engine-20260804-205605-e4c8fe9f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.87 | `5c67ee1d3431` | `a04760c875af` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `a07e4252b293`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-040720-85b2d638`](runs/engine-generation/macos-engine-20260801-040720-85b2d638.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-cal-subtle-s1 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-040720-85b2d638`](runs/engine-generation/macos-engine-20260801-040720-85b2d638.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | ~0.83 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-cal-subtle-s1 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `a12189627f68`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-212141-dca99156`](runs/engine-generation/macos-engine-20260804-212141-dca99156.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `a12189627f68` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-212141-dca99156`](runs/engine-generation/macos-engine-20260804-212141-dca99156.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.91 | `5c67ee1d3431` | `a12189627f68` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `a15427d20662`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-041859-e225bc66`](runs/engine-generation/macos-engine-20260801-041859-e225bc66.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c2-s1 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-041859-e225bc66`](runs/engine-generation/macos-engine-20260801-041859-e225bc66.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.84 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c2-s1 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `a3eb4eb392bc`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-23 | [`macos-engine-20260723-130812-478fed38`](runs/engine-generation/macos-engine-20260723-130812-478fed38.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | `9ceaf0b9238b` dirty | `excluded` | baseline | phase14a-qc-soak |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-23 | [`macos-engine-20260723-130812-478fed38`](runs/engine-generation/macos-engine-20260723-130812-478fed38.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | ~0.98 | `9ceaf0b9238b` dirty | `excluded` | baseline | phase14a-qc-soak |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `ab37b1ca70b0`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-190641-cc55eabd`](runs/engine-generation/macos-engine-20260805-190641-cc55eabd.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `f72bdb3a6b44` | `ab37b1ca70b0` | baseline | st133-delivery |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-190641-cc55eabd`](runs/engine-generation/macos-engine-20260805-190641-cc55eabd.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.87 | `f72bdb3a6b44` | `ab37b1ca70b0` | baseline | st133-delivery |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `af0db1741f59`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-205043-e4707123`](runs/engine-generation/macos-engine-20260804-205043-e4707123.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `af0db1741f59` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-205043-e4707123`](runs/engine-generation/macos-engine-20260804-205043-e4707123.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.87 | `5c67ee1d3431` | `af0db1741f59` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `b1d157fa2ce9`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-205823-84790d46`](runs/engine-generation/macos-engine-20260804-205823-84790d46.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `b1d157fa2ce9` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-205823-84790d46`](runs/engine-generation/macos-engine-20260804-205823-84790d46.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.88 | `5c67ee1d3431` | `b1d157fa2ce9` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `b7cc29f8a00b`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-29 | [`macos-engine-20260729-004519-0d30c659`](runs/engine-generation/macos-engine-20260729-004519-0d30c659.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | `311c3d0be053` dirty | `excluded` | baseline | phase0-cli-control-3 |
-| 2026-07-29 | [`macos-engine-20260729-005023-933281cb`](runs/engine-generation/macos-engine-20260729-005023-933281cb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `39a7117d5b51` | `b7cc29f8a00b` | baseline | phase0-cli-control-1 |
-| 2026-07-29 | [`macos-engine-20260729-005146-c1c5642e`](runs/engine-generation/macos-engine-20260729-005146-c1c5642e.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `39a7117d5b51` | `b7cc29f8a00b` | vs macos-engine-20260729-005023-933281cb: RTF -0.2%, TTFC +0.2%, RAM -3.4% | phase0-cli-control-2 |
-| 2026-07-29 | [`macos-engine-20260729-005310-2d7d3580`](runs/engine-generation/macos-engine-20260729-005310-2d7d3580.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `39a7117d5b51` | `b7cc29f8a00b` | vs macos-engine-20260729-005146-c1c5642e: RTF +1.8%, TTFC -0.7%, RAM +3.2% | phase0-cli-control-3 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-29 | [`macos-engine-20260729-004519-0d30c659`](runs/engine-generation/macos-engine-20260729-004519-0d30c659.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | ~0.95 | `311c3d0be053` dirty | `excluded` | baseline | phase0-cli-control-3 |
+| 2026-07-29 | [`macos-engine-20260729-005023-933281cb`](runs/engine-generation/macos-engine-20260729-005023-933281cb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.94 | `39a7117d5b51` | `b7cc29f8a00b` | baseline | phase0-cli-control-1 |
+| 2026-07-29 | [`macos-engine-20260729-005146-c1c5642e`](runs/engine-generation/macos-engine-20260729-005146-c1c5642e.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.95 | `39a7117d5b51` | `b7cc29f8a00b` | vs macos-engine-20260729-005023-933281cb: RTF -0.2% (slower), TTFC +0.2%, RAM -3.4% | phase0-cli-control-2 |
+| 2026-07-29 | [`macos-engine-20260729-005310-2d7d3580`](runs/engine-generation/macos-engine-20260729-005310-2d7d3580.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.96 | `39a7117d5b51` | `b7cc29f8a00b` | vs macos-engine-20260729-005146-c1c5642e: RTF +1.8% (faster), TTFC -0.7%, RAM +3.2% | phase0-cli-control-3 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `b7f0e4ef0127`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-190527-374b7066`](runs/engine-generation/macos-engine-20260805-190527-374b7066.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `f72bdb3a6b44` | `b7f0e4ef0127` | baseline | st133-delivery |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-190527-374b7066`](runs/engine-generation/macos-engine-20260805-190527-374b7066.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.86 | `f72bdb3a6b44` | `b7f0e4ef0127` | baseline | st133-delivery |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `b85b26c41c87`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`macos-engine-20260806-000338-1e74cf8a`](runs/engine-generation/macos-engine-20260806-000338-1e74cf8a.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `b85b26c41c87` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`macos-engine-20260806-000338-1e74cf8a`](runs/engine-generation/macos-engine-20260806-000338-1e74cf8a.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.92 | `d8e31ffe4957` | `b85b26c41c87` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `b8834ab7872d`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-043505-2868123c`](runs/engine-generation/macos-engine-20260801-043505-2868123c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `3884622b632a` | `b8834ab7872d` | baseline | r2a-sadstrong-20260822 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-043505-2868123c`](runs/engine-generation/macos-engine-20260801-043505-2868123c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | ~0.84 | `3884622b632a` | `b8834ab7872d` | baseline | r2a-sadstrong-20260822 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `b8dd7beed55a`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-25 | [`macos-engine-20260725-061018-431c7482`](runs/engine-generation/macos-engine-20260725-061018-431c7482.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 29 | `723f7fe8fee4` dirty | `excluded` | baseline | release-QA-2.2.0 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-25 | [`macos-engine-20260725-061018-431c7482`](runs/engine-generation/macos-engine-20260725-061018-431c7482.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 29 | ~0.95 | `723f7fe8fee4` dirty | `excluded` | baseline | release-QA-2.2.0 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `b90470a31591`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-040827-fbccea70`](runs/engine-generation/macos-engine-20260801-040827-fbccea70.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-cal-subtle-s3 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-040827-fbccea70`](runs/engine-generation/macos-engine-20260801-040827-fbccea70.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | ~0.83 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-cal-subtle-s3 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `bd262920e96e`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-205713-ba453a52`](runs/engine-generation/macos-engine-20260804-205713-ba453a52.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `bd262920e96e` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-205713-ba453a52`](runs/engine-generation/macos-engine-20260804-205713-ba453a52.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.87 | `5c67ee1d3431` | `bd262920e96e` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `be85526e123b`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-041954-19395d13`](runs/engine-generation/macos-engine-20260801-041954-19395d13.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c2-s4 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-041954-19395d13`](runs/engine-generation/macos-engine-20260801-041954-19395d13.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.83 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c2-s4 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `beb5848d6e9f`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-010135-6607009f`](runs/engine-generation/macos-engine-20260801-010135-6607009f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `626d3b3fba35` | `beb5848d6e9f` | baseline | composed-quality-proof |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-010135-6607009f`](runs/engine-generation/macos-engine-20260801-010135-6607009f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | ~0.85 | `626d3b3fba35` | `beb5848d6e9f` | baseline | composed-quality-proof |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `c086895bacbc`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-042022-0a8d4954`](runs/engine-generation/macos-engine-20260801-042022-0a8d4954.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c2-s5 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-042022-0a8d4954`](runs/engine-generation/macos-engine-20260801-042022-0a8d4954.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.84 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c2-s5 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `c4e70ace53eb`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-223250-a99c8a52`](runs/engine-generation/macos-engine-20260805-223250-a99c8a52.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `c4e70ace53eb` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-223250-a99c8a52`](runs/engine-generation/macos-engine-20260805-223250-a99c8a52.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.91 | `caa59cd37e6b` | `c4e70ace53eb` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `c4e849dcb35b`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-09-02 | [`mac-gate-bench-20260902-013854-f39c1c91`](runs/engine-generation/mac-gate-bench-20260902-013854-f39c1c91.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | `fd3bb5d343ea` | `c4e849dcb35b` | baseline | mac-gate-bench |
-| 2026-09-02 | [`mac-gate-bench-20260902-015022-591814fe`](runs/engine-generation/mac-gate-bench-20260902-015022-591814fe.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | `1fffa64de385` | `c4e849dcb35b` | vs mac-gate-bench-20260902-013854-f39c1c91: RTF +1.5%, TTFC +2.0%, RAM +3.4% | mac-gate-bench |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-02 | [`mac-gate-bench-20260902-013854-f39c1c91`](runs/engine-generation/mac-gate-bench-20260902-013854-f39c1c91.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | ~0.70 | `fd3bb5d343ea` | `c4e849dcb35b` | baseline | mac-gate-bench |
+| 2026-09-02 | [`mac-gate-bench-20260902-015022-591814fe`](runs/engine-generation/mac-gate-bench-20260902-015022-591814fe.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | ~0.69 | `1fffa64de385` | `c4e849dcb35b` | vs mac-gate-bench-20260902-013854-f39c1c91: RTF +1.5% (faster), TTFC +2.0%, RAM +3.4% | mac-gate-bench |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `c8340ad4e716`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-025646-3218e447`](runs/engine-generation/macos-engine-20260801-025646-3218e447.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s4 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-025646-3218e447`](runs/engine-generation/macos-engine-20260801-025646-3218e447.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 20 | ~0.85 | `5a06ed321d6a` dirty | `excluded` | baseline | delivery-cal-s4 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `ce893018e7a7`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-204933-600ba918`](runs/engine-generation/macos-engine-20260804-204933-600ba918.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `ce893018e7a7` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-204933-600ba918`](runs/engine-generation/macos-engine-20260804-204933-600ba918.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.87 | `5c67ee1d3431` | `ce893018e7a7` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `d2fc296b3321`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-042354-821f0f20`](runs/engine-generation/macos-engine-20260801-042354-821f0f20.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 10 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1final-s8 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-042354-821f0f20`](runs/engine-generation/macos-engine-20260801-042354-821f0f20.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 10 | ~0.83 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1final-s8 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `d3bb857d0d0b`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-213222-c87c2863`](runs/engine-generation/macos-engine-20260804-213222-c87c2863.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `d3bb857d0d0b` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-213222-c87c2863`](runs/engine-generation/macos-engine-20260804-213222-c87c2863.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.91 | `5c67ee1d3431` | `d3bb857d0d0b` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `d5cf7dbf4f87`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-212405-be0014b8`](runs/engine-generation/macos-engine-20260804-212405-be0014b8.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `d5cf7dbf4f87` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-212405-be0014b8`](runs/engine-generation/macos-engine-20260804-212405-be0014b8.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `d5cf7dbf4f87` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `dacfc1991ca2`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-191020-b30bff34`](runs/engine-generation/macos-engine-20260805-191020-b30bff34.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `f72bdb3a6b44` | `dacfc1991ca2` | baseline | st133-delivery |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-191020-b30bff34`](runs/engine-generation/macos-engine-20260805-191020-b30bff34.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.87 | `f72bdb3a6b44` | `dacfc1991ca2` | baseline | st133-delivery |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `dce8e0618048`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-222130-2783827d`](runs/engine-generation/macos-engine-20260805-222130-2783827d.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | `caa59cd37e6b` | `dce8e0618048` | baseline | dp22-normal |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-222130-2783827d`](runs/engine-generation/macos-engine-20260805-222130-2783827d.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 20 | ~0.91 | `caa59cd37e6b` | `dce8e0618048` | baseline | dp22-normal |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `dda93dbcede7`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-210150-81bd0f01`](runs/engine-generation/macos-engine-20260804-210150-81bd0f01.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `dda93dbcede7` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-210150-81bd0f01`](runs/engine-generation/macos-engine-20260804-210150-81bd0f01.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.87 | `5c67ee1d3431` | `dda93dbcede7` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `dfb84ad7c0d4`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-235400-e652da35`](runs/engine-generation/macos-engine-20260805-235400-e652da35.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `dfb84ad7c0d4` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-235400-e652da35`](runs/engine-generation/macos-engine-20260805-235400-e652da35.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.93 | `d8e31ffe4957` | `dfb84ad7c0d4` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `e0e82fccf3eb`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-engine-20260805-235552-bd6d3835`](runs/engine-generation/macos-engine-20260805-235552-bd6d3835.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `e0e82fccf3eb` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-engine-20260805-235552-bd6d3835`](runs/engine-generation/macos-engine-20260805-235552-bd6d3835.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.94 | `d8e31ffe4957` | `e0e82fccf3eb` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `e1886a180793`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`macos-engine-20260806-000631-c19b9ee9`](runs/engine-generation/macos-engine-20260806-000631-c19b9ee9.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `e1886a180793` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`macos-engine-20260806-000631-c19b9ee9`](runs/engine-generation/macos-engine-20260806-000631-c19b9ee9.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.91 | `d8e31ffe4957` | `e1886a180793` | baseline | dp23-crosstier |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `e262723bdc4a`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-041051-c64a7dc5`](runs/engine-generation/macos-engine-20260801-041051-c64a7dc5.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-cal-subtle-s5 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-041051-c64a7dc5`](runs/engine-generation/macos-engine-20260801-041051-c64a7dc5.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | ~0.83 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-cal-subtle-s5 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `e3ef8909118b`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-213933-457e0087`](runs/engine-generation/macos-engine-20260804-213933-457e0087.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `e3ef8909118b` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-213933-457e0087`](runs/engine-generation/macos-engine-20260804-213933-457e0087.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `e3ef8909118b` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `e548b47b5e0c`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-09-05 | [`clone-warm-repair-20260905-045240-e3a6fcbe`](runs/engine-generation/clone-warm-repair-20260905-045240-e3a6fcbe.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | `14dc148c94c8` dirty | `excluded` | baseline | clone-warm-repair |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-05 | [`clone-warm-repair-20260905-045240-e3a6fcbe`](runs/engine-generation/clone-warm-repair-20260905-045240-e3a6fcbe.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | ~0.78 | `14dc148c94c8` dirty | `excluded` | baseline | clone-warm-repair |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `e567e4873cee`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-213109-1b028ef0`](runs/engine-generation/macos-engine-20260804-213109-1b028ef0.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `e567e4873cee` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-213109-1b028ef0`](runs/engine-generation/macos-engine-20260804-213109-1b028ef0.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `e567e4873cee` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `e61461740953`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-23 | [`macos-engine-20260723-012824-092c953d`](runs/engine-generation/macos-engine-20260723-012824-092c953d.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` | `e61461740953` | baseline | p7-cli-profile |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-23 | [`macos-engine-20260723-012824-092c953d`](runs/engine-generation/macos-engine-20260723-012824-092c953d.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 4 | ~0.92 | `109559888e4d` | `e61461740953` | baseline | p7-cli-profile |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `e91954488081`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-210040-959d75de`](runs/engine-generation/macos-engine-20260804-210040-959d75de.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `e91954488081` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-210040-959d75de`](runs/engine-generation/macos-engine-20260804-210040-959d75de.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.87 | `5c67ee1d3431` | `e91954488081` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `ed9f8ac82faf`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-043815-323a5abe`](runs/engine-generation/macos-engine-20260801-043815-323a5abe.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `3884622b632a` | `ed9f8ac82faf` | baseline | r2a-sadstrong-20260830 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-043815-323a5abe`](runs/engine-generation/macos-engine-20260801-043815-323a5abe.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | ~0.83 | `3884622b632a` | `ed9f8ac82faf` | baseline | r2a-sadstrong-20260830 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `eebb3af2ca8b`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-043552-c8b90f7f`](runs/engine-generation/macos-engine-20260801-043552-c8b90f7f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `3884622b632a` | `eebb3af2ca8b` | baseline | r2a-sadstrong-20260824 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-043552-c8b90f7f`](runs/engine-generation/macos-engine-20260801-043552-c8b90f7f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | ~0.84 | `3884622b632a` | `eebb3af2ca8b` | baseline | r2a-sadstrong-20260824 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `f1326d693bac`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-204707-46dd0a8f`](runs/engine-generation/macos-engine-20260804-204707-46dd0a8f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `f1326d693bac` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-204707-46dd0a8f`](runs/engine-generation/macos-engine-20260804-204707-46dd0a8f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.88 | `5c67ee1d3431` | `f1326d693bac` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `f20269c15764`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-051412-c02b8396`](runs/engine-generation/macos-engine-20260801-051412-c02b8396.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `47d5349ef0a9` dirty | `excluded` | baseline | r5-neutral-preset-proof |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-051412-c02b8396`](runs/engine-generation/macos-engine-20260801-051412-c02b8396.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.85 | `47d5349ef0a9` dirty | `excluded` | baseline | r5-neutral-preset-proof |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `f26071c64f7b`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-212252-4693b185`](runs/engine-generation/macos-engine-20260804-212252-4693b185.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `f26071c64f7b` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-212252-4693b185`](runs/engine-generation/macos-engine-20260804-212252-4693b185.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `f26071c64f7b` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `f34508338bdf`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-04 | [`macos-engine-20260804-212849-b01c4e2a`](runs/engine-generation/macos-engine-20260804-212849-b01c4e2a.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | `5c67ee1d3431` | `f34508338bdf` | baseline | dp18-4bit |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-04 | [`macos-engine-20260804-212849-b01c4e2a`](runs/engine-generation/macos-engine-20260804-212849-b01c4e2a.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `f34508338bdf` | baseline | dp18-4bit |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `f46466146be2`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-engine-20260801-043440-cc4ea8b2`](runs/engine-generation/macos-engine-20260801-043440-cc4ea8b2.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `3884622b632a` | `f46466146be2` | baseline | r2a-sadstrong-20260821 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-engine-20260801-043440-cc4ea8b2`](runs/engine-generation/macos-engine-20260801-043440-cc4ea8b2.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | ~0.84 | `3884622b632a` | `f46466146be2` | baseline | r2a-sadstrong-20260821 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `ff23c88710ac`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-23 | [`macos-engine-20260723-063922-c8b277f3`](runs/engine-generation/macos-engine-20260723-063922-c8b277f3.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 4 | `34ed607cc810` | `ff23c88710ac` | baseline | p7-e2-app-open |
-| 2026-07-23 | [`macos-engine-20260723-065023-8fcdd4fb`](runs/engine-generation/macos-engine-20260723-065023-8fcdd4fb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 4 | `34ed607cc810` | `ff23c88710ac` | vs macos-engine-20260723-063922-c8b277f3: RTF -0.3%, TTFC +18.0%, RAM -0.1% | p7-mst-cli |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-23 | [`macos-engine-20260723-063922-c8b277f3`](runs/engine-generation/macos-engine-20260723-063922-c8b277f3.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 4 | ~0.54 | `34ed607cc810` | `ff23c88710ac` | baseline | p7-e2-app-open |
+| 2026-07-23 | [`macos-engine-20260723-065023-8fcdd4fb`](runs/engine-generation/macos-engine-20260723-065023-8fcdd4fb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 4 | ~0.55 | `34ed607cc810` | `ff23c88710ac` | vs macos-engine-20260723-063922-c8b277f3: RTF -0.3% (slower), TTFC +18.0%, RAM -0.1% | p7-mst-cli |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `ff3d5167376d`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`macos-engine-20260806-000045-08eda29d`](runs/engine-generation/macos-engine-20260806-000045-08eda29d.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | `d8e31ffe4957` | `ff3d5167376d` | baseline | dp23-crosstier |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`macos-engine-20260806-000045-08eda29d`](runs/engine-generation/macos-engine-20260806-000045-08eda29d.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.95 | `d8e31ffe4957` | `ff3d5167376d` | baseline | dp23-crosstier |
 
 ## instrument-profile / ios / iphone-17-pro / config `1259c1914031`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-14 | [`ios-memory-profile-20260714-112759-9a573224`](runs/instrument-profile/ios-memory-profile-20260714-112759-9a573224.json) | instrumented | instrumented | passedWithWarnings | qualified-with-warnings | 1 | `d416ad4b6f27` | `excluded` | baseline | instrument-memory-profile |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-14 | [`ios-memory-profile-20260714-112759-9a573224`](runs/instrument-profile/ios-memory-profile-20260714-112759-9a573224.json) | instrumented | instrumented | passedWithWarnings | qualified-with-warnings | 1 | — | `d416ad4b6f27` | `excluded` | baseline | instrument-memory-profile |
 
 ## instrument-profile / ios / iphone-17-pro / config `cf942dbf82f5`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-12 | [`ios-profile-20260712-211953-64c758be`](runs/instrument-profile/ios-profile-20260712-211953-64c758be.json) | instrumented | exploratory | passed | memory-contract-incomplete | 1 | `1ef1669326b5` dirty | `excluded` | baseline | instrument-profile |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-12 | [`ios-profile-20260712-211953-64c758be`](runs/instrument-profile/ios-profile-20260712-211953-64c758be.json) | instrumented | exploratory | passed | memory-contract-incomplete | 1 | — | `1ef1669326b5` dirty | `excluded` | baseline | instrument-profile |
 
 ## instrument-profile / macos / mac-mini-m2-8gb / config `115f86c9fd3a`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-13 | [`mac-memory-profile-20260713-074554-d2726020`](runs/instrument-profile/mac-memory-profile-20260713-074554-d2726020.json) | instrumented | exploratory | passedWithWarnings | qualified-with-warnings | 2 | `04083b15a4e2` dirty | `excluded` | baseline | instrument-memory-profile |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-13 | [`mac-memory-profile-20260713-074554-d2726020`](runs/instrument-profile/mac-memory-profile-20260713-074554-d2726020.json) | instrumented | exploratory | passedWithWarnings | qualified-with-warnings | 2 | — | `04083b15a4e2` dirty | `excluded` | baseline | instrument-memory-profile |
 
 ## instrument-profile / macos / mac-mini-m2-8gb / config `29e39545a535`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-09-05 | [`mac-cpu-profile-20260905-045133-ea3bfd91`](runs/instrument-profile/mac-cpu-profile-20260905-045133-ea3bfd91.json) | instrumented | exploratory | passedWithWarnings | qualified-with-warnings | 2 | `14dc148c94c8` dirty | `excluded` | baseline | instrument-cpu-profile |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-05 | [`mac-cpu-profile-20260905-045133-ea3bfd91`](runs/instrument-profile/mac-cpu-profile-20260905-045133-ea3bfd91.json) | instrumented | exploratory | passedWithWarnings | qualified-with-warnings | 2 | — | `14dc148c94c8` dirty | `excluded` | baseline | instrument-cpu-profile |
 
 ## instrument-profile / macos / mac-mini-m2-8gb / config `4cba431e682a`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-13 | [`mac-memory-profile-20260713-093058-7ab42993`](runs/instrument-profile/mac-memory-profile-20260713-093058-7ab42993.json) | instrumented | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `04083b15a4e2` dirty | `excluded` | baseline | instrument-memory-profile |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-13 | [`mac-memory-profile-20260713-093058-7ab42993`](runs/instrument-profile/mac-memory-profile-20260713-093058-7ab42993.json) | instrumented | exploratory | passedWithWarnings | qualified-with-warnings | 1 | — | `04083b15a4e2` dirty | `excluded` | baseline | instrument-memory-profile |
 
 ## instrument-profile / macos / mac-mini-m2-8gb / config `dcb4bf1d7685`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-12 | [`mac-profile-20260712-210447-f2761314`](runs/instrument-profile/mac-profile-20260712-210447-f2761314.json) | instrumented | exploratory | passed | memory-contract-incomplete | 2 | `1ef1669326b5` dirty | `excluded` | baseline | instrument-profile |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-12 | [`mac-profile-20260712-210447-f2761314`](runs/instrument-profile/mac-profile-20260712-210447-f2761314.json) | instrumented | exploratory | passed | memory-contract-incomplete | 2 | — | `1ef1669326b5` dirty | `excluded` | baseline | instrument-profile |
 
 ## language / ios / iphone-17-pro / config `12e46802c192`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-16 | [`ios-lang-bench-20260716-164248-1ecf8361`](runs/language/ios-lang-bench-20260716-164248-1ecf8361.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 19 | `7fdec9124a45` dirty | `excluded` | baseline | owned-core-language-full |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-16 | [`ios-lang-bench-20260716-164248-1ecf8361`](runs/language/ios-lang-bench-20260716-164248-1ecf8361.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 19 | — | `7fdec9124a45` dirty | `excluded` | baseline | owned-core-language-full |
 
 ## language / ios / iphone-17-pro / config `b79ed611e84b`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-14 | [`ios-lang-bench-20260714-115552-6abc66a9`](runs/language/ios-lang-bench-20260714-115552-6abc66a9.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 7 | `c6157ee65880` | `b79ed611e84b` | baseline | ios-lang-quick-v2 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-14 | [`ios-lang-bench-20260714-115552-6abc66a9`](runs/language/ios-lang-bench-20260714-115552-6abc66a9.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 7 | — | `c6157ee65880` | `b79ed611e84b` | baseline | ios-lang-quick-v2 |
 
 ## language / macos / mac-mini-m2-8gb / config `642f6a5a33ac`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-12 | [`mac-lang-bench-20260712-210629-ab917917`](runs/language/mac-lang-bench-20260712-210629-ab917917.json) | partial | exploratory | passed | memory-contract-incomplete | 7 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-language-quick |
-| 2026-07-12 | [`mac-lang-bench-20260712-210714-0a22efca`](runs/language/mac-lang-bench-20260712-210714-0a22efca.json) | partial | exploratory | passed | memory-contract-incomplete | 7 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-language-quick |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-12 | [`mac-lang-bench-20260712-210629-ab917917`](runs/language/mac-lang-bench-20260712-210629-ab917917.json) | partial | exploratory | passed | memory-contract-incomplete | 7 | — | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-language-quick |
+| 2026-07-12 | [`mac-lang-bench-20260712-210714-0a22efca`](runs/language/mac-lang-bench-20260712-210714-0a22efca.json) | partial | exploratory | passed | memory-contract-incomplete | 7 | — | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-language-quick |
 
 ## language / macos / mac-mini-m2-8gb / config `cfe53541d2ec`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-09-02 | [`mac-lang-bench-20260902-024501-bd2df074`](runs/language/mac-lang-bench-20260902-024501-bd2df074.json) | partial | exploratory | passedWithWarnings | qualified-with-warnings | 19 | `f7600f678425` dirty | `excluded` | baseline | av08-mac-full-20260901 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-02 | [`mac-lang-bench-20260902-024501-bd2df074`](runs/language/mac-lang-bench-20260902-024501-bd2df074.json) | partial | exploratory | passedWithWarnings | qualified-with-warnings | 19 | — | `f7600f678425` dirty | `excluded` | baseline | av08-mac-full-20260901 |
 
 ## memory-qualification / ios / iphone-17-pro / config `7482ce732e47`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-14 | [`ios-memory-qualification-20260714-112015-8aa21f7e`](runs/memory-qualification/ios-memory-qualification-20260714-112015-8aa21f7e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | `fe15820531a5` dirty | `excluded` | baseline | ios-memory-qualification-20260714-112015-8aa21f7e |
-| 2026-07-14 | [`ios-memory-qualification-20260714-112536-32554d95`](runs/memory-qualification/ios-memory-qualification-20260714-112536-32554d95.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | `ab102beda89b` | `7482ce732e47` | baseline | ios-memory-qualification-20260714-112536-32554d95 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-14 | [`ios-memory-qualification-20260714-112015-8aa21f7e`](runs/memory-qualification/ios-memory-qualification-20260714-112015-8aa21f7e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | — | `fe15820531a5` dirty | `excluded` | baseline | ios-memory-qualification-20260714-112015-8aa21f7e |
+| 2026-07-14 | [`ios-memory-qualification-20260714-112536-32554d95`](runs/memory-qualification/ios-memory-qualification-20260714-112536-32554d95.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | — | `ab102beda89b` | `7482ce732e47` | baseline | ios-memory-qualification-20260714-112536-32554d95 |
 
 ## memory-qualification / ios / iphone-17-pro / config `dcec19b63f13`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-02 | [`ios-memory-qualification-20260802-004313-87bfe92e`](runs/memory-qualification/ios-memory-qualification-20260802-004313-87bfe92e.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | `b6b2a028f1eb` | `dcec19b63f13` | baseline | ios-memory-qualification-20260802-004313-87bfe92e |
-| 2026-08-02 | [`ios-memory-qualification-20260802-004801-03ebafe1`](runs/memory-qualification/ios-memory-qualification-20260802-004801-03ebafe1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | `b6b2a028f1eb` | `dcec19b63f13` | vs ios-memory-qualification-20260802-004313-87bfe92e: RTF +6.8%, TTFC -2.3%, RAM -9.4% | ios-memory-qualification-20260802-004801-03ebafe1 |
-| 2026-08-02 | [`ios-memory-qualification-20260802-011251-9bddb00a`](runs/memory-qualification/ios-memory-qualification-20260802-011251-9bddb00a.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | `b6b2a028f1eb` dirty | `excluded` | baseline | ios-memory-qualification-20260802-011251-9bddb00a |
-| 2026-08-02 | [`ios-memory-qualification-20260802-011551-dba9b94f`](runs/memory-qualification/ios-memory-qualification-20260802-011551-dba9b94f.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | `b6b2a028f1eb` dirty | `excluded` | baseline | ios-memory-qualification-20260802-011551-dba9b94f |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-02 | [`ios-memory-qualification-20260802-004313-87bfe92e`](runs/memory-qualification/ios-memory-qualification-20260802-004313-87bfe92e.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | — | `b6b2a028f1eb` | `dcec19b63f13` | baseline | ios-memory-qualification-20260802-004313-87bfe92e |
+| 2026-08-02 | [`ios-memory-qualification-20260802-004801-03ebafe1`](runs/memory-qualification/ios-memory-qualification-20260802-004801-03ebafe1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | — | `b6b2a028f1eb` | `dcec19b63f13` | vs ios-memory-qualification-20260802-004313-87bfe92e: RTF +6.8% (faster), TTFC -2.3%, RAM -9.4% | ios-memory-qualification-20260802-004801-03ebafe1 |
+| 2026-08-02 | [`ios-memory-qualification-20260802-011251-9bddb00a`](runs/memory-qualification/ios-memory-qualification-20260802-011251-9bddb00a.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | — | `b6b2a028f1eb` dirty | `excluded` | baseline | ios-memory-qualification-20260802-011251-9bddb00a |
+| 2026-08-02 | [`ios-memory-qualification-20260802-011551-dba9b94f`](runs/memory-qualification/ios-memory-qualification-20260802-011551-dba9b94f.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | — | `b6b2a028f1eb` dirty | `excluded` | baseline | ios-memory-qualification-20260802-011551-dba9b94f |
 
 ## memory-qualification / ios / iphone-17-pro / config `e08611b860f6`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-29 | [`ios-memory-qualification-20260729-053501-857a9d2c`](runs/memory-qualification/ios-memory-qualification-20260729-053501-857a9d2c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | `fcb4f66f669b` | `e08611b860f6` | baseline | ios-memory-qualification-20260729-053501-857a9d2c |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-29 | [`ios-memory-qualification-20260729-053501-857a9d2c`](runs/memory-qualification/ios-memory-qualification-20260729-053501-857a9d2c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | — | `fcb4f66f669b` | `e08611b860f6` | baseline | ios-memory-qualification-20260729-053501-857a9d2c |
 
 ## memory-qualification / macos / mac-mini-m2-8gb / config `0efe7c615c69`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-15 | [`mac-memory-qualification-20260715-142146-84663e70`](runs/memory-qualification/mac-memory-qualification-20260715-142146-84663e70.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 11 | `247b266b0f1c` | `0efe7c615c69` | baseline | owned-core-retained-247b266 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-15 | [`mac-memory-qualification-20260715-142146-84663e70`](runs/memory-qualification/mac-memory-qualification-20260715-142146-84663e70.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 11 | — | `247b266b0f1c` | `0efe7c615c69` | baseline | owned-core-retained-247b266 |
 
 ## memory-qualification / macos / mac-mini-m2-8gb / config `23c2fd61c5e8`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-07 | [`mac-memory-qualification-20260807-020642-201fc2ba`](runs/memory-qualification/mac-memory-qualification-20260807-020642-201fc2ba.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | `80b1632c42e0` dirty | `excluded` | baseline | marking-peak-equality |
-| 2026-08-07 | [`mac-memory-qualification-20260807-022819-3eb4d25b`](runs/memory-qualification/mac-memory-qualification-20260807-022819-3eb4d25b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 11 | `269a0f74057b` | `23c2fd61c5e8` | baseline | marking-peak-equality |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-07 | [`mac-memory-qualification-20260807-020642-201fc2ba`](runs/memory-qualification/mac-memory-qualification-20260807-020642-201fc2ba.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | — | `80b1632c42e0` dirty | `excluded` | baseline | marking-peak-equality |
+| 2026-08-07 | [`mac-memory-qualification-20260807-022819-3eb4d25b`](runs/memory-qualification/mac-memory-qualification-20260807-022819-3eb4d25b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 11 | — | `269a0f74057b` | `23c2fd61c5e8` | baseline | marking-peak-equality |
 
 ## memory-qualification / macos / mac-mini-m2-8gb / config `2db9b5d8c68d`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`mac-memory-qualification-20260806-143414-d4284646`](runs/memory-qualification/mac-memory-qualification-20260806-143414-d4284646.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | `a2f01c95b089` dirty | `excluded` | baseline | retained-check |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`mac-memory-qualification-20260806-143414-d4284646`](runs/memory-qualification/mac-memory-qualification-20260806-143414-d4284646.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | — | `a2f01c95b089` dirty | `excluded` | baseline | retained-check |
 
 ## memory-qualification / macos / mac-mini-m2-8gb / config `3ec69e66d20e`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-26 | [`mac-memory-qualification-20260726-115343-5a1c8a85`](runs/memory-qualification/mac-memory-qualification-20260726-115343-5a1c8a85.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | `baad20e4d442` dirty | `excluded` | baseline | st-residency-check |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-26 | [`mac-memory-qualification-20260726-115343-5a1c8a85`](runs/memory-qualification/mac-memory-qualification-20260726-115343-5a1c8a85.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | — | `baad20e4d442` dirty | `excluded` | baseline | st-residency-check |
 
 ## memory-qualification / macos / mac-mini-m2-8gb / config `664a0267b9b5`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-13 | [`mac-memory-qualification-20260713-072952-5f0d31ad`](runs/memory-qualification/mac-memory-qualification-20260713-072952-5f0d31ad.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | `04083b15a4e2` dirty | `excluded` | baseline | memory-v8-integration |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-13 | [`mac-memory-qualification-20260713-072952-5f0d31ad`](runs/memory-qualification/mac-memory-qualification-20260713-072952-5f0d31ad.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | — | `04083b15a4e2` dirty | `excluded` | baseline | memory-v8-integration |
 
 ## memory-qualification / macos / mac-mini-m2-8gb / config `812b7a455be8`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-09-05 | [`mac-memory-qualification-20260905-025522-110bccc2`](runs/memory-qualification/mac-memory-qualification-20260905-025522-110bccc2.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | `14dc148c94c8` dirty | `excluded` | baseline | ui-followup-retention-20260905 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-05 | [`mac-memory-qualification-20260905-025522-110bccc2`](runs/memory-qualification/mac-memory-qualification-20260905-025522-110bccc2.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | — | `14dc148c94c8` dirty | `excluded` | baseline | ui-followup-retention-20260905 |
 
 ## memory-qualification / macos / mac-mini-m2-8gb / config `ce4effc5bd2e`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-13 | [`mac-memory-qualification-20260713-085223-c1bc1bd2`](runs/memory-qualification/mac-memory-qualification-20260713-085223-c1bc1bd2.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | `04083b15a4e2` dirty | `excluded` | baseline | memory-qualification |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-13 | [`mac-memory-qualification-20260713-085223-c1bc1bd2`](runs/memory-qualification/mac-memory-qualification-20260713-085223-c1bc1bd2.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | — | `04083b15a4e2` dirty | `excluded` | baseline | memory-qualification |
 
 ## memory-qualification / macos / mac-mini-m2-8gb / config `e04c74e62725`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-29 | [`mac-memory-qualification-20260729-024907-aec37fe2`](runs/memory-qualification/mac-memory-qualification-20260729-024907-aec37fe2.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 11 | `3331eecfdcdb` | `e04c74e62725` | baseline | retained-check |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-29 | [`mac-memory-qualification-20260729-024907-aec37fe2`](runs/memory-qualification/mac-memory-qualification-20260729-024907-aec37fe2.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 11 | — | `3331eecfdcdb` | `e04c74e62725` | baseline | retained-check |
 
 ## prosody-calibration / macos / mac-mini-m2-8gb / config `144146bbd7fa`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-12 | [`prosody-calibration-20260712-200718-54aa4b5d`](runs/prosody-calibration/prosody-calibration-20260712-200718-54aa4b5d.json) | focused | exploratory | passed | memory-contract-incomplete | 1 | `1ef1669326b5` dirty | `excluded` | baseline | controlled-fixture |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-12 | [`prosody-calibration-20260712-200718-54aa4b5d`](runs/prosody-calibration/prosody-calibration-20260712-200718-54aa4b5d.json) | focused | exploratory | passed | memory-contract-incomplete | 1 | — | `1ef1669326b5` dirty | `excluded` | baseline | controlled-fixture |
 
 ## telemetry-overhead / macos / mac-mini-m2-8gb / config `353077244bd7`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-12 | [`telemetry-overhead-20260712-221616-d7b19334`](runs/telemetry-overhead/telemetry-overhead-20260712-221616-d7b19334.json) | focused | exploratory | passed | memory-contract-incomplete | 18 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-overhead-20260712-221616-d7b19334 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-12 | [`telemetry-overhead-20260712-221616-d7b19334`](runs/telemetry-overhead/telemetry-overhead-20260712-221616-d7b19334.json) | focused | exploratory | passed | memory-contract-incomplete | 18 | — | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-overhead-20260712-221616-d7b19334 |
 
 ## ui-generation / ios / iphone-17-pro / config `12ff800e33d9`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`ios-xcui-benchmark-20260801-130748-c3630f44`](runs/ui-generation/ios-xcui-benchmark-20260801-130748-c3630f44.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `73cac34832cc` | `12ff800e33d9` | baseline | phase0-ios-control-3 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`ios-xcui-benchmark-20260801-130748-c3630f44`](runs/ui-generation/ios-xcui-benchmark-20260801-130748-c3630f44.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.60 | `73cac34832cc` | `12ff800e33d9` | baseline | phase0-ios-control-3 |
 
 ## ui-generation / ios / iphone-17-pro / config `19005f052026`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-13 | [`ios-xcui-benchmark-20260713-042913-57f9e32e`](runs/ui-generation/ios-xcui-benchmark-20260713-042913-57f9e32e.json) | focused | exploratory | passed | memory-contract-incomplete | 2 | `04083b15a4e2` dirty | `excluded` | baseline | focused-short-playback-repair-20260713 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-13 | [`ios-xcui-benchmark-20260713-042913-57f9e32e`](runs/ui-generation/ios-xcui-benchmark-20260713-042913-57f9e32e.json) | focused | exploratory | passed | memory-contract-incomplete | 2 | ~0.73 | `04083b15a4e2` dirty | `excluded` | baseline | focused-short-playback-repair-20260713 |
 
 ## ui-generation / ios / iphone-17-pro / config `35a3b94d3ba6`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-20 | [`ios-xcui-benchmark-20260720-061732-10df7fd1`](runs/ui-generation/ios-xcui-benchmark-20260720-061732-10df7fd1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `0d4eac8b336b` | `35a3b94d3ba6` | baseline | phase0-ios-control-1 |
-| 2026-07-20 | [`ios-xcui-benchmark-20260720-063420-e0258f45`](runs/ui-generation/ios-xcui-benchmark-20260720-063420-e0258f45.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `0d4eac8b336b` | `35a3b94d3ba6` | vs ios-xcui-benchmark-20260720-061732-10df7fd1: RTF -0.2%, RAM -0.2% | phase0-ios-control-2 |
-| 2026-07-20 | [`ios-xcui-benchmark-20260720-164844-5f6e9240`](runs/ui-generation/ios-xcui-benchmark-20260720-164844-5f6e9240.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | `0d4eac8b336b` dirty | `excluded` | baseline | phase0-ios-control-3 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-20 | [`ios-xcui-benchmark-20260720-061732-10df7fd1`](runs/ui-generation/ios-xcui-benchmark-20260720-061732-10df7fd1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.64 | `0d4eac8b336b` | `35a3b94d3ba6` | baseline | phase0-ios-control-1 |
+| 2026-07-20 | [`ios-xcui-benchmark-20260720-063420-e0258f45`](runs/ui-generation/ios-xcui-benchmark-20260720-063420-e0258f45.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.63 | `0d4eac8b336b` | `35a3b94d3ba6` | vs ios-xcui-benchmark-20260720-061732-10df7fd1: RTF -0.2% (slower), RAM -0.2% | phase0-ios-control-2 |
+| 2026-07-20 | [`ios-xcui-benchmark-20260720-164844-5f6e9240`](runs/ui-generation/ios-xcui-benchmark-20260720-164844-5f6e9240.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | ~0.63 | `0d4eac8b336b` dirty | `excluded` | baseline | phase0-ios-control-3 |
 
 ## ui-generation / ios / iphone-17-pro / config `410479be8ae2`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`ios-xcui-benchmark-20260806-141150-97c286b1`](runs/ui-generation/ios-xcui-benchmark-20260806-141150-97c286b1.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | `a2f01c95b089` dirty | `excluded` | baseline | ios-xcui-benchmark-20260806-141150-97c286b1 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`ios-xcui-benchmark-20260806-141150-97c286b1`](runs/ui-generation/ios-xcui-benchmark-20260806-141150-97c286b1.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | ~0.52 | `a2f01c95b089` dirty | `excluded` | baseline | ios-xcui-benchmark-20260806-141150-97c286b1 |
 
 ## ui-generation / ios / iphone-17-pro / config `4b53e59b2bf6`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`ios-xcui-benchmark-20260801-132415-abbec96b`](runs/ui-generation/ios-xcui-benchmark-20260801-132415-abbec96b.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `994e3c1f1ca0` | `4b53e59b2bf6` | baseline | ios-xcui-benchmark-20260801-132415-abbec96b |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`ios-xcui-benchmark-20260801-132415-abbec96b`](runs/ui-generation/ios-xcui-benchmark-20260801-132415-abbec96b.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.51 | `994e3c1f1ca0` | `4b53e59b2bf6` | baseline | ios-xcui-benchmark-20260801-132415-abbec96b |
 
 ## ui-generation / ios / iphone-17-pro / config `4d75b5478cdc`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-19 | [`ios-xcui-benchmark-20260719-133203-d413fac1`](runs/ui-generation/ios-xcui-benchmark-20260719-133203-d413fac1.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | `75fdc4847a92` dirty | `excluded` | baseline | phase4-ios-custom |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-19 | [`ios-xcui-benchmark-20260719-133203-d413fac1`](runs/ui-generation/ios-xcui-benchmark-20260719-133203-d413fac1.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | ~0.98 | `75fdc4847a92` dirty | `excluded` | baseline | phase4-ios-custom |
 
 ## ui-generation / ios / iphone-17-pro / config `505604f090fd`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-16 | [`ios-xcui-benchmark-20260716-184106-48e3a3a6`](runs/ui-generation/ios-xcui-benchmark-20260716-184106-48e3a3a6.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `bcb5265a8c57` | `505604f090fd` | baseline | owned-core-final-bcb5265-ios |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-16 | [`ios-xcui-benchmark-20260716-184106-48e3a3a6`](runs/ui-generation/ios-xcui-benchmark-20260716-184106-48e3a3a6.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.57 | `bcb5265a8c57` | `505604f090fd` | baseline | owned-core-final-bcb5265-ios |
 
 ## ui-generation / ios / iphone-17-pro / config `6edf7d8d8975`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-31 | [`ios-xcui-benchmark-20260731-065816-cb5e674e`](runs/ui-generation/ios-xcui-benchmark-20260731-065816-cb5e674e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | `ffffa2aac134` dirty | `excluded` | baseline | phase0-ios-control-1 |
-| 2026-07-31 | [`ios-xcui-benchmark-20260731-071308-d5e0496f`](runs/ui-generation/ios-xcui-benchmark-20260731-071308-d5e0496f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `b2d4aaec0fd0` | `6edf7d8d8975` | baseline | phase0-ios-control-1 |
-| 2026-07-31 | [`ios-xcui-benchmark-20260731-182050-19550c08`](runs/ui-generation/ios-xcui-benchmark-20260731-182050-19550c08.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `93768bed57f8` | `6edf7d8d8975` | vs ios-xcui-benchmark-20260731-071308-d5e0496f: RTF +0.7%, RAM +1.4% | phase0-ios-control-2 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-31 | [`ios-xcui-benchmark-20260731-065816-cb5e674e`](runs/ui-generation/ios-xcui-benchmark-20260731-065816-cb5e674e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | ~0.58 | `ffffa2aac134` dirty | `excluded` | baseline | phase0-ios-control-1 |
+| 2026-07-31 | [`ios-xcui-benchmark-20260731-071308-d5e0496f`](runs/ui-generation/ios-xcui-benchmark-20260731-071308-d5e0496f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.59 | `b2d4aaec0fd0` | `6edf7d8d8975` | baseline | phase0-ios-control-1 |
+| 2026-07-31 | [`ios-xcui-benchmark-20260731-182050-19550c08`](runs/ui-generation/ios-xcui-benchmark-20260731-182050-19550c08.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.58 | `93768bed57f8` | `6edf7d8d8975` | vs ios-xcui-benchmark-20260731-071308-d5e0496f: RTF +0.7% (faster), RAM +1.4% | phase0-ios-control-2 |
 
 ## ui-generation / ios / iphone-17-pro / config `79dc6d4371e7`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-19 | [`ios-xcui-benchmark-20260719-134041-9653f7cf`](runs/ui-generation/ios-xcui-benchmark-20260719-134041-9653f7cf.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | `75fdc4847a92` dirty | `excluded` | baseline | phase4-ios-design |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-19 | [`ios-xcui-benchmark-20260719-134041-9653f7cf`](runs/ui-generation/ios-xcui-benchmark-20260719-134041-9653f7cf.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | ~0.91 | `75fdc4847a92` dirty | `excluded` | baseline | phase4-ios-design |
 
 ## ui-generation / ios / iphone-17-pro / config `82d0f31be140`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-14 | [`ios-xcui-benchmark-20260714-113139-3b4b6d6c`](runs/ui-generation/ios-xcui-benchmark-20260714-113139-3b4b6d6c.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `6ffdbfddff09` | `82d0f31be140` | baseline | ios-canonical-v2 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-14 | [`ios-xcui-benchmark-20260714-113139-3b4b6d6c`](runs/ui-generation/ios-xcui-benchmark-20260714-113139-3b4b6d6c.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.61 | `6ffdbfddff09` | `82d0f31be140` | baseline | ios-canonical-v2 |
 
 ## ui-generation / ios / iphone-17-pro / config `8784432a549e`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-13 | [`ios-xcui-benchmark-20260713-043229-ec64bf4e`](runs/ui-generation/ios-xcui-benchmark-20260713-043229-ec64bf4e.json) | canonical | exploratory | passedWithWarnings | memory-contract-incomplete | 29 | `04083b15a4e2` dirty | `excluded` | baseline | ios-xcui-benchmark-20260713-043229-ec64bf4e |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-13 | [`ios-xcui-benchmark-20260713-043229-ec64bf4e`](runs/ui-generation/ios-xcui-benchmark-20260713-043229-ec64bf4e.json) | canonical | exploratory | passedWithWarnings | memory-contract-incomplete | 29 | ~0.61 | `04083b15a4e2` dirty | `excluded` | baseline | ios-xcui-benchmark-20260713-043229-ec64bf4e |
 
 ## ui-generation / ios / iphone-17-pro / config `903e57083293`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-12 | [`ios-xcui-benchmark-20260712-202308-154fbe92`](runs/ui-generation/ios-xcui-benchmark-20260712-202308-154fbe92.json) | canonical | exploratory | passed | memory-contract-incomplete | 29 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-full-final |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-12 | [`ios-xcui-benchmark-20260712-202308-154fbe92`](runs/ui-generation/ios-xcui-benchmark-20260712-202308-154fbe92.json) | canonical | exploratory | passed | memory-contract-incomplete | 29 | ~0.59 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-full-final |
 
 ## ui-generation / ios / iphone-17-pro / config `a291160fc9bc`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-06 | [`ios-xcui-benchmark-20260806-135457-1d545686`](runs/ui-generation/ios-xcui-benchmark-20260806-135457-1d545686.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | `a2f01c95b089` dirty | `excluded` | baseline | phase0-ios-control-3 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-06 | [`ios-xcui-benchmark-20260806-135457-1d545686`](runs/ui-generation/ios-xcui-benchmark-20260806-135457-1d545686.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | ~0.61 | `a2f01c95b089` dirty | `excluded` | baseline | phase0-ios-control-3 |
 
 ## ui-generation / ios / iphone-17-pro / config `b618272db7b3`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-23 | [`ios-xcui-benchmark-20260723-061044-f986bf4d`](runs/ui-generation/ios-xcui-benchmark-20260723-061044-f986bf4d.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `22caff2b1fbb` | `b618272db7b3` | baseline | ios-xcui-benchmark-20260723-061044-f986bf4d |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-23 | [`ios-xcui-benchmark-20260723-061044-f986bf4d`](runs/ui-generation/ios-xcui-benchmark-20260723-061044-f986bf4d.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.53 | `22caff2b1fbb` | `b618272db7b3` | baseline | ios-xcui-benchmark-20260723-061044-f986bf4d |
 
 ## ui-generation / ios / iphone-17-pro / config `ba554734b5b9`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-16 | [`ios-xcui-benchmark-20260716-152743-5ebdf4fd`](runs/ui-generation/ios-xcui-benchmark-20260716-152743-5ebdf4fd.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `dbf51a5d0138` | `ba554734b5b9` | baseline | ios-xcui-benchmark-20260716-152743-5ebdf4fd |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-16 | [`ios-xcui-benchmark-20260716-152743-5ebdf4fd`](runs/ui-generation/ios-xcui-benchmark-20260716-152743-5ebdf4fd.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.65 | `dbf51a5d0138` | `ba554734b5b9` | baseline | ios-xcui-benchmark-20260716-152743-5ebdf4fd |
 
 ## ui-generation / ios / iphone-17-pro / config `d5e2f1e5e711`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-29 | [`ios-xcui-benchmark-20260729-160223-ed1d5a32`](runs/ui-generation/ios-xcui-benchmark-20260729-160223-ed1d5a32.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | `c0e56715874c` dirty | `excluded` | baseline | clone-prime-probe-v3 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-29 | [`ios-xcui-benchmark-20260729-160223-ed1d5a32`](runs/ui-generation/ios-xcui-benchmark-20260729-160223-ed1d5a32.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | ~0.57 | `c0e56715874c` dirty | `excluded` | baseline | clone-prime-probe-v3 |
 
 ## ui-generation / ios / iphone-17-pro / config `d7232052b902`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-12 | [`ios-xcui-benchmark-20260712-201858-e9e16ecf`](runs/ui-generation/ios-xcui-benchmark-20260712-201858-e9e16ecf.json) | focused | exploratory | passed | memory-contract-incomplete | 4 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-design-long-diagnostic |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-12 | [`ios-xcui-benchmark-20260712-201858-e9e16ecf`](runs/ui-generation/ios-xcui-benchmark-20260712-201858-e9e16ecf.json) | focused | exploratory | passed | memory-contract-incomplete | 4 | ~0.54 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-design-long-diagnostic |
 
 ## ui-generation / ios / iphone-17-pro / config `dcb9159b66db`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-19 | [`ios-xcui-benchmark-20260719-134646-d90db984`](runs/ui-generation/ios-xcui-benchmark-20260719-134646-d90db984.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `75fdc4847a92` dirty | `excluded` | baseline | phase4-ios-clone |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-19 | [`ios-xcui-benchmark-20260719-134646-d90db984`](runs/ui-generation/ios-xcui-benchmark-20260719-134646-d90db984.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | ~0.71 | `75fdc4847a92` dirty | `excluded` | baseline | phase4-ios-clone |
 
 ## ui-generation / ios / iphone-17-pro / config `e0278c4862ee`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-13 | [`ios-xcui-benchmark-20260713-051357-cc104bf3`](runs/ui-generation/ios-xcui-benchmark-20260713-051357-cc104bf3.json) | focused | exploratory | passed | memory-contract-incomplete | 2 | `04083b15a4e2` dirty | `excluded` | baseline | focused-playback-source-repair-20260713 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-13 | [`ios-xcui-benchmark-20260713-051357-cc104bf3`](runs/ui-generation/ios-xcui-benchmark-20260713-051357-cc104bf3.json) | focused | exploratory | passed | memory-contract-incomplete | 2 | ~0.82 | `04083b15a4e2` dirty | `excluded` | baseline | focused-playback-source-repair-20260713 |
 
 ## ui-generation / ios / iphone-17-pro / config `e7fbd1871720`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-19 | [`ios-xcui-benchmark-20260719-234454-7df6a1e0`](runs/ui-generation/ios-xcui-benchmark-20260719-234454-7df6a1e0.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 5 | `d07384473fe9` dirty | `excluded` | baseline | secret-sauce-ios-20260719 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-19 | [`ios-xcui-benchmark-20260719-234454-7df6a1e0`](runs/ui-generation/ios-xcui-benchmark-20260719-234454-7df6a1e0.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 5 | ~0.66 | `d07384473fe9` dirty | `excluded` | baseline | secret-sauce-ios-20260719 |
 
 ## ui-generation / ios / iphone-17-pro / config `ef1fb93b4162`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-20 | [`ios-xcui-benchmark-20260720-174441-16fc128c`](runs/ui-generation/ios-xcui-benchmark-20260720-174441-16fc128c.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `610125b7423e` | `ef1fb93b4162` | baseline | post-phase0-ios-matrix-20260720 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-20 | [`ios-xcui-benchmark-20260720-174441-16fc128c`](runs/ui-generation/ios-xcui-benchmark-20260720-174441-16fc128c.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.57 | `610125b7423e` | `ef1fb93b4162` | baseline | post-phase0-ios-matrix-20260720 |
 
 ## ui-generation / ios / iphone-17-pro / config `f50250bbe161`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-19 | [`ios-xcui-benchmark-20260719-224743-1e69da39`](runs/ui-generation/ios-xcui-benchmark-20260719-224743-1e69da39.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | `d07384473fe9` dirty | `excluded` | baseline | pre-research-baseline-ios-20260719 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-19 | [`ios-xcui-benchmark-20260719-224743-1e69da39`](runs/ui-generation/ios-xcui-benchmark-20260719-224743-1e69da39.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | ~0.57 | `d07384473fe9` dirty | `excluded` | baseline | pre-research-baseline-ios-20260719 |
 
 ## ui-generation / ios / iphone-17-pro / config `f5d334319bef`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-12 | [`ios-xcui-benchmark-20260712-194549-2b2a7d4f`](runs/ui-generation/ios-xcui-benchmark-20260712-194549-2b2a7d4f.json) | focused | exploratory | passed | memory-contract-incomplete | 2 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-focused |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-12 | [`ios-xcui-benchmark-20260712-194549-2b2a7d4f`](runs/ui-generation/ios-xcui-benchmark-20260712-194549-2b2a7d4f.json) | focused | exploratory | passed | memory-contract-incomplete | 2 | ~0.94 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-focused |
 
 ## ui-generation / ios / iphone-17-pro / config `fc0fc2887412`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-14 | [`ios-xcui-benchmark-20260714-105423-4dddee2f`](runs/ui-generation/ios-xcui-benchmark-20260714-105423-4dddee2f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 5 | `4b79bb497f1b` | `fc0fc2887412` | baseline | ios-v2-focused |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-14 | [`ios-xcui-benchmark-20260714-105423-4dddee2f`](runs/ui-generation/ios-xcui-benchmark-20260714-105423-4dddee2f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 5 | ~0.67 | `4b79bb497f1b` | `fc0fc2887412` | baseline | ios-v2-focused |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `053bd44b7ee2`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-29 | [`macos-xcui-benchmark-20260729-023553-111d88c6`](runs/ui-generation/macos-xcui-benchmark-20260729-023553-111d88c6.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `3331eecfdcdb` | `053bd44b7ee2` | baseline | macos-xcui-benchmark-20260729-023553-111d88c6 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-29 | [`macos-xcui-benchmark-20260729-023553-111d88c6`](runs/ui-generation/macos-xcui-benchmark-20260729-023553-111d88c6.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.53 | `3331eecfdcdb` | `053bd44b7ee2` | baseline | macos-xcui-benchmark-20260729-023553-111d88c6 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `0c3160232d0e`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-29 | [`macos-xcui-benchmark-20260729-015937-cd85b2d5`](runs/ui-generation/macos-xcui-benchmark-20260729-015937-cd85b2d5.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `3331eecfdcdb` | `0c3160232d0e` | baseline | phase0-ui-control-1 |
-| 2026-07-29 | [`macos-xcui-benchmark-20260729-020753-75d2ec7b`](runs/ui-generation/macos-xcui-benchmark-20260729-020753-75d2ec7b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `3331eecfdcdb` | `0c3160232d0e` | vs macos-xcui-benchmark-20260729-015937-cd85b2d5: RTF +0.8%, RAM -0.0% | phase0-ui-control-2 |
-| 2026-07-29 | [`macos-xcui-benchmark-20260729-021554-659b10be`](runs/ui-generation/macos-xcui-benchmark-20260729-021554-659b10be.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `3331eecfdcdb` | `0c3160232d0e` | vs macos-xcui-benchmark-20260729-020753-75d2ec7b: RTF -0.9%, RAM -0.3% | phase0-ui-control-3 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-29 | [`macos-xcui-benchmark-20260729-015937-cd85b2d5`](runs/ui-generation/macos-xcui-benchmark-20260729-015937-cd85b2d5.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.70 | `3331eecfdcdb` | `0c3160232d0e` | baseline | phase0-ui-control-1 |
+| 2026-07-29 | [`macos-xcui-benchmark-20260729-020753-75d2ec7b`](runs/ui-generation/macos-xcui-benchmark-20260729-020753-75d2ec7b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.71 | `3331eecfdcdb` | `0c3160232d0e` | vs macos-xcui-benchmark-20260729-015937-cd85b2d5: RTF +0.8% (faster), RAM -0.0% | phase0-ui-control-2 |
+| 2026-07-29 | [`macos-xcui-benchmark-20260729-021554-659b10be`](runs/ui-generation/macos-xcui-benchmark-20260729-021554-659b10be.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.73 | `3331eecfdcdb` | `0c3160232d0e` | vs macos-xcui-benchmark-20260729-020753-75d2ec7b: RTF -0.9% (slower), RAM -0.3% | phase0-ui-control-3 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `0fc6cb69cd79`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-xcui-benchmark-20260801-182943-b0b5a448`](runs/ui-generation/macos-xcui-benchmark-20260801-182943-b0b5a448.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `75896cfd538f` | `0fc6cb69cd79` | baseline | macos-xcui-benchmark-20260801-182943-b0b5a448 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-xcui-benchmark-20260801-182943-b0b5a448`](runs/ui-generation/macos-xcui-benchmark-20260801-182943-b0b5a448.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.54 | `75896cfd538f` | `0fc6cb69cd79` | baseline | macos-xcui-benchmark-20260801-182943-b0b5a448 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `126311b505ce`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-20 | [`macos-xcui-benchmark-20260720-053624-f2eb6d13`](runs/ui-generation/macos-xcui-benchmark-20260720-053624-f2eb6d13.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `0d4eac8b336b` | `126311b505ce` | baseline | phase0-ui-control-1 |
-| 2026-07-20 | [`macos-xcui-benchmark-20260720-054551-6b71dc9b`](runs/ui-generation/macos-xcui-benchmark-20260720-054551-6b71dc9b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `0d4eac8b336b` | `126311b505ce` | vs macos-xcui-benchmark-20260720-053624-f2eb6d13: RTF -0.4%, RAM -3.4% | phase0-ui-control-2 |
-| 2026-07-20 | [`macos-xcui-benchmark-20260720-055506-11eb8550`](runs/ui-generation/macos-xcui-benchmark-20260720-055506-11eb8550.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | `0d4eac8b336b` | `126311b505ce` | vs macos-xcui-benchmark-20260720-054551-6b71dc9b: RTF +0.0%, RAM +0.2% | phase0-ui-control-3 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-20 | [`macos-xcui-benchmark-20260720-053624-f2eb6d13`](runs/ui-generation/macos-xcui-benchmark-20260720-053624-f2eb6d13.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.34 | `0d4eac8b336b` | `126311b505ce` | baseline | phase0-ui-control-1 |
+| 2026-07-20 | [`macos-xcui-benchmark-20260720-054551-6b71dc9b`](runs/ui-generation/macos-xcui-benchmark-20260720-054551-6b71dc9b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.28 | `0d4eac8b336b` | `126311b505ce` | vs macos-xcui-benchmark-20260720-053624-f2eb6d13: RTF -0.4% (slower), RAM -3.4% | phase0-ui-control-2 |
+| 2026-07-20 | [`macos-xcui-benchmark-20260720-055506-11eb8550`](runs/ui-generation/macos-xcui-benchmark-20260720-055506-11eb8550.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.34 | `0d4eac8b336b` | `126311b505ce` | vs macos-xcui-benchmark-20260720-054551-6b71dc9b: RTF +0.0% (faster), RAM +0.2% | phase0-ui-control-3 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `12ab6e459f65`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-09-05 | [`macos-xcui-benchmark-20260905-012117-0b234262`](runs/ui-generation/macos-xcui-benchmark-20260905-012117-0b234262.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `14dc148c94c8` | `12ab6e459f65` | baseline | ui-audit-generation-20260904 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-05 | [`macos-xcui-benchmark-20260905-012117-0b234262`](runs/ui-generation/macos-xcui-benchmark-20260905-012117-0b234262.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.65 | `14dc148c94c8` | `12ab6e459f65` | baseline | ui-audit-generation-20260904 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `161b2fa90d9f`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-16 | [`macos-xcui-benchmark-20260716-181853-b4c2e299`](runs/ui-generation/macos-xcui-benchmark-20260716-181853-b4c2e299.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `9a8da8745939` | `161b2fa90d9f` | baseline | owned-core-final-9a8da87-macos |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-16 | [`macos-xcui-benchmark-20260716-181853-b4c2e299`](runs/ui-generation/macos-xcui-benchmark-20260716-181853-b4c2e299.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.94 | `9a8da8745939` | `161b2fa90d9f` | baseline | owned-core-final-9a8da87-macos |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `172f44367db4`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-xcui-benchmark-20260801-162803-2dbdbcd1`](runs/ui-generation/macos-xcui-benchmark-20260801-162803-2dbdbcd1.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `0be0300482aa` | `172f44367db4` | baseline | macos-xcui-benchmark-20260801-162803-2dbdbcd1 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-xcui-benchmark-20260801-162803-2dbdbcd1`](runs/ui-generation/macos-xcui-benchmark-20260801-162803-2dbdbcd1.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.54 | `0be0300482aa` | `172f44367db4` | baseline | macos-xcui-benchmark-20260801-162803-2dbdbcd1 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `2fa1bcbeb993`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-01 | [`macos-xcui-benchmark-20260801-003208-403989cf`](runs/ui-generation/macos-xcui-benchmark-20260801-003208-403989cf.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | `4893c8eb8965` | `2fa1bcbeb993` | baseline | v3-fold-proof |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-01 | [`macos-xcui-benchmark-20260801-003208-403989cf`](runs/ui-generation/macos-xcui-benchmark-20260801-003208-403989cf.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | ~0.71 | `4893c8eb8965` | `2fa1bcbeb993` | baseline | v3-fold-proof |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `36ccb3ec182f`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-17 | [`macos-xcui-benchmark-20260717-193608-51fef175`](runs/ui-generation/macos-xcui-benchmark-20260717-193608-51fef175.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | `a9ebafff246b` dirty | `excluded` | baseline | phase4-clone |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-17 | [`macos-xcui-benchmark-20260717-193608-51fef175`](runs/ui-generation/macos-xcui-benchmark-20260717-193608-51fef175.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 1 | ~1.34 | `a9ebafff246b` dirty | `excluded` | baseline | phase4-clone |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `3bd86418d3bc`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-054315-9b6f267b`](runs/ui-generation/macos-xcui-benchmark-20260723-054315-9b6f267b.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `3a4378534195` | `3bd86418d3bc` | baseline | macos-xcui-benchmark-20260723-054315-9b6f267b |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-081659-e4a216aa`](runs/ui-generation/macos-xcui-benchmark-20260723-081659-e4a216aa.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | `f7ee0d006e3a` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-081659-e4a216aa |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-083313-d02005ae`](runs/ui-generation/macos-xcui-benchmark-20260723-083313-d02005ae.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `b6f11211da85` | `3bd86418d3bc` | vs macos-xcui-benchmark-20260723-054315-9b6f267b: RTF +34.3%, RAM -2.1% | macos-xcui-benchmark-20260723-083313-d02005ae |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-054315-9b6f267b`](runs/ui-generation/macos-xcui-benchmark-20260723-054315-9b6f267b.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.76 | `3a4378534195` | `3bd86418d3bc` | baseline | macos-xcui-benchmark-20260723-054315-9b6f267b |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-081659-e4a216aa`](runs/ui-generation/macos-xcui-benchmark-20260723-081659-e4a216aa.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | ~0.57 | `f7ee0d006e3a` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-081659-e4a216aa |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-083313-d02005ae`](runs/ui-generation/macos-xcui-benchmark-20260723-083313-d02005ae.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.57 | `b6f11211da85` | `3bd86418d3bc` | vs macos-xcui-benchmark-20260723-054315-9b6f267b: RTF +34.3% (faster), RAM -2.1% | macos-xcui-benchmark-20260723-083313-d02005ae |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `4a5bd9c374be`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-12 | [`macos-xcui-benchmark-20260712-192440-26c3dc3e`](runs/ui-generation/macos-xcui-benchmark-20260712-192440-26c3dc3e.json) | focused | exploratory | passed | memory-contract-incomplete | 2 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-focused |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-12 | [`macos-xcui-benchmark-20260712-192440-26c3dc3e`](runs/ui-generation/macos-xcui-benchmark-20260712-192440-26c3dc3e.json) | focused | exploratory | passed | memory-contract-incomplete | 2 | ~1.41 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-focused |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `4ad8aa46e085`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-17 | [`macos-xcui-benchmark-20260717-193323-f8506265`](runs/ui-generation/macos-xcui-benchmark-20260717-193323-f8506265.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | `a9ebafff246b` dirty | `excluded` | baseline | phase4-design |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-17 | [`macos-xcui-benchmark-20260717-193323-f8506265`](runs/ui-generation/macos-xcui-benchmark-20260717-193323-f8506265.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | ~1.53 | `a9ebafff246b` dirty | `excluded` | baseline | phase4-design |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `54c3c1bb6bba`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-12 | [`macos-xcui-benchmark-20260712-193112-1b5ab7cc`](runs/ui-generation/macos-xcui-benchmark-20260712-193112-1b5ab7cc.json) | canonical | exploratory | passedWithWarnings | memory-contract-incomplete | 29 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-full |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-12 | [`macos-xcui-benchmark-20260712-193112-1b5ab7cc`](runs/ui-generation/macos-xcui-benchmark-20260712-193112-1b5ab7cc.json) | canonical | exploratory | passedWithWarnings | memory-contract-incomplete | 29 | ~0.97 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-full |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `5520d70939c4`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-13 | [`macos-xcui-benchmark-20260713-094143-087ff425`](runs/ui-generation/macos-xcui-benchmark-20260713-094143-087ff425.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | `04083b15a4e2` dirty | `excluded` | baseline | memory-v8-final-full |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-13 | [`macos-xcui-benchmark-20260713-094143-087ff425`](runs/ui-generation/macos-xcui-benchmark-20260713-094143-087ff425.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | ~1.00 | `04083b15a4e2` dirty | `excluded` | baseline | memory-v8-final-full |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `55e5f9ce7b56`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-22 | [`macos-xcui-benchmark-20260722-172102-48c4a193`](runs/ui-generation/macos-xcui-benchmark-20260722-172102-48c4a193.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | `2f948a8b0491` dirty | `excluded` | baseline | v2-stack-acceptance |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-22 | [`macos-xcui-benchmark-20260722-172102-48c4a193`](runs/ui-generation/macos-xcui-benchmark-20260722-172102-48c4a193.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | ~1.34 | `2f948a8b0491` dirty | `excluded` | baseline | v2-stack-acceptance |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `6684732ad0ff`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-13 | [`macos-xcui-benchmark-20260713-081225-9455b028`](runs/ui-generation/macos-xcui-benchmark-20260713-081225-9455b028.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | `04083b15a4e2` dirty | `excluded` | baseline | memory-v8-focused-sampler-final |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-13 | [`macos-xcui-benchmark-20260713-081225-9455b028`](runs/ui-generation/macos-xcui-benchmark-20260713-081225-9455b028.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | ~1.78 | `04083b15a4e2` dirty | `excluded` | baseline | memory-v8-focused-sampler-final |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `6ba5d8499705`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-13 | [`macos-xcui-benchmark-20260713-093711-0fdf033f`](runs/ui-generation/macos-xcui-benchmark-20260713-093711-0fdf033f.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | `04083b15a4e2` dirty | `excluded` | baseline | memory-v8-final-focused |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-13 | [`macos-xcui-benchmark-20260713-093711-0fdf033f`](runs/ui-generation/macos-xcui-benchmark-20260713-093711-0fdf033f.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | ~2.22 | `04083b15a4e2` dirty | `excluded` | baseline | memory-v8-final-focused |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `7503f91afae5`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-22 | [`macos-xcui-benchmark-20260722-213731-c47b0d27`](runs/ui-generation/macos-xcui-benchmark-20260722-213731-c47b0d27.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `4c0713ee33a6` dirty | `excluded` | baseline | macos-xcui-benchmark-20260722-213731-c47b0d27 |
-| 2026-07-22 | [`macos-xcui-benchmark-20260722-214415-0d2d3a2a`](runs/ui-generation/macos-xcui-benchmark-20260722-214415-0d2d3a2a.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `4c0713ee33a6` dirty | `excluded` | baseline | macos-xcui-benchmark-20260722-214415-0d2d3a2a |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-013015-ebfb5722`](runs/ui-generation/macos-xcui-benchmark-20260723-013015-ebfb5722.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` | `7503f91afae5` | baseline | macos-xcui-benchmark-20260723-013015-ebfb5722 |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-015826-6f10085b`](runs/ui-generation/macos-xcui-benchmark-20260723-015826-6f10085b.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-015826-6f10085b |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-020700-9ecc33cf`](runs/ui-generation/macos-xcui-benchmark-20260723-020700-9ecc33cf.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-020700-9ecc33cf |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-023025-01319714`](runs/ui-generation/macos-xcui-benchmark-20260723-023025-01319714.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-023025-01319714 |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-023607-de938e28`](runs/ui-generation/macos-xcui-benchmark-20260723-023607-de938e28.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-023607-de938e28 |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-024332-1025a6ec`](runs/ui-generation/macos-xcui-benchmark-20260723-024332-1025a6ec.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-024332-1025a6ec |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-22 | [`macos-xcui-benchmark-20260722-213731-c47b0d27`](runs/ui-generation/macos-xcui-benchmark-20260722-213731-c47b0d27.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.29 | `4c0713ee33a6` dirty | `excluded` | baseline | macos-xcui-benchmark-20260722-213731-c47b0d27 |
+| 2026-07-22 | [`macos-xcui-benchmark-20260722-214415-0d2d3a2a`](runs/ui-generation/macos-xcui-benchmark-20260722-214415-0d2d3a2a.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.34 | `4c0713ee33a6` dirty | `excluded` | baseline | macos-xcui-benchmark-20260722-214415-0d2d3a2a |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-013015-ebfb5722`](runs/ui-generation/macos-xcui-benchmark-20260723-013015-ebfb5722.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 4 | ~1.38 | `109559888e4d` | `7503f91afae5` | baseline | macos-xcui-benchmark-20260723-013015-ebfb5722 |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-015826-6f10085b`](runs/ui-generation/macos-xcui-benchmark-20260723-015826-6f10085b.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.35 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-015826-6f10085b |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-020700-9ecc33cf`](runs/ui-generation/macos-xcui-benchmark-20260723-020700-9ecc33cf.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.35 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-020700-9ecc33cf |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-023025-01319714`](runs/ui-generation/macos-xcui-benchmark-20260723-023025-01319714.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.38 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-023025-01319714 |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-023607-de938e28`](runs/ui-generation/macos-xcui-benchmark-20260723-023607-de938e28.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.54 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-023607-de938e28 |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-024332-1025a6ec`](runs/ui-generation/macos-xcui-benchmark-20260723-024332-1025a6ec.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.32 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-024332-1025a6ec |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `7c600199ae07`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-19 | [`macos-xcui-benchmark-20260719-215547-11f8f4cf`](runs/ui-generation/macos-xcui-benchmark-20260719-215547-11f8f4cf.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | `d07384473fe9` dirty | `excluded` | baseline | pre-research-baseline-20260719 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-19 | [`macos-xcui-benchmark-20260719-215547-11f8f4cf`](runs/ui-generation/macos-xcui-benchmark-20260719-215547-11f8f4cf.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | ~1.10 | `d07384473fe9` dirty | `excluded` | baseline | pre-research-baseline-20260719 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `8153dd385f0f`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-19 | [`macos-xcui-benchmark-20260719-233834-98038639`](runs/ui-generation/macos-xcui-benchmark-20260719-233834-98038639.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 5 | `d07384473fe9` dirty | `excluded` | baseline | secret-sauce-20260719 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-19 | [`macos-xcui-benchmark-20260719-233834-98038639`](runs/ui-generation/macos-xcui-benchmark-20260719-233834-98038639.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 5 | ~1.43 | `d07384473fe9` dirty | `excluded` | baseline | secret-sauce-20260719 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `8d727e051825`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-20 | [`macos-xcui-benchmark-20260720-172920-591696d1`](runs/ui-generation/macos-xcui-benchmark-20260720-172920-591696d1.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `610125b7423e` | `8d727e051825` | baseline | post-phase0-matrix-20260720 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-20 | [`macos-xcui-benchmark-20260720-172920-591696d1`](runs/ui-generation/macos-xcui-benchmark-20260720-172920-591696d1.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~1.13 | `610125b7423e` | `8d727e051825` | baseline | post-phase0-matrix-20260720 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `92f60f37fc6a`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-064217-9a262db6`](runs/ui-generation/macos-xcui-benchmark-20260723-064217-9a262db6.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 4 | `34ed607cc810` | `92f60f37fc6a` | baseline | macos-xcui-benchmark-20260723-064217-9a262db6 |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-070906-56da55ec`](runs/ui-generation/macos-xcui-benchmark-20260723-070906-56da55ec.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `34ed607cc810` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-070906-56da55ec |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-071837-eefae1ec`](runs/ui-generation/macos-xcui-benchmark-20260723-071837-eefae1ec.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `1cdb94c164ad` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-071837-eefae1ec |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-072534-98b7cc52`](runs/ui-generation/macos-xcui-benchmark-20260723-072534-98b7cc52.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `1cdb94c164ad` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-072534-98b7cc52 |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-074016-ad57d384`](runs/ui-generation/macos-xcui-benchmark-20260723-074016-ad57d384.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `495a77e6c4ad` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-074016-ad57d384 |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-081106-807ae79f`](runs/ui-generation/macos-xcui-benchmark-20260723-081106-807ae79f.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `f7ee0d006e3a` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-081106-807ae79f |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-064217-9a262db6`](runs/ui-generation/macos-xcui-benchmark-20260723-064217-9a262db6.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 4 | ~0.76 | `34ed607cc810` | `92f60f37fc6a` | baseline | macos-xcui-benchmark-20260723-064217-9a262db6 |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-070906-56da55ec`](runs/ui-generation/macos-xcui-benchmark-20260723-070906-56da55ec.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.57 | `34ed607cc810` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-070906-56da55ec |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-071837-eefae1ec`](runs/ui-generation/macos-xcui-benchmark-20260723-071837-eefae1ec.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.74 | `1cdb94c164ad` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-071837-eefae1ec |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-072534-98b7cc52`](runs/ui-generation/macos-xcui-benchmark-20260723-072534-98b7cc52.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.76 | `1cdb94c164ad` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-072534-98b7cc52 |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-074016-ad57d384`](runs/ui-generation/macos-xcui-benchmark-20260723-074016-ad57d384.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.73 | `495a77e6c4ad` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-074016-ad57d384 |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-081106-807ae79f`](runs/ui-generation/macos-xcui-benchmark-20260723-081106-807ae79f.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.55 | `f7ee0d006e3a` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-081106-807ae79f |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `a0ef72d79b71`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-22 | [`macos-xcui-benchmark-20260722-211254-273bd16d`](runs/ui-generation/macos-xcui-benchmark-20260722-211254-273bd16d.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | `4c0713ee33a6` dirty | `excluded` | baseline | macos-xcui-benchmark-20260722-211254-273bd16d |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-22 | [`macos-xcui-benchmark-20260722-211254-273bd16d`](runs/ui-generation/macos-xcui-benchmark-20260722-211254-273bd16d.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | ~1.32 | `4c0713ee33a6` dirty | `excluded` | baseline | macos-xcui-benchmark-20260722-211254-273bd16d |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `ad660b134305`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-15 | [`macos-xcui-benchmark-20260715-140557-ab79eb71`](runs/ui-generation/macos-xcui-benchmark-20260715-140557-ab79eb71.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `247b266b0f1c` | `ad660b134305` | baseline | owned-core-247b266 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-15 | [`macos-xcui-benchmark-20260715-140557-ab79eb71`](runs/ui-generation/macos-xcui-benchmark-20260715-140557-ab79eb71.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~1.08 | `247b266b0f1c` | `ad660b134305` | baseline | owned-core-247b266 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `aee1fb0470f3`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-13 | [`macos-xcui-benchmark-20260713-185716-7f12cd35`](runs/ui-generation/macos-xcui-benchmark-20260713-185716-7f12cd35.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | `4e05f6fd458c` | `aee1fb0470f3` | baseline | macos-xcui-benchmark-20260713-185716-7f12cd35 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-13 | [`macos-xcui-benchmark-20260713-185716-7f12cd35`](runs/ui-generation/macos-xcui-benchmark-20260713-185716-7f12cd35.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~1.25 | `4e05f6fd458c` | `aee1fb0470f3` | baseline | macos-xcui-benchmark-20260713-185716-7f12cd35 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `d0feced7c0f0`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-17 | [`macos-xcui-benchmark-20260717-192747-0ae9d73c`](runs/ui-generation/macos-xcui-benchmark-20260717-192747-0ae9d73c.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | `a9ebafff246b` dirty | `excluded` | baseline | phase4-custom |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-17 | [`macos-xcui-benchmark-20260717-192747-0ae9d73c`](runs/ui-generation/macos-xcui-benchmark-20260717-192747-0ae9d73c.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | ~1.56 | `a9ebafff246b` dirty | `excluded` | baseline | phase4-custom |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `d9e63bb990c9`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-040433-9150a33d`](runs/ui-generation/macos-xcui-benchmark-20260723-040433-9150a33d.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-040433-9150a33d |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-041133-db2c72d6`](runs/ui-generation/macos-xcui-benchmark-20260723-041133-db2c72d6.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-041133-db2c72d6 |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-041834-0e93bbc2`](runs/ui-generation/macos-xcui-benchmark-20260723-041834-0e93bbc2.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-041834-0e93bbc2 |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-042644-e48f8f54`](runs/ui-generation/macos-xcui-benchmark-20260723-042644-e48f8f54.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-042644-e48f8f54 |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-043320-eb94bb9b`](runs/ui-generation/macos-xcui-benchmark-20260723-043320-eb94bb9b.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-043320-eb94bb9b |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-040433-9150a33d`](runs/ui-generation/macos-xcui-benchmark-20260723-040433-9150a33d.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.09 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-040433-9150a33d |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-041133-db2c72d6`](runs/ui-generation/macos-xcui-benchmark-20260723-041133-db2c72d6.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.32 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-041133-db2c72d6 |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-041834-0e93bbc2`](runs/ui-generation/macos-xcui-benchmark-20260723-041834-0e93bbc2.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.32 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-041834-0e93bbc2 |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-042644-e48f8f54`](runs/ui-generation/macos-xcui-benchmark-20260723-042644-e48f8f54.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.45 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-042644-e48f8f54 |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-043320-eb94bb9b`](runs/ui-generation/macos-xcui-benchmark-20260723-043320-eb94bb9b.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.84 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-043320-eb94bb9b |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `eca8c266159d`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-031943-3820c784`](runs/ui-generation/macos-xcui-benchmark-20260723-031943-3820c784.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-031943-3820c784 |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-032529-825cdc6e`](runs/ui-generation/macos-xcui-benchmark-20260723-032529-825cdc6e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-032529-825cdc6e |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-031943-3820c784`](runs/ui-generation/macos-xcui-benchmark-20260723-031943-3820c784.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.29 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-031943-3820c784 |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-032529-825cdc6e`](runs/ui-generation/macos-xcui-benchmark-20260723-032529-825cdc6e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.31 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-032529-825cdc6e |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `fda70137cb9f`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-074746-40ab73d6`](runs/ui-generation/macos-xcui-benchmark-20260723-074746-40ab73d6.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | `495a77e6c4ad` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-074746-40ab73d6 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-074746-40ab73d6`](runs/ui-generation/macos-xcui-benchmark-20260723-074746-40ab73d6.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.55 | `495a77e6c4ad` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-074746-40ab73d6 |
 
 ## ui-perf / ios / iphone-17-pro / config `42ae56926af0`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-09-05 | [`ios-xcui-perf-20260905-091655-27a05a63`](runs/ui-perf/ios-xcui-perf-20260905-091655-27a05a63.json) | canonical | exploratory | passed | not-applicable | 9 | `33f710f6493f` dirty | `excluded` | baseline | ios-xcui-perf-20260905-091655-27a05a63 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-05 | [`ios-xcui-perf-20260905-091655-27a05a63`](runs/ui-perf/ios-xcui-perf-20260905-091655-27a05a63.json) | canonical | exploratory | passed | not-applicable | 9 | — | `33f710f6493f` dirty | `excluded` | baseline | ios-xcui-perf-20260905-091655-27a05a63 |
 
 ## ui-perf / ios / iphone-17-pro / config `48910e79e69e`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-28 | [`ios-xcui-perf-20260828-172155-32e5b71e`](runs/ui-perf/ios-xcui-perf-20260828-172155-32e5b71e.json) | canonical | exploratory | passedWithWarnings | not-applicable | 9 | `4c1e83720ee0` dirty | `excluded` | baseline | control-audit-20260828 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-28 | [`ios-xcui-perf-20260828-172155-32e5b71e`](runs/ui-perf/ios-xcui-perf-20260828-172155-32e5b71e.json) | canonical | exploratory | passedWithWarnings | not-applicable | 9 | — | `4c1e83720ee0` dirty | `excluded` | baseline | control-audit-20260828 |
 
 ## ui-perf / ios / iphone-17-pro / config `9a7f6e403e06`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-15 | [`ios-xcui-perf-20260815-171707-8af6ffde`](runs/ui-perf/ios-xcui-perf-20260815-171707-8af6ffde.json) | canonical | exploratory | passed | not-applicable | 9 | `e82e1162298d` dirty | `excluded` | baseline | ios-xcui-perf-20260815-171707-8af6ffde |
-| 2026-08-15 | [`ios-xcui-perf-20260815-173719-6e425c28`](runs/ui-perf/ios-xcui-perf-20260815-173719-6e425c28.json) | canonical | canonical | passed | not-applicable | 9 | `07cb4411f7aa` | `9a7f6e403e06` | baseline | ios-xcui-perf-20260815-173719-6e425c28 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-15 | [`ios-xcui-perf-20260815-171707-8af6ffde`](runs/ui-perf/ios-xcui-perf-20260815-171707-8af6ffde.json) | canonical | exploratory | passed | not-applicable | 9 | — | `e82e1162298d` dirty | `excluded` | baseline | ios-xcui-perf-20260815-171707-8af6ffde |
+| 2026-08-15 | [`ios-xcui-perf-20260815-173719-6e425c28`](runs/ui-perf/ios-xcui-perf-20260815-173719-6e425c28.json) | canonical | canonical | passed | not-applicable | 9 | — | `07cb4411f7aa` | `9a7f6e403e06` | baseline | ios-xcui-perf-20260815-173719-6e425c28 |
 
 ## ui-perf / ios / iphone-17-pro / config `9e8a2e294459`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-29 | [`ios-xcui-perf-20260829-180027-45adde8a`](runs/ui-perf/ios-xcui-perf-20260829-180027-45adde8a.json) | canonical | exploratory | passed | not-applicable | 9 | `343635cb47df` dirty | `excluded` | baseline | ios-xcui-perf-20260829-180027-45adde8a |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-29 | [`ios-xcui-perf-20260829-180027-45adde8a`](runs/ui-perf/ios-xcui-perf-20260829-180027-45adde8a.json) | canonical | exploratory | passed | not-applicable | 9 | — | `343635cb47df` dirty | `excluded` | baseline | ios-xcui-perf-20260829-180027-45adde8a |
 
 ## ui-perf / macos / mac-mini-m2-8gb / config `13c54095581f`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-09-05 | [`macos-xcui-perf-20260905-003111-f1e53016`](runs/ui-perf/macos-xcui-perf-20260905-003111-f1e53016.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | `14dc148c94c8` | `13c54095581f` | baseline | ui-audit-warmup-20260904 |
-| 2026-09-05 | [`macos-xcui-perf-20260905-003953-2f8c09aa`](runs/ui-perf/macos-xcui-perf-20260905-003953-2f8c09aa.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | `14dc148c94c8` | `13c54095581f` | vs macos-xcui-perf-20260905-003111-f1e53016: compatible | ui-audit-baseline-01-20260904 |
-| 2026-09-05 | [`macos-xcui-perf-20260905-004759-01f5becf`](runs/ui-perf/macos-xcui-perf-20260905-004759-01f5becf.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | `14dc148c94c8` | `13c54095581f` | vs macos-xcui-perf-20260905-003953-2f8c09aa: compatible | ui-audit-baseline-02-20260904 |
-| 2026-09-05 | [`macos-xcui-perf-20260905-005605-bb711355`](runs/ui-perf/macos-xcui-perf-20260905-005605-bb711355.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | `14dc148c94c8` | `13c54095581f` | vs macos-xcui-perf-20260905-004759-01f5becf: compatible | ui-audit-baseline-03-20260904 |
-| 2026-09-05 | [`macos-xcui-perf-20260905-010411-715c63f2`](runs/ui-perf/macos-xcui-perf-20260905-010411-715c63f2.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | `14dc148c94c8` | `13c54095581f` | vs macos-xcui-perf-20260905-005605-bb711355: compatible | ui-audit-baseline-04-20260904 |
-| 2026-09-05 | [`macos-xcui-perf-20260905-011217-c4d5591f`](runs/ui-perf/macos-xcui-perf-20260905-011217-c4d5591f.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | `14dc148c94c8` | `13c54095581f` | vs macos-xcui-perf-20260905-010411-715c63f2: compatible | ui-audit-baseline-05-20260904 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-05 | [`macos-xcui-perf-20260905-003111-f1e53016`](runs/ui-perf/macos-xcui-perf-20260905-003111-f1e53016.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` | `13c54095581f` | baseline | ui-audit-warmup-20260904 |
+| 2026-09-05 | [`macos-xcui-perf-20260905-003953-2f8c09aa`](runs/ui-perf/macos-xcui-perf-20260905-003953-2f8c09aa.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` | `13c54095581f` | vs macos-xcui-perf-20260905-003111-f1e53016: compatible | ui-audit-baseline-01-20260904 |
+| 2026-09-05 | [`macos-xcui-perf-20260905-004759-01f5becf`](runs/ui-perf/macos-xcui-perf-20260905-004759-01f5becf.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` | `13c54095581f` | vs macos-xcui-perf-20260905-003953-2f8c09aa: compatible | ui-audit-baseline-02-20260904 |
+| 2026-09-05 | [`macos-xcui-perf-20260905-005605-bb711355`](runs/ui-perf/macos-xcui-perf-20260905-005605-bb711355.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` | `13c54095581f` | vs macos-xcui-perf-20260905-004759-01f5becf: compatible | ui-audit-baseline-03-20260904 |
+| 2026-09-05 | [`macos-xcui-perf-20260905-010411-715c63f2`](runs/ui-perf/macos-xcui-perf-20260905-010411-715c63f2.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` | `13c54095581f` | vs macos-xcui-perf-20260905-005605-bb711355: compatible | ui-audit-baseline-04-20260904 |
+| 2026-09-05 | [`macos-xcui-perf-20260905-011217-c4d5591f`](runs/ui-perf/macos-xcui-perf-20260905-011217-c4d5591f.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` | `13c54095581f` | vs macos-xcui-perf-20260905-010411-715c63f2: compatible | ui-audit-baseline-05-20260904 |
 
 ## ui-perf / macos / mac-mini-m2-8gb / config `c6729d972efe`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-xcui-perf-20260805-092804-98c69168`](runs/ui-perf/macos-xcui-perf-20260805-092804-98c69168.json) | canonical | exploratory | passed | not-applicable | 9 | `c8c86d7075ae` dirty | `excluded` | baseline | macos-xcui-perf-20260805-092804-98c69168 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-xcui-perf-20260805-092804-98c69168`](runs/ui-perf/macos-xcui-perf-20260805-092804-98c69168.json) | canonical | exploratory | passed | not-applicable | 9 | — | `c8c86d7075ae` dirty | `excluded` | baseline | macos-xcui-perf-20260805-092804-98c69168 |
 
 ## ui-perf / macos / mac-mini-m2-8gb / config `d7968ee2aa6a`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-08-05 | [`macos-xcui-perf-20260805-193934-7fd124ba`](runs/ui-perf/macos-xcui-perf-20260805-193934-7fd124ba.json) | canonical | canonical | passed | not-applicable | 9 | `f72bdb3a6b44` | `d7968ee2aa6a` | baseline | macos-xcui-perf-20260805-193934-7fd124ba |
-| 2026-08-05 | [`macos-xcui-perf-20260805-195041-f05d98df`](runs/ui-perf/macos-xcui-perf-20260805-195041-f05d98df.json) | canonical | canonical | passed | not-applicable | 9 | `f72bdb3a6b44` | `d7968ee2aa6a` | vs macos-xcui-perf-20260805-193934-7fd124ba: compatible | macos-xcui-perf-20260805-195041-f05d98df |
-| 2026-08-05 | [`macos-xcui-perf-20260805-195845-79b9f66d`](runs/ui-perf/macos-xcui-perf-20260805-195845-79b9f66d.json) | canonical | canonical | passed | not-applicable | 9 | `f72bdb3a6b44` | `d7968ee2aa6a` | vs macos-xcui-perf-20260805-195041-f05d98df: compatible | macos-xcui-perf-20260805-195845-79b9f66d |
-| 2026-08-05 | [`macos-xcui-perf-20260805-200639-fcd28854`](runs/ui-perf/macos-xcui-perf-20260805-200639-fcd28854.json) | canonical | canonical | passed | not-applicable | 9 | `f72bdb3a6b44` | `d7968ee2aa6a` | vs macos-xcui-perf-20260805-195845-79b9f66d: compatible | macos-xcui-perf-20260805-200639-fcd28854 |
-| 2026-08-05 | [`macos-xcui-perf-20260805-201443-066a6c70`](runs/ui-perf/macos-xcui-perf-20260805-201443-066a6c70.json) | canonical | canonical | passed | not-applicable | 9 | `f72bdb3a6b44` | `d7968ee2aa6a` | vs macos-xcui-perf-20260805-200639-fcd28854: compatible | macos-xcui-perf-20260805-201443-066a6c70 |
-| 2026-08-05 | [`macos-xcui-perf-20260805-202246-f7d85c1e`](runs/ui-perf/macos-xcui-perf-20260805-202246-f7d85c1e.json) | canonical | canonical | passed | not-applicable | 9 | `f72bdb3a6b44` | `d7968ee2aa6a` | vs macos-xcui-perf-20260805-201443-066a6c70: compatible | macos-xcui-perf-20260805-202246-f7d85c1e |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-08-05 | [`macos-xcui-perf-20260805-193934-7fd124ba`](runs/ui-perf/macos-xcui-perf-20260805-193934-7fd124ba.json) | canonical | canonical | passed | not-applicable | 9 | — | `f72bdb3a6b44` | `d7968ee2aa6a` | baseline | macos-xcui-perf-20260805-193934-7fd124ba |
+| 2026-08-05 | [`macos-xcui-perf-20260805-195041-f05d98df`](runs/ui-perf/macos-xcui-perf-20260805-195041-f05d98df.json) | canonical | canonical | passed | not-applicable | 9 | — | `f72bdb3a6b44` | `d7968ee2aa6a` | vs macos-xcui-perf-20260805-193934-7fd124ba: compatible | macos-xcui-perf-20260805-195041-f05d98df |
+| 2026-08-05 | [`macos-xcui-perf-20260805-195845-79b9f66d`](runs/ui-perf/macos-xcui-perf-20260805-195845-79b9f66d.json) | canonical | canonical | passed | not-applicable | 9 | — | `f72bdb3a6b44` | `d7968ee2aa6a` | vs macos-xcui-perf-20260805-195041-f05d98df: compatible | macos-xcui-perf-20260805-195845-79b9f66d |
+| 2026-08-05 | [`macos-xcui-perf-20260805-200639-fcd28854`](runs/ui-perf/macos-xcui-perf-20260805-200639-fcd28854.json) | canonical | canonical | passed | not-applicable | 9 | — | `f72bdb3a6b44` | `d7968ee2aa6a` | vs macos-xcui-perf-20260805-195845-79b9f66d: compatible | macos-xcui-perf-20260805-200639-fcd28854 |
+| 2026-08-05 | [`macos-xcui-perf-20260805-201443-066a6c70`](runs/ui-perf/macos-xcui-perf-20260805-201443-066a6c70.json) | canonical | canonical | passed | not-applicable | 9 | — | `f72bdb3a6b44` | `d7968ee2aa6a` | vs macos-xcui-perf-20260805-200639-fcd28854: compatible | macos-xcui-perf-20260805-201443-066a6c70 |
+| 2026-08-05 | [`macos-xcui-perf-20260805-202246-f7d85c1e`](runs/ui-perf/macos-xcui-perf-20260805-202246-f7d85c1e.json) | canonical | canonical | passed | not-applicable | 9 | — | `f72bdb3a6b44` | `d7968ee2aa6a` | vs macos-xcui-perf-20260805-201443-066a6c70: compatible | macos-xcui-perf-20260805-202246-f7d85c1e |
 
 ## ui-perf / macos / mac-mini-m2-8gb / config `df69436f7185`
 
-| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |
-|---|---|---|---|---|---|---:|---|---|---|---|
-| 2026-09-05 | [`macos-xcui-perf-20260905-015338-1374af2a`](runs/ui-perf/macos-xcui-perf-20260905-015338-1374af2a.json) | canonical | exploratory | passedWithWarnings | not-applicable | 9 | `14dc148c94c8` dirty | `excluded` | baseline | ui-followup-diagnostic-20260905 |
-| 2026-09-05 | [`macos-xcui-perf-20260905-020438-6e5e7c09`](runs/ui-perf/macos-xcui-perf-20260905-020438-6e5e7c09.json) | canonical | exploratory | passedWithWarnings | not-applicable | 9 | `14dc148c94c8` dirty | `excluded` | baseline | ui-followup-counted-01-20260905 |
-| 2026-09-05 | [`macos-xcui-perf-20260905-021246-5c9a093b`](runs/ui-perf/macos-xcui-perf-20260905-021246-5c9a093b.json) | canonical | exploratory | passedWithWarnings | not-applicable | 9 | `14dc148c94c8` dirty | `excluded` | baseline | ui-followup-counted-02-20260905 |
-| 2026-09-05 | [`macos-xcui-perf-20260905-022054-71e88d78`](runs/ui-perf/macos-xcui-perf-20260905-022054-71e88d78.json) | canonical | exploratory | passedWithWarnings | not-applicable | 9 | `14dc148c94c8` dirty | `excluded` | baseline | ui-followup-counted-03-20260905 |
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-05 | [`macos-xcui-perf-20260905-015338-1374af2a`](runs/ui-perf/macos-xcui-perf-20260905-015338-1374af2a.json) | canonical | exploratory | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` dirty | `excluded` | baseline | ui-followup-diagnostic-20260905 |
+| 2026-09-05 | [`macos-xcui-perf-20260905-020438-6e5e7c09`](runs/ui-perf/macos-xcui-perf-20260905-020438-6e5e7c09.json) | canonical | exploratory | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` dirty | `excluded` | baseline | ui-followup-counted-01-20260905 |
+| 2026-09-05 | [`macos-xcui-perf-20260905-021246-5c9a093b`](runs/ui-perf/macos-xcui-perf-20260905-021246-5c9a093b.json) | canonical | exploratory | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` dirty | `excluded` | baseline | ui-followup-counted-02-20260905 |
+| 2026-09-05 | [`macos-xcui-perf-20260905-022054-71e88d78`](runs/ui-perf/macos-xcui-perf-20260905-022054-71e88d78.json) | canonical | exploratory | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` dirty | `excluded` | baseline | ui-followup-counted-03-20260905 |

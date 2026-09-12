@@ -165,7 +165,8 @@ at an interactive terminal — a numbered picker. Scripted/piped runs without `-
 (no prompt). `vocello modes` lists the modes and what each needs.
 
 Prints the output WAV path on stdout (or a JSON object: `audioPath`, `durationSeconds`, `wallSeconds`,
-`realtimeFactor`, `finishReason`, `mode`, `variant`, `modelID`, and — when `--stream` — `firstChunkMS`
+`realtimeFactor` (standard RTF: `wallSeconds ÷ durationSeconds`, lower is faster, below 1.0 is faster than
+real time), `realtimeSpeedup` (its inverse), `finishReason`, `mode`, `variant`, `modelID`, and — when `--stream` — `firstChunkMS`
 and `chunks`).
 
 Explicit `--out` permits atomic replacement on successful QC/publication. Failed startup, QC,

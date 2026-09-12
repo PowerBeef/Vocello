@@ -27,14 +27,39 @@ def _make_cell(key, rtf, tokps, ttfc, phys, qc):
     }
 
 
-def test_rtf_decrease_regression():
+def test_rtf_increase_regression():
+    """Standard RTF (wall ÷ audio) regresses when it rises."""
     key = ("custom", "Qwen3-TTS-12Hz-1.7B-4bit", "warm", "medium")
     baseline = [_make_cell(key, rtf=1.0, tokps=1000.0, ttfc=300.0, phys=4000.0, qc="pass")]
-    current = [_make_cell(key, rtf=0.9, tokps=1000.0, ttfc=300.0, phys=4000.0, qc="pass")]
+    current = [_make_cell(key, rtf=1.1, tokps=1000.0, ttfc=300.0, phys=4000.0, qc="pass")]
     regressions = sgt.compare_summaries(baseline, current, threshold=0.05)
     assert len(regressions) == 1
     assert regressions[0]["metric"] == "rtf"
-    assert abs(regressions[0]["delta"] - (-0.1)) < 1e-9
+    assert abs(regressions[0]["delta"] - 0.1) < 1e-9
+
+
+def test_rtf_decrease_is_an_improvement():
+    key = ("custom", "Qwen3-TTS-12Hz-1.7B-4bit", "warm", "medium")
+    baseline = [_make_cell(key, rtf=1.0, tokps=1000.0, ttfc=300.0, phys=4000.0, qc="pass")]
+    current = [_make_cell(key, rtf=0.9, tokps=1000.0, ttfc=300.0, phys=4000.0, qc="pass")]
+    assert sgt.compare_summaries(baseline, current, threshold=0.05) == []
+
+
+def test_legacy_baseline_compares_the_decode_speedup():
+    """A pre-cutover baseline stored the speedup under rtf; compare it with decodeSpeedupX."""
+    key = ("custom", "Qwen3-TTS-12Hz-1.7B-4bit", "warm", "medium")
+    baseline = [_make_cell(key, rtf=2.0, tokps=1000.0, ttfc=300.0, phys=4000.0, qc="pass")]
+    current = [_make_cell(key, rtf=0.6, tokps=1000.0, ttfc=300.0, phys=4000.0, qc="pass")]
+    current[0]["decodeSpeedupX"] = 1.7
+    regressions = sgt.compare_summaries(
+        baseline, current, threshold=0.05, baseline_definition="legacy-speedup"
+    )
+    assert [r["metric"] for r in regressions] == ["rtf"]
+    assert regressions[0]["current"] == 1.7
+    current[0]["decodeSpeedupX"] = 2.05
+    assert sgt.compare_summaries(
+        baseline, current, threshold=0.05, baseline_definition="legacy-speedup"
+    ) == []
 
 
 def test_tokps_decrease_regression():
@@ -154,10 +179,10 @@ def test_exact_same_values_no_regression():
 
 
 def test_improvement_no_regression():
-    """Improvements (RTF up, tokps up) are never flagged."""
+    """Improvements (RTF down, tokps up) are never flagged."""
     key = ("custom", "Qwen3-TTS-12Hz-1.7B-4bit", "warm", "medium")
     baseline = [_make_cell(key, rtf=1.0, tokps=1000.0, ttfc=300.0, phys=4000.0, qc="pass")]
-    current = [_make_cell(key, rtf=2.0, tokps=2000.0, ttfc=150.0, phys=2000.0, qc="pass")]
+    current = [_make_cell(key, rtf=0.5, tokps=2000.0, ttfc=150.0, phys=2000.0, qc="pass")]
     regressions = sgt.compare_summaries(baseline, current, threshold=0.05)
     assert regressions == []
 
@@ -178,8 +203,8 @@ def test_save_and_compare_baseline_cli():
             assert sgt.main() == 0
         with open(baseline_path, "r", encoding="utf-8") as f:
             baseline = json.load(f)
-        assert isinstance(baseline, list)
-        assert all("cellKey" in cell for cell in baseline)
+        assert baseline["rtfDefinition"] == "wall/audio"
+        assert all("cellKey" in cell for cell in baseline["cells"])
 
         # Compare unchanged baseline: no regression.
         with mock.patch.object(
@@ -190,8 +215,8 @@ def test_save_and_compare_baseline_cli():
             assert sgt.main() == 0
 
         # Mutate saved baseline so the current run appears regressed.
-        for cell in baseline:
-            cell["rtf"] = 10.0  # baseline claims RTF was much better; current is worse
+        for cell in baseline["cells"]:
+            cell["rtf"] = 0.01  # baseline claims generation was far faster; current is worse
         with open(baseline_path, "w", encoding="utf-8") as f:
             json.dump(baseline, f, indent=2)
 

@@ -2,9 +2,14 @@ import React from "react";
 
 /*
   Measured performance, from the repository's tracked benchmark records:
-  - RTF bars: benchmarks/runs/ui-generation/macos-xcui-benchmark-20260801-182943-b0b5a448.json
-    (the newest canonical matrix; refresh with every release, see
-    docs/reference/macos-release-qa.md "Performance surfaces ship current numbers").
+  - RTF bars: benchmarks/runs/ui-generation/macos-xcui-benchmark-20260905-012117-0b234262.json
+    (the newest canonical matrix; `python3 scripts/generate_readme_charts.py --check` names the
+    newest canonical record and must agree with this pin).
+    RTF is the standard real-time factor: seconds of generation per second of audio, lower is
+    faster, below 1.0 audio is produced quicker than it plays. This record predates the 2026-09-12 RTF cutover,
+    so each value is the per-cell median of the take's app submit→completed span ÷ audio
+    seconds (scripts/lib/rtf.py `take_rtf`); a record published after the cutover carries the
+    engine-measured figure directly.
   - The retired gate chart's pinned A/B pair (…-9b6f267b / …-d02005ae) stays as history in
     benchmarks/HISTORY.md and OPTIMIZATION.md §K; per policy it is never re-promoted to a
     chart. The gate survives as one figcaption sentence below.
@@ -14,12 +19,12 @@ import React from "react";
   single-release billboard.
 */
 const MODES = [
-  { name: "Built-in Voice", tone: "var(--mode-custom)", takes: [1.66, 1.94, 2.02] },
-  { name: "Voice Design", tone: "var(--mode-design)", takes: [1.95, 2.00, 2.13] },
-  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [1.50, 1.85, 2.02] },
+  { name: "Built-in Voice", tone: "var(--mode-custom)", takes: [0.9, 0.65, 0.6] },
+  { name: "Voice Design", tone: "var(--mode-design)", takes: [0.83, 0.61, 0.57] },
+  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [0.96, 0.66, 0.59] },
 ];
 const LENGTHS = ["short", "medium", "long"];
-const RTF_SCALE_MAX = 2.4;
+const RTF_SCALE_MAX = 1.2;
 
 const LEDGER = [
   {
@@ -74,7 +79,7 @@ const RtfChart = () => {
             d={`M${x0} ${y} h${bw - 4} a4 4 0 0 1 4 4 v${barH - 8} a4 4 0 0 1 -4 4 h-${bw - 4} z`}
             fill={mode.tone}
           />
-          <text x={x0 + bw + 7} y={y + barH - 3} className="perf-value">{`${value.toFixed(2)}×`}</text>
+          <text x={x0 + bw + 7} y={y + barH - 3} className="perf-value">{value.toFixed(2)}</text>
         </g>
       );
       y += barH + inGap;
@@ -82,7 +87,7 @@ const RtfChart = () => {
     y += groupGap - inGap;
   });
   const plotBottom = y - groupGap + 8;
-  const gridlines = [0.5, 1.0, 1.5, 2.0].map((v) => (
+  const gridlines = [0.25, 0.5, 0.75, 1.0].map((v) => (
     <g key={v}>
       <line
         x1={xFor(v)} y1={top - 4} x2={xFor(v)} y2={plotBottom}
@@ -91,7 +96,7 @@ const RtfChart = () => {
         strokeDasharray={v === 1.0 ? "" : "3 3"}
       />
       <text x={xFor(v)} y={plotBottom + 18} textAnchor="middle" className="perf-tick">
-        {v === 1.0 ? "1.0× · realtime" : `${v.toFixed(1)}×`}
+        {v === 1.0 ? "1.0 · realtime" : v.toFixed(2)}
       </text>
     </g>
   ));
@@ -100,7 +105,7 @@ const RtfChart = () => {
       className="perf-chart"
       viewBox={`0 0 ${width} ${plotBottom + 30}`}
       role="img"
-      aria-label="Warm generation speed by mode and script length, as a multiple of realtime. Built-in Voice 1.66× to 2.02×, Voice Design 1.95× to 2.13×, Voice Cloning 1.50× to 2.02×. Every bar passes the realtime line at 1.0×."
+      aria-label="Warm real-time factor by mode and script length, lower is faster. Built-in Voice 0.60 to 0.90, Voice Design 0.57 to 0.83, Voice Cloning 0.59 to 0.96. Every bar sits below the real-time line at 1.0."
     >
       {gridlines}
       {rows}
@@ -116,8 +121,9 @@ export const Engineering = () => (
         <h2 id="eng-title" className="section-title">A first-party engine, measured on the minimum Mac.</h2>
         <p className="section-sub">
           Vocello is benchmarked on its own support floor, a Mac mini M2 with 8 GB.
-          Speeds are multiples of realtime: past 1.0×, audio generates ahead of
-          playback, and every number here traces to a tracked record in the open repository.
+          Speed is the real-time factor: seconds of generation per second of audio.
+          Below 1.0, audio generates ahead of playback, and every number here traces
+          to a tracked record in the open repository.
         </p>
       </header>
 

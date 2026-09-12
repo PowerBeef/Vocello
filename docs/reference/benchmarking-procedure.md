@@ -45,11 +45,13 @@ A benchmark pass requires **all** of the following:
 | Gate | Criterion |
 |------|-----------|
 | **audioQC** | Publication accepts `pass` or `warn`; promotion requires `pass` in every required cell. Any `fail` blocks both. |
-| **RTF** | `derivedMetrics.audioSecondsPerWallSecond` reviewed against the nearest compatible clean record in generated [`benchmarks/HISTORY.md`](../../benchmarks/HISTORY.md). |
+| **RTF** | `derivedMetrics.realTimeFactor` (request wall ÷ audio, lower is faster) reviewed against the nearest compatible clean record in generated [`benchmarks/HISTORY.md`](../../benchmarks/HISTORY.md); records before 2026-09-12 stored the inverted decode speedup under `rtf` and never share a comparison key with new ones. |
 | **Memory** | No rising `physFoot` peak or non-zero `hardTrim` in `trims` on floor-tier runs. |
 | **Automated output proof** | Fixed-seed cohort, exact WAV identity, and applicable locale-locked ASR/prosody gates pass. Human listening is optional annotation and is never inferred. |
 
-**RTF > 1** means faster than realtime (more audio seconds produced per wall second).
+**RTF < 1** means faster than real time (the standard definition: synthesis seconds per audio second). The
+decode-loop speedup that older documents and records called "RTF" is now `decodeSpeedupX` / the
+summarizer's `xRT` column.
 
 ### Design constraints
 
@@ -630,7 +632,8 @@ Useful flags:
 
 | Column | Source | Notes |
 |--------|--------|-------|
-| RTF | `derivedMetrics.audioSecondsPerWallSecond` | Primary throughput KPI |
+| RTF | `derivedMetrics.realTimeFactor` (request wall ÷ audio) | Primary throughput KPI, lower is faster |
+| xRT | `derivedMetrics.audioSecondsPerWallSecond` (audio ÷ decode s) | Decode-loop speedup, higher is faster |
 | tok/s | Codec tokens / decode wall | Compare across variants |
 | TTFC ms | App row `submitToFirstChunkMS` | `-` for CLI (no app process) |
 | peakGPU / physFoot | Sampler peaks | physFoot = Jetsam-relevant on iOS |

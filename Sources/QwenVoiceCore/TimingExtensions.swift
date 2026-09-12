@@ -5,9 +5,21 @@ extension ContinuousClock.Instant {
     var elapsedMilliseconds: Int {
         duration(to: .now).roundedMilliseconds
     }
+
+    /// Seconds elapsed on the monotonic clock. Wall time for throughput figures
+    /// (RTF) must come from here, never from `Date()`, which can jump.
+    public var elapsedSeconds: Double {
+        duration(to: .now).seconds
+    }
 }
 
 extension Duration {
+    /// Fractional seconds.
+    public var seconds: Double {
+        let components = components
+        return Double(components.seconds) + Double(components.attoseconds) / 1_000_000_000_000_000
+    }
+
     var roundedMilliseconds: Int {
         let components = components
         let secondsMS = Double(components.seconds) * 1_000

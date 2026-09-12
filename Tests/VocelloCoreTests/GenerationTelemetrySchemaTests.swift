@@ -994,4 +994,36 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
             blockOutputOperations: counters
         )
     }
+
+    // MARK: - Standard real-time factor
+
+    func testRequestWallSecondsSpansTheRequestMinusStartupStages() {
+        func mark(_ stage: String, _ tMS: Int) -> NativeTelemetryStageMark {
+            NativeTelemetryStageMark(tMS: tMS, stage: stage)
+        }
+        let marks = [
+            mark("startup.request_validated", 0),
+            mark("startup.model_load_started", 20),
+            mark("startup.model_loaded", 1_520),
+            mark("startup.prewarm_started", 1_530),
+            mark("startup.prewarm_completed", 2_030),
+            mark(NativeRuntimeStage.streamStartup.rawValue, 2_100),
+            mark(NativeRuntimeStage.streamGenerationEnded.rawValue, 7_900),
+            mark(NativeRuntimeStage.streamCompleted.rawValue, 8_030),
+        ]
+        // 8 030 ms total, minus 1 500 ms of model load and 500 ms of prewarm.
+        XCTAssertEqual(GenerationOutputAdapter.requestWallSeconds(stageMarks: marks), 6.03)
+    }
+
+    func testRequestWallSecondsFallsBackToGenerationEndedAndRefusesEmptyTimelines() {
+        let withoutCompletion = [
+            NativeTelemetryStageMark(tMS: 0, stage: "startup.request_validated"),
+            NativeTelemetryStageMark(tMS: 4_000, stage: NativeRuntimeStage.streamGenerationEnded.rawValue),
+        ]
+        XCTAssertEqual(GenerationOutputAdapter.requestWallSeconds(stageMarks: withoutCompletion), 4.0)
+        XCTAssertNil(GenerationOutputAdapter.requestWallSeconds(stageMarks: []))
+        XCTAssertNil(GenerationOutputAdapter.requestWallSeconds(stageMarks: [
+            NativeTelemetryStageMark(tMS: 0, stage: NativeRuntimeStage.streamCompleted.rawValue),
+        ]))
+    }
 }

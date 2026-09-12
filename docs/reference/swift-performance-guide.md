@@ -346,7 +346,7 @@ Swift performance change, complete the deeper checklist:
 
 - [ ] Build the change optimized (`scripts/release.sh` or `-O` xcodebuild), not just `-Onone`.
 - [ ] Run the relevant benchmark (`vocello bench`, `scripts/ios_device.sh bench`, or a targeted Instruments profile).
-- [ ] Compare telemetry KPIs: `audioSecondsPerWallSecond`, `tokensPerSecond`, process-owned
+- [ ] Compare telemetry KPIs: `realTimeFactor` (lower is faster), `tokensPerSecond`, process-owned
       physical-footprint peak, `maximumDelayedHeartbeatMS`, and heartbeat coverage.
 - [ ] Check for new `swift_retain` / `swift_release` hot spots in Time Profiler.
 - [ ] On iOS, confirm memory stays flat with length and no trims appear.

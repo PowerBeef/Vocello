@@ -1959,7 +1959,7 @@ print("  status   :", r.get("status"))
 print("  mode     :", r.get("mode"), "/", r.get("variant"))
 print("  model    :", r.get("modelID"))
 if r.get("status") == "ok":
-    print("  audio    : %.2fs   wall %.2fs   rtf %.2f"
+    print("  audio    : %.2fs   wall %.2fs   rtf %.2f (wall/audio, lower is faster)"
           % (num(r.get("durationSeconds")), num(r.get("wallSeconds")), num(r.get("realtimeFactor"))))
     print("  finish   :", r.get("finishReason"))
     print("  out      :", r.get("audioPath"))
@@ -2766,7 +2766,7 @@ _gate_generation_check() {
   python3 - "$sentinel" <<'PY' || return 1
 import json, sys
 r = json.load(open(sys.argv[1]))
-print(f"status={r.get('status')} mode={r.get('mode')} rtf={r.get('realtimeFactor')} wall={r.get('wallSeconds')}s error={r.get('error')}")
+print(f"status={r.get('status')} mode={r.get('mode')} rtf={r.get('realtimeFactor')} (wall/audio) wall={r.get('wallSeconds')}s error={r.get('error')}")
 for e in r.get("interruptions") or []:
     print(f"interruption: {e.get('type')} at t={(e.get('atMS') or 0) / 1000.0:.1f}s")
 sys.exit(0 if r.get("status") == "ok" else 1)

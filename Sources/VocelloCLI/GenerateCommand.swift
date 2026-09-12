@@ -10,7 +10,11 @@ enum GenerateCommand {
         let audioPath: String
         let durationSeconds: Double
         let wallSeconds: Double
+        /// Standard real-time factor: `wallSeconds ÷ durationSeconds`, lower is
+        /// faster, below 1.0 is faster than real time.
         let realtimeFactor: Double
+        /// Audio seconds produced per wall second (the inverse of `realtimeFactor`).
+        let realtimeSpeedup: Double
         let finishReason: String?
         let mode: String
         let variant: String
@@ -55,7 +59,7 @@ enum GenerateCommand {
     static func generateObservingFirstChunk(
         _ runtime: CLIRuntime, _ request: GenerationRequest
     ) async throws -> (result: GenerationResult, firstChunkMS: Double?, chunkCount: Int?) {
-        let submitWall = Date()
+        let submitted = ContinuousClock.now
         let wantedID = request.generationID
         let streamTask: Task<StreamObservation, Never>? = request.shouldStream && wantedID != nil ? {
             let events = runtime.engine.events(for: wantedID!)
@@ -65,7 +69,7 @@ enum GenerateCommand {
                 for await event in events {
                     switch event {
                     case .chunk:
-                        if firstChunkMS == nil { firstChunkMS = Date().timeIntervalSince(submitWall) * 1000 }
+                        if firstChunkMS == nil { firstChunkMS = submitted.elapsedSeconds * 1000 }
                         count += 1
                     case .completed, .cancelled, .failed:
                         return StreamObservation(firstChunkMS: firstChunkMS, chunkCount: count)
@@ -144,9 +148,9 @@ enum GenerateCommand {
             deliveryInstructionCellID: deliveryInstructionCellID)
 
         note("generating (\(text.count) chars)\(streaming ? ", streaming" : "")…")
-        let t0 = Date()
+        let started = ContinuousClock.now
         let (result, firstChunkMS, chunkCount) = try await generateObservingFirstChunk(runtime, request)
-        let wall = Date().timeIntervalSince(t0)
+        let wall = started.elapsedSeconds
 
         // Fail closed on the CM-7 shape: success must never be claimed for a
         // path with no file behind it. The engine publishing contract is
@@ -157,7 +161,8 @@ enum GenerateCommand {
             )
         }
 
-        let rtf = wall > 0 ? result.durationSeconds / wall : 0
+        let rtf = result.durationSeconds > 0 ? wall / result.durationSeconds : 0
+        let speedup = wall > 0 ? result.durationSeconds / wall : 0
         if args.flag("json") {
             let deliveryInstruction = payload.deliveryInstructionText?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -171,7 +176,7 @@ enum GenerateCommand {
             emitJSON(GenerateJSON(
                 generationID: generationID.uuidString.lowercased(),
                 audioPath: result.audioPath, durationSeconds: result.durationSeconds,
-                wallSeconds: wall, realtimeFactor: rtf,
+                wallSeconds: wall, realtimeFactor: rtf, realtimeSpeedup: speedup,
                 finishReason: result.finishReason?.rawValue,
                 mode: mode.rawValue, variant: quality ? "quality" : "speed",
                 modelID: modelID,
@@ -239,7 +244,7 @@ enum GenerateCommand {
         }
         let ttfc = firstChunkMS.map { " · ttfc=\(String(format: "%.0f", $0))ms" } ?? ""
         let chunks = chunkCount.map { " · chunks=\($0)" } ?? ""
-        note("✓ \(String(format: "%.2f", result.durationSeconds))s audio · rtf=\(String(format: "%.2f", rtf))\(ttfc)\(chunks) · finish=\(result.finishReason?.rawValue ?? "?")")
+        note("✓ \(String(format: "%.2f", result.durationSeconds))s audio · rtf=\(String(format: "%.2f", rtf)) (\(String(format: "%.2f", speedup))× realtime)\(ttfc)\(chunks) · finish=\(result.finishReason?.rawValue ?? "?")")
 
         if args.flag("play") {
             let p = Process()

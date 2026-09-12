@@ -399,7 +399,8 @@ When telemetry is on (`QWENVOICE_DEBUG=1` or the debug toggle), each generation 
 - `timingsMS.qwen_*` — Swift-side wall-clock breakdown of the decode loop.
 - `mlxMemoryByStage` — `active` / `cache` / `peak` GPU memory at stage boundaries.
 - `chunkTimeline` — per-chunk substage timings (streaming only).
-- `derivedMetrics.audioSecondsPerWallSecond` — **RTF** (>1 = faster than realtime).
+- `derivedMetrics.realTimeFactor` — **RTF** (request wall ÷ audio; <1 = faster than real time).
+- `derivedMetrics.audioSecondsPerWallSecond` — decode-loop speedup (`xRT`, higher is faster).
 - `derivedMetrics.tokensPerSecond` — token throughput.
 - `summary.targetIntervalNS` / `effectiveIntervalNS` / `maximumDriftNS` / `maximumLatenessNS` — sampler cadence, observed interval, and anchored scheduling phase error/lateness.
 - `summary.missedPeriodicDeadlineCount` — cadence deadlines skipped instead of issuing misleading burst catch-up samples.
@@ -412,7 +413,7 @@ python3 - <<'PY'
 import json, os
 d = os.path.expanduser("~/Library/Application Support/QwenVoice-Debug/diagnostics")
 row = json.loads(open(d+"/engine/generations.jsonl").read().splitlines()[-1])
-print("RTF:", row.get("derivedMetrics", {}).get("audioSecondsPerWallSecond"))
+print("RTF:", row.get("derivedMetrics", {}).get("realTimeFactor"))
 print("timingsMS:", {k: v for k, v in sorted(row.get("timingsMS", {}).items()) if k.startswith("qwen_")})
 PY
 ```

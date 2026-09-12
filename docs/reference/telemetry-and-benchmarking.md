@@ -317,8 +317,10 @@ backend throughput:
 | Key | Definition | Read as |
 |---|---|---|
 | `audioSeconds` | Generated audio duration (frames ÷ sample rate). | Output length. |
+| `requestWallSeconds` | Whole request on the per-generation monotonic recorder: prepare entry → `streamCompleted` (after the final WAV write), minus the one-time `startup.model_load_*` and `startup.prewarm_*` intervals. | Synthesis wall time; the wall side of RTF on cold and warm takes alike. |
+| `realTimeFactor` | `requestWallSeconds ÷ audioSeconds`. | **Standard real-time factor (RTF): lower is faster, <1 = faster than real time.** Primary throughput KPI since 2026-09-12; published as `rtf`. |
 | `decodeWallSeconds` | Decode wall time (`qwen_token_loop_total` when present, else model `.info.generateTime`, else `streamStartup→streamGenerationEnded` span). Excludes WAV finalize I/O. | Compute cost — **same time base as the summarizer `decode ms` column.** |
-| `audioSecondsPerWallSecond` | `audioSeconds ÷ decodeWallSeconds`. | **Real‑time factor: >1 = faster than realtime.** Primary throughput KPI. |
+| `audioSecondsPerWallSecond` | `audioSeconds ÷ decodeWallSeconds`. | **Decode-loop speedup** (higher is faster), published as `decodeSpeedupX`. Records before 2026-09-12 stored it under `rtf`; it is not an RTF. |
 | `tokensPerSecond` | Codec tokens ÷ decode wall seconds (from `.info` when present). | Decode throughput; compare across model variants / patches. |
 | `generatedTokenCount` | Codec tokens produced. | Work done; normalize other metrics by this. |
 
@@ -330,9 +332,11 @@ macOS transport row's `requestToFirstChunkMS` begins at request acceptance.
 
 ### RTF vs `decode ms` (read together, don't diff naively)
 
-The summarizer prints **RTF** from `derivedMetrics.audioSecondsPerWallSecond` and **decode
-ms** from `timingsMS.qwen_token_loop_total`. As of the P0‑1 alignment, both prefer the same
-token‑loop wall clock when `qwen_token_loop_total` is present.
+The summarizer prints **RTF** (`derivedMetrics.realTimeFactor`, request wall ÷ audio), **xRT**
+(`audioSecondsPerWallSecond`, the decode-loop speedup) and **decode ms** from
+`timingsMS.qwen_token_loop_total`. xRT and decode ms share the token-loop wall clock when
+`qwen_token_loop_total` is present; RTF spans the whole request, so it is always the slower-looking
+of the two figures.
 
 Caveats that still apply:
 
@@ -345,7 +349,8 @@ Caveats that still apply:
 - **Stage marks** — `streamGenerationEnded` closes before WAV finalize; do not compare
   `streamStartup→streamCompleted` to decode ms (finalize I/O inflates the old span).
 
-Use **RTF** for release throughput gates; use **decode breakdown + chunk timeline** for
+Use **RTF** (lower is better; a higher value is the regression direction) for release throughput
+gates; use **decode breakdown + chunk timeline** for
 where time goes; use **Instruments signposts** (see [`benchmarking-procedure.md`](benchmarking-procedure.md)
 §4.8) for GPU attribution.
 
@@ -474,7 +479,7 @@ selection. For authoritative output, call `summarize_generation_telemetry.py` wi
 from leaking into the current summary. The summarizer can merge the macOS app, XPC, and engine
 layers by `generationID`; CLI rows have only the engine boundary. Read `finishReason` and
 `audioQC` before interpreting performance, keep cold and warm populations separate, and compare
-`derivedMetrics.audioSecondsPerWallSecond` with the dominant `timingsMS` substage. A cold Custom or
+`derivedMetrics.realTimeFactor` (and the decode speedup `audioSecondsPerWallSecond`) with the dominant `timingsMS` substage. A cold Custom or
 Design row should include `upstreamModelLoad` in `stageMarks`; an immediately repeated row should be
 warm. See [`benchmarking-procedure.md`](benchmarking-procedure.md) for supported invocations.
 
@@ -496,7 +501,7 @@ procedure explicitly changes that contract.
 
 The summarizer is streaming (it walks JSONL once with `iter_jsonl`, maintains a lightweight
 app index, and aggregates with `CellAccumulator`) so it handles large verbose logs without
-loading them into memory. Prints a `mode × model × cold/warm` table (median over warm): RTF, tokens/s, TTFC, decode‑loop ms,
+loading them into memory. Prints a `mode × model × cold/warm` table (median over warm): RTF (wall ÷ audio), xRT (decode speedup), tokens/s, TTFC, decode‑loop ms,
 peak GPU / RSS MB, **`physFoot`** (phys_footprint peak — the Jetsam‑relevant OOM figure),
 **`headMin`** (min available headroom; iOS‑only, `-` on macOS), and **`trims`** (median
 `memory_trim` count for the cell, annotated with the worst level — `soft`/`hard`/`full`; derived

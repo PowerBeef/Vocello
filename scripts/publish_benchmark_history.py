@@ -37,6 +37,7 @@ MEMORY_POLICY_PATH = ROOT / "config" / "memory-qualification-policy.json"
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+from lib import rtf as rtf_semantics  # noqa: E402
 
 from benchmark_memory import (  # noqa: E402
     MemoryEvidenceError,
@@ -609,7 +610,11 @@ def row_metrics(row: dict[str, Any], take: dict[str, Any] | None = None) -> dict
         if isinstance(mark, dict) and mark.get("stage") == "memory_trim"
     ]
     candidates = {
-        "rtf": derived.get("audioSecondsPerWallSecond"),
+        # Standard real-time factor (request wall ÷ audio, lower is faster);
+        # the decode-loop speedup legacy records called "rtf" keeps its own key.
+        "rtf": rtf_semantics.engine_rtf(row),
+        "requestWallSeconds": rtf_semantics.request_wall_seconds(row),
+        "decodeSpeedupX": rtf_semantics.decode_speedup(row),
         "tokensPerSecond": derived.get("tokensPerSecond"),
         "decodeWallSeconds": derived.get("decodeWallSeconds"),
         "audioSeconds": derived.get("audioSeconds"),
@@ -658,10 +663,6 @@ def row_metrics(row: dict[str, Any], take: dict[str, Any] | None = None) -> dict
     }
     if take is not None:
         candidates["ttfcMS"] = take.get("firstChunkMS")
-        wall = finite_number(take.get("wallSeconds"))
-        audio = finite_number(take.get("audioSeconds"))
-        if wall and wall > 0 and audio is not None:
-            candidates["rtf"] = audio / wall
     return {
         key: number for key, value in candidates.items()
         if (number := finite_number(value)) is not None
@@ -1084,6 +1085,11 @@ def engine_take(
         **identity,
         **quality_identity_fields(row),
     }
+    if result["metrics"].get("rtf") is None:
+        raise PublicationError(
+            f"generation {generation_id} has no measurable request wall time "
+            "(engine row lacks realTimeFactor and a terminal stage mark)"
+        )
     if duration is not None:
         result["durationSeconds"] = duration
     return result
@@ -1315,6 +1321,7 @@ def record_shell(
             "status": status,
             "matrixScope": matrix_scope,
             "warnings": warnings,
+            "rtfDefinition": rtf_semantics.STANDARD_RTF_DEFINITION,
             **({"classification": classification} if classification else {}),
         },
         "toolchain": {"optimization": optimization},

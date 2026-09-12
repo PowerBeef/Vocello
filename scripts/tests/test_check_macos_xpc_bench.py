@@ -29,7 +29,13 @@ def make_engine_row(index: int, cell: str) -> dict:
         "mode": mode,
         "warmState": warm_state,
         "finishReason": "completed",
-        "derivedMetrics": {"generatedTokenCount": 100 + index},
+        "derivedMetrics": {
+            "generatedTokenCount": 100 + index,
+            "audioSeconds": 4.0,
+            "requestWallSeconds": 2.5,
+            "realTimeFactor": 0.625,
+            "audioSecondsPerWallSecond": 1.8,
+        },
         "stageMarks": [],
         "notes": {
             "benchRunID": RUN_ID,

@@ -37,6 +37,7 @@ SCRIPT_DIRECTORY = Path(__file__).resolve().parent
 if str(SCRIPT_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIRECTORY))
 from build_output_policy import load_policy
+from lib import rtf as rtf_semantics
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -95,6 +96,9 @@ SECTION_KEYS = {
     "run": {
         "id", "kind", "platform", "label", "startedAt", "finishedAt",
         "durationSeconds", "status", "matrixScope", "classification", "warnings",
+        # "wall/audio" on every record published since 2026-09-12; absent on
+        # legacy records whose `rtf` is the inverted decode-loop speedup.
+        "rtfDefinition",
     },
     "hardware": {
         "profileID", "modelIdentifier", "marketingName", "chip", "memoryBytes",
@@ -212,7 +216,7 @@ SCHEMA_PROPERTY_KEYS = {
     "traceSummary": TRACE_SUMMARY_KEYS,
 }
 SCHEMA_REQUIRED_KEYS = {
-    "run": SECTION_KEYS["run"],
+    "run": SECTION_KEYS["run"] - {"rtfDefinition"},
     "hardware": SECTION_KEYS["hardware"],
     "source": SECTION_KEYS["source"],
     "toolchain": SECTION_KEYS["toolchain"],
@@ -307,7 +311,8 @@ RAW_BENCHMARK_BUNDLE_SUFFIXES = {".xcresult", ".trace", ".xcarchive", ".dsym"}
 # This is intentionally finite.  New telemetry must be deliberately promoted
 # into the tracked schema rather than leaking arbitrary diagnostics into Git.
 METRIC_KEYS = {
-    "rtf", "tokensPerSecond", "ttfcMS", "submitToFirstChunkMS", "submitToCompletedMS",
+    "rtf", "requestWallSeconds", "decodeSpeedupX", "rtfAppEndToEnd",
+    "tokensPerSecond", "ttfcMS", "submitToFirstChunkMS", "submitToCompletedMS",
     "playbackScheduledMS", "firstChunkToPlaybackScheduledMS", "requestToFirstChunkMS",
     "decodeWallSeconds", "audioSeconds", "generatedTokens", "backendWallMS",
     "modelLoadMS", "prewarmMS", "finalizationMS", "postprocessMS",
@@ -1410,6 +1415,11 @@ def comparison_key(record: dict[str, Any]) -> str:
             record["evidence"].get("qcAlgorithmVersion"),
         ],
     }
+    # A standard-RTF record never shares a comparison lineage with a legacy
+    # speedup record. Legacy keys stay byte-identical (no key when absent).
+    definition = record["run"].get("rtfDefinition")
+    if definition:
+        comparable_identity["rtfDefinition"] = definition
     return sha256_bytes(canonical_bytes(comparable_identity))
 
 
@@ -1776,10 +1786,11 @@ def validate_telemetry_overhead_semantics(
         raise HistoryError("telemetry-overhead PCM parity does not match across modes")
     baseline_rtf = statistics.median(metrics_by_mode["off"]["rtf"])
     baseline_ttfc = statistics.median(metrics_by_mode["off"]["ttfcMS"])
+    definition = rtf_semantics.record_definition(record)
     for mode, limit in (("lightweight", 5.0), ("verbose", 10.0)):
         candidate_rtf = statistics.median(metrics_by_mode[mode]["rtf"])
         candidate_ttfc = statistics.median(metrics_by_mode[mode]["ttfcMS"])
-        rtf_regression = 0.0 if baseline_rtf <= 0 else (1.0 - candidate_rtf / baseline_rtf) * 100.0
+        rtf_regression = rtf_semantics.regression_percent(baseline_rtf, candidate_rtf, definition)
         ttfc_regression = 0.0 if baseline_ttfc <= 0 else (candidate_ttfc / baseline_ttfc - 1.0) * 100.0
         if rtf_regression > limit or ttfc_regression > limit:
             raise HistoryError(f"telemetry-overhead {mode} exceeds its tracked overhead threshold")
@@ -2166,6 +2177,13 @@ def validate_record(
     if not isinstance(run["durationSeconds"], (int, float)) or run["durationSeconds"] < 0:
         raise HistoryError("run.durationSeconds must be non-negative")
     validate_machine_codes(run["warnings"], "run.warnings")
+    definition = run.get("rtfDefinition")
+    if definition is not None and definition != rtf_semantics.STANDARD_RTF_DEFINITION:
+        raise HistoryError("run.rtfDefinition must be \"wall/audio\" when present")
+    if definition is None and run["finishedAt"] >= rtf_semantics.RTF_DEFINITION_CUTOVER:
+        raise HistoryError(
+            "records published since the RTF cutover must declare run.rtfDefinition"
+        )
 
     profiles = load_profiles()
     hardware = record["hardware"]
@@ -2691,7 +2709,13 @@ def trend_summary(record: dict[str, Any]) -> str:
     labels = {"rtf": "RTF", "ttfcMS": "TTFC", "peakPhysicalFootprintMB": "RAM"}
     for name, values in collected.items():
         if values:
-            parts.append(f"{labels[name]} {statistics.median(values):+.1f}%")
+            percent = statistics.median(values)
+            part = f"{labels[name]} {percent:+.1f}%"
+            if name == "rtf" and percent:
+                # Standard RTF: lower is faster. Legacy speedup: higher is faster.
+                faster = percent < 0 if rtf_semantics.is_standard(record) else percent > 0
+                part += " (faster)" if faster else " (slower)"
+            parts.append(part)
     suffix = ", ".join(parts) if parts else "compatible"
     return f"vs {baseline}: {suffix}"
 
@@ -2713,10 +2737,16 @@ def render_history(records: list[tuple[Path, dict[str, Any]]]) -> str:
         "[`LEGACY_HISTORY.md`](LEGACY_HISTORY.md) and are not treated as structured evidence.",
         "Schema-v1 records remain readable but are marked memory-contract-incomplete and are excluded",
         "from schema-v2 memory trends.",
-        "RTF here is audio seconds ÷ wall-clock seconds (`audioSecondsPerWallSecond`): higher is",
-        "faster, 1.1 ≈ 1.1× realtime, and a positive RTF trend is an improvement. Much of the TTS",
-        "ecosystem defines RTF as the inverse (wall-clock ÷ audio, lower is better); convert before",
-        "cross-project comparisons.",
+        "",
+        "**RTF** is the standard real-time factor: synthesis wall seconds ÷ generated audio seconds,",
+        "lower is faster, below 1.0 is faster than real time. Records published since 2026-09-12 declare",
+        "`run.rtfDefinition: \"wall/audio\"` and measure the engine request span (prepare entry to the",
+        "final WAV write, minus model load and prewarm). Older records stored the inverted decode-loop",
+        "speedup (audio ÷ decode seconds, higher is faster) under `rtf`; they are never rewritten. The",
+        "RTF column below shows a standard value for every record: measured for new records, and",
+        "`~`-prefixed when derived from the legacy take's app submit→completed span (or the inverse of",
+        "its end-to-end speedup for CLI records). The two lineages never share a comparison key, and",
+        "trend percentages carry their direction in words.",
         "",
     ]
     if not grouped:
@@ -2725,8 +2755,8 @@ def render_history(records: list[tuple[Path, dict[str, Any]]]) -> str:
     for kind, platform, profile, configuration in sorted(grouped):
         lines.extend([
             f"## {kind} / {platform} / {profile} / config `{configuration[:12]}`", "",
-            "| completed (UTC) | run | scope | classification | status | memory | takes | source | comparison | trend | label |",
-            "|---|---|---|---|---|---|---:|---|---|---|---|",
+            "| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |",
+            "|---|---|---|---|---|---|---:|---:|---|---|---|---|",
         ])
         ordered = sorted(
             grouped[(kind, platform, profile, configuration)],
@@ -2738,11 +2768,14 @@ def render_history(records: list[tuple[Path, dict[str, Any]]]) -> str:
             comparison = record["comparison"]
             relative = f"runs/{kind}/{run['id']}.json"
             comparable = comparison["key"][:12] if comparison.get("comparable") else "excluded"
+            rtf_value, rtf_derived = rtf_semantics.record_rtf_median(record)
             lines.append(
-                "| {date} | [`{run_id}`]({relative}) | {scope} | {classification} | {status} | {memory} | {takes} | `{sha}`{dirty} | `{comparison}` | {trend} | {label} |".format(
+                "| {date} | [`{run_id}`]({relative}) | {scope} | {classification} | {status} | {memory} | {takes} | {rtf} | `{sha}`{dirty} | `{comparison}` | {trend} | {label} |".format(
                     date=run["finishedAt"].split("T", 1)[0], run_id=markdown_escape(run["id"]),
                     relative=relative, scope=run["matrixScope"], classification=run["classification"],
-                    status=run["status"], takes=len(record["takes"]), sha=source["commit"][:12],
+                    status=run["status"], takes=len(record["takes"]),
+                    rtf=rtf_semantics.format_rtf(rtf_value, rtf_derived),
+                    sha=source["commit"][:12],
                     memory=memory_contract_status(record),
                     dirty=" dirty" if source["dirty"] else "", comparison=comparable,
                     trend=markdown_escape(trend_summary(record)),

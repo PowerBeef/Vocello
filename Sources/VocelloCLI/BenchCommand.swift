@@ -713,7 +713,8 @@ enum BenchCommand {
         if let delivery { setenv("QWENVOICE_BENCH_DELIVERY", delivery, 1) }
         defer { if delivery != nil { unsetenv("QWENVOICE_BENCH_DELIVERY") } }
         let environment = captureEnvironment()
-        let t0 = Date()
+        // Monotonic clock: a wall-clock step during a take must not corrupt the sample.
+        let started = ContinuousClock.now
         let result: GenerationResult
         var firstChunkMS: Double?
         do {
@@ -732,11 +733,16 @@ enum BenchCommand {
                 underlyingDescription: String(describing: error)
             )
         }
-        let wall = Date().timeIntervalSince(t0)
+        let wall = started.elapsedSeconds
         let deliveryTag = delivery.map { "/\($0)" } ?? ""
         let ttfcTag = firstChunkMS.map { "  ttfc=\(String(format: "%.1f", $0))ms" } ?? ""
+        // Standard real-time factor (wall ÷ audio, lower is faster); the CLI-side
+        // wall includes request dispatch, so the engine row's `realTimeFactor` is
+        // the published figure and this line is operator feedback.
+        let rtfTag = result.durationSeconds > 0
+            ? "  rtf=\(String(format: "%.2f", wall / result.durationSeconds))" : ""
         FileHandle.standardError.write(Data(
-            "  \(mode.rawValue)/\(modelID.hasSuffix("quality") ? "Q" : "S")/\(len)/\(state)\(deliveryTag)#\(n)  \(String(format: "%.2f", result.durationSeconds))s audio in \(String(format: "%.1f", wall))s\(ttfcTag)\n".utf8))
+            "  \(mode.rawValue)/\(modelID.hasSuffix("quality") ? "Q" : "S")/\(len)/\(state)\(deliveryTag)#\(n)  \(String(format: "%.2f", result.durationSeconds))s audio in \(String(format: "%.1f", wall))s\(rtfTag)\(ttfcTag)\n".utf8))
         return BenchTakeResult(
             takeIndex: takeIndex,
             generationID: generationID.uuidString,

@@ -322,7 +322,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
             "alignedProcessSampleCount", "alignedProcessSampleCoverage",
             "audioSeconds", "blockIOOperations", "chunksForwarded", "chunksReceived",
             "contextSwitches", "continuityFailures", "cpuSystemSeconds", "cpuUserSeconds",
-            "decodeWallSeconds", "delayedHeartbeatCount", "finalizationMS",
+            "decodeSpeedupX", "decodeWallSeconds", "delayedHeartbeatCount", "finalizationMS",
             "firstChunkToPlaybackScheduledMS", "generatedTokens",
             "gpuRecommendedWorkingSetMB", "gpuWorkingSetUsageRatioPeak",
             "heartbeatCoverage", "maximumPressureLevel", "maximumTrimLevel",
@@ -333,7 +333,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
             "peakPhysicalFootprintMB", "peakResidentMB", "physicalFootprintDeltaMB",
             "physicalFootprintEndMB", "physicalFootprintStartMB", "playbackScheduledMS",
             "requestToFirstChunkMS", "residentDeltaMB", "residentEndMB",
-            "residentStartMB", "rtf", "samplerBoundarySampleCount",
+            "requestWallSeconds", "residentStartMB", "rtf", "rtfAppEndToEnd", "samplerBoundarySampleCount",
             "samplerCaptureFailureCount", "samplerCoverage",
             "samplerEffectiveMedianIntervalMS", "samplerMaximumDriftMS",
             "samplerMaximumLatenessMS", "samplerMissedDeadlineCount",
@@ -835,6 +835,46 @@ class BenchmarkHistoryTests(unittest.TestCase):
         comparison = json.loads(path.read_text())["comparison"]
         self.assertIsNone(comparison["baselineRunID"])
         self.assertEqual(comparison["deltas"], {})
+
+    def test_rtf_definition_is_required_after_the_cutover_and_isolates_lineages(self) -> None:
+        legacy = record_fixture(run_id="rtf-legacy-20260712")
+        # Legacy UI takes store the app submit→completed span, from which a
+        # standard RTF is derived at render time (2.1 s ÷ 3 s = 0.70).
+        legacy["takes"][0]["metrics"].update({"audioSeconds": 3.0, "submitToCompletedMS": 2100.0})
+        legacy_path = self.publish(legacy, "rtf-legacy")
+        legacy_record = json.loads(legacy_path.read_text())
+        self.assertNotIn("rtfDefinition", legacy_record["run"])
+
+        # A record finished after the cutover without the declaration is refused.
+        undeclared = record_fixture(run_id="rtf-undeclared-20260920")
+        undeclared["run"]["startedAt"] = "2026-09-20T12:00:00Z"
+        undeclared["run"]["finishedAt"] = "2026-09-20T12:01:00Z"
+        with self.assertRaisesRegex(history.HistoryError, "rtfDefinition"):
+            self.publish(undeclared, "rtf-undeclared")
+
+        # A wrong definition is refused outright.
+        wrong = record_fixture(run_id="rtf-wrong-20260920")
+        wrong["run"]["rtfDefinition"] = "audio/wall"
+        with self.assertRaisesRegex(history.HistoryError, "rtfDefinition"):
+            self.publish(wrong, "rtf-wrong")
+
+        # A standard record is accepted, starts its own comparison lineage, and the
+        # index shows the measured value while the legacy record shows a derived one.
+        standard = record_fixture(run_id="rtf-standard-20260920")
+        standard["run"].update({
+            "startedAt": "2026-09-20T12:00:00Z", "finishedAt": "2026-09-20T12:01:00Z",
+            "rtfDefinition": "wall/audio",
+        })
+        standard["takes"][0]["metrics"].update({"rtf": 0.62, "decodeSpeedupX": 1.9, "requestWallSeconds": 1.86})
+        standard_path = self.publish(standard, "rtf-standard")
+        standard_record = json.loads(standard_path.read_text())
+        self.assertEqual(standard_record["run"]["rtfDefinition"], "wall/audio")
+        self.assertNotEqual(standard_record["comparison"]["key"], legacy_record["comparison"]["key"])
+        self.assertIsNone(standard_record["comparison"]["baselineRunID"])
+        index = self.index.read_text()
+        self.assertIn("| 0.62 |", index)
+        legacy_row = next(line for line in index.splitlines() if "rtf-legacy-20260712" in line)
+        self.assertIn("| ~0.70 |", legacy_row)
 
     def test_all_record_kinds_validate(self) -> None:
         for index, kind in enumerate(sorted(history.KINDS), start=1):

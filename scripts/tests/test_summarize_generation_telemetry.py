@@ -715,7 +715,8 @@ def test_aggregate_runs_streams_and_summarizes():
         assert key_4bit_warm_short in cells
         summary = cells[key_4bit_warm_short]
         assert summary["n"] == 1
-        assert summary["rtf"] == 1.05
+        assert summary["rtf"] == 1.0952  # standard RTF: request wall ÷ audio
+        assert summary["decodeSpeedupX"] == 1.05
         assert summary["tokps"] == 1550.0
         assert summary["decodeLoopMS"] == 210
         assert summary["peakGpuMB"] == 3000
@@ -726,7 +727,8 @@ def test_aggregate_runs_streams_and_summarizes():
         assert key_8bit_warm_medium in cells
         summary = cells[key_8bit_warm_medium]
         assert summary["n"] == 2
-        assert summary["rtf"] == 0.935  # median of 0.92 and 0.95
+        assert abs(summary["rtf"] - 1.23025) < 1e-9  # median of the two standard RTFs
+        assert summary["decodeSpeedupX"] == 0.935  # median of 0.92 and 0.95
         assert summary["trims"] == 0.5  # median of 0 and 1
         assert summary["worstTrim"] == "softTrim"
         assert summary["qcVerdict"] == "warn:clipping"
@@ -786,7 +788,7 @@ def test_aggregate_runs_delivery_cells():
                 "modelID": "Qwen3-TTS-12Hz-1.7B-4bit",
                 "warmState": "warm",
                 "notes": {"delivery": "instruct-demo", "deviceClass": "mid16GBMac"},
-                "derivedMetrics": {"audioSecondsPerWallSecond": 1.0, "tokensPerSecond": 1000.0},
+                "derivedMetrics": {"audioSecondsPerWallSecond": 1.0, "realTimeFactor": 1.0, "tokensPerSecond": 1000.0},
                 "timingsMS": {"qwen_token_loop_total": 200},
                 "summary": {"physFootprintPeakMB": 3000, "stageMarks": []},
                 "mlxMemoryByStage": {},
@@ -798,7 +800,7 @@ def test_aggregate_runs_delivery_cells():
                 "modelID": "Qwen3-TTS-12Hz-1.7B-4bit",
                 "warmState": "warm",
                 "notes": {"delivery": "instruct-demo", "deviceClass": "mid16GBMac"},
-                "derivedMetrics": {"audioSecondsPerWallSecond": 1.2, "tokensPerSecond": 1200.0},
+                "derivedMetrics": {"audioSecondsPerWallSecond": 1.2, "realTimeFactor": 0.8, "tokensPerSecond": 1200.0},
                 "timingsMS": {"qwen_token_loop_total": 180},
                 "summary": {"physFootprintPeakMB": 3200, "stageMarks": []},
                 "mlxMemoryByStage": {},
@@ -814,7 +816,8 @@ def test_aggregate_runs_delivery_cells():
         assert summary["delivery"] == "instruct-demo"
         assert summary["lenBucket"] is None
         assert summary["n"] == 2
-        assert summary["rtf"] == 1.1
+        assert summary["rtf"] == 0.9
+        assert summary["decodeSpeedupX"] == 1.1
         assert summary["physFootMB"] == 3100
 
 
@@ -828,7 +831,7 @@ def test_aggregate_runs_skips_non_success_finish_reason():
             "modelID": "Qwen3-TTS-12Hz-1.7B-4bit",
             "warmState": "warm",
             "notes": {"deviceClass": "mid16GBMac", "promptChars": "35"},
-            "derivedMetrics": {"audioSecondsPerWallSecond": 1.0, "tokensPerSecond": 1000.0},
+            "derivedMetrics": {"audioSecondsPerWallSecond": 1.0, "realTimeFactor": 0.95, "tokensPerSecond": 1000.0},
             "timingsMS": {"qwen_token_loop_total": 200},
             "summary": {"physFootprintPeakMB": 3000, "stageMarks": []},
             "mlxMemoryByStage": {},
@@ -848,7 +851,8 @@ def test_aggregate_runs_skips_non_success_finish_reason():
         assert len(runs) == 1
         assert runs[0]["generationID"] == "gen-ok"
         key = ("custom", "Qwen3-TTS-12Hz-1.7B-4bit", "warm", "short")
-        assert cells[key]["rtf"] == 1.0
+        assert cells[key]["rtf"] == 0.95
+        assert cells[key]["decodeSpeedupX"] == 1.0
         assert cells[key]["n"] == 1
 
 

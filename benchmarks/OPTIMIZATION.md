@@ -8,6 +8,11 @@ It is not the current runtime, telemetry, memory, or benchmark acceptance contra
 [`../docs/reference/telemetry-and-benchmarking.md`](../docs/reference/telemetry-and-benchmarking.md)
 for current measurement semantics. Git history and `LEGACY_HISTORY.md` retain the older narrative.
 
+> **RTF in this ledger.** Every entry below predates the 2026-09-12 cutover and uses the inverted
+> decode-loop speedup (audio seconds per decode second, higher is faster) under the name "RTF";
+> "RTF 1.8" here means what current tooling reports as `decodeSpeedupX 1.8`. Since the cutover the
+> repository's `rtf` is the standard real-time factor (synthesis wall ÷ audio, lower is faster).
+
 ## Reference baseline
 
 [`baseline-2026-05-31-641a541.md`](baseline-2026-05-31-641a541.md) — pre-optimization reference, CLI-driven

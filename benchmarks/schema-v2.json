@@ -581,6 +581,12 @@
             "ios"
           ]
         },
+        "rtfDefinition": {
+          "description": "Real-time factor semantics of take metrics. \"wall/audio\" (request wall seconds ÷ audio seconds, lower is faster) on every record published since 2026-09-12; absent on legacy records whose `rtf` is the inverted decode-loop speedup.",
+          "enum": [
+            "wall/audio"
+          ]
+        },
         "startedAt": {
           "format": "date-time",
           "type": "string"

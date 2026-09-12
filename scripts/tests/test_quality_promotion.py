@@ -91,6 +91,9 @@ class QualityPromotionTests(unittest.TestCase):
         duration = float(self.record["run"]["durationSeconds"])
         self.record["run"]["finishedAt"] = finished.isoformat().replace("+00:00", "Z")
         self.record["run"]["startedAt"] = (finished - timedelta(seconds=duration)).isoformat().replace("+00:00", "Z")
+        # Rebinding dates the record after the 2026-09-12 RTF cutover, which
+        # requires the standard-RTF declaration on every record.
+        self.record["run"]["rtfDefinition"] = "wall/audio"
         self.record["source"].update({
             "commit": self.commit,
             "dirty": False,
@@ -99,6 +102,7 @@ class QualityPromotionTests(unittest.TestCase):
         })
         self.record["toolchain"]["appVersion"] = "2.4.0"
         self.record["toolchain"]["appBuild"] = "23"
+        self.record["comparison"]["key"] = PROMOTION.benchmark_history.comparison_key(self.record)
         self.record["digest"] = PROMOTION.benchmark_history.record_digest(self.record)
         self.write_json(self.record_path, self.record)
 

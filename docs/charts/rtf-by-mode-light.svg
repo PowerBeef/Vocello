@@ -1,48 +1,49 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="720" height="428" viewBox="0 0 720 428" role="img">
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="440" viewBox="0 0 720 440" role="img">
 <g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
 <text x="16.0" y="28.0" fill="#1f2328" font-size="16" font-weight="600" text-anchor="start">Faster than playback in every mode</text>
-<text x="16.0" y="47.0" fill="#656d76" font-size="12" font-weight="normal" text-anchor="start">Warm generation speed, multiples of realtime (higher is faster) · Mac mini M2, 8 GB</text>
+<text x="16.0" y="47.0" fill="#656d76" font-size="12" font-weight="normal" text-anchor="start">Warm real-time factor: seconds of generation per second of audio (lower is faster) · Mac mini M2, 8 GB</text>
 <line x1="219.6" y1="64.0" x2="219.6" y2="388" stroke="#d1d9e0" stroke-width="1" stroke-dasharray="3 3"/>
-<text x="219.6" y="406.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="middle">0.5×</text>
-<line x1="329.2" y1="64.0" x2="329.2" y2="388" stroke="#656d76" stroke-width="1"/>
-<text x="329.2" y="406.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="middle">1.0× · realtime</text>
+<text x="219.6" y="406.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="middle">0.25</text>
+<line x1="329.2" y1="64.0" x2="329.2" y2="388" stroke="#d1d9e0" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="329.2" y="406.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="middle">0.50</text>
 <line x1="438.8" y1="64.0" x2="438.8" y2="388" stroke="#d1d9e0" stroke-width="1" stroke-dasharray="3 3"/>
-<text x="438.8" y="406.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="middle">1.5×</text>
-<line x1="548.3" y1="64.0" x2="548.3" y2="388" stroke="#d1d9e0" stroke-width="1" stroke-dasharray="3 3"/>
-<text x="548.3" y="406.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="middle">2.0×</text>
+<text x="438.8" y="406.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="middle">0.75</text>
+<line x1="548.3" y1="64.0" x2="548.3" y2="388" stroke="#656d76" stroke-width="1"/>
+<text x="548.3" y="406.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="middle">1.0 · realtime</text>
 <circle cx="22" cy="80.0" r="5" fill="#8A6410"/>
 <text x="32.0" y="84.0" fill="#1f2328" font-size="13" font-weight="600" text-anchor="start">Built-in Voice</text>
 <text x="102.0" y="106.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">short</text>
-<path d="M110.0 94.0 h358.9 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-358.9 z" fill="#8A6410"/>
-<text x="478.9" y="106.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.66×</text>
+<path d="M110.0 94.0 h392.6 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-392.6 z" fill="#8A6410"/>
+<text x="512.6" y="106.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">0.90</text>
 <text x="102.0" y="128.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">medium</text>
-<path d="M110.0 116.0 h420.6 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-420.6 z" fill="#8A6410"/>
-<text x="540.6" y="128.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.94×</text>
+<path d="M110.0 116.0 h282.4 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-282.4 z" fill="#8A6410"/>
+<text x="402.4" y="128.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">0.65</text>
 <text x="102.0" y="150.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">long</text>
-<path d="M110.0 138.0 h439.1 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-439.1 z" fill="#8A6410"/>
-<text x="559.1" y="150.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">2.02×</text>
+<path d="M110.0 138.0 h260.0 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-260.0 z" fill="#8A6410"/>
+<text x="380.0" y="150.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">0.60</text>
 <circle cx="22" cy="182.0" r="5" fill="#6C47C8"/>
 <text x="32.0" y="186.0" fill="#1f2328" font-size="13" font-weight="600" text-anchor="start">Voice Design</text>
 <text x="102.0" y="208.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">short</text>
-<path d="M110.0 196.0 h423.9 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-423.9 z" fill="#6C47C8"/>
-<text x="543.9" y="208.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.95×</text>
+<path d="M110.0 196.0 h361.1 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-361.1 z" fill="#6C47C8"/>
+<text x="481.1" y="208.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">0.83</text>
 <text x="102.0" y="230.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">medium</text>
-<path d="M110.0 218.0 h433.5 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-433.5 z" fill="#6C47C8"/>
-<text x="553.5" y="230.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">2.00×</text>
+<path d="M110.0 218.0 h263.2 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-263.2 z" fill="#6C47C8"/>
+<text x="383.2" y="230.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">0.61</text>
 <text x="102.0" y="252.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">long</text>
-<path d="M110.0 240.0 h461.9 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-461.9 z" fill="#6C47C8"/>
-<text x="581.9" y="252.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">2.13×</text>
+<path d="M110.0 240.0 h244.9 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-244.9 z" fill="#6C47C8"/>
+<text x="364.9" y="252.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">0.57</text>
 <circle cx="22" cy="284.0" r="5" fill="#B4471B"/>
 <text x="32.0" y="288.0" fill="#1f2328" font-size="13" font-weight="600" text-anchor="start">Voice Cloning</text>
 <text x="102.0" y="310.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">short</text>
-<path d="M110.0 298.0 h324.3 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-324.3 z" fill="#B4471B"/>
-<text x="444.3" y="310.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.50×</text>
+<path d="M110.0 298.0 h418.8 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-418.8 z" fill="#B4471B"/>
+<text x="538.8" y="310.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">0.96</text>
 <text x="102.0" y="332.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">medium</text>
-<path d="M110.0 320.0 h401.5 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-401.5 z" fill="#B4471B"/>
-<text x="521.5" y="332.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">1.85×</text>
+<path d="M110.0 320.0 h283.1 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-283.1 z" fill="#B4471B"/>
+<text x="403.1" y="332.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">0.66</text>
 <text x="102.0" y="354.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="end">long</text>
-<path d="M110.0 342.0 h437.8 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-437.8 z" fill="#B4471B"/>
-<text x="557.8" y="354.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">2.02×</text>
-<text x="704.0" y="422.0" fill="#656d76" font-size="10" font-weight="normal" text-anchor="end">record b0b5a448 · benchmarks/HISTORY.md</text>
+<path d="M110.0 342.0 h255.8 a4 4 0 0 1 4 4 v8.0 a4 4 0 0 1 -4 4 h-255.8 z" fill="#B4471B"/>
+<text x="375.8" y="354.0" fill="#1f2328" font-size="11" font-weight="normal" text-anchor="start">0.59</text>
+<text x="16.0" y="434.0" fill="#656d76" font-size="10" font-weight="normal" text-anchor="start">RTF derived from each take's app submit→completed span (record predates the 2026-09-12 RTF cutover)</text>
+<text x="704.0" y="434.0" fill="#656d76" font-size="10" font-weight="normal" text-anchor="end">record 0b234262 · benchmarks/HISTORY.md</text>
 </g>
 </svg>

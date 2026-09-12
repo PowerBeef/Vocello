@@ -232,6 +232,7 @@
         "label": {"maxLength": 96, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$", "type": "string"},
         "matrixScope": {"enum": ["canonical", "focused", "partial", "instrumented"]},
         "platform": {"enum": ["macos", "ios"]},
+        "rtfDefinition": {"description": "Real-time factor semantics of take metrics. \"wall/audio\" (request wall seconds ÷ audio seconds, lower is faster) on every record published since 2026-09-12; absent on legacy records whose `rtf` is the inverted decode-loop speedup.", "enum": ["wall/audio"]},
         "startedAt": {"format": "date-time", "type": "string"},
         "status": {"enum": ["passed", "passedWithWarnings"]},
         "warnings": {"items": {"maxLength": 96, "pattern": "^[a-z0-9][a-z0-9_.:-]{0,79}(?:\\([0-9]+/[0-9]+(?:-[0-9]+)?\\))?$", "type": "string"}, "type": "array"}

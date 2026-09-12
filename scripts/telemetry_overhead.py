@@ -100,7 +100,7 @@ def pcm_digest(path: Path) -> str:
 
 
 def throughput_regression(candidate: float, baseline: float) -> float:
-    """Positive when higher-is-better throughput regresses."""
+    """Positive when higher-is-better throughput (e.g. a speedup) regresses."""
     return 0.0 if baseline <= 0 else (1.0 - (candidate / baseline)) * 100.0
 
 
@@ -346,7 +346,9 @@ def run_lane(args: argparse.Namespace) -> dict:
                     "generationID": take["generationID"],
                     "audioSeconds": audio,
                     "wallSeconds": wall,
-                    "rtf": audio / wall,
+                    # Standard RTF: wall ÷ audio, lower is faster (bench wall
+                    # time on the CLI's monotonic clock).
+                    "rtf": wall / audio,
                     "ttfcMS": float(ttfc),
                     "environment": take.get("environment"),
                 }
@@ -385,7 +387,8 @@ def run_lane(args: argparse.Namespace) -> dict:
     if not parity:
         failures.append("seeded PCM differs across telemetry modes")
     for mode, limit in thresholds.items():
-        results[mode]["rtfRegressionPercent"] = throughput_regression(
+        # RTF is lower-is-better, so it regresses like a latency.
+        results[mode]["rtfRegressionPercent"] = latency_regression(
             results[mode]["medianRTF"], baseline["medianRTF"]
         )
         results[mode]["ttfcRegressionPercent"] = latency_regression(

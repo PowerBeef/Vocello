@@ -15,6 +15,7 @@ import tempfile
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+from lib import rtf as rtf_semantics  # noqa: E402
 
 from benchmark_memory import (  # noqa: E402
     MemoryEvidenceError,
@@ -161,6 +162,11 @@ def validate_v7_engine_telemetry(row: dict) -> list[str]:
     if not isinstance(summary, dict):
         return [f"generation {generation} has no schema-v7 sampler summary"]
     failures: list[str] = []
+    if rtf_semantics.engine_rtf(row) is None:
+        failures.append(
+            f"generation {generation} has no measurable request wall time "
+            "(no realTimeFactor and no terminal stage mark)"
+        )
     positive = ("targetIntervalNS", "effectiveIntervalNS")
     nonnegative = ("maximumDriftNS", "maximumLatenessNS", "boundarySampleCount", "captureFailureCount")
     for key in positive:
@@ -400,8 +406,14 @@ def tracked_metrics(engine: dict, service: dict, app: dict) -> dict[str, float |
             metrics[name] = value * scale
 
     derived = engine.get("derivedMetrics") or {}
+    # Standard real-time factor (engine request wall ÷ audio, lower is faster).
+    # The decode-loop speedup legacy records called "rtf" keeps its own key, and
+    # the app-layer span (adds transport and UI dispatch) is published beside it.
+    add("rtf", rtf_semantics.engine_rtf(engine))
+    add("requestWallSeconds", rtf_semantics.request_wall_seconds(engine))
+    add("decodeSpeedupX", rtf_semantics.decode_speedup(engine))
+    add("rtfAppEndToEnd", rtf_semantics.app_end_to_end_rtf(app, rtf_semantics.audio_seconds(engine)))
     for source, destination in (
-        ("audioSecondsPerWallSecond", "rtf"),
         ("tokensPerSecond", "tokensPerSecond"),
         ("audioSeconds", "audioSeconds"),
         ("decodeWallSeconds", "decodeWallSeconds"),
@@ -659,6 +671,7 @@ def build_manifest(
             "startedAt": started_at,
             "finishedAt": finished_at,
             "warnings": memory_run["warnings"],
+            "rtfDefinition": rtf_semantics.STANDARD_RTF_DEFINITION,
         },
         "hardware": hardware,
         "toolchain": {"optimization": "-O"},

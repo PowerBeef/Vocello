@@ -38,6 +38,25 @@ class GenerateReadmeChartsTests(unittest.TestCase):
         self.assertIn("benchmarks/HISTORY.md", rendered["rtf-by-mode-dark.svg"])
         self.assertIn(MODULE.LONGFORM_RUN_ID[-8:], rendered["longform-memory-dark.svg"])
 
+    def test_pinned_record_is_the_newest_canonical_and_the_readme_block_is_fresh(self) -> None:
+        self.assertEqual(MODULE.newest_canonical_record(), MODULE.RTF_RECORD)
+        medians, _ = MODULE.load_rtf_medians(MODULE.RTF_RECORD)
+        self.assertEqual(
+            MODULE.README_PATH.read_text(encoding="utf-8"), MODULE.render_readme(medians),
+            "README rtf-chart block is stale — run scripts/generate_readme_charts.py",
+        )
+        alt = MODULE.readme_alt_text(medians)
+        self.assertIn("lower is faster", alt)
+        self.assertNotIn("×", alt)
+        for value in medians.values():
+            self.assertLess(value, 1.0, "the chart claims every bar sits below the real-time line")
+
+    def test_rtf_chart_uses_the_standard_definition(self) -> None:
+        svg = MODULE.render_all()["rtf-by-mode-light.svg"]
+        self.assertIn("lower is faster", svg)
+        self.assertIn("1.0 · realtime", svg)
+        self.assertNotIn("×", svg)
+
     def test_committed_charts_are_fresh(self) -> None:
         rendered = MODULE.render_all()
         for name, content in rendered.items():

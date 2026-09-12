@@ -32,9 +32,15 @@ import os
 import re
 import statistics
 import subprocess
+import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
+
+SCRIPT_DIRECTORY = Path(__file__).resolve().parent
+if str(SCRIPT_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIRECTORY))
+from lib import rtf as rtf_semantics  # noqa: E402
 
 DEFAULT_DIR = os.path.expanduser(
     "~/Library/Application Support/QwenVoice-Debug/diagnostics"
@@ -484,7 +490,11 @@ def _engine_run(e, app_lookup, *, cell_override=None):
         "modelID": e.get("modelID") or "?",
         "warmState": e.get("warmState") or "?",
         "finishReason": e.get("finishReason"),
-        "rtf": derived.get("audioSecondsPerWallSecond"),
+        # Standard RTF (request wall ÷ audio, lower is faster) and the decode-loop
+        # speedup (audio ÷ decode seconds, higher is faster) that older summaries
+        # printed under the RTF heading.
+        "rtf": rtf_semantics.engine_rtf(e),
+        "decodeSpeedupX": derived.get("audioSecondsPerWallSecond"),
         "tokps": derived.get("tokensPerSecond"),
         "audioSec": derived.get("audioSeconds"),
         "ttfcMS": frontend.get("submitToFirstChunkMS")
@@ -621,6 +631,7 @@ class CellAccumulator:
 
     key: tuple
     rtfs: list = field(default_factory=list)
+    speedups: list = field(default_factory=list)
     tokpss: list = field(default_factory=list)
     ttfcs: list = field(default_factory=list)
     decode_loop_ms: list = field(default_factory=list)
@@ -648,6 +659,8 @@ class CellAccumulator:
         """Ingest one run into the accumulator's lists."""
         if run.get("rtf") is not None:
             self.rtfs.append(run["rtf"])
+        if run.get("decodeSpeedupX") is not None:
+            self.speedups.append(run["decodeSpeedupX"])
         if run.get("tokps") is not None:
             self.tokpss.append(run["tokps"])
         if run.get("ttfcMS") is not None:
@@ -730,8 +743,9 @@ class CellAccumulator:
             "warmState": state,
             "lenBucket": bucket,
             "delivery": None,
-            "n": len(self.rtfs) or len(self.tokpss) or len(self.ttfcs),
+            "n": len(self.rtfs) or len(self.speedups) or len(self.tokpss) or len(self.ttfcs),
             "rtf": med(self.rtfs),
+            "decodeSpeedupX": med(self.speedups),
             "tokps": med(self.tokpss),
             "ttfcMS": med(self.ttfcs),
             "decodeLoopMS": med(self.decode_loop_ms),
@@ -1088,6 +1102,7 @@ def build_summary(cells):
                 "lenBucket": lb,
                 "n": s["n"],
                 "rtf": s["rtf"],
+                "decodeSpeedupX": s.get("decodeSpeedupX"),
                 "tokps": s["tokps"],
                 "ttfcMS": s["ttfcMS"],
                 "physFootMB": s["physFootMB"],
@@ -1187,14 +1202,30 @@ def baseline_identity_from_evidence(payload):
 
 def baseline_document(cells, evidence_payload=None):
     if evidence_payload is None:
-        # Preserve the ad-hoc v1 CLI for exploratory local use. Governed callers
-        # pass --require-baseline-identity and reject this shape.
-        return cells
+        # Ad-hoc local baseline: no identity, but it still declares which RTF it
+        # stores. Governed callers pass --require-baseline-identity and reject it.
+        return {
+            "schemaVersion": BASELINE_SCHEMA_VERSION,
+            "rtfDefinition": rtf_semantics.STANDARD_RTF_DEFINITION,
+            "cells": cells,
+        }
     return {
         "schemaVersion": BASELINE_SCHEMA_VERSION,
+        "rtfDefinition": rtf_semantics.STANDARD_RTF_DEFINITION,
         "identity": baseline_identity_from_evidence(evidence_payload),
         "cells": cells,
     }
+
+
+def baseline_rtf_definition(payload):
+    """`wall/audio` for baselines saved since the RTF cutover, else legacy.
+
+    A legacy baseline's `rtf` is the decode-loop speedup, so it is compared
+    against the current `decodeSpeedupX` (the same quantity) rather than the
+    standard RTF; the caller prints that this happened."""
+    if isinstance(payload, dict) and payload.get("rtfDefinition") == rtf_semantics.STANDARD_RTF_DEFINITION:
+        return rtf_semantics.STANDARD_RTF_DEFINITION
+    return rtf_semantics.LEGACY_RTF_DEFINITION
 
 
 def baseline_cells(payload, *, current_identity=None, require_identity=False):
@@ -1208,6 +1239,9 @@ def baseline_cells(payload, *, current_identity=None, require_identity=False):
     identity = payload.get("identity")
     if not isinstance(cells, list) or not cells:
         raise ValueError("schema-v2 baseline has no cells")
+    if identity is None and not require_identity:
+        # Ad-hoc local baseline saved without an evidence manifest.
+        return cells
     if not isinstance(identity, dict):
         raise ValueError("schema-v2 baseline has no identity")
     if current_identity is None:
@@ -1217,11 +1251,16 @@ def baseline_cells(payload, *, current_identity=None, require_identity=False):
     return cells
 
 
-def compare_summaries(baseline, current, threshold=0.05, migrations=()):
+def compare_summaries(
+    baseline, current, threshold=0.05, migrations=(),
+    baseline_definition=rtf_semantics.STANDARD_RTF_DEFINITION,
+):
     """Return regression entries where current is worse than baseline by > threshold.
 
     A regression is:
-      - rtf decreased by > threshold (rtf = audioSecondsPerWallSecond; higher is better)
+      - rtf increased by > threshold (standard RTF = request wall ÷ audio; lower is better);
+        against a legacy baseline the baseline's speedup is compared with the current
+        `decodeSpeedupX` instead (decrease = regression)
       - tokps decreased by > threshold
       - ttfcMS increased by > threshold
       - physFootMB increased by > threshold
@@ -1258,18 +1297,19 @@ def compare_summaries(baseline, current, threshold=0.05, migrations=()):
                 "current": "present",
             }
         )
+    legacy_baseline = baseline_definition != rtf_semantics.STANDARD_RTF_DEFINITION
     for key, cur in current_by_key.items():
         base = baseline_by_key.get(key)
         if base is None:
             continue
         for metric, direction in [
-            ("rtf", "down"),
+            ("rtf", "down" if legacy_baseline else "up"),
             ("ttfcMS", "up"),
             ("physFootMB", "up"),
             ("tokps", "down"),
         ]:
             b = base.get(metric)
-            c = cur.get(metric)
+            c = cur.get("decodeSpeedupX" if metric == "rtf" and legacy_baseline else metric)
             if b is None and c is None:
                 continue
             if b is None or c is None or b == 0:
@@ -1458,7 +1498,7 @@ def main():
         variance_cols = f" {'RTF_IQR':>7} {'physFoot_IQR':>12}"
     header = (
         f"{'mode':<8} {'model':<26} {'state':<5} {'len':<6} {'n':>2} "
-        f"{'RTF':>6} {'tok/s':>7} {'TTFC ms':>8} {'decode ms':>9} "
+        f"{'RTF':>6} {'xRT':>6} {'tok/s':>7} {'TTFC ms':>8} {'decode ms':>9} "
         f"{'peakGPU':>8} {'physFoot':>8} {'headMin':>8} {'gpuWS':>6} {'thermal':<8} "
         f"{'trims':>9} {'UI heartbeat':>18} {'QC':<12}"
         + variance_cols
@@ -1469,6 +1509,7 @@ def main():
     if selected_run_id:
         print(f"runID: {selected_run_id} (strictly scoped)")
     print(f"({len(runs)} runs across {len(cells) + len(delivery_cells)} cells; warm shows median)")
+    print("RTF = request wall ÷ audio (lower is faster); xRT = decode-loop speedup (audio ÷ decode s, higher is faster)")
     print(f"tier: {', '.join(tiers)}"
           + ("   ⚠ forced (QWENVOICE_FORCE_MEMORY_CLASS)" if forced else "")
           + "\n")
@@ -1483,6 +1524,7 @@ def main():
         row = (
             f"{mode:<8} {short_model(model_id):<26} {state:<5} {lb:<6} {n:>2} "
             f"{fmt(summary['rtf']):>6} "
+            f"{fmt(summary.get('decodeSpeedupX')):>6} "
             f"{fmt(summary['tokps']):>7} "
             f"{fmt(summary['ttfcMS'], 0):>8} "
             f"{fmt(summary['decodeLoopMS'], 0):>9} "
@@ -1510,7 +1552,7 @@ def main():
         has_prosody = bool(prosody_rows)
         d_header = (
             f"{'mode':<8} {'model':<26} {'state':<5} {'delivery':<16} {'n':>2} "
-            f"{'RTF':>6} {'tok/s':>7} {'decode ms':>9} {'physFoot':>8} {'QC':<12}"
+            f"{'RTF':>6} {'xRT':>6} {'tok/s':>7} {'decode ms':>9} {'physFoot':>8} {'QC':<12}"
             + (f" {'prosN':>5} {'prosEff':>8} {'dF0Std':>7} {'dRateCV':>8} {'dPauseR':>8} {'dRough':>7}" if has_prosody else "")
         )
         print("\nDelivery cells (--delivery; medium text, instruct-bearing) — notes.delivery\n")
@@ -1523,6 +1565,7 @@ def main():
             base = (
                 f"{mode:<8} {short_model(model_id):<26} {state:<5} {delivery:<16} {summary['n']:>2} "
                 f"{fmt(summary['rtf']):>6} "
+                f"{fmt(summary.get('decodeSpeedupX')):>6} "
                 f"{fmt(summary['tokps']):>7} "
                 f"{fmt(summary['decodeLoopMS'], 0):>9} "
                 f"{fmt(summary['physFootMB'], 0):>8} "
@@ -1715,8 +1758,16 @@ def main():
             )
             migrations = load_baseline_migrations(args.baseline_migrations)
             current = build_summary(cells)
+            baseline_definition = baseline_rtf_definition(baseline_payload)
+            if baseline_definition != rtf_semantics.STANDARD_RTF_DEFINITION:
+                print(
+                    "\nnote: legacy baseline (pre-2026-09-12) stores the decode-loop speedup under rtf; "
+                    "comparing it with the current decodeSpeedupX. Re-save the baseline to compare "
+                    "standard RTF (wall/audio)."
+                )
             regressions = compare_summaries(
-                baseline, current, threshold=args.regress_threshold, migrations=migrations
+                baseline, current, threshold=args.regress_threshold, migrations=migrations,
+                baseline_definition=baseline_definition,
             )
         except (OSError, ValueError, json.JSONDecodeError) as error:
             print(f"FAIL: baseline comparison contract is invalid: {error}")

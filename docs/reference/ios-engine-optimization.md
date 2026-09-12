@@ -275,7 +275,7 @@ the maximum within the cell. This record directly covers the current owned-core 
 | clone | warm/long | 1.842 | 3517 | 1 | pass |
 
 **Reading it:**
-- **RTF > 1 in every canonical cell** — all three modes generated faster than realtime at this
+- **Decode speedup > 1 in every canonical cell** (the figure this record called RTF; standard RTF < 1) — all three modes generated faster than realtime at this
   pinned source. Clone was slower than Custom and Design, so “1.6–1.9 everywhere” was not accurate.
 - **Peak physical footprint was 2.56–3.52 GB** — under the ~6 GB implied entitled limit. Clone was
   the heaviest because its encoders remain resident.
@@ -360,7 +360,7 @@ record and metadata, and an explicit dispatch. Local on-device build/test is alr
 **P2 — 0.6B variant: RULED OUT (maintainer decision, 2026-07-02).** The 0.6B checkpoints exist
 (`Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice`; mlx-community publishes a 4-bit of the Base only), but
 **Voice Design is only available with the 1.7B model** — shipping a 0.6B tier would fragment the
-mode matrix (Custom-only tier) for a speed win the 1.7B doesn't need (already >1× realtime on
+mode matrix (Custom-only tier) for a speed win the 1.7B doesn't need (already faster than real time on
 device). Vocello stays **1.7B-variants-only** (Speed 4-bit / Quality 8-bit). Do not resurrect
 without a new maintainer decision.
 

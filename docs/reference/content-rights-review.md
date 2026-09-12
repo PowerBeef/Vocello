@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-06
+reviewed: 2026-09-12
 summary: Decision-ready evidence and qualified-review gates for downloadable Qwen model artifacts, built-in voice previews, marketing audio, product artwork, and the App Store Connect third-party-content declaration.
 sourceOfTruth:
   - config/third-party-attribution-policy.json
@@ -86,7 +86,8 @@ A qualified decision is complete only when it records:
 ASR-04 may move to `done` only after all rows have an affirmative qualified decision or the affected
 asset/surface has been removed and the removal is verified in source and the release artifact.
 
-Currency review (2026-09-04): the roadmap still correctly keeps ASR-04 planned. A fresh authenticated,
+Currency review (2026-09-04, status reconciled 2026-09-11): the roadmap keeps ASR-04 `in-flight` —
+source remediation is shipped, and only the qualified counsel decisions above remain open. A fresh authenticated,
 read-only App Store Connect inventory again found the third-party-content declaration; it proves only
 the account field and does not replace the qualified model-redistribution, voice/publicity,
 cloned-reference consent, marketing-audio, or artwork decisions above. The exact source-bound bundled

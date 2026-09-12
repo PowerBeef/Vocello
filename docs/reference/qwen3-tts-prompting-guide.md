@@ -1,6 +1,7 @@
 ---
 status: active
 owner: backend-mlx
+reviewed: 2026-09-12
 summary: Sourced reference for the three model-facing text surfaces (script, delivery instruction, voice description) — every claim labeled OFFICIAL/RESEARCH/MEASURED-HERE/COMMUNITY/UNVERIFIED.
 sourceOfTruth:
   - config/delivery-instruction-contract.json
@@ -49,7 +50,7 @@ preset copy came to be.
 
 `OFFICIAL`. The instruction is not a parameter, a tag, or a field. It is a ChatML **user turn**
 prepended to the speech prompt. Upstream's reference implementation
-(`qwen_tts/inference/qwen3_tts_model.py`) builds it as:
+([`qwen3_tts_model.py`](https://github.com/QwenLM/Qwen3-TTS/blob/main/qwen_tts/inference/qwen3_tts_model.py)) builds it as:
 
 ```python
 def _build_instruct_text(self, instruct: str) -> str:
@@ -610,8 +611,8 @@ than pinning it to the backbone (`Qwen3RequestSamplingPolicy.subtalker`). A port
 one temperature silently pins the residual-codebook sampler, which can degrade timbre even when
 prosody is right; this checkout does not have that bug.
 
-`MEASURED-HERE`. The decode budget is a **fixed constant** (`officialQualityDefault.n`), not derived
-from text length. A slow or heavy delivery therefore cannot clip against a text-proportional
+`MEASURED-HERE`. The decode budget is a **fixed constant**
+(`Qwen3GenerationConfiguration.officialQualityDefault.maxNewTokens`, 2048), not derived from text length. A slow or heavy delivery therefore cannot clip against a text-proportional
 budget — a failure mode reported against other MLX TTS ports. Reaching the cap before EOS is
 detected and the output discarded rather than silently truncated (`GenerationOutputAdapter`).
 
@@ -686,8 +687,9 @@ unaffected presets, but it does mean the finding is weaker than it reads.
 
 **Fixed 2026-08-02, without touching preset copy.** The append now resolves preset-wide: if any
 tier of a preset asks for clarity, the whole preset suppresses it, so the two tiers can never differ
-by boilerplate alone. [`check_delivery_instructions.py`](../../scripts/check_delivery_instructions.py)
-fails the build if that resolution is removed.
+by boilerplate alone. [`check_delivery_instructions.py`](../../scripts/check_delivery_instructions.py), a step of
+`./scripts/check_project_inputs.sh`, fails the contract gate (locally in `scripts/dev.sh check`, on push in CI)
+if that resolution is removed.
 
 `MEASURED-HERE`, **DP-4, 2026-08-02 — prosodic null. The sentence stays.**
 
@@ -726,7 +728,9 @@ question can be reopened when there is an instrument that can answer it.
 Delivery quality needs audio, models, and seeds, so it can never be an ordinary CI gate — but the
 text-level ways the copy can be wrong are deterministic, and
 [`check_delivery_instructions.py`](../../scripts/check_delivery_instructions.py) runs inside
-`check_project_inputs.sh` on every commit and push. It fails outright on **append parity** across a
+`./scripts/check_project_inputs.sh` — locally through `scripts/dev.sh check` (advisory; only the commit
+lint blocks a commit) and on every push to `main` in the CI `macos-tests` job whenever Swift or
+workflow paths change. It fails outright on **append parity** across a
 preset's tiers and on **repeated intensifiers**, both indefensible whatever the right copy turns out
 to be. It reports **tier direction inversions** and **copy-versus-expectation conflicts** against
 [`delivery-instruction-contract.json`](../../config/delivery-instruction-contract.json): a listed
@@ -761,7 +765,7 @@ and shortened the worst target output, but the Fearful/Sad screen remained incom
 separable. The more descriptive Fearful arm was worse. This is direct evidence against assuming
 that shorter, more explicit, or more acoustically detailed wording is universally better. The
 current checkpoint copy remains in production without a semantic-improvement claim; see
-[`delivery-harness.md`](delivery-harness.md) §2.7 for the bounded results.
+[`delivery-harness.md`](delivery-harness.md) §2.8 for the bounded results.
 
 ### 8.4 The controlled experiment layer
 
@@ -778,7 +782,9 @@ conflicting semantics at three lengths; covers the nine speakers natively; and a
 cross-language sentinels. [`delivery_experiment_runner.py`](../../scripts/delivery_experiment_runner.py)
 binds a plan to exact production instructions, binary digest, sampling parameters, seeds, script
 identities, instruction receipts, and output hashes. It is serial, resumable, local-only, and never
-publishes evidence automatically. For evaluator calibration, its balanced rotation can keep one
+publishes evidence automatically; its `run_execution_plan` requires an explicit `lock_root` (the CLI
+passes `DEFAULT_SERIAL_LOCK_ROOT`, which is `build/cache/delivery-analysis`, the same
+`delivery-analysis-supervisor.lock` root the heavy analyzers use), so programmatic callers must supply one. For evaluator calibration, its balanced rotation can keep one
 seed and one neutral script fixed per speaker across all presets while the cohort collectively
 spans multiple seeds and all three script lengths; this preserves paired neutral reuse and real
 speaker/script/seed blocking without expanding the listener packet into a full factorial.
@@ -815,7 +821,8 @@ each is actually worth.
 preset grid with the wrong intensity-tier count, contradicting the guide's own §6 table and the
 then-shipped code. The correct figure at the time was **10 presets × 2 intensity tiers**; the
 roster has since been cut to 8 presets (2026-08-03) and the user-facing intensity control retired
-(2026-08-02), each surviving preset shipping its `strong` copy — see §4.3. The current counts come from
+(2026-08-02), each surviving preset shipping one tier chosen by `EmotionPreset.shippedIntensity` (`normal` for
+`happy` and `angry`, `strong` for the rest) — see §4.3. The current counts come from
 [`EmotionPreset.swift`](../../Sources/QwenVoiceCore/EmotionPreset.swift).
 
 `MEASURED-HERE`. [`../qwen_tone.md`](../qwen_tone.md) additionally attributes "negative constraints
@@ -861,14 +868,16 @@ nothing that survives correction under *either* form — `happy`, `excited`, `ne
 short), with `happy.normal` at 0.00 recall against a 5% chance floor. Instruction register is not
 the lever for those presets; nothing about the wording made them separable.
 
-`MEASURED-HERE`. Three different instruction-length limits exist in this checkout, and they measure
-different things rather than disagreeing: 2,048 characters is the Model Studio `voice_prompt`
-ceiling mirrored in
-[`VoiceDesignBriefCatalog.swift`](../../Sources/SharedSupport/Services/VoiceDesignBriefCatalog.swift),
-1,600 tokens is the hosted instruction ceiling, and the 240-character check in
+`MEASURED-HERE`. Four different length limits exist in this checkout, and they measure different
+things rather than disagreeing: `VoiceDesignBriefCatalog.descriptionLimit` in
+[`VoiceDesignBriefCatalog.swift`](../../Sources/SharedSupport/Services/VoiceDesignBriefCatalog.swift)
+caps the UI voice-description brief at 500 characters (a comment there records the 2,048-character
+Model Studio `voice_prompt` ceiling it sits under), 1,600 tokens is the hosted instruction ceiling,
+and the 240-character check in
 [`IOSDeviceDiagnosticsRunner.swift`](../../Sources/iOS/IOSDeviceDiagnosticsRunner.swift) is a
 diagnostics-harness guard on one environment override, not a product limit. The "500-character cap"
-named in the `EmotionPreset` canon corresponds to none of them and has no traceable origin.
+the `EmotionPreset` canon cites for *delivery instructions* matches none of these and has no
+traceable origin.
 
 ---
 
@@ -888,7 +897,7 @@ turns a `bench --delivery` run into a receipt-verified paired sidecar,
 runs a seeded delivery matrix, and [`scripts/delivery_statistics.py`](../../scripts/delivery_statistics.py)
 provides paired Wilcoxon tests, Cohen's d_z, BCa intervals, and Benjamini-Hochberg correction. Each
 experiment below is a matrix run plus a paired comparison, pre-registered per
-[`delivery-harness.md`](delivery-harness.md) §6.
+[`delivery-harness.md`](delivery-harness.md) §7.
 
 1. ~~**Short versus long instruction.**~~ **SETTLED 2026-08-02 — the shipped long form wins,
    57 surviving features against 33 over 12 paired seeds.** The benchmark's prediction held and the
@@ -946,7 +955,7 @@ clone that.
 
 Official:
 
-- [QwenLM/Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) — repository, README support matrix, `qwen_tts/inference/qwen3_tts_model.py`, `qwen_tts/core/models/modeling_qwen3_tts.py`
+- [QwenLM/Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) — repository, README support matrix, [`qwen3_tts_model.py`](https://github.com/QwenLM/Qwen3-TTS/blob/main/qwen_tts/inference/qwen3_tts_model.py), [`modeling_qwen3_tts.py`](https://github.com/QwenLM/Qwen3-TTS/blob/main/qwen_tts/core/models/modeling_qwen3_tts.py)
 - [Qwen3-TTS Technical Report (arXiv:2601.15621)](https://arxiv.org/abs/2601.15621)
 - [Qwen3-TTS-12Hz-1.7B-CustomVoice model card](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice) · [VoiceDesign model card](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign) · [Voice Design demo space](https://huggingface.co/spaces/Qwen/Qwen3-TTS-Voice-Design)
 - [Model Studio: Voice Design](https://www.alibabacloud.com/help/en/model-studio/qwen-tts-voice-design) · [qwen-tts](https://www.alibabacloud.com/help/en/model-studio/qwen-tts) · [realtime TTS](https://www.alibabacloud.com/help/en/model-studio/qwen-tts-realtime)

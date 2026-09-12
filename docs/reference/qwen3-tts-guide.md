@@ -1,13 +1,12 @@
 ---
 status: active
 owner: backend-mlx
+reviewed: 2026-09-12
 summary: Qwen3-TTS architecture reference — model variants, tokenizer profile, Talker/decoder, speaker roster, generation modes, and parameters.
 sourceOfTruth:
   - Sources/Resources/qwenvoice_contract.json
   - Sources/QwenVoiceCore/EmotionPreset.swift
   - Sources/QwenVoiceCore/GenerationSemantics.swift
-appliesTo:
-  - backend-mlx
 ---
 
 # Qwen3-TTS Reference Guide
@@ -45,7 +44,7 @@ All three patterns generate **24 kHz mono PCM**. Vocello ships only the **12 Hz 
 
 ## 2. Model families and variants
 
-Vocello bundles three model families, served from Vocello's own `PowerBeef02` Hugging Face repos (originally converted from the `mlx-community` releases; re-pinned there since 2026-07-26) and pinned to exact revisions in `qwenvoice_contract.json` — currently artifactVersion `2026.08.06.1`.
+Vocello bundles three model families, served from Vocello's own `PowerBeef02` Hugging Face repos (pinned there since 2026-07-26; the six repos are `PowerBeef02/Qwen3-TTS-12Hz-1.7B-{CustomVoice,VoiceDesign,Base}-{8bit,4bit}`) and pinned to exact revisions in `qwenvoice_contract.json` — currently artifactVersion `2026.08.06.1`.
 
 | Family (mode) | Folder suffix | MLX repo suffix | Size | Platforms | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -204,7 +203,7 @@ Qwen3PromptAssembly(
 ```
 
 - Instruction control is **only available on the 1.7B CustomVoice model**. The 0.6B model (not shipped in Vocello) does not support it.
-- For English text, `GenerationSemantics` appends a diction-reinforcement clause (`Native English pronunciation with clear English diction and natural stress.`) unless the feature is disabled via the debug-gated `QWENVOICE_ENGLISH_DICTION_REINFORCEMENT=off` diagnostic override. The append is suppressed when the instruction already asks for clarity, and that decision resolves **preset-wide**: if any intensity tier of a preset contains a diction word, every tier of that preset suppresses. Resolving per string instead let a preset's two tiers differ by 76 characters of boilerplate that says nothing about intensity, confounding normal-versus-strong comparisons (fixed 2026-08-02; `scripts/check_delivery_instructions.py` fails the build if it returns). Free-form user instructions still resolve per string.
+- For English text, `GenerationSemantics` appends a diction-reinforcement clause (`Native English pronunciation with clear English diction and natural stress.`) unless the feature is disabled via the debug-gated `QWENVOICE_ENGLISH_DICTION_REINFORCEMENT=off` diagnostic override. The append is suppressed when the instruction already asks for clarity, and that decision resolves **preset-wide**: if any intensity tier of a preset contains a diction word, every tier of that preset suppresses. Resolving per string instead let a preset's two tiers differ by 76 characters of boilerplate that says nothing about intensity, confounding normal-versus-strong comparisons (fixed 2026-08-02; `scripts/check_delivery_instructions.py`, run by `./scripts/check_project_inputs.sh` in `scripts/dev.sh check` (advisory) and in the CI `macos-tests` job on `main` (the gate), fails if it returns). Free-form user instructions still resolve per string.
 - Celebrity imitation / voice impersonation instructions are rejected by `validateQwenPromptContract`.
 
 ### 5.2 Voice Design
@@ -360,19 +359,22 @@ Detection order:
 
 Official guidance: **explicit language tokens outperform `auto`**. Vocello therefore tries to detect and only falls back to `auto` when ambiguous.
 
-**Unit tests:** `Tests/VocelloCoreTests/` covers `Qwen3SupportedLanguage.normalized`, `PromptLanguageDetector`, `LanguageSelectionPresentation`, and the `qwenLanguageHint` matrix. Run on macOS with `scripts/macos_test.sh core-test` (also step 3 of `scripts/macos_test.sh gate`).
+**Unit tests:** `Tests/VocelloCoreTests/` covers `Qwen3SupportedLanguage.normalized`, `PromptLanguageDetector`, `LanguageSelectionPresentation`, and the `qwenLanguageHint` matrix. Run on macOS with `scripts/dev.sh test --only <TestClass>` (which dispatches to `scripts/macos_test.sh core-test --only`); the full bundle is also step 2 of `scripts/macos_test.sh gate`.
 
-**Headless hint bench (Phase 2):** `config/language-bench-matrix.json` + `scripts/ios_device.sh lang-bench` (device) or `scripts/macos_test.sh lang-bench` (CLI). Gated by `scripts/check_language_hints.py` on `notes.languageHint`.
+**Headless hint bench (Phase 2):** `config/language-bench-matrix.json` + `scripts/ios_device.sh lang-bench` (device) or `scripts/macos_test.sh lang-bench` (CLI). Gated by `scripts/check_language_hints.py` on `notes.languageHint`. Both lanes are consent-bound (run only on explicit request), refuse to start on a busy host (`require_quiet_host` in `scripts/lib/host_preflight.sh`), and require the pinned whisper-small MLX recognizer to be prepared first with `scripts/prepare_delivery_compact_model_config.py whisper-small-mlx` — nothing downloads automatically.
 
-**Output round-trip (Phase 3, iOS device only):** the same fixed-seed matrix retains and
-revalidates the exact generated WAV, then runs three sequential locale-locked on-device Speech
-passes. `scripts/check_language_output.py` requires exact transcript consensus and independently
-recomputes the primary edit metric against the tracked corpus: WER for word-delimited languages or
-CER for Chinese and Japanese, with a `0.15` maximum in either case. Requires on-device Speech assets
-for non-EN/FR locales (iOS Settings → dictation languages + Wi-Fi download). See
-[`language-bench.md`](language-bench.md).
+**Output round-trip (Phase 3):** on iOS the same fixed-seed matrix retains and revalidates the
+exact generated WAV, runs three sequential locale-locked on-device Speech passes, and
+`scripts/check_language_output.py` requires exact transcript consensus and independently recomputes
+the primary edit metric against the tracked corpus: WER for word-delimited languages or CER for
+Chinese and Japanese, with the shared `MAX_ACCURACY_ERROR_RATE = 0.15` from
+`scripts/lib/language_metrics.py`. After generation has finished, both lanes add the pinned
+whisper-small MLX family through `scripts/independent_asr.py` (prepared as above; nothing downloads
+automatically): on iOS the publisher requires Apple Speech and whisper to agree, on macOS whisper is
+the single witness. Requires on-device Speech assets for non-EN/FR locales (iOS Settings → dictation
+languages + Wi-Fi download). See [`language-bench.md`](language-bench.md).
 
-### 7.3 Dialects and accents
+### 7.4 Dialects and accents
 
 - Two built-in speakers carry Chinese dialect hints: `dylan` (Beijing) and `eric` (Sichuan/Chengdu).
 - Voice Design prompts can request accents, but the model treats them as suggestions, not guarantees.
@@ -536,7 +538,7 @@ These are compiled from the official docs, community reports, and Vocello's own 
 | File | What it owns |
 | --- | --- |
 | `Sources/Resources/qwenvoice_contract.json` | Model list, variants, repos/revisions, tokenizer profile, generation defaults, speaker roster. |
-| `Sources/QwenVoiceCore/EmotionPreset.swift` | 8 delivery presets and their instruction copy (each ships its `strong` text; the internal normal/strong pair survives for the delivery matrix harness). |
+| `Sources/QwenVoiceCore/EmotionPreset.swift` | 8 delivery presets and their instruction copy (`shippedIntensity` picks the tier that ships — `normal` for `happy` and `angry`, `strong` for the rest; the internal normal/strong pair survives for the delivery matrix harness). |
 | `Sources/QwenVoiceCore/GenerationSemantics.swift` | Prompt assembly, language hint logic, English diction reinforcement, prompt validation. |
 | `Sources/QwenVoiceCore/NativeCloneSupport.swift` | Reference normalization, transcript resolution, clone prompt caching, quality warnings. |
 | `Sources/QwenVoiceCore/Qwen3TTSRuntimeProfile.swift` | Runtime model-family detection, capability validation, generation-defaults parsing. |
@@ -552,6 +554,6 @@ These are compiled from the official docs, community reports, and Vocello's own 
 - Qwen3-TTS documentation site: https://qwenlm-qwen3-tts.mintlify.app/
 - Qwen3-TTS tokenizer docs: https://mintlify.com/QwenLM/Qwen3-TTS/concepts/tokenizer
 - Technical report: *Qwen3-TTS Technical Report*, arXiv:2601.15621
-- mlx-community Qwen3-TTS conversions: https://huggingface.co/mlx-community
+- Vocello's pinned MLX conversions: https://huggingface.co/PowerBeef02
 - Mimi codec (Kyutai): https://kyutai.org/codec-explainer
 - Community architecture / weight reference (unofficial but well-verified): https://github.com/gabriele-mastrapasqua/qwen3-tts/blob/main/MODEL.md

@@ -1,6 +1,7 @@
 ---
 status: active
 owner: backend-mlx
+reviewed: 2026-09-12
 summary: The design-then-clone workflow — build curated emotion reference banks with the pipeline script, how curation scores and honestly refuses candidates, and how banks present as personas with a delivery choice in both apps.
 sourceOfTruth:
   - scripts/build_emotion_reference_bank.py
@@ -33,6 +34,12 @@ machinery already conditions on the reference clip's full codec-token sequence
 and emotion carry into the take.
 
 ## Building a bank
+
+The builder and its scorers run from a local, untracked virtual environment:
+`python3 -m venv .venv && .venv/bin/pip install torch transformers speechbrain` (the headers of
+`scripts/emotion_advisory.py` and `scripts/clone_speaker_similarity.py` name the exact
+wav2vec2 and ECAPA backends; the ECAPA identity scorer imports `speechbrain`). Never install these into the system interpreter and never run
+them while the engine is generating.
 
 ```sh
 .venv/bin/python3 scripts/build_emotion_reference_bank.py build \

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-07
+reviewed: 2026-09-12
 summary: Source-grounded Audio QC architecture, corrected default preprocessing, M2 resource measurements, accuracy limitations and explicit historical replay boundaries.
 sourceOfTruth:
   - Sources/QwenVoiceCore/GenerationOutputAdapter.swift
@@ -15,6 +15,9 @@ sourceOfTruth:
   - scripts/run_local_delivery_cascade.py
   - scripts/prosody_quality_gate.py
   - scripts/check_language_output.py
+  - scripts/independent_asr.py
+  - scripts/lib/language_metrics.py
+  - scripts/lib/audio_qc.py
   - config/prosody-holdout-policy.json
   - scripts/prosody_corpus_inventory.py
   - scripts/prosody_holdout_validation.py
@@ -195,8 +198,8 @@ QC, prompts, models, seeds, personal data and the release queue are unchanged.
 | Layer | Implementation | Meaning and authority |
 | --- | --- | --- |
 | Product safety | `GenerationOutputAdapter.swift`, `PersistedWAVAudioQCAnalyzer`, limiter and atomic writer | Fast-QC v6 examines final marked PCM and retains pre-write instability. Hard failures prevent publication; ordinary cadence warnings remain visible. |
-| Product adapters | macOS/iOS `AudioQualityGate.swift` | Both delegate to the same core analyzer. Duplicate presentation adapters, **not** separate thresholds. |
-| Spoken content | `VoiceClipTranscriber.swift`, `check_language_output.py` | Three locale-locked recognitions of the exact WAV, edge evidence, WER/CER, language checks. Repeatability is not three independent ASR systems. |
+| Product adapter | `Sources/SharedSupport/Services/AudioQualityGate.swift` | One shared presentation adapter compiled into both app targets; it delegates to the core analyzer and owns no thresholds. |
+| Spoken content | `VoiceClipTranscriber.swift` (Apple Speech, three locale-locked passes), `scripts/independent_asr.py` (whisper-small MLX, after the generator exits), `scripts/lib/language_metrics.py`, `check_language_output.py` | Locale-locked full-WAV recognition, edge evidence, WER/CER (0.15 threshold). One family is one witness; two families must agree for consensus. |
 | Acoustic measurement | `analyze_prosody.py` v3, `delivery_temporal_features.py` v1 | Two bounded passes each: global features and five-region contours. Measures signal properties, not listener-recognized emotion. |
 | Acoustic decisions | `prosody_quality_gate.py`, `delivery_quality_gate.py`, frozen profile | Warn-first heuristics; incomplete measurement must not become PASS. AV-07's independent calibration is still missing. |
 | Local research | experiment runner, analysis cache, compact adapter, resource supervisor, cascade, evaluator | Source-bound serial screening; native QC and independent ASR evidence compose separately from optional heads. Missing/contradictory evidence abstains. Requested follow-up layers are **requests**, not executed ASR/UTMOS evidence. No listener-proven semantic claim. |
@@ -706,7 +709,7 @@ for this small absolute saving would add acceptance work without resolving a rel
 
 Each already-installed, contract-pinned compact model passed **two cache-cold serial probes** on
 public English/Chinese preview audio with finalized v2 preprocessing. Separate final reports are
-`sensevoice-qualified/qualification.json` and `distilhubert-qualified/qualification.json`; earlier development
+the `qualification.json` files in the `sensevoice-qualified/` and `distilhubert-qualified/` directories; earlier development
 probes are retained, not merged. Resource envelopes include RSS, clean exit, pressure snapshots,
 swap deltas and post-exit recovery. This is CPU/RSS short-clip bake-off qualification, not continuous
 pressure sampling, physical-footprint qualification, long-form neural memory bounds, calibrated
@@ -722,7 +725,7 @@ Evidence stays separate in `build/artifacts/diagnostics/audio-qc-current-default
 | SenseVoiceSmall Q8 | 277.68 / 272.96 MB | 0.269 / 0.192 s | `a58b480543c6f38b7210a1dc433a1285890e7f467485adca13cff90103d7d5df` |
 | DistilHuBERT | 572.87 / 562.99 MB | 2.834 / 2.172 s | `2138f39fad780c50182ae3c4e08decec74eced05c1b588b70d16f974fe4eecfc` |
 
-Reports are `sensevoice/qualification.json` and `distilhubert/qualification.json`. All four
+Reports are `qualification.json` under `sensevoice/` and `distilhubert/`. All four
 envelopes passed with confirmed clean exit and post-exit recovery; SenseVoice swap delta was zero,
 DistilHuBERT's was negative, and before/after pressure warnings were false. Existing swap was
 nonzero. These short, warm-host observations are not a speed benchmark, continuous pressure
@@ -748,8 +751,8 @@ judge would be invalid. French disagreement remains open; no extra recognizer wa
 ### Threshold-change authority
 
 The Fast-QC cadence and dropout boundaries (`makeAudioQCReport`, algorithm v6) change only under
-this policy, carried over verbatim from the retired `config/audio-cadence-qc-contract.json` on
-2026-09-12:
+this policy, carried over verbatim on 2026-09-12 from the retired cadence contract,
+`audio-cadence-qc-contract.json` (in git history):
 
 - an untouched confirmation cohort is required (`requiresUntouchedConfirmation`);
 - independent reference evidence is required, independent human labels are not
@@ -848,11 +851,10 @@ listener evidence, not to the automatic reference route:
   from another reviewer; original votes remain unchanged. Final `label` maps acceptable→good and
   objectionable→bad. `defectSeverity` is the maximum resolved interval severity, or none.
 
-The optional existing delivery listening session remains a **dimensional/emotion** tool: it requires
-completed generations and asks VAD/2AFC questions. It does **not** collect defect intervals or accept
-failed generations as a defect study, and is not silently repurposed as one. The new template is
-an annotation data contract, not a claim that a graphical/interactive defect-listening session has
-been built or completed. No independent reviewers or labels were fabricated.
+The blinded listening-session scripts were removed on 2026-09-12 (git history retains them); only
+`delivery_promotion_decision.py` schema 1 still reads historical listener results. The template
+above is an annotation data contract for optionally imported listener evidence, not a claim that
+any listening session exists or was run. No independent reviewers or labels were fabricated.
 
 **Compatibility.** Existing JSONL/profile readers and historical result files remain readable.
 New qualification requires source-family/exposure provenance and bound independent reference
@@ -919,9 +921,6 @@ Reference input formats (private JSONL, existing calibration/holdout commands):
   and `defectSeverity`. Its digest must also be in the policy's `approvedExternalCatalogSHA256`;
   the current list is empty, so an arbitrary local file cannot qualify itself. Verify actual source/licensing before acquisition; these declarations
   are provenance to audit, not legal clearance or self-label permission. No downloads occur.
-- Cadence schema-2 rows replace `humanLabel/listenerCount/labelAgreement` with `referenceLabel`
-  and `referenceInput` (the bound private row above). Emitted reports exclude private inputs.
-  Optional schema-1 listener cohorts keep their original validation and meaning.
 
 ASR evidence format: `{policyID: automated-evidence-1, executionPlanDigest, rows: {generationID:
 {instructed: [...], neutral: [...]}}}`. Each recognition contains `modelFamily`

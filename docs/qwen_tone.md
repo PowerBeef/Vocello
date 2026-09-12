@@ -1,13 +1,14 @@
 ---
 status: active
 owner: backend-mlx
+reviewed: 2026-09-12
 summary: App-facing quick guide to tone and emotion control; the sourced qwen3-tts-prompting-guide wins on any disagreement.
 sourceOfTruth:
   - Sources/QwenVoiceCore/EmotionPreset.swift
 ---
 # Tone and Emotion in Vocello
 
-_Last reviewed: 2026-08-27. Provenance pass 2026-08-02._
+_Last reviewed: 2026-09-12. Provenance pass 2026-08-02._
 
 `angry.normal` now has one governed bilingual variant: English remains canonical, while Mandarin is
 selected only for CustomVoice when both the catalog speaker is Chinese-native and output language
@@ -30,12 +31,12 @@ is unchanged. The delivery instruction contract owns the exact text and digests.
 > [`reference/qwen3-tts-prompting-guide.md`](reference/qwen3-tts-prompting-guide.md)
 > for the corrected record.
 
-This guide is a supplemental prompt-writing reference for the shipped macOS app. It is supplemental and may lag shipped behavior — when in doubt, trust the sources listed below before this guide.
+This guide is a supplemental prompt-writing reference for the shipped macOS and iOS apps and the `vocello` CLI. It is supplemental and may lag shipped behavior — when in doubt, trust the sources listed below before this guide.
 
 For current repo truth about app structure, workflows, or supported behavior, trust:
 
 1. `README.md`
-2. `CLAUDE.md` (repo guide: architecture, build, conventions)
+2. `CLAUDE.md` (working rules and commands) and `docs/ARCHITECTURE.md` (architecture)
 
 ## What the App Exposes
 
@@ -122,6 +123,6 @@ Voice Cloning support text:
 ## Related Docs
 
 - [`../README.md`](../README.md)
-- [`../CLAUDE.md`](../CLAUDE.md) — repo architecture, build, and conventions
+- [`../CLAUDE.md`](../CLAUDE.md) — working rules and commands; [`ARCHITECTURE.md`](ARCHITECTURE.md) — architecture
 - [`reference/qwen3-tts-prompting-guide.md`](reference/qwen3-tts-prompting-guide.md) — the sourced prompting reference this file defers to
 - `Sources/QwenVoiceCore/EmotionPreset.swift` — the shipped 8 preset instructions (roster cut from ten on 2026-08-03; the user-facing intensity control was retired 2026-08-02; every preset ships its per-preset measured-best tier — the `strong` anchor, except `happy`/`angry` at `normal` since 2026-08-15 — and both tiers survive for the delivery matrix harness) (single source for macOS + iOS + the CLI's `bench --delivery` cells); `Sources/QwenVoiceCore/GenerationSemantics.swift` assembles the Voice Design "Voice character / Delivery" framing.

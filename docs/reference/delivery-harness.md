@@ -1,11 +1,14 @@
 ---
 status: active
 owner: backend-mlx
+reviewed: 2026-09-12
 summary: Operator's reference for the audio delivery analysis harness — the tools, the bench --delivery measurement protocol, evidence and provenance conventions, the statistics the separability scorer reports, the pre-registration discipline, the DP results ledger, and re-run recipes.
 sourceOfTruth:
   - scripts/custom_delivery_matrix.py
   - scripts/delivery_experiment.py
   - scripts/delivery_experiment_runner.py
+  - scripts/delivery_prompt_remediation.py
+  - scripts/angry_bilingual_safety_matrix.py
   - scripts/delivery_evaluator.py
   - scripts/delivery_evaluator_v2.py
   - scripts/delivery_analysis_cache.py
@@ -16,6 +19,9 @@ sourceOfTruth:
   - scripts/qualify_delivery_compact_models.py
   - scripts/delivery_resource_supervisor.py
   - scripts/check_language_output.py
+  - scripts/independent_asr.py
+  - scripts/lib/language_metrics.py
+  - scripts/lib/audio_qc.py
   - scripts/run_local_delivery_cascade.py
   - scripts/delivery_acoustic_reference.py
   - config/delivery-acoustic-reference-base.json
@@ -50,10 +56,15 @@ their completion statuses into an unconditional audio-quality PASS.
 
 ## 1. Tool inventory
 
-Only the text-only `check_delivery_instructions.py` runs in the deterministic CI gate; audio
-generation and calibration remain explicit measurement lanes.
-Test files live under `scripts/tests/` and run in
-the script self-test suite via `scripts/check_project_inputs.sh`.
+Only text-level contract validators run in the deterministic gate (`./scripts/check_project_inputs.sh`,
+advisory locally through `scripts/dev.sh check`, enforced by CI on `main`): `check_delivery_instructions.py`,
+`delivery_experiment.py validate`, `delivery_evaluator.py validate-v2-contract`,
+`prosody_holdout_validation.py validate-contract` and `prepare_delivery_compact_model_config.py --validate-only`;
+audio generation and calibration remain explicit measurement lanes.
+Test files live under `scripts/tests/` and run with pytest in the `research` lane (modules are marked
+by name in `scripts/tests/conftest.py`): push CI runs them only when a research script, a research config
+or a workflow file changed, nightly runs the complete suite, and locally `scripts/dev.sh py --lane research` (or the
+default `scripts/dev.sh py`, which selects the modules the dirty tree affects) runs them.
 
 | Tool | Purpose | Tests |
 | --- | --- | --- |
@@ -65,7 +76,7 @@ the script self-test suite via `scripts/check_project_inputs.sh`.
 | `scripts/delivery_analysis_cache.py` | Content-addressed, atomic analysis cache keyed by original and canonical audio plus exact analyzer/model/preprocessing provenance; cache hits launch no model | `test_delivery_analysis_cache.py` |
 | `scripts/delivery_temporal_features.py` | Two-pass bounded-memory five-region contour analyzer plus same-identity instructed-minus-neutral deltas | `test_delivery_temporal_features.py` |
 | `scripts/delivery_compact_model_adapter.py` | Contract-first subprocess adapter for fully pinned SenseVoiceSmall Q8, DistilHuBERT or whisper-small MLX candidates; no candidate is adopted or downloaded by the repository | `test_delivery_compact_model_adapter.py` |
-| `scripts/independent_asr.py` | Second recognizer family: pinned whisper-small MLX loaded once in one supervised subprocess after the generator has exited; manifest → cached, digest-bound, transcript-carrying recognitions for the language lanes (`--platform macos\|ios`) and the cascade's `--review-evidence` | `test_independent_asr.py` |
+| `scripts/independent_asr.py` | Second recognizer family: pinned whisper-small MLX loaded once in one supervised subprocess after the generator has exited; `manifest` (`--platform macos\|ios\|cascade`; the cascade form takes `--cascade-input`) → `transcribe --manifest … --adapter-config <whisper-small-mlx config> --output …` → cached, digest-bound, transcript-carrying recognitions for the language lanes and the cascade's `--review-evidence` | `test_independent_asr.py` |
 | `scripts/lib/language_metrics.py` | The one tokenizer, edit distance, locale table, threshold set and family-consensus rule shared by the output gate, the publisher, the cascade and the producer | `test_language_metrics.py` |
 | `scripts/delivery_compact_model_runtime.py` | Offline CPU DistilHuBERT executor; emits one deterministic, normalized 128-dimensional frozen representation and never receives a requested label | `test_delivery_compact_model_runtime.py` |
 | `scripts/prepare_delivery_compact_model_config.py` | Validates the tracked candidate contract and exact local weights/runtime/dependencies, then emits an untracked path-bearing adapter configuration | `test_prepare_delivery_compact_model_config.py` |
@@ -78,8 +89,8 @@ the script self-test suite via `scripts/check_project_inputs.sh`.
 | `scripts/delivery_separability.py` | Cross-preset separability: ridge-LDA over paired signed features, seed-grouped CV, UAR, computed chance floor, permutation null, Wilson intervals, per-cell BH-FDR, `--presets` subset probes | `test_delivery_separability.py` |
 | `scripts/bench_delivery_prosody.py` | Post-processes the current `vocello bench --delivery` run from its immutable manifest into `bench-prosody.json`; fail-closed instruction-receipt provenance (§4) | via `test_bench_command_contract.py` |
 | `scripts/build_emotion_reference_bank.py` | Generate → score → select → enroll curated per-emotion VoiceDesign reference banks (design-then-clone) → [`emotion-reference-banks.md`](emotion-reference-banks.md) | `test_build_emotion_reference_bank.py` |
-| `scripts/emotion_advisory.py` | Advisory SER agreement column (pinned wav2vec2-XLSR checkpoint + revision); never a gate, never publication input → [`testing-runbook.md`](testing-runbook.md) | `test_emotion_advisory.py` |
-| `scripts/mos_advisory.py` | Advisory naturalness MOS-proxy column (UTMOSv2 pinned by commit + weights digest, CPU, relative signal only); never a gate, never publication input → [`testing-runbook.md`](testing-runbook.md) | `test_mos_advisory.py` |
+| `scripts/emotion_advisory.py` | Advisory SER agreement column (pinned wav2vec2-XLSR checkpoint + revision); advisory-only, runs after the engine has exited from a local `.venv` (`python3 -m venv .venv && .venv/bin/pip install torch transformers`; see the script header); never CI, packaging or benchmark-history input | `test_emotion_advisory.py` |
+| `scripts/mos_advisory.py` | Advisory naturalness MOS-proxy column (UTMOSv2 pinned by commit + weights digest, CPU, relative signal only); advisory-only, runs after the engine has exited from the same `.venv` plus the pinned `utmosv2` install named in the script header; never CI, packaging or benchmark-history input | `test_mos_advisory.py` |
 | `scripts/delivery_quality_gate.py` | Per-preset delivery-adherence verdict + neutral-cohort dispersion, thresholds from the versioned prosody profile | `test_delivery_quality_gate.py` |
 | `scripts/delivery_statistics.py` | Library: Wilcoxon, Cohen's d_z, BCa bootstrap, Wilson, Benjamini-Hochberg, required-pairs power | `test_delivery_statistics.py` |
 | `scripts/delivery_matrix_report.py` | Matrix-level report over paired delivery rows | `test_delivery_matrix_report.py` |
@@ -247,8 +258,8 @@ python3 scripts/custom_delivery_matrix.py run \
 
 The runner discovers the exact speaker and shipped-delivery rosters from the CLI,
 seals each speaker/seed unit, rejects missing/duplicate/cross-identity outcomes, and
-resumes only at unit boundaries. `--instruction-set short|candidate-v2` selects a
-registered debug-only arm; omit it for shipped production copy. Compare two complete
+resumes only at unit boundaries. `--instruction-set short|candidate-v2|angry-bilingual-v3` selects a
+registered debug-only arm (§2.9 describes the bilingual arm); omit it (or pass `shipped`) for production copy. Compare two complete
 same-identity arms with `custom_delivery_matrix.py compare`.
 
 ### 2.1 Multilingual prompt and sampling experiments
@@ -339,16 +350,32 @@ spectral, cadence, and pause contours without building a duration-sized frame ma
 tests cover rises/falls, peak position, attacks, delayed pauses, persistent noise, tremor, zero
 paired deltas, and duration-independent analyzer-owned memory.
 
-Post-generation evaluation starts only after the TTS/MLX process has exited:
+Post-generation evaluation starts only after the TTS/MLX process has exited. The second
+recognizer family is produced first, then handed to the cascade as `--review-evidence`:
 
 ```sh
 python3 scripts/delivery_evaluator.py validate-v2-contract \
   --contract config/delivery-evaluator-v2-contract.json
+python3 scripts/prepare_delivery_compact_model_config.py whisper-small-mlx \
+  --output build/cache/delivery-analysis/whisper-small-mlx.json
+python3 scripts/independent_asr.py manifest --platform cascade \
+  --cascade-input build/artifacts/macos/delivery-experiment/calibration/cascade-input.json \
+  --generation-process-exited \
+  --output build/artifacts/macos/delivery-experiment/calibration/asr-manifest.json
+python3 scripts/independent_asr.py transcribe \
+  --manifest build/artifacts/macos/delivery-experiment/calibration/asr-manifest.json \
+  --adapter-config build/cache/delivery-analysis/whisper-small-mlx.json \
+  --output build/artifacts/macos/delivery-experiment/calibration/asr-recognitions.json
 python3 scripts/run_local_delivery_cascade.py \
   --plan build/artifacts/macos/delivery-experiment/calibration/plan.json \
   --run-dir build/artifacts/macos/delivery-experiment/calibration/run \
+  --review-evidence build/artifacts/macos/delivery-experiment/calibration/asr-recognitions.json \
   --out build/artifacts/macos/delivery-experiment/cascade-report.json
 ```
+
+The prepare step only validates already-present pinned local weights and emits an untracked
+path-bearing config; nothing is downloaded automatically. Without `--review-evidence` the cascade
+has no second recognizer family and its spoken-content dimension stays inconclusive.
 
 The experiment analyzer reuses up to 128 blind global/temporal summary pairs by verified WAV digest
 within one invocation, avoiding repeated neutral-control passes without retaining PCM. Input hashes
@@ -359,7 +386,12 @@ The cascade derives its input from the runner's retained plan, execution state, 
 source identities and exact WAV digests after the generator has exited, then reuses neutral
 controls through `build/cache/delivery-analysis` (bounded on the 8 GB host with
 `python3 scripts/delivery_analysis_cache.py prune --keep-newest N`; a pruned entry is recomputed
-on its next use). Cache identity binds original and canonical
+on its next use). The default root is overridable with `QVOICE_DELIVERY_ANALYSIS_CACHE`; the
+cascade and `independent_asr.py transcribe` also take `--cache-root` and `--lock-root`. All heavy
+analyzers and the experiment runner serialize on `<lock root>/delivery-analysis-supervisor.lock`
+(the runner's `run_execution_plan` requires an explicit `lock_root`, and its CLI always passes the
+shared default root), so point every serial tool at the same root or they will not exclude one
+another. Cache identity binds original and canonical
 16 kHz mono PCM bytes to layer, binary, model, revision, weights, and preprocessing digests;
 corruption or drift fails closed and a cache hit launches no model. Reports contain digests and
 measurements, never local paths or audio. Always-on acoustics can reject a broken row, but absent a
@@ -433,8 +465,8 @@ classification into an old failed envelope or infer that all old signal denials 
 
 ### 2.4 Cadence validity is separate from delivery adherence
 
-Fast audio QC algorithm v5 retains the v4 pass/warn/fail boundaries and adds a bounded typed
-`AudioCadenceQCReport`. It records the punctuation-derived expected pause count, observed and
+Fast audio QC algorithm v6 keeps the v4 pass/warn/fail boundaries; v5 added the bounded typed
+`AudioCadenceQCReport` and v6 (VLR-09) additionally rejects an egregious terminal-silence run. The report records the punctuation-derived expected pause count, observed and
 excess cadence pauses, suspicious-pause count, the bounded pause-duration vector, cumulative
 interior/cadence silence, median and p90 pause duration, and cadence-silence ratio. These fields
 contain no script or audio. A `severe` cadence classification is still only the existing gross
@@ -455,20 +487,7 @@ automatic metrics as screens only, explicit source review) is recorded in
 contract and its cohort evaluator were removed on 2026-09-12: the engine never emitted the cohort
 schema they validated, so they gated nothing.
 
-Live status on 2026-08-23: both exact candidate configurations passed two cache-cold probes on the
-attested Mac14,3 / 8 GiB host. SenseVoice used 275-293 MB peak RSS and DistilHuBERT used 677-874 MB;
-all four probes recorded zero swap growth, no pressure warning and clean post-exit recovery. A
-balanced source-bound cohort completed 64 instructed rows plus eight shared neutral controls over
-all eight presets, eight speakers, six scripts/three translation groups and three languages. A
-prior cohort is retained but excluded because one fixed-seed cell reproducibly failed Fast QC with
-a 4.613-second dropout. The accepted run's 64-row acoustic/temporal analysis and both compact
-cascades completed; their historical results abstained pending human calibration. Its source-bound listener packet
-contains 64 dimensional trials, 56 non-neutral 2AFC trials and three multilingual anchors. The
-then-required gate was three independent qualified listeners. That requirement was removed on
-September 6; current independent-reference calibration and untouched measured-claim gates replace it.
-No production delivery copy or `EmotionPreset` changed.
-
-### 2.4 Development-screen findings (2026-08-22)
+### 2.5 Development-screen findings (2026-08-22)
 
 These local artifacts are exploratory and untracked; they are not promotion evidence and did not
 open the confirmation split.
@@ -496,7 +515,20 @@ unchanged. The next automatic screen may expand the Happy-only acoustic arm to t
 8-20 seed range. Current promotion follows the frozen automatic measured-claim protocol;
 historical listener results below are preserved, not required new work.
 
-### 2.5 Maintainer-directed production-copy checkpoint (2026-08-25)
+**Historical status (2026-08-23).** Both exact candidate configurations passed two cache-cold probes on the
+attested Mac14,3 / 8 GiB host. SenseVoice used 275-293 MB peak RSS and DistilHuBERT used 677-874 MB;
+all four probes recorded zero swap growth, no pressure warning and clean post-exit recovery. A
+balanced source-bound cohort completed 64 instructed rows plus eight shared neutral controls over
+all eight presets, eight speakers, six scripts/three translation groups and three languages. A
+prior cohort is retained but excluded because one fixed-seed cell reproducibly failed Fast QC with
+a 4.613-second dropout. The accepted run's 64-row acoustic/temporal analysis and both compact
+cascades completed; their historical results abstained pending human calibration. Its source-bound listener packet
+contains 64 dimensional trials, 56 non-neutral 2AFC trials and three multilingual anchors. The
+then-required gate was three independent qualified listeners. That requirement was removed on
+September 6; current independent-reference calibration and untouched measured-claim gates replace it.
+No production delivery copy or `EmotionPreset` changed.
+
+### 2.6 Maintainer-directed production-copy checkpoint (2026-08-25)
 
 The maintainer directed a narrow production-copy remediation from the 2026-08-24 engineering
 handout for Happy, Angry, Fearful, and Surprised. Both tiers now distinguish target valence and
@@ -512,10 +544,10 @@ identity failure at compliant development seed `32060824`. The literal handout s
 correctly refused because it is outside the governed development partition. Happy, Angry, Fearful,
 and Surprised each retained one-seed advisory acoustic misses, so the smoke makes no adherence or
 semantic-improvement claim. This checkpoint left DP-30 open for script/language/power screening;
-§2.7 records the later decision-complete negative screen. DP-31/DP-32 retain blinded semantic
-promotion authority.
+§2.8 records the later decision-complete negative screen. DP-31/DP-32 retain measured-claim
+promotion authority (automated; listening optional).
 
-### 2.6 Autonomous per-preset acoustic screen (pre-registered 2026-08-25)
+### 2.7 Autonomous per-preset acoustic screen (pre-registered 2026-08-25)
 
 [`config/delivery-prompt-remediation-contract.json`](../../config/delivery-prompt-remediation-contract.json)
 freezes six exact candidates before new generation: two Happy arms, one Angry arm, two Fearful arms,
@@ -582,7 +614,7 @@ uses zero magnitude for those supporting normal-tier axes while retaining direct
 unmeasured 1.15 strong multiplier is also retired; both tiers use 1.0 because the measured cross-tier
 separation ratio was 0.997. This changes threshold calibration, not tier identity or prompt copy.
 
-### 2.7 Autonomous screen result, corrected v2 composition (2026-08-26)
+### 2.8 Autonomous screen result, corrected v2 composition (2026-08-26)
 
 All six pre-registered Speed candidates completed the first screen on 2026-08-25. The same source-
 bound plans, WAVs, acoustic layers, and failure rows were recomposed on 2026-08-26 after the scoring
@@ -617,9 +649,10 @@ Sohee/Korean competitor failure, and Fearful durations up to 112.8 seconds. V2 c
 failed planned rows in the denominator while distinguishing them from missing features on a
 completed analysis. The full WAVs, execution state, original decisions, and recomposed decisions
 remain untracked. No automatic layer gained semantic, production-copy, or publication authority;
-DP-28/DP-31 still own calibrated human evidence.
+DP-28 owns evaluator calibration against independent references and DP-31 the frozen automated
+holdout (listening is optional).
 
-### 2.8 Angry bilingual hard-safety checkpoint (2026-08-26)
+### 2.9 Angry bilingual hard-safety checkpoint (2026-08-26)
 
 `scripts/angry_bilingual_safety_matrix.py` is the narrow fail-closed lane for the versioned
 `angry-bilingual-v3` arm. It derives native-language ownership from
@@ -803,13 +836,15 @@ ready; AV-07 remains open until an independently labelled real corpus produces a
   --designation confirmatory --json`, plus `--presets …` for registered subset probes.
 - **Listening is optional and has no lane**: the blinded 2AFC/identification session scripts were
   removed on 2026-09-12. Current automatic decisions use `delivery_promotion_decision.py` schema 2;
-  schema 1 remains readable for historical listener results. Setup and posture:
-  [`testing-runbook.md`](testing-runbook.md).
+  schema 1 remains readable for historical listener results; no setup exists for a lane that
+  does not exist.
 - **Reference bank**: [`emotion-reference-banks.md`](emotion-reference-banks.md) —
   generation strictly before scorers on the 8 GB canonical machine; SER + identity +
   prosody scoring; honest refusal when no candidate passes.
-- **SER advisory**: pinned model/revision, `.venv`, after-generation only —
-  [`testing-runbook.md`](testing-runbook.md).
+- **SER and MOS advisories**: pinned model/revision, after-generation only, from a local untracked
+  `.venv` (`python3 -m venv .venv && .venv/bin/pip install torch transformers`, plus the pinned
+  `utmosv2` install named in the `mos_advisory.py` header); never CI, packaging or
+  benchmark-history input.
 
 Constraint that governs all of the above: the canonical dev machine is the 8 GB M2 —
 never run analyzer models concurrently with the engine; generate first, score after.

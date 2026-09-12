@@ -56,6 +56,23 @@ enum CriticalMemoryReliefExecutor {
     }
 }
 
+/// Orders a critical full unload so its diagnostics event is a completion boundary: the event
+/// is recorded only after the awaited unload returned, and backend generation activity is
+/// cleared exactly once, after that record. `@MainActor` for the same reason as
+/// `CriticalMemoryReliefExecutor`: `TTSEngineStore` passes MainActor-bound closures.
+@MainActor
+enum CriticalMemoryFullUnloadSequence {
+    static func execute(
+        unload: () async -> Void,
+        recordUnloadCompleted: () -> Void,
+        clearGenerationActivity: () -> Void
+    ) async {
+        await unload()
+        recordUnloadCompleted()
+        clearGenerationActivity()
+    }
+}
+
 @MainActor
 final class RuntimeReleaseCoordinator: ObservableObject {
     @Published private(set) var pendingReason: String?

@@ -517,6 +517,8 @@ targets:
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
       - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
+      - path: Sources/iOSSupport/Services/IOSGenerationOwnershipAuthority.swift
+      - path: Sources/iOSSupport/Services/IOSModelDownloadCancellationSequence.swift
       - path: Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
       - path: Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
       - path: Sources/iOSSupport/Services/IOSExportAccessPolicy.swift
@@ -561,6 +563,8 @@ targets:
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
       - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
+      - path: Sources/iOSSupport/Services/IOSGenerationOwnershipAuthority.swift
+      - path: Sources/iOSSupport/Services/IOSModelDownloadCancellationSequence.swift
       - path: Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
       - path: Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
       - path: Sources/iOSSupport/Services/IOSExportAccessPolicy.swift

@@ -2719,6 +2719,27 @@
         "config/concurrency-safety.json",
         "Sources/QwenVoiceEngineService/EngineServiceHost.swift"
       ]
+    },
+    {
+      "id": "ICA-21",
+      "plan": "ios-control-audit-2026-08",
+      "title": "Swift unit tests for the two invariants the deleted source-text tests guarded",
+      "status": "done",
+      "updated": "2026-09-12",
+      "gate": "Two ordering invariants were guarded only by Python tests that asserted Swift source text (removed 2026-09-12): the download coordinator writes its durable tombstone before removing staged files (IOSModelDownloadCoordinator / HuggingFaceDownloader), and the device diagnostics runner keeps critical-memory ownership with the engine store during a run (IOSDeviceDiagnosticsRunner / TTSEngineStore). Closure: extract each order into a testable type reachable from VocelloiOSLogicTests (or a macOS-compiled shared type) and assert it there; no test may read Swift source text.",
+      "notes": "Closed 2026-09-12. The download order lives in IOSModelDownloadCancellationSequence (cancelPending / cancelActive: durable intent before any task cancellation, durable .deleted tombstone before staging removal or the terminal .deleted publish, raced-install rollback before the tombstone, every failed persist returns without touching staging) and IOSModelDownloadCoordinator.cancel(modelID:) drives it with non-escaping closures. The engine-store order lives in IOSGenerationOwnershipAuthority (admission, generation completion retained by an in-flight critical action, post-barrier release, one-scope critical claim, cancellation-failure abandon) plus CriticalMemoryFullUnloadSequence (awaited unload, then the critical_full_unload event, then clearGenerationActivity once); TTSEngineStore keeps its published hasActiveGeneration as the stored flag that syncFromSnapshot ORs with backend activity. The executor order cancel -> applyRelief -> releaseOwnership stays with the existing CriticalMemoryReliefExecutor tests. IOSModelDownloadCancellationSequenceTests pins the sequence's order; binding each closure to the right side effect remains a call-site review item in the coordinator (several steps share the type () -> Void and no token could constrain a closure body). Deliberately not unit-tested: the QVoiceiOSApp call routing into performCriticalMemoryPressureRelief (app-target wiring, not an order), the position of generate()'s ownership guard before guardModelAdmission and its re-check afterwards (both call admitsGeneration; the placement is store glue), the active-generation memory-guard Task loop (its retry precondition is the cancellation-failure test), the gate's IOSDeviceDiagnosticsRunner mention (the runner only drives TTSEngineStore.generate and the deleted tests asserted nothing in it), and the deleted restore-path, progress-barrier, no-op-reconcile and HuggingFaceDownloader terminal-phase assertions, which sit outside this gate; the downloader's terminal sequencing is already characterized by Tests/VocelloCoreTests/ModelDownloadLifecycleTests.swift (testDelegateTerminalSequencerAwaitsDurableStageBeforeCompletion).",
+      "evidence": [
+        "file:Tests/VocelloiOSLogicTests/IOSGenerationOwnershipAuthorityTests.swift",
+        "file:Tests/VocelloiOSLogicTests/IOSModelDownloadCancellationSequenceTests.swift",
+        "file:Sources/iOSSupport/Services/IOSGenerationOwnershipAuthority.swift",
+        "file:Sources/iOSSupport/Services/IOSModelDownloadCancellationSequence.swift"
+      ],
+      "sourceOfTruth": [
+        "Sources/iOS/IOSModelDownloadCoordinator.swift",
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "Sources/iOS/TTSEngineStore.swift",
+        "project.yml"
+      ]
     }
   ]
 }

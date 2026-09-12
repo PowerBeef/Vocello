@@ -220,21 +220,26 @@ final class IOSModelDownloadCoordinator {
         traceCurrentState(layer: "coordinator", event: "cancellation-requested", modelID: modelID)
         if let pendingIndex = pending.firstIndex(where: { $0.id == modelID }) {
             cancellationBarriers.insert(modelID)
-            guard persistCancellationStatus(modelID: modelID, status: .cancelRequested) else {
+            let outcome = IOSModelDownloadCancellationSequence.cancelPending(
+                persistIntent: { persistCancellationStatus(modelID: modelID, status: .cancelRequested) },
+                dequeue: { pending.remove(at: pendingIndex) },
+                persistTombstone: { persistCancellationStatus(modelID: modelID, status: .deleted) },
+                discardStaging: { discardStaging(modelID: modelID) },
+                publishDeleted: { publishTerminal(modelID: modelID, phase: .deleted) }
+            )
+            switch outcome {
+            case .intentPersistenceFailed:
                 cancellationBarriers.remove(modelID)
                 publishCancellationPersistenceFailure(modelID: modelID)
                 return false
-            }
-            pending.remove(at: pendingIndex)
-            guard persistCancellationStatus(modelID: modelID, status: .deleted) else {
+            case .tombstonePersistenceFailed:
                 publishCancellationPersistenceFailure(modelID: modelID)
                 return false
+            case .deleted:
+                stopDiagnosticsHeartbeat()
+                cancellationBarriers.remove(modelID)
+                return true
             }
-            discardStaging(modelID: modelID)
-            publishTerminal(modelID: modelID, phase: .deleted)
-            stopDiagnosticsHeartbeat()
-            cancellationBarriers.remove(modelID)
-            return true
         }
         guard let active = inflight[modelID] else {
             reconcileNoOpCancellation(modelID: modelID)
@@ -242,44 +247,52 @@ final class IOSModelDownloadCoordinator {
         }
 
         cancellationBarriers.insert(modelID)
-        guard persistCancellationStatus(modelID: modelID, status: .cancelRequested) else {
+        let outcome = await IOSModelDownloadCancellationSequence.cancelActive(
+            persistIntent: { persistCancellationStatus(modelID: modelID, status: .cancelRequested) },
+            publishCancelling: {
+                publishSnapshot(
+                    modelID: modelID,
+                    phase: .cancelling,
+                    downloadedBytes: ledgerReceivedBytes(modelID: modelID),
+                    totalBytes: active.totalBytes,
+                    message: nil,
+                    generation: active.operationGeneration
+                )
+            },
+            drainTask: {
+                await downloader.cancel()
+                active.task.cancel()
+                await active.task.value
+                inflight.removeValue(forKey: modelID)
+            },
+            rollbackRacedInstallation: { rollbackRacedInstallationIfNeeded(active) },
+            persistTombstone: { persistCancellationStatus(modelID: modelID, status: .deleted) },
+            removeStaging: { try? fileManager.removeItem(at: active.stagingRoot) },
+            publishDeleted: { publishTerminal(modelID: modelID, phase: .deleted) }
+        )
+        switch outcome {
+        case .intentPersistenceFailed:
             cancellationBarriers.remove(modelID)
             publishCancellationPersistenceFailure(
                 modelID: modelID,
                 recoverableGeneration: active.operationGeneration
             )
             return false
-        }
-        publishSnapshot(
-            modelID: modelID,
-            phase: .cancelling,
-            downloadedBytes: ledgerReceivedBytes(modelID: modelID),
-            totalBytes: active.totalBytes,
-            message: nil,
-            generation: active.operationGeneration
-        )
-
-        await downloader.cancel()
-        active.task.cancel()
-        await active.task.value
-        inflight.removeValue(forKey: modelID)
-        guard rollbackRacedInstallationIfNeeded(active) else {
+        case .racedInstallationRollbackFailed:
             reconcileInstalledAfterCancellationCleanupFailure(active)
             await startPendingDownloads()
             return false
-        }
-        guard persistCancellationStatus(modelID: modelID, status: .deleted) else {
+        case .tombstonePersistenceFailed:
             publishCancellationPersistenceFailure(modelID: modelID)
             await startPendingDownloads()
             return false
+        case .deleted:
+            traceCurrentState(layer: "coordinator", event: "cancellation-completed", modelID: modelID, outcome: "deleted")
+            stopDiagnosticsHeartbeat()
+            cancellationBarriers.remove(modelID)
+            await startPendingDownloads()
+            return true
         }
-        try? fileManager.removeItem(at: active.stagingRoot)
-        publishTerminal(modelID: modelID, phase: .deleted)
-        traceCurrentState(layer: "coordinator", event: "cancellation-completed", modelID: modelID, outcome: "deleted")
-        stopDiagnosticsHeartbeat()
-        cancellationBarriers.remove(modelID)
-        await startPendingDownloads()
-        return true
     }
 
     func delete(model: ModelDescriptor) async throws {

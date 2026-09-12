@@ -17,7 +17,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 14/26 (54%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
-| `ios-control-audit-2026-08` | active | ios | 15/21 (71%) |
+| `ios-control-audit-2026-08` | active | ios | 16/21 (76%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
@@ -262,7 +262,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `ICA-06` | in-flight | P1 — localize the long-Chinese non-EOS generation failure and terminal message | — |
 | `ICA-15` | in-flight | P1 — bound deterministic CustomVoice over-continuation without truncating valid speech | — |
 | `ICA-20` | planned | iOS XCUITest coverage for onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings | — |
-| `ICA-21` | planned | Swift unit tests for the two invariants the deleted source-text tests guarded | — |
 
 ### Open items in detail
 
@@ -280,9 +279,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 - **`ICA-20`** (planned) — iOS XCUITest coverage for onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings.
   gate: The 2026-09-11 XCUITest audit found 34 of 93 iOS identifiers never exercised: onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings. Extend the control-audit plan (`config/ios-control-audit.json`) and the smoke or control-audit classes so each control is source-bound, observed on the paired iPhone through genuine controls, and cleaned up. Replace the remaining English-label lookups (History clear and delete confirmations, seed unpin menu, Play/Pause label checks) with stable identifiers or accessibility values added in `Sources/iOS`. Validated only by an explicitly requested `scripts/ui_test.sh ios <lane>` run.
-
-- **`ICA-21`** (planned) — Swift unit tests for the two invariants the deleted source-text tests guarded.
-  gate: Two ordering invariants were guarded only by Python tests that asserted Swift source text (removed 2026-09-12): the download coordinator writes its durable tombstone before removing staged files (IOSModelDownloadCoordinator / HuggingFaceDownloader), and the device diagnostics runner keeps critical-memory ownership with the engine store during a run (IOSDeviceDiagnosticsRunner / TTSEngineStore). Closure: extract each order into a testable type reachable from VocelloiOSLogicTests (or a macOS-compiled shared type) and assert it there; no test may read Swift source text.
 
 ## iOS Built-in Voice startup reliability
 

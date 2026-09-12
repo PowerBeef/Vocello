@@ -74,12 +74,17 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
     private let diagnosticsRecorder: IOSDeviceDiagnosticsRecorder?
     private(set) var latestMemoryContext: IOSMemoryContext
     private var changeObserver: AnyCancellable?
-    private var activeGenerationDepth = 0
+    /// Single authority for generation admission, completion, the post-cancellation release and
+    /// the critical-memory claim. Every write goes through it; `hasActiveGeneration` mirrors the
+    /// held scope at the same statements as before and is additionally raised by backend
+    /// activity in `syncFromSnapshot`.
+    private var generationOwnership = IOSGenerationOwnershipAuthority()
+    private var activeGenerationDepth: Int { generationOwnership.activeGenerationDepth }
+    private var criticalMemoryActionInFlight: Bool { generationOwnership.criticalMemoryActionInFlight }
     private var sustainedPerformanceDepth = 0
     private var lastForwardedChunkIdentity: GenerationChunkDeliveryIdentity?
     private var activeGenerationMemoryGuardTask: Task<Void, Never>?
     private var activeGenerationPeakMemoryContext: IOSMemoryContext?
-    private var criticalMemoryActionInFlight = false
     private var lastLoggedMemoryBand: IOSMemoryPressureBand?
     private var debugForceCriticalOnceArmed = false
     /// Sustained-load thermal policy (roadmap P3): serious/critical thermal state
@@ -315,12 +320,11 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
         // proven compute termination and begin trimming live MLX state.
         // A store-owned critical-memory action also retains ownership after
         // this barrier until its awaited full unload completes.
-        guard !criticalMemoryActionInFlight else {
+        guard generationOwnership.releaseGenerationAfterCancellationBarrier() else {
             syncFromBackend()
             notifyMemoryContextDidChange()
             return
         }
-        activeGenerationDepth = 0
         hasActiveGeneration = false
         syncFromBackend()
         notifyMemoryContextDidChange()
@@ -344,7 +348,7 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
         if case .unsupported(let reason) = supportDecision(for: request) {
             throw MLXTTSEngineError.unsupportedRequest(reason)
         }
-        guard !hasActiveGeneration, !criticalMemoryActionInFlight else {
+        guard generationOwnership.admitsGeneration(hasActiveGeneration: hasActiveGeneration) else {
             throw MLXTTSEngineError.generationFailed(
                 "The engine is already generating audio or releasing memory. Wait for it to finish before starting another generation."
             )
@@ -353,27 +357,27 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
         // Admission captures live memory asynchronously. Revalidate ownership
         // because a critical-pressure action may have claimed the runtime while
         // that snapshot was in flight.
-        guard !hasActiveGeneration, !criticalMemoryActionInFlight else {
+        guard generationOwnership.admitsGeneration(hasActiveGeneration: hasActiveGeneration) else {
             throw MLXTTSEngineError.generationFailed(
                 "The engine began releasing memory before generation could start. Wait for it to finish and try again."
             )
         }
-        activeGenerationDepth += 1
-        hasActiveGeneration = activeGenerationDepth > 0
+        generationOwnership.enterGeneration()
+        hasActiveGeneration = generationOwnership.ownsGenerationScope
         startActiveGenerationMemoryGuard(reason: "generation_active")
         defer {
-            if criticalMemoryActionInFlight {
+            switch generationOwnership.completeGeneration() {
+            case .retainedByCriticalMemoryAction:
                 // The memory-guard task owns this generation scope until its
                 // cancellation barrier and awaited full unload both finish.
                 // Cancelling that task here would make the UI appear idle
                 // while MLX state is still being released.
                 syncFromBackend()
-            } else {
+            case .released:
                 stopActiveGenerationMemoryGuard(reason: "generation_finished")
                 logActiveGenerationPeakMemoryContext()
                 activeGenerationPeakMemoryContext = nil
-                activeGenerationDepth = max(activeGenerationDepth - 1, 0)
-                hasActiveGeneration = activeGenerationDepth > 0
+                hasActiveGeneration = generationOwnership.ownsGenerationScope
                 syncFromBackend()
             }
         }
@@ -909,7 +913,7 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
             // Never race a full unload against compute whose termination could
             // not be proven. Leave generation ownership intact, but release
             // the action claim so the still-running guard can retry later.
-            criticalMemoryActionInFlight = false
+            generationOwnership.abandonCriticalMemoryActionAfterCancellationFailure()
             syncFromBackend()
             notifyMemoryContextDidChange()
         }
@@ -918,28 +922,32 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
     }
 
     private func applyCriticalFullUnload(_ context: IOSMemoryContext) async {
-        await backend.trimMemory(
-            level: .fullUnload,
-            reason: "critical_memory_context"
+        await CriticalMemoryFullUnloadSequence.execute(
+            unload: {
+                await backend.trimMemory(
+                    level: .fullUnload,
+                    reason: "critical_memory_context"
+                )
+            },
+            recordUnloadCompleted: {
+                // This event is a completion boundary: it is written only after the
+                // awaited full unload returns.
+                diagnosticsRecorder?.recordAction(
+                    event: "critical_full_unload",
+                    reason: "critical_memory_context",
+                    context: context,
+                    trimLevel: .fullUnload
+                )
+            },
+            clearGenerationActivity: { backend.clearGenerationActivity() }
         )
-        // This event is a completion boundary: it is written only after the
-        // awaited full unload returns.
-        diagnosticsRecorder?.recordAction(
-            event: "critical_full_unload",
-            reason: "critical_memory_context",
-            context: context,
-            trimLevel: .fullUnload
-        )
-        backend.clearGenerationActivity()
     }
 
     private func beginCriticalMemoryAction() -> Bool {
-        guard !criticalMemoryActionInFlight else { return false }
-        criticalMemoryActionInFlight = true
         // Preserve one store-owned generation scope even if the backend's
         // cancellation terminal races this MainActor task. `syncFromBackend`
         // therefore cannot re-enable generation while fullUnload is awaited.
-        activeGenerationDepth = max(activeGenerationDepth, 1)
+        guard generationOwnership.beginCriticalMemoryAction() else { return false }
         hasActiveGeneration = true
         return true
     }
@@ -947,9 +955,9 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
     private func completeCriticalMemoryAction() {
         logActiveGenerationPeakMemoryContext()
         activeGenerationPeakMemoryContext = nil
-        activeGenerationDepth = 0
+        generationOwnership.releaseGenerationScopeAfterCriticalUnload()
         hasActiveGeneration = false
-        criticalMemoryActionInFlight = false
+        generationOwnership.completeCriticalMemoryAction()
         syncFromBackend()
         notifyMemoryContextDidChange()
     }

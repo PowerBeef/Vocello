@@ -1063,22 +1063,6 @@
       "notes": "Opened from the 2026-09-11 review. The label-dependent sites are `VocelloiOSControlAuditUITests` (History clear and delete dialogs, seed unpin, inline player Play/Pause labels) and `VocelloiOSPurchaseUITests` (player Play/Pause labels; the system share sheet's close button stays a system control). Waits for explicit device QA scope because identifier changes must be proven on the phone."
     },
     {
-      "id": "ICA-21",
-      "plan": "ios-control-audit-2026-08",
-      "title": "Swift unit tests for the two invariants the deleted source-text tests guarded",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "Two ordering invariants were guarded only by Python tests that asserted Swift source text (removed 2026-09-12): the download coordinator writes its durable tombstone before removing staged files (IOSModelDownloadCoordinator / HuggingFaceDownloader), and the device diagnostics runner keeps critical-memory ownership with the engine store during a run (IOSDeviceDiagnosticsRunner / TTSEngineStore). Closure: extract each order into a testable type reachable from VocelloiOSLogicTests (or a macOS-compiled shared type) and assert it there; no test may read Swift source text.",
-      "sourceOfTruth": [
-        "Sources/iOS/IOSModelDownloadCoordinator.swift",
-        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
-        "Sources/iOS/TTSEngineStore.swift",
-        "project.yml"
-      ],
-      "updated": "2026-09-12",
-      "notes": "Opened by the 2026-09-12 test-harness cleanup. The remaining product invariants from those tests moved into scripts/repo_invariants.sh exact greps, IOSExportPurchaseTests (StoreKit fixture parity) and the localization/supply-chain gates."
-    },
-    {
       "id": "AV-14",
       "plan": "autonomous-validation-remediation-2026-08",
       "title": "re-baseline the benchmark harness under the standard RTF definition (consent-bound runs)",

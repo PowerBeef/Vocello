@@ -266,6 +266,7 @@
           "Sources/Resources/qwenvoice_ios_model_catalog.json",
           "Sources/Resources/qwenvoice_production_model_catalog.json",
           "Sources/iOS/IOSModelDownloadCoordinator.swift",
+          "Sources/iOSSupport/Services/IOSModelDownloadCancellationSequence.swift",
           "Sources/iOS/IOSModelInstallerViewModel.swift",
           "Sources/iOS/IOSSettingsViews.swift",
           "Sources/iOSSupport/Services/IOSModelDeliverySupport.swift",
@@ -298,6 +299,8 @@
         "include": [
           "Sources/QwenVoiceCore/*Memory*.swift",
           "Sources/iOS/TTSEngineStore.swift",
+          "Sources/iOSSupport/Services/IOSGenerationOwnershipAuthority.swift",
+          "Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift",
           "config/memory-qualification-policy.json",
           "scripts/benchmark_memory.py",
           "scripts/ios_memory_field_report.py"

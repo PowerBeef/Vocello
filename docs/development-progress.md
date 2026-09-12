@@ -35,8 +35,8 @@ the monetization, export-boundary, StoreKit-fixture, clone-consent and candidate
 into `scripts/repo_invariants.sh`, binds the StoreKit fixture to `IOSExportAccessPolicy` in a Swift
 test, teaches `localization_contract.py` and `supply_chain_contract.py` the checks that had lived in
 tests, moves three device helpers into `scripts/lib/ios_device_state.sh`, then deletes three test
-modules and the text assertions in ten more (ICA-21 records the two invariants that still need Swift
-tests). `4c0e07ff` removes the `plan|focused|checkpoint` shim, makes `regenerate_project.sh` fast by
+modules and the text assertions in ten more (ICA-21, closed the same
+day, see below). `4c0e07ff` removes the `plan|focused|checkpoint` shim, makes `regenerate_project.sh` fast by
 default (`--verify` runs the gate), restores `dev.sh ci` to exactly the push-CI command list, derives
 the CI cache keys from `config/toolchain.json` and corrects the skills, agents and hook wording.
 `40d03135` adds `scripts/lib/jsonio.py` (load, canonical and pretty bytes, digests, atomic writes as
@@ -51,6 +51,24 @@ because `run_execution_plan` defaulted `lock_root` to the real `build/cache/deli
 lock and five test calls omitted it. `lock_root` is now a required keyword: the runner CLI and
 `delivery_prompt_remediation.py execute-stage` pass the shared `DEFAULT_SERIAL_LOCK_ROOT`
 explicitly, every test passes a private temporary root, and an omitted root is a `TypeError`.
+
+ICA-21 closed the same day. Both owning classes are `@MainActor` types in `Sources/iOS` that no
+unit-test target compiles, so the orders moved into `Sources/iOSSupport` after the
+`CriticalMemoryReliefExecutor` precedent. `IOSModelDownloadCancellationSequence` owns the
+cancellation order (durable intent before any task cancellation, raced-install rollback after the
+drain, the durable tombstone before staging removal or the terminal publish, every failed persist
+returning first); binding each closure to the right side effect stays a call-site review item. `IOSGenerationOwnershipAuthority` owns generation admission, the completion that
+stays retained while a critical-memory action is in flight, the post-barrier release, the
+one-scope critical claim and the two-step completion (scope returned, idle published, claim
+released); `CriticalMemoryFullUnloadSequence` orders the awaited unload, its event and the single
+activity clear. `IOSModelDownloadCoordinator.cancel` and `TTSEngineStore` drive them with
+unchanged statement order, events and early returns. Seventeen tests in `Tests/VocelloiOSLogicTests`
+cover the orders; the new files joined both test targets and the promotion routing classes.
+Adversarial review surfaced three pre-existing behaviours, recorded here and not changed by the
+refactor: cancelling a queued download stops the diagnostics heartbeat of another model's active
+transfer; `delete(model:)` reports a raced-install rollback failure with the storage-persistence
+message; a generation that completes while a critical action is in flight, followed by a failed
+cancellation inside that action, leaves the scope held until a user cancel.
 
 ### Audio and delivery QC streamlining (September 12)
 

@@ -10,7 +10,9 @@ Each lane is diffed against the last run on this branch in which that lane's
 job passed (`CI_HISTORY_PATH`, written by the workflow from `gh run view`), not
 against the previous push: `cancel-in-progress` drops the run of a superseded
 push, and a docs-only push on top of it must still run the lanes the cancelled
-run owed. Without history the diff falls back to $BEFORE_SHA..$HEAD_SHA.
+run owed. A lane routing skipped inside a green run counts as proven at that
+head. Only push CI's own inputs (ci.yml, its actions, this file) force every
+native lane. Without history the diff falls back to $BEFORE_SHA..$HEAD_SHA.
 
 Usage:
   classify_changes.py                      # route the push (GitHub push event)
@@ -50,12 +52,31 @@ MACOS_ONLY = (
     "Tests/VocelloEngineIntegrationTests/*",
 )
 
-SWIFT = ("Sources/*", "Tests/*", "Packages/*", "project.yml", "*Package.resolved",
-         "QwenVoice.xcodeproj/*", "config/*", "scripts/*", "benchmarks/*")
-IOS_ALWAYS = ("project.yml", "*Package.resolved", "Packages/*", "Sources/Resources/*",
-              "scripts/build_foundation_targets.sh", "scripts/regenerate_project.sh", "scripts/lib/*",
-              "config/apple-platform-capability-matrix.json", "config/build-output-policy.json")
-PYTHON = ("scripts/*", "config/*", "benchmarks/*", "Sources/Resources/*")
+# Push CI's own inputs: when they change, every native lane reruns. Other
+# workflows (nightly, release, security, promotion, dependabot) and the
+# templates change nothing push CI executes; their action pins are checked by
+# the supply-chain tests on the Python lane and by the contracts job.
+WORKFLOW_INPUTS = (".github/workflows/ci.yml", "scripts/ci/classify_changes.py")
+WORKFLOW_PREFIXES = (".github/actions/",)
+NATIVE_LANES = ("swift", "ios", "python")
+
+# Under Packages/ the iOS compile reads the package sources and manifests; the
+# governance JSON is a contract-gate input (macOS job) and the markdown is prose.
+PACKAGE_MANIFESTS = ("Package.swift", "Package.resolved")
+BUILD_CONFIGS = ("config/build-output-policy.json", "config/apple-platform-capability-matrix.json",
+                 "config/toolchain.json")
+# Validated on Linux by the contracts job; the macOS gate does not need them.
+ROADMAP_FILES = ("config/roadmap.json", "config/roadmap-archive.json")
+# The macOS job runs only the darwin-only pytest lane (test_benchmark_history)
+# plus the contract gate; every other test module runs on Linux.
+DARWIN_TEST_INPUTS = ("scripts/tests/test_benchmark_history.py", "scripts/tests/conftest.py")
+# Inputs of the iOS generic compile besides the sources themselves.
+IOS_BUILD_SCRIPTS = ("scripts/build_foundation_targets.sh", "scripts/regenerate_project.sh",
+                     "scripts/generate_cli_scheme.py", "scripts/generate_ios_logic_scheme.py",
+                     "scripts/lib/ios_platform_preflight.py", "scripts/lib/storage_preflight.py",
+                     "scripts/build_output_policy.py")
+BENCHMARK_EVIDENCE_PREFIXES = ("benchmarks/runs/", "benchmarks/baselines/")
+BENCHMARK_EVIDENCE_FILES = ("benchmarks/HISTORY.md", "benchmarks/hardware-profiles.json")
 RESEARCH_PREFIXES = (
     "delivery_", "prosody_", "analyze_", "audio_", "ios_control_audit", "ios_startup_reliability",
     "check_language", "clone_", "emotion_", "mos_", "bench_", "run_local_delivery", "qualify_delivery",
@@ -68,6 +89,54 @@ RESEARCH_CONFIG = ("delivery-", "prosody-", "ios-control-audit", "ios-startup-re
 
 def _match(path: str, patterns: tuple[str, ...]) -> bool:
     return any(fnmatch.fnmatch(path, p) for p in patterns)
+
+
+def _is_workflow_input(path: str) -> bool:
+    return path in WORKFLOW_INPUTS or path.startswith(WORKFLOW_PREFIXES)
+
+
+def _is_benchmark_evidence(path: str) -> bool:
+    return (path.startswith(BENCHMARK_EVIDENCE_PREFIXES) or path in BENCHMARK_EVIDENCE_FILES
+            or (path.startswith("benchmarks/schema-") and path.endswith(".json")))
+
+
+def _is_swift(path: str) -> bool:
+    """Inputs of the macOS job: the compile, the contract gate and the darwin-only pytest lane."""
+    if path.startswith(("Sources/", "Tests/", "QwenVoice.xcodeproj/", "config/xcode-schemes/")):
+        return True
+    if path in ("project.yml", "README.md", "website/PRODUCT.md") or path.endswith("Package.resolved"):
+        return True
+    if path.startswith("Packages/"):
+        return not path.endswith(".md")
+    if path.startswith("config/"):
+        return path not in ROADMAP_FILES
+    if path.startswith("scripts/tests/"):
+        return path in DARWIN_TEST_INPUTS or path.startswith("scripts/tests/fixtures/")
+    if path.startswith("scripts/"):
+        return not (path.startswith("scripts/hooks/") or path.endswith(".md") or _is_workflow_input(path))
+    return _is_benchmark_evidence(path)
+
+
+def _is_ios(path: str) -> bool:
+    """Inputs of the generic device-SDK compile."""
+    if path in ("project.yml", *IOS_BUILD_SCRIPTS, *BUILD_CONFIGS) or path.endswith("Package.resolved"):
+        return True
+    if path.startswith("QwenVoice.xcodeproj/") or (path.startswith("scripts/lib/") and path.endswith(".sh")):
+        return True
+    if path.startswith("Packages/"):
+        return "/Sources/" in path or path.endswith(PACKAGE_MANIFESTS)
+    if path.startswith("Sources/Resources/"):
+        return path.endswith(".xcstrings")
+    return (path.startswith("Sources/") or path.startswith("Tests/")) and not _match(path, MACOS_ONLY)
+
+
+def _is_python(path: str) -> bool:
+    if path.startswith("scripts/"):
+        return not path.endswith(".md")
+    if path.startswith("benchmarks/"):
+        return not path.endswith(".md") or path == "benchmarks/HISTORY.md"
+    return (path.startswith(("config/", "Sources/Resources/", ".github/workflows/"))
+            or path in ("project.yml", "pytest.ini"))
 
 
 def _is_research(path: str) -> bool:
@@ -84,18 +153,16 @@ def classify(paths: list[str]) -> dict[str, bool]:
         return {lane: True for lane in LANES}
     lanes = {lane: False for lane in LANES}
     for path in paths:
-        if path.startswith(".github/"):
+        if _is_workflow_input(path):
             lanes["workflows"] = True
             lanes["swift"] = lanes["ios"] = lanes["python"] = True
         if path.startswith("website/"):
             lanes["website"] = True
-        if _match(path, SWIFT):
+        if _is_swift(path):
             lanes["swift"] = True
-        if _match(path, PYTHON):
+        if _is_python(path):
             lanes["python"] = True
-        if _match(path, IOS_ALWAYS):
-            lanes["ios"] = True
-        elif (path.startswith("Sources/") or path.startswith("Tests/")) and not _match(path, MACOS_ONLY):
+        if _is_ios(path):
             lanes["ios"] = True
         if _is_research(path):
             lanes["research"] = True
@@ -141,8 +208,13 @@ def lane_bases(history: list[dict], head: str, cwd: str | None = None) -> dict[s
         jobs = run.get("jobs") or {}
         if not isinstance(jobs, dict) or sha == head:
             continue
+        run_passed = run.get("conclusion") == "success"
         for lane, job in LANE_JOBS.items():
-            if bases[lane] is None and jobs.get(job) == "success" and is_ancestor_commit(sha, head, cwd):
+            conclusion = jobs.get(job)
+            # A job routing skipped inside a run that passed is proven at that
+            # head too; a skip inside a failed or cancelled run proves nothing.
+            proven = conclusion == "success" or (conclusion == "skipped" and run_passed)
+            if bases[lane] is None and proven and is_ancestor_commit(sha, head, cwd):
                 bases[lane] = sha
     return bases
 
@@ -161,11 +233,13 @@ def route_push(head: str, before: str, history: list[dict] | None, cwd: str | No
             paths = diff_paths(base, head, cwd)
             verdict = classify(paths)
             lanes[lane] = verdict[lane]
-            if verdict["workflows"]:
+            # classify() already folds a workflow change into the native lanes
+            # of the diff it is given; only those lanes' own diffs may report
+            # it, or a lane whose green base predates an old workflow change
+            # (the rarely run website lane) would rerun every native lane.
+            if lane in NATIVE_LANES and verdict["workflows"]:
                 lanes["workflows"] = True
             reasons.append(f"{lane}: {len(paths)} path(s) since {base[:8]}")
-        if lanes["workflows"]:
-            lanes["swift"] = lanes["ios"] = lanes["python"] = True
         return lanes, "; ".join(reasons)
     if is_ancestor_commit(before, head, cwd):
         paths = diff_paths(before, head, cwd)

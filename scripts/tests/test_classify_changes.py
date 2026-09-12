@@ -95,6 +95,86 @@ class RoutingTests(unittest.TestCase):
         lanes, _ = MODULE.route_push(self.shas["c4"], self.shas["c3"], history, cwd=str(self.repo))
         self.assertTrue(lanes["workflows"] and lanes["swift"] and lanes["ios"] and lanes["python"])
 
+    def test_a_stale_website_base_never_forces_native_lanes(self) -> None:
+        # The PR template changed at c4; every native lane passed there, but the
+        # website lane last ran at c0. A docs push at c5 must not rerun the Mac lanes.
+        self.commit("c4", ".github/pull_request_template.md")
+        self.commit("c5", "docs/other.md")
+        history = self.history(c4="swift,ios,python", c0="website")
+        lanes, reason = MODULE.route_push(self.shas["c5"], self.shas["c4"], history, cwd=str(self.repo))
+        for lane in ("swift", "ios", "python", "workflows", "website"):
+            self.assertFalse(lanes[lane], f"{lane}: {reason}")
+
+    def test_a_workflow_change_already_proven_by_a_lanes_green_base_does_not_rerun_it(self) -> None:
+        self.commit("c4", ".github/workflows/ci.yml")
+        self.commit("c5", "docs/other.md")
+        history = self.history(c4="swift", c2="python,ios")
+        lanes, reason = MODULE.route_push(self.shas["c5"], self.shas["c4"], history, cwd=str(self.repo))
+        self.assertFalse(lanes["swift"], reason)
+        self.assertTrue(lanes["python"] and lanes["ios"] and lanes["workflows"], reason)
+
+    def test_a_lane_skipped_inside_a_green_run_advances_its_base(self) -> None:
+        skipped_green = [{"headSha": self.shas["c2"], "conclusion": "success",
+                          "jobs": {MODULE.LANE_JOBS["website"]: "skipped", MODULE.LANE_JOBS["python"]: "success"}}]
+        bases = MODULE.lane_bases(skipped_green, self.head, cwd=str(self.repo))
+        self.assertEqual(bases["website"], self.shas["c2"])
+        skipped_cancelled = [{"headSha": self.shas["c2"], "conclusion": "cancelled",
+                              "jobs": {MODULE.LANE_JOBS["website"]: "skipped"}}]
+        self.assertIsNone(MODULE.lane_bases(skipped_cancelled, self.head, cwd=str(self.repo))["website"])
+
+
+class ClassificationTests(unittest.TestCase):
+    def lanes(self, path: str) -> set[str]:
+        return {lane for lane, on in MODULE.classify([path]).items() if on}
+
+    def test_only_push_ci_inputs_are_workflow_changes(self) -> None:
+        for path in (".github/pull_request_template.md", ".github/dependabot.yml", ".github/CODEOWNERS",
+                     ".github/workflows/nightly.yml", ".github/workflows/release.yml"):
+            self.assertNotIn("workflows", self.lanes(path), path)
+            self.assertFalse(self.lanes(path) & {"swift", "ios"}, path)
+        for path in (".github/workflows/ci.yml", ".github/actions/native-toolchain/action.yml",
+                     "scripts/ci/classify_changes.py"):
+            self.assertEqual(self.lanes(path) & {"workflows", "swift", "ios", "python"},
+                             {"workflows", "swift", "ios", "python"}, path)
+        self.assertEqual(self.lanes(".github/workflows/nightly.yml"), {"python"})
+
+    def test_inert_paths_route_nowhere(self) -> None:
+        for path in ("Packages/VocelloQwen3Core/README.md", "Packages/VocelloQwen3Core/UPSTREAM.md",
+                     "benchmarks/OPTIMIZATION.md", "benchmarks/baseline-2026-05-30-06166f0.md",
+                     "benchmarks/README.md", "docs/reference/cli.md", "CONTRIBUTING.md", ".claude/settings.json"):
+            self.assertEqual(self.lanes(path), set(), path)
+        self.assertEqual(self.lanes("config/roadmap.json"), {"python"})
+        self.assertEqual(self.lanes("scripts/tests/test_foo.py"), {"python"})
+        self.assertEqual(self.lanes("scripts/hooks/policy_guard.sh"), {"python"})
+        self.assertEqual(self.lanes("Sources/Resources/qwenvoice_production_model_catalog.json"), {"swift", "python"})
+
+    def test_compile_and_contract_inputs_still_route(self) -> None:
+        expected = {
+            "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/X.swift": {"swift", "ios"},
+            "Packages/VocelloQwen3Core/Package.resolved": {"swift", "ios"},
+            "Packages/VocelloQwen3Core/Package.swift": {"swift", "ios"},
+            "Packages/VocelloQwen3Core/SEMANTIC_DELTAS.json": {"swift"},
+            "Sources/Resources/Localizable.xcstrings": {"swift", "ios", "python"},
+            "Sources/iOS/TTSEngineStore.swift": {"swift", "ios"},
+            "Sources/Views/ContentView.swift": {"swift"},
+            "scripts/lib/build_cache.sh": {"swift", "ios", "python"},
+            "scripts/lib/jsonio.py": {"swift", "python"},
+            "scripts/tests/test_benchmark_history.py": {"swift", "python"},
+            "scripts/tests/conftest.py": {"swift", "python"},
+            "benchmarks/runs/ui-generation/x.json": {"swift", "python"},
+            "benchmarks/schema-v3.json": {"swift", "python"},
+            "README.md": {"swift"},
+            "website/PRODUCT.md": {"swift", "website"},
+            "config/toolchain.json": {"swift", "ios", "python"},
+            "config/quality-promotion-contract.json": {"swift", "python"},
+            "project.yml": {"swift", "ios", "python"},
+            "QwenVoice.xcodeproj/project.pbxproj": {"swift", "ios"},
+            "scripts/build_foundation_targets.sh": {"swift", "ios", "python"},
+            "scripts/delivery_experiment_runner.py": {"swift", "python", "research"},
+        }
+        for path, lanes in expected.items():
+            self.assertEqual(self.lanes(path), lanes, path)
+
 
 if __name__ == "__main__":
     unittest.main()

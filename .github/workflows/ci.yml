@@ -125,7 +125,7 @@ jobs:
   python:
     name: Python tests (linux)
     needs: changes
-    if: needs.changes.outputs.python == 'true' || needs.changes.outputs.workflows == 'true'
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -157,7 +157,7 @@ jobs:
   macos-tests:
     name: macOS deterministic tests
     needs: changes
-    if: needs.changes.outputs.swift == 'true' || needs.changes.outputs.workflows == 'true'
+    if: needs.changes.outputs.swift == 'true'
     runs-on: macos-26
     timeout-minutes: 45
     steps:
@@ -242,7 +242,7 @@ jobs:
   ios-compile:
     name: iOS compile check (device SDK)
     needs: changes
-    if: needs.changes.outputs.ios == 'true' || needs.changes.outputs.workflows == 'true'
+    if: needs.changes.outputs.ios == 'true'
     runs-on: macos-26
     timeout-minutes: 30
     steps:

@@ -159,6 +159,7 @@ build_mac_test_bundles() {
     CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION=YES \
     QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
     SWIFT_OPTIMIZATION_LEVEL="-Onone" SWIFT_COMPILATION_MODE="incremental" \
+    GCC_OPTIMIZATION_LEVEL="0" \
     ENABLE_TESTABILITY=YES > "$log_path" 2>&1 || xcode_status=$?
   (( xcode_status == 0 )) || return "$xcode_status"
   local products="$derived_data/Build/Products/Release"

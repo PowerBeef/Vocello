@@ -150,6 +150,7 @@ build_app() {
         SWIFT_OPTIMIZATION_LEVEL="-Onone" \
         SWIFT_COMPILATION_MODE="incremental" \
         GCC_OPTIMIZATION_LEVEL="0" \
+        ENABLE_TESTABILITY=YES \
         "${build_tail[@]}"
 
     if [ ! -d "$XCODEBUILD_APP" ]; then
@@ -311,11 +312,16 @@ build_cli() {
     local swift_optimization="-Onone"
     local compilation_mode="incremental"
     local gcc_optimization="0"
+    # Every -Onone build in the shared macOS arena (test bundles, app, CLI) uses
+    # the same package-affecting settings, so switching between them relinks the
+    # owned targets instead of recompiling MLX and the other packages.
+    local testability="YES"
     local command_identity="scripts/build.sh cli"
     if [ "$optimization" = "O" ]; then
         swift_optimization="-O"
         compilation_mode="wholemodule"
         gcc_optimization="s"
+        testability="NO"
         command_identity="scripts/build.sh cli-optimized"
     elif [ "$optimization" != "Onone" ]; then
         echo "error: unsupported CLI optimization identity: $optimization" >&2
@@ -348,6 +354,7 @@ build_cli() {
         SWIFT_OPTIMIZATION_LEVEL="$swift_optimization" \
         SWIFT_COMPILATION_MODE="$compilation_mode" \
         GCC_OPTIMIZATION_LEVEL="$gcc_optimization" \
+        ENABLE_TESTABILITY="$testability" \
         build
 
     if [ ! -x "$CLI_BUILT" ]; then

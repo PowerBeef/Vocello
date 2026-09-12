@@ -15,25 +15,24 @@ public macOS release. Older releases and development snapshots are not supported
 ## Dependency monitoring
 
 Dependabot monitors the repository's GitHub Actions, website npm lock, and owned Swift package
-declarations. The security workflow also submits privacy-safe dependency snapshots from both
-tracked SwiftPM resolution files after changes land on `main`, on the weekly security schedule,
-and when run manually. These snapshots make the root Xcode workspace and the owned Qwen3 runtime
+declarations. Every push to `main` also submits a privacy-safe Swift dependency snapshot built from
+both tracked `Package.resolved` files (the `dependency-submission` job in `ci.yml`, via
+`scripts/swift_dependency_snapshot.py`). These snapshots make the root Xcode workspace and the owned Qwen3 runtime
 visible to GitHub's dependency graph and advisory matching without uploading source, credentials,
 absolute paths, or local device data.
 
-Pull requests receive dependency-diff review for newly introduced high-severity findings.
-Path-relevant CodeQL runs for native or website changes, and the website lock receives a
-high-severity npm advisory audit whenever website paths are relevant. The weekly schedule and
-manual dispatch conservatively run both surfaces. `Security required` aggregates those jobs into a
-stable exact-commit verdict; skipped irrelevant jobs do not become false failures. Release SBOM
+`security.yml` runs the website npm advisory audit (high severity, lock-only) and CodeQL for
+JavaScript/TypeScript and Swift on a weekly schedule, on manual dispatch, and inside `release.yml` on
+the tagged commit. `Security required` aggregates those jobs into one exact-commit verdict. Ordinary
+pushes to `main` run `ci.yml` only; there is no per-pull-request security lane. Release SBOM
 generation continues to use the committed lock files as its authoritative input.
 
 The repository intentionally permits its maintainer to develop directly on `main`, so that
 administrator bypass is treated as a residual risk rather than as release authorization. A release
 candidate requires an annotated version tag whose signature GitHub verifies as valid, a tag commit
-contained in `origin/main`, and latest successful `CI required` and `Security required` check runs
-on that exact commit. Candidate creation and later public promotion both re-evaluate this authority
-and fail closed on lightweight or unsigned tags, missing checks, cross-commit evidence, or an
+contained in `origin/main`, and a latest successful `CI required` check run on that exact commit;
+the release workflow then runs the Security workflow on that same commit before any packaging step.
+Candidate creation and later public promotion both re-evaluate this authority and fail closed on lightweight or unsigned tags, missing checks, cross-commit evidence, or an
 incomplete check-run response.
 
 ## Open-source purchase boundary

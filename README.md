@@ -141,7 +141,7 @@ This is the maintained engineering record of the whole package, refreshed with e
 
 ### The owned runtime
 
-Most local TTS tools shell out to a Python reference implementation behind a local server. Vocello generates through a first-party Swift runtime on MLX, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md): no Python, no local server, no bundled weights. The runtime is derived from [`mlx-audio-swift`](https://github.com/Blaizzy/mlx-audio-swift) v0.1.2 and narrowed to exactly what Vocello ships, the Qwen3-TTS runtime and the Mimi codec primitives it needs: about 36,000 of roughly 49,000 upstream lines were removed in that specialization, and the 83 retained files (37 identical, 21 modified, 25 added) plus 14 named semantic changes are tracked under an immutable lineage ledger (`Packages/VocelloQwen3Core/PATCHES.json`). A facade contract rejects any public declaration that leaks raw MLX types, and benchmark-backed capability claims automatically demote when their evidence source drifts from the recorded run.
+Most local TTS tools shell out to a Python reference implementation behind a local server. Vocello generates through a first-party Swift runtime on MLX, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md): no Python, no local server, no bundled weights. The runtime is derived from [`mlx-audio-swift`](https://github.com/Blaizzy/mlx-audio-swift) v0.1.2 and narrowed to exactly what Vocello ships, the Qwen3-TTS runtime and the Mimi codec primitives it needs: about 36,000 of roughly 49,000 upstream lines were removed in that specialization, and every retained, modified and added file is tracked in a generated inventory (`Packages/VocelloQwen3Core/CURRENT_INVENTORY.json`) with its named semantic changes under an immutable lineage ledger (`Packages/VocelloQwen3Core/PATCHES.json`). A facade contract rejects any public declaration that leaks raw MLX types, and benchmark-backed capability claims automatically demote when their evidence source drifts from the recorded run.
 
 One engine serves three hosts. On the Mac the engine lives in a separate XPC service process that retires when idle, so engine memory pressure can never take the app window down, and retiring the process returns memory that a model unload alone cannot. On iPhone the same engine runs in-process. The `vocello` command-line tool links the engine directly and reuses the models the app installed.
 
@@ -199,7 +199,8 @@ Command Line Tools alone are not enough, even for the CLI, because every product
 `vocello`) is a target of the generated Xcode project. If `xcodebuild` reports the active
 developer directory is a Command Line Tools instance, point it at Xcode:
 `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`. Validation scripts run with
-the system `python3` (any currently supported Python version).
+the system `python3`; the Python suite additionally needs `pytest`, `pytest-xdist` and `numpy` at the
+versions pinned in `config/toolchain.json` (`python3 -m pip install pytest==<pin> pytest-xdist==<pin> numpy==<pin>`).
 
 ```sh
 git clone https://github.com/PowerBeef/Vocello.git
@@ -223,7 +224,11 @@ scripts/clean_build_caches.sh --compact-profile-failure <run-id> --dry-run
 
 Status separates automatically eligible bytes from blocked evidence and explicit failed-profile reclamation. If only one persistent cache is stale, use `--cache macos`, `--cache ios`, `--cache packages`, or `--cache runtime` rather than `--aggressive`. See [`docs/reference/privacy-storage.md`](docs/reference/privacy-storage.md) for the exact retention and compaction rules.
 
-The ordinary deterministic checks are:
+The ordinary deterministic loop is `scripts/dev.sh check` (lint, contracts, the tests the dirty tree
+touches; advisory) and `scripts/dev.sh ci` (exactly what push CI runs, serially). The individual lanes
+remain available; `check_project_inputs.sh` without flags runs the complete Python suite, and
+`build.sh build` signs with an Apple Development identity when one is installed (ad-hoc otherwise,
+with a warning that microphone and speech grants will not survive rebuilds):
 
 ```sh
 ./scripts/check_project_inputs.sh
@@ -239,10 +244,10 @@ ordinary macOS deterministic lane. Xcode 26 does not support executing the stand
 app-host-free bundle on a physical-device destination, so that duplicate target remains
 compile-only; physical runtime and UI acceptance use the explicit device diagnostics and
 XCUITest lanes. The selected Xcode must still have matching iOS Platform
-Support/runtime availability for `generic/platform=iOS`; the repository checks this before package
+Support/runtime availability for `-destination generic/platform=iOS`; the repository checks this before package
 resolution and never downloads or runs a Simulator component automatically.
 
-These checks are sufficient for normal commits, pull requests, and merges. XCUITest is explicit frontend acceptance: native macOS or a paired physical iPhone, never Simulator. Models, a phone, and UI evidence are not prerequisites for sharing development work.
+These checks are sufficient for ordinary commits and for the push to `main` that produces `CI required`. XCUITest is explicit frontend acceptance: native macOS or a paired physical iPhone, never Simulator. Models, a phone, and UI evidence are not prerequisites for sharing development work.
 
 Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) for the human contribution flow. Maintainers and
 Coding agents should also read [`CLAUDE.md`](CLAUDE.md). Deeper references:

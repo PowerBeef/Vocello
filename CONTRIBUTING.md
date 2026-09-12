@@ -6,7 +6,7 @@ automation and coding agents use the additional durable instructions in [`CLAUDE
 ## Before starting
 
 - Use an Apple Silicon Mac with Xcode 26. The selected Xcode must expose usable iOS Platform
-  Support and a compatible iOS runtime component for the no-phone `generic/platform=iOS` compile;
+  Support and a compatible iOS runtime component for the no-phone `-destination generic/platform=iOS` compile;
   this toolchain prerequisite does not authorize Simulator testing.
 - Read the current checkpoint in [`docs/development-progress.md`](docs/development-progress.md).
 - Check existing [issues](https://github.com/PowerBeef/Vocello/issues) and pull requests before starting overlapping work.
@@ -28,8 +28,9 @@ scripts/dev.sh ci                        # exactly what push CI runs, serially
 without scheduling model generation, UI acceptance or release operations. The commit lint is the only
 local block and CI on `main` is the gate. Use the [development workflow](docs/reference/development-workflow.md)
 for the single-lane commands and cache policy. State exactly what ran and any deferred acceptance in the pull request.
-Pull requests need the single green `CI required` check; jobs skipped by
-path routing (for example docs-only changes) count as passing.
+`CI required` runs on every push to `main` (`ci.yml` has no pull-request lane), so a contribution from
+a fork gets its verdict when a maintainer pushes it to `main`; jobs skipped by path routing (for
+example docs-only changes) count as passing, and a red push is fixed forward or reverted.
 
 The Xcode project is generated from [`project.yml`](project.yml). Never edit `QwenVoice.xcodeproj/project.pbxproj` directly. Native output belongs under the paths declared by [`config/build-output-policy.json`](config/build-output-policy.json); do not add another DerivedData root or a `.build` directory inside vendored source.
 

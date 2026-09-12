@@ -2,6 +2,8 @@
 
 Describe the user-visible or maintainer-visible outcome.
 
+Development is main-only: `ci.yml` has no pull-request trigger, so the `CI required` verdict is produced by a maintainer's push to `main`.
+
 ## Verification
 
 - [ ] Relevant deterministic repository checks pass.

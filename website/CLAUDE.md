@@ -11,7 +11,8 @@ npm --prefix website run dev      # localhost:5173
 npm --prefix website run lint     # source, metadata, accessibility, copy contract
 npm --prefix website test         # Node contract fixtures + rendered contract
 npm --prefix website run build    # client + SSR + prerender -> website/dist/
-npm --prefix website run check    # lint + test + build
+npm --prefix website run check    # lint + test + build + Playwright browser tests
+                                  # (needs Chromium once: npx --prefix website playwright install --with-deps chromium)
 npm --prefix website run preview  # serve production build
 ```
 
@@ -107,7 +108,7 @@ Asset ownership:
   changes, regenerate waveform arrays with `website/scripts/render-waveforms.mjs`.
 - `public/assets/app-icon-1024.png`, `vocello-header-mark.png`, and `social_preview.png`: brand art.
 
-Add assets under `public/assets/<category>/` and reference them through the data layer, not directly
+Add assets under a category directory in `public/assets/` and reference them through the data layer, not directly
 from unrelated JSX.
 
 ## Interaction and accessibility

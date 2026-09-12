@@ -62,11 +62,12 @@ XCUITest lanes only when explicitly requested.
   (prepare entry to the final WAV write, minus model load and prewarm, on the monotonic stage recorder)
   ÷ audio seconds, lower is faster; `audioSecondsPerWallSecond` is the decode-loop speedup and is never
   called RTF. Wall time for any throughput figure comes from `ContinuousClock`, never `Date()`.
-- **Telemetry semantics are typed.** Schema-v8 frontend latency stops at playback scheduling; process
+- **Telemetry semantics are typed.** Since telemetry schema v8 (the engine now emits v9), frontend
+  latency stops at playback scheduling; process
   memory belongs to the process that measured it; a macOS UI benchmark is authoritative only when app,
   XPC and engine layers are complete.
 
-## macOS app and XPC (`Sources/App`, `Views`, `ViewModels`, `Services`, `QwenVoiceEngineService`)
+## macOS app and XPC (`Sources/QwenVoiceApp.swift`, `Sources/Views`, `ViewModels`, `Services`, `QwenVoiceEngineSupport`, `QwenVoiceEngineService`)
 
 - **XPC event forwarding drains off `MainActor`** (`Task.detached(.utility)` in `EngineServiceHost`);
   only `lastPublishedEvent` hops to `MainActor`. Reserve, bind accepted state, then open generation; a
@@ -111,7 +112,8 @@ XCUITest lanes only when explicitly requested.
   identifiers stable and governed with `config/ios-control-audit.json`; no hidden test UI.
 - **Hardware and memory.** `IOSDeviceSupport.isSupportedHardware` (iPhone 15 Pro and later) aligns with
   `scripts/ios_device_eligibility.py`; the `increased-memory-limit` entitlement stays; clone load profile
-  follows the entitled limit. Publishable device evidence is memory-qualified (telemetry v8, ≥95%
+  follows the entitled limit. Publishable device evidence is memory-qualified (telemetry schema v8 or
+  newer, ≥95%
   coverage, no critical pressure, warning, `hardTrim` or `fullUnload`).
 - **Localization grows through typed catalog entries.** Dynamic copy belongs in `VocelloPresentationText`
   and `Localizable.xcstrings` with plural rules; formatted copy goes through `VocelloLocalization.format`

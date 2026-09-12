@@ -8,7 +8,7 @@ product
 
 Mac (and iPhone) power users who create voice content for their own projects — videos, audiobooks, accessibility narration, podcasting, personal work — and value privacy enough to want generation to happen on-device instead of through a cloud TTS service. They are comfortable with native macOS conventions, likely use other Apple-native pro tools (Final Cut, Logic, Notes), and expect a Mac app to behave like a Mac app: keyboard-first, sheet-based, system materials, no novelty chrome.
 
-The hardware floor (Mac mini M1 8 GB / iPhone 15 Pro) intentionally widens the audience past pro-only — hobbyists creating one voice clone for a side project sit on the same surface as someone batching narration for a series. The UI must read as "competent for both" without optimizing for either.
+The hardware floor (any Apple Silicon Mac with 8 GB / iPhone 15 Pro) intentionally widens the audience past pro-only — hobbyists creating one voice clone for a side project sit on the same surface as someone batching narration for a series. The UI must read as "competent for both" without optimizing for either.
 
 The job: bring text, leave with audio that sounds right, in seconds, without leaving the laptop.
 
@@ -16,7 +16,7 @@ The job: bring text, leave with audio that sounds right, in seconds, without lea
 
 Vocello is a local-first text-to-speech application that runs Qwen3-TTS / MLX models entirely on-device. Three generation modes share one chrome:
 
-- **Custom Voice** — generate with a chosen preset speaker, delivery style, and intensity. “Speed”
+- **Built-in Voice** (internal mode id `custom`) — generate with a chosen preset speaker, delivery style, and intensity. “Speed”
   names the 4-bit model variant, not a delivery control.
 - **Voice Design** — describe a voice in natural language; the model produces it.
 - **Voice Cloning** — provide a 10–20 s reference clip (record it in-app or import a file; the transcript can auto-fill via on-device transcription); the model speaks the user's text in that voice.

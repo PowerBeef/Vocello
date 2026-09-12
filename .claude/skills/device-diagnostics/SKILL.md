@@ -17,7 +17,7 @@ the deterministic physical-device driver; it is not a UI driver. Verbs that gene
 1. `scripts/ios_device.sh doctor` first when the environment is uncertain (signing identity, paired
    device, platform support).
 2. Require a verb as the first argument. Never use `install` or `launch` against a distribution
-   candidate here; the candidate route is `scripts/ui_test.sh ios --preinstalled-candidate`.
+   candidate here; the candidate route is `scripts/ui_test.sh ios smoke --preinstalled-candidate <verified-release-dir>`.
 3. Say what the verb does and how long it takes before running: `scripts/ios_device.sh $ARGUMENTS`.
 4. Report the verb's own verdict, the artifacts under `build/artifacts/diagnostics/ios/` or
    `build/artifacts/ios/`, and whether a crash delta appeared. Do not publish benchmark records from

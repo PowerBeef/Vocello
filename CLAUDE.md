@@ -70,21 +70,24 @@ publication and device consent are always explicit; ordinary work never needs a 
 
 | Tier | When | What |
 | --- | --- | --- |
-| Inner loop | while editing | `dev.sh test --only Class`, `dev.sh py --changed`, `dev.sh lint`. The XCUITest bundles compile only inside `scripts/ui_test.sh`; after editing `Tests/*UITests` or `Tests/UIAutomationSupport`, run `xcodebuild build-for-testing` for `VocelloMacUI` and `VocelloiOSUI` (generic iOS destination, unsigned, `-skipPackagePluginValidation`) before committing. |
+| Inner loop | while editing | `dev.sh test --only Class`, `dev.sh py` (changed consumers by default; `--all`, `--lane`, or explicit modules), `dev.sh lint`. Quarantine (`config/test-quarantine.json`) applies only under `VOCELLO_QUARANTINE=1`, which CI sets; local runs execute quarantined tests. The XCUITest bundles compile only inside `scripts/ui_test.sh`; after editing `Tests/*UITests` or `Tests/UIAutomationSupport`, run `xcodebuild build-for-testing` for `VocelloMacUI` and `VocelloiOSUI` (generic iOS destination, unsigned, `-skipPackagePluginValidation`) before committing. |
 | Commit | `git commit` | `scripts/hooks/commit_lint.sh`: branch `main`, clean whitespace, no private path or credential in staged files. Nothing else blocks a commit. |
 | Push CI | every push to `main` | `.github/workflows/ci.yml`: routed lanes, cached native builds, Linux Python suite, `CI required` aggregate |
 | Nightly | 04:00 UTC | TSan subset, complete Python suite, cold compiles of both platforms; opens a `nightly` issue on failure |
 | Weekly / release | schedule, tag | `security.yml` (CodeQL, npm audit); `release.yml` (signing, notarization, evidence) |
 
-`./scripts/check_project_inputs.sh` is the deterministic contract gate (product contracts,
-`scripts/repo_invariants.sh`, the privacy scan, the Python suite). Serialize native Xcode commands;
-never clear caches to evade contention.
+`./scripts/check_project_inputs.sh [--local] [--python all|darwin-only|selected|none]` is the
+deterministic contract gate (product contracts, `scripts/repo_invariants.sh`, the privacy scan, the
+roadmap validator and render check, the Python suite); `--local` selects Python tests from the dirty
+tree and is refused in CI, and `QVOICE_GATES=quick` skips the full suite locally while `scripts/` and
+`config/` are clean. Serialize native Xcode commands; never clear caches to evade contention.
 
 ## Hooks and assists
 
 `.claude/settings.json` wires `commit_lint.sh`, `policy_guard.sh` (Simulator destinations, whole-cache
-deletion, force pushes, new branches, `project.pbxproj` writes), `generated_file_guard.sh` (generated
-files), `project_yml_reminder.sh` (regenerate after editing `project.yml`) and `session_start.sh`. Behaviour is pinned by `scripts/tests/test_claude_hooks.py`. Personal
+deletion, force pushes, new branches, `project.pbxproj` writes), `generated_file_guard.sh` (`docs/ROADMAP.md`,
+the production catalog, `docs/charts/*.svg`, `benchmarks/HISTORY.md`, frozen `benchmarks/runs/*`, the
+`.xcodeproj`, the owned-package inventory and facade baseline), `project_yml_reminder.sh` (regenerate after editing `project.yml`) and `session_start.sh`. Behaviour is pinned by `scripts/tests/test_claude_hooks.py`. Personal
 overrides live in the untracked `settings.local.json` under `.claude/`.
 
 Optional assists, verified before relying on them: user-invoked skills `/ios-lane`, `/macos-ui-lane`,

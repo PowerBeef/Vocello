@@ -758,6 +758,7 @@ class CellAccumulator:
             "rtfIQR": iqr(self.rtfs),
             "rtfMAD": mad(self.rtfs),
             "physFootIQR": iqr(self.phys_foot_mb),
+            "physFootMAD": mad(self.phys_foot_mb),
             "trims": med(self.trims),
             "worstTrim": worst_trim,
             "uiDelayedHeartbeat50": med(self.ui_stalls),
@@ -1087,6 +1088,7 @@ def build_summary(cells):
                 "n": s["n"],
                 "rtf": s["rtf"],
                 "rtfMAD": s.get("rtfMAD"),
+                "physFootMAD": s.get("physFootMAD"),
                 "decodeSpeedupX": s.get("decodeSpeedupX"),
                 "tokps": s["tokps"],
                 "ttfcMS": s["ttfcMS"],
@@ -1225,12 +1227,14 @@ def host_load_verdict(evidence_payload, *, cpu_count=None):
     return reasons
 
 
-def effective_threshold(base_cell, threshold):
-    """Widen the flat threshold to three median absolute deviations when the
-    baseline has at least three samples; one-take baselines keep the flat value."""
+def effective_threshold(base_cell, threshold, median_key="rtf", mad_key="rtfMAD"):
+    """Widen the flat threshold to three median absolute deviations of the
+    baseline's own takes when it has at least three samples; one-take baselines
+    keep the flat value. Applied to `rtf` and to `physFootMB`, whose sampled
+    per-take peak swings by hundreds of MB between identical takes."""
     n = base_cell.get("n")
-    mad_value = base_cell.get("rtfMAD")
-    median = base_cell.get("rtf")
+    mad_value = base_cell.get(mad_key)
+    median = base_cell.get(median_key)
     if (
         isinstance(n, int) and n >= 3
         and isinstance(mad_value, (int, float)) and isinstance(median, (int, float)) and median
@@ -1317,7 +1321,8 @@ def compare_summaries(
         `decodeSpeedupX` instead (decrease = regression)
       - tokps decreased by > threshold
       - ttfcMS increased by > threshold
-      - physFootMB increased by > threshold
+      - physFootMB increased by > threshold (widened to three of the baseline's
+        physFootMAD like rtf when the baseline has three samples)
       - qcVerdict worsened (pass -> warn/fail, warn -> fail)
     """
     baseline_by_key = {tuple(b["cellKey"]): b for b in baseline}
@@ -1389,7 +1394,12 @@ def compare_summaries(
                 )
                 continue
             delta = (c - b) / b
-            metric_threshold = cell_threshold if metric == "rtf" else threshold
+            if metric == "rtf":
+                metric_threshold = cell_threshold
+            elif metric == "physFootMB":
+                metric_threshold = effective_threshold(base, threshold, "physFootMB", "physFootMAD")
+            else:
+                metric_threshold = threshold
             is_regression = (
                 (direction == "up" and delta > metric_threshold)
                 or (direction == "down" and -delta > metric_threshold)

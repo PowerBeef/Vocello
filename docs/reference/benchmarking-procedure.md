@@ -631,7 +631,8 @@ Useful flags:
 | `--show-variance` | IQR / outlier hints per cell |
 | `--merged` | Cross-layer first-chunk table from `generations-merged.jsonl` |
 | `--save-baseline PATH` | Write the current per-cell summary as a **JSON** baseline |
-| `--compare-baseline BASELINE.json` | Fail-closed regression/coverage comparison against a **JSON** baseline from `--save-baseline`. Exit 2 on regression (RTF **rise**, tok/s drop, TTFC/physFoot rise beyond the threshold), removed/added cells, a missing sample count or required metric, or QC worsening; exit 3 (inconclusive) when the evidence shows a host load average above 2× the core count or a serious/critical thermal state. The RTF threshold is `max(--regress-threshold, 3 × baseline MAD ÷ median)` once the baseline cell has n ≥ 3, so a one-take baseline keeps the flat 5%. A baseline saved before 2026-09-12 stores the decode speedup under `rtf` and is compared with the current `decodeSpeedupX`; re-save it to compare standard RTF. Markdown snapshots cannot be fed to this flag — diff those with `git diff`. |
+| `--compare-baseline BASELINE.json` | Fail-closed regression/coverage comparison against a **JSON** baseline from `--save-baseline`. Exit 2 on regression (RTF **rise**, tok/s drop, TTFC/physFoot rise beyond the threshold), removed/added cells, a missing sample count or required metric, or QC worsening; exit 3 (inconclusive) when the evidence shows a host load average above 2× the core count or a serious/critical thermal state. The RTF threshold is `max(--regress-threshold, 3 × baseline MAD ÷ median)` once the baseline cell has n ≥ 3, so a one-take baseline keeps the flat 5%. A baseline saved before 2026-09-12 stores the decode speedup under `rtf` and is compared with the current `decodeSpeedupX`; re-save it to compare standard RTF. Markdown snapshots cannot be fed to this flag — diff those with `git diff`. The `rtf` and `physFootMB` thresholds widen to three median absolute deviations of the baseline's own takes (`rtfMAD`, `physFootMAD`) when it holds three samples: the sampled per-take footprint peak swings by hundreds of MB between identical takes. |
+| `--compare-states STATE[,STATE]` | Restrict the baseline verdict to cells in those warm states (the gate passes `warm`: its three-take medians decide, the single cold take stays informational). Without it every cell is judged. |
 | `--baseline-migrations PATH` | Use a reviewed schema-v1 old-cell → new-cell migration map. Defaults to `config/benchmark-baseline-migrations.json`; ambiguous mappings and empty reasons fail. |
 | `--run-id ID` | Reject rows from other benchmark runs. |
 | `--evidence-manifest PATH` | Select the manifest's exact ordered generations and cells. |
@@ -774,8 +775,9 @@ The committed **`benchmarks/baselines/mac-gate-bench.json`** (custom/speed/mediu
 cold+warm) is a schema-v2 baseline binding the hardware profile, `-O` optimization,
 matrix/corpus, model artifact, evidence semantics and, since 2026-09-12, the host OS and Xcode
 versions and the RTF definition. It is what `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate`
-compares against — the gate runs three warm takes and compares medians, uses an isolated runtime
-directory, rejects rows outside its collision-resistant run ID, freezes the exact ordered generation
+compares against — the gate runs three warm takes and compares their medians (`--compare-states
+warm`; the cold take is informational), uses an isolated runtime directory, rejects rows outside
+its collision-resistant run ID, freezes the exact ordered generation
 selection in `benchmark-evidence.json` before comparing, and reports a loaded or throttled host as
 inconclusive rather than pass or fail. The committed baseline predates the cutover (one take, decode
 speedup, no host identity); the comparer says so on every run until it is re-saved from a

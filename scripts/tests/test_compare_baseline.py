@@ -344,3 +344,19 @@ def test_states_restricts_the_verdict_to_the_named_warm_states():
     worse = [_make_cell(warm, 0.70, 23.6, 421.0, 2270.0, "pass")]
     reported = sgt.compare_summaries(baseline, worse, states=("warm",))
     assert [(r["metric"], tuple(r["cellKey"])) for r in reported] == [("rtf", warm)]
+
+
+def test_footprint_threshold_widens_with_the_baseline_takes_dispersion():
+    key = ("custom", "Qwen3-TTS-12Hz-1.7B-4bit", "warm", "medium")
+    baseline = [_make_cell(key, 0.58, 23.6, 420.0, 2273.0, "pass")]
+    current = [_make_cell(key, 0.58, 23.6, 420.0, 2511.3, "pass")]  # +10.5 %
+    assert [r["metric"] for r in sgt.compare_summaries(baseline, current)] == ["physFootMB"]
+    # Three warm takes whose sampled peaks were 2022, 2273 and 2640 MB: MAD 251 MB,
+    # so the footprint threshold becomes 3 × 251 / 2273 = 33 %.
+    baseline[0].update({"n": 3, "physFootMAD": 251.0})
+    assert sgt.compare_summaries(baseline, current) == []
+    far = [_make_cell(key, 0.58, 23.6, 420.0, 3100.0, "pass")]  # +36 %
+    assert [r["metric"] for r in sgt.compare_summaries(baseline, far)] == ["physFootMB"]
+    # The footprint dispersion never loosens the rtf verdict.
+    slower = [_make_cell(key, 0.62, 23.6, 420.0, 2273.0, "pass")]  # +6.9 %
+    assert [r["metric"] for r in sgt.compare_summaries(baseline, slower)] == ["rtf"]

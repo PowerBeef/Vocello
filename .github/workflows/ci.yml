@@ -175,9 +175,14 @@ jobs:
           # The Xcode segment comes from config/toolchain.json so a pin bump starts a new cache namespace.
           xcode="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
           graph="${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}"
+          # One entry per (Xcode, dependency graph, ISO week): a warm run hits it
+          # exactly and saves nothing; the first run of a week or of a new graph
+          # misses the exact key, restores the newest prefix match and saves once.
+          week="$(date -u +%G-W%V)"
           echo "prefix=macos-xcode${xcode}-" >> "$GITHUB_OUTPUT"
           echo "graph=macos-xcode${xcode}-${graph}-" >> "$GITHUB_OUTPUT"
-          echo "value=macos-xcode${xcode}-${graph}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "value=macos-xcode${xcode}-${graph}-${week}" >> "$GITHUB_OUTPUT"
+          echo "spm=spm-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved') }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore build caches
         id: cache
@@ -186,12 +191,19 @@ jobs:
         with:
           path: |
             build/cache/xcode/macos
-            build/cache/xcode/source-packages
             build/cache/swiftpm/mlx-audio-runtime
           key: ${{ steps.key.outputs.value }}
           restore-keys: |
             ${{ steps.key.outputs.graph }}
             ${{ steps.key.outputs.prefix }}
+
+      - name: Restore the shared package checkout
+        id: spm
+        if: ${{ !inputs.cold }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/cache/xcode/source-packages
+          key: ${{ steps.key.outputs.spm }}
 
       - name: Restore tracked-file mtimes from history
         run: python3 scripts/ci/restore_mtimes.py
@@ -230,14 +242,22 @@ jobs:
           echo "restored from: ${{ steps.cache.outputs.cache-matched-key || 'nothing (cold)' }}"
 
       - name: Save build caches
-        if: always()
+        # Only an exact miss saves (first run of the week or of a new graph, or a
+        # cold dispatch); a warm run leaves the store untouched.
+        if: ${{ !cancelled() && steps.cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             build/cache/xcode/macos
-            build/cache/xcode/source-packages
             build/cache/swiftpm/mlx-audio-runtime
           key: ${{ steps.key.outputs.value }}
+
+      - name: Save the shared package checkout
+        if: ${{ !cancelled() && steps.spm.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/cache/xcode/source-packages
+          key: ${{ steps.key.outputs.spm }}
 
   ios-compile:
     name: iOS compile check (device SDK)
@@ -260,22 +280,33 @@ jobs:
           # The Xcode segment comes from config/toolchain.json so a pin bump starts a new cache namespace.
           xcode="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
           graph="${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}"
+          # One entry per (Xcode, dependency graph, ISO week): a warm run hits it
+          # exactly and saves nothing; the first run of a week or of a new graph
+          # misses the exact key, restores the newest prefix match and saves once.
+          week="$(date -u +%G-W%V)"
           echo "prefix=ios-xcode${xcode}-" >> "$GITHUB_OUTPUT"
           echo "graph=ios-xcode${xcode}-${graph}-" >> "$GITHUB_OUTPUT"
-          echo "value=ios-xcode${xcode}-${graph}-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "value=ios-xcode${xcode}-${graph}-${week}" >> "$GITHUB_OUTPUT"
+          echo "spm=spm-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved') }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore build caches
         id: cache
         if: ${{ !inputs.cold }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: |
-            build/cache/xcode/ios-device
-            build/cache/xcode/source-packages
+          path: build/cache/xcode/ios-device
           key: ${{ steps.key.outputs.value }}
           restore-keys: |
             ${{ steps.key.outputs.graph }}
             ${{ steps.key.outputs.prefix }}
+
+      - name: Restore the shared package checkout
+        id: spm
+        if: ${{ !inputs.cold }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/cache/xcode/source-packages
+          key: ${{ steps.key.outputs.spm }}
 
       - name: Restore tracked-file mtimes from history
         run: python3 scripts/ci/restore_mtimes.py
@@ -285,7 +316,11 @@ jobs:
 
       - name: Compile VocelloiOS and the iOS policy tests for the device SDK
         # Same script and same persistent DerivedData as the local checkpoint;
-        # CODE_SIGNING_ALLOWED=NO inside the script. Compile only, no phone.
+        # CODE_SIGNING_ALLOWED=NO inside the script. Compile only, no phone. A
+        # compile check needs no optimized products, so CI keeps -Onone and the
+        # arena stays incremental; the local checkpoint keeps -O for the device lanes.
+        env:
+          QVOICE_FOUNDATION_SWIFT_OPTIMIZATION: "-Onone"
         run: ./scripts/build_foundation_targets.sh ios --incremental
 
       - name: Upload compile results on failure
@@ -306,13 +341,18 @@ jobs:
           echo "restored from: ${{ steps.cache.outputs.cache-matched-key || 'nothing (cold)' }}"
 
       - name: Save build caches
-        if: always()
+        if: ${{ !cancelled() && steps.cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: |
-            build/cache/xcode/ios-device
-            build/cache/xcode/source-packages
+          path: build/cache/xcode/ios-device
           key: ${{ steps.key.outputs.value }}
+
+      - name: Save the shared package checkout
+        if: ${{ !cancelled() && steps.spm.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/cache/xcode/source-packages
+          key: ${{ steps.key.outputs.spm }}
 
   website:
     name: Website deterministic checks

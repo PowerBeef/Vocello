@@ -22,6 +22,16 @@ FOUNDATION_BUILD_ROOT="$QVOICE_ARTIFACTS_FOUNDATION"
 # QVOICE_FOUNDATION_SWIFT_OPTIMIZATION=-O compiles the macOS foundation target optimized (the
 # nightly lane uses it so -O-only warnings surface before a release build does).
 MACOS_OPTIMIZATION="${QVOICE_FOUNDATION_SWIFT_OPTIMIZATION:--Onone}"
+# The incremental iOS compile defaults to -O so its arena matches the physical-device
+# UI lanes; push CI sets -Onone because a compile check needs no optimized products.
+IOS_INCREMENTAL_OPTIMIZATION="${QVOICE_FOUNDATION_SWIFT_OPTIMIZATION:--O}"
+case "${QVOICE_FOUNDATION_SWIFT_OPTIMIZATION:--O}" in
+  -O|-Onone) ;;
+  *)
+    echo "error: QVOICE_FOUNDATION_SWIFT_OPTIMIZATION must be -O or -Onone (got '${QVOICE_FOUNDATION_SWIFT_OPTIMIZATION}')" >&2
+    exit 2
+    ;;
+esac
 FOUNDATION_DERIVED_ROOT="$QVOICE_SCRATCH_FOUNDATION"
 SOURCE_PACKAGES_DIR="$QVOICE_XCODE_SOURCE_PACKAGES"
 
@@ -139,11 +149,15 @@ build_ios() {
   )
   if (( INCREMENTAL == 1 )); then
     derived_data_path="$QVOICE_XCODE_IOS_DERIVED"
-    provenance_optimization="O"
-    # Match physical-device UI lanes so package products remain reusable. The
-    # internal diagnostics conditions are target-scoped and may rebuild only
-    # owned QwenVoiceCore when the subsequent XCUITest lane needs them.
-    swift_settings=(SWIFT_OPTIMIZATION_LEVEL=-O)
+    provenance_optimization="${IOS_INCREMENTAL_OPTIMIZATION#-}"
+    # -O by default: match the physical-device UI lanes so package products
+    # remain reusable (the internal diagnostics conditions are target-scoped and
+    # may rebuild only owned QwenVoiceCore when the subsequent XCUITest lane
+    # needs them). Push CI asks for -Onone through QVOICE_FOUNDATION_SWIFT_OPTIMIZATION.
+    swift_settings=(SWIFT_OPTIMIZATION_LEVEL="$IOS_INCREMENTAL_OPTIMIZATION")
+    if [[ "$IOS_INCREMENTAL_OPTIMIZATION" == "-Onone" ]]; then
+      swift_settings+=(SWIFT_COMPILATION_MODE=incremental)
+    fi
   fi
 
   ensure_spm_resolved "$QVOICE_SCRATCH_PACKAGE_RESOLUTION" "$SOURCE_PACKAGES_DIR" \

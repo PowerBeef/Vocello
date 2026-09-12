@@ -23,7 +23,8 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   roadmap validator and the Python suite (`pytest -n auto`; `research` and `darwin_only` lanes by marker
   in `scripts/tests/conftest.py`). Add a check only when it protects a product invariant; never a check
   that asserts the wording of another script or workflow.
-- `ci.yml`: `scripts/ci/classify_changes.py` routes pushes into lanes; `macos-tests` and `ios-compile`
+- `ci.yml`: `scripts/ci/classify_changes.py` routes pushes into lanes, diffing each lane against the last
+  run in which that lane's job passed (a cancelled superseded run cannot leave a lane unrun); `macos-tests` and `ios-compile`
   restore the persistent DerivedData caches from `config/build-output-policy.json`
   (`scripts/ci/restore_mtimes.py` first); `contracts` and `python` run on ubuntu; `CI required` is the
   only branch-protection context and passes when jobs are path-skipped. The shared toolchain step is

@@ -16,7 +16,10 @@ git add -A && git commit && git push
 ```
 
 Routing is `scripts/ci/classify_changes.py`, the same file CI uses, so the local plan and the CI lanes
-agree: `swift` runs the macOS test bundles (`scripts/macos_test.sh test`, or `core-test --only` when
+agree. On a push, CI diffs each lane against the last run on the branch in which that lane's job
+passed (not against the previous push), because `cancel-in-progress` can drop a superseded push's run
+and the lanes it owed must still run on the next push; a lane with no prior green run always runs.
+Locally the lanes come from the dirty tree: `swift` runs the macOS test bundles (`scripts/macos_test.sh test`, or `core-test --only` when
 only test classes changed), `ios` runs the generic compile, `python` runs the reverse-dependency Python
 selection, `website` runs `npm --prefix website run check`. A change to shared tooling
 (`scripts/lib/`, `scripts/development_workflow.py`, `config/toolchain.json`,

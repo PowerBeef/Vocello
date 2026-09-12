@@ -32,6 +32,9 @@ jobs:
     name: Change routing
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
     outputs:
       swift: ${{ steps.classify.outputs.swift }}
       ios: ${{ steps.classify.outputs.ios }}
@@ -45,12 +48,46 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Each lane is diffed against the last run on this branch in which its job
+      # passed, so a run cancelled by a superseding push cannot leave a lane
+      # unrun behind a later docs-only push. Best effort: without history the
+      # classifier falls back to the previous push, then to every lane.
+      - name: Recent runs of this workflow on this branch
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          : > ci-history.json
+          ids="$(gh run list --workflow ci.yml --branch "$GITHUB_REF_NAME" --limit 15 \
+            --json databaseId,status --jq '.[] | select(.status == "completed") | .databaseId' || true)"
+          python3 - $ids <<'PY' > ci-history.json
+          import json, subprocess, sys
+          runs = []
+          for run_id in sys.argv[1:]:
+              view = subprocess.run(
+                  ["gh", "run", "view", run_id, "--json", "headSha,conclusion,jobs"],
+                  capture_output=True, text=True, check=False,
+              )
+              if view.returncode:
+                  continue
+              payload = json.loads(view.stdout)
+              runs.append({
+                  "headSha": payload.get("headSha"),
+                  "conclusion": payload.get("conclusion"),
+                  "jobs": {job.get("name"): job.get("conclusion") for job in payload.get("jobs", [])},
+              })
+          json.dump(runs, sys.stdout)
+          PY
+          echo "history: $(python3 -c 'import json,sys; print(len(json.load(open("ci-history.json"))))' 2>/dev/null || echo 0) completed run(s)"
+
       - name: Classify changed paths
         id: classify
         env:
           EVENT_NAME: ${{ github.event_name }}
           BEFORE_SHA: ${{ github.event.before }}
           HEAD_SHA: ${{ github.sha }}
+          CI_HISTORY_PATH: ci-history.json
         run: python3 scripts/ci/classify_changes.py
 
   contracts:

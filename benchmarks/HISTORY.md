@@ -428,6 +428,12 @@ trend percentages carry their direction in words.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-04 | [`macos-engine-20260804-210410-840af10c`](runs/engine-generation/macos-engine-20260804-210410-840af10c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.87 | `5c67ee1d3431` | `703de4cf9d62` | baseline | dp18-4bit |
 
+## engine-generation / macos / mac-mini-m2-8gb / config `74e8d4afc52c`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-12 | [`mac-gate-bench-20260912-234613-c8f8a8c6`](runs/engine-generation/mac-gate-bench-20260912-234613-c8f8a8c6.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 4 | 0.60 | `b88d6d033388` | `74e8d4afc52c` | baseline | mac-gate-bench |
+
 ## engine-generation / macos / mac-mini-m2-8gb / config `769db51ea1e0`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

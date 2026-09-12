@@ -118,10 +118,9 @@ public func stableFacadeEntryPoint() -> Bool { true }
             [],
         )
 
-    def test_legacy_compatibility_spi_consumers_match_the_precise_allowlist(self) -> None:
+    def test_no_product_source_consumes_the_retired_legacy_spi(self) -> None:
         observed = MODULE.legacy_compatibility_spi_consumers(ROOT)
         self.assertEqual(observed, set())
-        self.assertEqual(MODULE.LEGACY_COMPATIBILITY_SPI_CONSUMERS, frozenset())
         self.assertEqual(MODULE.legacy_compatibility_consumer_errors(observed), [])
 
         extra = {"Sources/QwenVoiceCore/UnapprovedConsumer.swift"}

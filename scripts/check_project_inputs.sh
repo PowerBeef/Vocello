@@ -54,7 +54,6 @@ python3 "$SCRIPT_DIR/vendor_runtime_contract.py" validate
 "$SCRIPT_DIR/check_backend_resource_contract.sh" --project
 "$SCRIPT_DIR/check_qwen3_backend_only.sh"
 python3 "$SCRIPT_DIR/validate_backend_risk_spine.py" --root "$PROJECT_DIR"
-python3 "$SCRIPT_DIR/check_convergence_promotion_gate.py"
 
 # Model delivery and App Store readiness.
 python3 "$SCRIPT_DIR/model_catalog_contract.py" rebuild --check
@@ -68,7 +67,6 @@ python3 "$SCRIPT_DIR/ios_release_analyzer_warnings.py" validate
 # Release evidence, supply chain and benchmark history.
 python3 "$SCRIPT_DIR/supply_chain_contract.py"
 python3 "$SCRIPT_DIR/required_step_ledger.py" validate-contract
-python3 "$SCRIPT_DIR/evidence_impact.py" validate
 python3 "$SCRIPT_DIR/quality_promotion.py" validate-contract
 python3 "$SCRIPT_DIR/benchmark_history.py" validate --all
 python3 "$SCRIPT_DIR/benchmark_history.py" rebuild-index --check

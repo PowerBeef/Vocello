@@ -17,7 +17,6 @@ import tempfile
 from typing import Any
 
 import benchmark_history
-import evidence_impact
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -117,9 +116,7 @@ def model_applicability(contract: dict[str, Any], root: Path) -> dict[str, dict[
     return result
 
 
-def validate_contract(
-    contract: dict[str, Any], impact: dict[str, Any] | None = None, *, root: Path = ROOT
-) -> None:
+def validate_contract(contract: dict[str, Any], *, root: Path = ROOT) -> None:
     version = contract.get("schemaVersion")
     if type(version) is not int or version not in {2, CONTRACT_SCHEMA_VERSION}:
         raise PromotionError("quality promotion contract schemaVersion must be 2 or 3")
@@ -234,25 +231,33 @@ def validate_contract(
     forbidden = privacy.get("forbiddenKeys")
     if not isinstance(forbidden, list) or not forbidden:
         raise PromotionError("quality promotion privacy forbiddenKeys are missing")
-    if impact is not None:
-        references: set[str] = set()
-        for item in [*impact.get("pathClasses", []), impact.get("fallbackClass", {})]:
-            if isinstance(item, dict):
-                references.update(item.get("promotionRequiredEvidence") or [])
-        unknown = sorted(references - definitions.keys())
+    routing = contract.get("promotionRouting")
+    if routing is None:
+        if version != 2:
+            raise PromotionError("quality promotion contract v3 requires promotionRouting")
+        return
+    classes = routing.get("classes") if isinstance(routing, dict) else None
+    if not isinstance(classes, list) or not classes:
+        raise PromotionError("promotionRouting.classes must be a non-empty list")
+    seen: set[str] = set()
+    for item in classes:
+        identity = item.get("id") if isinstance(item, dict) else None
+        if not isinstance(identity, str) or not identity or identity in seen:
+            raise PromotionError("promotionRouting class ids must be unique non-empty strings")
+        seen.add(identity)
+        for field in ("include", "exclude"):
+            patterns = item.get(field, [])
+            if not isinstance(patterns, list) or (field == "include" and not patterns) or any(
+                not isinstance(pattern, str) or not pattern for pattern in patterns
+            ):
+                raise PromotionError(f"promotionRouting class {identity}.{field} must list non-empty globs")
+        unknown = sorted(set(item.get("requiredEvidence", [])) - definitions.keys())
         if unknown:
-            raise PromotionError("evidence-impact promotion references are undefined: " + ", ".join(unknown))
-        capability_references = {
-            capability
-            for item in [*impact.get("pathClasses", []), impact.get("fallbackClass", {})]
-            if isinstance(item, dict)
-            for capability in item.get("promotionCapabilities", [])
-        }
-        unknown_capabilities = sorted(capability_references - capabilities.keys())
+            raise PromotionError(f"promotionRouting class {identity} references undefined evidence: " + ", ".join(unknown))
+        unknown_capabilities = sorted(set(item.get("capabilities", [])) - capabilities.keys())
         if unknown_capabilities:
             raise PromotionError(
-                "evidence-impact promotion capabilities are undefined: "
-                + ", ".join(unknown_capabilities)
+                f"promotionRouting class {identity} references undefined capabilities: " + ", ".join(unknown_capabilities)
             )
 
 
@@ -330,6 +335,42 @@ def changed_paths(root: Path, base: str, commit: str) -> tuple[str, list[str]]:
         raise PromotionError("promotion base must be a distinct ancestor of the candidate")
     paths = git(root, "diff", "--name-only", f"{base_commit}..{commit}").splitlines()
     return base_commit, sorted(set(filter(None, paths)))
+
+
+def _matches(path: str, pattern: str) -> bool:
+    return fnmatch.fnmatchcase(path, pattern) or (
+        pattern.endswith("/**") and (path == pattern[:-3] or path.startswith(pattern[:-2]))
+    )
+
+
+def _class_matches(path: str, item: dict[str, Any]) -> bool:
+    return any(_matches(path, pattern) for pattern in item["include"]) and not any(
+        _matches(path, pattern) for pattern in item.get("exclude", [])
+    )
+
+
+def classify_paths(contract: dict[str, Any], paths: list[str]) -> dict[str, Any]:
+    """Route changed paths through the contract's own promotionRouting classes.
+
+    The result names the classes hit, the extra evidence lanes they require and
+    the capabilities whose coverage the manifest must state. A path that
+    matches no class adds nothing: the platform minimum always applies.
+    """
+    normalized: list[str] = []
+    for raw in sorted(set(paths)):
+        path = raw.replace("\\", "/")
+        while path.startswith("./"):
+            path = path[2:]
+        normalized.append(path.lstrip("/"))
+    classes = (contract.get("promotionRouting") or {}).get("classes") or []
+    matched = {item["id"]: item for item in classes if any(_class_matches(path, item) for path in normalized)}
+    return {
+        "changedPaths": normalized,
+        "changedPathsDigest": digest_value(normalized),
+        "classes": sorted(matched),
+        "promotionRequiredEvidence": sorted({ref for item in matched.values() for ref in item.get("requiredEvidence", [])}),
+        "promotionCapabilities": sorted({cap for item in matched.values() for cap in item.get("capabilities", [])}),
+    }
 
 
 def required_evidence(
@@ -498,11 +539,10 @@ def assignments(values: list[str], label: str) -> dict[str, Path]:
 def create(args: argparse.Namespace) -> dict[str, Any]:
     root = args.root.resolve()
     contract = load_contract(root)
-    impact_contract = evidence_impact.load_contract(root)
-    validate_contract(contract, impact_contract, root=root)
+    validate_contract(contract, root=root)
     release_evidence, commit = release_identity(args.release_evidence.resolve(), args.platform, args.tag, root)
     base_commit, paths = changed_paths(root, args.base, commit)
-    impact_result = evidence_impact.classify(impact_contract, paths)
+    impact_result = classify_paths(contract, paths)
     required = required_evidence(contract, impact_result, args.platform)
     capabilities, unsupported_dimensions = capability_coverage(
         contract, impact_result, args.platform
@@ -552,14 +592,7 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
             "releaseEvidenceSHA256": file_digest(args.release_evidence.resolve()),
         },
         "contractDigest": contract_digest,
-        "impact": {
-            "contractDigest": impact_result["contractDigest"],
-            "changedPaths": paths,
-            "changedPathsDigest": digest_value(paths),
-            "classes": impact_result["classes"],
-            "promotionRequiredEvidence": impact_result["promotionRequiredEvidence"],
-            "promotionCapabilities": impact_result["promotionCapabilities"],
-        },
+        "impact": impact_result,
         "capabilityCoverage": capabilities,
         "unsupportedDimensions": unsupported_dimensions,
         "requiredEvidence": required,
@@ -575,8 +608,7 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
 def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
     root = args.root.resolve()
     contract = load_contract(root)
-    impact_contract = evidence_impact.load_contract(root)
-    validate_contract(contract, impact_contract, root=root)
+    validate_contract(contract, root=root)
     manifest = read_json(args.manifest.resolve())
     expected_top_level = {
         "schemaVersion", "platform", "tag", "sourceCommit", "baseCommit", "createdAt",
@@ -610,16 +642,9 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
     }:
         raise PromotionError("quality promotion manifest differs from release evidence")
     base_commit, paths = changed_paths(root, str(manifest.get("baseCommit", "")), commit)
-    impact_result = evidence_impact.classify(impact_contract, paths)
+    impact_result = classify_paths(contract, paths)
     impact = manifest.get("impact")
-    expected_impact = {
-        "contractDigest": impact_result["contractDigest"],
-        "changedPaths": paths,
-        "changedPathsDigest": digest_value(paths),
-        "classes": impact_result["classes"],
-        "promotionRequiredEvidence": impact_result["promotionRequiredEvidence"],
-        "promotionCapabilities": impact_result["promotionCapabilities"],
-    }
+    expected_impact = impact_result
     required = required_evidence(contract, impact_result, args.platform)
     capabilities, unsupported_dimensions = capability_coverage(contract, impact_result, args.platform)
     if (
@@ -660,8 +685,7 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
 def capture(args: argparse.Namespace) -> dict[str, Any]:
     root = args.root.resolve()
     contract = load_contract(root)
-    impact_contract = evidence_impact.load_contract(root)
-    validate_contract(contract, impact_contract, root=root)
+    validate_contract(contract, root=root)
     definition = contract["evidence"].get(args.evidence_id)
     if not isinstance(definition, dict) or definition.get("type") != "managed-command":
         raise PromotionError("capture requires a managed-command evidence id")
@@ -709,6 +733,11 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--root", type=Path, default=ROOT, help=argparse.SUPPRESS)
     commands = result.add_subparsers(dest="operation", required=True)
     commands.add_parser("validate-contract")
+    classify_parser = commands.add_parser(
+        "classify", help="show the lanes a candidate must prove, from the paths changed since --base"
+    )
+    classify_parser.add_argument("--base", required=True)
+    classify_parser.add_argument("--platform", choices=("macos", "ios"))
     capture_parser = commands.add_parser("capture")
     capture_parser.add_argument("--evidence-id", required=True)
     capture_parser.add_argument("--platform", choices=("macos", "ios"), required=True)
@@ -737,8 +766,20 @@ def main() -> int:
     try:
         if args.operation == "validate-contract":
             contract = load_contract(args.root.resolve())
-            validate_contract(contract, evidence_impact.load_contract(args.root.resolve()), root=args.root.resolve())
+            validate_contract(contract, root=args.root.resolve())
             print(f"Quality promotion contract: PASS ({digest_value(contract)})")
+            return 0
+        if args.operation == "classify":
+            root = args.root.resolve()
+            contract = load_contract(root)
+            validate_contract(contract, root=root)
+            _base, paths = changed_paths(root, args.base, resolve_commit(root, "HEAD"))
+            result = classify_paths(contract, paths)
+            platforms = [args.platform] if args.platform else ["macos", "ios"]
+            result["requiredEvidenceByPlatform"] = {
+                platform: required_evidence(contract, result, platform) for platform in platforms
+            }
+            print(json.dumps(result, indent=2, sort_keys=True))
             return 0
         if args.operation == "capture":
             if args.command and args.command[0] == "--":

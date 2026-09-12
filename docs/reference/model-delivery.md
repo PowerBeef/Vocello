@@ -456,6 +456,6 @@ without more retries, duplicate bytes, thermal regression, or restoration failur
 Background Assets was evaluated and not adopted in this change. See
 [`../decisions/model-delivery-background-assets.md`](../decisions/model-delivery-background-assets.md).
 
-Changed-path evidence expectations are classified by
-[`evidence-impact.md`](evidence-impact.md). Live model downloads remain explicit quality evidence,
-not ordinary commit, merge, or release-packaging blockers.
+Changed-path evidence expectations for a public promotion are routed by
+[`quality-promotion.md`](quality-promotion.md). Live model downloads remain explicit quality
+evidence, not ordinary commit, merge, or release-packaging blockers.

@@ -207,15 +207,6 @@
       "env": "QVOICE_SCRATCH_TRANSIENT"
     },
     {
-      "id": "scratch-gate-fingerprint",
-      "path": "build/scratch/gate-fingerprint",
-      "class": "scratch",
-      "owner": "retired commit receipt (no writer since 2026-09-11; safe to delete)",
-      "cleanup": "routine",
-      "retention": "Legacy receipt cache; routine cleanup removes it",
-      "env": "QVOICE_SCRATCH_GATE_FINGERPRINT"
-    },
-    {
       "id": "scratch-release-macos",
       "path": "build/scratch/derived-data/release-macos",
       "class": "scratch",
@@ -295,15 +286,6 @@
       "cleanup": "governed",
       "retention": "Validator-owned; preserve unresolved failure and publication-repair evidence",
       "env": "QVOICE_ARTIFACTS_DIAGNOSTICS"
-    },
-    {
-      "id": "artifacts-project-health",
-      "path": "build/artifacts/project-health",
-      "class": "artifact",
-      "owner": "Generated project-health inventory and release-readiness diagnostics",
-      "cleanup": "routine",
-      "retention": "Local detailed reports are disposable; the compact reproducible snapshot is tracked under docs",
-      "env": "QVOICE_ARTIFACTS_PROJECT_HEALTH"
     },
     {
       "id": "artifacts-quality-promotion",

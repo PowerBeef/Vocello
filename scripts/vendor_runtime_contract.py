@@ -73,6 +73,7 @@ FORBIDDEN_FACADE_API_TYPES = re.compile(
 )
 LEGACY_COMPATIBILITY_SPI = "VocelloQwen3LegacyCompatibility"
 LEGACY_COMPATIBILITY_SPI_ATTRIBUTE = f"@_spi({LEGACY_COMPATIBILITY_SPI})"
+LEGACY_COMPATIBILITY_SPI_ENFORCEMENT = "scripts/vendor_runtime_contract.py::legacy_compatibility_consumer_errors"
 LEGACY_COMPATIBILITY_SPI_ATTRIBUTE_PATTERN = re.compile(
     rf"@_spi\(\s*{re.escape(LEGACY_COMPATIBILITY_SPI)}\s*\)"
 )
@@ -99,8 +100,6 @@ VOCELLO_QWEN3_CORE_IMPORT = re.compile(r"\bimport\s+VocelloQwen3Core\b")
 # metadata, priming, and clone-artifact adoption are actor-owned, and the
 # previously SPI-gated symbols are internal to the package. The empty sets keep
 # the fail-closed checks alive so no consumer or surface can silently return.
-LEGACY_COMPATIBILITY_SPI_CONSUMERS: frozenset[str] = frozenset()
-LEGACY_COMPATIBILITY_SPI_SURFACES: frozenset[str] = frozenset()
 RELOCATION_POST_PATHS = {
     CURRENT_INVENTORY_NAME,
     RELOCATION_INVENTORY_NAME,
@@ -385,16 +384,11 @@ def legacy_compatibility_spi_consumers(repo_root: Path) -> set[str]:
 
 
 def legacy_compatibility_consumer_errors(observed: set[str]) -> list[str]:
-    errors: list[str] = []
-    for path in sorted(observed - LEGACY_COMPATIBILITY_SPI_CONSUMERS):
-        errors.append(
-            f"unapproved {LEGACY_COMPATIBILITY_SPI} product consumer: {path}"
-        )
-    for path in sorted(LEGACY_COMPATIBILITY_SPI_CONSUMERS - observed):
-        errors.append(
-            f"stale {LEGACY_COMPATIBILITY_SPI} product consumer registration: {path}"
-        )
-    return errors
+    """The SPI was retired on 2026-07-23; no product source may consume it again."""
+    return [
+        f"unapproved {LEGACY_COMPATIBILITY_SPI} product consumer: {path}"
+        for path in sorted(observed)
+    ]
 
 
 def legacy_compatibility_metadata_errors(compatibility: dict) -> list[str]:
@@ -407,10 +401,12 @@ def legacy_compatibility_metadata_errors(compatibility: dict) -> list[str]:
         errors.append("COMPATIBILITY retired SPI name differs from the enforced boundary")
     if metadata.get("status") != "retired-2026-07-23-phase14b-actor-owned-loading":
         errors.append("COMPATIBILITY retired SPI status token drifted")
-    if set(metadata.get("surfaces", [])) != LEGACY_COMPATIBILITY_SPI_SURFACES:
+    if metadata.get("surfaces", []) != []:
         errors.append("COMPATIBILITY retired SPI surface inventory must stay empty")
-    if set(metadata.get("consumerAllowlist", [])) != LEGACY_COMPATIBILITY_SPI_CONSUMERS:
+    if metadata.get("consumerAllowlist", []) != []:
         errors.append("COMPATIBILITY retired SPI consumer allowlist must stay empty")
+    if metadata.get("consumerAllowlistEnforcement") != LEGACY_COMPATIBILITY_SPI_ENFORCEMENT:
+        errors.append("COMPATIBILITY retired SPI enforcement reference drifted")
     return errors
 
 

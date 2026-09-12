@@ -249,6 +249,194 @@
       "unsupportedDimensions": []
     }
   },
+  "promotionRouting": {
+    "note": "Paths changed since the previous release select the capability lanes a public promotion must prove. Every platform always needs its platformMinimumEvidence; a class adds requiredEvidence and capabilities when any changed path matches one of its include globs and none of its exclude globs (fnmatch, ** matches whole subtrees). Paths matching no class add nothing.",
+    "classes": [
+      {
+        "id": "model-catalog-and-delivery",
+        "include": [
+          "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+          "Sources/QwenVoiceCore/IOSModelDownloadLedger.swift",
+          "Sources/QwenVoiceCore/ModelDownloadDiagnosticsStore.swift",
+          "Sources/QwenVoiceCore/ModelDownloadContracts.swift",
+          "Sources/QwenVoiceCore/ProductionModelCatalog.swift",
+          "Sources/Models/TTSContract.swift",
+          "Sources/Models/TTSModel.swift",
+          "Sources/Resources/qwenvoice_contract.json",
+          "Sources/Resources/qwenvoice_ios_model_catalog.json",
+          "Sources/Resources/qwenvoice_production_model_catalog.json",
+          "Sources/iOS/IOSModelDownloadCoordinator.swift",
+          "Sources/iOS/IOSModelInstallerViewModel.swift",
+          "Sources/iOS/IOSSettingsViews.swift",
+          "Sources/iOSSupport/Services/IOSModelDeliverySupport.swift",
+          "Sources/iOSSupport/Services/IOSModelProgressPresentation.swift",
+          "Sources/ViewModels/ModelManagerViewModel.swift",
+          "Sources/VocelloCLI/CLIRuntime.swift",
+          "Sources/VocelloCLI/ModelsCommand.swift",
+          "Sources/QwenVoiceCore/SharedModelComponentStore.swift",
+          "Sources/QwenVoiceCore/ModelAssets.swift",
+          "config/model-catalog-schema-v1.json",
+          "config/model-catalog-schema-v2.json",
+          "config/model-artifact-receipts.json",
+          "scripts/check_ios_catalog.sh",
+          "scripts/check_ios_model_management.py",
+          "scripts/model_catalog_contract.py"
+        ],
+        "requiredEvidence": [
+          "macos-model-download-lifecycle",
+          "ios-model-download-lifecycle"
+        ],
+        "capabilities": [
+          "speed-generation",
+          "quality-generation",
+          "studio-modes",
+          "model-lifecycle"
+        ]
+      },
+      {
+        "id": "memory-runtime",
+        "include": [
+          "Sources/QwenVoiceCore/*Memory*.swift",
+          "Sources/iOS/TTSEngineStore.swift",
+          "config/memory-qualification-policy.json",
+          "scripts/benchmark_memory.py",
+          "scripts/ios_memory_field_report.py"
+        ],
+        "requiredEvidence": [
+          "macos-retained-memory",
+          "ios-retained-memory"
+        ],
+        "capabilities": [
+          "speed-generation",
+          "quality-generation",
+          "studio-modes"
+        ]
+      },
+      {
+        "id": "platform-ui",
+        "include": [
+          "Sources/Views/**",
+          "Sources/iOS/**",
+          "Sources/iOSSupport/Services/*UIPerf*.swift",
+          "Tests/VocelloMacUITests/**",
+          "Tests/VocelloiOSUITests/**",
+          "config/ui-perf-thresholds.json",
+          "config/ui-perf-thresholds-ios.json",
+          "scripts/check_macos_ui_perf.py",
+          "scripts/check_ios_ui_perf.py"
+        ],
+        "requiredEvidence": [
+          "macos-ui-performance",
+          "ios-ui-performance"
+        ],
+        "capabilities": [
+          "speed-generation",
+          "quality-generation",
+          "studio-modes"
+        ]
+      },
+      {
+        "id": "audio-quality-and-evaluation",
+        "include": [
+          "Sources/**/AudioQuality*.swift",
+          "Sources/**/GenerationOutputVerifier.swift",
+          "Sources/**/GenerationQuality*.swift",
+          "Sources/VocelloCLI/GenerateCommand.swift",
+          "scripts/analyze_*.py",
+          "scripts/*prosody*.py",
+          "scripts/*delivery*.py",
+          "scripts/*language*.py",
+          "scripts/lib/language_metrics.py",
+          "scripts/lib/audio_qc.py",
+          "scripts/independent_asr.py",
+          "scripts/*speaker_similarity*.py",
+          "scripts/*fidelity*.py",
+          "scripts/check_marking_peak_equality.py",
+          "config/language-bench-*.json",
+          "config/delivery-*.json",
+          "config/voice-identity-language-reliability.json",
+          "config/*prosody*.json",
+          "config/marking-peak-equality.json"
+        ],
+        "requiredEvidence": [
+          "macos-ui-benchmark",
+          "ios-ui-benchmark",
+          "macos-engine-benchmark",
+          "ios-engine-benchmark"
+        ],
+        "capabilities": [
+          "speed-generation",
+          "quality-generation",
+          "studio-modes",
+          "multilingual-output",
+          "delivery-evaluation"
+        ]
+      },
+      {
+        "id": "benchmark-and-promotion-authority",
+        "include": [
+          "scripts/benchmark*.py",
+          "scripts/publish_benchmark_history.py",
+          "scripts/check_*benchmark.py",
+          "scripts/check_*ui_perf.py",
+          "scripts/quality_promotion.py",
+          "scripts/release_evidence.py",
+          "scripts/ios_device.sh",
+          "scripts/macos_test.sh",
+          "scripts/ui_test.sh",
+          "config/quality-promotion-contract.json",
+          "config/memory-qualification-policy.json",
+          "config/ui-perf-thresholds*.json"
+        ],
+        "requiredEvidence": [
+          "macos-ui-benchmark",
+          "ios-ui-benchmark",
+          "macos-engine-benchmark",
+          "ios-engine-benchmark",
+          "macos-retained-memory",
+          "ios-retained-memory",
+          "macos-ui-performance",
+          "ios-ui-performance"
+        ],
+        "capabilities": [
+          "speed-generation",
+          "quality-generation",
+          "studio-modes",
+          "multilingual-output",
+          "delivery-evaluation",
+          "model-lifecycle"
+        ]
+      },
+      {
+        "id": "engine-runtime",
+        "include": [
+          "Sources/QwenVoiceBackendCore/**",
+          "Sources/QwenVoiceCore/**",
+          "Sources/QwenVoiceEngineService/**",
+          "Sources/QwenVoiceEngineSupport/**",
+          "Packages/VocelloQwen3Core/**"
+        ],
+        "exclude": [
+          "Packages/VocelloQwen3Core/README.md",
+          "Packages/VocelloQwen3Core/PERFORMANCE.md",
+          "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/README.md"
+        ],
+        "requiredEvidence": [
+          "macos-ui-benchmark",
+          "ios-ui-benchmark",
+          "macos-engine-benchmark",
+          "ios-engine-benchmark"
+        ],
+        "capabilities": [
+          "speed-generation",
+          "quality-generation",
+          "studio-modes",
+          "multilingual-output",
+          "delivery-evaluation"
+        ]
+      }
+    ]
+  },
   "privacy": {
     "deviceIdentity": "canonical-hardware-profile-only",
     "forbiddenKeys": [

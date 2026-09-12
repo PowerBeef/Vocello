@@ -767,7 +767,7 @@ def runtime_refactor_contract_errors(
     if phase2.get("legacyShippingSPI") != LEGACY_COMPATIBILITY_SPI:
         errors.append("runtime-refactor-contract Phase 2 legacy SPI name drifted")
     if phase2.get("consumerAllowlistEnforcement") != (
-        "scripts/vendor_runtime_contract.py::LEGACY_COMPATIBILITY_SPI_CONSUMERS"
+        "scripts/vendor_runtime_contract.py::legacy_compatibility_consumer_errors"
     ):
         errors.append("runtime-refactor-contract Phase 2 SPI enforcement reference drifted")
     if phase2.get("combinedCompatibilitySession") != (

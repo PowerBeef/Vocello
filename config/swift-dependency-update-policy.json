@@ -4,7 +4,7 @@
   "workflow": ".github/workflows/swift-dependency-watch.yml",
   "governanceSurfaces": [
     "config/toolchain.json",
-    "config/evidence-impact.json",
+    "config/quality-promotion-contract.json",
     "config/macos-entitlement-policy.json",
     "docs/reference/mlx-guide.md"
   ],

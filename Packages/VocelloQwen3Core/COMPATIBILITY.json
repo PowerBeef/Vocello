@@ -50,7 +50,7 @@
       "status": "retired-2026-07-23-phase14b-actor-owned-loading",
       "surfaces": [],
       "consumerAllowlist": [],
-      "consumerAllowlistEnforcement": "scripts/vendor_runtime_contract.py::LEGACY_COMPATIBILITY_SPI_CONSUMERS",
+      "consumerAllowlistEnforcement": "scripts/vendor_runtime_contract.py::legacy_compatibility_consumer_errors",
       "policy": "Phase 14b retired the named SPI. Prepared-model loading, post-load metadata, preparation diagnostics, priming, and schema-3 clone-artifact persistence/adoption are actor-owned public surfaces; the previously SPI-gated symbols are internal to the package and the empty inventories are enforced fail-closed."
     },
     "internalCharacterizationSurfaces": [],

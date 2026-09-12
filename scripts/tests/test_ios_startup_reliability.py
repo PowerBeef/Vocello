@@ -167,9 +167,7 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         self.assertNotIn("additionalNotes: [String: String] =", declaration)
 
     def test_post_generation_failure_vocabulary_is_v2_only(self):
-        v1 = json.loads((ROOT / "config/ios-startup-reliability-result-schema-v1.json").read_text())
         v2 = json.loads((ROOT / "config/ios-startup-reliability-result-schema-v2.json").read_text())
-        self.assertNotIn('"post_generation_failure"', json.dumps(v1))
         self.assertIn("post_generation_failure", v2["$defs"]["take"]["properties"]["classification"]["enum"])
         self.assertNotIn("post_generation_failure", MODULE.CLASSIFICATIONS)
 

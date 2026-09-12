@@ -23,7 +23,7 @@ SPEC.loader.exec_module(release_evidence)
 IDENTITY_DIGESTS = [
     "requiredInputsDigest", "toolchainDigest", "projectInputsDigest", "projectDigest",
     "runtimeCapabilitiesDigest", "compatibilityDigest", "modelCatalogDigest",
-    "evidenceImpactDigest", "orchestrationContractDigest", "releaseContractDigest",
+    "orchestrationContractDigest", "releaseContractDigest",
 ]
 
 

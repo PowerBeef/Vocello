@@ -2,7 +2,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/search_helpers.sh"
+command -v rg >/dev/null 2>&1 || { echo "error: ripgrep (rg) is required" >&2; exit 1; }
+search_regex_in_file() { rg -q -- "$1" "$2"; }
+search_fixed_in_file() { rg -Fq -- "$1" "$2"; }
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 PROJECT_YML="$PROJECT_DIR/project.yml"
 PBXPROJ="$PROJECT_DIR/QwenVoice.xcodeproj/project.pbxproj"

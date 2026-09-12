@@ -99,3 +99,6 @@ id_ed25519
 .claude/settings.local.json
 .claude/worktrees/
 buildServer.json
+
+# Third-party agent-tool output (never repository state)
+.impeccable/

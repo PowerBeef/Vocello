@@ -35,7 +35,7 @@ class QualityPromotionTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         (self.root / "config").mkdir()
-        for name in ("quality-promotion-contract.json", "evidence-impact.json"):
+        for name in ("quality-promotion-contract.json",):
             shutil.copy2(REPO_ROOT / "config" / name, self.root / "config" / name)
         model_path = self.root / PROMOTION.MODEL_CONTRACT_PATH
         model_path.parent.mkdir(parents=True)
@@ -142,6 +142,35 @@ class QualityPromotionTests(unittest.TestCase):
             validated["lanes"]["macos-ui-benchmark"]["hardwareProfileID"],
             "mac-mini-m2-8gb",
         )
+
+    def test_changed_paths_route_to_lanes_through_the_contract(self) -> None:
+        contract = PROMOTION.load_contract(self.root)
+        docs_only = PROMOTION.classify_paths(contract, ["docs/reference/cli.md", "./README.md"])
+        self.assertEqual(docs_only["classes"], [])
+        self.assertEqual(docs_only["changedPaths"], ["README.md", "docs/reference/cli.md"])
+        self.assertEqual(PROMOTION.required_evidence(contract, docs_only, "macos"), ["macos-ui-benchmark"])
+        engine = PROMOTION.classify_paths(contract, ["Sources/QwenVoiceCore/MLXTTSEngine.swift"])
+        self.assertIn("engine-runtime", engine["classes"])
+        self.assertIn("macos-engine-benchmark", PROMOTION.required_evidence(contract, engine, "macos"))
+        self.assertIn("multilingual-output", engine["promotionCapabilities"])
+        excluded = PROMOTION.classify_paths(contract, ["Packages/VocelloQwen3Core/README.md"])
+        self.assertNotIn("engine-runtime", excluded["classes"])
+        memory = PROMOTION.classify_paths(contract, ["Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift"])
+        self.assertIn("macos-retained-memory", memory["promotionRequiredEvidence"])
+
+    def test_routing_must_reference_defined_evidence_and_capabilities(self) -> None:
+        contract = PROMOTION.load_contract(self.root)
+        contract["promotionRouting"]["classes"][0]["requiredEvidence"].append("no-such-lane")
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "undefined evidence"):
+            PROMOTION.validate_contract(contract, root=self.root)
+        contract = PROMOTION.load_contract(self.root)
+        contract["promotionRouting"]["classes"][0]["capabilities"].append("no-such-capability")
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "undefined capabilities"):
+            PROMOTION.validate_contract(contract, root=self.root)
+        contract = PROMOTION.load_contract(self.root)
+        del contract["promotionRouting"]
+        with self.assertRaisesRegex(PROMOTION.PromotionError, "requires promotionRouting"):
+            PROMOTION.validate_contract(contract, root=self.root)
 
     def test_capability_matrix_derives_platform_specific_evidence_and_limitations(self) -> None:
         contract = PROMOTION.load_contract(self.root)

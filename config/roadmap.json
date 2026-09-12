@@ -163,8 +163,7 @@
       "sourceOfTruth": [
         "project.yml",
         "scripts/release_source_authority.py",
-        "scripts/release_evidence.py",
-        "scripts/evidence_impact.py"
+        "scripts/release_evidence.py"
       ],
       "updated": "2026-09-07",
       "notes": "September 7 preparation: exact-SHA CI/Security for 3272d17e completed successfully; source 3.0.0/build 24, host iOS platform readiness, promotion-contract validation and local Development/Distribution/Developer ID identities confirmed read-only. Profile payload/emitted entitlements, fresh collision/account-version check and archive/IPA remain pending. Build 24 is not reserved. New RF-13 one-time iOS export purchase must be implemented and focused-tested before final freeze/full campaign. No tag, signing or account mutation performed. Earlier checkpoint: Latest September 7 correction: compatibility AudioGeneration materializes PCM before task transfer; production-constructor/proxy regression and 20 planner tests pass. Unexpected enum Sendable Analyze warning removed. Unassigned byte-identical icon copy retained outside catalog, assigned icon unchanged. Incremental Analyze/warning gate PASS; 19 registered full-build warnings not claimed eliminated. Exact-tree checkpoint receipt owns final deterministic verdict. Candidate authorization, exact-SHA CI/Security, tag, archive/IPA and freeze remain separate. (Earlier history: git log -p -- config/roadmap.json.)",
@@ -665,7 +664,6 @@
       "gate": "Both the original script and tracked sentinel must pass 10/10 cold, 20/20 warm, all eight seeds, every focused predecessor, streaming/non-streaming, and matching UI/engine receipts; then complete the 9-speaker × 8-delivery grid at one seed plus a second seed for the affected speaker row and delivery column. Closure rejects unknown boundaries, silent seed changes, leaked retries, memory-policy violations, crashes, or unrepresented attempts and requires all deterministic gates green.",
       "sourceOfTruth": [
         "docs/reference/ios-built-in-startup-reliability.md",
-        "config/ios-startup-reliability-sentinel.json",
         "scripts/ios_startup_reliability.py"
       ],
       "updated": "2026-09-11",

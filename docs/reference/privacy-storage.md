@@ -265,7 +265,6 @@ block byte-for-byte, so a manifest change cannot silently leave documentation st
 | `build/scratch/derived-data/foundation/` | Foundation target compile-safety lane | `scratch` | `routine` | Delete after successful invocation and during routine cleanup |
 | `build/scratch/derived-data/package-resolution/` | Serialized Xcode SwiftPM resolver | `scratch` | `routine` | Ephemeral resolver intermediates; the shared checkout lives under build/cache |
 | `build/scratch/transient/` | One-off repository tooling and migration-only diagnostic probes | `scratch` | `routine` | Invocation-local helpers and obsolete untracked probes; routine cleanup removes them |
-| `build/scratch/gate-fingerprint/` | retired commit receipt (no writer since 2026-09-11; safe to delete) | `scratch` | `routine` | Legacy receipt cache; routine cleanup removes it |
 | `build/scratch/derived-data/release-macos/` | macOS release build and archive lane | `scratch` | `routine` | Isolated release DerivedData; never reused as a development cache |
 | `build/scratch/derived-data/release-ios/` | Local iOS archive and export lane | `scratch` | `routine` | Isolated local archive DerivedData; never reused as a development cache |
 | `build/scratch/derived-data/xcodebuildmcp/macos/` | XcodeBuildMCP macOS profile | `scratch` | `routine` | Session scratch; repository scripts remain authoritative |
@@ -275,7 +274,6 @@ block byte-for-byte, so a manifest change cannot silently leave documentation st
 | `build/artifacts/ios/` | Physical-device iOS diagnostics, benchmarks, and profiles | `artifact` | `governed` | Retain compact summaries and publication-repair evidence; prune raw evidence only after validation |
 | `build/artifacts/ui-tests/` | Unified macOS and physical-device XCUITest runner | `artifact` | `prune-ui-results` | Keep policy-selected passing and failure result bundles |
 | `build/artifacts/diagnostics/` | Cross-platform logs, crash deltas, and local diagnostics | `artifact` | `governed` | Validator-owned; preserve unresolved failure and publication-repair evidence |
-| `build/artifacts/project-health/` | Generated project-health inventory and release-readiness diagnostics | `artifact` | `routine` | Local detailed reports are disposable; the compact reproducible snapshot is tracked under docs |
 | `build/artifacts/quality-promotion/` | Source-bound public-promotion manifests and managed quality receipts | `artifact` | `preserve` | Preserve the current candidate manifest until promotion or explicit candidate retirement |
 | `build/artifacts/app-store/` | Redacted App Store Connect, build-collision, and model-host readiness probes | `artifact` | `preserve` | Preserve the current candidate readiness summaries until closure or explicit candidate retirement |
 | `build/artifacts/symbols/macos/` | macOS build and release identity checks | `artifact` | `preserve` | Keep only symbols whose UUIDs match the current macOS app and XPC products |

@@ -64,7 +64,7 @@ RESEARCH_PREFIXES = (
     "language_bench", "angry_bilingual", "custom_delivery", "independent_asr",
 )
 RESEARCH_CONFIG = ("delivery-", "prosody-", "ios-control-audit", "ios-startup-reliability", "language-bench",
-                   "voice-identity", "characterization-fixtures", "ui-perf-thresholds")
+                   "voice-identity", "ui-perf-thresholds")
 
 
 def _match(path: str, patterns: tuple[str, ...]) -> bool:

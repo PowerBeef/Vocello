@@ -4,7 +4,6 @@ owner: release-qa
 summary: Source-bound quality promotion for making a verified macOS draft public or submitting an iOS candidate for external App Store review.
 sourceOfTruth:
   - config/quality-promotion-contract.json
-  - config/evidence-impact.json
   - scripts/quality_promotion.py
   - .github/workflows/promote-release.yml
 ---
@@ -29,7 +28,7 @@ an untrusted or unverified release source.
 `scripts/quality_promotion.py` binds one privacy-safe artifact to:
 
 - the tag commit, clean release source identity, exact `release-evidence.json` bytes, version, and build;
-- the evidence-impact contract and the exact paths changed since the previous release commit;
+- the contract's own path routing (`promotionRouting`) and the exact paths changed since the previous release commit;
 - the capability/change matrix for Speed, Quality, Studio modes, multilingual output, delivery
   evaluation, and model lifecycle, including dimensions the current evidence does not support;
 - the required platform lanes, record or receipt digests, and explicitly accepted warnings;
@@ -47,8 +46,9 @@ requires a Quality-tier engine record across Custom, Design, and Clone on macOS;
 model contract does not expose Quality on iOS. Multilingual changes require every
 declared language cell; delivery changes require delivery cells carrying the governed prosody
 metric; and model-catalog changes require the managed lifecycle receipt. Memory paths add
-`memory-qualification`, and UI paths add `ui-perf`. `python3 scripts/evidence_impact.py
-classify --base <previous-tag>` shows the conditional evidence before capture.
+`memory-qualification`, and UI paths add `ui-perf`. `python3 scripts/quality_promotion.py
+classify --base <previous-tag>` shows the conditional evidence before capture; a path that matches
+no routing class adds nothing beyond the platform minimum.
 
 The manifest records `capabilityCoverage` and `unsupportedDimensions`. Unsupported combinations
 such as multilingual Quality/Clone cohorts and independently held-out delivery calibration are
@@ -68,7 +68,7 @@ lane requirements and exact contract digest; they are not reinterpreted as curre
 
 1. Commit the release candidate, create its protected tag, and let `release.yml` produce the
    verified draft and `release-evidence.json`.
-2. Check out that exact tag with a clean tree. Run only the lanes selected by the impact result.
+2. Check out that exact tag with a clean tree. Run only the lanes `classify` selects.
    Publish successful benchmark records locally but do not create another source commit: exact-tag
    promotion records are external draft evidence, avoiding a self-referential commit.
 3. Download the draft's exact release evidence for assembly (or download every asset and validate

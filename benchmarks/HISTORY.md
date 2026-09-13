@@ -1440,6 +1440,12 @@ trend percentages carry their direction in words.
 | 2026-09-05 | [`macos-xcui-perf-20260905-010411-715c63f2`](runs/ui-perf/macos-xcui-perf-20260905-010411-715c63f2.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` | `13c54095581f` | vs macos-xcui-perf-20260905-005605-bb711355: compatible | ui-audit-baseline-04-20260904 |
 | 2026-09-05 | [`macos-xcui-perf-20260905-011217-c4d5591f`](runs/ui-perf/macos-xcui-perf-20260905-011217-c4d5591f.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` | `13c54095581f` | vs macos-xcui-perf-20260905-010411-715c63f2: compatible | ui-audit-baseline-05-20260904 |
 
+## ui-perf / macos / mac-mini-m2-8gb / config `bc561eb752bb`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-13 | [`macos-xcui-perf-20260913-174907-79e014f2`](runs/ui-perf/macos-xcui-perf-20260913-174907-79e014f2.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | — | `ee97e92c52a2` | `bc561eb752bb` | baseline | macos-xcui-perf-20260913-174907-79e014f2 |
+
 ## ui-perf / macos / mac-mini-m2-8gb / config `c6729d972efe`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

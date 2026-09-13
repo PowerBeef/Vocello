@@ -78,6 +78,10 @@ V1_KINDS = set(KINDS)
 # memory-qualification — no historical v1 records can carry it.
 V2_KINDS = (KINDS - {"telemetry-overhead"}) | {"memory-qualification", "ui-perf"}
 ALL_KINDS = V1_KINDS | V2_KINDS
+# Kinds whose takes carry a real-time factor and therefore declare which one:
+# ui-perf measures frame health and prosody-calibration scores prosody, neither
+# publishes an RTF.
+RTF_BEARING_KINDS = ALL_KINDS - {"ui-perf", "prosody-calibration"}
 MEMORY_QUALIFIED_KINDS = {
     "ui-generation", "engine-generation", "language", "instrument-profile",
     "memory-qualification",
@@ -2207,7 +2211,11 @@ def validate_record(
     definition = run.get("rtfDefinition")
     if definition is not None and definition != rtf_semantics.STANDARD_RTF_DEFINITION:
         raise HistoryError("run.rtfDefinition must be \"wall/audio\" when present")
-    if definition is None and run["finishedAt"] >= rtf_semantics.RTF_DEFINITION_CUTOVER:
+    if (
+        definition is None
+        and run["kind"] in RTF_BEARING_KINDS
+        and run["finishedAt"] >= rtf_semantics.RTF_DEFINITION_CUTOVER
+    ):
         raise HistoryError(
             "records published since the RTF cutover must declare run.rtfDefinition"
         )

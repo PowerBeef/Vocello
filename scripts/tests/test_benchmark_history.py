@@ -987,6 +987,24 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.assertIsNone(comparison["baselineRunID"])
         self.assertEqual(comparison["deltas"], {})
 
+    def test_records_without_an_rtf_need_no_rtf_definition_after_the_cutover(self) -> None:
+        # ui-perf measures frame health; the first perf run after the cutover
+        # (macos-xcui-perf-20260913-173142) was refused for a declaration it has
+        # nothing to declare. A tracked ui-perf record moved past the cutover must
+        # validate as it is, while an RTF-bearing kind keeps the requirement.
+        repo = Path(history.__file__).resolve().parents[1]  # the harness isolates RUNS_ROOT
+        tracked = sorted((repo / "benchmarks" / "runs" / "ui-perf").glob("*.json"))
+        self.assertTrue(tracked, "a tracked ui-perf record is the fixture")
+        record = json.loads(tracked[-1].read_text())
+        self.assertNotIn("rtfDefinition", record["run"])
+        record["run"]["finishedAt"] = "2026-09-20T12:01:00Z"
+        record["digest"] = history.record_digest(record)
+        history.validate_record(record)
+        self.assertNotIn("ui-perf", history.RTF_BEARING_KINDS)
+        self.assertNotIn("prosody-calibration", history.RTF_BEARING_KINDS)
+        self.assertTrue({"ui-generation", "engine-generation", "language",
+                         "memory-qualification"} <= history.RTF_BEARING_KINDS)
+
     def test_rtf_definition_is_required_after_the_cutover_and_isolates_lineages(self) -> None:
         legacy = record_fixture(run_id="rtf-legacy-20260712")
         # Legacy UI takes store the app submit→completed span, from which a

@@ -25,7 +25,8 @@ from typing import Any, Iterable
 
 STANDARD_RTF_DEFINITION = "wall/audio"
 LEGACY_RTF_DEFINITION = "legacy-speedup"
-# Records finished at or after this instant must declare rtfDefinition.
+# RTF-bearing records finished at or after this instant must declare rtfDefinition
+# (benchmark_history.RTF_BEARING_KINDS; ui-perf and prosody-calibration carry no RTF).
 RTF_DEFINITION_CUTOVER = "2026-09-12T00:00:00Z"
 
 TERMINAL_STAGES = ("streamCompleted", "streamGenerationEnded")

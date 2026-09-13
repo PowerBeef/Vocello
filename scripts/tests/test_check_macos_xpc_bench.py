@@ -531,13 +531,21 @@ class PlaybackCaptureEvidenceTests(CheckMacOSXPCBenchmarkTests):
         start = stamp.timestamp() * 1000 - 1_000
         (captures / f"take-{take_index:02d}-{safe_cell}.json").write_text(json.dumps({
             "takeIndex": take_index, "cell": cell, "status": "captured",
-            "submitClickEpochMS": start - 250, "captureStartEpochMS": start,
+            # The fixture app schedules playback 30 ms after submit; the burst starts
+            # 0.2 s into the file and the capture adds 137 ms, so a click 307 ms after
+            # the capture start makes the audible first frame agree with the app.
+            "submitClickEpochMS": start + 307, "captureStartEpochMS": start,
             "stopEpochMS": start + duration * 1000 + 3_000,
         }))
         (captures / "capture-run.json").write_text(json.dumps({"runID": RUN_ID}))
         return captures, outputs
 
     def test_a_captured_take_carries_status_digest_and_metrics(self) -> None:
+        def pc_frame_ms() -> float:
+            sys.path.insert(0, str(ROOT / "scripts"))
+            from lib import playback_capture as pc
+            return float(pc.FRAME_MS)
+
         with tempfile.TemporaryDirectory() as temp:
             captures, outputs = self._capture_fixture(Path(temp), take_index=2, cell="custom/short/warm#0", duration=3.0)
 
@@ -557,6 +565,7 @@ class PlaybackCaptureEvidenceTests(CheckMacOSXPCBenchmarkTests):
             self.assertGreaterEqual(captured["metrics"]["playbackCaptureCoverage"], 0.99)
             self.assertEqual(captured["metrics"]["playbackCaptureDropoutCount"], 0.0)
             self.assertNotIn("playback.capture.misaligned", captured["warnings"])
+            self.assertAlmostEqual(captured["metrics"]["playbackCaptureFirstAudibleMS"], 30.0, delta=pc_frame_ms() + 1)
             for other in (takes[0], *takes[2:]):
                 self.assertEqual(other["playbackCaptureStatus"], "unavailable")
                 self.assertNotIn("playbackCaptureDigest", other)

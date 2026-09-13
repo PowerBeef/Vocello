@@ -335,11 +335,17 @@ output during every take (a Core Audio process tap with the physical output mute
 `scripts/lib/playback_capture.py` compares the capture with the published take WAV. The take then
 carries `playbackCaptureStatus` (`captured`, `silent`, `unavailable`, `referenceUnresolved`,
 `aborted`), `playbackCaptureDigest` and, when captured, `playbackCaptureFirstAudibleMS` (Generate
-click → first frame above −50 dBFS, runner clock), `playbackCaptureAlignmentMS`,
+click → first frame above −50 dBFS, all on the runner clock; the capture's first sample is the
+first buffer the tap delivered, which arrives only once the app's output device runs),
+`playbackCaptureAlignmentMS` (where the published WAV starts inside the capture, a lead-in, not a
+fault),
 `playbackCaptureResidualDBFS` (after gain match), `playbackCaptureDropoutCount` /
 `playbackCaptureMaxGapMS` (20 ms frames where the file speaks above −40 dBFS and the capture
 collapses by more than 25 dB), `playbackCaptureCoverage` and `playbackCaptureStepBurstPeakCount`.
-Anomalies are warn-only codes on the take (`playback.capture.misaligned` above 250 ms,
+Anomalies are warn-only codes on the take (`playback.capture.misaligned` when the audible first
+frame and the app's own `playbackScheduledMS` disagree by more than 250 ms either way — the app's
+timeline stops at scheduling, the tap hears the result; the first captured takes put the audible
+onset about 1.8 s after scheduling on final-file playback —
 `.dropouts`, `.low_coverage` below 0.95, `.high_residual` above −20 dBFS, `.silent`); thresholds
 become a gate only once a corpus exists (roadmap PC-02).
 

@@ -104,6 +104,9 @@ class HelperTests(unittest.TestCase):
         capture[12_000:] = 0.1
         sidecar = {"captureStartEpochMS": 1_000.0, "submitClickEpochMS": 800.0}
         self.assertAlmostEqual(pc.first_audible_ms(capture, 24_000, sidecar), 700.0, delta=pc.FRAME_MS)
+        # The WAV starts at the first delivered buffer, which wins over the arming time.
+        self.assertAlmostEqual(pc.first_audible_ms(capture, 24_000, {**sidecar, "firstBufferEpochMS": 1_500.0}),
+                               1_200.0, delta=pc.FRAME_MS)
         self.assertIsNone(pc.first_audible_ms(np.zeros(24_000), 24_000, sidecar))
         self.assertIsNone(pc.first_audible_ms(capture, 24_000, {}))
 
@@ -167,9 +170,19 @@ class AnalyzeTakeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             sidecar, capture, reference = self._fixture(tmp, silent=True)
             self.assertEqual(pc.analyze_take(sidecar, capture, reference)["status"], "silent")
+            # A long lead-in inside the capture is not a fault: the tap runs from the
+            # app's device start. Misalignment is measured against the app's own
+            # playback-scheduled time, in either direction.
             sidecar, capture, reference = self._fixture(tmp, delay_ms=400.0)
             late = pc.analyze_take(sidecar, capture, reference)
-            self.assertIn("playback.capture.misaligned", late["warnings"])
+            self.assertNotIn("playback.capture.misaligned", late["warnings"])
+            self.assertAlmostEqual(late["metrics"]["playbackCaptureAlignmentMS"], 400.0, delta=1.0)
+            agreed = pc.analyze_take(sidecar, capture, reference, playback_scheduled_ms=800.0)
+            self.assertNotIn("playback.capture.misaligned", agreed["warnings"])
+            self.assertIn("playback.capture.misaligned",
+                          pc.analyze_take(sidecar, capture, reference, playback_scheduled_ms=300.0)["warnings"])
+            self.assertIn("playback.capture.misaligned",
+                          pc.analyze_take(sidecar, capture, reference, playback_scheduled_ms=1_300.0)["warnings"])
             self.assertEqual(pc.analyze_take(sidecar, capture, None)["status"], "referenceUnresolved")
             self.assertEqual(pc.analyze_take({**sidecar, "status": "aborted"}, capture, reference)["status"], "aborted")
             self.assertEqual(pc.analyze_take(sidecar, None, reference)["status"], "unavailable")

@@ -502,7 +502,7 @@ def tracked_metrics(engine: dict, service: dict, app: dict) -> dict[str, float |
 
 def evaluate_playback_capture(
     take_index: int, cell: str, mode: str, duration_seconds, captures: dict,
-    capture_dir: Path | None, outputs_dir: Path | None,
+    capture_dir: Path | None, outputs_dir: Path | None, playback_scheduled_ms=None,
 ) -> dict:
     """Played-audio capture evidence for one take (PC-01): fields, metrics, warn codes, summary.
 
@@ -529,7 +529,10 @@ def evaluate_playback_capture(
             Path(outputs_dir), mode, float(start) - 2_000.0, float(stop) + 5_000.0, expected,
         )
     try:
-        result = playback_capture.analyze_take(sidecar, entry["wav"], reference)
+        result = playback_capture.analyze_take(
+            sidecar, entry["wav"], reference,
+            playback_scheduled_ms if isinstance(playback_scheduled_ms, (int, float)) else None,
+        )
     except playback_capture.PlaybackCaptureError as error:
         result = {"status": "aborted", "metrics": {}, "warnings": [], "digest": None, "error": str(error)}
     fields = {"playbackCaptureStatus": result["status"]}
@@ -585,7 +588,7 @@ def build_manifest(
         frontend = (app_by_id.get(row["generationID"]) or {}).get("frontendMetrics") or {}
         capture = evaluate_playback_capture(
             index, cell, mode, output.get("durationSeconds"), captures,
-            playback_capture_dir, outputs_dir,
+            playback_capture_dir, outputs_dir, frontend.get("submitToPlaybackScheduledMS"),
         )
         capture_by_index[index] = capture
         if capture["summary"] is not None:

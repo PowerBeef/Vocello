@@ -34,7 +34,7 @@ SILENCE_DBFS = -50.0
 REFERENCE_ACTIVE_DBFS = -40.0
 DROPOUT_DROP_DB = 25.0
 MIN_DROPOUT_FRAMES = 2
-MAX_ALIGNMENT_LAG_S = 3.0
+MAX_ALIGNMENT_LAG_S = 20.0   # the tap runs from the app's device start; the lead-in can span a whole generation
 REFINE_WINDOW_MS = 50
 STEP_BURST_THRESHOLD = 0.25
 STEP_BURST_WINDOW_MS = 20
@@ -268,8 +268,15 @@ def step_burst_peak(samples: np.ndarray, rate: int) -> tuple[int, float | None]:
 
 
 def first_audible_ms(capture: np.ndarray, rate: int, sidecar: dict[str, Any]) -> float | None:
-    """Milliseconds from the Generate click to the first audible captured frame."""
-    start = sidecar.get("captureStartEpochMS")
+    """Milliseconds from the Generate click to the first audible captured frame.
+
+    The capture's first sample is the first buffer the tap delivered
+    (`firstBufferEpochMS`), not the moment the runner armed the tap: the tap
+    only runs once the app's output device does.
+    """
+    start = sidecar.get("firstBufferEpochMS")
+    if not isinstance(start, (int, float)):
+        start = sidecar.get("captureStartEpochMS")
     click = sidecar.get("submitClickEpochMS")
     if not isinstance(start, (int, float)) or not isinstance(click, (int, float)):
         return None
@@ -351,8 +358,14 @@ def sha256_file(path: Path) -> str:
 
 
 def analyze_take(sidecar: dict[str, Any], capture_wav: Path | None,
-                 reference_wav: Path | None) -> dict[str, Any]:
-    """Status, numeric metrics, warn codes and digest for one take's capture."""
+                 reference_wav: Path | None, playback_scheduled_ms: float | None = None) -> dict[str, Any]:
+    """Status, numeric metrics, warn codes and digest for one take's capture.
+
+    `playback_scheduled_ms` is the app's own submit → playback-scheduled figure
+    for the take; when known, `playback.capture.misaligned` says the audible
+    first frame disagrees with it by more than WARN_MISALIGNED_MS in either
+    direction (the app's timeline stops at scheduling, the tap hears the result).
+    """
     result: dict[str, Any] = {"status": "unavailable", "metrics": {}, "warnings": [], "digest": None}
     status = sidecar.get("status")
     if status == "aborted":
@@ -394,7 +407,8 @@ def analyze_take(sidecar: dict[str, Any], capture_wav: Path | None,
         "playbackCaptureCoverage": round(comparison["coverage"], 3),
     })
     warnings = result["warnings"]
-    if comparison["alignmentMS"] > WARN_MISALIGNED_MS:
+    if (audible is not None and isinstance(playback_scheduled_ms, (int, float))
+            and abs(audible - float(playback_scheduled_ms)) > WARN_MISALIGNED_MS):
         warnings.append("playback.capture.misaligned")
     if comparison["dropoutCount"] > 0:
         warnings.append("playback.capture.dropouts")

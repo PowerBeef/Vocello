@@ -527,6 +527,61 @@ class BenchmarkHistoryTests(unittest.TestCase):
         take["qualityRegistryRequiredGates"] = sorted(history.QUALITY_FAST_GATES)
         return record
 
+    def test_playback_capture_fields_are_v3_take_evidence(self) -> None:
+        # A tracked canonical macOS UI record is the fixture: the capture fields join
+        # its takes without disturbing the rest of the schema-v3 contract.
+        repo = Path(history.__file__).resolve().parents[1]
+        tracked = sorted((repo / "benchmarks" / "runs" / "ui-generation").glob("macos-xcui-benchmark-202609*.json"))
+        self.assertTrue(tracked, "a tracked schema-v3 macOS UI record is the fixture")
+        base = json.loads(tracked[-1].read_text())
+        self.assertEqual(base["schemaVersion"], 3)
+
+        def with_capture(**overrides: object) -> dict:
+            record = copy.deepcopy(base)
+            take = record["takes"][0]
+            take["playbackCaptureStatus"] = "captured"
+            take["playbackCaptureDigest"] = "c" * 64
+            take["metrics"].update({
+                "playbackCaptureAlignmentMS": 137.2, "playbackCaptureResidualDBFS": -43.1,
+                "playbackCaptureDropoutCount": 0.0, "playbackCaptureMaxGapMS": 0.0,
+                "playbackCaptureFirstAudibleMS": 512.0, "playbackCaptureCoverage": 0.998,
+                "playbackCaptureStepBurstPeakCount": 0.0,
+            })
+            take.update(overrides)
+            record["cells"] = history.aggregate_cells(record["takes"])
+            record["evidence"]["selectedEvidenceDigest"] = history.selected_evidence_digest(record)
+            record["digest"] = history.record_digest(record)
+            return record
+
+        history.validate_record(with_capture())
+        unavailable = with_capture(playbackCaptureStatus="unavailable")
+        for key in list(unavailable["takes"][0]["metrics"]):
+            if key.startswith("playbackCapture"):
+                unavailable["takes"][0]["metrics"].pop(key)
+        unavailable["takes"][0].pop("playbackCaptureDigest")
+        unavailable["cells"] = history.aggregate_cells(unavailable["takes"])
+        unavailable["evidence"]["selectedEvidenceDigest"] = history.selected_evidence_digest(unavailable)
+        unavailable["digest"] = history.record_digest(unavailable)
+        history.validate_record(unavailable)
+
+        for label, record in (
+            ("unknown status", with_capture(playbackCaptureStatus="heard")),
+            ("digest on an unavailable take", with_capture(playbackCaptureStatus="unavailable")),
+            ("comparison metrics without a capture", with_capture(playbackCaptureStatus="silent")),
+        ):
+            with self.subTest(label=label), self.assertRaises(history.HistoryError):
+                history.validate_record(record)
+        v2 = with_capture()
+        v2["schemaVersion"] = 2
+        for take in v2["takes"]:
+            for key in ("qualityRegistryOutcome", "qualityRegistryRequiredGates", "qualityRegistryIssues"):
+                take.pop(key, None)
+        v2["cells"] = history.aggregate_cells(v2["takes"])
+        v2["evidence"]["selectedEvidenceDigest"] = history.selected_evidence_digest(v2)
+        v2["digest"] = history.record_digest(v2)
+        with self.assertRaises(history.HistoryError):
+            history.validate_record(v2)
+
     def test_language_negative_control_take_is_evidence_only_when_it_failed(self) -> None:
         valid = self._schema_v3_language_record("control-valid")
         valid["evidence"]["languageVerification"] = {

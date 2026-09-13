@@ -16,6 +16,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from lib import rtf as rtf_semantics  # noqa: E402
+from lib import playback_capture
 from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
 from lib.audio_qc import (  # noqa: E402
     SUCCESS_FINISH,
@@ -499,6 +500,51 @@ def tracked_metrics(engine: dict, service: dict, app: dict) -> dict[str, float |
     return metrics
 
 
+def evaluate_playback_capture(
+    take_index: int, cell: str, mode: str, duration_seconds, captures: dict,
+    capture_dir: Path | None, outputs_dir: Path | None,
+) -> dict:
+    """Played-audio capture evidence for one take (PC-01): fields, metrics, warn codes, summary.
+
+    A lane that never armed a capture directory adds nothing; a lane that did but has
+    no sidecar for the take marks it unavailable. Comparison metrics exist only when
+    the capture aligned with the published WAV; warnings never fail the lane.
+    """
+    empty = {"fields": {}, "metrics": {}, "warnings": [], "summary": None}
+    if capture_dir is None:
+        return empty
+    entry = captures.get((take_index, cell))
+    if entry is None:
+        return {"fields": {"playbackCaptureStatus": "unavailable"}, "metrics": {}, "warnings": [],
+                "summary": {"takeIndex": take_index, "cell": cell, "status": "unavailable"}}
+    sidecar = entry["sidecar"]
+    reference = None
+    start = sidecar.get("captureStartEpochMS")
+    if outputs_dir is not None and entry["wav"] is not None and isinstance(start, (int, float)):
+        stop = sidecar.get("stopEpochMS")
+        if not isinstance(stop, (int, float)):
+            stop = float(start) + 600_000.0
+        expected = duration_seconds if isinstance(duration_seconds, (int, float)) else None
+        reference = playback_capture.resolve_reference_wav(
+            Path(outputs_dir), mode, float(start) - 2_000.0, float(stop) + 5_000.0, expected,
+        )
+    try:
+        result = playback_capture.analyze_take(sidecar, entry["wav"], reference)
+    except playback_capture.PlaybackCaptureError as error:
+        result = {"status": "aborted", "metrics": {}, "warnings": [], "digest": None, "error": str(error)}
+    fields = {"playbackCaptureStatus": result["status"]}
+    if result.get("digest"):
+        fields["playbackCaptureDigest"] = result["digest"]
+    summary = {
+        "takeIndex": take_index, "cell": cell, "status": result["status"],
+        "reference": reference.name if reference is not None else None,
+        "metrics": result["metrics"], "warnings": result["warnings"],
+    }
+    if result.get("error"):
+        summary["error"] = result["error"]
+    return {"fields": fields, "metrics": dict(result["metrics"]), "warnings": list(result["warnings"]), "summary": summary}
+
+
 def build_manifest(
     diagnostics: Path,
     run_id: str,
@@ -513,6 +559,8 @@ def build_manifest(
     merged_rows: list[dict],
     *,
     optimization: str,
+    playback_capture_dir: Path | None = None,
+    outputs_dir: Path | None = None,
 ) -> dict:
     memory_evidence, memory_run = qualify_memory_rows(
         rows=engine_rows,
@@ -523,6 +571,9 @@ def build_manifest(
     )
     memory_by_id = {item.generation_id: item for item in memory_evidence}
     app_by_id = {row.get("generationID"): row for row in app_rows}
+    captures = playback_capture.collect_captures(playback_capture_dir) if playback_capture_dir else {}
+    capture_by_index: dict[int, dict] = {}
+    capture_summary: list[dict] = []
     takes = []
     warning_count = 0
     for index, (row, cell) in enumerate(zip(engine_rows, cells, strict=True), start=1):
@@ -532,7 +583,14 @@ def build_manifest(
         qc = row.get("audioQC") or output.get("audioQC") or {}
         memory = memory_by_id[row["generationID"]]
         frontend = (app_by_id.get(row["generationID"]) or {}).get("frontendMetrics") or {}
-        if qc.get("verdict") == "warn" or memory.warnings:
+        capture = evaluate_playback_capture(
+            index, cell, mode, output.get("durationSeconds"), captures,
+            playback_capture_dir, outputs_dir,
+        )
+        capture_by_index[index] = capture
+        if capture["summary"] is not None:
+            capture_summary.append(capture["summary"])
+        if qc.get("verdict") == "warn" or memory.warnings or capture["warnings"]:
             warning_count += 1
         completeness = {"engine": True, "engineService": True, "app": True, "merged": True}
         takes.append({
@@ -599,8 +657,10 @@ def build_manifest(
         qc = take["audioQC"]
         raw_qc = raw_audio_qc(row)
         qc_metrics = shared_qc_metrics(raw_qc)
+        capture = capture_by_index[take["takeIndex"]]
+        metrics.update(capture["metrics"])
         take_warnings = sorted(set(
-            (qc["flags"] if qc["verdict"] == "warn" else []) + list(memory.warnings)
+            (qc["flags"] if qc["verdict"] == "warn" else []) + list(memory.warnings) + capture["warnings"]
         ))
         history_takes.append({
             "takeIndex": take["takeIndex"],
@@ -643,7 +703,16 @@ def build_manifest(
             "warnings": take_warnings,
             "memoryStatus": memory.status,
             "sampleSidecarDigest": memory.sidecar_digest,
+            **capture["fields"],
             **take_quality_identity(row),
+        })
+    if playback_capture_dir is not None:
+        write_json_atomic(Path(playback_capture_dir) / "summary.json", {
+            "schemaVersion": 1,
+            "runID": run_id,
+            "takes": capture_summary,
+            "captured": sum(1 for item in capture_summary if item.get("status") == "captured"),
+            "expected": len(cells),
         })
     history_record = {
         "schemaVersion": history_record_schema_version(history_takes),
@@ -743,6 +812,14 @@ def main() -> int:
         "--crash-delta-passed",
         action="store_true",
         help="assert that the caller completed its pre/post crash-delta gate",
+    )
+    parser.add_argument(
+        "--playback-capture-dir", type=Path, metavar="DIR",
+        help="the runner's per-take capture WAVs and sidecars (PC-01); takes without one are marked unavailable",
+    )
+    parser.add_argument(
+        "--outputs-dir", type=Path, metavar="DIR",
+        help="the app's published outputs root, used to resolve each take's WAV for the capture comparison",
     )
     args = parser.parse_args()
 
@@ -967,6 +1044,8 @@ def main() -> int:
             app_rows,
             merged_rows,
             optimization=optimization,
+            playback_capture_dir=args.playback_capture_dir,
+            outputs_dir=args.outputs_dir,
         )
         write_json_atomic(args.evidence_manifest, manifest)
         print(f"evidence={args.evidence_manifest}")

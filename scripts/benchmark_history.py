@@ -150,6 +150,7 @@ TAKE_KEYS = {
     "runtimeProfileSignature", "fixtureDigest", "modelIntegrityDigest", "modelRepository",
     "modelRevision", "modelArtifactVersion", "modelQuantization", "seed",
     "accuracyMetric", "accuracyThreshold", "expectedOutcome", "playbackStartSource",
+    "playbackCaptureStatus", "playbackCaptureDigest",
     "memoryStatus", "sampleSidecarDigest",
     "streamingTelemetryV9SidecarDigest", "samplingPromotionPackaged", "samplingWAVDigest",
     "samplingSeedAgreement",
@@ -312,7 +313,10 @@ V3_ONLY_TAKE_KEYS = {
     # A language negative control (expected verification failure) is stamped on
     # the take since 2026-09-12; older records never carried one with metrics.
     "expectedOutcome",
+    # Played-audio capture evidence (PC-01, 2026-09) on macOS UI benchmark takes.
+    "playbackCaptureStatus", "playbackCaptureDigest",
 }
+PLAYBACK_CAPTURE_STATUSES = {"captured", "silent", "unavailable", "referenceUnresolved", "aborted"}
 V2_ONLY_TRACE_SUMMARY_KEYS = {
     *LEGACY_MEMORY_TRACE_SUMMARY_KEYS,
     *MEMORY_TRACE_V2_SUMMARY_KEYS,
@@ -396,6 +400,10 @@ METRIC_KEYS = {
     "f0TurningPointsPerSecond", "syllableRateHz", "localRateCV", "maximumPauseSeconds",
     "pauseSpeechRatio", "energyEnvelopeRoughness", "discontinuityCount", "clipCount",
     "nonFiniteCount", "dcOffset", "longestSilenceMS", "stepBurstPeakCount", "stepBurstPeakStartMS",
+    # Played-audio capture (PC-01, 2026-09): the app's rendered output compared with the take.
+    "playbackCaptureAlignmentMS", "playbackCaptureResidualDBFS", "playbackCaptureDropoutCount",
+    "playbackCaptureMaxGapMS", "playbackCaptureFirstAudibleMS", "playbackCaptureCoverage",
+    "playbackCaptureStepBurstPeakCount",
     "goodClipCount", "badClipCount", "targetFalsePositiveRate",
     "observedFalsePositiveRate", "observedTruePositiveRate", "goodFlagRate", "badFlagRate",
     "monotoneF0StdThresholdHz", "monotoneTurningPointsThresholdPerSecond",
@@ -2339,6 +2347,19 @@ def validate_record(
             raise HistoryError("take playbackStartSource is invalid")
         if take.get("expectedOutcome", "pass") not in {"pass", "fail"}:
             raise HistoryError("take expectedOutcome is invalid")
+        capture_status = take.get("playbackCaptureStatus")
+        if capture_status is not None and capture_status not in PLAYBACK_CAPTURE_STATUSES:
+            raise HistoryError("take playbackCaptureStatus is invalid")
+        if "playbackCaptureDigest" in take:
+            if capture_status not in {"captured", "silent", "referenceUnresolved"}:
+                raise HistoryError("take playbackCaptureDigest requires a captured take")
+            require_digest(take["playbackCaptureDigest"], "take.playbackCaptureDigest", allow_na=False)
+        if capture_status != "captured" and any(
+            key.startswith("playbackCapture") and key not in (
+                "playbackCaptureFirstAudibleMS", "playbackCaptureStepBurstPeakCount",
+            ) for key in take.get("metrics", {})
+        ):
+            raise HistoryError("playback capture comparison metrics require a captured take")
         if take.get("expectedOutcome") == "fail" and "accuracyMetric" not in take:
             raise HistoryError("a negative-control take needs its language accuracy gate")
         # A negative control (a pinned hint over a script in another language)

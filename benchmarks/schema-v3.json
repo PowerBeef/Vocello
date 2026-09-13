@@ -778,6 +778,20 @@
         "output": {
           "$ref": "#/$defs/output"
         },
+        "playbackCaptureDigest": {
+          "$ref": "#/$defs/digest",
+          "description": "SHA-256 of the capture WAV the UI benchmark runner recorded from the app's own audio output (kept under the run artifacts, never in the registry)."
+        },
+        "playbackCaptureStatus": {
+          "description": "Played-audio capture evidence for the take: captured (compared with the published WAV), silent, unavailable (no tap), referenceUnresolved, aborted.",
+          "enum": [
+            "captured",
+            "silent",
+            "unavailable",
+            "referenceUnresolved",
+            "aborted"
+          ]
+        },
         "playbackStartSource": {
           "enum": [
             "liveStream",

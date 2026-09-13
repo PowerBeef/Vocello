@@ -189,6 +189,7 @@ class CheckMacOSXPCBenchmarkTests(unittest.TestCase):
         mutate_layers=None,
         malformed_layer: str | None = None,
         evidence: bool = False,
+        extra_args: list[str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         self.last_manifest = None
         with tempfile.TemporaryDirectory() as temp:
@@ -280,6 +281,7 @@ class CheckMacOSXPCBenchmarkTests(unittest.TestCase):
                     "--label",
                     "fixture",
                 ])
+            command.extend(extra_args or [])
             result = subprocess.run(
                 command,
                 capture_output=True,
@@ -502,3 +504,70 @@ class CheckMacOSXPCBenchmarkTests(unittest.TestCase):
 
 if __name__ == "__main__":
     raise SystemExit(unittest.main())
+
+
+class PlaybackCaptureEvidenceTests(CheckMacOSXPCBenchmarkTests):
+    """PC-01: the runner's per-take capture joins the take and yields warn-only evidence."""
+
+    def _capture_fixture(self, root: Path, *, take_index: int, cell: str, duration: float) -> tuple[Path, Path]:
+        import datetime as dt
+        import numpy as np
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from lib import playback_capture as pc
+        world_rate = 48_000
+        t = np.arange(int(world_rate * duration)) / world_rate
+        burst = ((t > 0.2) & (t < duration - 0.3)).astype(float)
+        world = 0.4 * np.sin(2 * np.pi * 440 * t) * burst * (1 + 0.3 * np.sin(2 * np.pi * 3 * t))
+        outputs = root / "outputs"
+        (outputs / "CustomVoice").mkdir(parents=True)
+        stamp = dt.datetime(2026, 9, 13, 15, 0, 0)
+        reference = outputs / "CustomVoice" / (stamp.strftime("%Y%m%d_%H-%M-%S-") + "000_fixture.wav")
+        pc.write_wav_int16(reference, 24_000, pc.resample(world, world_rate, 24_000))
+        captures = root / "playback-capture"
+        captures.mkdir()
+        safe_cell = cell.replace("/", "_")
+        played = np.concatenate([np.zeros(int(world_rate * 0.137)), world * 0.7, np.zeros(world_rate)])
+        pc.write_wav_float32(captures / f"take-{take_index:02d}-{safe_cell}.wav", world_rate, played)
+        start = stamp.timestamp() * 1000 - 1_000
+        (captures / f"take-{take_index:02d}-{safe_cell}.json").write_text(json.dumps({
+            "takeIndex": take_index, "cell": cell, "status": "captured",
+            "submitClickEpochMS": start - 250, "captureStartEpochMS": start,
+            "stopEpochMS": start + duration * 1000 + 3_000,
+        }))
+        (captures / "capture-run.json").write_text(json.dumps({"runID": RUN_ID}))
+        return captures, outputs
+
+    def test_a_captured_take_carries_status_digest_and_metrics(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            captures, outputs = self._capture_fixture(Path(temp), take_index=2, cell="custom/short/warm#0", duration=3.0)
+
+            def set_duration(rows: list[dict]) -> None:
+                rows[1]["outputMetrics"]["durationSeconds"] = 3.0
+
+            result = self.run_checker(
+                self.expected_order, mutate_engine_rows=set_duration, evidence=True,
+                extra_args=["--playback-capture-dir", str(captures), "--outputs-dir", str(outputs)],
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            takes = self.last_manifest["historyRecord"]["takes"]
+            captured = takes[1]
+            self.assertEqual(captured["playbackCaptureStatus"], "captured")
+            self.assertEqual(len(captured["playbackCaptureDigest"]), 64)
+            self.assertAlmostEqual(captured["metrics"]["playbackCaptureAlignmentMS"], 137.0, delta=1.0)
+            self.assertGreaterEqual(captured["metrics"]["playbackCaptureCoverage"], 0.99)
+            self.assertEqual(captured["metrics"]["playbackCaptureDropoutCount"], 0.0)
+            self.assertNotIn("playback.capture.misaligned", captured["warnings"])
+            for other in (takes[0], *takes[2:]):
+                self.assertEqual(other["playbackCaptureStatus"], "unavailable")
+                self.assertNotIn("playbackCaptureDigest", other)
+                self.assertFalse([k for k in other["metrics"] if k.startswith("playbackCapture")])
+            summary = json.loads((captures / "summary.json").read_text())
+            self.assertEqual((summary["captured"], summary["expected"]), (1, 5))
+            self.assertEqual(summary["takes"][1]["reference"].endswith("_fixture.wav"), True)
+
+    def test_a_lane_without_a_capture_directory_adds_no_capture_fields(self) -> None:
+        result = self.run_checker(self.expected_order, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for take in self.last_manifest["historyRecord"]["takes"]:
+            self.assertNotIn("playbackCaptureStatus", take)
+            self.assertFalse([k for k in take["metrics"] if k.startswith("playbackCapture")])

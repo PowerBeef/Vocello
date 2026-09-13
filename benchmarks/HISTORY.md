@@ -951,6 +951,12 @@ trend percentages carry their direction in words.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-14 | [`ios-lang-bench-20260714-115552-6abc66a9`](runs/language/ios-lang-bench-20260714-115552-6abc66a9.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 7 | — | `c6157ee65880` | `b79ed611e84b` | baseline | ios-lang-quick-v2 |
 
+## language / macos / mac-mini-m2-8gb / config `0fd5f68a817d`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-13 | [`mac-lang-bench-20260913-000655-546b90cf`](runs/language/mac-lang-bench-20260913-000655-546b90cf.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 7 | 0.59 | `8fc78d553f3d` | `0fd5f68a817d` | baseline | lang-quick-whisper-1 |
+
 ## language / macos / mac-mini-m2-8gb / config `642f6a5a33ac`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

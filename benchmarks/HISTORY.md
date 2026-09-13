@@ -1428,6 +1428,12 @@ trend percentages carry their direction in words.
 | 2026-07-23 | [`macos-xcui-benchmark-20260723-031943-3820c784`](runs/ui-generation/macos-xcui-benchmark-20260723-031943-3820c784.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.29 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-031943-3820c784 |
 | 2026-07-23 | [`macos-xcui-benchmark-20260723-032529-825cdc6e`](runs/ui-generation/macos-xcui-benchmark-20260723-032529-825cdc6e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~1.31 | `109559888e4d` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-032529-825cdc6e |
 
+## ui-generation / macos / mac-mini-m2-8gb / config `f21d8d8d74ba`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-13 | [`macos-xcui-benchmark-20260913-223436-256bda25`](runs/ui-generation/macos-xcui-benchmark-20260913-223436-256bda25.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | 0.79 | `382b2f27ef17` | `f21d8d8d74ba` | baseline | clone-onset-capture-1 |
+
 ## ui-generation / macos / mac-mini-m2-8gb / config `f8840be06205`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

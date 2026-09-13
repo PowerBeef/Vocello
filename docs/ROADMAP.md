@@ -20,7 +20,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-control-audit-2026-08` | active | ios | 16/21 (76%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
-| `machinery-validation-follow-ups-2026-09` | active | release-qa | 0/6 (0%) |
+| `machinery-validation-follow-ups-2026-09` | active | release-qa | 0/7 (0%) |
 | `playback-capture-evidence-2026-09` | active | release-qa | 1/3 (33%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
@@ -338,8 +338,9 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `MV-02` | planned | The optimized CLI shares the -Onone macOS arena locally | — |
 | `MV-03` | planned | A manual ci.yml dispatch cancels the in-flight push run | — |
 | `MV-04` | planned | Run the deterministic contract gate on Linux so the swift lane routes on compile inputs only | — |
-| `MV-05` | planned | Short clone takes open with a burst the audio QC cannot judge | — |
+| `MV-05` | planned | The plosive-onset burst in short clone takes is model-intrinsic and still unjudged | — |
 | `MV-06` | planned | A clip-level non-intrusive quality screen as a second machine judge | — |
+| `MV-07` | planned | The fp16 speech tokenizer opens streamed clone takes with a full-scale burst | — |
 
 ### Open items in detail
 
@@ -355,11 +356,14 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 - **`MV-04`** (planned) — Run the deterministic contract gate on Linux so the swift lane routes on compile inputs only.
   gate: scripts/check_project_inputs.sh runs in the ubuntu contracts job (product contracts, invariants, privacy scan, roadmap validator) and scripts/ci/classify_changes.py's swift rule shrinks to Sources, Tests, project.yml, package manifests, xcode-schemes and benchmark evidence.
 
-- **`MV-05`** (planned) — Short clone takes open with a burst the audio QC cannot judge.
+- **`MV-05`** (planned) — The plosive-onset burst in short clone takes is model-intrinsic and still unjudged.
   gate: Either the generator no longer produces the onset burst on the clone short cell, or the QC carries a validated perceptual judgement of it; in both cases the reproduction below passes a machine gate without listening.
 
 - **`MV-06`** (planned) — A clip-level non-intrusive quality screen as a second machine judge.
   gate: A pinned, reference-free speech-quality model (NISQA v2 or an MLX port) scores every published take in the delivery-analysis cascade with a corpus-calibrated warn floor; weights and runtime pinned by digest in config/toolchain.json; no listening in the loop.
+
+- **`MV-07`** (planned) — The fp16 speech tokenizer opens streamed clone takes with a full-scale burst.
+  gate: On the clone short cell over at least 28 fixed seeds, no take carries a step burst inside its first 50 ms and no take's first 50 ms peak exceeds 0.5 (the fp32 codec's figures: 0/28 and 1/28), with the fp16 codec kept or a decision recorded to ship the fp32 codec again; the QC v7 onset_step_burst warning then never fires on that matrix.
 
 ## Played-audio capture evidence for the macOS benchmark lane
 

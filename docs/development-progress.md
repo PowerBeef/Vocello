@@ -100,6 +100,23 @@ the app's playback-scheduled timestamp by about 1.8 s, on final-file playback, w
 buffer arriving 1.3 s after scheduling. The app's timeline stops at scheduling; the tap is the only
 witness of what reaches the listener, and the warning stays warn-only until the cause is known.
 
+**Clone onset glitch, root cause split (September 13, night).** With the capture in place the
+maintainer asked whether the onset glitch had a root cause. The clone capture lane (record
+`macos-xcui-benchmark-20260913-223436-256bda25`) showed the app plays the published file
+faithfully (residual −55 dBFS, no dropouts), so the defect is in the file. A scratch A/B with two
+data directories differing only in the speech tokenizer weights (the fp16 codec promoted in
+`76bd6f3b` five hours after 2.4.0 shipped, versus the fp32 codec 2.4.0 carried; both blobs are still in
+the local component store) over 28 fixed seeds, plus the 2.4.0 CLI built from its tag and run on the
+fp32 codec, separated two phenomena. The 150 to 250 ms plosive-onset cluster the QC first measured is
+in 19 of 28 fp16 takes and 18 of 28 fp32 takes, and the 2.4.0 binary renders the fp32 takes
+sample-identically: model-intrinsic, present in 2.4.0, not a regression (MV-05 keeps the open
+perceptual question). The regression is a burst inside the first 50 ms: 4 of 28 fp16 takes and 0 of
+28 fp32, one of them at full scale, the take opening with broadband garbage from sample 0 where
+fp32, 2.4.0 and the fp16 non-streaming decode all open in digital silence. It needs both the fp16
+codec and the streaming decoder's first chunk (MV-07). The text tokenizer bump and the model-code
+changes since August produce identical waveforms and are cleared. QC algorithm v7 adds the
+warn-only `onset_step_burst` flag so the harness names this opening burst on every future take.
+
 **Deferred.** The iPhone lanes (AV-14's iOS halves, AV-08's two-family record): CoreDevice reported
 the paired phone unavailable and `ui_test.sh ios benchmark` aborted before its build as designed.
 

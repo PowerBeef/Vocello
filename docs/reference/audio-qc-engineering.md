@@ -750,7 +750,8 @@ judge would be invalid. French disagreement remains open; no extra recognizer wa
 
 ### Threshold-change authority
 
-The Fast-QC cadence and dropout boundaries (`makeAudioQCReport`, algorithm v6) change only under
+The Fast-QC cadence and dropout boundaries (`makeAudioQCReport`, algorithm v7; v7 added only the
+warn-only `onset_step_burst` flag, no cadence or dropout boundary moved) change only under
 this policy, carried over verbatim on 2026-09-12 from the retired cadence contract,
 `audio-cadence-qc-contract.json` (in git history):
 

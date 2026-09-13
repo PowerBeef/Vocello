@@ -2720,6 +2720,13 @@ struct StreamingExecutionContext: Sendable {
         let clipFailFrac = 0.001, clickFailFrac = 0.005
         let clickWarnFrac = 0.0005, hotWarnFrac = 0.02
         let dcOffsetWarn = 0.05, dcOffsetFail = 0.20
+        // v7: a take that opens with a dense burst of quarter-scale steps. The
+        // September 13 A/B (28 seeds per codec, clone short) found such bursts
+        // inside the first 50 ms in 4 of 28 fp16-codec takes and 0 of 28 fp32
+        // takes; the ordinary plosive-onset cluster 150 to 250 ms in is common to
+        // both codecs and to release 2.4.0, so the window stays tight. Warn-only
+        // until a corpus sets the failing boundary.
+        let onsetStepBurstMinSteps = 3, onsetStepBurstWindowMS = 50.0
         // Dropout (punctuation-aware). This fast, amplitude-only tripwire cannot
         // decide that an ordinary cadence pause is missing speech. The 2026-08-22
         // cross-speaker delivery screen proved the old rule could: it rejected 38
@@ -2812,6 +2819,11 @@ struct StreamingExecutionContext: Sendable {
         if clickFrac > clickFailFrac { flags.append("clicks"); raise(.fail, &instabilityVerdict) }
         else if clickFrac > clickWarnFrac { flags.append("clicks"); raise(.warn, &instabilityVerdict) }
         if hotFrac > hotWarnFrac { flags.append("hot"); raise(.warn, &instabilityVerdict) }
+        if metrics.stepBurstPeakCount >= onsetStepBurstMinSteps, sampleRate > 0,
+           let burstStart = metrics.stepBurstPeakStartSample,
+           Double(burstStart) * 1_000 / Double(sampleRate) < onsetStepBurstWindowMS {
+            flags.append("onset_step_burst"); raise(.warn, &instabilityVerdict)
+        }
         if let dcOffset {
             if abs(dcOffset) > dcOffsetFail {
                 flags.append("dc_offset"); raise(.fail, &writtenOutputVerdict)

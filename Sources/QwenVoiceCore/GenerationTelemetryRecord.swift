@@ -1043,7 +1043,11 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
     /// context-sensitive egregious dead-air failures. v5 retains those exact
     /// verdict boundaries and adds a structured, bounded cadence report. v6
     /// observes an open terminal silence run and rejects egregious dead air.
-    public static let currentAlgorithmVersion = 6
+    /// v7 warns when the densest step burst opens the take (a cluster of at
+    /// least three quarter-scale steps inside the first 50 ms): the September
+    /// 13 codec A/B showed the fp16 speech tokenizer's first streamed chunk
+    /// can start a clone take with a full-scale burst that fp32 never produces.
+    public static let currentAlgorithmVersion = 7
 
     public enum Verdict: String, Hashable, Codable, Sendable {
         case pass

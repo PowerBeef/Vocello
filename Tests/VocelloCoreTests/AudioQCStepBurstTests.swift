@@ -58,6 +58,34 @@ final class AudioQCStepBurstTests: XCTestCase {
         XCTAssertEqual(second.metrics.stepBurstPeakStartSample, 1_971)
     }
 
+    func testABurstThatOpensTheTakeWarnsAndALaterOneDoesNot() throws {
+        func report(burstAtSample offset: Int) -> AudioQCReport {
+            var limiter = PCM16StreamLimiter()
+            var output: [Int16] = []
+            var signal = [Float](repeating: 0, count: offset)
+            signal += (0 ..< 12).map { $0.isMultiple(of: 2) ? Float(0.2) : Float(-0.2) }
+            signal += (0 ..< 24_000).map { Float(0.3 * sin(2 * Double.pi * 220 * Double($0) / 24_000)) }
+            limiter.append(signal, into: &output)
+            return StreamingExecutionContext.makeAudioQCReport(
+                metrics: limiter.metrics, sampleRate: 24_000,
+                durationSeconds: Double(signal.count) / 24_000, expectedPauseCount: 0
+            )
+        }
+        // 11 steps 2 ms in: the fp16 first-chunk signature.
+        let opening = report(burstAtSample: 48)
+        XCTAssertEqual(opening.stepBurstPeakCount, 11)
+        XCTAssertEqual(opening.stepBurstPeakStartMS, 2)
+        XCTAssertTrue(opening.flags.contains("onset_step_burst"), "\(opening.flags)")
+        XCTAssertEqual(opening.instabilityVerdict, .warn)
+        XCTAssertEqual(opening.algorithmVersion, 7)
+        // The same cluster at the plosive onset (150 ms) is recorded, not judged.
+        let later = report(burstAtSample: 3_600)
+        XCTAssertEqual(later.stepBurstPeakCount, 11)
+        XCTAssertEqual(later.stepBurstPeakStartMS, 150)
+        XCTAssertFalse(later.flags.contains("onset_step_burst"), "\(later.flags)")
+        XCTAssertEqual(later.instabilityVerdict, .pass)
+    }
+
     func testOlderRowsDecodeWithoutTheBurstFields() throws {
         let json = """
         {"algorithmVersion":6,"verdict":"pass","flags":[],"rmsDBFS":-20,"peak":0.5,"clippedSamples":0,

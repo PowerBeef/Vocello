@@ -615,7 +615,10 @@ dropouts, garbled words, "sounds worse"). Three layers, increasing in what they 
    the final PCM (extends `PCM16StreamLimiter`) and writes an `audioQC` verdict into the engine row:
    `pass` / `warn` / `fail` plus flags — `nonfinite` (NaN/Inf model output), `clipping`, `clicks`
    (chunk-boundary discontinuities — the decoder-drift class), `dropout` (interior silence),
-   `near_silent` (dead output). Surfaced as the summarizer's **`QC`** column. **Any `fail` blocks
+   `near_silent` (dead output), `onset_step_burst` (v7: at least three quarter-scale steps clustered
+   inside the first 50 ms, warn-only — the fp16 codec's first streamed chunk signature; the ordinary
+   plosive-onset cluster 150 to 250 ms in is recorded as `stepBurstPeakCount` / `stepBurstPeakStartMS`
+   and not judged). Surfaced as the summarizer's **`QC`** column. **Any `fail` blocks
    promoting a backend change.** Thresholds are conservative + tunable (`makeAudioQCReport`).
    **Dropout is punctuation-aware.** Long interior pauses (≥350 ms) count against the text's
    punctuation pause budget; an excess (flag `dropout:excessN`, followed by the long-pause count over the budget in parentheses; ≥2 fail, 1 warn) or a

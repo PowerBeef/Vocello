@@ -629,11 +629,15 @@ targets:
         SWIFT_VERSION: "6"
         MACOSX_DEPLOYMENT_TARGET: "26.0"
         CODE_SIGN_IDENTITY: "-"
-        GENERATE_INFOPLIST_FILE: YES
-        # Played-audio capture (PC-01): the runner taps the app's own output
-        # during benchmark takes; macOS asks once for System Audio Recording.
-        INFOPLIST_KEY_NSAudioCaptureUsageDescription: "The Vocello UI benchmark records the app's own rendered audio as evidence."
         SWIFT_STRICT_CONCURRENCY: complete
+    # Played-audio capture (PC-01): the runner taps the app's own output during
+    # benchmark takes. Xcode copies the test bundle's usage strings into the
+    # generated VocelloMacUITests-Runner.app, whose bundle id is
+    # com.qwenvoice.app.uitests.xctrunner; macOS asks once for System Audio Recording.
+    info:
+      path: Tests/VocelloMacUITests/Info.plist
+      properties:
+        NSAudioCaptureUsageDescription: "The Vocello UI benchmark records the app's own rendered audio as evidence."
 
   # Explicit physical-device iPhone UI automation. Simulator destinations are
   # unsupported; scripts/ui_test.sh resolves and signs for the paired phone.

@@ -21,12 +21,15 @@ SPEC.loader.exec_module(MODULE)
 
 
 def macos_ui_record_ids(records: dict) -> list[str]:
-    """Tracked macOS UI-generation records, oldest first; the tests pick by age, never by name."""
+    """Tracked macOS UI-generation records the contract treats as evidence (clean, canonical),
+    oldest first; the tests pick by age, never by name. Focused matrices such as a
+    two-take capture smoke run are tracked records but never comparison evidence."""
     matching = [
         identifier for identifier, record in records.items()
         if record.get("run", {}).get("platform") == "macos"
         and record.get("run", {}).get("kind") == "ui-generation"
         and not record.get("source", {}).get("dirty")
+        and MODULE.benchmark_record_is_eligible(record)
     ]
     return sorted(matching, key=lambda identifier: records[identifier]["run"]["finishedAt"])
 

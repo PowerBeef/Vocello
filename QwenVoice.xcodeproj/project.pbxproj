@@ -1111,6 +1111,7 @@
 		A55F5C185C7CAC960AAC9C80 /* MacGenerationWarmupCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacGenerationWarmupCoordinator.swift; sourceTree = "<group>"; };
 		A5ABE6DDCB5E50B7789B611D /* IOSExportPurchaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSExportPurchaseTests.swift; sourceTree = "<group>"; };
 		A5C15F6A1291506C7D8605BB /* CLIRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLIRuntime.swift; sourceTree = "<group>"; };
+		A5F747E37480FE43A393C784 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A7E2584F639E4BB6307A19F6 /* VocelloiOSRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VocelloiOSRelease.entitlements; sourceTree = "<group>"; };
 		A811133C20B31FED78D6A187 /* IOSSingleTakeGenerationExecutionHooks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSSingleTakeGenerationExecutionHooks.swift; sourceTree = "<group>"; };
 		A836AA336201DB6B2A733B80 /* HuggingFaceDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HuggingFaceDownloader.swift; sourceTree = "<group>"; };
@@ -1387,6 +1388,7 @@
 		02AB5E140B9656EDA4FEB4BD /* VocelloMacUITests */ = {
 			isa = PBXGroup;
 			children = (
+				A5F747E37480FE43A393C784 /* Info.plist */,
 				F0699EDC590E2AF981A1D618 /* VocelloMacBenchmarkUITests.swift */,
 				0716B559B408F8D2FE864E82 /* VocelloMacMarketingCaptureUITests.swift */,
 				5CC8D0BE5D262D74AB7FEFD5 /* VocelloMacPerfUITests.swift */,
@@ -3739,8 +3741,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSAudioCaptureUsageDescription = "The Vocello UI benchmark records the app's own rendered audio as evidence.";
+				INFOPLIST_FILE = Tests/VocelloMacUITests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

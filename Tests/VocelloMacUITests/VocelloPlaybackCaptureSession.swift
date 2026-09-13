@@ -345,7 +345,7 @@ final class VocelloPlaybackCaptureCoordinator {
             "runID": runID,
             "hostOS": ProcessInfo.processInfo.operatingSystemVersionString,
             "muteBehavior": "mutedWhenTapped",
-            "unavailableReason": unavailableReason as Any,
+            "unavailableReason": unavailableReason ?? "",
             "createdAt": ISO8601DateFormatter().string(from: Date()),
         ]
         if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys, .prettyPrinted]) {

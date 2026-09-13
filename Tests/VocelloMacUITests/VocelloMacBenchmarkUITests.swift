@@ -48,6 +48,8 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
         // Played-audio capture (PC-01): armed by scripts/ui_test.sh through
         // QVOICE_MAC_BENCH_CAPTURE_DIR; absent or failing capture never fails a take.
         let capture = VocelloPlaybackCaptureCoordinator(environment: processEnvironment, runID: runID)
+        print("VOCELLO_PLAYBACK_CAPTURE_DIR=\(processEnvironment[VocelloPlaybackCaptureCoordinator.environmentKey] ?? "missing")")
+        fflush(stdout)
         defer { capture?.abort() }
 
         var preparedMode: VocelloUIBenchMatrix.Mode?

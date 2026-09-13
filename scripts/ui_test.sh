@@ -479,6 +479,30 @@ export_attachments() {
 # match an existing row, so a prompt can still appear despite a decided row.
 # That path is only reachable when the virtual-microphone fixture is broken;
 # the smoke suite asserts the fixture explicitly.
+# Played-audio capture (PC-01): Xcode generates VocelloMacUITests-Runner.app
+# from its XCTRunner template with its own Info.plist, and TCC judges that
+# process, so the audio-capture usage string declared on the test bundle is
+# added to the runner after build-for-testing and the runner is re-signed the
+# way the lane signs everything (ad hoc). Idempotent; never fails the lane.
+ensure_runner_audio_capture_usage() {
+  local runner="$MAC_DERIVED/Build/Products/Release/VocelloMacUITests-Runner.app"
+  local plist="$runner/Contents/Info.plist"
+  local usage="The Vocello UI benchmark records the app's own rendered audio as evidence."
+  if [[ ! -f "$plist" ]]; then
+    warn "runner Info.plist not found; playback capture cannot prompt for System Audio Recording"
+    return 0
+  fi
+  if /usr/libexec/PlistBuddy -c "Print :NSAudioCaptureUsageDescription" "$plist" >/dev/null 2>&1; then
+    return 0
+  fi
+  if /usr/libexec/PlistBuddy -c "Add :NSAudioCaptureUsageDescription string $usage" "$plist" \
+      && codesign --force --sign - "$runner" >/dev/null 2>&1; then
+    note "runner Info.plist: added NSAudioCaptureUsageDescription and re-signed ad hoc"
+  else
+    warn "could not add the audio-capture usage string to the runner; playback capture evidence will be unavailable"
+  fi
+}
+
 mac_ui_preflight() {
   local tcc_db="$HOME/Library/Application Support/com.apple.TCC/TCC.db"
   local svc rows
@@ -498,11 +522,11 @@ mac_ui_preflight() {
   # passes and every take's capture evidence reads "unavailable".
   if [[ "$lane" == "benchmark" ]]; then
     if ! rows="$(sqlite3 -readonly "$tcc_db" \
-        "SELECT auth_value FROM access WHERE service='kTCCServiceAudioCapture' AND client='com.qwenvoice.app.uitests';" \
+        "SELECT auth_value FROM access WHERE service='kTCCServiceAudioCapture' AND client='com.qwenvoice.app.uitests.xctrunner';" \
         2>/dev/null)"; then
       note "ui-preflight: TCC database unreadable (no Full Disk Access) — cannot verify kTCCServiceAudioCapture"
     elif [[ -z "$rows" ]]; then
-      warn "ui-preflight: no System Audio Recording decision for com.qwenvoice.app.uitests — the first capture prompts once; until granted, playback capture evidence is unavailable (docs/reference/macos-permissions.md)"
+      warn "ui-preflight: no System Audio Recording decision for com.qwenvoice.app.uitests.xctrunner — the first capture prompts once; until granted, playback capture evidence is unavailable (docs/reference/macos-permissions.md)"
     fi
   fi
   return 0
@@ -1369,6 +1393,7 @@ WAV
       || die "macOS UI build-for-testing failed (see $out/xcodebuild.log)"
     printf '%s\n' "$mac_fingerprint" >"$mac_build_marker"
   fi
+  [[ "$lane" != "benchmark" ]] || ensure_runner_audio_capture_usage
   arm_mac_crash_marker
   required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test-without-building \
     -project "$PROJECT" -scheme VocelloMacUI -configuration Release \

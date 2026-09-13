@@ -117,7 +117,7 @@ scripts/ui_test.sh macos perf
 
 The benchmark lane also records what the app actually plays: the test runner taps the app's own
 audio output for every take (Core Audio process tap, physical output muted while tapped, one
-System Audio Recording grant for `com.qwenvoice.app.uitests`), writes the captures under the run's
+System Audio Recording grant for `com.qwenvoice.app.uitests.xctrunner`), writes the captures under the run's
 `playback-capture/` directory and the checker compares each one with the published take WAV
 (`playbackCapture*` metrics, warn-only codes; see
 [`benchmarking-procedure.md`](benchmarking-procedure.md) §4.10). A missing or denied capture never

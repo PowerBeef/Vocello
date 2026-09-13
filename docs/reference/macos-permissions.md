@@ -57,10 +57,10 @@ the recurring permission pain.
 - Switching ad-hoc → certificate leaves stale TCC rows behind; reset once:
   `scripts/permissions_doctor.sh --reset-tcc` (then grant on next launch).
 - **System Audio Recording for the UI test runner.** `scripts/ui_test.sh macos benchmark` taps the
-  app's own audio output from `VocelloMacUITests-Runner` (`com.qwenvoice.app.uitests`, usage
+  app's own audio output from `VocelloMacUITests-Runner` (`com.qwenvoice.app.uitests.xctrunner`, usage
   string in `project.yml`); macOS prompts once for that runner. Deny or never answer and the lane
   still passes with `playbackCaptureStatus: unavailable` on every take. Reset with
-  `tccutil reset AudioCapture com.qwenvoice.app.uitests`.
+  `tccutil reset AudioCapture com.qwenvoice.app.uitests.xctrunner`.
 - **UI-lane builds are ad-hoc signed** (`scripts/ui_test.sh` builds with
   `CODE_SIGN_IDENTITY="-"`), so they never match the dev identity's TCC grant: any *real*
   microphone request from a lane-built app prompts fresh, and answering it re-keys the row to that

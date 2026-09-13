@@ -497,6 +497,103 @@ class BenchmarkHistoryTests(unittest.TestCase):
         })
         self.publish(legacy, "apple-legacy")
 
+    @staticmethod
+    def _schema_v3_language_record(run_id: str) -> dict:
+        """A schema-v3 language record: memory-qualified take with the quality identity."""
+        record = record_fixture(run_id=run_id, kind="language")
+        record["schemaVersion"] = 3
+        record["evidence"].update({
+            "telemetrySchemaVersion": 8,
+            "memoryContractVersion": 1,
+            "memoryQualified": True,
+            "sampleSidecarCount": 1,
+            "sampleSidecarsDigest": "a" * 64,
+        })
+        take = record["takes"][0]
+        take["memoryStatus"] = "qualified"
+        take["sampleSidecarDigest"] = "b" * 64
+        take["metrics"].update({key: 0.0 for key in history.MEMORY_REQUIRED_METRICS})
+        take["metrics"].update({
+            "samplerCoverage": 1.0,
+            "samplerSampleCount": 10.0,
+            "samplerBoundarySampleCount": 8.0,
+            "samplerPeriodicSampleCount": 1.0,
+            "gpuRecommendedWorkingSetMB": 4096.0,
+            "mlxActivePeakMB": 100.0,
+            "mlxCachePeakMB": 10.0,
+            "mlxPeakMB": 110.0,
+        })
+        take["qualityRegistryOutcome"] = "pass"
+        take["qualityRegistryRequiredGates"] = sorted(history.QUALITY_FAST_GATES)
+        return record
+
+    def test_language_negative_control_take_is_evidence_only_when_it_failed(self) -> None:
+        valid = self._schema_v3_language_record("control-valid")
+        valid["evidence"]["languageVerification"] = {
+            **history.INDEPENDENT_VERIFICATION_IDENTITY,
+            "families": ["whisper"],
+            "independentRecognitionAlgorithm": "mlx-whisper-locked-decode-v1",
+            "independentModelIdentitySHA256": "2" * 64,
+            "hintCellsPassed": 1, "hintCellsExpected": 1,
+            "outputCellsPassed": 1, "outputCellsExpected": 1, "negativeControlsConfirmed": 1,
+        }
+        # A pinned English hint over a French script: the English-locked
+        # verification ran, detected English weakly and missed the accuracy gate.
+        valid["takes"][0].update({
+            "accuracyMetric": "wordErrorRate", "accuracyThreshold": 0.15, "expectedOutcome": "fail",
+        })
+        valid["takes"][0]["metrics"].update({
+            "independentWordErrorRate": 0.5625, "independentCharacterErrorRate": 0.23,
+            "independentPrimaryAccuracyScore": 0.5625, "independentLanguageMatchScore": 0.89,
+            "independentLanguagePass": 1.0, "independentAccuracyPass": 0.0,
+            "independentRecognitionDurationSeconds": 0.7,
+        })
+        self.publish(valid, "control-valid")
+
+        mutations = {
+            "control that passed": lambda record: record["takes"][0]["metrics"].update(
+                {"independentWordErrorRate": 0.0, "independentPrimaryAccuracyScore": 0.0,
+                 "independentAccuracyPass": 1.0}),
+            "pass flag disagreeing with the score": lambda record: record["takes"][0]["metrics"].update(
+                {"independentWordErrorRate": 0.1, "independentPrimaryAccuracyScore": 0.1}),
+            "control not counted": lambda record: record["evidence"]["languageVerification"].__setitem__(
+                "negativeControlsConfirmed", 0),
+            "unknown expected outcome": lambda record: record["takes"][0].__setitem__(
+                "expectedOutcome", "maybe"),
+            "control without an accuracy gate": lambda record: (
+                record["takes"][0].pop("accuracyMetric"), record["takes"][0].pop("accuracyThreshold")),
+        }
+        for index, (label, mutate) in enumerate(mutations.items()):
+            record = copy.deepcopy(valid)
+            record["run"]["id"] = f"control-invalid-{index}"
+            mutate(record)
+            with self.subTest(label=label), self.assertRaises(history.HistoryError):
+                self.publish(record, f"control-invalid-{index}")
+
+        # An ordinary take that failed its verification is still refused.
+        failed = copy.deepcopy(valid)
+        failed["run"]["id"] = "control-plain-failure"
+        failed["takes"][0].pop("expectedOutcome")
+        failed["evidence"]["languageVerification"]["negativeControlsConfirmed"] = 0
+        with self.assertRaises(history.HistoryError):
+            self.publish(failed, "control-plain-failure")
+
+        apple = self._schema_v3_language_record("apple-control")
+        apple["evidence"]["languageVerification"] = dict(history.APPLE_SPEECH_VERIFICATION_IDENTITY)
+        apple["takes"][0].update({
+            "accuracyMetric": "wordErrorRate", "accuracyThreshold": 0.15, "expectedOutcome": "fail",
+        })
+        apple["takes"][0]["metrics"].update({
+            "wordErrorRate": 0.5, "characterErrorRate": 0.5, "primaryAccuracyScore": 0.5,
+            "accuracyThreshold": 0.15, "languageMatchScore": 0.4, "outputLanguagePass": 0.0,
+            "outputAccuracyPass": 0.0, "referenceTokenCount": 8.0, "hypothesisTokenCount": 8.0,
+            "referenceCharacterCount": 32.0, "hypothesisCharacterCount": 32.0, "substitutions": 4.0,
+            "insertions": 0.0, "deletions": 0.0, "characterSubstitutions": 16.0,
+            "characterInsertions": 0.0, "characterDeletions": 0.0, "recognitionPassCount": 3.0,
+            "recognitionDurationSeconds": 0.3,
+        })
+        self.publish(apple, "apple-control")
+
     def test_language_take_accuracy_gate_is_bounded_and_paired(self) -> None:
         valid = record_fixture(run_id="accuracy-valid", kind="language")
         provenance = {

@@ -1444,12 +1444,15 @@ class PublisherTests(unittest.TestCase):
             json.dumps(manifest, sort_keys=True),
         )
 
-    def _publish_two_language_cells(self, *, english_provenance: dict) -> dict:
+    def _publish_two_language_cells(self, *, english_provenance: dict | None = None,
+                                    english_expected_outcome: str = "pass",
+                                    english_transcript: str | None = None) -> dict:
         matrix = self.root / "matrix.json"
         corpus = self.root / "corpus.json"
         matrix.write_text(json.dumps({"cells": [
             {"id": "fr", "quick": True, "expectedHint": "french", "scriptLang": "french"},
-            {"id": "en", "quick": True, "expectedHint": "english", "scriptLang": "english"},
+            {"id": "en", "quick": True, "expectedHint": "english", "scriptLang": "english",
+             "expectedOutcome": english_expected_outcome},
         ]}))
         french = "un deux trois quatre cinq six sept huit"
         english = "one two three four five six seven eight"
@@ -1471,6 +1474,7 @@ class PublisherTests(unittest.TestCase):
                 "expectedOutcome": "pass",
                 "recognitions": [independent_recognition(
                     audio_sha256=digest, script=script, language=language, provenance=provenance,
+                    transcript=english_transcript if cell_id == "en" else None,
                 )],
             }
         recognitions = independent_evidence(
@@ -1507,6 +1511,19 @@ class PublisherTests(unittest.TestCase):
         verification = record["evidence"]["languageVerification"]
         self.assertEqual(verification["independentModelIdentitySHA256"], "2" * 64)
         self.assertEqual(verification["outputCellsPassed"], 2)
+
+    def test_a_negative_control_take_is_stamped_with_its_expected_failure(self) -> None:
+        record = self._publish_two_language_cells(
+            english_expected_outcome="fail",
+            english_transcript="nine ten eleven twelve thirteen fourteen fifteen sixteen",
+        )
+        verification = record["evidence"]["languageVerification"]
+        self.assertEqual(verification["negativeControlsConfirmed"], 1)
+        self.assertEqual(verification["outputCellsPassed"], 2)
+        by_cell = {take["cell"]: take for take in record["takes"]}
+        self.assertEqual(by_cell["en"]["expectedOutcome"], "fail")
+        self.assertNotIn("expectedOutcome", by_cell["fr"])
+        self.assertEqual(by_cell["en"]["metrics"]["independentAccuracyPass"], 0.0)
 
     def test_two_recognizer_models_in_one_run_refuse_publication(self) -> None:
         with self.assertRaises(publisher.PublicationError) as raised:

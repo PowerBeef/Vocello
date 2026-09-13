@@ -145,7 +145,7 @@ TAKE_KEYS = {
     "durationSeconds", "metrics", "output", "audioQC", "thermalState", "warnings",
     "runtimeProfileSignature", "fixtureDigest", "modelIntegrityDigest", "modelRepository",
     "modelRevision", "modelArtifactVersion", "modelQuantization", "seed",
-    "accuracyMetric", "accuracyThreshold", "playbackStartSource",
+    "accuracyMetric", "accuracyThreshold", "expectedOutcome", "playbackStartSource",
     "memoryStatus", "sampleSidecarDigest",
     "streamingTelemetryV9SidecarDigest", "samplingPromotionPackaged", "samplingWAVDigest",
     "samplingSeedAgreement",
@@ -305,6 +305,9 @@ V2_ONLY_TAKE_KEYS = {
 # records must reject it as unknown so historical documents stay immutable.
 V3_ONLY_TAKE_KEYS = {
     "qualityRegistryOutcome", "qualityRegistryRequiredGates", "qualityRegistryIssues",
+    # A language negative control (expected verification failure) is stamped on
+    # the take since 2026-09-12; older records never carried one with metrics.
+    "expectedOutcome",
 }
 V2_ONLY_TRACE_SUMMARY_KEYS = {
     *LEGACY_MEMORY_TRACE_SUMMARY_KEYS,
@@ -2280,6 +2283,7 @@ def validate_record(
     if generation_kind and not takes:
         raise HistoryError("generation benchmarks require at least one take")
     seen_generations: set[str] = set()
+    negative_control_count = 0
     for position, take in enumerate(takes, start=1):
         if not isinstance(take, dict):
             raise HistoryError(f"takes[{position - 1}] must be an object")
@@ -2325,6 +2329,15 @@ def validate_record(
         playback_source = take.get("playbackStartSource")
         if playback_source is not None and playback_source not in {"liveStream", "finalFile"}:
             raise HistoryError("take playbackStartSource is invalid")
+        if take.get("expectedOutcome", "pass") not in {"pass", "fail"}:
+            raise HistoryError("take expectedOutcome is invalid")
+        if take.get("expectedOutcome") == "fail" and "accuracyMetric" not in take:
+            raise HistoryError("a negative-control take needs its language accuracy gate")
+        # A negative control (a pinned hint over a script in another language)
+        # is evidence only when its output verification ran and failed.
+        negative_control = take.get("expectedOutcome") == "fail"
+        if negative_control:
+            negative_control_count += 1
         if version >= 2 and run["kind"] == "ui-generation" and playback_source is None:
             raise HistoryError("schema-v2 UI take has no typed playback start source")
         if version >= 2 and run["kind"] in MEMORY_QUALIFIED_KINDS:
@@ -2381,17 +2394,24 @@ def validate_record(
                 )
             metric = take["accuracyMetric"]
             independent_score = metrics["independent" + metric[0].upper() + metric[1:]]
+            independent_within = float(independent_score) <= float(take["accuracyThreshold"])
             if (
                 not math.isclose(
                     float(metrics["independentPrimaryAccuracyScore"]), float(independent_score),
                     rel_tol=1e-9, abs_tol=1e-12,
                 )
-                or float(independent_score) > float(take["accuracyThreshold"])
-                or metrics["independentLanguagePass"] != 1.0
-                or metrics["independentAccuracyPass"] != 1.0
+                or (metrics["independentAccuracyPass"] == 1.0) != independent_within
+                or metrics["independentLanguagePass"] not in (0.0, 1.0)
                 or not 0.0 <= float(metrics["independentLanguageMatchScore"]) <= 1.0
                 or float(metrics["independentRecognitionDurationSeconds"]) <= 0
             ):
+                raise HistoryError("independent recognition gate metrics are inconsistent")
+            independent_passed = (
+                metrics["independentLanguagePass"] == 1.0 and metrics["independentAccuracyPass"] == 1.0
+            )
+            if negative_control and independent_passed:
+                raise HistoryError("negative-control take passed its independent verification")
+            if not negative_control and not independent_passed:
                 raise HistoryError("independent recognition gate metrics are inconsistent")
         if "accuracyMetric" in take and "apple-speech" not in language_families(record):
             if present := sorted((LANGUAGE_ACCURACY_METRIC_KEYS - {"accuracyThreshold"}) & set(take["metrics"])):
@@ -2415,13 +2435,18 @@ def validate_record(
                     float(metrics["primaryAccuracyScore"]), float(selected_score),
                     rel_tol=1e-9, abs_tol=1e-12,
                 )
-                or float(selected_score) > float(take["accuracyThreshold"])
-                or metrics["outputLanguagePass"] != 1.0
-                or metrics["outputAccuracyPass"] != 1.0
-                or not 0.5 <= metrics["languageMatchScore"] <= 1.0
+                or (metrics["outputAccuracyPass"] == 1.0)
+                != (float(selected_score) <= float(take["accuracyThreshold"]))
+                or metrics["outputLanguagePass"] not in (0.0, 1.0)
+                or not (0.0 if negative_control else 0.5) <= metrics["languageMatchScore"] <= 1.0
                 or metrics["recognitionPassCount"] != 3.0
                 or metrics["recognitionDurationSeconds"] <= 0
             ):
+                raise HistoryError("language accuracy gate metrics are inconsistent")
+            output_passed = metrics["outputLanguagePass"] == 1.0 and metrics["outputAccuracyPass"] == 1.0
+            if negative_control and output_passed:
+                raise HistoryError("negative-control take passed its in-app verification")
+            if not negative_control and not output_passed:
                 raise HistoryError("language accuracy gate metrics are inconsistent")
             count_keys = {
                 "referenceTokenCount", "hypothesisTokenCount", "referenceCharacterCount",
@@ -2506,6 +2531,12 @@ def validate_record(
             raise HistoryError("independent recognizer provenance does not match the declared families")
     if language_verification is not None and run["kind"] != "language":
         raise HistoryError("language verifier provenance belongs only to language records")
+    if (
+        language_verification is not None
+        and "negativeControlsConfirmed" in language_verification
+        and language_verification["negativeControlsConfirmed"] != negative_control_count
+    ):
+        raise HistoryError("negativeControlsConfirmed does not match the negative-control takes")
 
     cells = record.get("cells")
     if not isinstance(cells, list):

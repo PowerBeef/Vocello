@@ -2509,6 +2509,8 @@ def language_command(args: argparse.Namespace) -> Path:
                 reference_script=corpus_scripts[str(cell["scriptLang"])],
             )
             asr_evidence.append(evidence)
+            if cell.get("expectedOutcome") == "fail":
+                take["expectedOutcome"] = "fail"
             take["accuracyMetric"] = evidence["accuracyMetric"]
             take["accuracyThreshold"] = evidence["accuracyThreshold"]
             take["metrics"].update({
@@ -2566,6 +2568,10 @@ def language_command(args: argparse.Namespace) -> Path:
             elif independent_provenance != recognizer_identity:
                 raise PublicationError("independent recognitions come from more than one recognizer identity")
             independent_evidence.append(evidence)
+            if cell.get("expectedOutcome") == "fail":
+                # The history validator inverts the accuracy gate for a negative
+                # control: the take is evidence only if its verification failed.
+                take["expectedOutcome"] = "fail"
             take.setdefault("accuracyMetric", evidence["accuracyMetric"])
             take.setdefault("accuracyThreshold", evidence["accuracyThreshold"])
             take["metrics"].update({

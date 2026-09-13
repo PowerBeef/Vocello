@@ -721,6 +721,13 @@
           "minimum": 0,
           "type": "number"
         },
+        "expectedOutcome": {
+          "description": "Language negative control: a take whose output verification was expected to fail and did; the validator inverts its accuracy gate.",
+          "enum": [
+            "pass",
+            "fail"
+          ]
+        },
         "finishReason": {
           "type": "string"
         },

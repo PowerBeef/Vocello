@@ -188,7 +188,10 @@ Negative control `custom-fr-text-en-pinned` carries `expectedOutcome: "fail"`: t
 is sent over a French script, synthesis still speaks French today, and the cell passes only when the
 English-locked output verification ran and failed (on accuracy or language). A verification that
 passes means the model started honoring the pinned hint; a skipped verification is not a confirmed
-control. Before 2026-09-12 this cell was hint-only and never measured its output.
+control. Before 2026-09-12 this cell was hint-only and never measured its output. In a published
+record the control's take carries `expectedOutcome: "fail"` (a schema-v3 take key) and
+`scripts/benchmark_history.py` inverts its accuracy gate: the take is evidence only if its
+verification failed, and the stamped takes must match `negativeControlsConfirmed`.
 
 The version-2 corpus, explicit Design language, native-language Custom fixtures where available,
 stricter validator correlation, and CJK-aware punctuation pause accounting address the defects

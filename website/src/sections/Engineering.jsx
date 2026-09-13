@@ -2,7 +2,7 @@ import React from "react";
 
 /*
   Measured performance, from the repository's tracked benchmark records:
-  - RTF bars: benchmarks/runs/ui-generation/macos-xcui-benchmark-20260913-170946-488a9ed0.json
+  - RTF bars: benchmarks/runs/ui-generation/macos-xcui-benchmark-20260913-181112-6cb80773.json
     (the newest canonical matrix; `python3 scripts/generate_readme_charts.py --check` names the
     newest canonical record and must agree with this pin).
     RTF is the standard real-time factor: seconds of generation per second of audio, lower is
@@ -18,9 +18,9 @@ import React from "react";
   single-release billboard.
 */
 const MODES = [
-  { name: "Built-in Voice", tone: "var(--mode-custom)", takes: [0.68, 0.6, 0.57] },
-  { name: "Voice Design", tone: "var(--mode-design)", takes: [0.64, 0.56, 0.53] },
-  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [0.77, 0.62, 0.55] },
+  { name: "Built-in Voice", tone: "var(--mode-custom)", takes: [0.71, 0.59, 0.57] },
+  { name: "Voice Design", tone: "var(--mode-design)", takes: [0.65, 0.56, 0.53] },
+  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [0.75, 0.61, 0.55] },
 ];
 const LENGTHS = ["short", "medium", "long"];
 const RTF_SCALE_MAX = 1.2;

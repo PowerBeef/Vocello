@@ -371,12 +371,12 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `PC-01` | planned | Capture and compare what the app plays during every macOS benchmark take | — |
+| `PC-01` | in-flight | Capture and compare what the app plays during every macOS benchmark take | — |
 | `PC-02` | planned | Promote the played-audio comparison from warnings to a gate | `PC-01` |
 
 ### Open items in detail
 
-- **`PC-01`** (planned) — Capture and compare what the app plays during every macOS benchmark take.
+- **`PC-01`** (in-flight) — Capture and compare what the app plays during every macOS benchmark take.
   gate: scripts/ui_test.sh macos benchmark produces $out/playback-capture/{capture-run.json, take-NN-<cell>.wav/.json, summary.json}; every take of a captured run carries playbackCaptureStatus, playbackCaptureDigest and the seven playbackCapture* metrics, warn-only codes on take.warnings; the lane still passes when the tap is unavailable; scripts/tests/test_playback_capture.py and the Swift support tests pass; the physical output stays silent while a take is tapped.
 
 - **`PC-02`** (planned) — Promote the played-audio comparison from warnings to a gate.

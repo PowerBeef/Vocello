@@ -1190,7 +1190,7 @@
       "id": "PC-01",
       "plan": "playback-capture-evidence-2026-09",
       "title": "Capture and compare what the app plays during every macOS benchmark take",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "scripts/ui_test.sh macos benchmark produces $out/playback-capture/{capture-run.json, take-NN-<cell>.wav/.json, summary.json}; every take of a captured run carries playbackCaptureStatus, playbackCaptureDigest and the seven playbackCapture* metrics, warn-only codes on take.warnings; the lane still passes when the tap is unavailable; scripts/tests/test_playback_capture.py and the Swift support tests pass; the physical output stays silent while a take is tapped.",
       "sourceOfTruth": [
@@ -1201,7 +1201,7 @@
         "config/orchestration-contract.json"
       ],
       "updated": "2026-09-13",
-      "notes": "Design in the September 13 plan addendum: Core Audio process tap on the app process from the XCUITest runner (CATapDescription mutedWhenTapped, private aggregate device, IOProc into a preallocated ring), per-take sidecar with runner-clock timestamps, numpy analysis (resample to 24 kHz, envelope cross-correlation, gain match, dropout frames, coverage, first audible sample), take fields added to schema-v3 and the allowlists, optional ledger step playback-capture, one-time System Audio Recording grant for the runner."
+      "notes": "September 13: analysis, checker, history contract, schema and tests landed in 336f4458; the runner's tap session, lane wiring, ledger step, preflight and docs in 220a887b and 1de0aa50. End-to-end on the reduced Custom/short matrix (run macos-xcui-benchmark-20260913-202238-83dcb7d1, record 6d952772): lane PASS, summary.json, both takes playbackCaptureStatus unavailable, ledger step recorded. The captured path is unverified: Xcode's generated VocelloMacUITests-Runner.app (com.qwenvoice.app.uitests.xctrunner) had no NSAudioCaptureUsageDescription, so macOS never prompted; the lane now adds the key to the runner after build-for-testing and re-signs it ad hoc. Next run needs one person at the Mac to click Allow on the System Audio Recording prompt (the maintainer was remote); then verify take-NN sidecars, capture WAVs, playbackCaptureStatus captured, first-audible ≥ playbackScheduled − 50 ms and coverage ≈ 1. Also still open: why the runner saw no capture directory on run 83dcb7d1 (a VOCELLO_PLAYBACK_CAPTURE_DIR trace line now lands in xcodebuild.log)."
     },
     {
       "id": "PC-02",

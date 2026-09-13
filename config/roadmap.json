@@ -1190,7 +1190,7 @@
       "id": "PC-01",
       "plan": "playback-capture-evidence-2026-09",
       "title": "Capture and compare what the app plays during every macOS benchmark take",
-      "status": "in-flight",
+      "status": "done",
       "blockedBy": [],
       "gate": "scripts/ui_test.sh macos benchmark produces $out/playback-capture/{capture-run.json, take-NN-<cell>.wav/.json, summary.json}; every take of a captured run carries playbackCaptureStatus, playbackCaptureDigest and the seven playbackCapture* metrics, warn-only codes on take.warnings; the lane still passes when the tap is unavailable; scripts/tests/test_playback_capture.py and the Swift support tests pass; the physical output stays silent while a take is tapped.",
       "sourceOfTruth": [
@@ -1201,7 +1201,17 @@
         "config/orchestration-contract.json"
       ],
       "updated": "2026-09-13",
-      "notes": "September 13: analysis, checker, history contract, schema and tests landed in 336f4458; the runner's tap session, lane wiring, ledger step, preflight and docs in 220a887b and 1de0aa50. End-to-end on the reduced Custom/short matrix (run macos-xcui-benchmark-20260913-202238-83dcb7d1, record 6d952772): lane PASS, summary.json, both takes playbackCaptureStatus unavailable, ledger step recorded. The captured path is unverified: Xcode's generated VocelloMacUITests-Runner.app (com.qwenvoice.app.uitests.xctrunner) had no NSAudioCaptureUsageDescription, so macOS never prompted; the lane now adds the key to the runner after build-for-testing and re-signs it ad hoc. Next run needs one person at the Mac to click Allow on the System Audio Recording prompt (the maintainer was remote); then verify take-NN sidecars, capture WAVs, playbackCaptureStatus captured, first-audible ≥ playbackScheduled − 50 ms and coverage ≈ 1. Also still open: why the runner saw no capture directory on run 83dcb7d1 (a VOCELLO_PLAYBACK_CAPTURE_DIR trace line now lands in xcodebuild.log)."
+      "notes": "Closed 2026-09-13. Analysis, checker, history contract, schema and tests in 336f4458; the runner's tap session, lane wiring, ledger step, preflight and docs in 220a887b and 1de0aa50; the unavailable path proven on runs 83dcb7d1 and 7804867e. The captured path needed three more facts: a fresh app process has no Core Audio process object until its first playback, so the runner attaches on the HAL process-list change (f06de0a8); Xcode signs the generated XCTRunner sandboxed, which silently blocked the tap and every capture file, and an ad-hoc System Audio Recording grant binds to one code hash, so the lane re-signs the runner unsandboxed with the stable Apple Development identity (99081685; a process tap never prompts on macOS 26, the maintainer added the runner by hand once); and the capture WAV starts at the first delivered buffer, not at arming (28ef9156, which also redefined playback.capture.misaligned against the app's playbackScheduledMS). First canonical captured record: macos-xcui-benchmark-20260913-220529-a1103a3a (reduced Custom/short matrix, 2/2 captured, coverage 1.0, no dropouts, residual -53/-56 dBFS, no step burst, physical output silent while tapped, grant survived the rebuild). Finding handed to PC-03: the audible onset trails the app's playback-scheduled timestamp by 1.86 s (cold) and 1.82 s (warm) on final-file playback.",
+      "evidence": [
+        "commit:336f4458",
+        "commit:220a887b",
+        "commit:1de0aa50",
+        "commit:f06de0a8",
+        "commit:99081685",
+        "commit:28ef9156",
+        "file:benchmarks/runs/ui-generation/macos-xcui-benchmark-20260913-220529-a1103a3a.json",
+        "doc:docs/development-progress.md#machinery-validation-september-12-to-13"
+      ]
     },
     {
       "id": "PC-02",
@@ -1218,6 +1228,22 @@
       ],
       "updated": "2026-09-13",
       "notes": "Blocked on PC-01 producing the corpus."
+    },
+    {
+      "id": "PC-03",
+      "plan": "playback-capture-evidence-2026-09",
+      "title": "Explain the 1.8 s gap between playback scheduling and audible output",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "The macOS app's playback timeline accounts for the interval between playbackScheduledMS and the first audible captured frame: either the timeline gains the event that actually starts audio (device start, final-file player start) and the capture agrees with it within 250 ms on three canonical runs, or the latency is removed; the playback.capture.misaligned warning then clears on Custom/short final-file takes.",
+      "sourceOfTruth": [
+        "Sources/ViewModels/AudioPlayerViewModel.swift",
+        "Sources/Services/LiveStreamingPlaybackEngine.swift",
+        "Sources/QwenVoiceCore/AppGenerationTimeline.swift",
+        "scripts/lib/playback_capture.py"
+      ],
+      "updated": "2026-09-13",
+      "notes": "Opened 2026-09-13 from record macos-xcui-benchmark-20260913-220529-a1103a3a: on both Custom/short takes (playbackStartSource finalFile) the tap's first buffer arrived about 1.3 s after playbackScheduledMS and audio followed 0.3 to 0.5 s of digital silence later, so the listener hears the take about 1.8 s after the app says it scheduled playback and well after submitToCompletedMS. The app's timeline stops at scheduling (AppGenerationTimeline); the capture is the only witness of the audible onset. Product change needs its own decision; evidence first."
     }
   ]
 }

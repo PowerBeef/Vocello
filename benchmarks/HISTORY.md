@@ -1405,6 +1405,12 @@ trend percentages carry their direction in words.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-17 | [`macos-xcui-benchmark-20260717-192747-0ae9d73c`](runs/ui-generation/macos-xcui-benchmark-20260717-192747-0ae9d73c.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | ~1.56 | `a9ebafff246b` dirty | `excluded` | baseline | phase4-custom |
 
+## ui-generation / macos / mac-mini-m2-8gb / config `d7dfa72973e5`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-13 | [`macos-xcui-benchmark-20260913-220529-a1103a3a`](runs/ui-generation/macos-xcui-benchmark-20260913-220529-a1103a3a.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | 0.75 | `28ef91566c5a` | `d7dfa72973e5` | baseline | capture-smoke-5 |
+
 ## ui-generation / macos / mac-mini-m2-8gb / config `d9e63bb990c9`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

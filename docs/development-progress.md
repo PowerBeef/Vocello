@@ -84,6 +84,22 @@ QC harness exists so nobody has to listen; the next step is PC-01, a Core Audio 
 UI benchmark lane that captures what the app actually plays, mutes the physical output, and
 compares the played audio with the published WAV.
 
+**Played-audio capture landed (September 13, evening).** PC-01 closed with the first canonical
+captured record, `macos-xcui-benchmark-20260913-220529-a1103a3a` (reduced Custom/short matrix, two
+takes captured, coverage 1.0, no dropouts, residual −53 and −56 dBFS, no step burst, speakers silent
+while tapped). Getting there took five runs and three facts nobody had written down: a freshly
+relaunched app has no Core Audio process object until its first playback, so the runner attaches
+on the HAL's process-list change (`f06de0a8`); Xcode signs the generated XCTest runner sandboxed,
+which silently blocked both the tap and every capture file, and an ad hoc System Audio Recording
+grant binds to one code hash, so the lane now re-signs the runner unsandboxed with the stable
+Apple Development identity and the maintainer added it once by hand, because a process tap never
+prompts on this macOS (`99081685`); and the capture WAV starts at the first delivered buffer, not at
+arming (`28ef9156`, which also redefined `playback.capture.misaligned` against the app's own
+`playbackScheduledMS`). The capture's first finding is PC-03: on both takes the audible onset trails
+the app's playback-scheduled timestamp by about 1.8 s, on final-file playback, with the tap's first
+buffer arriving 1.3 s after scheduling. The app's timeline stops at scheduling; the tap is the only
+witness of what reaches the listener, and the warning stays warn-only until the cause is known.
+
 **Deferred.** The iPhone lanes (AV-14's iOS halves, AV-08's two-family record): CoreDevice reported
 the paired phone unavailable and `ui_test.sh ios benchmark` aborted before its build as designed.
 

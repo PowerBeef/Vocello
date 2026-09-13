@@ -21,7 +21,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `machinery-validation-follow-ups-2026-09` | active | release-qa | 0/6 (0%) |
-| `playback-capture-evidence-2026-09` | active | release-qa | 0/2 (0%) |
+| `playback-capture-evidence-2026-09` | active | release-qa | 1/3 (33%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — primary release-first execution plan
@@ -371,16 +371,17 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `PC-01` | in-flight | Capture and compare what the app plays during every macOS benchmark take | — |
+| `PC-01` | done | Capture and compare what the app plays during every macOS benchmark take | — |
 | `PC-02` | planned | Promote the played-audio comparison from warnings to a gate | `PC-01` |
+| `PC-03` | planned | Explain the 1.8 s gap between playback scheduling and audible output | — |
 
 ### Open items in detail
 
-- **`PC-01`** (in-flight) — Capture and compare what the app plays during every macOS benchmark take.
-  gate: scripts/ui_test.sh macos benchmark produces $out/playback-capture/{capture-run.json, take-NN-<cell>.wav/.json, summary.json}; every take of a captured run carries playbackCaptureStatus, playbackCaptureDigest and the seven playbackCapture* metrics, warn-only codes on take.warnings; the lane still passes when the tap is unavailable; scripts/tests/test_playback_capture.py and the Swift support tests pass; the physical output stays silent while a take is tapped.
-
 - **`PC-02`** (planned) — Promote the played-audio comparison from warnings to a gate.
   gate: Thresholds for alignment, residual, dropouts and coverage are set from at least three canonical captured runs and a failing comparison fails the lane; the smoke lane captures too.
+
+- **`PC-03`** (planned) — Explain the 1.8 s gap between playback scheduling and audible output.
+  gate: The macOS app's playback timeline accounts for the interval between playbackScheduledMS and the first audible captured frame: either the timeline gains the event that actually starts audio (device start, final-file player start) and the capture agrees with it within 250 ms on three canonical runs, or the latency is removed; the playback.capture.misaligned warning then clears on Custom/short final-file takes.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

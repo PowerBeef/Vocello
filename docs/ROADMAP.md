@@ -20,6 +20,8 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-control-audit-2026-08` | active | ios | 16/21 (76%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
+| `machinery-validation-follow-ups-2026-09` | active | release-qa | 0/6 (0%) |
+| `playback-capture-evidence-2026-09` | active | release-qa | 0/2 (0%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — primary release-first execution plan
@@ -81,7 +83,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `AV-08` | in-flight | P2 — qualify multilingual output beyond a single cohort | — |
 | `AV-09` | in-flight | P2 — make stateful physical-device lanes independently repeatable | — |
 | `AV-13` | planned | macOS XCUITest lanes for the untested identifiers (Design/Clone generation, enrollment, History actions, seed pin, downloads, batch cancel) | — |
-| `AV-14` | planned | re-baseline the benchmark harness under the standard RTF definition (consent-bound runs) | — |
+| `AV-14` | in-flight | re-baseline the benchmark harness under the standard RTF definition (consent-bound runs) | — |
 
 ### Open items in detail
 
@@ -97,7 +99,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 - **`AV-13`** (planned) — macOS XCUITest lanes for the untested identifiers (Design/Clone generation, enrollment, History actions, seed pin, downloads, batch cancel).
   gate: The 2026-09-11 XCUITest audit found 78 of 102 macOS accessibility identifiers never exercised. Add acceptance coverage, in the existing lane structure, for Voice Design and Voice Cloning generation through the visible controls, saved-voice enrollment (recording to enrollment and Save), History playback, export and delete, the seed pin, the Settings model download route, and batch cancel. Each lane asserts real persisted state (History rows, files) and restores user data; no hidden markers or seeded state. Validated only by an explicitly requested `scripts/ui_test.sh macos <lane>` run.
 
-- **`AV-14`** (planned) — re-baseline the benchmark harness under the standard RTF definition (consent-bound runs).
+- **`AV-14`** (in-flight) — re-baseline the benchmark harness under the standard RTF definition (consent-bound runs).
   gate: After the 2026-09-12 harness fixes: (1) run `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` and re-save `benchmarks/baselines/mac-gate-bench.json` from a three-take run so it carries `rtfDefinition`, `rtfMAD`, n=3 and the host OS/Xcode identity; (2) one canonical `scripts/ui_test.sh macos benchmark` and one `scripts/ui_test.sh ios benchmark` run publish the first records with `run.rtfDefinition`, validate the provenance-bound optimization label, the iOS cell-length check and the sleep hold; (3) one macOS and one iOS `perf` run re-derive the warn-only thresholds under the clipped window arithmetic and the macOS environment row; (4) repin `scripts/generate_readme_charts.py` and the website chart to the new canonical macOS record. (5) one macOS `scripts/macos_test.sh lang-bench --subset quick` run publishes the first whisper-verified (`focused`, single-family) macOS language record and exercises the producer on generated audio under the host-quiet preflight. Each run needs explicit consent (model download, phone).
 
 ## Delivery instruction quality and Qwen3-TTS prompting
@@ -321,6 +323,64 @@ Narrative authority: [`docs/reference/ios-ui-reference.md`](reference/ios-ui-ref
 
 - **`ISU-5`** (in-flight) — AX-XXXL reachability: cap the tab dock's Dynamic Type growth, restore the switch role and adapt the App Language rows.
   gate: Physical iPhone English/French AX-XXXL and pseudo-localization Settings walks reach and mutate App Language with the existing identifiers; VoiceOver announces the accessibility toggles as switches; no new identifiers or copy.
+
+## Development machinery: follow-ups from the September 12–13 validation campaign
+
+`machinery-validation-follow-ups-2026-09` · **active** · release-qa · adopted 2026-09-13
+
+Close the gaps the validation campaign measured but did not fix: CI's macOS cache that restores yet recompiles, the optimized CLI sharing the -Onone arena locally, dispatch runs cancelling push runs, the Linux contract gate that lets the swift lane shrink, and the two audio-QC findings (the clone short onset burst and a clip-level quality screen).
+
+Narrative authority: [`docs/development-progress.md`](development-progress.md)
+
+| Item | Status | Title | Blocked by |
+| --- | --- | --- | --- |
+| `MV-01` | planned | macOS push CI restores its weekly DerivedData cache and still recompiles the package graph | — |
+| `MV-02` | planned | The optimized CLI shares the -Onone macOS arena locally | — |
+| `MV-03` | planned | A manual ci.yml dispatch cancels the in-flight push run | — |
+| `MV-04` | planned | Run the deterministic contract gate on Linux so the swift lane routes on compile inputs only | — |
+| `MV-05` | planned | Short clone takes open with a burst the audio QC cannot judge | — |
+| `MV-06` | planned | A clip-level non-intrusive quality screen as a second machine judge | — |
+
+### Open items in detail
+
+- **`MV-01`** (planned) — macOS push CI restores its weekly DerivedData cache and still recompiles the package graph.
+  gate: The warm macOS lane's deterministic-tests step compiles fewer than 100 Swift files after an exact cache hit, or the cache is replaced by a mechanism that survives the round trip (content-addressed compilation cache).
+
+- **`MV-02`** (planned) — The optimized CLI shares the -Onone macOS arena locally.
+  gate: A gate bench or lang-bench run followed by scripts/macos_test.sh test does not recompile the package graph; the optimized CLI builds into a registered arena of its own and the build receipt path follows.
+
+- **`MV-03`** (planned) — A manual ci.yml dispatch cancels the in-flight push run.
+  gate: concurrency.group keys on the event name as well as the ref, so a measurement dispatch never supersedes the gate run for a commit; a dispatch and a push on the same commit both finish.
+
+- **`MV-04`** (planned) — Run the deterministic contract gate on Linux so the swift lane routes on compile inputs only.
+  gate: scripts/check_project_inputs.sh runs in the ubuntu contracts job (product contracts, invariants, privacy scan, roadmap validator) and scripts/ci/classify_changes.py's swift rule shrinks to Sources, Tests, project.yml, package manifests, xcode-schemes and benchmark evidence.
+
+- **`MV-05`** (planned) — Short clone takes open with a burst the audio QC cannot judge.
+  gate: Either the generator no longer produces the onset burst on the clone short cell, or the QC carries a validated perceptual judgement of it; in both cases the reproduction below passes a machine gate without listening.
+
+- **`MV-06`** (planned) — A clip-level non-intrusive quality screen as a second machine judge.
+  gate: A pinned, reference-free speech-quality model (NISQA v2 or an MLX port) scores every published take in the delivery-analysis cascade with a corpus-calibrated warn floor; weights and runtime pinned by digest in config/toolchain.json; no listening in the loop.
+
+## Played-audio capture evidence for the macOS benchmark lane
+
+`playback-capture-evidence-2026-09` · **active** · release-qa · adopted 2026-09-13
+
+Capture what the Vocello app actually renders during each UI benchmark take through an Apple Core Audio process tap (muted physical output), compare it with the published take WAV and record the listener-side metrics (audible first sample, alignment, residual, dropouts, coverage, step bursts) as warn-only evidence; promote thresholds to a gate once a corpus exists. Maintainer decisions of September 13: process tap, mute during lanes, evidence first, benchmark lane only.
+
+Narrative authority: [`docs/development-progress.md`](development-progress.md)
+
+| Item | Status | Title | Blocked by |
+| --- | --- | --- | --- |
+| `PC-01` | planned | Capture and compare what the app plays during every macOS benchmark take | — |
+| `PC-02` | planned | Promote the played-audio comparison from warnings to a gate | `PC-01` |
+
+### Open items in detail
+
+- **`PC-01`** (planned) — Capture and compare what the app plays during every macOS benchmark take.
+  gate: scripts/ui_test.sh macos benchmark produces $out/playback-capture/{capture-run.json, take-NN-<cell>.wav/.json, summary.json}; every take of a captured run carries playbackCaptureStatus, playbackCaptureDigest and the seven playbackCapture* metrics, warn-only codes on take.warnings; the lane still passes when the tap is unavailable; scripts/tests/test_playback_capture.py and the Swift support tests pass; the physical output stays silent while a take is tapped.
+
+- **`PC-02`** (planned) — Promote the played-audio comparison from warnings to a gate.
+  gate: Thresholds for alignment, residual, dropouts and coverage are set from at least three canonical captured runs and a failing comparison fails the lane; the smoke lane captures too.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

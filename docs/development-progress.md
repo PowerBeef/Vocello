@@ -17,6 +17,76 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Machinery validation (September 12 to 13)
+
+The maintainer asked to prove that the refreshed development machinery works as intended and
+optimally. Three read-only investigations set the baseline (mechanism checklist over the 41
+commits, CI step timings of the previous 36 hours, local readiness), then a five-phase campaign
+repaired what they found and ran every lane once with timings. The full ledger of commands, exit
+codes and verdict lines is the session's campaign log; this section keeps the outcomes.
+
+**Repairs before measuring (`22ab4c42`…`643891b8`).** Push CI routes only its own inputs
+(`ci.yml`, `.github/actions/**`, the classifier) to every native lane, the website base advances
+when the lane is skipped inside a green run, and inert paths route nowhere; the DerivedData caches
+are keyed by ISO week and saved only on an exact miss with the package checkout in its own entry;
+the iOS lane compiles at `-Onone`; every `-Onone` build in the macOS arena shares one settings set;
+`config/toolchain.json` pins numpy 2.4.6 like the whisper adapter; the hook wiring, the single test
+root and `scripts/lib/shared.sh` have tests. Phase 1 evidence: 1473 Python tests in 87 s,
+`scripts/dev.sh ci` in 318 s, every negative probe and scratch-mirror probe behaved as claimed.
+
+**Defects the heavy lanes exposed, all fixed the same day.** `Duration.seconds` divided attoseconds
+by 1e15, so every CLI-side wall figure since the RTF commit carried its fraction ×1000 (`6ab8c461`,
+with `TimingExtensionsTests`); the gate bench judged its single cold take and mapped an invalid
+baseline to "REGRESSION" (`b1824091`); the sampled footprint peak swings by hundreds of MB between
+identical runs, so it now uses the baseline's own dispersion like `rtf` (`b88d6d03`); the language
+publisher rejected mixed-language runs on the per-row decode digest (`acba7581`); the history
+validator had never met a negative-control take with metrics (`5ca95a73`); it demanded an RTF
+declaration from kinds that publish no RTF (`ee97e92c`); the shell lint failed on forty
+pre-existing warnings (`a24cc3f8`); a flaky replay assertion expected an empty cache that MLX refills from its
+scheduler thread (`5619004c`); a stale owned-package inventory and a stale chart pin each cost one
+red push. Gate bench, language, UI benchmark and perf lanes each needed two to four runs to reach a
+clean PASS; no lane was retried without a code change.
+
+**Records published (all schema 3, clean tree, receipt-bound `-O`, `run.rtfDefinition`).**
+Gate bench `mac-gate-bench-20260912-234613-c8f8a8c6`; language
+`mac-lang-bench-20260913-000655-546b90cf` and `…-180416-c86db379` (whisper producer 851 / 852 MB
+peak RSS, clean exit, no swap growth: AV-08's macOS host runs); UI benchmark
+`macos-xcui-benchmark-20260913-170946-488a9ed0` and `…-181112-6cb80773`; CLI Speed matrix
+`macos-engine-20260913-180702-42b26142`; perf `macos-xcui-perf-20260913-174907-79e014f2`. The
+README and website charts pin the newest canonical UI record (Built-in Voice 0.71/0.59/0.57, Voice
+Design 0.65/0.56/0.53, Voice Cloning 0.75/0.61/0.55 for short/medium/long). TSan passed cold locally
+in 144 s and in the nightly in 386 s (was 646 s); smoke and localization lanes passed.
+
+**CLI versus UI, same host, back to back.** Engine-measured RTF agrees within 0.04 per cell across
+the two drivers. The UI adds 60 to 120 ms to the first chunk through XPC and about 0.3 to the
+submit-to-completed span divided by audio on short scripts, nothing on long ones: a fixed
+per-request latency, not a throughput loss. Footprints sit within run-to-run noise.
+
+**CI before and after.** Push macOS lane 738 to 1100 s before; 501 to 582 s warm after (contract
+gate 55 to 78 s, deterministic tests 332 to 419 s, CLI identity 28 to 48 s, restore 45 to 68 s); cold
+dispatch 911 s. iOS 433 to 478 s before; 120 to 167 s warm after (compile 83 to 120 s at `-Onone`),
+325 to 359 s cold. Python 208 s before, 102 to 109 s after on pushes. The store holds one weekly
+entry per platform plus the package checkout (7.6 GiB after deleting the per-commit entries). The
+warm macOS test step still recompiles the package graph after an exact cache hit (927 Swift files,
+"Base directory status changed. Regenerating..."): follow-up MV-01. A manual dispatch cancels the
+in-flight push run on the same ref: MV-03.
+
+**Audio QC blind spot (September 13).** The maintainer heard the cloned voice break for the first
+moments of the UI benchmark; every gate had passed the takes. Direct measurement found a 20 ms
+burst of quarter-scale steps at the "tr" onset of eight of nine short clone takes across the UI runs
+and the headless CLI matrix, seed-dependent and more frequent for consecutive in-process takes;
+not the first streamed chunk seam, not the limiter, not the Article 50 mark (seeded on/off onsets
+identical). Telemetry showed no underruns and the QC's click counter only sees steps the slew
+limiter clamps. `0f16f35c` makes every take record `stepBurstPeakCount` and `stepBurstPeakStartMS`;
+the perceptual judgement still needs a corpus (NISQA rates the affected takes no worse than clean
+ones): MV-05 holds the reproduction, MV-06 the clip-level screen. The maintainer's rule stands: the
+QC harness exists so nobody has to listen; the next step is PC-01, a Core Audio process tap in the
+UI benchmark lane that captures what the app actually plays, mutes the physical output, and
+compares the played audio with the published WAV.
+
+**Deferred.** The iPhone lanes (AV-14's iOS halves, AV-08's two-family record): CoreDevice reported
+the paired phone unavailable and `ui_test.sh ios benchmark` aborted before its build as designed.
+
 ### Documentation currency pass (September 12)
 
 After the workflow rebuild the maintainer asked whether the documentation, READMEs, rules and

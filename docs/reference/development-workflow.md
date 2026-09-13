@@ -93,9 +93,9 @@ it does not slow every push.
 | --- | --- | --- | --- |
 | `changes` | ubuntu | always | seconds |
 | `contracts` | ubuntu | always | about 1 min: action pins, invariants, privacy scan, roadmap |
-| `python` | ubuntu | Python or workflow paths | 2 to 3 min: product and tooling tests; research tests when routed |
-| `macos-tests` | macos-26 | Swift, config, scripts or workflow paths | cached DerivedData; contract gate (darwin-only Python), macOS bundles, CLI identity |
-| `ios-compile` | macos-26 | iOS-relevant paths | cached DerivedData; `build_foundation_targets.sh ios --incremental` |
+| `python` | ubuntu | Python paths, contracts, workflow files | 3 to 4 min: product and tooling tests; research tests when routed |
+| `macos-tests` | macos-26 | Swift, config, scripts and benchmark evidence | cached DerivedData; contract gate (darwin-only Python), macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s) |
+| `ios-compile` | macos-26 | iOS compile inputs | cached DerivedData; `build_foundation_targets.sh ios --incremental` at `-Onone` (`QVOICE_FOUNDATION_SWIFT_OPTIMIZATION`) |
 | `website` | ubuntu | `website/` | about 4 min |
 | `dependency-submission` | ubuntu | push only (skipped on dispatch) | seconds: `scripts/swift_dependency_snapshot.py` submitted to the GitHub dependency graph; needed by `CI required` |
 | `CI required` | ubuntu | always | the branch-protection context; skipped lanes count as passed |
@@ -111,9 +111,15 @@ lane by routing, and it runs the whole Python suite inside the gate in one proce
 into `-m "not research and not darwin_only"` plus an optional `-m research` on Linux and
 `--python darwin-only` in the macOS job.
 
-Caches are keyed on the toolchain and dependency graph and saved after every run on `main`;
-`scripts/ci/restore_mtimes.py` gives tracked files their commit mtimes so Xcode's task signatures hit.
-Dispatch with `cold: true` to skip the restore. `nightly.yml` (04:00 UTC and on dispatch) runs the TSan
+Only push CI's own inputs (`.github/workflows/ci.yml`, `.github/actions/**`,
+`scripts/ci/classify_changes.py`) force the three native lanes; the other workflow files route to the
+Python lane, whose supply-chain tests check their pins. A lane skipped inside a green run advances
+that lane's base, so a rarely-run lane never drags the others back. Caches are keyed
+`<platform>-xcode<version>-<dependency graph>-<ISO week>` and saved only on an exact miss, so the
+first run of each week (or of a new dependency graph) pays one save and the store holds at most a
+couple of generations per platform; the shared package checkout has its own cache keyed on the two
+`Package.resolved` digests. `scripts/ci/restore_mtimes.py` gives tracked files their commit mtimes so
+Xcode's task signatures hit. Dispatch with `cold: true` to skip the restore. `nightly.yml` (04:00 UTC and on dispatch) runs the TSan
 subset (`tsan`), the complete Python suite (`python-full`) and cold compiles of both platforms
 (`foundation-cold`, which also compiles the macOS app optimized with warnings as errors); a failure
 keeps one open issue labelled `nightly`, titled "Nightly lane failing", commenting on it rather than

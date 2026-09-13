@@ -934,6 +934,14 @@ struct PCM16StreamLimiter: Sendable {
         // Absolute sample index of the first input sample whose magnitude exceeds
         // the digital unit range (|x| > 1). nil when no clip was observed.
         var firstClipSample: Int? = nil
+        // Densest cluster of large sample-to-sample output steps
+        // (|Δ| > stepBurstStepThreshold) inside one stepBurstWindowSamples
+        // window: its count and the absolute index of the window's first step.
+        // Observational (2026-09-13): an onset or seam transient this short
+        // moves none of the whole-clip statistics, and the click counter only
+        // sees steps the slew limiter had to clamp.
+        var stepBurstPeakCount = 0
+        var stepBurstPeakStartSample: Int? = nil
 
         private static func partsPerMillion(_ value: Float) -> Int {
             Int((Double(value) * 1_000_000).rounded())
@@ -943,6 +951,11 @@ struct PCM16StreamLimiter: Sendable {
     static let ceiling: Float = 0.965
     static let maxSingleSampleStep: Float = 0.42
     static let releaseStepPerSample: Float = 0.002
+    /// A sample-to-sample output step this large counts toward the step-burst
+    /// measurement (a quarter of full scale; well below the slew clamp).
+    static let stepBurstStepThreshold: Float = 0.25
+    /// Step-burst window: 20 ms at the engine's fixed 24 kHz output rate.
+    static let stepBurstWindowSamples = 480
     /// Below this absolute input magnitude a sample counts as silence for
     /// interior-dropout detection.
     static let silenceFloor: Float = 0.001
@@ -956,6 +969,9 @@ struct PCM16StreamLimiter: Sendable {
 
     private var currentGain: Float = 1
     private var previousOutput: Float?
+    // Absolute indices of the large output steps inside the trailing
+    // step-burst window (bounded by the window length).
+    private var recentLargeStepSamples: [Int] = []
     // Cross-`append` silence-run state (a dropout can span chunk boundaries).
     private var sawAudio = false
     private var currentSilentRun = 0
@@ -972,6 +988,7 @@ struct PCM16StreamLimiter: Sendable {
         var localSawAudio = sawAudio
         var localSilentRun = currentSilentRun
         var localSilentRunStart = currentSilentRunStartSample
+        var localRecentSteps = recentLargeStepSamples
 
         samples.withUnsafeBufferPointer { buffer in
             guard let base = buffer.baseAddress else { return }
@@ -1042,6 +1059,17 @@ struct PCM16StreamLimiter: Sendable {
                 var limited = sample * localGain
                 if let localPreviousOutput {
                     let delta = limited - localPreviousOutput
+                    if abs(delta) > Self.stepBurstStepThreshold {
+                        localRecentSteps.append(absoluteIndex)
+                        let windowStart = absoluteIndex - Self.stepBurstWindowSamples + 1
+                        while let first = localRecentSteps.first, first < windowStart {
+                            localRecentSteps.removeFirst()
+                        }
+                        if localRecentSteps.count > localMetrics.stepBurstPeakCount {
+                            localMetrics.stepBurstPeakCount = localRecentSteps.count
+                            localMetrics.stepBurstPeakStartSample = localRecentSteps.first
+                        }
+                    }
                     if delta > Self.maxSingleSampleStep {
                         limited = localPreviousOutput + Self.maxSingleSampleStep
                         localMetrics.slewLimitedSamples += 1
@@ -1065,6 +1093,7 @@ struct PCM16StreamLimiter: Sendable {
         sawAudio = localSawAudio
         currentSilentRun = localSilentRun
         currentSilentRunStartSample = localSilentRunStart
+        recentLargeStepSamples = localRecentSteps
         localMetrics.trailingSilentRunSamples = localSilentRun
         localMetrics.trailingSilentRunStartSample = localSilentRunStart
         metrics = localMetrics
@@ -2845,6 +2874,10 @@ struct StreamingExecutionContext: Sendable {
             nonFiniteSamples: metrics.nonFiniteSamples,
             clickEvents: clicks,
             longestSilenceMS: longestSilenceMS,
+            stepBurstPeakCount: metrics.stepBurstPeakCount,
+            stepBurstPeakStartMS: sampleRate > 0
+                ? metrics.stepBurstPeakStartSample.map { Int(Double($0) * 1000 / Double(sampleRate)) }
+                : nil,
             durationSeconds: durationSeconds,
             firstNonFiniteSample: metrics.firstNonFiniteSample,
             firstClipSample: metrics.firstClipSample,

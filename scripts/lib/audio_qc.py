@@ -29,6 +29,10 @@ QC_METRIC_MAP = (
     ("nonFiniteSamples", "nonFiniteCount"),
     ("longestSilenceMS", "longestSilenceMS"),
     ("dcOffset", "dcOffset"),
+    # Since 2026-09-13: densest 20 ms cluster of large output steps and where it
+    # starts; absent on older rows.
+    ("stepBurstPeakCount", "stepBurstPeakCount"),
+    ("stepBurstPeakStartMS", "stepBurstPeakStartMS"),
 )
 VERDICT_KEYS = ("verdict", "instabilityVerdict", "writtenOutputVerdict")
 VERDICT_RANK = {"pass": 0, "warn": 1, "fail": 2}

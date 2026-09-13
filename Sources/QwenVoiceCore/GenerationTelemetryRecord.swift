@@ -1078,6 +1078,12 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
     public let clickEvents: Int
     /// Longest interior near-silent run (mid-utterance dropout), in milliseconds.
     public let longestSilenceMS: Int
+    /// Densest 20 ms cluster of large output steps (> a quarter of full scale)
+    /// and its start; a short onset or seam transient the whole-clip statistics
+    /// and the slew-clamp click counter both miss. Observational since
+    /// 2026-09-13 (0 / nil on older rows).
+    public let stepBurstPeakCount: Int
+    public let stepBurstPeakStartMS: Int?
     /// Absolute sample index of the first non-finite sample, or nil if none.
     public let firstNonFiniteSample: Int?
     /// Absolute sample index of the first sample outside the digital unit range,
@@ -1109,6 +1115,8 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         nonFiniteSamples: Int,
         clickEvents: Int,
         longestSilenceMS: Int,
+        stepBurstPeakCount: Int = 0,
+        stepBurstPeakStartMS: Int? = nil,
         durationSeconds: Double,
         firstNonFiniteSample: Int? = nil,
         firstClipSample: Int? = nil,
@@ -1131,6 +1139,8 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         self.nonFiniteSamples = nonFiniteSamples
         self.clickEvents = clickEvents
         self.longestSilenceMS = longestSilenceMS
+        self.stepBurstPeakCount = stepBurstPeakCount
+        self.stepBurstPeakStartMS = stepBurstPeakStartMS
         self.durationSeconds = durationSeconds
         self.firstNonFiniteSample = firstNonFiniteSample
         self.firstClipSample = firstClipSample
@@ -1158,6 +1168,8 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         self.nonFiniteSamples = try container.decode(Int.self, forKey: .nonFiniteSamples)
         self.clickEvents = try container.decode(Int.self, forKey: .clickEvents)
         self.longestSilenceMS = try container.decode(Int.self, forKey: .longestSilenceMS)
+        self.stepBurstPeakCount = try container.decodeIfPresent(Int.self, forKey: .stepBurstPeakCount) ?? 0
+        self.stepBurstPeakStartMS = try container.decodeIfPresent(Int.self, forKey: .stepBurstPeakStartMS)
         self.durationSeconds = try container.decode(Double.self, forKey: .durationSeconds)
         self.firstNonFiniteSample = try container.decodeIfPresent(Int.self, forKey: .firstNonFiniteSample)
         self.firstClipSample = try container.decodeIfPresent(Int.self, forKey: .firstClipSample)

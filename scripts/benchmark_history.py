@@ -395,7 +395,7 @@ METRIC_KEYS = {
     "rtfRegressionPercent", "ttfcRegressionPercent", "f0MeanHz", "f0StdHz",
     "f0TurningPointsPerSecond", "syllableRateHz", "localRateCV", "maximumPauseSeconds",
     "pauseSpeechRatio", "energyEnvelopeRoughness", "discontinuityCount", "clipCount",
-    "nonFiniteCount", "dcOffset", "longestSilenceMS",
+    "nonFiniteCount", "dcOffset", "longestSilenceMS", "stepBurstPeakCount", "stepBurstPeakStartMS",
     "goodClipCount", "badClipCount", "targetFalsePositiveRate",
     "observedFalsePositiveRate", "observedTruePositiveRate", "goodFlagRate", "badFlagRate",
     "monotoneF0StdThresholdHz", "monotoneTurningPointsThresholdPerSecond",

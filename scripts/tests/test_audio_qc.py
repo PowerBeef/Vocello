@@ -82,3 +82,13 @@ class AudioQCTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StepBurstMetricTests(unittest.TestCase):
+    def test_qc_metrics_carry_the_step_burst_when_present_and_tolerate_its_absence(self) -> None:
+        new = {"clickEvents": 0, "clippedSamples": 0, "nonFiniteSamples": 0, "longestSilenceMS": 0,
+               "dcOffset": 0.0, "stepBurstPeakCount": 31, "stepBurstPeakStartMS": 166}
+        metrics = audio_qc.qc_metrics(new)
+        self.assertEqual((metrics["stepBurstPeakCount"], metrics["stepBurstPeakStartMS"]), (31, 166))
+        legacy = {k: v for k, v in new.items() if not k.startswith("stepBurst")}
+        self.assertNotIn("stepBurstPeakCount", audio_qc.qc_metrics(legacy))

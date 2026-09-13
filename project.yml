@@ -637,7 +637,7 @@ targets:
     info:
       path: Tests/VocelloMacUITests/Info.plist
       properties:
-        NSAudioCaptureUsageDescription: "The Vocello UI benchmark records the app's own rendered audio as evidence."
+        NSAudioCaptureUsageDescription: "The Vocello UI benchmark records the audio the app renders, as evidence."
 
   # Explicit physical-device iPhone UI automation. Simulator destinations are
   # unsupported; scripts/ui_test.sh resolves and signs for the paired phone.

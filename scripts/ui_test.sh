@@ -10,6 +10,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT_DIR/scripts/lib/host_preflight.sh"
 . "$ROOT_DIR/scripts/lib/shared.sh"
 . "$ROOT_DIR/scripts/lib/required_steps.sh"
+. "$ROOT_DIR/scripts/lib/dev_signing.sh"
 PROJECT="$ROOT_DIR/QwenVoice.xcodeproj"
 MAC_DERIVED="$QVOICE_XCODE_MACOS_DERIVED"
 IOS_DERIVED="$QVOICE_XCODE_IOS_DERIVED"
@@ -479,27 +480,42 @@ export_attachments() {
 # match an existing row, so a prompt can still appear despite a decided row.
 # That path is only reachable when the virtual-microphone fixture is broken;
 # the smoke suite asserts the fixture explicitly.
-# Played-audio capture (PC-01): Xcode generates VocelloMacUITests-Runner.app
-# from its XCTRunner template with its own Info.plist, and TCC judges that
-# process, so the audio-capture usage string declared on the test bundle is
-# added to the runner after build-for-testing and the runner is re-signed the
-# way the lane signs everything (ad hoc). Idempotent; never fails the lane.
-ensure_runner_audio_capture_usage() {
+# Played-audio capture (PC-01). Xcode signs the generated XCTRunner app with
+# the App Sandbox on, which blocks both the process tap and every write under
+# build/artifacts (the coordinator's files silently never appear). The lane
+# therefore adds the usage string and re-signs the runner without entitlements,
+# using the stable Apple Development identity when the keychain has one so the
+# System Audio Recording grant's designated requirement survives rebuilds; an
+# ad-hoc signature binds that grant to one code hash and every rebuild of the
+# test bundle voids it. Creating a process tap never prompts on macOS 26, so
+# the grant is added by hand once (docs/reference/macos-permissions.md).
+prepare_runner_for_playback_capture() {
   local runner="$MAC_DERIVED/Build/Products/Release/VocelloMacUITests-Runner.app"
   local plist="$runner/Contents/Info.plist"
-  local usage="The Vocello UI benchmark records the app's own rendered audio as evidence."
+  local usage="The Vocello UI benchmark records the audio the app renders, as evidence."
   if [[ ! -f "$plist" ]]; then
-    warn "runner Info.plist not found; playback capture cannot prompt for System Audio Recording"
+    warn "runner Info.plist not found; playback capture evidence will be unavailable"
     return 0
   fi
-  if /usr/libexec/PlistBuddy -c "Print :NSAudioCaptureUsageDescription" "$plist" >/dev/null 2>&1; then
-    return 0
-  fi
-  if /usr/libexec/PlistBuddy -c "Add :NSAudioCaptureUsageDescription string $usage" "$plist" \
-      && codesign --force --sign - "$runner" >/dev/null 2>&1; then
-    note "runner Info.plist: added NSAudioCaptureUsageDescription and re-signed ad hoc"
-  else
+  if ! /usr/libexec/PlistBuddy -c "Print :NSAudioCaptureUsageDescription" "$plist" >/dev/null 2>&1 \
+      && ! /usr/libexec/PlistBuddy -c "Add :NSAudioCaptureUsageDescription string \"$usage\"" "$plist"; then
     warn "could not add the audio-capture usage string to the runner; playback capture evidence will be unavailable"
+    return 0
+  fi
+  local identity
+  identity="$(resolve_dev_signing_identity)"
+  if ! codesign --force --sign "$identity" "$runner" >/dev/null 2>&1; then
+    warn "could not re-sign the UI test runner; playback capture evidence will be unavailable"
+    return 0
+  fi
+  if codesign -d --entitlements - "$runner" 2>/dev/null | grep -q 'com.apple.security.app-sandbox'; then
+    warn "UI test runner is still sandboxed after re-signing; playback capture evidence will be unavailable"
+    return 0
+  fi
+  if [[ "$identity" == "-" ]]; then
+    note "runner re-signed ad hoc (no Apple Development identity): the System Audio Recording grant binds to this build's code hash and must be redone after every rebuild"
+  else
+    note "runner re-signed with '$identity' (sandbox off): the System Audio Recording grant follows the identity across rebuilds"
   fi
 }
 
@@ -526,7 +542,7 @@ mac_ui_preflight() {
         2>/dev/null)"; then
       note "ui-preflight: TCC database unreadable (no Full Disk Access) — cannot verify kTCCServiceAudioCapture"
     elif [[ -z "$rows" ]]; then
-      warn "ui-preflight: no System Audio Recording decision for com.qwenvoice.app.uitests.xctrunner — the first capture prompts once; until granted, playback capture evidence is unavailable (docs/reference/macos-permissions.md)"
+      warn "ui-preflight: no System Audio Recording decision for com.qwenvoice.app.uitests.xctrunner — a process tap never prompts; add the runner once by hand or playback capture evidence stays unavailable (docs/reference/macos-permissions.md)"
     fi
   fi
   return 0
@@ -1393,7 +1409,7 @@ WAV
       || die "macOS UI build-for-testing failed (see $out/xcodebuild.log)"
     printf '%s\n' "$mac_fingerprint" >"$mac_build_marker"
   fi
-  [[ "$lane" != "benchmark" ]] || ensure_runner_audio_capture_usage
+  [[ "$lane" != "benchmark" ]] || prepare_runner_for_playback_capture
   arm_mac_crash_marker
   required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test-without-building \
     -project "$PROJECT" -scheme VocelloMacUI -configuration Release \

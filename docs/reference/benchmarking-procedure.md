@@ -532,9 +532,11 @@ complete without its matching deterministic History/WAV assertion.
 
 **Played-audio capture.** The runner taps the app's own output for every take through a Core Audio
 process tap (`mutedWhenTapped`), so the speakers stay silent while a take is captured; the tap's
-destruction restores audible output. The first run prompts once for **System Audio Recording** for
-`VocelloMacUITests-Runner` (bundle id `com.qwenvoice.app.uitests.xctrunner`); until granted, the lane passes
-and every take's `playbackCaptureStatus` is `unavailable`. Artifacts land under
+destruction restores audible output. The runner (`com.qwenvoice.app.uitests.xctrunner`, re-signed
+unsandboxed by the lane) needs one manual **System Audio Recording** grant, added in System Settings
+after the first lane run because a process tap never prompts (see
+[`macos-permissions.md`](macos-permissions.md)); until granted, the lane passes and every take's
+`playbackCaptureStatus` is `unavailable` or `silent`. Artifacts land under
 `<run-artifact-dir>/playback-capture/` (`capture-run.json`, `take-NN-<cell>.wav` and `.json`,
 `summary.json`); the WAVs stay untracked and only their digests enter the record. The metrics and
 warn codes are listed in [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md).

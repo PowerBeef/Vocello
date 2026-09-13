@@ -58,9 +58,17 @@ the recurring permission pain.
   `scripts/permissions_doctor.sh --reset-tcc` (then grant on next launch).
 - **System Audio Recording for the UI test runner.** `scripts/ui_test.sh macos benchmark` taps the
   app's own audio output from `VocelloMacUITests-Runner` (`com.qwenvoice.app.uitests.xctrunner`, usage
-  string in `project.yml`); macOS prompts once for that runner. Deny or never answer and the lane
-  still passes with `playbackCaptureStatus: unavailable` on every take. Reset with
-  `tccutil reset AudioCapture com.qwenvoice.app.uitests.xctrunner`.
+  string in `project.yml`). Xcode signs that runner sandboxed, which would block the tap and the
+  capture files, so the lane re-signs it without entitlements after the build, with the same
+  Apple Development identity `build.sh` uses (ad hoc only when none is installed). Creating a
+  process tap never prompts on macOS 26: an ungranted runner simply receives silence. Add the
+  runner once by hand under System Settings → Privacy & Security → Screen & System Audio Recording
+  → *System Audio Recording Only* (plus button, Cmd+Shift+G,
+  `build/cache/xcode/macos/Build/Products/Release/VocelloMacUITests-Runner.app`; the pane asks for
+  the login password) **after** a benchmark lane has re-signed it. An identity-signed grant survives
+  rebuilds; an ad-hoc one binds to a single code hash and needs redoing after every rebuild.
+  Ungranted, the lane still passes with `playbackCaptureStatus: unavailable` or `silent` on every
+  take. Reset with `tccutil reset AudioCapture com.qwenvoice.app.uitests.xctrunner`.
 - **UI-lane builds are ad-hoc signed** (`scripts/ui_test.sh` builds with
   `CODE_SIGN_IDENTITY="-"`), so they never match the dev identity's TCC grant: any *real*
   microphone request from a lane-built app prompts fresh, and answering it re-keys the row to that

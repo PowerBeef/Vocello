@@ -19,6 +19,6 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>The Vocello UI benchmark records the app's own rendered audio as evidence.</string>
+	<string>The Vocello UI benchmark records the audio the app renders, as evidence.</string>
 </dict>
 </plist>

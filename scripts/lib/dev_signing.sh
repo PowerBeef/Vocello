@@ -13,8 +13,9 @@
 #   2. first "Apple Development: …" identity in the keychain
 #   3. "-" (ad-hoc) with a warning that TCC grants will not survive rebuilds
 #
-# Sourced by scripts/build.sh only — release.sh has its own signing flow and
-# re-signs every component from scratch, so nothing dev-signed can ship.
+# Sourced by scripts/build.sh and scripts/ui_test.sh (the benchmark lane re-signs
+# the XCTest runner with the same identity) — release.sh has its own signing flow
+# and re-signs every component from scratch, so nothing dev-signed can ship.
 
 # shellcheck shell=bash
 

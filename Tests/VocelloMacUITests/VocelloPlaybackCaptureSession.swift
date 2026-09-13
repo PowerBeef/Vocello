@@ -420,8 +420,14 @@ final class VocelloPlaybackCaptureCoordinator {
             "unavailableReason": unavailableReason ?? "",
             "createdAt": ISO8601DateFormatter().string(from: Date()),
         ]
-        if let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys, .prettyPrinted]) {
-            try? data.write(to: directory.appendingPathComponent("capture-run.json"), options: .atomic)
+        do {
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys, .prettyPrinted])
+            try data.write(to: directory.appendingPathComponent("capture-run.json"), options: .atomic)
+        } catch {
+            // A sandboxed runner cannot write here; say so in the xcodebuild log
+            // because no sidecar can carry the reason either.
+            print("VOCELLO_PLAYBACK_CAPTURE: capture-run.json not written: \(error.localizedDescription)")
+            unavailableReason = unavailableReason ?? "capture directory not writable: \(error.localizedDescription)"
         }
     }
 

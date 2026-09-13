@@ -216,6 +216,12 @@ trend percentages carry their direction in words.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-12 | [`macos-engine-20260712-204208-0cb5705c`](runs/engine-generation/macos-engine-20260712-204208-0cb5705c.json) | focused | exploratory | passed | memory-contract-incomplete | 2 | ~1.79 | `1ef1669326b5` dirty | `excluded` | baseline | telemetry-v7-cli-focused |
 
+## engine-generation / macos / mac-mini-m2-8gb / config `26cd3311c1a3`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-13 | [`macos-engine-20260913-180702-42b26142`](runs/engine-generation/macos-engine-20260913-180702-42b26142.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | 0.60 | `600a6f087bb4` | `26cd3311c1a3` | baseline | av14-cli-speed-1 |
+
 ## engine-generation / macos / mac-mini-m2-8gb / config `27d67c5808ac`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

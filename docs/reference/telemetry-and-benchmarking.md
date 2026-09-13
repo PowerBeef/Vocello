@@ -326,9 +326,22 @@ backend throughput:
 
 Frontend latency is the app row's `submitToFirstChunkMS` and
 `submitToPlaybackScheduledMS`. The latter means the player was commanded with a bounded queued
-buffer; it is **not** proof that acoustic output was audible. Proving audibility would require an
-independent loopback measurement. The engine row's `firstChunk` mark is backend-only, while the
-macOS transport row's `requestToFirstChunkMS` begins at request acceptance.
+buffer; it is **not** proof that acoustic output was audible. The engine row's `firstChunk` mark is
+backend-only, while the macOS transport row's `requestToFirstChunkMS` begins at request acceptance.
+
+**Played-audio capture (PC-01, macOS benchmark lane).** The XCUITest runner taps the app's own audio
+output during every take (a Core Audio process tap with the physical output muted), writes
+`take-NN-<cell>.wav` plus a sidecar under `<run>/playback-capture/`, and
+`scripts/lib/playback_capture.py` compares the capture with the published take WAV. The take then
+carries `playbackCaptureStatus` (`captured`, `silent`, `unavailable`, `referenceUnresolved`,
+`aborted`), `playbackCaptureDigest` and, when captured, `playbackCaptureFirstAudibleMS` (Generate
+click → first frame above −50 dBFS, runner clock), `playbackCaptureAlignmentMS`,
+`playbackCaptureResidualDBFS` (after gain match), `playbackCaptureDropoutCount` /
+`playbackCaptureMaxGapMS` (20 ms frames where the file speaks above −40 dBFS and the capture
+collapses by more than 25 dB), `playbackCaptureCoverage` and `playbackCaptureStepBurstPeakCount`.
+Anomalies are warn-only codes on the take (`playback.capture.misaligned` above 250 ms,
+`.dropouts`, `.low_coverage` below 0.95, `.high_residual` above −20 dBFS, `.silent`); thresholds
+become a gate only once a corpus exists (roadmap PC-02).
 
 ### RTF vs `decode ms` (read together, don't diff naively)
 

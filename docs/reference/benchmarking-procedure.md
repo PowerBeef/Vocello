@@ -505,7 +505,8 @@ python3 scripts/check_macos_xpc_bench.py ~/Library/Application\ Support/QwenVoic
 For the strict contract, use `scripts/ui_test.sh macos benchmark`. Internally it passes the exact
 `--modes`, `--lengths`, `--warm`, and `--label` values plus
 `--evidence-manifest <run-artifact-dir>/benchmark-evidence.json --crash-delta-passed
---build-provenance <run-artifact-dir>/last-build.json`. The build receipt names the app executable
+--build-provenance <run-artifact-dir>/last-build.json --playback-capture-dir
+<run-artifact-dir>/playback-capture --outputs-dir <QwenVoice-Debug>/outputs`. The build receipt names the app executable
 and its digest, and the gate copies its optimization level into `toolchain.optimization` only after
 re-hashing that executable. Never add the crash-delta assertion to a manual command unless the
 caller actually captured and compared the pre/post crash snapshots.
@@ -528,6 +529,15 @@ The test target consumes the canonical matrix and wraps every UI-driven generati
 XCTest activity. The command accepts `--modes`, `--lengths`, `--warm`, and `--label`; without filters
 it runs exactly 29 takes. Cold Custom and Design cells are exact-path relaunches; a cell cannot
 complete without its matching deterministic History/WAV assertion.
+
+**Played-audio capture.** The runner taps the app's own output for every take through a Core Audio
+process tap (`mutedWhenTapped`), so the speakers stay silent while a take is captured; the tap's
+destruction restores audible output. The first run prompts once for **System Audio Recording** for
+`VocelloMacUITests-Runner` (bundle id `com.qwenvoice.app.uitests`); until granted, the lane passes
+and every take's `playbackCaptureStatus` is `unavailable`. Artifacts land under
+`<run-artifact-dir>/playback-capture/` (`capture-run.json`, `take-NN-<cell>.wav` and `.json`,
+`summary.json`); the WAVs stay untracked and only their digests enter the record. The metrics and
+warn codes are listed in [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md).
 
 The benchmark `.xcresult`, smoke result, and seeded telemetry-overhead result are independent.
 For telemetry/backend changes, run the model-dependent overhead parity lane directly when its

@@ -351,7 +351,8 @@ class VocelloMacUITestCase: XCTestCase {
     /// is the visible completion condition.
     func generateAndWaitForCompletion(
         mode: VocelloUIBenchMatrix.Mode,
-        timeout: TimeInterval
+        timeout: TimeInterval,
+        onBeforeGenerate: (() -> Void)? = nil
     ) {
         assertReadyToGenerate(mode: mode)
         let generate = button("textInput_generateButton")
@@ -360,6 +361,9 @@ class VocelloMacUITestCase: XCTestCase {
         let backendError = element("sidebar_backendStatus_error")
         let backendCrash = element("sidebar_backendStatus_crashed")
 
+        // The played-audio capture stamps its submit time here, right before the
+        // genuine click, so first-audible latency is measured on one clock.
+        onBeforeGenerate?()
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: generate, timeout: 30))
         XCTAssertTrue(
             VocelloUIWait.condition("generation to visibly start", timeout: 30) {
@@ -409,6 +413,16 @@ class VocelloMacUITestCase: XCTestCase {
         }
         XCTAssertFalse(backendError.exists, "Generation must not expose a backend error")
         XCTAssertFalse(backendCrash.exists, "Generation must not expose a backend crash")
+    }
+
+    /// Waits until the sidebar player reports it stopped playing (its play/pause
+    /// control exposes "pause" while playing and "play" once done). Returns
+    /// whether the stop was observed within the timeout.
+    func waitForPlaybackToFinish(timeout: TimeInterval) -> Bool {
+        let control = button("sidebarPlayer_playPause")
+        return VocelloUIWait.condition("playback to finish", timeout: timeout) {
+            !control.exists || (control.value as? String) == "play"
+        }
     }
 
     func timeout(for take: VocelloUIBenchMatrix.Take) -> TimeInterval {

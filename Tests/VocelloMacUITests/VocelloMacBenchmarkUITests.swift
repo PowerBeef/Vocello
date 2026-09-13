@@ -45,6 +45,10 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
         // toggle on and restores the user's original value afterwards.
         let autoplayWasEnabled = ensureAutoplayEnabled()
         defer { restoreAutoplayPreference(originallyEnabled: autoplayWasEnabled) }
+        // Played-audio capture (PC-01): armed by scripts/ui_test.sh through
+        // QVOICE_MAC_BENCH_CAPTURE_DIR; absent or failing capture never fails a take.
+        let capture = VocelloPlaybackCaptureCoordinator(environment: processEnvironment, runID: runID)
+        defer { capture?.abort() }
 
         var preparedMode: VocelloUIBenchMatrix.Mode?
         for (offset, take) in takes.enumerated() {
@@ -81,7 +85,23 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
 
             XCTContext.runActivity(named: "Take \(takeIndex): \(take.cellID)") { _ in
                 replaceScript(with: take.text)
-                generateAndWaitForCompletion(mode: take.mode, timeout: timeout(for: take))
+                capture?.beginTake(index: takeIndex, cell: take.cellID, warmState: take.warmState.rawValue)
+                generateAndWaitForCompletion(
+                    mode: take.mode,
+                    timeout: timeout(for: take),
+                    onBeforeGenerate: { capture?.markSubmit() }
+                )
+                if let capture, !capture.isIdle {
+                    // Let the take play out; the tap stops once the captured audio
+                    // itself has been quiet for half a second after the player stopped.
+                    let playbackEnded = waitForPlaybackToFinish(timeout: timeout(for: take))
+                    _ = VocelloUIWait.condition("captured audio to fall silent after playback", timeout: 5) {
+                        capture.capturedAudioIsQuiet(forLast: 0.5)
+                    }
+                    capture.endTake(playbackEnded: playbackEnded)
+                } else {
+                    capture?.endTake(playbackEnded: false)
+                }
 
                 if take.warmState == .cold || offset == 0 || offset == takes.count - 1 {
                     VocelloUIScreenshot.attach(

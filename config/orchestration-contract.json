@@ -436,7 +436,8 @@
       "optionalSteps": [
         "result-retention",
         "ui-preflight",
-        "ui-build"
+        "ui-build",
+        "playback-capture"
       ]
     },
     "ui-macos-smoke": {

@@ -482,6 +482,7 @@ targets:
         buildPhase: resources
       - path: Tests/VocelloCoreTests
       - path: Tests/UIAutomationSupport/VocelloUIInteractionPolicy.swift
+      - path: Tests/UIAutomationSupport/VocelloPlaybackCaptureSupport.swift
       - path: Tests/VocelloiOSLogicTests
       - path: Sources/SharedSupport/Services/AudioPlaybackResumePolicy.swift
       - path: Sources/SharedSupport/Services/LanguageSelectionPresentation.swift
@@ -629,6 +630,9 @@ targets:
         MACOSX_DEPLOYMENT_TARGET: "26.0"
         CODE_SIGN_IDENTITY: "-"
         GENERATE_INFOPLIST_FILE: YES
+        # Played-audio capture (PC-01): the runner taps the app's own output
+        # during benchmark takes; macOS asks once for System Audio Recording.
+        INFOPLIST_KEY_NSAudioCaptureUsageDescription: "The Vocello UI benchmark records the app's own rendered audio as evidence."
         SWIFT_STRICT_CONCURRENCY: complete
 
   # Explicit physical-device iPhone UI automation. Simulator destinations are

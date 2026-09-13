@@ -493,6 +493,18 @@ mac_ui_preflight() {
       warn "ui-preflight: no $svc decision recorded for com.qwenvoice.app — a system permission dialog may appear mid-run; settle it once (docs/reference/macos-permissions.md). Note: an existing row keyed to a different code identity can still prompt for the ad-hoc lane build."
     fi
   done
+  # Played-audio capture (PC-01): the XCUITest runner taps the app's output and
+  # needs one System Audio Recording grant of its own; without it the lane still
+  # passes and every take's capture evidence reads "unavailable".
+  if [[ "$lane" == "benchmark" ]]; then
+    if ! rows="$(sqlite3 -readonly "$tcc_db" \
+        "SELECT auth_value FROM access WHERE service='kTCCServiceAudioCapture' AND client='com.qwenvoice.app.uitests';" \
+        2>/dev/null)"; then
+      note "ui-preflight: TCC database unreadable (no Full Disk Access) — cannot verify kTCCServiceAudioCapture"
+    elif [[ -z "$rows" ]]; then
+      warn "ui-preflight: no System Audio Recording decision for com.qwenvoice.app.uitests — the first capture prompts once; until granted, playback capture evidence is unavailable (docs/reference/macos-permissions.md)"
+    fi
+  fi
   return 0
 }
 
@@ -1072,6 +1084,8 @@ validate_macos_benchmark() {
         --label "${label:-$run_id}" --evidence-manifest "$evidence" \
         --build-provenance "$out/last-build.json" \
         --crash-delta-passed \
+        --playback-capture-dir "$out/playback-capture" \
+        --outputs-dir "$HOME/Library/Application Support/QwenVoice-Debug/outputs" \
         >"$out/benchmark-gate.txt" 2>&1; then
       status=0
       break
@@ -1293,6 +1307,10 @@ elif [[ "$platform" == "macos" ]]; then
     export TEST_RUNNER_QVOICE_MAC_BENCH_LENGTHS="$lengths"
     export TEST_RUNNER_QVOICE_MAC_BENCH_WARM="$warm"
     export TEST_RUNNER_QVOICE_MAC_BENCH_LABEL="${label:-$run_id}"
+    # Played-audio capture (PC-01): the runner taps the app's own output per take
+    # and writes take-NN-<cell>.wav/.json here; absent captures never fail the lane.
+    mkdir -p "$out/playback-capture"
+    export TEST_RUNNER_QVOICE_MAC_BENCH_CAPTURE_DIR="$out/playback-capture"
   fi
 
   note "macOS XCUITest $lane → $out"
@@ -1376,6 +1394,11 @@ WAV
     "scripts/ui_test.sh macos $lane" VocelloMacUI Release \
     "platform=macOS,arch=arm64" arm64 O ad-hoc \
     "$MAC_DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES" "$MAC_APP_EXECUTABLE"
+  # Played-audio capture (PC-01): an optional ledger step that says the runner
+  # armed its tap directory; per-take availability lives in the evidence.
+  if [[ "$lane" == "benchmark" && -f "$out/playback-capture/capture-run.json" ]]; then
+    required_step_record "$step_ledger" playback-capture 0
+  fi
   [[ "$lane" != "benchmark" ]] || required_step_run "$step_ledger" \
     benchmark-validation validate_macos_benchmark \
     || die "macOS benchmark telemetry gate failed"

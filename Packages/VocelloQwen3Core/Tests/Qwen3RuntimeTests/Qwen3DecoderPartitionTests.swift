@@ -126,6 +126,7 @@ final class Qwen3DecoderPartitionTests: XCTestCase {
             let ranges = stride(from: 0, to: 300, by: size).map {
                 Qwen3CodecFrameRange(start: $0, endExclusive: min(300, $0 + size))
             }
+            var unclearedCacheBytes = 0
             for clear in [false, true] {
                 var observations: [CodecReplayMemoryObservation] = []
                 let replay = try Qwen3TTSModel.replayDecoderArm(
@@ -141,8 +142,21 @@ final class Qwen3DecoderPartitionTests: XCTestCase {
                 XCTAssertEqual(observations.last?.stage, .finished)
                 XCTAssertEqual(observations.last?.completedFrames, 300)
                 XCTAssertLessThanOrEqual(observations.count, 36)
-                let cleared = observations.filter { $0.stage == .afterCachePolicy }
-                if clear { XCTAssertTrue(cleared.allSatisfy { $0.cacheBytes == 0 }) }
+                let afterPolicy = observations.filter { $0.stage == .afterCachePolicy }
+                let afterPolicyCacheBytes = afterPolicy.map(\.cacheBytes).max() ?? 0
+                if clear {
+                    // `Memory.clearCache()` runs synchronously, but MLX releases the
+                    // evaluated graph's temporaries on its scheduler thread, so a few
+                    // buffers can re-enter the cache between the clear and the capture
+                    // (CI runs 34663845404 and 34727403360 saw exactly that). The policy
+                    // must still leave far less than the arm accumulates without it.
+                    XCTAssertLessThanOrEqual(
+                        afterPolicyCacheBytes, max(unclearedCacheBytes / 4, 1 << 20),
+                        "cache policy left \(afterPolicyCacheBytes) bytes cached; uncleared arm peaked at \(unclearedCacheBytes)"
+                    )
+                } else {
+                    unclearedCacheBytes = afterPolicyCacheBytes
+                }
                 for row in observations {
                     XCTAssertGreaterThanOrEqual(row.activeBytes, 0)
                     XCTAssertGreaterThanOrEqual(row.cacheBytes, 0)

@@ -2,14 +2,13 @@ import React from "react";
 
 /*
   Measured performance, from the repository's tracked benchmark records:
-  - RTF bars: benchmarks/runs/ui-generation/macos-xcui-benchmark-20260905-012117-0b234262.json
+  - RTF bars: benchmarks/runs/ui-generation/macos-xcui-benchmark-20260913-170946-488a9ed0.json
     (the newest canonical matrix; `python3 scripts/generate_readme_charts.py --check` names the
     newest canonical record and must agree with this pin).
     RTF is the standard real-time factor: seconds of generation per second of audio, lower is
-    faster, below 1.0 audio is produced quicker than it plays. This record predates the 2026-09-12 RTF cutover,
-    so each value is the per-cell median of the take's app submit→completed span ÷ audio
-    seconds (scripts/lib/rtf.py `take_rtf`); a record published after the cutover carries the
-    engine-measured figure directly.
+    faster, below 1.0 audio is produced quicker than it plays. This record was published after the
+    2026-09-12 RTF cutover (`run.rtfDefinition: wall/audio`), so each value is the per-cell median
+    of the engine-measured figure; the optimization label comes from the build receipt.
   - The retired gate chart's pinned A/B pair (…-9b6f267b / …-d02005ae) stays as history in
     benchmarks/HISTORY.md and OPTIMIZATION.md §K; per policy it is never re-promoted to a
     chart. The gate survives as one figcaption sentence below.
@@ -19,9 +18,9 @@ import React from "react";
   single-release billboard.
 */
 const MODES = [
-  { name: "Built-in Voice", tone: "var(--mode-custom)", takes: [0.9, 0.65, 0.6] },
-  { name: "Voice Design", tone: "var(--mode-design)", takes: [0.83, 0.61, 0.57] },
-  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [0.96, 0.66, 0.59] },
+  { name: "Built-in Voice", tone: "var(--mode-custom)", takes: [0.68, 0.6, 0.57] },
+  { name: "Voice Design", tone: "var(--mode-design)", takes: [0.64, 0.56, 0.53] },
+  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [0.77, 0.62, 0.55] },
 ];
 const LENGTHS = ["short", "medium", "long"];
 const RTF_SCALE_MAX = 1.2;

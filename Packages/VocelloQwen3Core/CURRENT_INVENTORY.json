@@ -198,7 +198,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift",
-      "sha256": "36c2a21fe2d76d7faca18634a4941824055b46e90be16788140d4c030d79e388",
+      "sha256": "d760c0b0cbc0a493c3a4cf8b754feb91126d0d0ab4cedf14afe85575e8cdd0f0",
       "upstreamStatus": "added"
     },
     {

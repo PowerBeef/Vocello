@@ -48,8 +48,11 @@ class GenerateReadmeChartsTests(unittest.TestCase):
         alt = MODULE.readme_alt_text(medians)
         self.assertIn("lower is faster", alt)
         self.assertNotIn("×", alt)
-        for value in medians.values():
-            self.assertLess(value, 1.0, "the chart claims every bar sits below the real-time line")
+        # The chart renders the warm cells; a record's single cold take may sit above 1.0.
+        for mode in MODULE.MODES:
+            for length in MODULE.LENGTHS:
+                value = medians[f"{mode}/{length}/warm"]
+                self.assertLess(value, 1.0, "the chart claims every bar sits below the real-time line")
 
     def test_rtf_chart_uses_the_standard_definition(self) -> None:
         svg = MODULE.render_all()["rtf-by-mode-light.svg"]

@@ -209,6 +209,17 @@ final class VocelloPlaybackCaptureCoordinator {
     private var session: VocelloPlaybackCaptureSession?
     private var sidecar: VocelloPlaybackCaptureSidecar?
     private var clock = VocelloPlaybackCaptureClock()
+    /// A freshly relaunched app has no Core Audio process object until it first
+    /// opens an audio device (its first playback). The coordinator listens for
+    /// the HAL's process-object list to change and attaches the moment the
+    /// app's object exists: event-driven, no polling.
+    private var processListListener: AudioObjectPropertyListenerBlock?
+    private var attachGeneration = 0
+    private static var processListAddress = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyProcessObjectList,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain
+    )
     /// Samples drained from the ring while a take is still open (the quiet-tail
     /// condition reads them); `endTake` appends whatever remains.
     private var collected: [Float] = []
@@ -256,18 +267,73 @@ final class VocelloPlaybackCaptureCoordinator {
             sidecar = record
             return
         }
-        do {
-            let live = try VocelloPlaybackCaptureSession(pid: pid)
-            record.sampleRate = live.format.mSampleRate
-            record.channels = Int(live.format.mChannelsPerFrame)
-            record.captureStartEpochMS = VocelloPlaybackCaptureClock.nowEpochMS
-            record.status = "captured"
-            session = live
-        } catch {
-            record.status = "unavailable"
-            record.reason = String(describing: error)
-        }
         sidecar = record
+        attach(pid: pid)
+    }
+
+    @available(macOS 14.2, *)
+    private func attach(pid: pid_t) {
+        do {
+            adopt(try VocelloPlaybackCaptureSession(pid: pid))
+        } catch VocelloPlaybackCaptureSession.Failure.translatePID {
+            // No process object yet: the app opens its audio device at its first
+            // playback. Listen for the HAL's process list and attach as soon as
+            // the object exists; the take then captures from that moment
+            // (coverage says how much of it was seen).
+            attachGeneration += 1
+            let generation = attachGeneration
+            sidecar?.reason = "waiting for the app to open its audio device"
+            let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+                MainActor.assumeIsolated {
+                    self?.attachNow(pid: pid, generation: generation)
+                }
+            }
+            let status = AudioObjectAddPropertyListenerBlock(
+                AudioObjectID(kAudioObjectSystemObject), &Self.processListAddress, DispatchQueue.main, listener
+            )
+            if status == noErr {
+                processListListener = listener
+            } else {
+                sidecar?.status = "unavailable"
+                sidecar?.reason = "process-list listener failed (\(status))"
+            }
+        } catch {
+            sidecar?.status = "unavailable"
+            sidecar?.reason = String(describing: error)
+        }
+    }
+
+    @available(macOS 14.2, *)
+    private func attachNow(pid: pid_t, generation: Int) {
+        guard generation == attachGeneration, sidecar != nil, session == nil else { return }
+        do {
+            adopt(try VocelloPlaybackCaptureSession(pid: pid))
+            removeProcessListListener()
+        } catch VocelloPlaybackCaptureSession.Failure.translatePID {
+            return  // the list changed for another process; keep listening
+        } catch {
+            removeProcessListListener()
+            sidecar?.status = "unavailable"
+            sidecar?.reason = String(describing: error)
+        }
+    }
+
+    private func removeProcessListListener() {
+        guard let listener = processListListener else { return }
+        AudioObjectRemovePropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject), &Self.processListAddress, DispatchQueue.main, listener
+        )
+        processListListener = nil
+    }
+
+    @available(macOS 14.2, *)
+    private func adopt(_ live: VocelloPlaybackCaptureSession) {
+        sidecar?.sampleRate = live.format.mSampleRate
+        sidecar?.channels = Int(live.format.mChannelsPerFrame)
+        sidecar?.captureStartEpochMS = VocelloPlaybackCaptureClock.nowEpochMS
+        sidecar?.status = "captured"
+        sidecar?.reason = nil
+        session = live
     }
 
     /// Call immediately before the Generate click.
@@ -275,9 +341,9 @@ final class VocelloPlaybackCaptureCoordinator {
         sidecar?.submitClickEpochMS = VocelloPlaybackCaptureClock.nowEpochMS
     }
 
-    /// True when no tap is live for the current take (nothing to wait for).
+    /// True when no tap is live or pending for the current take.
     var isIdle: Bool {
-        session == nil
+        session == nil && processListListener == nil
     }
 
     /// Condition for the post-playback wait: the last `seconds` of captured
@@ -296,6 +362,12 @@ final class VocelloPlaybackCaptureCoordinator {
     func endTake(playbackEnded: Bool, status: String? = nil, reason: String? = nil) {
         guard var record = sidecar else { return }
         sidecar = nil
+        removeProcessListListener()
+        attachGeneration += 1
+        if session == nil, record.status != "unavailable" {
+            record.status = "unavailable"
+            record.reason = record.reason ?? "the app never opened its audio device during the take"
+        }
         if playbackEnded {
             record.playbackEndedEpochMS = VocelloPlaybackCaptureClock.nowEpochMS
         }

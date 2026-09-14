@@ -123,7 +123,10 @@ ten-language release. Device work remains separately authorized.
 ## Existing acceptance routes
 
 The focused `scripts/ui_test.sh macos localization` readiness journey launches with Foundation's
-double-length and untranslated-string diagnostics. The `scripts/ui_test.sh ios localization`
+double-length and untranslated-string diagnostics (its attachment is
+`mac-smoke-readiness-pseudolocalized`: doubled text is the stress, UPPERCASE marks a key absent from
+`Localizable.xcstrings`), and since 2026-09-14 asserts single-line rows, chips and badges plus
+in-window controls under it; the same journey opens every `smoke` lane. The `scripts/ui_test.sh ios localization`
 Settings layout walk adds a `Pseudo-AX-XXXL` arm combining the same diagnostics with the largest
 tested accessibility content-size category. Both use stable accessibility identifiers and genuine
 product controls; there is no hidden test UI. iOS acceptance remains physical-device XCUITest only.

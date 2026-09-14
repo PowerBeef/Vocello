@@ -178,4 +178,39 @@ final class UIInteractionPolicyTests: XCTestCase {
         XCTAssertLessThan(try XCTUnwrap(navigation.nextScroll(target: band, visible: viewport)), 0)
         XCTAssertFalse(VocelloUIRevealRequirement.fullVisibility.satisfied(by: oversized, visible: viewport))
     }
+
+    // MARK: - Layout bounds under long strings
+
+    func testSingleLineBoundsAcceptOneLineAndRejectTheCollapsedChip() {
+        let oneLine = CGRect(x: 40, y: 100, width: 120, height: 18)
+        XCTAssertTrue(VocelloUILayoutBounds.singleLine(oneLine, maxHeight: 30, minWidth: 60))
+        // The 2026-09-13 pseudo-localized collapse: one character per line.
+        let collapsedChip = CGRect(x: 60, y: 120, width: 30, height: 340)
+        XCTAssertFalse(VocelloUILayoutBounds.singleLine(collapsedChip, maxHeight: 30, minWidth: 60))
+        // Two wrapped lines are also refused; a narrow single line is refused by width.
+        XCTAssertFalse(VocelloUILayoutBounds.singleLine(CGRect(x: 0, y: 0, width: 200, height: 36), maxHeight: 30, minWidth: 60))
+        XCTAssertFalse(VocelloUILayoutBounds.singleLine(CGRect(x: 0, y: 0, width: 12, height: 18), maxHeight: 30, minWidth: 60))
+        for invalid in [CGRect.null, CGRect.infinite, CGRect(x: 0, y: 0, width: 0, height: 0),
+                        CGRect(x: CGFloat.nan, y: 0, width: 10, height: 10)] {
+            XCTAssertFalse(VocelloUILayoutBounds.singleLine(invalid, maxHeight: 30, minWidth: 1))
+        }
+    }
+
+    func testHorizontalContainmentIgnoresRowsBelowTheFoldButCatchesOverflow() {
+        let window = CGRect(x: 100, y: 50, width: 720, height: 690)
+        XCTAssertTrue(VocelloUILayoutBounds.horizontallyWithin(
+            CGRect(x: 400, y: 900, width: 100, height: 24), window: window),
+            "a row scrolled below the window is still horizontally contained")
+        XCTAssertTrue(VocelloUILayoutBounds.horizontallyWithin(
+            CGRect(x: 99.5, y: 60, width: 720.8, height: 24), window: window),
+            "sub-point rendering slop stays inside the tolerance")
+        XCTAssertFalse(VocelloUILayoutBounds.horizontallyWithin(
+            CGRect(x: 700, y: 60, width: 160, height: 24), window: window),
+            "an action button pushed past the right edge is the collapse signal")
+        XCTAssertFalse(VocelloUILayoutBounds.horizontallyWithin(
+            CGRect(x: 60, y: 60, width: 100, height: 24), window: window))
+        XCTAssertFalse(VocelloUILayoutBounds.horizontallyWithin(.null, window: window))
+        XCTAssertFalse(VocelloUILayoutBounds.horizontallyWithin(
+            CGRect(x: 200, y: 60, width: 100, height: 24), window: .infinite))
+    }
 }

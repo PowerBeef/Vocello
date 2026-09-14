@@ -30,6 +30,10 @@ struct VoicesView: View {
     /// same commit that publishes the new reference (see
     /// `handleSavedVoiceSheetCompletion`). Nil for normal add flows.
     @State private var voiceBeingReplaced: Voice?
+    /// One width signal for every row: the List is clipped to its proposal, so
+    /// an overflowing row can never inflate it (W1-F kept one signal, but a
+    /// row's own rendered width fed back into its layout choice).
+    @State private var listWidth: CGFloat = 0
 
     private var voices: [Voice] {
         savedVoicesViewModel.voices
@@ -141,6 +145,7 @@ struct VoicesView: View {
                     ForEach(voices) { voice in
                         VoiceRow(
                             voice: voice,
+                            availableWidth: listWidth,
                             isHighlighted: highlightedVoiceID == voice.id,
                             canUseInVoiceCloning: canUseInVoiceCloning,
                             onUseInVoiceCloning: {
@@ -163,6 +168,11 @@ struct VoicesView: View {
                 .scrollContentBackground(.hidden)
                 .frame(maxWidth: LayoutConstants.contentMaxWidth)
                 .frame(maxWidth: .infinity)
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.width
+                } action: { width in
+                    listWidth = width
+                }
                 .onChange(of: voices) { _, newVoices in
                     guard let pendingRevealVoiceID else { return }
                     guard newVoices.contains(where: { $0.id == pendingRevealVoiceID }) else { return }
@@ -297,6 +307,8 @@ private extension VoicesView {
 
 private struct VoiceRow: View {
     let voice: Voice
+    /// The List's width (container-owned, never the row's own rendered size).
+    let availableWidth: CGFloat
     let isHighlighted: Bool
     let canUseInVoiceCloning: Bool
     let onUseInVoiceCloning: () -> Void
@@ -331,11 +343,6 @@ private struct VoiceRow: View {
                 .padding(.top, 4)
 
             rowContent
-                .onGeometryChange(for: CGFloat.self) { proxy in
-                    proxy.size.width
-                } action: { width in
-                    rowWidth = width
-                }
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 6)
@@ -366,12 +373,25 @@ private struct VoiceRow: View {
     /// W1-F: one width signal + `AnyLayout` replaces the `ViewThatFits`
     /// that built and measured BOTH full row layouts for every visible row
     /// on every layout pass. Child identity is preserved across the flip.
-    /// 430 pt fits the metadata column beside the fixed action cluster;
-    /// width 0 (pre-first-layout) renders wide, matching the default window.
-    @State private var rowWidth: CGFloat = 0
+    ///
+    /// The two inputs are stable by construction: the List's width comes from
+    /// the container, and the action cluster is horizontally fixed-size, so its
+    /// width does not depend on which layout wraps it. Measuring the row's own
+    /// rendered width (the previous rule, wide when >= 430) fed back into the
+    /// choice: once the action cluster overflowed under long titles, the wide
+    /// HStack reported an inflated width and the row locked into a near-zero
+    /// metadata column (pseudo-localized readiness journey, 2026-09-13).
+    /// Width 0 (pre-first-layout) renders wide, matching the default window.
+    @State private var actionsWidth: CGFloat = 0
+
+    /// Name plus status chip at body/caption sizes.
+    private static let minimumMetadataWidth: CGFloat = 220
+    /// Leading icon, its gap, the layout gap, horizontal padding and List insets.
+    private static let rowChrome: CGFloat = 24 + 14 + 14 + 12 + 40
 
     private var usesWideLayout: Bool {
-        rowWidth == 0 || rowWidth >= 430
+        guard availableWidth > 0, actionsWidth > 0 else { return true }
+        return availableWidth - Self.rowChrome - actionsWidth >= Self.minimumMetadataWidth
     }
 
     private var rowContent: some View {
@@ -397,6 +417,11 @@ private struct VoiceRow: View {
                 onUseInVoiceCloning: onUseInVoiceCloning,
                 onDelete: onDelete
             )
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { width in
+                actionsWidth = width
+            }
         }
     }
 }
@@ -426,6 +451,9 @@ private struct VoiceRowMetadata: View {
                 Text(transcriptStatus)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .accessibilityIdentifier("voicesRow_\(voiceID)_transcriptStatus")
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     #if QW_UI_LIQUID
@@ -470,10 +498,12 @@ private struct VoiceRowMetadata: View {
                     .font(.caption)
                 Text(label)
                     .font(.caption.weight(.medium))
+                    .lineLimit(1)
                 Image(systemName: "chevron.right")
                     .font(.caption2.weight(.semibold))
                     .opacity(0.7)
             }
+            .fixedSize(horizontal: true, vertical: false)
             .foregroundStyle(.orange)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)

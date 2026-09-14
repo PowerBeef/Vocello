@@ -215,6 +215,61 @@ class VocelloMacUITestCase: XCTestCase {
         )
     }
 
+    /// Every visible Saved Voices row keeps a single-line name, status chip and
+    /// warning pill, and its action buttons stay inside the window. Under the
+    /// pseudo-localized launch this is the check that catches a collapsed row
+    /// (2026-09-13: a chip rendered one character per line at 30 × 340 pt).
+    func assertSavedVoicesLayoutIntact() {
+        navigate(to: .voices)
+        let window = app.windows.firstMatch.frame
+        let excluded = ["_use_", "_play_", "_delete_", "_transcriptStatus", "_qualityWarning", "_replaceReference"]
+        let predicate = NSPredicate(
+            format: "identifier BEGINSWITH %@ AND NOT (%@)", "voicesRow_",
+            NSCompoundPredicate(orPredicateWithSubpredicates: excluded.map {
+                NSPredicate(format: "identifier CONTAINS %@", $0)
+            })
+        )
+        let names = app.staticTexts.matching(predicate).allElementsBoundByIndex
+        var checked = 0
+        for name in names {
+            let identifier = name.identifier
+            guard identifier.hasPrefix("voicesRow_"), name.frame.intersects(window) else { continue }
+            let voiceID = String(identifier.dropFirst("voicesRow_".count))
+            checked += 1
+            VocelloUILayoutAssert.assertSingleLine(name, maxHeight: 30, minWidth: 40)
+            VocelloUILayoutAssert.assertSingleLine(
+                element("\(identifier)_transcriptStatus", type: .staticText), maxHeight: 30, minWidth: 60
+            )
+            let warning = button("\(identifier)_qualityWarning")
+            if warning.exists {
+                VocelloUILayoutAssert.assertSingleLine(warning, maxHeight: 34, minWidth: 80)
+            }
+            for action in ["voicesRow_use_\(voiceID)", "voicesRow_play_\(voiceID)", "voicesRow_delete_\(voiceID)"] {
+                VocelloUILayoutAssert.assertWithinWindow(button(action), of: app)
+            }
+        }
+        XCTAssertGreaterThan(checked, 0, "no visible Saved Voices row was checked; the query cannot pass vacuously")
+    }
+
+    /// The three Speed package rows keep single-line status and badge labels and
+    /// their action slot inside the window.
+    func assertSettingsPackageRowsLayoutIntact() {
+        navigate(to: .settings)
+        for id in ["pro_custom_speed", "pro_design_speed", "pro_clone_speed"] {
+            VocelloUILayoutAssert.assertSingleLine(
+                element("settings_packageStatus_\(id)"), maxHeight: 24, minWidth: 30
+            )
+            let badge = element("settings_packageBadge_\(id)", type: .staticText)
+            if badge.exists {
+                VocelloUILayoutAssert.assertSingleLine(badge, maxHeight: 24, minWidth: 30)
+            }
+            let manage = button("settings_manage_\(id)")
+            if manage.exists {
+                VocelloUILayoutAssert.assertWithinWindow(manage, of: app)
+            }
+        }
+    }
+
     func prepare(mode: VocelloUIBenchMatrix.Mode) {
         switch mode {
         case .custom:

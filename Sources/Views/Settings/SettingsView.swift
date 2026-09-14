@@ -472,6 +472,9 @@ private struct ModelPackageLine: View {
                         .font(.caption.weight(.semibold))
                         .lineLimit(1)
                     packageBadge
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .accessibilityIdentifier("settings_packageBadge_\(model.id)")
                 }
                 .layoutPriority(1)
 

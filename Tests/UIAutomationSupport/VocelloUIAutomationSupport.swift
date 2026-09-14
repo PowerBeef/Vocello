@@ -589,6 +589,58 @@ public struct VocelloUIPerfScenarioMarker: Codable {
     }
 }
 
+/// Frame assertions for controls that must stay legible under long strings. Failures attach the
+/// same evidence as `VocelloUIWait` and name the identifier and frame in the message.
+@MainActor
+public enum VocelloUILayoutAssert {
+    public static func assertSingleLine(
+        _ element: XCUIElement,
+        maxHeight: CGFloat,
+        minWidth: CGFloat,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard element.exists else {
+            VocelloUIFailureEvidence.capture(reason: "layout subject missing: \(element)")
+            XCTFail("Layout subject does not exist: \(element)", file: file, line: line)
+            return
+        }
+        let frame = element.frame
+        guard VocelloUILayoutBounds.singleLine(frame, maxHeight: maxHeight, minWidth: minWidth) else {
+            VocelloUIFailureEvidence.capture(reason: "collapsed or wrapped control \(element.identifier)")
+            XCTFail(
+                "\(element.identifier) is not a single legible line: frame \(frame) "
+                + "(expected height <= \(maxHeight), width >= \(minWidth))",
+                file: file, line: line
+            )
+            return
+        }
+    }
+
+    public static func assertWithinWindow(
+        _ element: XCUIElement,
+        of app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard element.exists else {
+            VocelloUIFailureEvidence.capture(reason: "layout subject missing: \(element)")
+            XCTFail("Layout subject does not exist: \(element)", file: file, line: line)
+            return
+        }
+        let window = app.windows.firstMatch.frame
+        let frame = element.frame
+        guard VocelloUILayoutBounds.horizontallyWithin(frame, window: window) else {
+            VocelloUIFailureEvidence.capture(reason: "control outside the window \(element.identifier)")
+            XCTFail(
+                "\(element.identifier) overflows the window horizontally: frame \(frame), window \(window)",
+                file: file, line: line
+            )
+            return
+        }
+    }
+}
+
 /// Screenshots are retained in the xcresult; no out-of-band coordinate metadata is used.
 @MainActor
 public enum VocelloUIScreenshot {

@@ -108,9 +108,14 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
             navigate(to: screen)
         }
         assertVisibleSpeedModelReadiness()
+        // Under the doubled strings every row, chip and badge must still be a
+        // single legible line with its controls inside the window (the 2026-09-13
+        // collapse in Saved Voices was visible only in the screenshot).
+        assertSettingsPackageRowsLayoutIntact()
         ensureCloneConsentEnabled()
         assertSavedCloneVoice()
-        VocelloUIScreenshot.attach(app, named: "mac-smoke-readiness")
+        assertSavedVoicesLayoutIntact()
+        VocelloUIScreenshot.attach(app, named: "mac-smoke-readiness-pseudolocalized")
     }
 
     func test02_CustomGenerationAndHistory() {

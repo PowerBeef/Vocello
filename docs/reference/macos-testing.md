@@ -106,7 +106,15 @@ run and perform no automatic retry. The first corrected physical-host run on 202
 
 ## Explicit XCUITest lanes
 
-Run only when frontend acceptance is explicitly requested:
+Run only when frontend acceptance is explicitly requested. `test01_NavigationAndReadiness` (the whole
+`localization` lane, and the first journey of every `smoke` lane) launches the app with Foundation's
+`-NSDoubleLocalizedStrings YES -NSShowNonLocalizedStrings YES`, so doubled text (menus included) and
+UPPERCASE labels in its attachment `mac-smoke-readiness-pseudolocalized` are the diagnostic, not a
+defect: doubling is the long-string stress and uppercase marks a key absent from the String Catalog.
+Under that stress the journey asserts single-line Saved Voices rows, chips and Settings badges and
+in-window controls (`assertSavedVoicesLayoutIntact`, `assertSettingsPackageRowsLayoutIntact`), the
+check that caught the 2026-09-13 row collapse. The arguments are process-scoped and never persist.
+Lanes:
 
 ```sh
 scripts/ui_test.sh macos smoke

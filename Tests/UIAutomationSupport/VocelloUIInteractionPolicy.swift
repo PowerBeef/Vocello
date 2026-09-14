@@ -30,6 +30,25 @@ enum VocelloUIRevealRequirement {
     }
 }
 
+/// Layout bounds a rendered control must respect under long strings. The pseudo-localized
+/// readiness journey (2026-09-13) rendered a saved-voice chip one character per line
+/// (30 × 340 pt) and pushed its action buttons past the window; both are frame facts
+/// the accessibility snapshot exposes, so the lane asserts them instead of a reviewer.
+enum VocelloUILayoutBounds {
+    /// A single-line label: a valid frame no taller than `maxHeight` and at least `minWidth` wide.
+    static func singleLine(_ frame: CGRect, maxHeight: CGFloat, minWidth: CGFloat) -> Bool {
+        guard VocelloUIRevealRequirement.valid(frame) else { return false }
+        return frame.height <= maxHeight && frame.width >= minWidth
+    }
+
+    /// Horizontal containment only: rows below the fold are legitimately outside the window
+    /// vertically, while overflow past the right edge is the collapse signal.
+    static func horizontallyWithin(_ frame: CGRect, window: CGRect, tolerance: CGFloat = 1) -> Bool {
+        guard VocelloUIRevealRequirement.valid(frame), VocelloUIRevealRequirement.valid(window) else { return false }
+        return frame.minX >= window.minX - tolerance && frame.maxX <= window.maxX + tolerance
+    }
+}
+
 /// Test-only bounded search. Geometry comes from the current accessibility snapshot,
 /// not coordinates to tap or assumptions about the retained scroll position.
 struct VocelloUIRevealSearch {

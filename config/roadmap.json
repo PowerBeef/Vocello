@@ -1144,7 +1144,7 @@
       "id": "PC-02",
       "plan": "harness-stabilization-2026-09",
       "title": "Promote the played-audio comparison from warnings to a gate",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [
         "PC-01"
       ],
@@ -1153,13 +1153,13 @@
         "scripts/check_macos_xpc_bench.py",
         "config/orchestration-contract.json"
       ],
-      "updated": "2026-09-13",
-      "notes": "Blocked on PC-01 producing the corpus."
+      "updated": "2026-09-14",
+      "notes": "Corpus run 1 of 3: macos-xcui-benchmark-20260914-041837-5dae624f (2026-09-14, canonical 29-take matrix, 29/29 captured): coverage 1.00 on every take, dropouts 0, residual -33.0 to -55.7 dBFS (median -39.3), alignment lead-in up to 9.1 s (a lead-in, not a fault), first-audible minus playbackScheduledMS 30 to 176 ms on 28 takes and 359 ms once. Run f4125e76 the same night captured 27/29 with the same ranges before the window and bundle fixes (publication refused; artifacts retained). Thresholds are set from three such runs."
     },
     {
       "id": "PC-03",
       "plan": "harness-stabilization-2026-09",
-      "title": "Explain the 1.8 s gap between playback scheduling and audible output",
+      "title": "The 1.8 s between playback scheduling and audible output was the UI driver's click latency; confirm on three canonical runs",
       "status": "in-flight",
       "blockedBy": [],
       "gate": "The macOS app's playback timeline accounts for the interval between playbackScheduledMS and the first audible captured frame: either the timeline gains the event that actually starts audio (device start, final-file player start) and the capture agrees with it within 250 ms on three canonical runs, or the latency is removed; the playback.capture.misaligned warning then clears on Custom/short final-file takes.",
@@ -1170,7 +1170,7 @@
         "scripts/lib/playback_capture.py"
       ],
       "updated": "2026-09-14",
-      "notes": "Opened 2026-09-13 from record macos-xcui-benchmark-20260913-220529-a1103a3a: on both Custom/short takes (finalFile playback) the tap's first buffer arrived about 1.3 s after playbackScheduledMS and audio followed 0.3 to 0.5 s of leading digital silence in the file. September 14 scratch probes validated the measurement and cleared the environment: the HDMI sink starts IO 55 to 95 ms after AudioDeviceStart; the tap connects to a running process within 20 to 120 ms and its HAL timestamps lead the callback clock by 32 ms; an AVAudioPlayer process tapped between two plays becomes audible 85 to 145 ms after play() with IO running and 300 to 530 ms after an idle restart (play() itself blocks 230 to 470 ms then), and the app's exact engine-to-file switch (node stop, engine reset or stop, then play) is audible within 95 ms. So the 1.3 s sits inside the app process after play() returns true, in a state none of the reproductions reached; no signposts are retained in the unified log. Next: stamp play() entry and exit and the first advance of the player's audio clock in the frontend metrics (the gate's first branch), then read them against the capture on the next captured run."
+      "notes": "Resolved in measurement on 2026-09-14 (fcf2fe93, record macos-xcui-benchmark-20260914-041837-5dae624f): the app row now carries submittedAtEpochMS and the capture measures first-audible from it. On the first canonical captured run the runner's click stamp preceded the app's submit by a median 1690 ms (1636 to 2691 ms; XCUITest resolving the Generate button on this accessibility tree), which is the whole 'gap'. Measured from the app's clock, audio reaches the tap 30 to 176 ms after playbackScheduledMS on 28 of 29 takes (medians per cell 50 to 149 ms, live stream and final file alike); one design/medium take took 359 ms and carries the misaligned warning. Earlier scratch probes had already cleared the HDMI sink (55 to 95 ms start), the tap (connects within 120 ms, HAL stamps lead by 32 ms) and every AVFoundation reproduction (85 to 530 ms). Remaining gate clause: two more canonical captured runs within 250 ms; then the warning should clear on the Custom/short cells and this item closes. (Earlier history: git log -p -- config/roadmap.json.)"
     },
     {
       "id": "HS-01",

@@ -1152,8 +1152,8 @@
         ".github/workflows/nightly.yml",
         "scripts/macos_test.sh"
       ],
-      "updated": "2026-09-13",
-      "notes": "Opened 2026-09-13: docs/development-progress.md promised the characterization before the policy deadline and no item carried it. Only nightly passes count (maintainer decision of September 12); the local cold TSan pass of September 13 is evidence of the lane, not of the counter."
+      "updated": "2026-09-14",
+      "notes": "Opened 2026-09-13: docs/development-progress.md promised the characterization before the policy deadline and no item carried it. Only nightly passes count (maintainer decision of September 12). State on 2026-09-14: config/tsan-policy.json records 1 consecutive pass while nightly.yml is green on the scheduled runs 34683488068 (2026-09-12) and 34749309445 (2026-09-13) and the dispatched run 34773188765 (2026-09-13); the counter is a hand-edited field under maintainer review, so recording those passes (2 scheduled, or 3 with the dispatch) and the blocking decision are the maintainer's edits. The local cold TSan pass of September 13 is evidence of the lane, not of the counter."
     }
   ]
 }

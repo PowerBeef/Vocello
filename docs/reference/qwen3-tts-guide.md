@@ -44,7 +44,7 @@ All three patterns generate **24 kHz mono PCM**. Vocello ships only the **12 Hz 
 
 ## 2. Model families and variants
 
-Vocello bundles three model families, served from Vocello's own `PowerBeef02` Hugging Face repos (pinned there since 2026-07-26; the six repos are `PowerBeef02/Qwen3-TTS-12Hz-1.7B-{CustomVoice,VoiceDesign,Base}-{8bit,4bit}`) and pinned to exact revisions in `qwenvoice_contract.json` — currently artifactVersion `2026.08.06.1`.
+Vocello bundles three model families, served from Vocello's own `PowerBeef02` Hugging Face repos (pinned there since 2026-07-26; the six repos are `PowerBeef02/Qwen3-TTS-12Hz-1.7B-{CustomVoice,VoiceDesign,Base}-{8bit,4bit}`) and pinned to exact revisions in `qwenvoice_contract.json` — currently artifactVersion `2026.09.14.1`.
 
 | Family (mode) | Folder suffix | MLX repo suffix | Size | Platforms | Notes |
 | --- | --- | --- | --- | --- | --- |
@@ -153,7 +153,7 @@ A Mimi-based neural codec decoder that converts the 16-code frames back to a 24 
 - 2 ConvNeXt upsampling blocks
 - Final tanh → float samples in `[-1, 1]`
 
-Since 2026-08-01 the speech-tokenizer weights ship as **F16** (unified half-precision codec on both platforms; the T-Mimi final two layers are excluded from the f16 cast), even when the Talker is quantized to 4/8 bit — see `benchmarks/OPTIMIZATION.md` §R.
+The speech-tokenizer weights ship as **fp32** (682,293,092 bytes, the file Vocello 2.4.0 carried), even when the Talker is quantized to 4/8 bit. The unified f16 codec promoted on 2026-08-01 was withdrawn on 2026-09-14 (artifactVersion `2026.09.14.1`): with the f16 weights the streaming decoder opened clone takes with a burst inside the first 50 ms (roadmap MV-07) — see `benchmarks/OPTIMIZATION.md` §R.
 
 ### 3.5 Speaker encoding (voice cloning)
 
@@ -506,12 +506,12 @@ Apple Silicon MLX numbers depend heavily on quantization tier, model size, text 
 
 Model download sizes (approximate, from `qwenvoice_contract.json`):
 
-- 4-bit: ~1.7 GB
-- 8-bit: ~2.5 GB (Base slightly larger due to the speaker encoder)
+- 4-bit: ~2.05 GB
+- 8-bit: ~2.8 GB (Base slightly larger due to the speaker encoder)
 
-The f16 tokenizer promotion (2026-08-01) cut ~341 MB per download, and since
-2026-08-08 every artifact also bundles the AudioSeal fp16 marking generator
-(~29 MB, artifactVersion `2026.08.06.1`).
+Since 2026-08-08 every artifact also bundles the AudioSeal fp16 marking generator
+(~29 MB). The f16 tokenizer promotion of 2026-08-01 (−341 MB per download) was
+withdrawn on 2026-09-14; artifactVersion `2026.09.14.1` ships the fp32 codec again.
 
 ---
 

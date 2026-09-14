@@ -47,8 +47,8 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
             "artifactVersion": "test-current",
         }
         self.contract = copy.deepcopy(self.contract)
-        self.contract["tokenizerArms"]["current-fp16"] = identity
-        self.contract["tokenizerArms"]["archived-fp32"] = {
+        self.contract["tokenizerArms"]["current-fp32"] = identity
+        self.contract["tokenizerArms"]["archived-fp16"] = {
             **identity,
             "required": False,
             "artifactVersion": "test-archived",
@@ -102,8 +102,8 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
             "runID": "vlr-test-run",
             "references": self.references,
             "runtimeProfiles": profiles or {
-                "current-fp16": {"dataDir": str(self.runtime)},
-                "archived-fp32": {"dataDir": str(self.runtime)},
+                "current-fp32": {"dataDir": str(self.runtime)},
+                "archived-fp16": {"dataDir": str(self.runtime)},
             },
         }
         self.spec.write_text(json.dumps(payload), encoding="utf-8")
@@ -141,7 +141,7 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
 
     def test_missing_transcript_and_archived_runtime_are_explicitly_blocked(self):
         self.references[0].pop("correctedTranscriptPath")
-        self._write_spec(profiles={"current-fp16": {"dataDir": str(self.runtime)}})
+        self._write_spec(profiles={"current-fp32": {"dataDir": str(self.runtime)}})
         bundle_root = self.root / "partial-bundle"
         bundle = VLR.prepare_bundle(
             input_spec_path=self.spec, output=bundle_root, contract=self.contract
@@ -151,7 +151,7 @@ class VoiceIdentityLanguageReliabilityTests(unittest.TestCase):
         )
         blocked = [row for row in plan["takes"] if row.get("blockedPrerequisite")]
         self.assertTrue(any(row["blockedPrerequisite"] == "corrected-transcript-missing" for row in blocked))
-        self.assertTrue(any(row["blockedPrerequisite"] == "archived-fp32-runtime-unavailable" for row in blocked))
+        self.assertTrue(any(row["blockedPrerequisite"] == "archived-fp16-runtime-unavailable" for row in blocked))
         self.assertEqual(plan["takeCount"], 734)
 
     def test_plan_digest_and_cross_run_observation_fail_closed(self):

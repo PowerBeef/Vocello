@@ -96,7 +96,7 @@ def validate_contract(contract: dict[str, Any]) -> None:
     ):
         raise ReliabilityError("contract must declare eight unique UInt64 seeds")
     tokenizers = contract.get("tokenizerArms")
-    if not isinstance(tokenizers, dict) or set(tokenizers) != {"current-fp16", "archived-fp32"}:
+    if not isinstance(tokenizers, dict) or set(tokenizers) != {"current-fp32", "archived-fp16"}:
         raise ReliabilityError("contract tokenizer arms are incomplete")
     for arm, value in tokenizers.items():
         if (
@@ -207,8 +207,8 @@ def prepare_bundle(*, input_spec_path: Path, output: Path, contract: dict[str, A
         })
 
     raw_profiles = spec.get("runtimeProfiles")
-    if not isinstance(raw_profiles, dict) or "current-fp16" not in raw_profiles:
-        raise ReliabilityError("private input spec requires the current-fp16 runtime profile")
+    if not isinstance(raw_profiles, dict) or "current-fp32" not in raw_profiles:
+        raise ReliabilityError("private input spec requires the current-fp32 runtime profile")
     public_profiles: dict[str, Any] = {}
     private_profiles: dict[str, Any] = {}
     for arm, identity in contract["tokenizerArms"].items():
@@ -361,8 +361,8 @@ def build_plan(*, contract: dict[str, Any], bundle: dict[str, Any], source_ident
                 referenceLanguage=reference["referenceLanguage"], scriptID=script_id,
                 scriptDigest=script["sha256"], targetLanguage=script["language"],
                 languageSelection="explicit", expectedStoredLanguage=script["language"],
-                expectedFinalLanguage=script["language"], tokenizerArm="current-fp16",
-                expectedTokenizerDigest=contract["tokenizerArms"]["current-fp16"]["sha256"],
+                expectedFinalLanguage=script["language"], tokenizerArm="current-fp32",
+                expectedTokenizerDigest=contract["tokenizerArms"]["current-fp32"]["sha256"],
                 seed=seeds[0], variation=contract["clone"]["sentinelVariation"],
                 warmState=warm_state,
                 blockedPrerequisite="reviewed-transcript-missing" if transcript is None else None,
@@ -416,8 +416,8 @@ def build_plan(*, contract: dict[str, Any], bundle: dict[str, Any], source_ident
                 deliveryCellID=sentinel_cell,
                 expectedInstructionDigest=text_digest(sentinel_instruction),
                 expectedInstructionLanguage="english",
-                tokenizerArm="current-fp16",
-                expectedTokenizerDigest=contract["tokenizerArms"]["current-fp16"]["sha256"],
+                tokenizerArm="current-fp32",
+                expectedTokenizerDigest=contract["tokenizerArms"]["current-fp32"]["sha256"],
                 seed=seeds[0], variation=design["sentinelVariation"], warmState=warm_state,
                 blockedPrerequisite=None,
             ))
@@ -501,7 +501,7 @@ def build_device_plan(
     sys.path.insert(0, str(REPO / "scripts"))
     from check_delivery_instructions import load_presets
     presets = load_presets(REPO)
-    tokenizer = contract["tokenizerArms"]["current-fp16"]["sha256"]
+    tokenizer = contract["tokenizerArms"]["current-fp32"]["sha256"]
     seeds = contract["fixedSeeds"]
     rows: list[dict[str, Any]] = []
 
@@ -656,7 +656,7 @@ def validate_device_plan(
         )
         if row.get("seed") not in allowed_seeds:
             raise ReliabilityError(f"{row['takeID']}: device seed drift")
-        if row.get("expectedTokenizerDigest") != contract["tokenizerArms"]["current-fp16"]["sha256"]:
+        if row.get("expectedTokenizerDigest") != contract["tokenizerArms"]["current-fp32"]["sha256"]:
             raise ReliabilityError(f"{row['takeID']}: device tokenizer drift")
     if schema == 2:
         expected = build_device_plan(

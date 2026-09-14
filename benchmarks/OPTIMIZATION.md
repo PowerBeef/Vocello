@@ -1182,6 +1182,21 @@ short/medium/long × warm 3 at the canonical seed.
   fresh fixture identities, delivery proof, and memory re-qualification ride that
   release's QA battery per the 2.2 precedent.
 
+- **Promotion withdrawn (2026-09-14, maintainer decision — fp32 codec restored as
+  artifactVersion 2026.09.14.1).** The September 13 codec A/B (two data directories
+  differing only in `speech_tokenizer/model.safetensors`, 28 fixed seeds on the clone
+  short cell) showed the f16 codec opening streamed takes with a quarter-scale step
+  burst inside the first 50 ms in 4/28 takes (0/28 with fp32; seed 11 reached full
+  scale at 3 ms), while the same codes decoded non-streaming started in digital
+  silence — the defect needs both the f16 weights and the streaming decoder's first
+  chunk. The maintainer chose the codec that 2.4.0 shipped over a precision patch in
+  the decoder: the fp32 file (`836b7b35…`, 682,293,092 bytes, byte-identical to the
+  2026.07.26.1 payload) went back to all six repos, the contract, receipts and iOS
+  catalog re-pinned (estimatedDownloadBytes +341,113,208 each), MLX active peak
+  returns to the §R control figure (+234 MB resident) and warm RTF recovers the ~5%.
+  QC v7's `onset_step_burst` warning stays as the regression detector; roadmap MV-07
+  records the decision and the post-re-pin verification matrix.
+
 **Original decision framing (resolved above):** the trade is unchanged from §N — −234 MB resident
 and −325 MB installed per Speed chain for ~5% warm RTF — but its value is
 platform-asymmetric: on iPhone the resident saving is Jetsam headroom and could make

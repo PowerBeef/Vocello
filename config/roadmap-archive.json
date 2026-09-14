@@ -2929,6 +2929,25 @@
         "scripts/lib/playback_capture.py"
       ],
       "notes": "Closed 2026-09-14. The 1.8 s was the UI driver, not the app: the runner stamped its click before XCUITest resolved the Generate button (click-to-submit median 1685 to 1690 ms on this accessibility tree). The app row now carries submittedAtEpochMS and the capture measures from it; three consecutive canonical runs (db6af858, dfa37630, 379db820) put every audible onset 27 to 163 ms after playbackScheduledMS, live stream and final file alike, and the misaligned warning cleared on the Custom/short cells. Scratch probes had cleared the HDMI sink (55 to 95 ms), the tap (connects within 120 ms, HAL stamps lead by 32 ms) and every AVFoundation reproduction (85 to 530 ms) first."
+    },
+    {
+      "id": "MV-07",
+      "plan": "harness-stabilization-2026-09",
+      "title": "The fp16 speech tokenizer opens streamed clone takes with a full-scale burst",
+      "status": "done",
+      "updated": "2026-09-14",
+      "gate": "On the clone short cell over at least 28 fixed seeds, no take carries a step burst inside its first 50 ms and no take's first 50 ms peak exceeds 0.5 (the fp32 codec's figures: 0/28 and 1/28), with the fp16 codec kept or a decision recorded to ship the fp32 codec again; the QC v7 onset_step_burst warning then never fires on that matrix.",
+      "evidence": [
+        "file:config/model-artifact-receipts.json",
+        "file:Sources/Resources/qwenvoice_production_model_catalog.json",
+        "file:benchmarks/OPTIMIZATION.md"
+      ],
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
+        "config/model-artifact-receipts.json",
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift"
+      ],
+      "notes": "Closed 2026-09-14. Maintainer decision: ship the fp32 codec again (the 2.4.0 file) rather than patch the streaming decoder. The fp32 file (836b7b35, 682,293,092 bytes) went back to all six repos as artifactVersion 2026.09.14.1; each new revision was verified file-by-file (only speech_tokenizer/model.safetensors changed), and the contract, receipts, iOS catalog and production catalog were re-pinned (+341,113,208 bytes per artifact; installed models relink the fp32 blob from the component store without a download). Verification on the re-pinned pro_clone_speed, clone short warm x1 over the same 28 seeds: 0/28 step bursts inside the first 50 ms, first-50 ms peak above 0.5 in 1/28 (seed 55; the MV-05 onset cluster remains, stepBurstPeakCount>0 on 18/28), QC v7 flags empty on all 28. Cost accepted: +234 MB resident and about 5% warm RTF; the gate-bench baseline is re-saved under the fp32 codec. Reliability arms renamed current-fp32 / archived-fp16. (Earlier history: git log -p -- config/roadmap.json.)"
     }
   ]
 }

@@ -597,7 +597,7 @@ The private map is schema 1, binds the plan digest, and contains exactly
 names, IDs, transcripts, or paths in a tracked file or task log. The command first runs the genuine
 on-device enrollment transcriber against each stored reference without writing its result back; it
 retains only typed authorization, locale-attempt, availability, on-device-support, confidence, and
-digest evidence. The production `closure` profile executes exactly 14 no-retry current-fp16 rows:
+digest evidence. The production `closure` profile executes exactly 14 no-retry current-fp32 rows:
 eight Clone target-language ownership cells and six French Design Auto/explicit ×
 short/medium/long current-Neutral controls. The 26-row `focused` profile retains the no-delivery and
 Calm experimental arms for diagnosis; it is not the production closure gate. Every terminal
@@ -615,7 +615,7 @@ retries or substitutes a failed seed. Missing Speech assets, missing model readi
 references, source drift, or an unverifiable output are explicit failures rather than skipped proof.
 
 For causal localization before closure, generate the bounded eight-seed profile with
-`--profile characterization`. It contains 122 current-fp16 rows: 38 Clone cells across both private
+`--profile characterization`. It contains 122 current-fp32 rows: 38 Clone cells across both private
 aliases, English/French scripts, Auto core seeds, explicit parity, and Expressive sentinels; plus 84
 French Design cells across short/medium/long, Neutral/no-delivery/Calm, Auto core seeds, explicit
 parity, and Expressive sentinels. It remains below the 128-take runner bound. The append-only launch

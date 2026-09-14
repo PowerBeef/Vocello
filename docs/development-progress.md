@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-13
+reviewed: 2026-09-14
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -42,8 +42,16 @@ PC-02 are done. The 1.8 s "gap" was the UI driver: XCUITest takes about 1.7 s to
 button, and measured from the app's own submit clock audio reaches the tap 27 to 163 ms after
 scheduling on three consecutive canonical runs. The played-audio comparison is a gate now
 (coverage 0.98, residual −25 dBFS, no dropout, 500 ms), proven by a gated canonical run and a smoke
-run that captures too. Open in the plan: MV-07 (the fp16 opening burst needs your fix decision),
-MV-06 (the second judge's dependency), MV-05 behind it, and HS-01 (TSan by 2026-09-30).
+run that captures too. Open in the plan: MV-06 (the second judge's dependency), MV-05 behind it,
+and HS-01 (TSan by 2026-09-30).
+
+**fp32 codec restored, September 14.** MV-07 is decided: rather than patch the streaming decoder,
+the maintainer chose the codec 2.4.0 shipped. The fp32 speech tokenizer went back to all six
+Hugging Face repos and everything is re-pinned as artifactVersion 2026.09.14.1 (each artifact grows
+by 341 MB; installed models relink the fp32 blob already in the component store, no download).
+The same 28-seed clone-short matrix on the re-pinned model shows no burst inside the first 50 ms
+and no QC v7 onset warning, matching the fp32 reference exactly; the plosive-onset cluster stays
+(MV-05). The gate-bench baseline is re-saved under the fp32 codec.
 
 Critical path: the MV-07 decision, MV-06, HS-01 by 2026-09-30; release-first resumes RF-13 → RF-09
 freeze → ICA-04 → ICA-05 → RF-12, and ISU-4's physical walk rides the next device window.

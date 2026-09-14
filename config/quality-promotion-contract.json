@@ -2,7 +2,7 @@
   "schemaVersion": 3,
   "modelApplicabilitySource": {
     "path": "Sources/Resources/qwenvoice_contract.json",
-    "sha256": "ac5c76af58bb43bc928a2adc47b3f8aa178497c5bf1b6b50fe2c11dc0c0627e3"
+    "sha256": "69f21e603802fbc20e011024f02ec3c95f292d19077820651cf6f9bcaf521662"
   },
   "owner": "release-qa",
   "publicPromotionPolicy": "source-bound-quality-evidence",

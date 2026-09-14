@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `harness-stabilization-2026-09` | active | release-qa | 6/10 (60%) |
+| `harness-stabilization-2026-09` | active | release-qa | 7/10 (70%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 9/15 (60%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -36,7 +36,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `HS-01` | planned | Complete the TSan characterization and decide promotion | — |
 | `MV-05` | planned | The plosive-onset burst in short clone takes is model-intrinsic and still unjudged | `MV-06` |
 | `MV-06` | planned | A clip-level non-intrusive quality screen as a second machine judge | — |
-| `MV-07` | planned | The fp16 speech tokenizer opens streamed clone takes with a full-scale burst | — |
 
 ### Open items in detail
 
@@ -48,9 +47,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 - **`MV-06`** (planned) — A clip-level non-intrusive quality screen as a second machine judge.
   gate: A pinned, reference-free speech-quality model (NISQA v2 or an MLX port) scores every published take in the delivery-analysis cascade with a corpus-calibrated warn floor; weights and runtime pinned by digest in config/toolchain.json; no listening in the loop.
-
-- **`MV-07`** (planned) — The fp16 speech tokenizer opens streamed clone takes with a full-scale burst.
-  gate: On the clone short cell over at least 28 fixed seeds, no take carries a step burst inside its first 50 ms and no take's first 50 ms peak exceeds 0.5 (the fp32 codec's figures: 0/28 and 1/28), with the fp16 codec kept or a decision recorded to ship the fp32 codec again; the QC v7 onset_step_burst warning then never fires on that matrix.
 
 ## Autonomous validation audit remediation
 

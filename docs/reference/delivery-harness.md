@@ -202,7 +202,8 @@ ordinary terminal padding and all existing interior-pause thresholds remain unch
 
 No prompt, tokenizer, model pin, sampling default, seed, retry policy, or QC threshold changed. The
 current fp16 artifact remains selected because it broadly passed and the immutable archived-fp32
-artifact was unavailable rather than substituted. Any Design delivery-copy candidate remains under
+artifact was unavailable rather than substituted (superseded 2026-09-14: the fp32 codec ships again as
+artifactVersion 2026.09.14.1 and the live arms are `current-fp32` / `archived-fp16`). Any Design delivery-copy candidate remains under
 DP-31/DP-32 measured-claim authority (listening is now optional). The immutable run identities and next-run procedure live
 in the iOS device-testing guide.
 

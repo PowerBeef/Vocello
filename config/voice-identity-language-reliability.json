@@ -20,18 +20,18 @@
     32060828
   ],
   "tokenizerArms": {
-    "current-fp16": {
+    "current-fp32": {
       "required": true,
-      "sha256": "88f0a51a62f89d9d970bc01b52f811ee429be29bc0ae387c7d2f0311560b088e",
-      "sizeBytes": 341179884,
-      "artifactVersion": "2026.08.06.1"
-    },
-    "archived-fp32": {
-      "required": false,
       "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258",
       "sizeBytes": 682293092,
-      "artifactVersion": "2026.07.26.1",
-      "sourceCommit": "6de7283a"
+      "artifactVersion": "2026.09.14.1"
+    },
+    "archived-fp16": {
+      "required": false,
+      "sha256": "88f0a51a62f89d9d970bc01b52f811ee429be29bc0ae387c7d2f0311560b088e",
+      "sizeBytes": 341179884,
+      "artifactVersion": "2026.08.06.1",
+      "sourceCommit": "d3419a90"
     }
   },
   "scripts": {

@@ -2,8 +2,8 @@
   "generatedAt": "2026-08-01T23:56:53Z",
   "models": [
     {
-      "artifactVersion": "2026.08.06.1",
-      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit/resolve/f84295ee776abf19745312ae197f1e044a0ce53b",
+      "artifactVersion": "2026.09.14.1",
+      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit/resolve/29c4b746cd1e2a916f0233b241019205dffbfbc2",
       "files": [
         {
           "relativePath": "README.md",
@@ -57,8 +57,8 @@
         },
         {
           "relativePath": "speech_tokenizer/model.safetensors",
-          "sha256": "88f0a51a62f89d9d970bc01b52f811ee429be29bc0ae387c7d2f0311560b088e",
-          "sizeBytes": 341179884
+          "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258",
+          "sizeBytes": 682293092
         },
         {
           "relativePath": "speech_tokenizer/preprocessor_config.json",
@@ -77,11 +77,11 @@
         }
       ],
       "modelID": "pro_custom",
-      "totalBytes": 1708583689
+      "totalBytes": 2049696897
     },
     {
-      "artifactVersion": "2026.08.06.1",
-      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit/resolve/ff503f17dd41f8cd589638ec2cade5c0d1c59ecd",
+      "artifactVersion": "2026.09.14.1",
+      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit/resolve/62f2646e55499e3d5bc73abec274342718220ffe",
       "files": [
         {
           "relativePath": "README.md",
@@ -135,8 +135,8 @@
         },
         {
           "relativePath": "speech_tokenizer/model.safetensors",
-          "sha256": "88f0a51a62f89d9d970bc01b52f811ee429be29bc0ae387c7d2f0311560b088e",
-          "sizeBytes": 341179884
+          "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258",
+          "sizeBytes": 682293092
         },
         {
           "relativePath": "speech_tokenizer/preprocessor_config.json",
@@ -155,11 +155,11 @@
         }
       ],
       "modelID": "pro_design",
-      "totalBytes": 1708583196
+      "totalBytes": 2049696404
     },
     {
-      "artifactVersion": "2026.08.06.1",
-      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit/resolve/fdad8c2d93c555ddc02e8ce475aeb72645268ae3",
+      "artifactVersion": "2026.09.14.1",
+      "baseURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-4bit/resolve/47ab65f7eda0aad7e1c1a008d9c12d93a10ac475",
       "files": [
         {
           "relativePath": "README.md",
@@ -213,8 +213,8 @@
         },
         {
           "relativePath": "speech_tokenizer/model.safetensors",
-          "sha256": "88f0a51a62f89d9d970bc01b52f811ee429be29bc0ae387c7d2f0311560b088e",
-          "sizeBytes": 341179884
+          "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258",
+          "sizeBytes": 682293092
         },
         {
           "relativePath": "speech_tokenizer/preprocessor_config.json",
@@ -233,7 +233,7 @@
         }
       ],
       "modelID": "pro_clone",
-      "totalBytes": 1732600769
+      "totalBytes": 2073713977
     }
   ]
 }

@@ -1126,21 +1126,6 @@
       "notes": "September 13: NISQA v2 through torchmetrics 1.9 on the local torch 2.13 (24 kHz native) scored 60 takes in seconds; it flagged three takes the QC passed (custom short warm_7 MOS 3.23/NOI 3.40; two delivery-cell custom mediums 2.84 and 3.35) and did not separate the MV-05 onset bursts. Candidate dependency: torch (present on the host, not pinned) or an MLX port of the 1M-parameter CNN/self-attention model in the spirit of the whisper producer."
     },
     {
-      "id": "MV-07",
-      "plan": "harness-stabilization-2026-09",
-      "title": "The fp16 speech tokenizer opens streamed clone takes with a full-scale burst",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "On the clone short cell over at least 28 fixed seeds, no take carries a step burst inside its first 50 ms and no take's first 50 ms peak exceeds 0.5 (the fp32 codec's figures: 0/28 and 1/28), with the fp16 codec kept or a decision recorded to ship the fp32 codec again; the QC v7 onset_step_burst warning then never fires on that matrix.",
-      "sourceOfTruth": [
-        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
-        "config/model-artifact-receipts.json",
-        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift"
-      ],
-      "updated": "2026-09-13",
-      "notes": "Opened 2026-09-13. Scratch A/B with two data dirs differing only in speech_tokenizer/model.safetensors (fp16 88f0a51a promoted in 76bd6f3b five hours after v2.4.0; fp32 836b7b35 shipped in 2.4.0; both blobs are in the local component store), 28 seeds each on clone short: a quarter-scale step burst inside the first 50 ms in 4/28 fp16 takes and 0/28 fp32; first-50 ms peak above 0.5 in 6/28 versus 1/28; seed 11 hits full scale at 3 ms. The fp16 take starts with broadband garbage from sample 0 at -15 dBFS where fp32, the 2.4.0 binary and the fp16 non-streaming decode (--no-stream, same codes) start in digital silence, so the defect needs both the fp16 codec and the streaming decoder's first chunk (resetStreamingState then streamingStep on a fresh state; the causal-conv padding and the overlap-and-discard upsampler match the batch path). Next: per-layer fp16-versus-fp32 instrumentation of that chunk; options are decoding the first chunk at fp32, priming the streaming state, or shipping the fp32 codec again (+341 MB installed, +234 MB resident). The capture (record 256bda25) proves the app plays these files faithfully. Product change needs the maintainer's decision."
-    },
-    {
       "id": "HS-01",
       "plan": "harness-stabilization-2026-09",
       "title": "Complete the TSan characterization and decide promotion",

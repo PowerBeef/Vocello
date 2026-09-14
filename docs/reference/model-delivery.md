@@ -164,6 +164,12 @@ nominal thermal). Observed disk cost on the Mac was 12 GiB for the 16.2 GB catal
 > 2026-08-29 acceptance run `ios-xcui-model-download-20260829-182534-91d70526` (see
 > "Diagnostics and acceptance").
 
+> **Currency note (2026-09-14):** artifactVersion **2026.09.14.1** restores the fp32
+> speech tokenizer (682,293,092 bytes, digest `836b7b35…`, the 2.4.0 payload) in all six
+> artifacts; the f16 codec opened streamed clone takes with a burst (roadmap MV-07,
+> OPTIMIZATION.md §R). Nothing else in the artifacts changed. Fresh post-change delivery
+> evidence rides the next release's battery per the standing rule.
+
 The iOS ledger is atomically written, versioned, and contains only privacy-safe identifiers and
 relative paths. It records the logical request, model and artifact version, expected and verified
 files, retries, monotonic received bytes, and terminal state. A one-time migration cancels the old

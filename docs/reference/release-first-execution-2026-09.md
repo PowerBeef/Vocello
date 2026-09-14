@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-12
+reviewed: 2026-09-13
 summary: Finite release-first execution order for iOS, macOS, and the downloadable CLI; current scheduling and durable gates only; dated programme checkpoints are archived.
 sourceOfTruth:
   - config/roadmap.json
@@ -15,7 +15,14 @@ The maintainer adopted this programme on 2026-09-04. The external September 3 au
 reviewed `86696036`; the initial implementation baseline is clean `main` at `2f392484`.
 Its readiness score is advisory, not a release gate. Source and the roadmap remain authoritative.
 
-`config/roadmap.json` designates **`release-first-3-0-2026-09` as `primaryPlan`**. Its
+**September 13 amendment.** `config/roadmap.json` now designates
+`harness-stabilization-2026-09` as `primaryPlan` until two September 13 findings are decided
+(MV-07, the fp16 speech tokenizer's opening burst on streamed clone takes, and PC-03, the 1.8 s
+gap between playback scheduling and audible output); this plan stays active and secondary and
+returns to `primaryPlan` afterwards. RF-11 was superseded by ICA-04/ICA-05 (one campaign, one
+owner) and RF-12 now waits on ICA-05; RF-09 is re-gated on the freeze commit behind RF-13.
+
+Until then, `config/roadmap.json` designated **`release-first-3-0-2026-09` as `primaryPlan`**. Its
 `RF-01` through `RF-13` milestones remain the execution roadmap. The September 6 iOS-first
 amendment below supersedes their original numeric scheduling order, not their closure gates.
 Both `roadmap.py status` and the generated `docs/ROADMAP.md` present it first. Older plans retain

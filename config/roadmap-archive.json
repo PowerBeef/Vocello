@@ -82,6 +82,26 @@
       "adopted": "2026-09-11",
       "goal": "Replace the Codex-shaped governance (AGENTS.md, .agents rules, .codex hook, session-storage tooling) with repository-owned, gate-validated Claude Code configuration (CLAUDE.md, path-scoped .claude/rules, hooks, skills, subagents), route the testing workflow through XcodeBuildMCP, Axiom and project subagents without weakening any invariant, and modernize the macOS unit lane (xcresult, coverage) and the Python test roots through the replace-and-retire procedure.",
       "authority": "docs/reference/development-workflow.md"
+    },
+    {
+      "id": "machinery-validation-follow-ups-2026-09",
+      "title": "Development machinery: follow-ups from the September 12–13 validation campaign",
+      "status": "superseded",
+      "owner": "release-qa",
+      "authority": "docs/development-progress.md",
+      "adopted": "2026-09-13",
+      "goal": "Close the gaps the validation campaign measured but did not fix: CI's macOS cache that restores yet recompiles, the optimized CLI sharing the -Onone arena locally, dispatch runs cancelling push runs, the Linux contract gate that lets the swift lane shrink, and the two audio-QC findings (the clone short onset burst and a clip-level quality screen).",
+      "supersededBy": "harness-stabilization-2026-09"
+    },
+    {
+      "id": "playback-capture-evidence-2026-09",
+      "title": "Played-audio capture evidence for the macOS benchmark lane",
+      "status": "superseded",
+      "owner": "release-qa",
+      "authority": "docs/development-progress.md",
+      "adopted": "2026-09-13",
+      "goal": "Capture what the Vocello app actually renders during each UI benchmark take through an Apple Core Audio process tap (muted physical output), compare it with the published take WAV and record the listener-side metrics (audible first sample, alignment, residual, dropouts, coverage, step bursts) as warn-only evidence; promote thresholds to a gate once a corpus exists. Maintainer decisions of September 13: process tap, mute during lanes, evidence first, benchmark lane only.",
+      "supersededBy": "harness-stabilization-2026-09"
     }
   ],
   "items": [
@@ -2743,7 +2763,7 @@
     },
     {
       "id": "PC-01",
-      "plan": "playback-capture-evidence-2026-09",
+      "plan": "harness-stabilization-2026-09",
       "title": "Capture and compare what the app plays during every macOS benchmark take",
       "status": "done",
       "updated": "2026-09-13",
@@ -2766,6 +2786,46 @@
         "config/orchestration-contract.json"
       ],
       "notes": "Closed 2026-09-13. Details in docs/development-progress.md (Machinery validation, played-audio capture landed)."
+    },
+    {
+      "id": "F-17",
+      "plan": "engineering-review-remediation-2026-08",
+      "title": "P1 release dependency — distribute an optimized standalone CLI package",
+      "status": "superseded",
+      "supersededBy": "RF-08",
+      "updated": "2026-09-13",
+      "gate": "The existing release workflow produces a separate arm64 CLI DMG containing all required runtime resources/libraries and notices, Developer ID signatures, notarization/stapling, checksums and source/version provenance. The copied package works outside the checkout and in paths with spaces; version/JSON discovery, all three modes, cancellation and error exits pass. No Homebrew route or privileged installer. Public promotion requires the existing exact-source gate and separate authorization.",
+      "notes": "Closed 2026-09-13. Same work as RF-08 (the release workflow's optimized CLI DMG); RF-08 carries it in legacyIds and F-05 keeps the packaged-launch smoke."
+    },
+    {
+      "id": "RF-11",
+      "plan": "release-first-3-0-2026-09",
+      "title": "account for the full frozen-source 201-take iOS campaign",
+      "status": "superseded",
+      "supersededBy": "ICA-04",
+      "updated": "2026-09-13",
+      "gate": "Complete ICA-04/ICA-05's full 201-take plan in bounded mode-grouped shards with frozen seeds/corpus, all original failures/attempts retained, terminal state and preservation before each next cell, and correlated UI/receipt/QC/History/playback/cleanup after every shard. Complete applicable outstanding controls/accessibility/model/perf acceptance, reserve collection before device deadlines and verify unattended screen protection/termination/cleanup. Accounted-for is not PASS; no difficult, failed or missing row may be dropped or substituted.",
+      "notes": "Closed 2026-09-13. Same campaign as ICA-04 (execution) and ICA-05 (report); ICA-04 carries the sharding, reservation and unattended-run clauses and RF-12 now waits on ICA-05."
+    },
+    {
+      "id": "ICA-20",
+      "plan": "ios-control-audit-2026-08",
+      "title": "iOS XCUITest coverage for onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings",
+      "status": "superseded",
+      "supersededBy": "AV-13",
+      "updated": "2026-09-13",
+      "gate": "The 2026-09-11 XCUITest audit found 34 of 93 iOS identifiers never exercised: onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings. Extend the control-audit plan (`config/ios-control-audit.json`) and the smoke or control-audit classes so each control is source-bound, observed on the paired iPhone through genuine controls, and cleaned up. Replace the remaining English-label lookups (History clear and delete confirmations, seed unpin menu, Play/Pause label checks) with stable identifiers or accessibility values added in `Sources/iOS`. Validated only by an explicitly requested `scripts/ui_test.sh ios <lane>` run.",
+      "notes": "Closed 2026-09-13. One 2026-09-11 identifier audit split by platform; AV-13 now carries both the macOS and the iOS clauses."
+    },
+    {
+      "id": "MV-02",
+      "plan": "machinery-validation-follow-ups-2026-09",
+      "title": "The optimized CLI shares the -Onone macOS arena locally",
+      "status": "superseded",
+      "supersededBy": "MV-01",
+      "updated": "2026-09-13",
+      "gate": "A gate bench or lang-bench run followed by scripts/macos_test.sh test does not recompile the package graph; the optimized CLI builds into a registered arena of its own and the build receipt path follows.",
+      "notes": "Closed 2026-09-13. Same recompilation root cause seen from the laptop; MV-01 now carries the local-arena clause."
     }
   ]
 }

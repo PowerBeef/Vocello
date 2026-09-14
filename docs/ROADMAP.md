@@ -4,7 +4,7 @@
 > Open work lives in `config/roadmap.json`; finished items and completed plans are in
 > `config/roadmap-archive.json` and only count toward progress here.
 
-**Current execution plan: Vocello 3.0 — primary release-first execution plan** (`release-first-3-0-2026-09`).
+**Current execution plan: Harness stabilization first: audio-QC decisions, played-audio evidence and development machinery** (`harness-stabilization-2026-09`).
 Follow its ordered milestones; the other plans retain the underlying defect records
 and deferred backlog. Milestone progress is not a release-readiness score.
 
@@ -12,64 +12,65 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 5/13 (38%) |
+| `harness-stabilization-2026-09` | active | release-qa | 1/10 (10%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 9/14 (64%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
-| `engineering-review-remediation-2026-08` | active | backend-and-platform | 14/26 (54%) |
+| `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
-| `ios-control-audit-2026-08` | active | ios | 16/21 (76%) |
+| `ios-control-audit-2026-08` | active | ios | 17/21 (81%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
-| `machinery-validation-follow-ups-2026-09` | active | release-qa | 0/7 (0%) |
-| `playback-capture-evidence-2026-09` | active | release-qa | 1/3 (33%) |
+| `release-first-3-0-2026-09` | active | release-qa | 6/13 (46%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
-## Vocello 3.0 — primary release-first execution plan
+## Harness stabilization first: audio-QC decisions, played-audio evidence and development machinery
 
-`release-first-3-0-2026-09` · **active** · release-qa · adopted 2026-09-04
+`harness-stabilization-2026-09` · **active** · release-qa · adopted 2026-09-13
 
-September 6 accelerated iOS submission order: RF-01 queue, RF-02 external packet alongside engineering, RF-06 bounded audio corrections, RF-09 platform applicability/candidate route and authorized freeze, RF-11 targeted acceptance then all 201 takes, RF-12 processed-candidate acceptance and submission materials. RF-03/04/05/07 implementation stays done. Park RF-08/RF-10 Mac/CLI-only qualification and broad research off the iOS critical path; preserve original defect gates. Existing F/ASR/ICA/VLR/AV authorities remain. Implementation, candidate proof and submission authorization differ. No account mutation, candidate operation, upload or uninstall is implicitly authorized.
+Decide the two September 13 findings before release work resumes: MV-07 (the fp16 speech tokenizer opens streamed clone takes with a burst: fix the first streamed chunk, decode it at fp32, or ship the fp32 codec again) and PC-03 (1.8 s between playbackScheduledMS and audible output). Around them: close the machinery gaps the validation campaign measured but did not fix (one build arena, CI concurrency, the Linux contract gate), give the QC a second machine judge, promote the played-audio comparison to a gate once three canonical captured runs exist, and finish the TSan characterization before its 2026-09-30 deadline. Absorbs machinery-validation-follow-ups-2026-09 and playback-capture-evidence-2026-09 with their ids kept. release-first-3-0-2026-09 stays active and secondary and returns to primaryPlan when MV-07 and PC-03 are decided.
 
-Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](reference/release-first-execution-2026-09.md)
+Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `RF-02` | in-flight | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
-| `RF-06` | in-flight | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
-| `RF-08` | parked | package the downloadable optimized CLI | — |
-| `RF-09` | in-flight | verify the coherent tree and freeze the 3.0.0 candidate | — |
-| `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
-| `RF-11` | planned | account for the full frozen-source 201-take iOS campaign | `RF-09` |
-| `RF-12` | planned | verify the distribution iOS candidate and finish submission preparation | `RF-11` |
-| `RF-13` | in-flight | implement the one-time iOS Design and Clone export unlock before freeze | — |
+| `HS-01` | planned | Complete the TSan characterization and decide promotion | — |
+| `MV-01` | planned | One build arena per optimization level: the macOS cache restores yet recompiles, and the optimized CLI flips the local arena | — |
+| `MV-03` | planned | A manual ci.yml dispatch cancels the in-flight push run | — |
+| `MV-04` | planned | Run the deterministic contract gate on Linux so the swift lane routes on compile inputs only | — |
+| `MV-05` | planned | The plosive-onset burst in short clone takes is model-intrinsic and still unjudged | `MV-06` |
+| `MV-06` | planned | A clip-level non-intrusive quality screen as a second machine judge | — |
+| `MV-07` | planned | The fp16 speech tokenizer opens streamed clone takes with a full-scale burst | — |
+| `PC-02` | planned | Promote the played-audio comparison from warnings to a gate | `PC-01` |
+| `PC-03` | planned | Explain the 1.8 s gap between playback scheduling and audible output | — |
 
 ### Open items in detail
 
-- **`RF-02`** (in-flight) — complete Apple prerequisites and the consolidated qualified-decision packet.
-  gate: Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement, version, and collision checks. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; qualified legal/privacy decisions are recorded before closure. Authentication failures remain failures.
+- **`HS-01`** (planned) — Complete the TSan characterization and decide promotion.
+  gate: config/tsan-policy.json records three consecutive nightly.yml passes on or before its 2026-09-30 deadline with zero open confirmed races (each confirmed race becomes its own item), then the maintainer records the blocking or non-blocking decision in the policy status; deterministic and MLX runtime coverage are never weakened to pass.
 
-- **`RF-06`** (in-flight) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
-  gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.
+- **`MV-01`** (planned) — One build arena per optimization level: the macOS cache restores yet recompiles, and the optimized CLI flips the local arena.
+  gate: The warm macOS lane's deterministic-tests step compiles fewer than 100 Swift files after an exact cache hit, or the cache is replaced by a mechanism that survives the round trip (content-addressed compilation cache). Locally, a scripts/build.sh cli-optimized (gate bench, lang-bench, benchmark lanes) followed by scripts/macos_test.sh test does not recompile the package graph: the optimized CLI builds into a registered arena of its own in config/build-output-policy.json and the build receipt path follows.
 
-- **`RF-08`** (parked) — package the downloadable optimized CLI.
-  gate: Implement F-17 in the existing release workflow: separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, a real two-item batch, cancellation, failure exits and resource loading. The F-21 batch-admission regression must use production-built requests against the real engine policy; keep index/total outside ordinary requests. No Homebrew route, privileged installer, shell-profile edits, or second release system.
-  unparkWhen: The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.
+- **`MV-03`** (planned) — A manual ci.yml dispatch cancels the in-flight push run.
+  gate: concurrency.group keys on the event name as well as the ref, so a measurement dispatch never supersedes the gate run for a commit; a dispatch and a push on the same commit both finish.
 
-- **`RF-09`** (in-flight) — verify the coherent tree and freeze the 3.0.0 candidate.
-  gate: Run derived refresh/validation, full project-input gate, macOS deterministic tests/app build, generic physical-iOS SDK compile, website check and affected release/privacy/attribution/supply-chain fixtures. Set shared version 3.0.0 through project.yml, reconcile the pending iOS version and collision-check an unused build number under ASR-08. Commit main and require exact-SHA CI/security, verified annotated-tag authority and command-bound candidate evidence; compute required promotion lanes before expensive QA. No unrelated source/docs edits during the frozen campaign or full-tree identity bypass. The September 4 pre-freeze source amendment must first qualify F-18/F-01 preservation, F-19 terminal ownership, F-22 shared-store exclusion, F-20/F-21 CLI lifecycle/accounting, F-16 recovery/retention, and VLR-07 live-duration/edge semantics. This means their bounded source corrections/tests, not their later device or signed-candidate closure gates; do not introduce a dependency cycle or replace RF-10 through RF-12. Complete RF-13 source implementation and focused purchase/export verification before final iOS candidate freeze; later processed-candidate IAP acceptance remains RF-12, avoiding a circular dependency.
+- **`MV-04`** (planned) — Run the deterministic contract gate on Linux so the swift lane routes on compile inputs only.
+  gate: scripts/check_project_inputs.sh runs in the ubuntu contracts job (product contracts, invariants, privacy scan, roadmap validator) and scripts/ci/classify_changes.py's swift rule shrinks to Sources, Tests, project.yml, package manifests, xcode-schemes and benchmark evidence.
 
-- **`RF-10`** (parked) — independently qualify macOS and downloadable CLI.
-  gate: Close F-05 with actual signed/notarized packaged-app startup/XPC evidence, verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.
-  unparkWhen: The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.
+- **`MV-05`** (planned) — The plosive-onset burst in short clone takes is model-intrinsic and still unjudged.
+  gate: Either the generator no longer produces the plosive-onset cluster on the clone short cell, or MV-06's clip-level judge, extended with an onset-window metric if NISQA alone does not separate it, carries a validated perceptual judgement of it; in both cases the reproduction in the notes passes a machine gate without listening.
 
-- **`RF-11`** (planned) — account for the full frozen-source 201-take iOS campaign.
-  gate: Complete ICA-04/ICA-05's full 201-take plan in bounded mode-grouped shards with frozen seeds/corpus, all original failures/attempts retained, terminal state and preservation before each next cell, and correlated UI/receipt/QC/History/playback/cleanup after every shard. Complete applicable outstanding controls/accessibility/model/perf acceptance, reserve collection before device deadlines and verify unattended screen protection/termination/cleanup. Accounted-for is not PASS; no difficult, failed or missing row may be dropped or substituted.
+- **`MV-06`** (planned) — A clip-level non-intrusive quality screen as a second machine judge.
+  gate: A pinned, reference-free speech-quality model (NISQA v2 or an MLX port) scores every published take in the delivery-analysis cascade with a corpus-calibrated warn floor; weights and runtime pinned by digest in config/toolchain.json; no listening in the loop.
 
-- **`RF-12`** (planned) — verify the distribution iOS candidate and finish submission preparation.
-  gate: Under ASR-05 through ASR-12, verify archive/IPA entitlements/privacy/notices/architecture/UUID identity and absence of internal diagnostics. Separately authorize any internal TestFlight upload, then black-box test the processed candidate through the same XCUITest stack without replacing it with a diagnostics build. Preserve personal data during upgrade; fresh install needs another phone or explicit verified backup/reinstallation authorization. Verify reviewer-critical downloads/modes/import/transcription/permissions/offline/recovery/long-form/export, storage/screenshots, manual-only gaps, fresh regional hosting and all qualified account/privacy/rights decisions. No unexplained required failure; App Review submission requires separate explicit authorization and approval is not guaranteed.
+- **`MV-07`** (planned) — The fp16 speech tokenizer opens streamed clone takes with a full-scale burst.
+  gate: On the clone short cell over at least 28 fixed seeds, no take carries a step burst inside its first 50 ms and no take's first 50 ms peak exceeds 0.5 (the fp32 codec's figures: 0/28 and 1/28), with the fp16 codec kept or a decision recorded to ship the fp32 codec again; the QC v7 onset_step_burst warning then never fires on that matrix.
 
-- **`RF-13`** (in-flight) — implement the one-time iOS Design and Clone export unlock before freeze.
-  gate: Implement one verified StoreKit non-consumable entitlement for Design/Clone output export. All other functionality, generation/listening/internal History in every mode and Built-in output export remain free. Define local StoreKit test configuration first; centralize entitlement and output-provenance-based export authorization across Studio/full player/History, Files/share/save destination, long-form/segments, recovery and applicable automation. Audit document sharing/storage bypasses without deleting personal files or paywalling original reference recovery. Test purchased/unpurchased, cancelled/pending/failed/unverified transactions, restore, relaunch/offline owned access, refund/revocation and free-mode controls using deterministic policy/StoreKit tests and focused physical XCUITest. Preserve model/QC/seed policies and macOS/CLI behavior. RF-02 owns product ID/name/price/Family Sharing and live account setup; RF-12 owns processed-candidate purchase and first-IAP review proof. No live purchase or account mutation without separate authorization. Source/focused verification precedes RF-09 freeze and RF-11 full campaign; local test configuration is not a live product. Monetization and App Store submission are iOS-only. macOS remains distributed through GitHub Releases; macOS/CLI exports must not depend on StoreKit entitlements. Do not introduce a Mac App Store submission route.
+- **`PC-02`** (planned) — Promote the played-audio comparison from warnings to a gate.
+  gate: Thresholds for alignment, residual, dropouts and coverage are set from at least three canonical captured runs and a failing comparison fails the lane; the smoke lane captures too.
+
+- **`PC-03`** (planned) — Explain the 1.8 s gap between playback scheduling and audible output.
+  gate: The macOS app's playback timeline accounts for the interval between playbackScheduledMS and the first audible captured frame: either the timeline gains the event that actually starts audio (device start, final-file player start) and the capture agrees with it within 250 ms on three canonical runs, or the latency is removed; the playback.capture.misaligned warning then clears on Custom/short final-file takes.
 
 ## Autonomous validation audit remediation
 
@@ -84,7 +85,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `AV-07` | in-flight | P2 — independently validate prosody thresholds | — |
 | `AV-08` | in-flight | P2 — qualify multilingual output beyond a single cohort | — |
 | `AV-09` | in-flight | P2 — make stateful physical-device lanes independently repeatable | — |
-| `AV-13` | planned | macOS XCUITest lanes for the untested identifiers (Design/Clone generation, enrollment, History actions, seed pin, downloads, batch cancel) | — |
+| `AV-13` | planned | XCUITest coverage for the identifiers never exercised (78 macOS, 34 iOS) | — |
 | `AV-14` | in-flight | re-baseline the benchmark harness under the standard RTF definition (consent-bound runs) | — |
 
 ### Open items in detail
@@ -98,8 +99,8 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 - **`AV-09`** (in-flight) — P2 — make stateful physical-device lanes independently repeatable.
   gate: Each stateful iOS UI lane must declare and preflight exact prerequisites, use a non-destructive test-owned run namespace, and keep fixture-dependent journeys separate from generic smoke; download scheduling unit tests must use a controllable clock while retaining one real-throttle integration proof. Required closure evidence: missing/present/stale prerequisite fixtures, isolated reruns without residual-state failures, unchanged fail-closed no-retry policy, and physical-device XCUITest evidence for affected lanes.
 
-- **`AV-13`** (planned) — macOS XCUITest lanes for the untested identifiers (Design/Clone generation, enrollment, History actions, seed pin, downloads, batch cancel).
-  gate: The 2026-09-11 XCUITest audit found 78 of 102 macOS accessibility identifiers never exercised. Add acceptance coverage, in the existing lane structure, for Voice Design and Voice Cloning generation through the visible controls, saved-voice enrollment (recording to enrollment and Save), History playback, export and delete, the seed pin, the Settings model download route, and batch cancel. Each lane asserts real persisted state (History rows, files) and restores user data; no hidden markers or seeded state. Validated only by an explicitly requested `scripts/ui_test.sh macos <lane>` run.
+- **`AV-13`** (planned) — XCUITest coverage for the identifiers never exercised (78 macOS, 34 iOS).
+  gate: The 2026-09-11 XCUITest audit found 78 of 102 macOS and 34 of 93 iOS accessibility identifiers never exercised. macOS: add acceptance coverage, in the existing lane structure, for Voice Design and Voice Cloning generation through the visible controls, saved-voice enrollment (recording to enrollment and Save), History playback, export and delete, the seed pin, the Settings model download route, and batch cancel; each lane asserts real persisted state and restores user data. iOS: extend the control-audit plan (config/ios-control-audit.json) and the smoke or control-audit classes so onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings are source-bound, observed on the paired iPhone through genuine controls and cleaned up, and replace the remaining English-label lookups (History clear and delete confirmations, seed unpin menu, Play/Pause labels) with stable identifiers or accessibility values in Sources/iOS. No hidden markers or seeded state. Validated only by explicitly requested scripts/ui_test.sh macos <lane> and scripts/ui_test.sh ios <lane> runs.
 
 - **`AV-14`** (in-flight) — re-baseline the benchmark harness under the standard RTF definition (consent-bound runs).
   gate: After the 2026-09-12 harness fixes: (1) run `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` and re-save `benchmarks/baselines/mac-gate-bench.json` from a three-take run so it carries `rtfDefinition`, `rtfMAD`, n=3 and the host OS/Xcode identity; (2) one canonical `scripts/ui_test.sh macos benchmark` and one `scripts/ui_test.sh ios benchmark` run publish the first records with `run.rtfDefinition`, validate the provenance-bound optimization label, the iOS cell-length check and the sleep hold; (3) one macOS and one iOS `perf` run re-derive the warn-only thresholds under the clipped window arithmetic and the macOS environment row; (4) repin `scripts/generate_readme_charts.py` and the website chart to the new canonical macOS record. (5) one macOS `scripts/macos_test.sh lang-bench --subset quick` run publishes the first whisper-verified (`focused`, single-family) macOS language record and exercises the producer on generated audio under the host-quiet preflight. Each run needs explicit consent (model download, phone).
@@ -153,7 +154,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `F-06` | in-flight | Medium — durably couple audio publication and History persistence | — |
 | `F-15` | planned | P1 — preserve macOS Voice Design language, seed, and variation at launch | `RF-10` |
 | `F-16` | in-flight | P1 — transactionally accept long-form projects and replacement segments | — |
-| `F-17` | planned | P1 release dependency — distribute an optimized standalone CLI package | `RF-08` |
 | `F-18` | planned | P1 — preserve pre-existing generation destinations across failure and cancellation | `RF-10` |
 | `F-20` | planned | P2 — make CLI signal cancellation graceful and bounded | `RF-10` |
 | `F-21` | planned | P1 — restore CLI batch admission and preserve partial outcomes | `RF-10` |
@@ -177,9 +177,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 - **`F-16`** (in-flight) — P1 — transactionally accept long-form projects and replacement segments.
   gate: Both platforms stage and QC candidate segment/joined audio and a throwing manifest before accepted History mutation. Journaled atomic-file/database recovery is idempotent; normal failure preserves the accepted project and removes only unreferenced owned candidates. Fault tests cover serialization, writes, assembly, QC, database commits, cancellation and interruption; unchanged QC/seeds survive replacement, reused segments count once, and segment/project terminals are distinct. Existing manifests decode. Native long-form/regeneration acceptance passes on both platforms. Before RF-09 freeze, qualify recoveryRequired with an actual non-destructive recovery/export path and usable unrelated History where safe, cross-referencing F-06. Define accepted/candidate/recovery/session-resume/discardable ownership and test abandon/new-project/relaunch/replacement/delete/clear-all; retain anything referenced by accepted History, a journal, pending outbox, active playback or export. Intentional retention must be bounded and documented, not silently deleted.
-
-- **`F-17`** (planned) — P1 release dependency — distribute an optimized standalone CLI package.
-  gate: The existing release workflow produces a separate arm64 CLI DMG containing all required runtime resources/libraries and notices, Developer ID signatures, notarization/stapling, checksums and source/version provenance. The copied package works outside the checkout and in paths with spaces; version/JSON discovery, all three modes, cancellation and error exits pass. No Homebrew route or privileged installer. Public promotion requires the existing exact-source gate and separate authorization.
 
 - **`F-18`** (planned) — P1 — preserve pre-existing generation destinations across failure and cancellation.
   gate: Define publication ownership and the no-clobber or explicit atomic-replacement policy before touching an existing destination. Failed startup, QC rejection, cancellation, allocation retry and publication failure must preserve pre-existing bytes; clean only operation-owned staging/output. Native sentinel-hash fixtures cover successful replacement, reference/output aliasing and two writers targeting one path. Qualify corrected app and copied-CLI paths without hidden retry.
@@ -266,12 +263,11 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `ICA-05` | planned | Publish the evidence-linked device findings checkpoint | `ICA-04` |
 | `ICA-06` | in-flight | P1 — localize the long-Chinese non-EOS generation failure and terminal message | — |
 | `ICA-15` | in-flight | P1 — bound deterministic CustomVoice over-continuation without truncating valid speech | — |
-| `ICA-20` | planned | iOS XCUITest coverage for onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings | — |
 
 ### Open items in detail
 
 - **`ICA-04`** (planned) — Execute the complete physical-device campaign.
-  gate: On the paired unlocked, charged, thermally nominal iPhone, complete inventory, stateful, external, accessibility, saved-voice, isolated model diagnose/queue/acceptance, generation, smoke, and perf phases against one frozen source identity. Every row must receive a terminal classification, every generated take must correlate visible request, receipt, QC, History and playback, and no failed row may be automatically retried or replaced.
+  gate: On the paired unlocked, charged, thermally nominal iPhone, complete inventory, stateful, external, accessibility, saved-voice, isolated model diagnose/queue/acceptance, generation, smoke, and perf phases against one frozen source identity. Every row must receive a terminal classification, every generated take must correlate visible request, receipt, QC, History and playback, and no failed row may be automatically retried or replaced. Run in bounded mode-grouped shards with frozen seeds and corpus, reserve collection at least 20 minutes before each device deadline, verify unattended screen protection, termination and cleanup, and correlate UI, receipt, QC, History, playback and cleanup after every shard. Accounted-for is not PASS: no difficult, failed or missing row may be dropped or substituted.
 
 - **`ICA-05`** (planned) — Publish the evidence-linked device findings checkpoint.
   gate: After ICA-04, re-pin the historical audit report with every control and generation row represented, P0-P3 findings separated into product, harness, infrastructure, prerequisite, preservation-policy, not-applicable and post-failure categories, exact untracked artifact references, restoration proof, and objective remediation gates. No product fix may be folded into the audit without a separate request.
@@ -281,9 +277,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 - **`ICA-15`** (in-flight) — P1 — bound deterministic CustomVoice over-continuation without truncating valid speech.
   gate: Preserve the exact custom-005 Eric, Calm Strong, Italian, Consistent request and independently reproduce its sampled-output failure across warm/cold and streaming/non-streaming paths. The retained codec traces, full and incremental decoder replays, final model counters, EOS/token-cap state, AudioQC, memory, and publication outcome must identify the first divergent layer. Evaluate any continuation-budget candidate on a pre-registered representative CustomVoice corpus spanning script lengths, languages, deliveries, speakers, seeds, and both output modes. A production change qualifies only if it prevents the reproduced pathological continuation without converting valid speech to token-cap/incomplete failures, worsening WER/CER or delivery evidence, changing sampling defaults, or weakening mandatory QC. If no candidate qualifies, preserve fail-closed rejection and explicit user-controlled retry; never trim, silently regenerate, or substitute a seed.
-
-- **`ICA-20`** (planned) — iOS XCUITest coverage for onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings.
-  gate: The 2026-09-11 XCUITest audit found 34 of 93 iOS identifiers never exercised: onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings. Extend the control-audit plan (`config/ios-control-audit.json`) and the smoke or control-audit classes so each control is source-bound, observed on the paired iPhone through genuine controls, and cleaned up. Replace the remaining English-label lookups (History clear and delete confirmations, seed unpin menu, Play/Pause label checks) with stable identifiers or accessibility values added in `Sources/iOS`. Validated only by an explicitly requested `scripts/ui_test.sh ios <lane>` run.
 
 ## iOS Built-in Voice startup reliability
 
@@ -327,67 +320,48 @@ Narrative authority: [`docs/reference/ios-ui-reference.md`](reference/ios-ui-ref
 - **`ISU-5`** (in-flight) — AX-XXXL reachability: cap the tab dock's Dynamic Type growth, restore the switch role and adapt the App Language rows.
   gate: Physical iPhone English/French AX-XXXL and pseudo-localization Settings walks reach and mutate App Language with the existing identifiers; VoiceOver announces the accessibility toggles as switches; no new identifiers or copy.
 
-## Development machinery: follow-ups from the September 12–13 validation campaign
+## Vocello 3.0 — release-first execution plan (secondary while harness-stabilization-2026-09 is primary)
 
-`machinery-validation-follow-ups-2026-09` · **active** · release-qa · adopted 2026-09-13
+`release-first-3-0-2026-09` · **active** · release-qa · adopted 2026-09-04
 
-Close the gaps the validation campaign measured but did not fix: CI's macOS cache that restores yet recompiles, the optimized CLI sharing the -Onone arena locally, dispatch runs cancelling push runs, the Linux contract gate that lets the swift lane shrink, and the two audio-QC findings (the clone short onset burst and a clip-level quality screen).
+September 6 accelerated iOS submission order: RF-01 queue, RF-02 external packet alongside engineering, RF-06 bounded audio corrections, RF-09 platform applicability/candidate route and authorized freeze, ICA-04/ICA-05 (formerly RF-11) targeted acceptance then all 201 takes, RF-12 processed-candidate acceptance and submission materials. RF-03/04/05/07 implementation stays done. Park RF-08/RF-10 Mac/CLI-only qualification and broad research off the iOS critical path; preserve original defect gates. Existing F/ASR/ICA/VLR/AV authorities remain. Implementation, candidate proof and submission authorization differ. No account mutation, candidate operation, upload or uninstall is implicitly authorized.
 
-Narrative authority: [`docs/development-progress.md`](development-progress.md)
-
-| Item | Status | Title | Blocked by |
-| --- | --- | --- | --- |
-| `MV-01` | planned | macOS push CI restores its weekly DerivedData cache and still recompiles the package graph | — |
-| `MV-02` | planned | The optimized CLI shares the -Onone macOS arena locally | — |
-| `MV-03` | planned | A manual ci.yml dispatch cancels the in-flight push run | — |
-| `MV-04` | planned | Run the deterministic contract gate on Linux so the swift lane routes on compile inputs only | — |
-| `MV-05` | planned | The plosive-onset burst in short clone takes is model-intrinsic and still unjudged | — |
-| `MV-06` | planned | A clip-level non-intrusive quality screen as a second machine judge | — |
-| `MV-07` | planned | The fp16 speech tokenizer opens streamed clone takes with a full-scale burst | — |
-
-### Open items in detail
-
-- **`MV-01`** (planned) — macOS push CI restores its weekly DerivedData cache and still recompiles the package graph.
-  gate: The warm macOS lane's deterministic-tests step compiles fewer than 100 Swift files after an exact cache hit, or the cache is replaced by a mechanism that survives the round trip (content-addressed compilation cache).
-
-- **`MV-02`** (planned) — The optimized CLI shares the -Onone macOS arena locally.
-  gate: A gate bench or lang-bench run followed by scripts/macos_test.sh test does not recompile the package graph; the optimized CLI builds into a registered arena of its own and the build receipt path follows.
-
-- **`MV-03`** (planned) — A manual ci.yml dispatch cancels the in-flight push run.
-  gate: concurrency.group keys on the event name as well as the ref, so a measurement dispatch never supersedes the gate run for a commit; a dispatch and a push on the same commit both finish.
-
-- **`MV-04`** (planned) — Run the deterministic contract gate on Linux so the swift lane routes on compile inputs only.
-  gate: scripts/check_project_inputs.sh runs in the ubuntu contracts job (product contracts, invariants, privacy scan, roadmap validator) and scripts/ci/classify_changes.py's swift rule shrinks to Sources, Tests, project.yml, package manifests, xcode-schemes and benchmark evidence.
-
-- **`MV-05`** (planned) — The plosive-onset burst in short clone takes is model-intrinsic and still unjudged.
-  gate: Either the generator no longer produces the onset burst on the clone short cell, or the QC carries a validated perceptual judgement of it; in both cases the reproduction below passes a machine gate without listening.
-
-- **`MV-06`** (planned) — A clip-level non-intrusive quality screen as a second machine judge.
-  gate: A pinned, reference-free speech-quality model (NISQA v2 or an MLX port) scores every published take in the delivery-analysis cascade with a corpus-calibrated warn floor; weights and runtime pinned by digest in config/toolchain.json; no listening in the loop.
-
-- **`MV-07`** (planned) — The fp16 speech tokenizer opens streamed clone takes with a full-scale burst.
-  gate: On the clone short cell over at least 28 fixed seeds, no take carries a step burst inside its first 50 ms and no take's first 50 ms peak exceeds 0.5 (the fp32 codec's figures: 0/28 and 1/28), with the fp16 codec kept or a decision recorded to ship the fp32 codec again; the QC v7 onset_step_burst warning then never fires on that matrix.
-
-## Played-audio capture evidence for the macOS benchmark lane
-
-`playback-capture-evidence-2026-09` · **active** · release-qa · adopted 2026-09-13
-
-Capture what the Vocello app actually renders during each UI benchmark take through an Apple Core Audio process tap (muted physical output), compare it with the published take WAV and record the listener-side metrics (audible first sample, alignment, residual, dropouts, coverage, step bursts) as warn-only evidence; promote thresholds to a gate once a corpus exists. Maintainer decisions of September 13: process tap, mute during lanes, evidence first, benchmark lane only.
-
-Narrative authority: [`docs/development-progress.md`](development-progress.md)
+Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](reference/release-first-execution-2026-09.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `PC-02` | planned | Promote the played-audio comparison from warnings to a gate | `PC-01` |
-| `PC-03` | planned | Explain the 1.8 s gap between playback scheduling and audible output | — |
+| `RF-02` | in-flight | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
+| `RF-06` | in-flight | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
+| `RF-08` | parked | package the downloadable optimized CLI | — |
+| `RF-09` | in-flight | verify the coherent tree and freeze the 3.0.0 candidate | — |
+| `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
+| `RF-12` | planned | verify the distribution iOS candidate and finish submission preparation | `ICA-05` |
+| `RF-13` | in-flight | implement the one-time iOS Design and Clone export unlock before freeze | — |
 
 ### Open items in detail
 
-- **`PC-02`** (planned) — Promote the played-audio comparison from warnings to a gate.
-  gate: Thresholds for alignment, residual, dropouts and coverage are set from at least three canonical captured runs and a failing comparison fails the lane; the smoke lane captures too.
+- **`RF-02`** (in-flight) — complete Apple prerequisites and the consolidated qualified-decision packet.
+  gate: Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement, version, and collision checks. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; qualified legal/privacy decisions are recorded before closure. Authentication failures remain failures.
 
-- **`PC-03`** (planned) — Explain the 1.8 s gap between playback scheduling and audible output.
-  gate: The macOS app's playback timeline accounts for the interval between playbackScheduledMS and the first audible captured frame: either the timeline gains the event that actually starts audio (device start, final-file player start) and the capture agrees with it within 250 ms on three canonical runs, or the latency is removed; the playback.capture.misaligned warning then clears on Custom/short final-file takes.
+- **`RF-06`** (in-flight) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
+  gate: Per the September 7 scheduling amendment in docs/reference/release-first-execution-2026-09.md: keep the English long-form generated-code failure as an open known limitation with its original code/audio/seed/receipt evidence and uncertainty preserved; verify explicit rejection, recovery and accepted-output preservation on current source; measure incidence and workflow impact through RF-11's frozen 201-take campaign rather than a new research matrix. The separate French interior-gap and Chinese trailing-silence/cadence findings stay open under VLR-07/ICA-15. QC, seeds, prompts, token caps and model pins stay unchanged absent causal proof; no sampled-output pathology becomes harness PASS, and shipping with an unresolved required failure needs a separately recorded risk decision.
+
+- **`RF-08`** (parked) — package the downloadable optimized CLI.
+  gate: In the existing release workflow (formerly F-17): separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, a real two-item batch, cancellation, failure exits and resource loading. The F-21 batch-admission regression must use production-built requests against the real engine policy; keep index/total outside ordinary requests. No Homebrew route, privileged installer, shell-profile edits, or second release system.
+  unparkWhen: The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.
+
+- **`RF-09`** (in-flight) — verify the coherent tree and freeze the 3.0.0 candidate.
+  gate: Run derived refresh/validation, full project-input gate, macOS deterministic tests/app build, generic physical-iOS SDK compile, website check and affected release/privacy/attribution/supply-chain fixtures. Set shared version 3.0.0 through project.yml, reconcile the pending iOS version and collision-check an unused build number under ASR-08. Commit main and require exact-SHA CI/security, verified annotated-tag authority and command-bound candidate evidence; compute required promotion lanes before expensive QA. No unrelated source/docs edits during the frozen campaign or full-tree identity bypass. The September 4 pre-freeze source amendment must first qualify F-18/F-01 preservation, F-19 terminal ownership, F-22 shared-store exclusion, F-20/F-21 CLI lifecycle/accounting, F-16 recovery/retention, and VLR-07 live-duration/edge semantics. This means their bounded source corrections/tests, not their later device or signed-candidate closure gates; do not introduce a dependency cycle or replace RF-10 through RF-12. Complete RF-13 source implementation and focused purchase/export verification before final iOS candidate freeze; later processed-candidate IAP acceptance remains RF-12, avoiding a circular dependency.
+
+- **`RF-10`** (parked) — independently qualify macOS and downloadable CLI.
+  gate: Close F-05 with actual signed/notarized packaged-app startup/XPC evidence, verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.
+  unparkWhen: The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.
+
+- **`RF-12`** (planned) — verify the distribution iOS candidate and finish submission preparation.
+  gate: Under ASR-05 through ASR-12, verify archive/IPA entitlements/privacy/notices/architecture/UUID identity and absence of internal diagnostics. Separately authorize any internal TestFlight upload, then black-box test the processed candidate through the same XCUITest stack without replacing it with a diagnostics build. Preserve personal data during upgrade; fresh install needs another phone or explicit verified backup/reinstallation authorization. Verify reviewer-critical downloads/modes/import/transcription/permissions/offline/recovery/long-form/export, storage/screenshots, manual-only gaps, fresh regional hosting and all qualified account/privacy/rights decisions. No unexplained required failure; App Review submission requires separate explicit authorization and approval is not guaranteed.
+
+- **`RF-13`** (in-flight) — implement the one-time iOS Design and Clone export unlock before freeze.
+  gate: Implement one verified StoreKit non-consumable entitlement for Design/Clone output export. All other functionality, generation/listening/internal History in every mode and Built-in output export remain free. Define local StoreKit test configuration first; centralize entitlement and output-provenance-based export authorization across Studio/full player/History, Files/share/save destination, long-form/segments, recovery and applicable automation. Audit document sharing/storage bypasses without deleting personal files or paywalling original reference recovery. Test purchased/unpurchased, cancelled/pending/failed/unverified transactions, restore, relaunch/offline owned access, refund/revocation and free-mode controls using deterministic policy/StoreKit tests and focused physical XCUITest. Preserve model/QC/seed policies and macOS/CLI behavior. RF-02 owns product ID/name/price/Family Sharing and live account setup; RF-12 owns processed-candidate purchase and first-IAP review proof. No live purchase or account mutation without separate authorization. Source/focused verification precedes RF-09 freeze and RF-11 full campaign; local test configuration is not a live product. Monetization and App Store submission are iOS-only. macOS remains distributed through GitHub Releases; macOS/CLI exports must not depend on StoreKit entitlements. Do not introduce a Mac App Store submission route.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

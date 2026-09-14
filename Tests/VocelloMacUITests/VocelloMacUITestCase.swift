@@ -223,12 +223,12 @@ class VocelloMacUITestCase: XCTestCase {
         navigate(to: .voices)
         let window = app.windows.firstMatch.frame
         let excluded = ["_use_", "_play_", "_delete_", "_transcriptStatus", "_qualityWarning", "_replaceReference"]
-        let predicate = NSPredicate(
-            format: "identifier BEGINSWITH %@ AND NOT (%@)", "voicesRow_",
-            NSCompoundPredicate(orPredicateWithSubpredicates: excluded.map {
-                NSPredicate(format: "identifier CONTAINS %@", $0)
-            })
-        )
+        let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            NSPredicate(format: "identifier BEGINSWITH %@", "voicesRow_"),
+            NSCompoundPredicate(notPredicateWithSubpredicate: NSCompoundPredicate(
+                orPredicateWithSubpredicates: excluded.map { NSPredicate(format: "identifier CONTAINS %@", $0) }
+            )),
+        ])
         let names = app.staticTexts.matching(predicate).allElementsBoundByIndex
         var checked = 0
         for name in names {

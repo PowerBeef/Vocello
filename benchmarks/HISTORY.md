@@ -1369,6 +1369,7 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-14 | [`macos-xcui-benchmark-20260914-051814-db6af858`](runs/ui-generation/macos-xcui-benchmark-20260914-051814-db6af858.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | 0.60 | `f069cee85b9d` | `8b07cae23f49` | baseline | pc02-corpus-2 |
+| 2026-09-14 | [`macos-xcui-benchmark-20260914-055243-dfa37630`](runs/ui-generation/macos-xcui-benchmark-20260914-055243-dfa37630.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | 0.60 | `468664669c5e` | `8b07cae23f49` | vs macos-xcui-benchmark-20260914-051814-db6af858: RTF +1.1% (slower), RAM -0.9% | pc02-corpus-3 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `8d727e051825`
 

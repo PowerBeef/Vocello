@@ -51,7 +51,7 @@ from lib import rtf as rtf_semantics  # noqa: E402
 
 # Newest canonical macOS UI matrix on the canonical hardware profile.
 # `--check` refuses a stale pin (see newest_canonical_record).
-RTF_RECORD = "macos-xcui-benchmark-20260914-051814-db6af858"
+RTF_RECORD = "macos-xcui-benchmark-20260914-055243-dfa37630"
 RTF_HARDWARE_PROFILE = "mac-mini-m2-8gb"
 LONGFORM_RUN_ID = "macos-xcui-smoke-20260725-062451-8f15c1fd"
 # (audio seconds, engine phys-footprint end MB, peak MB) per segment.

@@ -104,8 +104,12 @@ jobs:
           # roadmap.py resolves evidence commits against history.
           fetch-depth: 0
 
-      - name: Install ripgrep
-        run: sudo apt-get install -y --no-install-recommends ripgrep
+      - name: Install ripgrep and the pinned numpy
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends ripgrep
+          NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
+          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}"
 
       # The complete deterministic contract gate runs here on every push (MV-04):
       # product contracts, invariants, privacy scan, work authority and benchmark

@@ -2865,6 +2865,24 @@
         "MV-02"
       ],
       "notes": "Closed 2026-09-14. CI: the warm macOS lane of run 34799408393 printed 'test bundles built: 2 SwiftCompile task(s)' after its cache restore (the September 13 evidence runs compiled 927; the warm test step fell from 419 s in dispatch 34773187587 to 148 to 210 s). Local: build/cache/xcode/macos-optimized hosts scripts/build.sh cli-optimized and every macOS XCUITest lane, and scripts/macos_test.sh test right after a full optimized build reported 0 SwiftCompile tasks in the -Onone arena."
+    },
+    {
+      "id": "MV-04",
+      "plan": "harness-stabilization-2026-09",
+      "title": "Run the deterministic contract gate on Linux so the swift lane routes on compile inputs only",
+      "status": "done",
+      "updated": "2026-09-14",
+      "gate": "scripts/check_project_inputs.sh runs in the ubuntu contracts job (product contracts, invariants, privacy scan, roadmap validator) and scripts/ci/classify_changes.py's swift rule shrinks to Sources, Tests, project.yml, package manifests, xcode-schemes and benchmark evidence.",
+      "evidence": [
+        "commit:2be6b327",
+        "commit:ceb553c5"
+      ],
+      "sourceOfTruth": [
+        "scripts/ci/classify_changes.py",
+        ".github/workflows/ci.yml",
+        "scripts/check_project_inputs.sh"
+      ],
+      "notes": "Closed 2026-09-14. The ubuntu contracts job runs scripts/check_project_inputs.sh --python none on every push (green in run 34800316703 after the pinned numpy install that delivery_statistics.py needs); the macOS job keeps only the darwin-only pytest lane; the swift rule routes on compile inputs, build configs, benchmark evidence and the lane's own drivers (config/ and scripts/ changes no longer reach the macOS lane; scripts/tests/test_classify_changes.py pins the table). The closure push of this note, config and docs only, is the first routing proof."
     }
   ]
 }

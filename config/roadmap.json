@@ -1095,21 +1095,6 @@
       "unparkWhen": "The paired iPhone is available for one ios benchmark and one ios perf run (the macOS clauses are done)."
     },
     {
-      "id": "MV-04",
-      "plan": "harness-stabilization-2026-09",
-      "title": "Run the deterministic contract gate on Linux so the swift lane routes on compile inputs only",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "scripts/check_project_inputs.sh runs in the ubuntu contracts job (product contracts, invariants, privacy scan, roadmap validator) and scripts/ci/classify_changes.py's swift rule shrinks to Sources, Tests, project.yml, package manifests, xcode-schemes and benchmark evidence.",
-      "sourceOfTruth": [
-        "scripts/ci/classify_changes.py",
-        ".github/workflows/ci.yml",
-        "scripts/check_project_inputs.sh"
-      ],
-      "updated": "2026-09-13",
-      "notes": "Today config/ and scripts/ changes route to the 13-minute macOS lane because only it runs the contract gate. Identified in the September 12 routing repair (22ab4c42)."
-    },
-    {
       "id": "MV-05",
       "plan": "harness-stabilization-2026-09",
       "title": "The plosive-onset burst in short clone takes is model-intrinsic and still unjudged",
@@ -1175,7 +1160,7 @@
       "id": "PC-03",
       "plan": "harness-stabilization-2026-09",
       "title": "Explain the 1.8 s gap between playback scheduling and audible output",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "The macOS app's playback timeline accounts for the interval between playbackScheduledMS and the first audible captured frame: either the timeline gains the event that actually starts audio (device start, final-file player start) and the capture agrees with it within 250 ms on three canonical runs, or the latency is removed; the playback.capture.misaligned warning then clears on Custom/short final-file takes.",
       "sourceOfTruth": [
@@ -1184,8 +1169,8 @@
         "Sources/SharedSupport/Telemetry/AppGenerationTimeline.swift",
         "scripts/lib/playback_capture.py"
       ],
-      "updated": "2026-09-13",
-      "notes": "Opened 2026-09-13 from record macos-xcui-benchmark-20260913-220529-a1103a3a: on both Custom/short takes (playbackStartSource finalFile) the tap's first buffer arrived about 1.3 s after playbackScheduledMS and audio followed 0.3 to 0.5 s of digital silence later, so the listener hears the take about 1.8 s after the app says it scheduled playback and well after submitToCompletedMS. The app's timeline stops at scheduling (AppGenerationTimeline); the capture is the only witness of the audible onset. Product change needs its own decision; evidence first."
+      "updated": "2026-09-14",
+      "notes": "Opened 2026-09-13 from record macos-xcui-benchmark-20260913-220529-a1103a3a: on both Custom/short takes (finalFile playback) the tap's first buffer arrived about 1.3 s after playbackScheduledMS and audio followed 0.3 to 0.5 s of leading digital silence in the file. September 14 scratch probes validated the measurement and cleared the environment: the HDMI sink starts IO 55 to 95 ms after AudioDeviceStart; the tap connects to a running process within 20 to 120 ms and its HAL timestamps lead the callback clock by 32 ms; an AVAudioPlayer process tapped between two plays becomes audible 85 to 145 ms after play() with IO running and 300 to 530 ms after an idle restart (play() itself blocks 230 to 470 ms then), and the app's exact engine-to-file switch (node stop, engine reset or stop, then play) is audible within 95 ms. So the 1.3 s sits inside the app process after play() returns true, in a state none of the reproductions reached; no signposts are retained in the unified log. Next: stamp play() entry and exit and the first advance of the player's audio clock in the frontend metrics (the gate's first branch), then read them against the capture on the next captured run."
     },
     {
       "id": "HS-01",

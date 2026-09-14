@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `harness-stabilization-2026-09` | active | release-qa | 3/10 (30%) |
+| `harness-stabilization-2026-09` | active | release-qa | 4/10 (40%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 9/15 (60%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -34,20 +34,16 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `HS-01` | planned | Complete the TSan characterization and decide promotion | — |
-| `MV-04` | planned | Run the deterministic contract gate on Linux so the swift lane routes on compile inputs only | — |
 | `MV-05` | planned | The plosive-onset burst in short clone takes is model-intrinsic and still unjudged | `MV-06` |
 | `MV-06` | planned | A clip-level non-intrusive quality screen as a second machine judge | — |
 | `MV-07` | planned | The fp16 speech tokenizer opens streamed clone takes with a full-scale burst | — |
 | `PC-02` | planned | Promote the played-audio comparison from warnings to a gate | `PC-01` |
-| `PC-03` | planned | Explain the 1.8 s gap between playback scheduling and audible output | — |
+| `PC-03` | in-flight | Explain the 1.8 s gap between playback scheduling and audible output | — |
 
 ### Open items in detail
 
 - **`HS-01`** (planned) — Complete the TSan characterization and decide promotion.
   gate: config/tsan-policy.json records three consecutive nightly.yml passes on or before its 2026-09-30 deadline with zero open confirmed races (each confirmed race becomes its own item), then the maintainer records the blocking or non-blocking decision in the policy status; deterministic and MLX runtime coverage are never weakened to pass.
-
-- **`MV-04`** (planned) — Run the deterministic contract gate on Linux so the swift lane routes on compile inputs only.
-  gate: scripts/check_project_inputs.sh runs in the ubuntu contracts job (product contracts, invariants, privacy scan, roadmap validator) and scripts/ci/classify_changes.py's swift rule shrinks to Sources, Tests, project.yml, package manifests, xcode-schemes and benchmark evidence.
 
 - **`MV-05`** (planned) — The plosive-onset burst in short clone takes is model-intrinsic and still unjudged.
   gate: Either the generator no longer produces the plosive-onset cluster on the clone short cell, or MV-06's clip-level judge, extended with an onset-window metric if NISQA alone does not separate it, carries a validated perceptual judgement of it; in both cases the reproduction in the notes passes a machine gate without listening.
@@ -61,7 +57,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 - **`PC-02`** (planned) — Promote the played-audio comparison from warnings to a gate.
   gate: Thresholds for alignment, residual, dropouts and coverage are set from at least three canonical captured runs and a failing comparison fails the lane; the smoke lane captures too.
 
-- **`PC-03`** (planned) — Explain the 1.8 s gap between playback scheduling and audible output.
+- **`PC-03`** (in-flight) — Explain the 1.8 s gap between playback scheduling and audible output.
   gate: The macOS app's playback timeline accounts for the interval between playbackScheduledMS and the first audible captured frame: either the timeline gains the event that actually starts audio (device start, final-file player start) and the capture agrees with it within 250 ms on three canonical runs, or the latency is removed; the playback.capture.misaligned warning then clears on Custom/short final-file takes.
 
 ## Autonomous validation audit remediation

@@ -53,6 +53,14 @@ The same 28-seed clone-short matrix on the re-pinned model shows no burst inside
 and no QC v7 onset warning, matching the fp32 reference exactly; the plosive-onset cluster stays
 (MV-05). The gate-bench baseline is re-saved under the fp32 codec.
 
+**Second machine judge, September 14.** MV-06 is done on the torch route the DistilHuBERT candidate
+already established: NISQA v2 is a pinned evaluator candidate (checkpoint digest, upstream commit,
+runtime versions in the registry, a venv under the owned model root that the prepare step verifies)
+and the delivery cascade's `--clip-quality-config` scores both sides of every pair on the original
+24 kHz bytes. The warn floor is corpus-calibrated (tenth percentile of 54 neutral PASS takes, 3.81);
+a take below it abstains the pair and never rejects, so native QC keeps the decision. Two-run
+qualification passed. MV-05 is unblocked: its next step is the onset-window extension of that judge.
+
 Critical path: the MV-07 decision, MV-06, HS-01 by 2026-09-30; release-first resumes RF-13 → RF-09
 freeze → ICA-04 → ICA-05 → RF-12, and ISU-4's physical walk rides the next device window.
 

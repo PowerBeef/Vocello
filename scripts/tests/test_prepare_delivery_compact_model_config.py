@@ -92,6 +92,45 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(PreparationError, "lock the language"):
                 validate_candidate_contract(unlocked)
 
+    def test_nisqa_candidate_prepares_from_the_owned_model_root_with_its_warn_floor(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            contract = copy.deepcopy(self.contract)
+            candidate = contract["candidates"]["nisqa-v2"]
+            (root / "nisqa").mkdir()
+            (root / "nisqa/nisqa.tar").write_bytes(b"fixture nisqa checkpoint")
+            candidate["weightsSHA256"] = file_sha256(root / "nisqa/nisqa.tar")
+            runtime = root / "nisqa-runtime-py314/bin"
+            runtime.mkdir(parents=True)
+            (runtime / "python").write_bytes(b"#!/bin/sh\n")
+            contract_path = root / "contract.json"
+            contract_path.write_text(json.dumps(contract))
+            pins = candidate["runtimeDependencies"]
+            with patch("prepare_delivery_compact_model_config._nisqa_runtime_versions", return_value=dict(pins)):
+                config = prepare("nisqa-v2", contract_path=contract_path, model_root=root)
+            self.assertEqual(config["outputFormat"], "json")
+            self.assertEqual(config["warnFloor"]["mos"], candidate["warnFloor"]["mos"])
+            self.assertEqual(config["preprocessingConfig"]["inputAudio"], "original")
+            self.assertEqual(config["commandTemplate"][2], "nisqa")
+            self.assertIn("delivery_compact_model_runtime.py", config["commandTemplate"][1])
+            self.assertIs(validate_adapter_config(config), config)
+
+            drifted = dict(pins, torchmetrics="0.0.1")
+            with patch("prepare_delivery_compact_model_config._nisqa_runtime_versions", return_value=drifted):
+                with self.assertRaisesRegex(PreparationError, "dependency versions drifted"):
+                    prepare("nisqa-v2", contract_path=contract_path, model_root=root)
+            for mutate, message in (
+                (lambda c: c["warnFloor"].update(mos=0.5), "MOS between 1 and 5"),
+                (lambda c: c["warnFloor"]["calibration"].pop("corpusSHA256"), "SHA-256"),
+                (lambda c: c["preprocessingConfig"].update(inputAudio="canonical"), "original audio"),
+                (lambda c: c["labelMap"].update(dimensions=["mos"]), "five quality dimensions"),
+                (lambda c: c["runtimeDependencies"].pop("torchmetrics"), "dependency pins"),
+            ):
+                broken = copy.deepcopy(contract)
+                mutate(broken["candidates"]["nisqa-v2"])
+                with self.assertRaisesRegex(PreparationError, message):
+                    validate_candidate_contract(broken)
+
     def test_prepared_config_cache_adapter_and_cascade_agree_on_actual_model_input(self) -> None:
         # Only the external model process is a fixture. Exercise the real config
         # producer, validators, canonical writer, compact adapter and composer.

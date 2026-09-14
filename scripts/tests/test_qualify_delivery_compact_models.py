@@ -170,6 +170,19 @@ class QualifyDeliveryCompactModelsTests(unittest.TestCase):
         ), self.assertRaisesRegex(QualificationError, "does not match"):
             canonical_hardware_attestation()
 
+    def test_nisqa_summary_keeps_scores_and_rejects_non_finite_dimensions(self) -> None:
+        import qualify_delivery_compact_models as qualifier
+
+        payload = {"adapterID": "nisqa-v2", "outputs": {
+            "mos": 4.6123456, "noisiness": 4.4, "discontinuity": 4.7, "coloration": 4.5,
+            "loudness": 4.6, "sampleRateHz": 24000, "chunkCount": 1}}
+        summary = qualifier._summary(payload)
+        self.assertEqual(summary["mos"], 4.6123)
+        self.assertEqual((summary["sampleRateHz"], summary["chunkCount"]), (24000, 1))
+        broken = {"adapterID": "nisqa-v2", "outputs": {**payload["outputs"], "coloration": float("nan")}}
+        with self.assertRaisesRegex(qualifier.QualificationError, "finite coloration"):
+            qualifier._summary(broken)
+
 
 if __name__ == "__main__":
     unittest.main()

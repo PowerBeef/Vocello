@@ -221,6 +221,57 @@ class DeliveryCompactModelAdapterTests(unittest.TestCase):
         )
         self.assertFalse(second_hit)
 
+    def test_nisqa_scores_the_original_bytes_and_requires_five_finite_dimensions(self) -> None:
+        # A 24 kHz original: the clip-quality screen must receive it untouched
+        # while every other adapter still receives the canonical 16 kHz derivative.
+        original = self.root / "original.wav"
+        with wave.open(str(original), "wb") as output:
+            output.setnchannels(1); output.setsampwidth(2); output.setframerate(24_000)
+            output.writeframes(struct.pack("<h", 900) * 4800)
+        code = (
+            "import json,sys,wave; r=wave.open(sys.argv[1]); "
+            "print(json.dumps({'mos':4.61,'noisiness':4.4,'discontinuity':4.7,'coloration':4.5,'loudness':4.6,"
+            "'sampleRateHz':r.getframerate(),'frames':r.getnframes()}))"
+        )
+        preprocessing = dict(self.config["preprocessingConfig"], inputAudio="original")
+        config = dict(
+            self.config, adapterID="nisqa-v2", modelID="nisqa-fixture", preprocessingConfig=preprocessing,
+            preprocessingConfigDigest=digest(preprocessing),
+            commandTemplate=["{binary}", "-c", code, "{audio}", "{weights}"],
+        )
+        payload, hit = run_compact_adapter(
+            wav_path=original, config=config, cache=self.cache,
+            lock_root=self.root / "lock", supervisor=self._supervisor,
+        )
+        self.assertFalse(hit)
+        self.assertEqual(payload["outputs"]["sampleRateHz"], 24_000)
+        self.assertEqual(payload["outputs"]["frames"], 4800)
+        self.assertEqual(payload["outputs"]["mos"], 4.61)
+        _payload, second_hit = run_compact_adapter(
+            wav_path=original, config=config, cache=self.cache,
+            lock_root=self.root / "lock", supervisor=self._supervisor,
+        )
+        self.assertTrue(second_hit)
+        canonical = dict(config, preprocessingConfig=self.config["preprocessingConfig"],
+                         preprocessingConfigDigest=self.config["preprocessingConfigDigest"])
+        payload, _hit = run_compact_adapter(
+            wav_path=original, config=canonical, cache=self.cache,
+            lock_root=self.root / "lock", supervisor=self._supervisor,
+        )
+        self.assertEqual(payload["outputs"]["sampleRateHz"], 16_000)
+        for broken in (
+            "print(json.dumps({'mos':4.6,'noisiness':4.4,'discontinuity':4.7,'coloration':4.5}))",
+            "print(json.dumps({'mos':'4.6','noisiness':4.4,'discontinuity':4.7,'coloration':4.5,'loudness':4.6}))",
+            "print(json.dumps({'mos':9.0,'noisiness':4.4,'discontinuity':4.7,'coloration':4.5,'loudness':4.6}))",
+        ):
+            invalid = dict(config, modelID="nisqa-broken-" + hashlib.sha256(broken.encode()).hexdigest()[:8],
+                           commandTemplate=["{binary}", "-c", "import json; " + broken, "{audio}", "{weights}"])
+            with self.assertRaisesRegex(CompactAdapterError, "NISQA|lacks"):
+                run_compact_adapter(
+                    wav_path=original, config=invalid, cache=self.cache,
+                    lock_root=self.root / "lock", supervisor=self._supervisor,
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

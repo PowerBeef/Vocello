@@ -2948,6 +2948,27 @@
         "Sources/QwenVoiceCore/GenerationOutputAdapter.swift"
       ],
       "notes": "Closed 2026-09-14. Maintainer decision: ship the fp32 codec again (the 2.4.0 file) rather than patch the streaming decoder. The fp32 file (836b7b35, 682,293,092 bytes) went back to all six repos as artifactVersion 2026.09.14.1; each new revision was verified file-by-file (only speech_tokenizer/model.safetensors changed), and the contract, receipts, iOS catalog and production catalog were re-pinned (+341,113,208 bytes per artifact; installed models relink the fp32 blob from the component store without a download). Verification on the re-pinned pro_clone_speed, clone short warm x1 over the same 28 seeds: 0/28 step bursts inside the first 50 ms, first-50 ms peak above 0.5 in 1/28 (seed 55; the MV-05 onset cluster remains, stepBurstPeakCount>0 on 18/28), QC v7 flags empty on all 28. Cost accepted: +234 MB resident and about 5% warm RTF; the gate-bench baseline is re-saved under the fp32 codec. Reliability arms renamed current-fp32 / archived-fp16. (Earlier history: git log -p -- config/roadmap.json.)"
+    },
+    {
+      "id": "MV-06",
+      "plan": "harness-stabilization-2026-09",
+      "title": "A clip-level non-intrusive quality screen as a second machine judge",
+      "status": "done",
+      "updated": "2026-09-14",
+      "gate": "A pinned, reference-free speech-quality model (NISQA v2 or an MLX port) scores every take that enters the delivery-analysis cascade with a corpus-calibrated warn floor; weights and runtime pinned by digest in the evaluator candidate registry (config/delivery-evaluator-v2-candidates.json, the repository's pin authority for evaluator runtimes; config/toolchain.json pins host tools); no listening in the loop.",
+      "evidence": [
+        "file:config/delivery-evaluator-v2-candidates.json",
+        "file:scripts/run_local_delivery_cascade.py",
+        "file:scripts/delivery_compact_model_runtime.py",
+        "doc:docs/reference/delivery-harness.md"
+      ],
+      "sourceOfTruth": [
+        "config/delivery-evaluator-v2-candidates.json",
+        "scripts/delivery_compact_model_runtime.py",
+        "scripts/run_local_delivery_cascade.py",
+        "scripts/prepare_delivery_compact_model_config.py"
+      ],
+      "notes": "Closed 2026-09-14. Dependency decision: the torch route, following the DistilHuBERT precedent (a pinned venv under the owned model root, versions in the registry, drift refused by the prepare step), not an MLX port. NISQA v2 (checkpoint 7ec4cf93, upstream fe84f0f2, MIT) runs through the Apache-2.0 torchmetrics 1.9.0 port as candidate nisqa-v2: the compact runtime scores the original 24 kHz bytes (chunks of 52 s averaged by duration), the adapter binds the same identities as the other heads, and the cascade's --clip-quality-config scores both sides of every pair; a take below the warn floor abstains the pair (never rejects). Floor 3.81 = tenth percentile of a 54-take neutral PASS corpus (speed bench matrix + the 28-seed clone matrix; median 4.77, MAD 0.18; the corpus has a gap between 3.68 and 4.11 and the floor names the six takes below it; corpus digest recorded). Two-run qualification passed (403 MB peak RSS, 1.6 s per probe). Gate wording amended at closure: the pin lives in the candidate registry, not toolchain.json. MV-05 is unblocked; the onset-window extension is its next step. (Earlier history: git log -p -- config/roadmap.json.)"
     }
   ]
 }

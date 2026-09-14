@@ -271,6 +271,55 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
                 self.assertFalse(result["rows"][0]["finalistLayers"]["required"])
                 self.assertFalse(result["promotionAuthority"])
 
+    def test_clip_quality_screen_abstains_below_its_floor_and_never_rejects(self) -> None:
+        config = {
+            "adapterID": "nisqa-v2", "modelID": "nisqa-fixture", "weightsSHA256": "9" * 64,
+            "warnFloor": {"mos": 3.81, "calibration": {"takes": 54}},
+            "preprocessingConfig": {
+                "inputAudio": "original",
+                "canonicalizationIdentity": canonicalization_identity(RESAMPLER_VERSION),
+            },
+        }
+        scores = {"one": 4.6, "two": 3.2, str(self.neutral): 4.9}
+
+        def judge(*, wav_path, config, cache, lock_root, supervisor_options=None):
+            key = "one" if wav_path == self.one else "two" if wav_path == self.two else str(wav_path)
+            return ({"adapterID": "nisqa-v2", "outputs": {
+                "mos": scores[key], "noisiness": 4.0, "discontinuity": 4.5, "coloration": 4.4,
+                "loudness": 4.3, "minimumChunkMOS": scores[key]}}, False)
+
+        with mock.patch("run_local_delivery_cascade.run_compact_adapter", side_effect=judge) as adapter:
+            result = run_cascade(
+                manifest=self.manifest, cache=self.cache, lock_root=self.root / "lock",
+                clip_quality_config=config,
+            )
+        self.assertEqual(adapter.call_count, 4)
+        by_id = {row["generationID"]: row for row in result["rows"]}
+        screen_one = by_id["one"]["alwaysLayers"]["clipQualityScreen"]
+        self.assertFalse(screen_one["instructed"]["belowWarnFloor"])
+        self.assertFalse(screen_one["neutral"]["belowWarnFloor"])
+        self.assertEqual(screen_one["instructed"]["scores"]["mos"], 4.6)
+        self.assertNotIn("clip-quality-below-warn-floor", by_id["one"]["reasons"])
+        screen_two = by_id["two"]["alwaysLayers"]["clipQualityScreen"]
+        self.assertTrue(screen_two["instructed"]["belowWarnFloor"])
+        self.assertEqual(by_id["two"]["route"], "abstained")
+        self.assertIn("clip-quality-below-warn-floor", by_id["two"]["reasons"])
+        self.assertEqual(result["clipQualityScreen"]["rowsBelowWarnFloor"], 1)
+        self.assertEqual(result["clipQualityScreen"]["warnFloor"]["mos"], 3.81)
+        self.assertFalse(result["clipQualityScreen"]["promotionAuthority"])
+        # No floor, wrong adapter, or a judge without finite scores fail closed.
+        with self.assertRaisesRegex(CascadeError, "calibrated warn floor"):
+            run_cascade(manifest=self.manifest, cache=self.cache, lock_root=self.root / "lock",
+                        clip_quality_config={**config, "warnFloor": {}})
+        with self.assertRaisesRegex(CascadeError, "nisqa-v2"):
+            run_cascade(manifest=self.manifest, cache=self.cache, lock_root=self.root / "lock",
+                        clip_quality_config={**config, "adapterID": "distilhubert"})
+        with mock.patch("run_local_delivery_cascade.run_compact_adapter",
+                        return_value=({"adapterID": "nisqa-v2", "outputs": {"mos": "high"}}, False)):
+            with self.assertRaisesRegex(CascadeError, "no finite mos"):
+                run_cascade(manifest=self.manifest, cache=self.cache, lock_root=self.root / "lock",
+                            clip_quality_config=config)
+
     def test_temporal_cache_binds_its_imported_global_analyzer(self) -> None:
         canonical = self.cache.canonicalize(self.one)
         first = _identity(canonical, layer="temporal-contour", version="1", source=TEMPORAL_ANALYZER)

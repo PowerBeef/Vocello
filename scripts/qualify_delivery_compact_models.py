@@ -85,6 +85,14 @@ def _summary(payload: dict[str, Any]) -> dict[str, Any]:
             "transcriptSHA256": hashlib.sha256(transcript).hexdigest(),
             "transcriptByteCount": len(transcript),
         }
+    if payload["adapterID"] == "nisqa-v2":
+        scores = {}
+        for name in ("mos", "noisiness", "discontinuity", "coloration", "loudness"):
+            value = outputs.get(name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                raise QualificationError(f"NISQA did not emit a finite {name}")
+            scores[name] = round(float(value), 4)
+        return {**scores, "sampleRateHz": outputs.get("sampleRateHz"), "chunkCount": outputs.get("chunkCount")}
     embedding = outputs.get("embedding")
     if not isinstance(embedding, list) or not embedding:
         raise QualificationError("DistilHuBERT did not emit an embedding")

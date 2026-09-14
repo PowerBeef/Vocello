@@ -75,14 +75,14 @@ default `scripts/dev.sh py`, which selects the modules the dirty tree affects) r
 | `scripts/delivery_evaluator.py` | Preserves ridge-v1 and exposes versioned v2 commands for preset-specific pairwise heads, elastic-net/PLS challengers, blocked validation, conformal intervals, OOD and typed abstention | `test_delivery_evaluator.py`, `test_delivery_evaluator_v2.py` |
 | `scripts/delivery_analysis_cache.py` | Content-addressed, atomic analysis cache keyed by original and canonical audio plus exact analyzer/model/preprocessing provenance; cache hits launch no model | `test_delivery_analysis_cache.py` |
 | `scripts/delivery_temporal_features.py` | Two-pass bounded-memory five-region contour analyzer plus same-identity instructed-minus-neutral deltas | `test_delivery_temporal_features.py` |
-| `scripts/delivery_compact_model_adapter.py` | Contract-first subprocess adapter for fully pinned SenseVoiceSmall Q8, DistilHuBERT or whisper-small MLX candidates; no candidate is adopted or downloaded by the repository | `test_delivery_compact_model_adapter.py` |
+| `scripts/delivery_compact_model_adapter.py` | Contract-first subprocess adapter for fully pinned SenseVoiceSmall Q8, DistilHuBERT, whisper-small MLX or NISQA v2 candidates (NISQA scores the original bytes at their native rate; the others receive the canonical derivative); no candidate is adopted or downloaded by the repository | `test_delivery_compact_model_adapter.py` |
 | `scripts/independent_asr.py` | Second recognizer family: pinned whisper-small MLX loaded once in one supervised subprocess after the generator has exited; `manifest` (`--platform macos\|ios\|cascade`; the cascade form takes `--cascade-input`) → `transcribe --manifest … --adapter-config <whisper-small-mlx config> --output …` → cached, digest-bound, transcript-carrying recognitions for the language lanes and the cascade's `--review-evidence` | `test_independent_asr.py` |
 | `scripts/lib/language_metrics.py` | The one tokenizer, edit distance, locale table, threshold set and family-consensus rule shared by the output gate, the publisher, the cascade and the producer | `test_language_metrics.py` |
-| `scripts/delivery_compact_model_runtime.py` | Offline CPU DistilHuBERT executor; emits one deterministic, normalized 128-dimensional frozen representation and never receives a requested label | `test_delivery_compact_model_runtime.py` |
+| `scripts/delivery_compact_model_runtime.py` | Offline CPU executor for DistilHuBERT (one deterministic, normalized 128-dimensional frozen representation) and NISQA v2 (`nisqa`: MOS, noisiness, discontinuity, coloration and loudness of one clip, chunked at 52 s and averaged by duration); never receives a requested label | `test_delivery_compact_model_runtime.py` |
 | `scripts/prepare_delivery_compact_model_config.py` | Validates the tracked candidate contract and exact local weights/runtime/dependencies, then emits an untracked path-bearing adapter configuration | `test_prepare_delivery_compact_model_config.py` |
 | `scripts/qualify_delivery_compact_models.py` | Runs exactly two cache-cold probes, retains sanitized resource evidence, and refuses holdout bake-off on any unqualified run | `test_qualify_delivery_compact_models.py` |
 | `scripts/delivery_resource_supervisor.py` | Single-process lock, enforced RSS/optional physical-footprint ceilings, pressure/swap/timeout capture, and post-exit memory-recovery qualification for heavy local analyzers | `test_delivery_resource_supervisor.py` |
-| `scripts/run_local_delivery_cascade.py` | Existing-harness composer: byte-bound native QC, independent full-file ASR receipts, cached acoustics, optional heads, rejection and explicit inconclusive routes; no mandatory listening | `test_run_local_delivery_cascade.py` |
+| `scripts/run_local_delivery_cascade.py` | Existing-harness composer: byte-bound native QC, independent full-file ASR receipts, cached acoustics, optional heads, the `--clip-quality-config` NISQA screen (both sides scored against the registry's calibrated warn floor; below it the pair abstains, never rejects), rejection and explicit inconclusive routes; no mandatory listening | `test_run_local_delivery_cascade.py` |
 | `scripts/delivery_acoustic_reference.py` | Default digest-pinned numerical reference comparison in the cascade: same-language paired deltas, unpaired style context, warning retention and flagged-exclusion sensitivity; descriptive only, no downloads or quality authority | `test_delivery_acoustic_reference.py` |
 | `scripts/delivery_promotion_decision.py` | Automatic measured-claim decision (schema 2); schema 1 is the optional historical listener reader. Paired statistics, independent judges, multiplicity correction and runtime/quality guardrails | `test_delivery_promotion_decision.py` |
 | `scripts/voice_identity_language_reliability.py` | Source-bound, serial Clone fidelity/enrollment-transcription/tokenizer and French Voice Design diagnosis; personal references stay in a private content-addressed bundle, rows never retry, and sanitized analysis has no semantic-promotion authority | `test_voice_identity_language_reliability.py` |
@@ -367,12 +367,22 @@ python3 scripts/independent_asr.py transcribe \
   --manifest build/artifacts/macos/delivery-experiment/calibration/asr-manifest.json \
   --adapter-config build/cache/delivery-analysis/whisper-small-mlx.json \
   --output build/artifacts/macos/delivery-experiment/calibration/asr-recognitions.json
+python3 scripts/prepare_delivery_compact_model_config.py nisqa-v2 \
+  --output build/cache/delivery-analysis/nisqa-v2.json
 python3 scripts/run_local_delivery_cascade.py \
   --plan build/artifacts/macos/delivery-experiment/calibration/plan.json \
   --run-dir build/artifacts/macos/delivery-experiment/calibration/run \
   --review-evidence build/artifacts/macos/delivery-experiment/calibration/asr-recognitions.json \
+  --clip-quality-config build/cache/delivery-analysis/nisqa-v2.json \
   --out build/artifacts/macos/delivery-experiment/cascade-report.json
 ```
+
+`--clip-quality-config` is the second machine judge (MV-06): NISQA v2 scores every take on both
+sides of a pair, on the original 24 kHz bytes, and a take below the registry's calibrated warn
+floor abstains the pair with `clip-quality-below-warn-floor`. The floor is the tenth percentile of
+a neutral PASS corpus (54 takes on 2026-09-14: the speed benchmark matrix plus the 28-seed clone
+short matrix, MOS median 4.77, floor 3.81); the registry records the corpus digest, so a re-pin of
+the codec or the model re-calibrates it. The head warns and abstains; native QC still decides.
 
 The prepare step only validates already-present pinned local weights and emits an untracked
 path-bearing config; nothing is downloaded automatically. Without `--review-evidence` the cascade
@@ -416,8 +426,10 @@ for numerical/resource evidence, compatibility rules and independent-calibration
 External candidates are governed separately by
 [`config/delivery-evaluator-v2-candidates.json`](../../config/delivery-evaluator-v2-candidates.json).
 The tracked contract pins the exact SenseVoiceSmall Q8 model revision, GGUF and runtime archive/
-binary digests, and the exact DistilHuBERT revision, safetensors/support-file digests and Python,
-Torch, Transformers, safetensors and NumPy versions. The local configuration additionally binds
+binary digests, the exact DistilHuBERT revision, safetensors/support-file digests and Python,
+Torch, Transformers, safetensors and NumPy versions, and the NISQA v2 checkpoint (`nisqa.tar`,
+digest `7ec4cf93…`, upstream commit `fe84f0f2`) with its Python, Torch, torchmetrics, librosa and
+NumPy versions plus the calibrated warn floor. The local configuration additionally binds
 the adapter layer and resource-supervisor source bytes into the preprocessing/cache identity.
 No model file or absolute path is tracked:
 
@@ -427,7 +439,25 @@ python3 scripts/prepare_delivery_compact_model_config.py sensevoice-small-q8 \
   --output build/artifacts/macos/delivery-evaluator-v2/candidate-configs/sensevoice.json
 python3 scripts/prepare_delivery_compact_model_config.py distilhubert \
   --output build/artifacts/macos/delivery-evaluator-v2/candidate-configs/distilhubert.json
+python3 scripts/prepare_delivery_compact_model_config.py nisqa-v2 \
+  --output build/artifacts/macos/delivery-evaluator-v2/candidate-configs/nisqa-v2.json
 ```
+
+The NISQA runtime is an operator-provisioned venv under the owned model root, pinned by the
+registry's `runtimeDependencies` (the prepare step refuses any drift), and the checkpoint is
+fetched once by hand and verified by digest:
+
+```sh
+M=build/cache/delivery-analysis/external-models
+python3 -m venv --system-site-packages "$M/nisqa-runtime-py314"
+"$M/nisqa-runtime-py314/bin/pip" install "torchmetrics==1.9.0" "librosa==1.0.0"
+mkdir -p "$M/nisqa" && curl -sSL -o "$M/nisqa/nisqa.tar" \
+  https://github.com/gabrielmittag/NISQA/raw/fe84f0f252abec382b24367d5b22498a7ce34dbb/weights/nisqa.tar
+shasum -a 256 "$M/nisqa/nisqa.tar"   # 7ec4cf93…e805c
+```
+
+Its two-run qualification on 2026-09-14 (`qualify_delivery_compact_models.py`, two byte-distinct
+clone takes) passed with about 403 MB peak RSS and 1.6 s wall per probe.
 
 Qualification uses two byte-distinct real clips, one candidate at a time. It records peak process
 RSS, wall time, pressure before/after, swap delta, clean exit and bounded post-exit recovery. An

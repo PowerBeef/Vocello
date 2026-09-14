@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `harness-stabilization-2026-09` | active | release-qa | 7/10 (70%) |
+| `harness-stabilization-2026-09` | active | release-qa | 8/10 (80%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 9/15 (60%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -35,7 +35,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | --- | --- | --- | --- |
 | `HS-01` | planned | Complete the TSan characterization and decide promotion | — |
 | `MV-05` | planned | The plosive-onset burst in short clone takes is model-intrinsic and still unjudged | `MV-06` |
-| `MV-06` | planned | A clip-level non-intrusive quality screen as a second machine judge | — |
 
 ### Open items in detail
 
@@ -44,9 +43,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 - **`MV-05`** (planned) — The plosive-onset burst in short clone takes is model-intrinsic and still unjudged.
   gate: Either the generator no longer produces the plosive-onset cluster on the clone short cell, or MV-06's clip-level judge, extended with an onset-window metric if NISQA alone does not separate it, carries a validated perceptual judgement of it; in both cases the reproduction in the notes passes a machine gate without listening.
-
-- **`MV-06`** (planned) — A clip-level non-intrusive quality screen as a second machine judge.
-  gate: A pinned, reference-free speech-quality model (NISQA v2 or an MLX port) scores every published take in the delivery-analysis cascade with a corpus-calibrated warn floor; weights and runtime pinned by digest in config/toolchain.json; no listening in the loop.
 
 ## Autonomous validation audit remediation
 

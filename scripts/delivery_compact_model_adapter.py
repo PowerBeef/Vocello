@@ -31,7 +31,8 @@ import delivery_resource_supervisor
 
 
 SCHEMA_VERSION = 1
-PERMITTED_ADAPTERS = ("sensevoice-small-q8", "distilhubert", "whisper-small-mlx")
+PERMITTED_ADAPTERS = ("sensevoice-small-q8", "distilhubert", "whisper-small-mlx", "nisqa-v2")
+NISQA_OUTPUT_FIELDS = ("mos", "noisiness", "discontinuity", "coloration", "loudness")
 EXECUTION_IDENTITY_VERSION = 2
 SENSEVOICE_OUTPUT = re.compile(
     r"^<\|(?P<language>[^|]+)\|><\|(?P<emotion>[^|]+)\|>"
@@ -175,11 +176,18 @@ def _parse_output(config: dict[str, Any], output: bytes) -> dict[str, Any]:
         required = ("transcript", "languageTag", "emotionTag", "eventTag")
     elif config["adapterID"] == "whisper-small-mlx":
         required = ("transcript", "language", "detectedLanguage", "segments")
+    elif config["adapterID"] == "nisqa-v2":
+        required = NISQA_OUTPUT_FIELDS
     else:
         required = ("embedding",)
     for field in required:
         if field not in payload:
             raise CompactAdapterError(f"compact adapter output lacks {field}")
+    if config["adapterID"] == "nisqa-v2":
+        for field in NISQA_OUTPUT_FIELDS:
+            value = payload[field]
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0.0 <= float(value) <= 6.0:
+                raise CompactAdapterError(f"NISQA {field} is not a finite score on the 1-5 scale")
     # Paths, raw bytes and non-finite values are rejected again by the cache.
     return payload
 
@@ -210,11 +218,17 @@ def run_compact_adapter(
     if retained is not None:
         return retained, True
     with tempfile.TemporaryDirectory(prefix="vocello-compact-adapter-") as temporary:
-        canonical_wav = Path(temporary) / "canonical.wav"
-        _canonical_wav(canonical, canonical_wav)
+        model_input = Path(temporary) / "canonical.wav"
+        if config["preprocessingConfig"].get("inputAudio") == "original":
+            # The clip-quality screen scores the original bytes at their native
+            # rate; the identity above still binds the canonical derivative.
+            model_input = Path(temporary) / "original.wav"
+            model_input.write_bytes(wav_path.read_bytes())
+        else:
+            _canonical_wav(canonical, model_input)
         substitutions = {
             "binary": str(config["binaryPath"]),
-            "audio": str(canonical_wav),
+            "audio": str(model_input),
             "weights": str(config["weightsPath"]),
         }
         command = []

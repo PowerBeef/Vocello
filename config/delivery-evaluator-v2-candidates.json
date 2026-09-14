@@ -7,7 +7,8 @@
   "candidateOrder": [
     "sensevoice-small-q8",
     "distilhubert",
-    "whisper-small-mlx"
+    "whisper-small-mlx",
+    "nisqa-v2"
   ],
   "candidates": {
     "sensevoice-small-q8": {
@@ -29,10 +30,41 @@
       "trainingDataDeclaration": "Official SenseVoice documentation declares more than 400,000 hours across more than 50 languages; the Small checkpoint exposes Mandarin, Cantonese, English, Japanese, and Korean recognition plus coarse emotion and event labels.",
       "trainingDataSourceURI": "https://github.com/FunAudioLLM/SenseVoice",
       "labelMap": {
-        "languages": ["zh", "en", "yue", "ja", "ko", "nospeech"],
-        "emotions": ["HAPPY", "SAD", "ANGRY", "NEUTRAL", "FEARFUL", "DISGUSTED", "SURPRISED", "EMO_UNKNOWN"],
-        "events": ["BGM", "Speech", "Applause", "Laughter", "Cry", "Sneeze", "Breath", "Cough", "Sing", "Speech_Noise", "Event_UNK"],
-        "textNormalization": ["withitn", "woitn"]
+        "languages": [
+          "zh",
+          "en",
+          "yue",
+          "ja",
+          "ko",
+          "nospeech"
+        ],
+        "emotions": [
+          "HAPPY",
+          "SAD",
+          "ANGRY",
+          "NEUTRAL",
+          "FEARFUL",
+          "DISGUSTED",
+          "SURPRISED",
+          "EMO_UNKNOWN"
+        ],
+        "events": [
+          "BGM",
+          "Speech",
+          "Applause",
+          "Laughter",
+          "Cry",
+          "Sneeze",
+          "Breath",
+          "Cough",
+          "Sing",
+          "Speech_Noise",
+          "Event_UNK"
+        ],
+        "textNormalization": [
+          "withitn",
+          "woitn"
+        ]
       },
       "preprocessingConfig": {
         "sampleRateHz": 16000,
@@ -97,7 +129,14 @@
       "role": "independent-asr-family",
       "labelMap": {
         "type": "locked-language-transcript",
-        "languages": {"english": "en", "french": "fr", "german": "de", "spanish": "es", "chinese": "zh", "japanese": "ja"}
+        "languages": {
+          "english": "en",
+          "french": "fr",
+          "german": "de",
+          "spanish": "es",
+          "chinese": "zh",
+          "japanese": "ja"
+        }
       },
       "runtimeDependencies": {
         "mlx": "0.32.0",
@@ -120,6 +159,66 @@
         "backend": "mlx",
         "modelLoadsPerRun": 1,
         "runsAfterGenerationExit": true
+      }
+    },
+    "nisqa-v2": {
+      "modelID": "gabrielmittag/NISQA:nisqa.tar",
+      "sourceRevision": "fe84f0f252abec382b24367d5b22498a7ce34dbb",
+      "sourceURI": "https://github.com/gabrielmittag/NISQA/tree/fe84f0f252abec382b24367d5b22498a7ce34dbb",
+      "weightsFile": "nisqa.tar",
+      "weightsSHA256": "7ec4cf937514dd3f8860b21e66fabd8ca87a168572675ef8d979c4c4ad2e805c",
+      "license": "MIT (NISQA model code and released weights); the runtime executes the Apache-2.0 torchmetrics port of the same architecture",
+      "commercialUseCompatible": true,
+      "trainingDataDeclaration": "NISQA v2 (Mittag, Naderi, Chehadi, Moeller, INTERSPEECH 2021) was trained on the crowdsourced NISQA Corpus of simulated and live-condition speech rated for overall MOS plus noisiness, coloration, discontinuity and loudness, together with the public listening-test datasets the paper lists; no Vocello audio.",
+      "trainingDataSourceURI": "https://github.com/gabrielmittag/NISQA",
+      "role": "clip-quality-screen",
+      "labelMap": {
+        "type": "non-intrusive-speech-quality-dimensions",
+        "dimensions": [
+          "mos",
+          "noisiness",
+          "discontinuity",
+          "coloration",
+          "loudness"
+        ],
+        "scale": "1-5 mean opinion score per dimension; long clips are scored in chunks of at most 52 s and averaged by duration"
+      },
+      "runtimeDependencies": {
+        "librosa": "1.0.0",
+        "numpy": "2.4.6",
+        "python": "3.14.4",
+        "torch": "2.13.0",
+        "torchmetrics": "1.9.0"
+      },
+      "preprocessingConfig": {
+        "inputAudio": "original",
+        "channels": 1,
+        "format": "pcm-s16le",
+        "normalization": "divide-by-32768",
+        "melFrontEnd": "librosa slaney 48-mel, n_fft 4096, 20 ms window, 10 ms hop, fmax 20 kHz, amplitude to dB top 80",
+        "segmentation": "15-frame windows, hop 4, at most 1300 segments per chunk",
+        "backend": "cpu",
+        "modelLoadsPerRun": 1,
+        "runsAfterGenerationExit": true
+      },
+      "warnFloor": {
+        "mos": 3.81,
+        "calibration": {
+          "method": "tenth-percentile-of-neutral-pass-corpus",
+          "date": "2026-09-14",
+          "takes": 54,
+          "corpusSHA256": "8f65d27ac8364dd31519c0ebe70a3779401925a8dc40b5c262eef4573be93790",
+          "corpus": "vocello bench --variants speed --warm 3 (custom/design/clone x short/medium/long, cold + warm; QC verdict pass only, 26 takes) plus the MV-07 28-seed clone short matrix on artifactVersion 2026.09.14.1, scored on the original 24 kHz files",
+          "perMode": {
+            "custom": 10,
+            "design": 8,
+            "clone": 36
+          },
+          "mosMedian": 4.771,
+          "mosMAD": 0.18,
+          "mosMin": 3.378,
+          "note": "The sorted corpus has a gap between 3.68 and 4.11; the tenth percentile names the six takes below it. median minus three MAD (4.23) would also name two bulk takes."
+        }
       }
     }
   },

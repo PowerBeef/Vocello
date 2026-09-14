@@ -24,8 +24,10 @@ RUNTIME_SOURCE = REPO / "scripts/delivery_compact_model_runtime.py"
 ADAPTER_LAYER_SOURCE = REPO / "scripts/delivery_compact_model_adapter.py"
 SUPERVISOR_SOURCE = REPO / "scripts/delivery_resource_supervisor.py"
 INDEPENDENT_ASR_SOURCE = REPO / "scripts/independent_asr.py"
-CANDIDATE_ORDER = ("sensevoice-small-q8", "distilhubert", "whisper-small-mlx")
+CANDIDATE_ORDER = ("sensevoice-small-q8", "distilhubert", "whisper-small-mlx", "nisqa-v2")
 WHISPER_RUNTIME_PINS = ("mlx", "mlx-whisper", "numpy")
+NISQA_RUNTIME_PINS = ("python", "torch", "torchmetrics", "librosa", "numpy")
+NISQA_DIMENSIONS = ("mos", "noisiness", "discontinuity", "coloration", "loudness")
 
 
 class PreparationError(ValueError):
@@ -109,6 +111,25 @@ def validate_candidate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         not isinstance(code, str) or not code.isalpha() for code in languages.values()
     ):
         raise PreparationError("whisper label map must name the corpus languages")
+    nisqa = candidates["nisqa-v2"]
+    nisqa_dependencies = nisqa.get("runtimeDependencies")
+    if not isinstance(nisqa_dependencies, dict) or set(nisqa_dependencies) != set(NISQA_RUNTIME_PINS) or any(
+        not isinstance(value, str) or not value for value in nisqa_dependencies.values()
+    ):
+        raise PreparationError("NISQA runtime dependency pins are incomplete")
+    if nisqa["labelMap"].get("dimensions") != list(NISQA_DIMENSIONS):
+        raise PreparationError("NISQA label map must list the five quality dimensions in model order")
+    if nisqa["preprocessingConfig"].get("inputAudio") != "original":
+        raise PreparationError("NISQA must score the original audio bytes")
+    floor = nisqa.get("warnFloor")
+    if not isinstance(floor, dict) or isinstance(floor.get("mos"), bool) or not isinstance(
+        floor.get("mos"), (int, float)
+    ) or not 1.0 <= float(floor["mos"]) <= 5.0:
+        raise PreparationError("NISQA warn floor must carry a MOS between 1 and 5")
+    calibration = floor.get("calibration")
+    if not isinstance(calibration, dict) or not isinstance(calibration.get("takes"), int) or calibration["takes"] < 1:
+        raise PreparationError("NISQA warn floor must record its calibration corpus")
+    _sha(calibration.get("corpusSHA256"), "nisqa.warnFloor.calibration.corpusSHA256")
     required_gates = {
         "two-clean-eight-gib-host-runs", "serial-process-isolation",
         "post-exit-memory-recovery", "untouched-independent-reference-holdout-gain",
@@ -190,6 +211,24 @@ def _runtime_versions(python: Path) -> dict[str, str]:
     return value
 
 
+def _nisqa_runtime_versions(python: Path) -> dict[str, str]:
+    command = [str(python), "-c", (
+        "import json,sys;from importlib import metadata;"
+        "print(json.dumps({'python':'.'.join(map(str,sys.version_info[:3])),"
+        "**{name: metadata.version(name) for name in ('torch','torchmetrics','librosa','numpy')}},sort_keys=True))"
+    )]
+    result = subprocess.run(command, check=False, capture_output=True, text=True, timeout=30)
+    if result.returncode != 0:
+        raise PreparationError("NISQA runtime dependencies cannot be inspected")
+    try:
+        value = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise PreparationError("NISQA runtime dependency output is invalid") from error
+    if not isinstance(value, dict) or any(not isinstance(item, str) for item in value.values()):
+        raise PreparationError("NISQA runtime dependency inventory is invalid")
+    return value
+
+
 def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
             resampler_version: str = RESAMPLER_VERSION) -> dict[str, Any]:
     try:
@@ -267,6 +306,23 @@ def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
             "{binary}", str(INDEPENDENT_ASR_SOURCE), "worker",
             "--weights", "{weights}", "--audio", "{audio}",
         ]
+    elif adapter_id == "nisqa-v2":
+        weights = _verified(
+            model_root / "nisqa" / candidate["weightsFile"], candidate["weightsSHA256"],
+            "NISQA v2 checkpoint (owned model root; nothing is downloaded)",
+        )
+        binary = model_root / "nisqa-runtime-py314/bin/python"
+        if not binary.is_file():
+            raise PreparationError("NISQA Python runtime is missing")
+        dependencies = _nisqa_runtime_versions(binary)
+        if dependencies != candidate["runtimeDependencies"]:
+            raise PreparationError("NISQA runtime dependency versions drifted from the contract pins")
+        source_digest = file_sha256(RUNTIME_SOURCE)
+        output_format = "json"
+        command = [
+            "{binary}", str(RUNTIME_SOURCE), "nisqa",
+            "--weights", "{weights}", "--audio", "{audio}",
+        ]
     else:  # pragma: no cover - contract owns this branch
         raise PreparationError("unsupported candidate")
     dependency_digest = digest(dependencies)
@@ -310,6 +366,7 @@ def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
         "outputFormat": output_format,
         "commandTemplate": command,
         **({"decodeOptions": candidate["decodeOptions"]} if adapter_id == "whisper-small-mlx" else {}),
+        **({"warnFloor": candidate["warnFloor"]} if adapter_id == "nisqa-v2" else {}),
     }
 
 

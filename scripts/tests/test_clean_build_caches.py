@@ -385,6 +385,22 @@ raise SystemExit(0 if payload.get("_fixtureValid") is True else 1)
         for path in (ios, packages, runtime):
             self.assertTrue(path.exists())
 
+    def test_a_public_link_into_the_alternate_arena_survives_and_falls_with_it(self) -> None:
+        mac = self.write(self.root / "build" / "cache" / "xcode" / "macos" / "cache")
+        optimized = self.write(self.root / "build" / "cache" / "xcode" / "macos-optimized" / "cache")
+        cli = self.root / "build" / "vocello"
+        cli.parent.mkdir(parents=True, exist_ok=True)
+        cli.symlink_to("cache/xcode/macos-optimized/Build/Products/Release/vocello")
+
+        self.run_clean("--cache", "macos")
+        self.assertFalse(mac.exists())
+        self.assertTrue(cli.is_symlink(), "the CLI link points into the optimized arena, which stays")
+        self.assertTrue(optimized.exists())
+
+        self.run_clean("--cache", "macos-optimized")
+        self.assertFalse(optimized.exists())
+        self.assertFalse(cli.is_symlink())
+
     def test_selective_cache_cleanup_refuses_a_copied_public_product(self) -> None:
         cache = self.write(
             self.root / "build" / "cache" / "xcode" / "macos" / "cache"

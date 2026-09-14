@@ -795,12 +795,14 @@ def validated_public_links(
     entries = {entry.get("id"): entry for entry in policy_entries(policy)}
     result: list[Path] = []
     for link in policy.get("publicLinks") or []:
-        entry_id = link.get("targetEntry")
-        if entry_id not in selected_entry_ids:
+        # A link may point into its primary arena or one of its alternates
+        # (build/vocello follows whichever CLI built last).
+        candidates = [link.get("targetEntry"), *(link.get("alternateTargetEntries") or [])]
+        if not any(candidate in selected_entry_ids for candidate in candidates):
             continue
-        entry = entries.get(entry_id)
-        if not entry:
-            raise CleanupError(f"public link references unknown cache entry: {entry_id}")
+        for candidate in candidates:
+            if candidate not in entries:
+                raise CleanupError(f"public link references unknown cache entry: {candidate}")
         link_path = REPO_ROOT / str(link["path"])
         if not link_path.exists() and not link_path.is_symlink():
             continue
@@ -808,13 +810,20 @@ def validated_public_links(
             raise CleanupError(
                 f"refusing to remove non-symlink public product during cache cleanup: {link_path}"
             )
-        expected = managed_path(entry) / str(link["targetSuffix"])
         actual = (link_path.parent / os.readlink(link_path)).resolve(strict=False)
-        if actual != expected.resolve(strict=False):
+        targeted = next(
+            (candidate for candidate in candidates
+             if actual == (managed_path(entries[candidate]) / str(link["targetSuffix"])).resolve(strict=False)),
+            None,
+        )
+        if targeted is None:
             raise CleanupError(
                 f"public product does not target the selected cache: {link_path}"
             )
-        result.append(link_path)
+        if targeted in selected_entry_ids:
+            # The link points into the arena being removed: it goes with it.
+            result.append(link_path)
+        # Otherwise it points into an arena that stays; leave it untouched.
     return result
 
 

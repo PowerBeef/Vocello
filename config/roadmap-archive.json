@@ -2740,6 +2740,32 @@
         "Sources/iOS/TTSEngineStore.swift",
         "project.yml"
       ]
+    },
+    {
+      "id": "PC-01",
+      "plan": "playback-capture-evidence-2026-09",
+      "title": "Capture and compare what the app plays during every macOS benchmark take",
+      "status": "done",
+      "updated": "2026-09-13",
+      "gate": "scripts/ui_test.sh macos benchmark produces $out/playback-capture/{capture-run.json, take-NN-<cell>.wav/.json, summary.json}; every take of a captured run carries playbackCaptureStatus, playbackCaptureDigest and the seven playbackCapture* metrics, warn-only codes on take.warnings; the lane still passes when the tap is unavailable; scripts/tests/test_playback_capture.py and the Swift support tests pass; the physical output stays silent while a take is tapped.",
+      "evidence": [
+        "commit:336f4458",
+        "commit:220a887b",
+        "commit:1de0aa50",
+        "commit:f06de0a8",
+        "commit:99081685",
+        "commit:28ef9156",
+        "file:benchmarks/runs/ui-generation/macos-xcui-benchmark-20260913-220529-a1103a3a.json",
+        "doc:docs/development-progress.md#machinery-validation-september-12-to-13"
+      ],
+      "sourceOfTruth": [
+        "scripts/ui_test.sh",
+        "Tests/VocelloMacUITests/VocelloMacBenchmarkUITests.swift",
+        "scripts/check_macos_xpc_bench.py",
+        "scripts/benchmark_history.py",
+        "config/orchestration-contract.json"
+      ],
+      "notes": "Closed 2026-09-13. Details in docs/development-progress.md (Machinery validation, played-audio capture landed)."
     }
   ]
 }

@@ -121,7 +121,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 ### Open items in detail
 
 - **`DP-20`** (parked) — External delivery-control lever watch list (audit R8).
-  unparkWhen: Only when a watched lever becomes runnable on-device at the 8 GB floor: a Qwen3-TTS VoiceEditing/instruct variant that combines ICL with instructions, CosyVoice 3-class instruct control in an MLX-portable form, emotion-vector steering (IndexTTS-2/EmoSteer-class) with published weights, or a quantization-robust valence result. The pinned audit's R8 section is the source list; re-verify claims against primary sources at unpark time rather than trusting the 2026-08 snapshot.
+  gate: Re-verify the R8 watch list against primary sources; if a lever runs on-device at the 8 GB floor, open a measured DP item with a pre-registered holdout comparison, else re-park with the reason.
 
 - **`DP-28`** (in-flight) — Calibrate the layered local delivery evaluator.
   gate: Qualify the existing local cascade with byte-bound native Fast QC, independent locale-locked full-file ASR evidence, cached acoustics and optional compact features/heads. Human listening and listener-trained heads are not operational prerequisites. Preserve serial M2/8 GB resource envelopes, source/model/config identities, warnings and inconclusive outcomes. Model adoption requires independent-reference untouched holdout gain on the named metric without measured dimension/preset/speaker/script regressions. No listener-proven claim, prompt edit, automatic publication or ordinary CI model prerequisite.
@@ -375,7 +375,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `PC-01` | done | Capture and compare what the app plays during every macOS benchmark take | — |
 | `PC-02` | planned | Promote the played-audio comparison from warnings to a gate | `PC-01` |
 | `PC-03` | planned | Explain the 1.8 s gap between playback scheduling and audible output | — |
 

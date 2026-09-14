@@ -95,6 +95,7 @@ it does not slow every push.
 | `contracts` | ubuntu | always | about 1 min: the complete deterministic contract gate (`check_project_inputs.sh --python none`: product contracts, invariants, privacy scan, work authority, benchmark history) |
 | `python` | ubuntu | Python paths, contracts, workflow files | 3 to 4 min: product and tooling tests; research tests when routed |
 | `macos-tests` | macos-26 | Swift compile inputs, the lane's own scripts, build configs and benchmark evidence | cached DerivedData; darwin-only Python modules, macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s) |
+| `macos-tsan` | macos-26 | Swift compile inputs (same routing as `macos-tests`) | cached `macos-tsan` DerivedData; `scripts/macos_test.sh tsan`, the deterministic core and injectable XPC transport bundles under ThreadSanitizer, blocking since 2026-09-14 (`config/tsan-policy.json`); 5 to 11 min on a second runner |
 | `ios-compile` | macos-26 | iOS compile inputs | cached DerivedData; `build_foundation_targets.sh ios --incremental` at `-Onone` (`QVOICE_FOUNDATION_SWIFT_OPTIMIZATION`) |
 | `website` | ubuntu | `website/` | about 4 min |
 | `dependency-submission` | ubuntu | push only (skipped on dispatch) | seconds: `scripts/swift_dependency_snapshot.py` submitted to the GitHub dependency graph; needed by `CI required` |
@@ -105,8 +106,8 @@ trigger, so `CI required` is always produced by a maintainer's push to `main`. C
 on the event name and the ref, so a newer push cancels the previous push run while a manual
 measurement dispatch never cancels the gate run for a commit. `scripts/dev.sh ci`
 replays that job graph serially: project regeneration, the complete `check_project_inputs.sh`
-(the Linux `contracts` job runs it with `--python none`), `scripts/macos_test.sh test`, the CLI
-version identity, `build_foundation_targets.sh ios --incremental`, the website supply-chain check
+(the Linux `contracts` job runs it with `--python none`), `scripts/macos_test.sh test`,
+`scripts/macos_test.sh tsan`, the CLI version identity, `build_foundation_targets.sh ios --incremental`, the website supply-chain check
 and `npm --prefix website run check`. It is a superset rather than a byte-identical replay: it skips
 no lane by routing, and it runs the whole Python suite inside the gate in one process where CI splits
 it into `-m "not research and not darwin_only"` plus an optional `-m research` on Linux and
@@ -120,7 +121,7 @@ that lane's base, so a rarely-run lane never drags the others back. Caches are k
 first run of each week (or of a new dependency graph) pays one save and the store holds at most a
 couple of generations per platform; the shared package checkout has its own cache keyed on the two
 `Package.resolved` digests. `scripts/ci/restore_mtimes.py` gives tracked files their commit mtimes so
-Xcode's task signatures hit. Dispatch with `cold: true` to skip the restore. `nightly.yml` (04:00 UTC and on dispatch) runs the TSan
+Xcode's task signatures hit. Dispatch with `cold: true` to skip the restore. `nightly.yml` (04:00 UTC and on dispatch) runs a cold pass of the TSan
 subset (`tsan`), the complete Python suite (`python-full`) and cold compiles of both platforms
 (`foundation-cold`, which also compiles the macOS app optimized with warnings as errors); a failure
 keeps one open issue labelled `nightly`, titled "Nightly lane failing", commenting on it rather than

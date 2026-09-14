@@ -987,11 +987,11 @@ values without retaining those values. Likewise,
 `scripts/runtime_security_contract.py`. Registry schema v2 also requires a current review date and
 substantive removal condition for every exception and caps unreviewed growth at the registered 41
 `@unchecked Sendable` and 9 `nonisolated(unsafe)` declarations (`budget` in
-`config/concurrency-safety.json`). The scheduled CPU-focused
+`config/concurrency-safety.json`). The CPU-focused
 ThreadSanitizer subset is owned by `config/tsan-policy.json`; it covers the deterministic core and
 injectable XPC transport while MLX/Metal runtime execution stays in its single-owner deterministic
-suite. Characterization remains non-blocking only until the policy deadline and cannot become
-blocking without three consecutive clean runs and explicit maintainer review.
+suite. Since 2026-09-14 it blocks push CI (`macos-tsan` inside `CI required`) after three
+consecutive clean nightly runs and a recorded maintainer decision; the nightly keeps a cold run.
 
 Records are written by the `GenerationTelemetryJSONLSink` actor as JSONL under
 `…/QwenVoice[-Debug]/diagnostics/`:

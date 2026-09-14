@@ -580,6 +580,28 @@ def tsan_policy_errors(policy: dict) -> list[str]:
         errors.append("TSan policy schemaVersion must be 1")
     if policy.get("command") != "scripts/macos_test.sh tsan":
         errors.append("TSan policy command must use the repository macOS test driver")
+    status = policy.get("status")
+    if status not in ("characterizing-non-blocking", "blocking-on-push-ci"):
+        errors.append("TSan policy status must be characterizing-non-blocking or blocking-on-push-ci")
+    characterization = policy.get("characterization")
+    if not isinstance(characterization, dict):
+        errors.append("TSan policy must carry its characterization record")
+        characterization = {}
+    if status == "blocking-on-push-ci":
+        # Promotion is a recorded maintainer decision on top of the required
+        # consecutive passes, and the blocking job must really run the lane
+        # inside the push workflow's required aggregate.
+        required = characterization.get("requiredConsecutivePassesForBlockingReview")
+        recorded = characterization.get("recordedConsecutivePasses")
+        if not isinstance(required, int) or not isinstance(recorded, int) or recorded < required:
+            errors.append("TSan policy cannot block before the required consecutive passes are recorded")
+        if characterization.get("openConfirmedRaceCount") != 0:
+            errors.append("TSan policy cannot block with open confirmed races")
+        decision = policy.get("blockingDecision")
+        if not isinstance(decision, dict) or decision.get("decision") != status or not decision.get("date"):
+            errors.append("TSan policy blocking status needs a dated blockingDecision that names it")
+        if not isinstance(policy.get("blockingJob"), str) or not policy["blockingJob"].strip():
+            errors.append("TSan policy blocking status must name its blockingJob")
     subset = policy.get("subset")
     if not isinstance(subset, list) or not subset or not all(isinstance(s, str) and s for s in subset):
         errors.append("TSan policy subset must be a non-empty list of test bundle names")

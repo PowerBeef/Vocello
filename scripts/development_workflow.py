@@ -183,6 +183,7 @@ CI_COMMANDS: list[list[str]] = [
     ["./scripts/regenerate_project.sh", "--fast"],
     ["./scripts/check_project_inputs.sh"],
     ["scripts/macos_test.sh", "test"],
+    ["scripts/macos_test.sh", "tsan"],
     ["./scripts/build.sh", "cli", "--version"],
     ["./scripts/build_foundation_targets.sh", "ios", "--incremental"],
     ["python3", "scripts/supply_chain_contract.py", "--installed", "website"],

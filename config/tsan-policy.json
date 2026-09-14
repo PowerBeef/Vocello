@@ -1,7 +1,9 @@
 {
   "schemaVersion": 1,
-  "status": "characterizing-non-blocking",
-  "workflow": ".github/workflows/nightly.yml",
+  "status": "blocking-on-push-ci",
+  "workflow": ".github/workflows/ci.yml",
+  "blockingJob": "macos-tsan",
+  "nightlyWorkflow": ".github/workflows/nightly.yml",
   "command": "scripts/macos_test.sh tsan",
   "derivedDataEntry": "xcode-macos-tsan-derived-data",
   "subset": [
@@ -18,8 +20,41 @@
   "characterization": {
     "deadline": "2026-09-30",
     "requiredConsecutivePassesForBlockingReview": 3,
-    "recordedConsecutivePasses": 1,
+    "recordedConsecutivePasses": 3,
     "openConfirmedRaceCount": 0,
-    "promotionRequiresMaintainerReview": true
+    "promotionRequiresMaintainerReview": true,
+    "recordedPasses": [
+      {
+        "run": 34683488068,
+        "event": "schedule",
+        "date": "2026-09-12",
+        "commit": "8550a37b"
+      },
+      {
+        "run": 34749309445,
+        "event": "schedule",
+        "date": "2026-09-13",
+        "commit": "a63aadb9"
+      },
+      {
+        "run": 34829408217,
+        "event": "schedule",
+        "date": "2026-09-14",
+        "commit": "124c8566",
+        "tests": {
+          "core": 654,
+          "transport": 19,
+          "skipped": 2,
+          "races": 0
+        }
+      }
+    ],
+    "recordedOn": "2026-09-14"
+  },
+  "blockingDecision": {
+    "date": "2026-09-14",
+    "decidedBy": "maintainer",
+    "decision": "blocking-on-push-ci",
+    "basis": "Three consecutive scheduled nightly passes (runs 34683488068, 34749309445, 34829408217) with zero race reports and only the two registered skips; the lane costs 5 to 11 minutes on a second macOS runner and is routed with the Swift lane inside CI required. The nightly keeps its cold run."
   }
 }

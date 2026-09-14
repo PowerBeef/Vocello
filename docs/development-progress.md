@@ -66,10 +66,18 @@ judge with a 300 ms onset window, run over 88 fixed-seed clone short takes throu
 `scripts/clip_quality_screen.py`, cannot tell the 11 cluster takes from the 52 clean ones at clip
 level (AUC 0.54) and only modestly on the onset window (AUC 0.71, overlapping ranges). The cluster
 is recorded as model-intrinsic with a minor perceptual footprint, QC v7 keeps counting it, and the
-reproduction (seed 55) passes the clip-quality warn floor. The primary plan now holds HS-01 only.
+reproduction (seed 55) passes the clip-quality warn floor.
 
-Critical path: the MV-07 decision, MV-06, HS-01 by 2026-09-30; release-first resumes RF-13 → RF-09
-freeze → ICA-04 → ICA-05 → RF-12, and ISU-4's physical walk rides the next device window.
+**TSan promoted, September 14.** HS-01 closes the harness plan: three consecutive scheduled nightly
+passes (Sept 12, 13, 14; 654 core and 19 transport tests, zero races) are recorded in the policy and
+the maintainer chose blocking on push CI. `ci.yml` now runs the sanitizer subset as `macos-tsan`
+with the Swift lane inside `CI required`, the nightly keeps a cold run, and the policy validator
+refuses a blocking status without the recorded passes and a dated decision. Every item of
+`harness-stabilization-2026-09` is done; `release-first-3-0-2026-09` is the primary plan again and
+resumes at RF-13 → RF-09.
+
+Critical path (the harness plan completed on September 14): RF-13 → RF-09 freeze → ICA-04 → ICA-05
+→ RF-12, and ISU-4's physical walk rides the next device window.
 
 ### Machinery validation (September 12 to 13)
 
@@ -386,9 +394,7 @@ non-blocking llvm-cov export. The Python test roots are one root (`scripts/tests
 2026-08-21 omitted-tests finding was already closed, and pytest collects every module under `scripts/tests/`
 (the 302 s unittest discovery figure recorded then is superseded by the ~90 s pytest run).
 
-Follow-ups scheduled, not started: TSan characterization before its 2026-09-30 deadline
-(`config/tsan-policy.json`, one of three consecutive passes recorded) with `axiom:concurrency-auditor`
-first; an `axiom:iap-auditor` pass over the iOS export unlock before RF-13; an
+Follow-ups scheduled, not started (the TSan characterization closed as HS-01 on 2026-09-14): an `axiom:iap-auditor` pass over the iOS export unlock before RF-13; an
 `axiom:accessibility-auditor` pass for ISU-4; the optional `swift-lsp` build-server setup. Product
 critical path is unchanged: ISU-4 localization qualification and RF-13 remain next; the adoption track
 is closed.

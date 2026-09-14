@@ -30,7 +30,8 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   restore the persistent DerivedData caches from `config/build-output-policy.json`
   (`scripts/ci/restore_mtimes.py` first); `contracts` and `python` run on ubuntu; `CI required` is the
   only branch-protection context and passes when jobs are path-skipped. The shared toolchain step is
-  `.github/actions/native-toolchain`. `nightly.yml` runs TSan, the complete Python suite and cold
+  `.github/actions/native-toolchain`; `macos-tsan` runs the ThreadSanitizer subset with the Swift lane
+  (blocking since 2026-09-14, `config/tsan-policy.json`). `nightly.yml` runs a cold TSan pass, the complete Python suite and cold
   compiles (the macOS app also optimized with warnings as errors) and keeps one open issue labelled
   `nightly`, refreshed rather than duplicated; `security.yml` runs weekly, on dispatch and inside
   `release.yml` on the tagged commit.
@@ -98,8 +99,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   exit 3, from the run's own load sample, and the record keeps `loadAverage1M`). Runner PASS
   requires diagnostics, crash deltas and restoration; no retries; a failed run keeps its artifacts;
   changed source needs new run IDs. XCUITest is never a packaging, notarization or upload prerequisite.
-- **TSan.** `config/tsan-policy.json` names the subset and the tests that skip under the sanitizer;
-  the nightly lane runs it; never weaken deterministic or MLX runtime coverage to make it pass.
+- **TSan.** `config/tsan-policy.json` names the subset, the tests that skip under the sanitizer and the
+  blocking decision; push CI and the nightly run it; never weaken deterministic or MLX runtime coverage
+  to make it pass, and never relax the status without a new dated decision.
 - **Claude Code state stays external.** Sessions, memory and `settings.local.json` never enter Git,
   CI or evidence; the repository tracks only `.claude/settings.json`, rules, skills and subagents.
 

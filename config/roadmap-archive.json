@@ -102,6 +102,16 @@
       "adopted": "2026-09-13",
       "goal": "Capture what the Vocello app actually renders during each UI benchmark take through an Apple Core Audio process tap (muted physical output), compare it with the published take WAV and record the listener-side metrics (audible first sample, alignment, residual, dropouts, coverage, step bursts) as warn-only evidence; promote thresholds to a gate once a corpus exists. Maintainer decisions of September 13: process tap, mute during lanes, evidence first, benchmark lane only.",
       "supersededBy": "harness-stabilization-2026-09"
+    },
+    {
+      "id": "harness-stabilization-2026-09",
+      "title": "Harness stabilization first: audio-QC decisions, played-audio evidence and development machinery",
+      "status": "complete",
+      "owner": "release-qa",
+      "adopted": "2026-09-13",
+      "goal": "Decide the two September 13 findings before release work resumes: MV-07 (the fp16 speech tokenizer opens streamed clone takes with a burst: fix the first streamed chunk, decode it at fp32, or ship the fp32 codec again) and PC-03 (1.8 s between playbackScheduledMS and audible output). Around them: close the machinery gaps the validation campaign measured but did not fix (one build arena, CI concurrency, the Linux contract gate), give the QC a second machine judge, promote the played-audio comparison to a gate once three canonical captured runs exist, and finish the TSan characterization before its 2026-09-30 deadline. Absorbs machinery-validation-follow-ups-2026-09 and playback-capture-evidence-2026-09 with their ids kept. release-first-3-0-2026-09 stays active and secondary and returns to primaryPlan when MV-07 and PC-03 are decided.",
+      "authority": "docs/development-progress.md",
+      "completed": "2026-09-14"
     }
   ],
   "items": [
@@ -2988,6 +2998,26 @@
         "scripts/clip_quality_screen.py"
       ],
       "notes": "Closed 2026-09-14 with a judgement, not a fix. The judge (MV-06's NISQA v2) extended with an onset-window metric (scripts/clip_quality_screen.py --onset-window-ms 300) over 88 fixed-seed clone short takes on artifactVersion 2026.09.14.1 (the 28-seed matrix plus seeds 200-259): 11 takes carry the cluster (8-32 quarter-scale steps in 20 ms, 142-216 ms in, one at 1045 ms), 52 are clean (count at most 2). Full-clip MOS: cluster median 4.82 vs clean 4.90, rank AUC 0.54, Spearman with the count 0.00. 300 ms onset window: 3.29 vs 3.72, AUC 0.71, Spearman -0.18, ranges overlapping. The four takes under the warn floor all have counts of 1-2. Judgement recorded in audio-qc-engineering.md: model-intrinsic, minor perceptual footprint, monitored by QC v7 counts; no onset warning added because the window does not separate. Machine gate for the reproduction (seed 55: MOS 4.61, count 20 at 143 ms): the clip-quality warn floor 3.81, passed without listening. Python detector matches the Swift count within +/-1 (54/60 exact). (Earlier history: git log -p -- config/roadmap.json.)"
+    },
+    {
+      "id": "HS-01",
+      "plan": "harness-stabilization-2026-09",
+      "title": "Complete the TSan characterization and decide promotion",
+      "status": "done",
+      "updated": "2026-09-14",
+      "gate": "config/tsan-policy.json records three consecutive nightly.yml passes on or before its 2026-09-30 deadline with zero open confirmed races (each confirmed race becomes its own item), then the maintainer records the blocking or non-blocking decision in the policy status; deterministic and MLX runtime coverage are never weakened to pass.",
+      "evidence": [
+        "file:config/tsan-policy.json",
+        "file:.github/workflows/ci.yml",
+        "doc:docs/reference/macos-testing.md"
+      ],
+      "sourceOfTruth": [
+        "config/tsan-policy.json",
+        ".github/workflows/nightly.yml",
+        "scripts/macos_test.sh",
+        "scripts/runtime_security_contract.py"
+      ],
+      "notes": "Closed 2026-09-14. Three consecutive scheduled nightly passes on record (runs 34683488068 2026-09-12, 34749309445 2026-09-13, 34829408217 2026-09-14): 654 core and 19 transport tests, the two registered skips, zero race reports (the artifact logs mention the sanitizer only in the skip reasons). Maintainer decision: blocking on push CI. ci.yml gains macos-tsan (routed with the Swift lane, own macos-tsan cache, 5-11 min on a second runner) inside CI required; nightly.yml keeps its cold run; dev.sh ci mirrors it. config/tsan-policy.json records the passes, status blocking-on-push-ci and the dated decision; runtime_security_contract.py refuses a blocking status without the recorded passes, zero open confirmed races and that decision (policy-internal rules only, per the release rule against asserting workflow wording). Coverage unchanged. (Earlier history: git log -p -- config/roadmap.json.)"
     }
   ]
 }

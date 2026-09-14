@@ -70,6 +70,27 @@ class RuntimeSecurityContractTests(unittest.TestCase):
     def test_tsan_policy_is_valid(self) -> None:
         self.assertEqual(MODULE.validate_tsan_contract(), [])
 
+    def test_tsan_blocking_status_needs_passes_decision_and_a_required_job(self) -> None:
+        policy = MODULE.load_json(ROOT / "config/tsan-policy.json")
+        self.assertEqual(policy["status"], "blocking-on-push-ci")
+        self.assertEqual(MODULE.tsan_policy_errors(policy), [])
+        for mutate, message in (
+            (lambda p: p.update(status="blocking-someday"), "status must be"),
+            (lambda p: p["characterization"].update(recordedConsecutivePasses=2), "required consecutive passes"),
+            (lambda p: p["characterization"].update(openConfirmedRaceCount=1), "open confirmed races"),
+            (lambda p: p.pop("blockingDecision"), "dated blockingDecision"),
+            (lambda p: p["blockingDecision"].update(decision="characterizing-non-blocking"), "dated blockingDecision"),
+            (lambda p: p.update(blockingJob=""), "must name its blockingJob"),
+        ):
+            broken = copy.deepcopy(policy)
+            mutate(broken)
+            errors = MODULE.tsan_policy_errors(broken)
+            self.assertTrue(any(message in error for error in errors), (message, errors))
+        relaxed = copy.deepcopy(policy)
+        relaxed["status"] = "characterizing-non-blocking"
+        relaxed.pop("blockingDecision")
+        self.assertEqual(MODULE.tsan_policy_errors(relaxed), [])
+
     def test_tsan_skipped_tests_are_named_justified_and_real(self) -> None:
         policy = MODULE.load_json(ROOT / "config/tsan-policy.json")
         self.assertIn(

@@ -99,6 +99,7 @@ class CommandRunnerTests(unittest.TestCase):
             "python3 scripts/supply_chain_contract.py --installed website",
             "./scripts/check_project_inputs.sh",
             "scripts/macos_test.sh test",
+            "scripts/macos_test.sh tsan",
             "./scripts/build_foundation_targets.sh ios --incremental",
         ):
             self.assertIn(expected, joined)

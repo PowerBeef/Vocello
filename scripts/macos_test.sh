@@ -843,9 +843,8 @@ cmd_core_test() {
 # MLX/Metal runtime test bundle: the owned deterministic core and injectable XPC
 # transport are the stable CPU subset, while MLX has its own single-owner/runtime
 # tests. Xcode may still compile linked package targets while building the host.
-# The
-# scheduled workflow retains both logs and remains non-blocking only while the
-# policy records characterization status.
+# Since 2026-09-14 the push workflow runs this lane as a required job (blocking,
+# config/tsan-policy.json) and the nightly keeps a cold run; both retain the logs.
 cmd_tsan() {
   [[ $# -eq 0 ]] || die "tsan accepts no arguments"
   local run_id

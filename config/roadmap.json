@@ -1,17 +1,8 @@
 {
   "schemaVersion": 1,
-  "primaryPlan": "harness-stabilization-2026-09",
+  "primaryPlan": "release-first-3-0-2026-09",
   "description": "Single source of truth for open work: active plans and their unfinished items. Finished items and completed plans live in config/roadmap-archive.json (history and progress counts only). Validated by scripts/roadmap.py; rendered to docs/ROADMAP.md.",
   "plans": [
-    {
-      "id": "harness-stabilization-2026-09",
-      "title": "Harness stabilization first: audio-QC decisions, played-audio evidence and development machinery",
-      "status": "active",
-      "owner": "release-qa",
-      "authority": "docs/development-progress.md",
-      "adopted": "2026-09-13",
-      "goal": "Decide the two September 13 findings before release work resumes: MV-07 (the fp16 speech tokenizer opens streamed clone takes with a burst: fix the first streamed chunk, decode it at fp32, or ship the fp32 codec again) and PC-03 (1.8 s between playbackScheduledMS and audible output). Around them: close the machinery gaps the validation campaign measured but did not fix (one build arena, CI concurrency, the Linux contract gate), give the QC a second machine judge, promote the played-audio comparison to a gate once three canonical captured runs exist, and finish the TSan characterization before its 2026-09-30 deadline. Absorbs machinery-validation-follow-ups-2026-09 and playback-capture-evidence-2026-09 with their ids kept. release-first-3-0-2026-09 stays active and secondary and returns to primaryPlan when MV-07 and PC-03 are decided."
-    },
     {
       "id": "release-first-3-0-2026-09",
       "title": "Vocello 3.0 — release-first execution plan (secondary while harness-stabilization-2026-09 is primary)",
@@ -1093,21 +1084,6 @@
       "updated": "2026-09-13",
       "notes": "macOS clauses done on September 13: (1) gate bench PASS after three harness fixes (6ab8c461 clock divisor, b1824091 warm-only verdict, b88d6d03 footprint dispersion), baseline re-saved from mac-gate-bench-20260912-225643-0fd52c77, first standard-RTF gate record mac-gate-bench-20260912-234613-c8f8a8c6; (2) canonical UI records macos-xcui-benchmark-20260913-170946-488a9ed0 and 181112-6cb80773, the latter paired with CLI matrix macos-engine-20260913-180702-42b26142 (engine rtf equal within 0.04; the UI adds 60 to 120 ms to the first chunk); (3) macos-xcui-perf-20260913-174907-79e014f2 after ee97e92c; (4) charts and website repinned (ae676061, 4ea74266); (5) mac-lang-bench-20260913-000655-546b90cf after acba7581 and 5ca95a73. Open: the iOS halves of (2) and (3); run ios-xcui-benchmark-20260913-184908-a94cbc47 aborted before its build because CoreDevice reported the paired iPhone unavailable. The replay cache-policy flake is fixed in 5619004c.",
       "unparkWhen": "The paired iPhone is available for one ios benchmark and one ios perf run (the macOS clauses are done)."
-    },
-    {
-      "id": "HS-01",
-      "plan": "harness-stabilization-2026-09",
-      "title": "Complete the TSan characterization and decide promotion",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "config/tsan-policy.json records three consecutive nightly.yml passes on or before its 2026-09-30 deadline with zero open confirmed races (each confirmed race becomes its own item), then the maintainer records the blocking or non-blocking decision in the policy status; deterministic and MLX runtime coverage are never weakened to pass.",
-      "sourceOfTruth": [
-        "config/tsan-policy.json",
-        ".github/workflows/nightly.yml",
-        "scripts/macos_test.sh"
-      ],
-      "updated": "2026-09-14",
-      "notes": "Opened 2026-09-13: docs/development-progress.md promised the characterization before the policy deadline and no item carried it. Only nightly passes count (maintainer decision of September 12). State on 2026-09-14: config/tsan-policy.json records 1 consecutive pass while nightly.yml is green on the scheduled runs 34683488068 (2026-09-12) and 34749309445 (2026-09-13) and the dispatched run 34773188765 (2026-09-13); the counter is a hand-edited field under maintainer review, so recording those passes (2 scheduled, or 3 with the dispatch) and the blocking decision are the maintainer's edits. The local cold TSan pass of September 13 is evidence of the lane, not of the counter."
     }
   ]
 }

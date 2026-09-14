@@ -93,11 +93,16 @@ still compile linked MLX targets while building the test host. The driver launch
 Mach-O files remain arm64-only, while only the named Xcode sanitizer dylib may retain its universal
 toolchain slices.
 
-The nightly workflow (`nightly.yml`, job `tsan`, 04:00 UTC and on dispatch) is non-blocking only
-during the bounded characterization period in `config/tsan-policy.json`. It preserves every failed run, performs no automatic retry, and requires
-three consecutive clean runs plus explicit maintainer review before it may become blocking. The
-first corrected physical-host run on 2026-08-26 passed all 460 core and 18 XPC tests with no TSan
-warning or race summary.
+Since 2026-09-14 this lane is blocking: `ci.yml` runs it as the `macos-tsan` job whenever the Swift
+lane routes (its own `build/cache/xcode/macos-tsan` cache, 5 to 11 minutes on a second macOS runner)
+inside `CI required`, and the nightly workflow (`nightly.yml`, job `tsan`, 04:00 UTC and on
+dispatch) keeps a cold run of the same lane. `config/tsan-policy.json` records the characterization
+that earned the promotion (three consecutive scheduled nightly passes, runs 34683488068,
+34749309445 and 34829408217, zero race reports, only the two registered skips) and the dated
+maintainer decision; `scripts/runtime_security_contract.py` refuses a blocking status without the
+recorded passes, zero open confirmed races and that decision. Both workflows preserve every failed
+run and perform no automatic retry. The first corrected physical-host run on 2026-08-26 passed all
+460 core and 18 XPC tests with no TSan warning or race summary.
 
 ## Explicit XCUITest lanes
 

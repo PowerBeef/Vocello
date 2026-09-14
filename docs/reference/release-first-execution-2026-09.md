@@ -22,6 +22,10 @@ gap between playback scheduling and audible output); this plan stays active and 
 returns to `primaryPlan` afterwards. RF-11 was superseded by ICA-04/ICA-05 (one campaign, one
 owner) and RF-12 now waits on ICA-05; RF-09 is re-gated on the freeze commit behind RF-13.
 
+**September 14 amendment.** The harness plan completed (MV-07 decided by restoring the fp32 codec,
+PC-03 explained, MV-06 and MV-05 judged, HS-01 promoted TSan to blocking) and this plan is
+`primaryPlan` again; work resumes at RF-13.
+
 Until then, `config/roadmap.json` designated **`release-first-3-0-2026-09` as `primaryPlan`**. Its
 `RF-01` through `RF-13` milestones remain the execution roadmap. The September 6 iOS-first
 amendment below supersedes their original numeric scheduling order, not their closure gates.

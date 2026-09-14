@@ -72,8 +72,8 @@ publication and device consent are always explicit; ordinary work never needs a 
 | --- | --- | --- |
 | Inner loop | while editing | `dev.sh test --only Class`, `dev.sh py` (changed consumers by default; `--all`, `--lane`, or explicit modules), `dev.sh lint`. Quarantine (`config/test-quarantine.json`) applies only under `VOCELLO_QUARANTINE=1`, which CI sets; local runs execute quarantined tests. The XCUITest bundles compile only inside `scripts/ui_test.sh`; after editing `Tests/*UITests` or `Tests/UIAutomationSupport`, run `xcodebuild build-for-testing` for `VocelloMacUI` and `VocelloiOSUI` (generic iOS destination, unsigned, `-skipPackagePluginValidation`) before committing. |
 | Commit | `git commit` | `scripts/hooks/commit_lint.sh`: branch `main`, clean whitespace, no private path or credential in staged files. Nothing else blocks a commit. |
-| Push CI | every push to `main` | `.github/workflows/ci.yml`: routed lanes, cached native builds, Linux Python suite, `CI required` aggregate |
-| Nightly | 04:00 UTC | TSan subset, complete Python suite, cold compiles of both platforms; opens a `nightly` issue on failure |
+| Push CI | every push to `main` | `.github/workflows/ci.yml`: routed lanes (macOS tests and the blocking TSan subset on Swift changes), cached native builds, Linux Python suite, `CI required` aggregate |
+| Nightly | 04:00 UTC | cold TSan subset, complete Python suite, cold compiles of both platforms; opens a `nightly` issue on failure |
 | Weekly / release | schedule, tag | `security.yml` (CodeQL, npm audit); `release.yml` (signing, notarization, evidence) |
 
 `./scripts/check_project_inputs.sh [--local] [--python all|darwin-only|selected|none]` is the

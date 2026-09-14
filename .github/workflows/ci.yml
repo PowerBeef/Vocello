@@ -258,6 +258,89 @@ jobs:
           path: build/cache/xcode/source-packages
           key: ${{ steps.key.outputs.spm }}
 
+  macos-tsan:
+    # Blocking since 2026-09-14 (config/tsan-policy.json): the deterministic core
+    # and injectable XPC transport subset under ThreadSanitizer, routed with the
+    # Swift lane. The nightly keeps its cold run of the same lane.
+    name: macOS ThreadSanitizer subset
+    needs: changes
+    if: needs.changes.outputs.swift == 'true'
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Native toolchain
+        uses: ./.github/actions/native-toolchain
+        with:
+          metal: "true"
+
+      - name: Compute cache key
+        id: key
+        run: |
+          xcode="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
+          graph="${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift', 'project.yml') }}"
+          week="$(date -u +%G-W%V)"
+          echo "prefix=macos-tsan-xcode${xcode}-" >> "$GITHUB_OUTPUT"
+          echo "graph=macos-tsan-xcode${xcode}-${graph}-" >> "$GITHUB_OUTPUT"
+          echo "value=macos-tsan-xcode${xcode}-${graph}-${week}" >> "$GITHUB_OUTPUT"
+          echo "spm=spm-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the sanitizer build cache
+        id: cache
+        if: ${{ !inputs.cold }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/cache/xcode/macos-tsan
+          key: ${{ steps.key.outputs.value }}
+          restore-keys: |
+            ${{ steps.key.outputs.graph }}
+            ${{ steps.key.outputs.prefix }}
+
+      - name: Restore the shared package checkout
+        id: spm
+        if: ${{ !inputs.cold }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/cache/xcode/source-packages
+          key: ${{ steps.key.outputs.spm }}
+
+      - name: Restore tracked-file mtimes from history
+        run: python3 scripts/ci/restore_mtimes.py
+
+      - name: Regenerate Xcode project
+        run: ./scripts/regenerate_project.sh --fast
+
+      - name: Run the Thread Sanitizer subset
+        run: scripts/macos_test.sh tsan
+
+      - name: Retain sanitizer evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tsan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/artifacts/macos/tests/tsan-*/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Prune the sanitizer cache before save
+        if: always()
+        run: |
+          rm -rf build/cache/xcode/macos-tsan/Logs build/cache/xcode/macos-tsan/Index.noindex
+          find build/cache/xcode/macos-tsan -name '*.xcactivitylog' -delete 2>/dev/null || true
+          du -sh build/cache/xcode/macos-tsan 2>/dev/null || true
+          echo "restored from: ${{ steps.cache.outputs.cache-matched-key || 'nothing (cold)' }}"
+
+      - name: Save the sanitizer build cache
+        if: ${{ !cancelled() && steps.cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/cache/xcode/macos-tsan
+          key: ${{ steps.key.outputs.value }}
+
   ios-compile:
     name: iOS compile check (device SDK)
     needs: changes
@@ -420,7 +503,7 @@ jobs:
 
   ci-required:
     name: CI required
-    needs: [changes, contracts, python, macos-tests, ios-compile, website, dependency-submission]
+    needs: [changes, contracts, python, macos-tests, macos-tsan, ios-compile, website, dependency-submission]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

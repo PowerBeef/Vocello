@@ -536,7 +536,9 @@ destruction restores audible output. The runner (`com.qwenvoice.app.uitests.xctr
 unsandboxed by the lane) needs one manual **System Audio Recording** grant, added in System Settings
 after the first lane run because a process tap never prompts (see
 [`macos-permissions.md`](macos-permissions.md)); until granted, the lane passes and every take's
-`playbackCaptureStatus` is `unavailable` or `silent`. Artifacts land under
+`playbackCaptureStatus` is `unavailable` or `silent`. A captured take that fails the played-audio gate
+(coverage < 0.98, residual > −25 dBFS, a dropout, or an audible onset more than 500 ms from the
+scheduling stamp; thresholds from the three canonical runs of 2026-09-14) fails the lane. Artifacts land under
 `<run-artifact-dir>/playback-capture/` (`capture-run.json`, `take-NN-<cell>.wav` and `.json`,
 `summary.json`); the WAVs stay untracked and only their digests enter the record. The metrics and
 warn codes are listed in [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md).

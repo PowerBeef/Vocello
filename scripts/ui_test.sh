@@ -538,7 +538,7 @@ mac_ui_preflight() {
   # Played-audio capture (PC-01): the XCUITest runner taps the app's output and
   # needs one System Audio Recording grant of its own; without it the lane still
   # passes and every take's capture evidence reads "unavailable".
-  if [[ "$lane" == "benchmark" ]]; then
+  if [[ "$lane" == "benchmark" || "$lane" == "smoke" ]]; then
     if ! rows="$(sqlite3 -readonly "$tcc_db" \
         "SELECT auth_value FROM access WHERE service='kTCCServiceAudioCapture' AND client='com.qwenvoice.app.uitests.xctrunner';" \
         2>/dev/null)"; then
@@ -1337,6 +1337,12 @@ elif [[ "$platform" == "macos" ]]; then
     if [[ -n "$long_form_segments" ]]; then
       export TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS="$long_form_segments"
     fi
+    # Played-audio capture (PC-02): the completed-generation journey taps the
+    # app's output like a benchmark take; scripts/analyze_playback_capture.py
+    # writes the summary since this lane has no telemetry checker.
+    mkdir -p "$out/playback-capture"
+    export TEST_RUNNER_QVOICE_MAC_BENCH_RUN_ID="$run_id"
+    export TEST_RUNNER_QVOICE_MAC_BENCH_CAPTURE_DIR="$out/playback-capture"
   elif [[ "$lane" == "perf" ]]; then
     # UI-performance scenarios (frame probe + marked windows).
     only_test="VocelloMacUITests/VocelloMacPerfUITests"
@@ -1411,7 +1417,7 @@ WAV
       || die "macOS UI build-for-testing failed (see $out/xcodebuild.log)"
     printf '%s\n' "$mac_fingerprint" >"$mac_build_marker"
   fi
-  [[ "$lane" != "benchmark" ]] || prepare_runner_for_playback_capture
+  [[ "$lane" != "benchmark" && "$lane" != "smoke" ]] || prepare_runner_for_playback_capture
   arm_mac_crash_marker
   required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test-without-building \
     -project "$PROJECT" -scheme VocelloMacUI -configuration Release \
@@ -1439,8 +1445,13 @@ WAV
     "$MAC_DERIVED" "$QVOICE_XCODE_SOURCE_PACKAGES" "$MAC_APP_EXECUTABLE"
   # Played-audio capture (PC-01): an optional ledger step that says the runner
   # armed its tap directory; per-take availability lives in the evidence.
-  if [[ "$lane" == "benchmark" && -f "$out/playback-capture/capture-run.json" ]]; then
+  if [[ ( "$lane" == "benchmark" || "$lane" == "smoke" ) && -f "$out/playback-capture/capture-run.json" ]]; then
     required_step_record "$step_ledger" playback-capture 0
+  fi
+  if [[ "$lane" == "smoke" && -f "$out/playback-capture/capture-run.json" ]]; then
+    python3 "$ROOT_DIR/scripts/analyze_playback_capture.py" "$out/playback-capture" \
+      --outputs-dir "$HOME/Library/Application Support/QwenVoice-Debug/outputs" --mode custom \
+      || warn "smoke playback capture analysis failed (advisory)"
   fi
   [[ "$lane" != "benchmark" ]] || required_step_run "$step_ledger" \
     benchmark-validation validate_macos_benchmark \

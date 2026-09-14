@@ -119,7 +119,7 @@ The benchmark lane also records what the app actually plays: the test runner tap
 audio output for every take (Core Audio process tap, physical output muted while tapped, one
 manual System Audio Recording grant for the lane-re-signed `com.qwenvoice.app.uitests.xctrunner`), writes the captures under the run's
 `playback-capture/` directory and the checker compares each one with the published take WAV
-(`playbackCapture*` metrics, warn-only codes; see
+(`playbackCapture*` metrics, warn codes, and since 2026-09-14 a gate on captured takes; the smoke lane captures its completed-generation take as well; see
 [`benchmarking-procedure.md`](benchmarking-procedure.md) §4.10). A missing or denied capture never
 fails the lane; the take reads `playbackCaptureStatus: unavailable`.
 

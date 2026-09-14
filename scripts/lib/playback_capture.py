@@ -41,6 +41,16 @@ STEP_BURST_WINDOW_MS = 20
 WARN_MISALIGNED_MS = 250.0
 WARN_LOW_COVERAGE = 0.95
 WARN_HIGH_RESIDUAL_DBFS = -20.0
+# Gate thresholds (PC-02), set from the first three canonical captured runs of
+# 2026-09-14 (87 takes): coverage was 1.00 on every take, the residual never
+# rose above -31.9 dBFS, no take had a dropout, and 86 of 87 audible onsets
+# fell within 250 ms of the app's scheduling stamp (the outlier: 359 ms). A
+# captured take that breaks one of these fails the lane; unavailable, silent
+# and unresolved captures stay warnings so an ungranted host still passes.
+GATE_COVERAGE_MIN = 0.98
+GATE_RESIDUAL_MAX_DBFS = -25.0
+GATE_DROPOUT_MAX = 0
+GATE_MISALIGNED_MAX_MS = 500.0
 # The app names published takes `YYYYMMDD_HH-mm-ss-SSS_<prefix>.wav` in local time.
 OUTPUT_SUBDIRECTORY = {"custom": "CustomVoice", "design": "VoiceDesign", "clone": "Clones"}
 OUTPUT_NAME_RE = re.compile(r"^(\d{8})_(\d{2})-(\d{2})-(\d{2})-(\d{3})_")
@@ -290,6 +300,30 @@ def first_audible_ms(capture: np.ndarray, rate: int, sidecar: dict[str, Any],
     if len(audible) == 0:
         return None
     return float(start) + float(audible[0]) * FRAME_MS - float(click)
+
+
+def gate_failures(status: str, metrics: dict[str, Any], playback_scheduled_ms: float | None = None) -> list[str]:
+    """Why a captured take fails the played-audio gate; empty when it passes or was not captured."""
+    if status != "captured":
+        return []
+    failures: list[str] = []
+    coverage = metrics.get("playbackCaptureCoverage")
+    if isinstance(coverage, (int, float)) and coverage < GATE_COVERAGE_MIN:
+        failures.append(f"playback capture coverage {coverage:.3f} < {GATE_COVERAGE_MIN}")
+    residual = metrics.get("playbackCaptureResidualDBFS")
+    if isinstance(residual, (int, float)) and residual > GATE_RESIDUAL_MAX_DBFS:
+        failures.append(f"playback capture residual {residual:.1f} dBFS > {GATE_RESIDUAL_MAX_DBFS}")
+    dropouts = metrics.get("playbackCaptureDropoutCount")
+    if isinstance(dropouts, (int, float)) and dropouts > GATE_DROPOUT_MAX:
+        failures.append(f"playback capture dropouts {int(dropouts)} > {GATE_DROPOUT_MAX}")
+    audible = metrics.get("playbackCaptureFirstAudibleMS")
+    if (isinstance(audible, (int, float)) and isinstance(playback_scheduled_ms, (int, float))
+            and abs(audible - float(playback_scheduled_ms)) > GATE_MISALIGNED_MAX_MS):
+        failures.append(
+            f"playback capture audible onset {audible - float(playback_scheduled_ms):+.0f} ms from scheduling "
+            f"(limit ±{GATE_MISALIGNED_MAX_MS:.0f})"
+        )
+    return failures
 
 
 # -------------------------------------------------------------- run join

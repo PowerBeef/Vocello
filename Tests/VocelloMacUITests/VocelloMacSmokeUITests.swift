@@ -120,7 +120,29 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         let nonce = "smoke-complete-\(Self.pronounceableNonce())"
         prepare(mode: .custom)
         replaceScript(with: "Automated Built-in Voice smoke generation \(nonce).")
-        generateAndWaitForCompletion(mode: .custom, timeout: 240)
+        // Played-audio capture (PC-02): the smoke lane taps this one take like a
+        // benchmark take; an absent or failing capture never fails the journey.
+        let environment = ProcessInfo.processInfo.environment
+        let capture = VocelloPlaybackCaptureCoordinator(
+            environment: environment,
+            runID: environment["QVOICE_MAC_BENCH_RUN_ID"] ?? "macos-xcui-smoke"
+        )
+        defer { capture?.abort() }
+        capture?.beginTake(index: 1, cell: "custom/smoke/warm#0", warmState: "warm")
+        generateAndWaitForCompletion(
+            mode: .custom, timeout: 240,
+            onBeforeGenerate: { capture?.markSubmit() },
+            onAfterGenerateClick: { capture?.markSubmitReturned() }
+        )
+        if let capture, !capture.isIdle {
+            let playbackEnded = waitForPlaybackToFinish(timeout: 120)
+            _ = VocelloUIWait.condition("captured audio to fall silent after playback", timeout: 5) {
+                capture.capturedAudioIsQuiet(forLast: 0.5)
+            }
+            capture.endTake(playbackEnded: playbackEnded)
+        } else {
+            capture?.endTake(playbackEnded: false)
+        }
         VocelloUIScreenshot.attach(app, named: "mac-smoke-custom-complete")
 
         // The completed take must be visible in History exactly once.

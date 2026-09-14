@@ -571,7 +571,35 @@ def evaluate_playback_capture(
         summary["submitReference"] = "runnerClick"
     if result.get("error"):
         summary["error"] = result["error"]
-    return {"fields": fields, "metrics": dict(result["metrics"]), "warnings": list(result["warnings"]), "summary": summary}
+    gate = playback_capture.gate_failures(result["status"], result["metrics"], playback_scheduled_ms)
+    if gate:
+        summary["gateFailures"] = gate
+    return {"fields": fields, "metrics": dict(result["metrics"]), "warnings": list(result["warnings"]),
+            "summary": summary, "gateFailures": gate}
+
+
+def evaluate_all_captures(
+    cells: list[str], engine_rows: list[dict], app_rows: list[dict],
+    playback_capture_dir: Path | None, outputs_dir: Path | None,
+) -> dict[int, dict]:
+    """Every take's capture evidence, keyed by take index, before the verdict is decided."""
+    if playback_capture_dir is None:
+        return {}
+    captures = playback_capture.collect_captures(playback_capture_dir)
+    app_by_id = {row.get("generationID"): row for row in app_rows}
+    results: dict[int, dict] = {}
+    for index, (row, cell) in enumerate(zip(engine_rows, cells, strict=True), start=1):
+        mode = cell.split("/")[0]
+        output = row.get("outputMetrics") or {}
+        app_row = app_by_id.get(row.get("generationID")) or {}
+        frontend = app_row.get("frontendMetrics") or {}
+        app_timings = app_row.get("timingsMS") or {}
+        results[index] = evaluate_playback_capture(
+            index, cell, mode, output.get("durationSeconds"), captures,
+            playback_capture_dir, outputs_dir, frontend.get("submitToPlaybackScheduledMS"),
+            app_timings.get("submittedAtEpochMS"),
+        )
+    return results
 
 
 def build_manifest(
@@ -591,6 +619,7 @@ def build_manifest(
     playback_capture_dir: Path | None = None,
     outputs_dir: Path | None = None,
     app_bundle_relative_path: str | None = None,
+    capture_results: dict[int, dict] | None = None,
 ) -> dict:
     memory_evidence, memory_run = qualify_memory_rows(
         rows=engine_rows,
@@ -601,7 +630,8 @@ def build_manifest(
     )
     memory_by_id = {item.generation_id: item for item in memory_evidence}
     app_by_id = {row.get("generationID"): row for row in app_rows}
-    captures = playback_capture.collect_captures(playback_capture_dir) if playback_capture_dir else {}
+    if capture_results is None:
+        capture_results = evaluate_all_captures(cells, engine_rows, app_rows, playback_capture_dir, outputs_dir)
     capture_by_index: dict[int, dict] = {}
     capture_summary: list[dict] = []
     takes = []
@@ -613,12 +643,7 @@ def build_manifest(
         qc = row.get("audioQC") or output.get("audioQC") or {}
         memory = memory_by_id[row["generationID"]]
         frontend = (app_by_id.get(row["generationID"]) or {}).get("frontendMetrics") or {}
-        app_timings = (app_by_id.get(row["generationID"]) or {}).get("timingsMS") or {}
-        capture = evaluate_playback_capture(
-            index, cell, mode, output.get("durationSeconds"), captures,
-            playback_capture_dir, outputs_dir, frontend.get("submitToPlaybackScheduledMS"),
-            app_timings.get("submittedAtEpochMS"),
-        )
+        capture = capture_results.get(index) or {"fields": {}, "metrics": {}, "warnings": [], "summary": None, "gateFailures": []}
         capture_by_index[index] = capture
         if capture["summary"] is not None:
             capture_summary.append(capture["summary"])
@@ -745,6 +770,13 @@ def build_manifest(
             "takes": capture_summary,
             "captured": sum(1 for item in capture_summary if item.get("status") == "captured"),
             "expected": len(cells),
+            "gate": {
+                "coverageMin": playback_capture.GATE_COVERAGE_MIN,
+                "residualMaxDBFS": playback_capture.GATE_RESIDUAL_MAX_DBFS,
+                "dropoutMax": playback_capture.GATE_DROPOUT_MAX,
+                "misalignedMaxMS": playback_capture.GATE_MISALIGNED_MAX_MS,
+                "failedTakes": [item["takeIndex"] for item in capture_summary if item.get("gateFailures")],
+            },
         })
     history_record = {
         "schemaVersion": history_record_schema_version(history_takes),
@@ -1058,6 +1090,16 @@ def main() -> int:
         except MemoryEvidenceError as error:
             failures.append(str(error))
 
+    # Played-audio gate (PC-02): captured takes must match what the app played.
+    capture_results: dict[int, dict] | None = None
+    if not failures and args.playback_capture_dir is not None:
+        capture_results = evaluate_all_captures(
+            expected_cell_order, engine_rows, app_rows, args.playback_capture_dir, args.outputs_dir,
+        )
+        for index, capture in sorted(capture_results.items()):
+            for reason in capture.get("gateFailures", []):
+                failures.append(f"take {index} ({expected_cell_order[index - 1]}): {reason}")
+
     print(
         f"XPC bench gate: expected={expected} engine={len(engine_rows)} "
         f"service={len(service_rows)} app={len(app_rows)} merged={len(merged_rows)}"
@@ -1085,6 +1127,7 @@ def main() -> int:
             playback_capture_dir=args.playback_capture_dir,
             outputs_dir=args.outputs_dir,
             app_bundle_relative_path=app_bundle_relative_path,
+            capture_results=capture_results,
         )
         write_json_atomic(args.evidence_manifest, manifest)
         print(f"evidence={args.evidence_manifest}")

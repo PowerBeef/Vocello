@@ -349,8 +349,13 @@ Anomalies are warn-only codes on the take (`playback.capture.misaligned` when th
 frame and the app's own `playbackScheduledMS` disagree by more than 250 ms either way — the app's
 timeline stops at scheduling, the tap hears the result; the first captured takes put the audible
 onset about 1.8 s after scheduling on final-file playback —
-`.dropouts`, `.low_coverage` below 0.95, `.high_residual` above −20 dBFS, `.silent`); thresholds
-become a gate only once a corpus exists (roadmap PC-02).
+`.dropouts`, `.low_coverage` below 0.95, `.high_residual` above −20 dBFS, `.silent`). Since
+2026-09-14 (PC-02) a **captured** take also fails the lane when it breaks the gate set from the first
+three canonical captured runs (87 takes): coverage below 0.98, residual above −25 dBFS, any
+dropout, or an audible onset more than 500 ms from `playbackScheduledMS`; unavailable, silent and
+unresolved captures stay warnings so an ungranted host still passes. The macOS smoke lane captures
+its completed-generation take too; `scripts/analyze_playback_capture.py` writes its `summary.json`
+(advisory there).
 
 ### RTF vs `decode ms` (read together, don't diff naively)
 

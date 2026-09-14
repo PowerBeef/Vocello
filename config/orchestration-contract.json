@@ -214,7 +214,9 @@
               "build/dist/macos/release-metadata.txt",
               "--include-cli"
             ],
-            "outputs": ["build/dist/macos/cli-package-verification.json"]
+            "outputs": [
+              "build/dist/macos/cli-package-verification.json"
+            ]
           },
           {
             "id": "macos-artifact-verification-v1",
@@ -294,8 +296,16 @@
     },
     "ui-ios-purchase": {
       "producer": "scripts/ui_test.sh",
-      "requiredSteps": ["source-provenance", "crash-baseline", "xcuitest", "purchase-validation", "crash-delta"],
-      "optionalSteps": ["result-retention"]
+      "requiredSteps": [
+        "source-provenance",
+        "crash-baseline",
+        "xcuitest",
+        "purchase-validation",
+        "crash-delta"
+      ],
+      "optionalSteps": [
+        "result-retention"
+      ]
     },
     "ui-ios-screen-protection": {
       "producer": "scripts/ui_test.sh",
@@ -341,7 +351,9 @@
         "control-audit-composition",
         "crash-delta"
       ],
-      "optionalSteps": ["result-retention"]
+      "optionalSteps": [
+        "result-retention"
+      ]
     },
     "ui-ios-model-download": {
       "producer": "scripts/ui_test.sh",
@@ -392,7 +404,9 @@
         "crash-delta",
         "smoke-diagnostics"
       ],
-      "optionalSteps": ["result-retention"]
+      "optionalSteps": [
+        "result-retention"
+      ]
     },
     "ui-ios-candidate-smoke": {
       "producer": "scripts/ui_test.sh",
@@ -410,7 +424,9 @@
         "candidate-attachments",
         "candidate-result"
       ],
-      "optionalSteps": ["result-retention"]
+      "optionalSteps": [
+        "result-retention"
+      ]
     },
     "ui-ios-localization": {
       "producer": "scripts/ui_test.sh",
@@ -450,7 +466,8 @@
       "optionalSteps": [
         "result-retention",
         "ui-preflight",
-        "ui-build"
+        "ui-build",
+        "playback-capture"
       ]
     },
     "ui-macos-localization": {

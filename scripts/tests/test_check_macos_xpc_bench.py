@@ -509,7 +509,7 @@ if __name__ == "__main__":
 class PlaybackCaptureEvidenceTests(CheckMacOSXPCBenchmarkTests):
     """PC-01: the runner's per-take capture joins the take and yields warn-only evidence."""
 
-    def _capture_fixture(self, root: Path, *, take_index: int, cell: str, duration: float) -> tuple[Path, Path]:
+    def _capture_fixture(self, root: Path, *, take_index: int, cell: str, duration: float, hole_ms: float = 0.0) -> tuple[Path, Path]:
         import datetime as dt
         import numpy as np
         sys.path.insert(0, str(ROOT / "scripts"))
@@ -527,6 +527,9 @@ class PlaybackCaptureEvidenceTests(CheckMacOSXPCBenchmarkTests):
         captures.mkdir()
         safe_cell = cell.replace("/", "_")
         played = np.concatenate([np.zeros(int(world_rate * 0.137)), world * 0.7, np.zeros(world_rate)])
+        if hole_ms:
+            # A dropout inside the spoken part: the app stopped rendering for hole_ms.
+            start = int(world_rate * (0.137 + 1.0)); played[start:start + int(world_rate * hole_ms / 1000)] = 0.0
         pc.write_wav_float32(captures / f"take-{take_index:02d}-{safe_cell}.wav", world_rate, played)
         start = stamp.timestamp() * 1000 - 1_000
         (captures / f"take-{take_index:02d}-{safe_cell}.json").write_text(json.dumps({
@@ -539,6 +542,23 @@ class PlaybackCaptureEvidenceTests(CheckMacOSXPCBenchmarkTests):
         }))
         (captures / "capture-run.json").write_text(json.dumps({"runID": RUN_ID}))
         return captures, outputs
+
+    def test_a_captured_take_with_a_dropout_fails_the_lane_but_keeps_its_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            captures, outputs = self._capture_fixture(Path(temp), take_index=2, cell="custom/short/warm#0", duration=3.0, hole_ms=120)
+
+            def set_duration(rows: list[dict]) -> None:
+                rows[1]["outputMetrics"]["durationSeconds"] = 3.0
+
+            result = self.run_checker(
+                self.expected_order, mutate_engine_rows=set_duration, evidence=True,
+                extra_args=["--playback-capture-dir", str(captures), "--outputs-dir", str(outputs)],
+            )
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("FAIL:", result.stdout)
+            self.assertRegex(result.stdout, r"take 2 \(custom/short/warm#0\): playback capture dropouts \d+ > 0")
+            # The hole also drags the residual above the gate; both reasons are named.
+            self.assertIn("playback capture residual", result.stdout)
 
     def test_the_bundle_path_follows_the_receipt(self) -> None:
         sys.path.insert(0, str(ROOT / "scripts"))
@@ -614,6 +634,8 @@ class PlaybackCaptureEvidenceTests(CheckMacOSXPCBenchmarkTests):
                 self.assertFalse([k for k in other["metrics"] if k.startswith("playbackCapture")])
             summary = json.loads((captures / "summary.json").read_text())
             self.assertEqual((summary["captured"], summary["expected"]), (1, 5))
+            self.assertEqual(summary["gate"]["failedTakes"], [])
+            self.assertEqual(summary["gate"]["coverageMin"], 0.98)
             self.assertEqual(summary["takes"][1]["reference"].endswith("_fixture.wav"), True)
 
     def test_a_lane_without_a_capture_directory_adds_no_capture_fields(self) -> None:

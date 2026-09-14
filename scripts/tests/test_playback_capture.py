@@ -145,6 +145,25 @@ class HelperTests(unittest.TestCase):
             self.assertIsNone(pc.resolve_reference_wav(Path(tmp), "unknown", epoch - 2000, epoch + 5000, 2.32))
 
 
+class GateTests(unittest.TestCase):
+    def test_a_clean_capture_passes_and_each_threshold_is_named(self) -> None:
+        clean = {"playbackCaptureCoverage": 1.0, "playbackCaptureResidualDBFS": -40.0,
+                 "playbackCaptureDropoutCount": 0.0, "playbackCaptureFirstAudibleMS": 120.0}
+        self.assertEqual(pc.gate_failures("captured", clean, 100.0), [])
+        self.assertEqual(pc.gate_failures("silent", clean, 100.0), [], "only captured takes are gated")
+        self.assertEqual(pc.gate_failures("unavailable", {}, None), [])
+        bad = {"playbackCaptureCoverage": 0.9, "playbackCaptureResidualDBFS": -20.0,
+               "playbackCaptureDropoutCount": 1.0, "playbackCaptureFirstAudibleMS": 900.0}
+        reasons = pc.gate_failures("captured", bad, 100.0)
+        self.assertEqual(len(reasons), 4)
+        self.assertTrue(any("coverage" in r for r in reasons))
+        self.assertTrue(any("residual" in r for r in reasons))
+        self.assertTrue(any("dropouts" in r for r in reasons))
+        self.assertTrue(any("audible onset" in r for r in reasons))
+        # 359 ms was the corpus outlier: a warning, not a failure.
+        self.assertEqual(pc.gate_failures("captured", {**clean, "playbackCaptureFirstAudibleMS": 459.0}, 100.0), [])
+
+
 class AnalyzeTakeTests(unittest.TestCase):
     def _fixture(self, tmp: str, *, delay_ms: float = 137.0, silent: bool = False) -> tuple[dict, Path, Path]:
         world = speech_like(WORLD_RATE)

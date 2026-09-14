@@ -94,7 +94,7 @@ struct RecordReferenceClipSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Record Reference Clip")
+            Text(MacInterfaceText.recordTitle)
                 .font(.title2.weight(.bold))
 
             VStack(spacing: 14) {
@@ -136,7 +136,7 @@ struct RecordReferenceClipSheet: View {
             .appAnimation(AppTheme.Motion.state, value: recorder.isRecording)
 
             HStack(spacing: 10) {
-                Button("Cancel") {
+                Button(MacInterfaceText.cancel) {
                     recorder.stopWithoutSaving()
                     dismiss()
                 }
@@ -150,7 +150,7 @@ struct RecordReferenceClipSheet: View {
                     Button {
                         Task { await recorder.start() }
                     } label: {
-                        Label("Record", systemImage: "mic.fill")
+                        Label(MacInterfaceText.recordRecord, systemImage: "mic.fill")
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(AppTheme.voiceCloning)
@@ -160,13 +160,13 @@ struct RecordReferenceClipSheet: View {
                     Button {
                         _ = recorder.stopAndSave()
                     } label: {
-                        Label("Stop", systemImage: "stop.fill")
+                        Label(MacInterfaceText.recordStop, systemImage: "stop.fill")
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(AppTheme.voiceCloning)
                     .accessibilityIdentifier("recordClip_stop")
                 case .captured:
-                    Button("Retake") {
+                    Button(MacInterfaceText.recordRetake) {
                         reviewPlayer.stop()
                         recorder.reset()
                     }
@@ -208,19 +208,19 @@ struct RecordReferenceClipSheet: View {
                 reviewPlayer.stop()
             }
         }
-        .alert("Microphone access denied", isPresented: $recorder.showsPermissionAlert) {
-            Button("Open System Settings") {
+        .alert(MacInterfaceText.recordMicrophoneDeniedTitle, isPresented: $recorder.showsPermissionAlert) {
+            Button(MacInterfaceText.recordOpenSystemSettings) {
                 if let url = URL(
                     string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
                 ) {
                     NSWorkspace.shared.open(url)
                 }
             }
-            Button("Cancel", role: .cancel) {
+            Button(MacInterfaceText.cancel, role: .cancel) {
                 dismiss()
             }
         } message: {
-            Text("Vocello needs the microphone to record reference clips. Enable it in System Settings to continue.")
+            Text(MacInterfaceText.recordMicrophoneDeniedDetail)
         }
     }
 

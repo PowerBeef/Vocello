@@ -237,6 +237,33 @@ class LocalizationContractTests(unittest.TestCase):
         with self.assertRaisesRegex(localization_contract.ContractError, "not in the catalog"):
             localization_contract.validate(self.root)
 
+    def test_mac_interface_default_must_match_catalog_english(self) -> None:
+        catalog_path = self.root / localization_contract.CATALOG
+        catalog = json.loads(catalog_path.read_text())
+        catalog["strings"]["vocello.mac.fixture.label"] = {
+            "comment": "fixture", "extractionState": "manual",
+            "localizations": {locale: {"stringUnit": {"state": "translated", "value": "Fixture"}} for locale in ("en", "fr")},
+        }
+        catalog_path.write_text(json.dumps(catalog))
+        source = self.root / localization_contract.MAC_INTERFACE_SOURCE
+        source.parent.mkdir(parents=True, exist_ok=True)
+        binding = (
+            'enum MacInterfaceText {\n    private static let localization = VocelloLocalization()\n'
+            '    static var fixture: String {\n        localization.string(localized: "vocello.mac.fixture.label", '
+            'defaultValue: "%s",\n               comment: "fixture")\n    }\n}\n'
+        )
+        source.write_text(binding % "Fixture")
+        localization_contract.validate(self.root)
+        source.write_text(binding % "Drifted")
+        with self.assertRaisesRegex(localization_contract.ContractError, "differs from the catalog"):
+            localization_contract.validate(self.root)
+        source.write_text("// no binding\n")
+        with self.assertRaisesRegex(localization_contract.ContractError, "do not match the catalog"):
+            localization_contract.validate(self.root)
+        source.write_text(binding % "Fixture" + binding.replace("MacInterfaceText", "Twice") % "Fixture")
+        with self.assertRaisesRegex(localization_contract.ContractError, "more than once"):
+            localization_contract.validate(self.root)
+
     def test_permission_translation_preserves_source_and_is_bundled(self) -> None:
         path = self.root / "Sources/iOS/InfoPlist.xcstrings"
         catalog = json.loads(path.read_text())

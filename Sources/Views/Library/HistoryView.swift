@@ -307,18 +307,18 @@ struct HistoryView: View {
                     )
                 }
             }
-            .alert("Delete Generation?", isPresented: $showDeleteConfirmation) {
-                Button("Cancel", role: .cancel) {
+            .alert(MacInterfaceText.historyDeleteTitle, isPresented: $showDeleteConfirmation) {
+                Button(MacInterfaceText.cancel, role: .cancel) {
                     itemToDelete = nil
                 }
-                Button("Delete", role: .destructive) {
+                Button(MacInterfaceText.delete, role: .destructive) {
                     if let item = itemToDelete {
                         confirmDelete(item)
                     }
                     itemToDelete = nil
                 }
             } message: {
-                Text("This will permanently delete the generation and its audio file.")
+                Text(MacInterfaceText.historyDeleteDetail)
             }
             .alert(item: $actionAlert) { alert in
                 if let confirmTitle = alert.confirmTitle, let onConfirm = alert.onConfirm {
@@ -332,7 +332,7 @@ struct HistoryView: View {
                     Alert(
                         title: Text(alert.title),
                         message: Text(alert.message),
-                        dismissButton: .default(Text("OK"))
+                        dismissButton: .default(Text(MacInterfaceText.ok))
                     )
                 }
             }
@@ -354,7 +354,7 @@ struct HistoryView: View {
                         systemImage: "exclamationmark.triangle",
                         description: Text(loadError)
                     )
-                    Button("Retry") {
+                    Button(MacInterfaceText.retry) {
                         reloadHistory(reopenFailedStore: true)
                     }
                     .accessibilityIdentifier("historyRetryButton")
@@ -405,7 +405,7 @@ struct HistoryView: View {
                     Button {
                         NSWorkspace.shared.selectFile(item.generation.audioPath, inFileViewerRootedAtPath: "")
                     } label: {
-                        Label("Reveal in Finder", systemImage: "folder")
+                        Label(MacInterfaceText.historyRevealInFinder, systemImage: "folder")
                     }
                     .disabled(!item.audioFileExists)
 
@@ -413,7 +413,7 @@ struct HistoryView: View {
                         Button {
                             onPinSeed(item.generation)
                         } label: {
-                            Label("Pin seed \(String(seedValue)) for new takes", systemImage: "pin")
+                            Label(MacInterfaceText.historyPinSeed(String(seedValue)), systemImage: "pin")
                         }
                         .accessibilityIdentifier("history_pinSeedButton")
                     }
@@ -464,16 +464,16 @@ struct HistoryView: View {
             Image(systemName: "arrow.clockwise.icloud")
                 .foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Finished audio is waiting for History")
+                Text(MacInterfaceText.historyFinishedAudioWaiting)
                     .font(.headline)
                 Text(recoveryMessage)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
-            Button("Retry") { reloadHistory(reopenFailedStore: true) }
+            Button(MacInterfaceText.retry) { reloadHistory(reopenFailedStore: true) }
                 .accessibilityIdentifier("historyRecovery_retry")
-            Button("Reveal Audio") { NSWorkspace.shared.open(AppPaths.outputsDir) }
+            Button(MacInterfaceText.historyRevealAudio) { NSWorkspace.shared.open(AppPaths.outputsDir) }
                 .disabled(recoverySnapshot.availableAudioCount == 0)
                 .accessibilityIdentifier("historyRecovery_reveal")
             Button(VocelloPresentationText.exportRecoveryFiles) { exportPendingAudio() }
@@ -887,7 +887,7 @@ private struct HistoryRowActions: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .disabled(!audioFileExists)
-                .accessibilityLabel("Save to Saved Voices")
+                .accessibilityLabel(MacInterfaceText.historySaveToSavedVoices)
                 .accessibilityIdentifier("historyRow_saveVoice_\(itemID)")
             }
 

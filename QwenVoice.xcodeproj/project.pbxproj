@@ -530,6 +530,7 @@
 		E14FE0C5EF47848560CB00E8 /* XPCNativeEngineClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584102582A0CD1F4A0D5734B /* XPCNativeEngineClient.swift */; };
 		E165360BF4E7A07DF979A8B9 /* GenerationEnginePresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D3D0691D493C308EB2B348 /* GenerationEnginePresentation.swift */; };
 		E180DB5FA1A255E2E4A90A27 /* AppPaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73645F4C6E07C717ABF11961 /* AppPaths.swift */; };
+		E18E35A9C1AFA4CE06BDA837 /* MacInterfaceText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BABBA7A7BD639B7281CDF97 /* MacInterfaceText.swift */; };
 		E19B905D11F87544587EB7B4 /* AudioPlaybackResumePolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B334C843B0A20A8A58583994 /* AudioPlaybackResumePolicyTests.swift */; };
 		E1F3D5FAECEE93CAB3C2D0B6 /* NativeTelemetrySampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7B6A4BEC2A7485ACA5C4C78 /* NativeTelemetrySampler.swift */; };
 		E2F2ADD415F59283803E1937 /* GenerationHistoryOutboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A69BFE3108AE5EE77DB0FE3 /* GenerationHistoryOutboxTests.swift */; };
@@ -1054,6 +1055,7 @@
 		78EF20ADADE3A9E5CEACA790 /* OpenSourceLicensesScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenSourceLicensesScreen.swift; sourceTree = "<group>"; };
 		7A3736EA57DD8B4B60EF1883 /* AppCommandRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCommandRouter.swift; sourceTree = "<group>"; };
 		7AB88B8C400B171FB3344FC3 /* Qwen3SupportedLanguageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Qwen3SupportedLanguageTests.swift; sourceTree = "<group>"; };
+		7BABBA7A7BD639B7281CDF97 /* MacInterfaceText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacInterfaceText.swift; sourceTree = "<group>"; };
 		7D74D044F7CCAA1AF2027134 /* MacEngineServiceLifecycleCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacEngineServiceLifecycleCoordinator.swift; sourceTree = "<group>"; };
 		7D9DDDEEAEED933D8DB35472 /* VoicesCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoicesCommand.swift; sourceTree = "<group>"; };
 		7DE42BFBCAD789F940DC13D4 /* ryan.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = ryan.wav; sourceTree = "<group>"; };
@@ -1888,6 +1890,7 @@
 				2A4F18EF6E8C4624607CF181 /* LongTextGenerationRouter.swift */,
 				7D74D044F7CCAA1AF2027134 /* MacEngineServiceLifecycleCoordinator.swift */,
 				A55F5C185C7CAC960AAC9C80 /* MacGenerationWarmupCoordinator.swift */,
+				7BABBA7A7BD639B7281CDF97 /* MacInterfaceText.swift */,
 				2B992E1A6D01B95314004B09 /* MacStudioGenerationRequestFactory.swift */,
 				CC5190BFE7853E14F8FFC844 /* MacWarmupAdmissionPolicy.swift */,
 				FA8B8CF81B642A127770AB26 /* UIPerfFrameProbe.swift */,
@@ -3107,6 +3110,7 @@
 				A41BEBCD40A6E278CE00E0AF /* LongTextGenerationRouter.swift in Sources */,
 				F674AE89EAE48E64296DA6F0 /* MacEngineServiceLifecycleCoordinator.swift in Sources */,
 				B8B9814A59B20C56BDFA4B24 /* MacGenerationWarmupCoordinator.swift in Sources */,
+				E18E35A9C1AFA4CE06BDA837 /* MacInterfaceText.swift in Sources */,
 				754F5D419C1C2A94AF4A19FB /* MacStudioGenerationRequestFactory.swift in Sources */,
 				2C9D40B6961C3AA1D1DA2C52 /* MacWarmupAdmissionPolicy.swift in Sources */,
 				2D233C6F443119FA6212B35C /* MainThreadStallWatchdog.swift in Sources */,

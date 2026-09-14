@@ -73,23 +73,23 @@ struct VoicesView: View {
                 }
                 .environment(ttsEngineStore)
             }
-            .alert("Delete Saved Voice?", isPresented: $showDeleteConfirmation) {
-                Button("Cancel", role: .cancel) {
+            .alert(MacInterfaceText.voicesDeleteTitle, isPresented: $showDeleteConfirmation) {
+                Button(MacInterfaceText.cancel, role: .cancel) {
                     voiceToDelete = nil
                 }
-                Button("Delete", role: .destructive) {
+                Button(MacInterfaceText.delete, role: .destructive) {
                     confirmDeleteVoice()
                 }
             } message: {
                 if let voice = voiceToDelete {
-                    Text("This will permanently remove \"\(voice.name)\" from Saved Voices.")
+                    Text(MacInterfaceText.voicesDeleteDetail(voice.name))
                 }
             }
             .alert(item: $actionAlert) { alert in
                 Alert(
                     title: Text(alert.title),
                     message: Text(alert.message),
-                    dismissButton: .default(Text("OK"))
+                    dismissButton: .default(Text(MacInterfaceText.ok))
                 )
             }
     }
@@ -103,7 +103,7 @@ struct VoicesView: View {
                 ContentUnavailableView(
                     "Starting speech engine...",
                     systemImage: "arrow.triangle.2.circlepath.circle",
-                    description: Text("Saved voices will appear once the speech engine is ready.")
+                    description: Text(MacInterfaceText.voicesWaitingForEngine)
                 )
             }
         } else if let loadError, voices.isEmpty, !isLoading {
@@ -115,7 +115,7 @@ struct VoicesView: View {
                         description: Text(loadError)
                     )
 
-                    Button("Try Again") {
+                    Button(MacInterfaceText.tryAgain) {
                         retryLoadVoices()
                     }
                     .buttonStyle(.bordered)
@@ -126,7 +126,7 @@ struct VoicesView: View {
             voicesStateContainer(identifier: "voices_loadingState") {
                 VStack(spacing: 12) {
                     ProgressView()
-                    Text("Loading saved voices...")
+                    Text(MacInterfaceText.voicesLoading)
                         .font(.body)
                         .foregroundStyle(.secondary)
                 }
@@ -136,7 +136,7 @@ struct VoicesView: View {
                 ContentUnavailableView(
                     "No saved voices",
                     systemImage: "person.2.wave.2",
-                    description: Text("Add a voice sample from the toolbar, then use it in Voice Cloning.")
+                    description: Text(MacInterfaceText.voicesEmpty)
                 )
             }
         } else {
@@ -325,13 +325,13 @@ private struct VoiceRow: View {
     }
 
     private var transcriptStatus: String {
-        voice.hasTranscript ? "Transcript-backed" : "Audio-only fallback"
+        voice.hasTranscript ? MacInterfaceText.voicesTranscriptBacked : MacInterfaceText.voicesAudioOnlyFallback
     }
 
     private var detailCopy: String {
         voice.hasTranscript
-            ? "Clone prompt prepares on first use."
-            : "Add a transcript for the strongest clone."
+            ? MacInterfaceText.voicesDetailTranscript
+            : MacInterfaceText.voicesDetailAudioOnly
     }
 
     var body: some View {
@@ -488,7 +488,7 @@ private struct VoiceRowMetadata: View {
     private var warningChip: some View {
         let token = qualityWarnings.first ?? ""
         let label = PreparedVoiceQualityWarning.shortLabel(for: token)
-            ?? "Reference outside range"
+            ?? MacInterfaceText.voicesReferenceOutsideRangeShort
 
         return Button {
             showsWarningDetails = true
@@ -517,7 +517,7 @@ private struct VoiceRowMetadata: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Reference quality warning")
+        .accessibilityLabel(MacInterfaceText.voicesQualityWarningAccessibility)
         .accessibilityHint(qualityHeadline ?? label)
         .accessibilityIdentifier("voicesRow_\(voiceID)_qualityWarning")
         .popover(isPresented: $showsWarningDetails, arrowEdge: .top) {
@@ -527,7 +527,7 @@ private struct VoiceRowMetadata: View {
 
     private var warningDetailsPopover: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Reference outside recommended range", systemImage: "exclamationmark.triangle.fill")
+            Label(MacInterfaceText.voicesReferenceOutsideRange, systemImage: "exclamationmark.triangle.fill")
                 .font(.headline)
                 .foregroundStyle(.orange)
 
@@ -536,7 +536,7 @@ private struct VoiceRowMetadata: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack {
-                Button("Replace reference…") {
+                Button(MacInterfaceText.voicesReplaceReference) {
                     showsWarningDetails = false
                     onReplaceReference()
                 }
@@ -546,7 +546,7 @@ private struct VoiceRowMetadata: View {
 
                 Spacer(minLength: 8)
 
-                Button("Close") {
+                Button(MacInterfaceText.close) {
                     showsWarningDetails = false
                 }
                 .keyboardShortcut(.cancelAction)
@@ -566,7 +566,7 @@ private struct VoiceRowActions: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Button("Open in Cloning", action: onUseInVoiceCloning)
+            Button(MacInterfaceText.voicesOpenInCloning, action: onUseInVoiceCloning)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .fixedSize(horizontal: true, vertical: false)
@@ -577,7 +577,7 @@ private struct VoiceRowActions: View {
                 )
                 .accessibilityIdentifier("voicesRow_use_\(voiceID)")
 
-            Button("Preview", action: onPlay)
+            Button(MacInterfaceText.voicesPreview, action: onPlay)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .fixedSize(horizontal: true, vertical: false)

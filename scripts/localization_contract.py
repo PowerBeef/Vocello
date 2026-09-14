@@ -19,6 +19,7 @@ CATALOG = Path("Sources/Resources/Localizable.xcstrings")
 BASELINE = Path("config/localization-unlocalized-baseline.json")
 PRESENTATION_SOURCE = Path("Sources/SharedSupport/Services/VocelloPresentationText.swift")
 INTERFACE_DEFAULTS_SOURCE = Path("Sources/iOS/IOSRootNavigationModels.swift")
+MAC_INTERFACE_SOURCE = Path("Sources/Services/MacInterfaceText.swift")
 COMMERCE_SOURCE = Path("Sources/iOS/Commerce/IOSCommercePresentationText.swift")
 UI_TEST_SOURCE = Path("Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift")
 MAC_UI_TEST_SOURCE = Path("Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift")
@@ -271,15 +272,16 @@ def _validate_typed_presentation(root: Path) -> None:
                 raise ContractError(f"{path} must use typed presentation value {needle}")
 
     # Every typed interface default is the catalog's English value, and every
-    # vocello.ui / vocello.presentation catalog key is bound by exactly one default.
+    # vocello.ui / vocello.presentation / vocello.mac catalog key is bound by exactly
+    # one default (iOS interface, shared presentation, macOS interface owners).
     catalog = _read_json(root, CATALOG)["strings"]
     default_binding = re.compile(
         r'(?:String|localization\.string|IOSAppLanguage\.shared\.localized)\(localized:\s*"'
-        r'(?P<key>vocello\.(?:ui|presentation)\.[^"]+)",\s*defaultValue:\s*(?P<value>"(?:[^"\\]|\\.)*")'
+        r'(?P<key>vocello\.(?:ui|presentation|mac)\.[^"]+)",\s*defaultValue:\s*(?P<value>"(?:[^"\\]|\\.)*")'
     )
     matched: set[str] = set()
-    for relative in (INTERFACE_DEFAULTS_SOURCE, PRESENTATION_SOURCE):
-        text = _read_text(root, relative)
+    for relative in (INTERFACE_DEFAULTS_SOURCE, PRESENTATION_SOURCE, MAC_INTERFACE_SOURCE):
+        text = _read_text(root, relative) if (root / relative).is_file() else ""
         for match in default_binding.finditer(text):
             key = match["key"]
             if key in matched:
@@ -292,7 +294,7 @@ def _validate_typed_presentation(root: Path) -> None:
             unit = english.get("stringUnit") or english["variations"]["plural"]["other"]["stringUnit"]
             if json.loads(match["value"]) != unit["value"]:
                 raise ContractError(f"{key} typed default differs from the catalog's English value")
-    expected = {key for key in catalog if key.startswith(("vocello.ui.", "vocello.presentation."))}
+    expected = {key for key in catalog if key.startswith(("vocello.ui.", "vocello.presentation.", "vocello.mac."))}
     if matched != expected:
         raise ContractError(
             "typed interface defaults do not match the catalog's interface keys: "

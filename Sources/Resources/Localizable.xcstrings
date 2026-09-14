@@ -9054,6 +9054,816 @@
           }
         }
       }
+    },
+    "vocello.mac.common.cancel": {
+      "comment": "macOS interface: generic cancel button. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler"
+          }
+        }
+      }
+    },
+    "vocello.mac.common.delete": {
+      "comment": "macOS interface: destructive confirmation button. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer"
+          }
+        }
+      }
+    },
+    "vocello.mac.common.ok": {
+      "comment": "macOS interface: acknowledge an alert. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
+    "vocello.mac.common.close": {
+      "comment": "macOS interface: dismiss a popover or sheet. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fermer"
+          }
+        }
+      }
+    },
+    "vocello.mac.common.retry": {
+      "comment": "macOS interface: retry a failed operation. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer"
+          }
+        }
+      }
+    },
+    "vocello.mac.common.tryAgain": {
+      "comment": "macOS interface: reload after a failed load. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try Again"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.deleteTitle": {
+      "comment": "macOS interface: Saved Voices delete confirmation title. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Saved Voice?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer la voix enregistrée ?"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.deleteDetail": {
+      "comment": "macOS interface: Saved Voices delete confirmation body. %1$@ is the saved voice name, never translated.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This will permanently remove “%1$@” from Saved Voices."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette action supprimera définitivement « %1$@ » des voix enregistrées."
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.waitingForEngine": {
+      "comment": "macOS interface: Saved Voices placeholder while the engine starts. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved voices will appear once the speech engine is ready."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les voix enregistrées apparaîtront dès que le moteur vocal sera prêt."
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.loading": {
+      "comment": "macOS interface: Saved Voices loading placeholder. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading saved voices..."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chargement des voix enregistrées…"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.empty": {
+      "comment": "macOS interface: Saved Voices empty state. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a voice sample from the toolbar, then use it in Voice Cloning."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajoutez un échantillon de voix depuis la barre d’outils, puis utilisez-le dans Clonage vocal."
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.qualityWarningAccessibility": {
+      "comment": "macOS interface: VoiceOver label of the reference-quality warning pill. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference quality warning"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avertissement sur la qualité de la référence"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.referenceOutsideRange": {
+      "comment": "macOS interface: reference-quality popover title. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference outside recommended range"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Référence hors de la plage recommandée"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.referenceOutsideRangeShort": {
+      "comment": "macOS interface: compact warning pill label when no specific warning token is known. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference outside range"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Référence hors plage"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.replaceReference": {
+      "comment": "macOS interface: opens the sheet that replaces a saved voice's reference clip. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replace reference…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remplacer la référence…"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.openInCloning": {
+      "comment": "macOS interface: Saved Voices row action that selects the voice in Voice Cloning. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in Cloning"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir dans Clonage"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.preview": {
+      "comment": "macOS interface: Saved Voices row action that plays the reference clip. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aperçu"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.transcriptBacked": {
+      "comment": "macOS interface: Saved Voices status chip for a voice with a transcript. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcript-backed"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avec transcription"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.audioOnlyFallback": {
+      "comment": "macOS interface: Saved Voices status chip for a voice without a transcript. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio-only fallback"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio seulement (repli)"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.detailTranscript": {
+      "comment": "macOS interface: Saved Voices row detail for a transcript-backed voice. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clone prompt prepares on first use."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’amorce de clonage se prépare à la première utilisation."
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.detailAudioOnly": {
+      "comment": "macOS interface: Saved Voices row detail for an audio-only voice. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add a transcript for the strongest clone."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajoutez une transcription pour un clone optimal."
+          }
+        }
+      }
+    },
+    "vocello.mac.history.deleteTitle": {
+      "comment": "macOS interface: History delete confirmation title. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Generation?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer la génération ?"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.deleteDetail": {
+      "comment": "macOS interface: History delete confirmation body. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This will permanently delete the generation and its audio file."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette action supprimera définitivement la génération et son fichier audio."
+          }
+        }
+      }
+    },
+    "vocello.mac.history.revealInFinder": {
+      "comment": "macOS interface: History row action. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reveal in Finder"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher dans le Finder"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.pinSeed": {
+      "comment": "macOS interface: History row action. %1$@ is the numeric sampling seed, never translated.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pin seed %1$@ for new takes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Épingler la graine %1$@ pour les prochaines prises"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.finishedAudioWaiting": {
+      "comment": "macOS interface: History recovery banner title for unqueued generations. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finished audio is waiting for History"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’audio terminé attend d’être ajouté à l’historique"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.revealAudio": {
+      "comment": "macOS interface: History recovery banner action that reveals the retained audio in Finder. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reveal Audio"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher l’audio"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.saveToSavedVoices": {
+      "comment": "macOS interface: VoiceOver label of the History action that saves a generation as a voice. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save to Saved Voices"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer dans les voix enregistrées"
+          }
+        }
+      }
+    },
+    "vocello.mac.savedVoice.nameSection": {
+      "comment": "macOS interface: Saved Voice sheet section header. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nom"
+          }
+        }
+      }
+    },
+    "vocello.mac.savedVoice.namePlaceholder": {
+      "comment": "macOS interface: Saved Voice sheet name field placeholder. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved voice name"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nom de la voix enregistrée"
+          }
+        }
+      }
+    },
+    "vocello.mac.savedVoice.audioSection": {
+      "comment": "macOS interface: Saved Voice sheet section header. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio"
+          }
+        }
+      }
+    },
+    "vocello.mac.savedVoice.audioPlaceholder": {
+      "comment": "macOS interface: Saved Voice sheet audio path field placeholder. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reference audio file"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fichier audio de référence"
+          }
+        }
+      }
+    },
+    "vocello.mac.savedVoice.browse": {
+      "comment": "macOS interface: Saved Voice sheet button that opens the file chooser. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Browse..."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parcourir…"
+          }
+        }
+      }
+    },
+    "vocello.mac.savedVoice.record": {
+      "comment": "macOS interface: Saved Voice sheet button that opens the recorder. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record..."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer…"
+          }
+        }
+      }
+    },
+    "vocello.mac.savedVoice.transcriptSection": {
+      "comment": "macOS interface: Saved Voice sheet section header. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcript (recommended for reusable clones)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription (recommandée pour des clones réutilisables)"
+          }
+        }
+      }
+    },
+    "vocello.mac.savedVoice.transcriptHelp": {
+      "comment": "macOS interface: Saved Voice sheet explanation under the transcript field. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcript-backed voices can reuse prepared Qwen3 clone prompts; audio-only voices remain available as a lower-guidance fallback."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les voix avec transcription peuvent réutiliser des amorces de clonage Qwen3 préparées ; les voix audio seulement restent disponibles comme repli moins guidé."
+          }
+        }
+      }
+    },
+    "vocello.mac.savedVoice.keepVoice": {
+      "comment": "macOS interface: Saved Voice sheet choice after a recording warning. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep voice"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conserver la voix"
+          }
+        }
+      }
+    },
+    "vocello.mac.savedVoice.discardAndReRecord": {
+      "comment": "macOS interface: Saved Voice sheet choice after a recording warning. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard and re-record"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abandonner et réenregistrer"
+          }
+        }
+      }
+    },
+    "vocello.mac.record.title": {
+      "comment": "macOS interface: recorder sheet title. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record Reference Clip"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer un clip de référence"
+          }
+        }
+      }
+    },
+    "vocello.mac.record.record": {
+      "comment": "macOS interface: recorder start button. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer"
+          }
+        }
+      }
+    },
+    "vocello.mac.record.stop": {
+      "comment": "macOS interface: recorder stop button. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêter"
+          }
+        }
+      }
+    },
+    "vocello.mac.record.retake": {
+      "comment": "macOS interface: recorder button that discards the take and records again. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retake"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recommencer"
+          }
+        }
+      }
+    },
+    "vocello.mac.record.microphoneDeniedTitle": {
+      "comment": "macOS interface: recorder alert title when the microphone permission is denied. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Microphone access denied"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accès au microphone refusé"
+          }
+        }
+      }
+    },
+    "vocello.mac.record.openSystemSettings": {
+      "comment": "macOS interface: recorder alert action that opens the privacy pane. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open System Settings"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir les Réglages Système"
+          }
+        }
+      }
+    },
+    "vocello.mac.record.microphoneDeniedDetail": {
+      "comment": "macOS interface: recorder alert body when the microphone permission is denied. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello needs the microphone to record reference clips. Enable it in System Settings to continue."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello a besoin du microphone pour enregistrer des clips de référence. Activez-le dans les Réglages Système pour continuer."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

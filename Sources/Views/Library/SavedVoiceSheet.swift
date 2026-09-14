@@ -262,10 +262,10 @@ struct SavedVoiceSheet: View {
 
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Name")
+                    Text(MacInterfaceText.savedVoiceNameSection)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    TextField("Saved voice name", text: $name)
+                    TextField(MacInterfaceText.savedVoiceNamePlaceholder, text: $name)
                         .textFieldStyle(.plain)
                         .vocelloFocusRing(AppTheme.accent, radius: 8)
                         .padding(.horizontal, 8)
@@ -275,12 +275,12 @@ struct SavedVoiceSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Audio")
+                    Text(MacInterfaceText.savedVoiceAudioSection)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
                     HStack {
-                        TextField("Reference audio file", text: $audioPath)
+                        TextField(MacInterfaceText.savedVoiceAudioPlaceholder, text: $audioPath)
                             .textFieldStyle(.plain)
                             .vocelloFocusRing(AppTheme.accent, radius: 8)
                             .padding(.horizontal, 8)
@@ -288,7 +288,7 @@ struct SavedVoiceSheet: View {
                             .glassTextField(radius: 8)
                             .accessibilityIdentifier("voicesEnroll_audioPathField")
 
-                        Button("Browse...") {
+                        Button(MacInterfaceText.savedVoiceBrowse) {
                             browseForAudio()
                         }
                         .buttonStyle(.bordered)
@@ -297,7 +297,7 @@ struct SavedVoiceSheet: View {
                         Button {
                             isRecordSheetPresented = true
                         } label: {
-                            Label("Record...", systemImage: "mic.fill")
+                            Label(MacInterfaceText.savedVoiceRecord, systemImage: "mic.fill")
                         }
                         .buttonStyle(.bordered)
                         .accessibilityIdentifier("voicesEnroll_recordButton")
@@ -305,7 +305,7 @@ struct SavedVoiceSheet: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Transcript (recommended for reusable clones)")
+                    Text(MacInterfaceText.savedVoiceTranscriptSection)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
 
@@ -386,7 +386,7 @@ struct SavedVoiceSheet: View {
                         .accessibilityIdentifier("voicesEnroll_referenceLanguagePicker")
                     }
 
-                    Text("Transcript-backed voices can reuse prepared Qwen3 clone prompts; audio-only voices remain available as a lower-guidance fallback.")
+                    Text(MacInterfaceText.savedVoiceTranscriptHelp)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -401,7 +401,7 @@ struct SavedVoiceSheet: View {
             }
 
             HStack {
-                Button("Cancel") {
+                Button(MacInterfaceText.cancel) {
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
@@ -480,16 +480,16 @@ struct SavedVoiceSheet: View {
             // the user has to discard or cancel; soft-warn tier keeps
             // all three buttons.
             if !PreparedVoiceQualityWarning.isHardBlocking(candidate.qualityWarnings) {
-                Button("Keep voice") {
+                Button(MacInterfaceText.savedVoiceKeepVoice) {
                     acceptPendingVoice(candidate)
                 }
                 .accessibilityIdentifier("voicesEnroll_keepDespiteWarning")
             }
-            Button("Discard and re-record", role: .destructive) {
+            Button(MacInterfaceText.savedVoiceDiscardAndReRecord, role: .destructive) {
                 discardPendingVoice(candidate)
             }
             .accessibilityIdentifier("voicesEnroll_discardOnWarning")
-            Button("Cancel", role: .cancel) {
+            Button(MacInterfaceText.cancel, role: .cancel) {
                 discardPendingVoice(candidate)
             }
             .accessibilityIdentifier("voicesEnroll_cancelOnWarning")

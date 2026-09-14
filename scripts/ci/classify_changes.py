@@ -67,9 +67,16 @@ BUILD_CONFIGS = ("config/build-output-policy.json", "config/apple-platform-capab
                  "config/toolchain.json")
 # Validated on Linux by the contracts job; the macOS gate does not need them.
 ROADMAP_FILES = ("config/roadmap.json", "config/roadmap-archive.json")
-# The macOS job runs only the darwin-only pytest lane (test_benchmark_history)
-# plus the contract gate; every other test module runs on Linux.
-DARWIN_TEST_INPUTS = ("scripts/tests/test_benchmark_history.py", "scripts/tests/conftest.py")
+# The macOS job runs the compile, the deterministic bundles, the CLI identity
+# step and the darwin-only pytest lane (test_benchmark_history); the contract
+# gate itself runs on Linux (MV-04), so only these scripts are its inputs.
+DARWIN_TEST_INPUTS = ("scripts/tests/test_benchmark_history.py", "scripts/tests/conftest.py",
+                      "scripts/benchmark_history.py", "scripts/lib/rtf.py", "scripts/lib/jsonio.py")
+MACOS_LANE_SCRIPTS = ("scripts/macos_test.sh", "scripts/build.sh", "scripts/regenerate_project.sh",
+                      "scripts/generate_cli_scheme.py", "scripts/generate_ios_logic_scheme.py",
+                      "scripts/build_output_policy.py", "scripts/cli_version_contract.py",
+                      "scripts/ci/restore_mtimes.py", "scripts/lib/xctest_summary.py",
+                      "scripts/lib/build_provenance.py", "scripts/lib/storage_preflight.py")
 # Inputs of the iOS generic compile besides the sources themselves.
 IOS_BUILD_SCRIPTS = ("scripts/build_foundation_targets.sh", "scripts/regenerate_project.sh",
                      "scripts/generate_cli_scheme.py", "scripts/generate_ios_logic_scheme.py",
@@ -101,19 +108,21 @@ def _is_benchmark_evidence(path: str) -> bool:
 
 
 def _is_swift(path: str) -> bool:
-    """Inputs of the macOS job: the compile, the contract gate and the darwin-only pytest lane."""
+    """Inputs of the macOS job: the compile, its own driver scripts and the darwin-only pytest lane."""
     if path.startswith(("Sources/", "Tests/", "QwenVoice.xcodeproj/", "config/xcode-schemes/")):
         return True
-    if path in ("project.yml", "README.md", "website/PRODUCT.md") or path.endswith("Package.resolved"):
+    if path == "project.yml" or path.endswith("Package.resolved"):
         return True
     if path.startswith("Packages/"):
-        return not path.endswith(".md")
-    if path.startswith("config/"):
-        return path not in ROADMAP_FILES
+        return "/Sources/" in path or path.endswith(PACKAGE_MANIFESTS)
+    if path in (*BUILD_CONFIGS, "config/test-quarantine.json"):
+        return True
     if path.startswith("scripts/tests/"):
         return path in DARWIN_TEST_INPUTS or path.startswith("scripts/tests/fixtures/")
-    if path.startswith("scripts/"):
-        return not (path.startswith("scripts/hooks/") or path.endswith(".md") or _is_workflow_input(path))
+    if path in DARWIN_TEST_INPUTS or path in MACOS_LANE_SCRIPTS:
+        return True
+    if path.startswith("scripts/lib/") and path.endswith(".sh"):
+        return True
     return _is_benchmark_evidence(path)
 
 
@@ -133,6 +142,9 @@ def _is_ios(path: str) -> bool:
 def _is_python(path: str) -> bool:
     if path.startswith("scripts/"):
         return not path.endswith(".md")
+    if path.startswith("Packages/"):
+        # Governance JSON is read by the contract tests; sources are compile inputs.
+        return path.endswith(".json")
     if path.startswith("benchmarks/"):
         return not path.endswith(".md") or path == "benchmarks/HISTORY.md"
     return (path.startswith(("config/", "Sources/Resources/", ".github/workflows/"))

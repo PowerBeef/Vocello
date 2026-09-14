@@ -96,8 +96,6 @@ class CommandRunnerTests(unittest.TestCase):
     def test_ci_commands_mirror_the_push_workflow(self) -> None:
         joined = [" ".join(command) for command in MODULE.CI_COMMANDS]
         for expected in (
-            "python3 scripts/roadmap.py validate",
-            "python3 scripts/roadmap.py render --check",
             "python3 scripts/supply_chain_contract.py --installed website",
             "./scripts/check_project_inputs.sh",
             "scripts/macos_test.sh test",

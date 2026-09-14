@@ -107,20 +107,12 @@ jobs:
       - name: Install ripgrep
         run: sudo apt-get install -y --no-install-recommends ripgrep
 
-      - name: Pinned actions, Dependabot coverage, website scripts
-        run: python3 scripts/supply_chain_contract.py
-
-      - name: Product invariants and privacy scan
-        run: |
-          set -euo pipefail
-          scripts/repo_invariants.sh
-          python3 scripts/privacy_scan.py
-
-      - name: Work authority
-        run: |
-          set -euo pipefail
-          python3 scripts/roadmap.py validate
-          python3 scripts/roadmap.py render --check
+      # The complete deterministic contract gate runs here on every push (MV-04):
+      # product contracts, invariants, privacy scan, work authority and benchmark
+      # history. None of it needs a Mac, so config/ and scripts/ changes no longer
+      # route to the macOS lane; only the darwin-only pytest modules stay there.
+      - name: Contract gate
+        run: ./scripts/check_project_inputs.sh --python none
 
   # The Python suite on Linux. Modules that need the macOS host (benchmark
   # record publication binds Mac hardware) carry explicit skips and still run
@@ -214,10 +206,10 @@ jobs:
       - name: Regenerate Xcode project
         run: ./scripts/regenerate_project.sh --fast
 
-      - name: Check project inputs (darwin-only Python modules)
+      - name: Darwin-only Python modules
         env:
           VOCELLO_QUARANTINE: "1"
-        run: ./scripts/check_project_inputs.sh --python darwin-only
+        run: python3 -m pytest -n auto -m darwin_only
 
       - name: Run deterministic macOS tests
         env:

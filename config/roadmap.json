@@ -1095,27 +1095,6 @@
       "unparkWhen": "The paired iPhone is available for one ios benchmark and one ios perf run (the macOS clauses are done)."
     },
     {
-      "id": "MV-01",
-      "plan": "harness-stabilization-2026-09",
-      "title": "One build arena per optimization level: the macOS cache restores yet recompiles, and the optimized CLI flips the local arena",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "The warm macOS lane's deterministic-tests step compiles fewer than 100 Swift files after an exact cache hit, or the cache is replaced by a mechanism that survives the round trip (content-addressed compilation cache). Locally, a scripts/build.sh cli-optimized (gate bench, lang-bench, benchmark lanes) followed by scripts/macos_test.sh test does not recompile the package graph: the optimized CLI builds into a registered arena of its own in config/build-output-policy.json and the build receipt path follows.",
-      "sourceOfTruth": [
-        ".github/workflows/ci.yml",
-        "scripts/macos_test.sh",
-        "scripts/build.sh",
-        "scripts/ci/restore_mtimes.py",
-        "config/build-output-policy.json",
-        "scripts/lib/build_provenance.py"
-      ],
-      "updated": "2026-09-14",
-      "notes": "Local clause done 2026-09-14: build/cache/xcode/macos-optimized is a registered arena (env QVOICE_XCODE_MACOS_OPTIMIZED_DERIVED, cleanup alias macos-optimized); scripts/build.sh cli-optimized and every macOS XCUITest lane build there, build/vocello follows, and scripts/macos_test.sh test right after a full optimized CLI build reported 0 SwiftCompile tasks in the -Onone arena (previously 1281 files, about 100 s). The optimized CLI arena is 1.4 GB. CI clause: the warm macOS test step already fell from 419 s (dispatch 34773187587) to 148 s (run 34796586318); macos_test.sh now prints the SwiftCompile task count so the next warm push run states the number the gate asks for (fewer than 100). (Earlier history: git log -p -- config/roadmap.json.)",
-      "legacyIds": [
-        "MV-02"
-      ]
-    },
-    {
       "id": "MV-04",
       "plan": "harness-stabilization-2026-09",
       "title": "Run the deterministic contract gate on Linux so the swift lane routes on compile inputs only",

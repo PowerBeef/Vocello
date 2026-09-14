@@ -2841,6 +2841,30 @@
         ".github/workflows/ci.yml"
       ],
       "notes": "Closed 2026-09-14. concurrency.group is ci-<event>-<ref>; proof: push run 34797784288 and manual dispatch 34797805634 on d431cc03 ran concurrently and both succeeded (before the change the dispatch cancelled the push run within seconds)."
+    },
+    {
+      "id": "MV-01",
+      "plan": "harness-stabilization-2026-09",
+      "title": "One build arena per optimization level: the macOS cache restores yet recompiles, and the optimized CLI flips the local arena",
+      "status": "done",
+      "updated": "2026-09-14",
+      "gate": "The warm macOS lane's deterministic-tests step compiles fewer than 100 Swift files after an exact cache hit, or the cache is replaced by a mechanism that survives the round trip (content-addressed compilation cache). Locally, a scripts/build.sh cli-optimized (gate bench, lang-bench, benchmark lanes) followed by scripts/macos_test.sh test does not recompile the package graph: the optimized CLI builds into a registered arena of its own in config/build-output-policy.json and the build receipt path follows.",
+      "evidence": [
+        "commit:ba2ad007",
+        "commit:3882fa6c"
+      ],
+      "sourceOfTruth": [
+        ".github/workflows/ci.yml",
+        "scripts/macos_test.sh",
+        "scripts/build.sh",
+        "scripts/ci/restore_mtimes.py",
+        "config/build-output-policy.json",
+        "scripts/lib/build_provenance.py"
+      ],
+      "legacyIds": [
+        "MV-02"
+      ],
+      "notes": "Closed 2026-09-14. CI: the warm macOS lane of run 34799408393 printed 'test bundles built: 2 SwiftCompile task(s)' after its cache restore (the September 13 evidence runs compiled 927; the warm test step fell from 419 s in dispatch 34773187587 to 148 to 210 s). Local: build/cache/xcode/macos-optimized hosts scripts/build.sh cli-optimized and every macOS XCUITest lane, and scripts/macos_test.sh test right after a full optimized build reported 0 SwiftCompile tasks in the -Onone arena."
     }
   ]
 }

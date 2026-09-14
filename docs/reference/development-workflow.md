@@ -92,9 +92,9 @@ it does not slow every push.
 | Job | Runner | Runs when | Warm / cold |
 | --- | --- | --- | --- |
 | `changes` | ubuntu | always | seconds |
-| `contracts` | ubuntu | always | about 1 min: action pins, invariants, privacy scan, roadmap |
+| `contracts` | ubuntu | always | about 1 min: the complete deterministic contract gate (`check_project_inputs.sh --python none`: product contracts, invariants, privacy scan, work authority, benchmark history) |
 | `python` | ubuntu | Python paths, contracts, workflow files | 3 to 4 min: product and tooling tests; research tests when routed |
-| `macos-tests` | macos-26 | Swift, config, scripts and benchmark evidence | cached DerivedData; contract gate (darwin-only Python), macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s) |
+| `macos-tests` | macos-26 | Swift compile inputs, the lane's own scripts, build configs and benchmark evidence | cached DerivedData; darwin-only Python modules, macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s) |
 | `ios-compile` | macos-26 | iOS compile inputs | cached DerivedData; `build_foundation_targets.sh ios --incremental` at `-Onone` (`QVOICE_FOUNDATION_SWIFT_OPTIMIZATION`) |
 | `website` | ubuntu | `website/` | about 4 min |
 | `dependency-submission` | ubuntu | push only (skipped on dispatch) | seconds: `scripts/swift_dependency_snapshot.py` submitted to the GitHub dependency graph; needed by `CI required` |
@@ -104,14 +104,13 @@ it does not slow every push.
 trigger, so `CI required` is always produced by a maintainer's push to `main`. Concurrency is keyed
 on the event name and the ref, so a newer push cancels the previous push run while a manual
 measurement dispatch never cancels the gate run for a commit. `scripts/dev.sh ci`
-replays that job graph serially: the supply-chain contract, `scripts/repo_invariants.sh`, the privacy
-scan, `roadmap.py validate` and `render --check`, project regeneration, the complete
-`check_project_inputs.sh`, `scripts/macos_test.sh test`, the CLI version identity,
-`build_foundation_targets.sh ios --incremental`, the website supply-chain check and
-`npm --prefix website run check`. It is a superset rather than a byte-identical replay: it skips no
-lane by routing, and it runs the whole Python suite inside the gate in one process where CI splits it
-into `-m "not research and not darwin_only"` plus an optional `-m research` on Linux and
-`--python darwin-only` in the macOS job.
+replays that job graph serially: project regeneration, the complete `check_project_inputs.sh`
+(the Linux `contracts` job runs it with `--python none`), `scripts/macos_test.sh test`, the CLI
+version identity, `build_foundation_targets.sh ios --incremental`, the website supply-chain check
+and `npm --prefix website run check`. It is a superset rather than a byte-identical replay: it skips
+no lane by routing, and it runs the whole Python suite inside the gate in one process where CI splits
+it into `-m "not research and not darwin_only"` plus an optional `-m research` on Linux and
+`-m darwin_only` in the macOS job.
 
 Only push CI's own inputs (`.github/workflows/ci.yml`, `.github/actions/**`,
 `scripts/ci/classify_changes.py`) force the three native lanes; the other workflow files route to the

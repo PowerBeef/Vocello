@@ -178,11 +178,8 @@ def check_plan(paths: list[str]) -> dict:
 # Mirrors .github/workflows/ci.yml: contracts, routing-independent lanes, then
 # the three native/website lanes. Order follows the workflow's job graph.
 CI_COMMANDS: list[list[str]] = [
-    ["python3", "scripts/supply_chain_contract.py"],
-    ["scripts/repo_invariants.sh"],
-    ["python3", "scripts/privacy_scan.py"],
-    ["python3", "scripts/roadmap.py", "validate"],
-    ["python3", "scripts/roadmap.py", "render", "--check"],
+    # The Linux contracts job is the whole gate (--python none there; the Python
+    # suite runs in the python job); locally one gate call covers both.
     ["./scripts/regenerate_project.sh", "--fast"],
     ["./scripts/check_project_inputs.sh"],
     ["scripts/macos_test.sh", "test"],

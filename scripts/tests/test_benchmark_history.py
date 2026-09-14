@@ -1028,6 +1028,31 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.assertAlmostEqual(rtf_delta["percent"], 10.0)
         self.assertIn("RTF +10.0%", self.index.read_text())
 
+    def test_new_records_store_only_the_trend_deltas(self) -> None:
+        first = self._schema_v3_language_record("mac-lang-bench-20260712-130000")
+        first["takes"][0]["metrics"]["physicalFootprintStartMB"] = 900.0
+        self.publish(first, "trend-first")
+        second = self._schema_v3_language_record("mac-lang-bench-20260712-131000")
+        second["run"]["startedAt"] = "2026-07-12T13:10:00Z"
+        second["run"]["finishedAt"] = "2026-07-12T13:11:00Z"
+        take = second["takes"][0]
+        take["metrics"]["rtf"] = take["metrics"].get("rtf", 2.0) + 0.2
+        take["metrics"]["physicalFootprintStartMB"] = 950.0
+        published = json.loads(self.publish(second, "trend-second").read_text())
+        comparison = published["comparison"]
+        self.assertEqual(comparison["deltaMetrics"], "trend-v1")
+        self.assertEqual(comparison["baselineRunID"], "mac-lang-bench-20260712-130000")
+        cell_deltas = comparison["deltas"][take["cell"]]
+        self.assertIn("rtf", cell_deltas)
+        self.assertNotIn("physicalFootprintStartMB", cell_deltas, "only trend metrics are stored")
+        self.assertTrue(set(cell_deltas) <= history.COMPARISON_DELTA_METRICS["trend-v1"])
+
+    def test_an_unknown_delta_declaration_is_rejected(self) -> None:
+        record = record_fixture(run_id="macos-bench-20260712-140000")
+        record["comparison"]["deltaMetrics"] = "everything"
+        with self.assertRaises(history.HistoryError):
+            history.validate_record(record)
+
     def test_cross_optimization_records_are_never_compared(self) -> None:
         baseline = record_fixture(run_id="optimization-onone")
         baseline["toolchain"]["optimization"] = "-Onone"

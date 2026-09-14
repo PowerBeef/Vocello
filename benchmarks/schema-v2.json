@@ -157,6 +157,11 @@
         },
         "key": {
           "$ref": "#/$defs/digest"
+        },
+        "deltaMetrics": {
+          "enum": [
+            "trend-v1"
+          ]
         }
       },
       "required": [

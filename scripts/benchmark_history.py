@@ -136,7 +136,7 @@ SECTION_KEYS = {
         "streamingTelemetryV9SidecarCount", "streamingTelemetryV9SidecarsDigest",
         "streamingTelemetryV9PublicationReadyCount",
     },
-    "comparison": {"key", "comparable", "baselineRunID", "deltas"},
+    "comparison": {"key", "comparable", "baselineRunID", "deltas", "deltaMetrics"},
     "listening": {"status", "note", "annotatedAt"},
 }
 MODEL_KEYS = {
@@ -270,7 +270,9 @@ SCHEMA_REQUIRED_KEYS = {
         "streamingTelemetryV9SidecarCount", "streamingTelemetryV9SidecarsDigest",
         "streamingTelemetryV9PublicationReadyCount",
     },
-    "comparison": SECTION_KEYS["comparison"],
+    # deltaMetrics is declared only by records published from 2026-09-14 on;
+    # older records keep their full delta blocks and never claim it.
+    "comparison": SECTION_KEYS["comparison"] - {"deltaMetrics"},
     "listening": SECTION_KEYS["listening"],
     "model": MODEL_KEYS,
     "take": {"takeIndex", "generationID", "cell", "status", "metrics", "warnings"},
@@ -328,6 +330,7 @@ def schema_property_keys(version: int) -> dict[str, set[str]]:
     properties = {name: set(keys) for name, keys in SCHEMA_PROPERTY_KEYS.items()}
     if version == 1:
         properties["evidence"] -= V2_ONLY_EVIDENCE_KEYS
+        properties["comparison"] -= {"deltaMetrics"}   # legacy records never declare it
         properties["take"] -= V2_ONLY_TAKE_KEYS | V3_ONLY_TAKE_KEYS
         properties["trace"] -= V2_ONLY_TRACE_KEYS
         properties["traceSummary"] -= V2_ONLY_TRACE_SUMMARY_KEYS
@@ -1464,10 +1467,39 @@ def record_is_comparable(record: dict[str, Any]) -> bool:
     )
 
 
+# `comparison.deltaMetrics: "trend-v1"` restricts a record's stored deltas to the
+# metrics something actually reads (the index trend line, the RTF and memory
+# gates, first-chunk and playback latency, the played-audio comparison). A
+# full 11-cell record carried 75 metrics × 4 floats of deltas (about 90 KB)
+# and overflowed the 256 KiB record contract on the second canonical
+# captured run; records without the declaration keep their full blocks.
+COMPARISON_DELTA_METRICS = {
+    "trend-v1": frozenset({
+        "rtf", "decodeSpeedupX", "ttfcMS", "peakPhysicalFootprintMB", "physicalFootprintEndMB",
+        "submitToFirstChunkMS", "playbackScheduledMS", "submitToCompletedMS",
+        "stepBurstPeakCount", "playbackCaptureFirstAudibleMS", "playbackCaptureAlignmentMS",
+        "playbackCaptureResidualDBFS", "playbackCaptureDropoutCount", "playbackCaptureMaxGapMS",
+        "playbackCaptureCoverage", "playbackCaptureStepBurstPeakCount",
+    }),
+}
+DEFAULT_COMPARISON_DELTA_METRICS = "trend-v1"
+
+
+def allowed_delta_metrics(record: dict[str, Any]) -> frozenset[str] | None:
+    """The metric allowlist a record declares for its stored deltas; None means every metric."""
+    declared = (record.get("comparison") or {}).get("deltaMetrics")
+    if declared is None:
+        return None
+    if declared not in COMPARISON_DELTA_METRICS:
+        raise HistoryError(f"comparison.deltaMetrics is unknown: {declared!r}")
+    return COMPARISON_DELTA_METRICS[declared]
+
+
 def comparison_deltas(
     record: dict[str, Any], baseline: dict[str, Any],
 ) -> dict[str, dict[str, dict[str, float]]]:
     baseline_cells = {cell["key"]: cell for cell in baseline.get("cells", [])}
+    allowed = allowed_delta_metrics(record)
     deltas: dict[str, dict[str, dict[str, float]]] = {}
     for cell in record.get("cells", []):
         prior = baseline_cells.get(cell["key"])
@@ -1475,6 +1507,8 @@ def comparison_deltas(
             continue
         metric_deltas: dict[str, dict[str, float]] = {}
         for metric, current_summary in cell.get("statistics", {}).items():
+            if allowed is not None and metric not in allowed:
+                continue
             prior_summary = prior.get("statistics", {}).get(metric)
             current_value = current_summary.get("median") if isinstance(current_summary, dict) else None
             prior_value = prior_summary.get("median") if isinstance(prior_summary, dict) else None
@@ -1503,6 +1537,9 @@ def expected_comparison_metadata(
         "baselineRunID": None,
         "deltas": {},
     }
+    declared = (record.get("comparison") or {}).get("deltaMetrics")
+    if declared is not None:
+        expected["deltaMetrics"] = declared
     if not expected["comparable"]:
         return expected
     current_order = (record["run"]["finishedAt"], record["run"]["id"])
@@ -1644,6 +1681,10 @@ def build_record(manifest_path: Path) -> dict[str, Any]:
     )
     comparison.setdefault("baselineRunID", None)
     comparison.setdefault("deltas", {})
+    # New v2+ records store only the trend metrics' deltas (see
+    # COMPARISON_DELTA_METRICS); the legacy v1 shape never carries the key.
+    if int(record.get("schemaVersion", 1)) >= 2:
+        comparison.setdefault("deltaMetrics", DEFAULT_COMPARISON_DELTA_METRICS)
     record.setdefault("listening", {"status": "not-performed", "note": "", "annotatedAt": None})
     record["digest"] = record_digest(record)
     return record
@@ -2719,6 +2760,7 @@ def validate_record(
         raise HistoryError("comparison.baselineRunID must be a run ID or null")
     if not isinstance(comparison.get("deltas"), dict):
         raise HistoryError("comparison.deltas must be an object")
+    allowed_delta_metrics(record)   # an unknown declaration is an error
     listening = record["listening"]
     if listening.get("status") not in LISTENING_STATUSES:
         raise HistoryError("listening.status is invalid")

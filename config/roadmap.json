@@ -1095,22 +1095,6 @@
       "unparkWhen": "The paired iPhone is available for one ios benchmark and one ios perf run (the macOS clauses are done)."
     },
     {
-      "id": "MV-05",
-      "plan": "harness-stabilization-2026-09",
-      "title": "The plosive-onset burst in short clone takes is model-intrinsic and still unjudged",
-      "status": "planned",
-      "blockedBy": [
-        "MV-06"
-      ],
-      "gate": "Either the generator no longer produces the plosive-onset cluster on the clone short cell, or MV-06's clip-level judge, extended with an onset-window metric if NISQA alone does not separate it, carries a validated perceptual judgement of it; in both cases the reproduction in the notes passes a machine gate without listening.",
-      "sourceOfTruth": [
-        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift"
-      ],
-      "updated": "2026-09-14",
-      "notes": "The 150 to 250 ms plosive-onset step cluster in short clone takes (8 to 36 quarter-scale steps within 20 ms at the 'tr' onset; seed-dependent; medium and long takes 0 to 1) is model-intrinsic: the September 13 codec A/B (28 seeds per codec) shows it in 19/28 fp16 and 18/28 fp32 takes, and the 2.4.0 CLI built from tag 4a5a905f renders the fp32 takes sample-identically (corr 1.00 on 7/8 seeds), so it predates release 2.4.0; the swift-transformers bump and the model-code changes since August produce identical waveforms. Not the chunk seam, not the limiter, not the Article 50 mark. The regression the maintainer hears is MV-07. QC v7 records the cluster (stepBurstPeakCount / stepBurstPeakStartMS) without judging it; NISQA v2 (now the cascade's clip-quality screen, MV-06 done 2026-09-14) did not separate affected takes at clip level, so the perceptual gate needs that judge extended with an onset-window metric: score the first 300 ms window separately, or run the judge on the onset segment and compare against the clip. Reproduce: QWENVOICE_DEBUG=1 ./build/vocello bench --modes clone --lengths short --warm 3 --seed 55. (Earlier history: git log -p -- config/roadmap.json.)"
-    },
-    {
       "id": "HS-01",
       "plan": "harness-stabilization-2026-09",
       "title": "Complete the TSan characterization and decide promotion",

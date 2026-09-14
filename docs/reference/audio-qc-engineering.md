@@ -748,6 +748,24 @@ The 14 retained French Design comparisons already include independent Apple/Whis
 SenseVoice does not support French and DistilHuBERT does not transcribe; running either as a French
 judge would be invalid. French disagreement remains open; no extra recognizer was downloaded.
 
+### The plosive-onset step cluster (MV-05, judged 2026-09-14)
+
+`stepBurstPeakCount` / `stepBurstPeakStartMS` record the densest 20 ms window of sample-to-sample
+steps above a quarter of full scale. On the clone short cell the generator places such a cluster
+150 to 250 ms into the take (8 to 32 steps in 11 of 88 fixed-seed takes on artifactVersion
+2026.09.14.1; a count above zero in 63 of 88); it is model-intrinsic (present under either codec
+and in the 2.4.0 binary, sample-identically). The NISQA clip-quality judge (MV-06) does not
+register it: full-clip MOS of the 11 cluster takes has median 4.82 against 4.90 for the 52 clean
+takes (rank AUC 0.54, Spearman with the count 0.00), and a 300 ms onset window moves only modestly
+(median 3.29 against 3.72, AUC 0.71, Spearman −0.18) inside a range clean takes also cover. The
+four takes below the warn floor in that set all carry counts of one or two. The recorded
+judgement is therefore: the cluster is a measured, monitored artefact with a minor perceptual
+footprint, not a QC defect; QC v7 keeps counting it, `scripts/clip_quality_screen.py` reproduces
+the judgement (`--onset-window-ms 300`, separation block), and the machine gate a reproduction
+must pass is the clip-quality warn floor. No onset-window warning was added because the window
+does not separate the classes. The Python detector in `lib/playback_capture.py` matches the
+Swift count within ±1 on 60 of 60 takes (54 exact), a windowing boundary difference.
+
 ### Threshold-change authority
 
 The Fast-QC cadence and dropout boundaries (`makeAudioQCReport`, algorithm v7; v7 added only the

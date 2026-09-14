@@ -59,7 +59,14 @@ runtime versions in the registry, a venv under the owned model root that the pre
 and the delivery cascade's `--clip-quality-config` scores both sides of every pair on the original
 24 kHz bytes. The warn floor is corpus-calibrated (tenth percentile of 54 neutral PASS takes, 3.81);
 a take below it abstains the pair and never rejects, so native QC keeps the decision. Two-run
-qualification passed. MV-05 is unblocked: its next step is the onset-window extension of that judge.
+qualification passed.
+
+**Onset cluster judged, September 14.** MV-05 closes with a judgement rather than a fix. The NISQA
+judge with a 300 ms onset window, run over 88 fixed-seed clone short takes through the new
+`scripts/clip_quality_screen.py`, cannot tell the 11 cluster takes from the 52 clean ones at clip
+level (AUC 0.54) and only modestly on the onset window (AUC 0.71, overlapping ranges). The cluster
+is recorded as model-intrinsic with a minor perceptual footprint, QC v7 keeps counting it, and the
+reproduction (seed 55) passes the clip-quality warn floor. The primary plan now holds HS-01 only.
 
 Critical path: the MV-07 decision, MV-06, HS-01 by 2026-09-30; release-first resumes RF-13 → RF-09
 freeze → ICA-04 → ICA-05 → RF-12, and ISU-4's physical walk rides the next device window.

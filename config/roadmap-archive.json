@@ -2969,6 +2969,25 @@
         "scripts/prepare_delivery_compact_model_config.py"
       ],
       "notes": "Closed 2026-09-14. Dependency decision: the torch route, following the DistilHuBERT precedent (a pinned venv under the owned model root, versions in the registry, drift refused by the prepare step), not an MLX port. NISQA v2 (checkpoint 7ec4cf93, upstream fe84f0f2, MIT) runs through the Apache-2.0 torchmetrics 1.9.0 port as candidate nisqa-v2: the compact runtime scores the original 24 kHz bytes (chunks of 52 s averaged by duration), the adapter binds the same identities as the other heads, and the cascade's --clip-quality-config scores both sides of every pair; a take below the warn floor abstains the pair (never rejects). Floor 3.81 = tenth percentile of a 54-take neutral PASS corpus (speed bench matrix + the 28-seed clone matrix; median 4.77, MAD 0.18; the corpus has a gap between 3.68 and 4.11 and the floor names the six takes below it; corpus digest recorded). Two-run qualification passed (403 MB peak RSS, 1.6 s per probe). Gate wording amended at closure: the pin lives in the candidate registry, not toolchain.json. MV-05 is unblocked; the onset-window extension is its next step. (Earlier history: git log -p -- config/roadmap.json.)"
+    },
+    {
+      "id": "MV-05",
+      "plan": "harness-stabilization-2026-09",
+      "title": "The plosive-onset burst in short clone takes is model-intrinsic and still unjudged",
+      "status": "done",
+      "updated": "2026-09-14",
+      "gate": "Either the generator no longer produces the plosive-onset cluster on the clone short cell, or MV-06's clip-level judge, extended with an onset-window metric if NISQA alone does not separate it, carries a validated perceptual judgement of it; in both cases the reproduction in the notes passes a machine gate without listening.",
+      "evidence": [
+        "file:scripts/clip_quality_screen.py",
+        "doc:docs/reference/audio-qc-engineering.md",
+        "file:config/delivery-evaluator-v2-candidates.json"
+      ],
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",
+        "scripts/clip_quality_screen.py"
+      ],
+      "notes": "Closed 2026-09-14 with a judgement, not a fix. The judge (MV-06's NISQA v2) extended with an onset-window metric (scripts/clip_quality_screen.py --onset-window-ms 300) over 88 fixed-seed clone short takes on artifactVersion 2026.09.14.1 (the 28-seed matrix plus seeds 200-259): 11 takes carry the cluster (8-32 quarter-scale steps in 20 ms, 142-216 ms in, one at 1045 ms), 52 are clean (count at most 2). Full-clip MOS: cluster median 4.82 vs clean 4.90, rank AUC 0.54, Spearman with the count 0.00. 300 ms onset window: 3.29 vs 3.72, AUC 0.71, Spearman -0.18, ranges overlapping. The four takes under the warn floor all have counts of 1-2. Judgement recorded in audio-qc-engineering.md: model-intrinsic, minor perceptual footprint, monitored by QC v7 counts; no onset warning added because the window does not separate. Machine gate for the reproduction (seed 55: MOS 4.61, count 20 at 143 ms): the clip-quality warn floor 3.81, passed without listening. Python detector matches the Swift count within +/-1 (54/60 exact). (Earlier history: git log -p -- config/roadmap.json.)"
     }
   ]
 }

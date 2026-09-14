@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `harness-stabilization-2026-09` | active | release-qa | 8/10 (80%) |
+| `harness-stabilization-2026-09` | active | release-qa | 9/10 (90%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 9/15 (60%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -34,15 +34,11 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `HS-01` | planned | Complete the TSan characterization and decide promotion | — |
-| `MV-05` | planned | The plosive-onset burst in short clone takes is model-intrinsic and still unjudged | `MV-06` |
 
 ### Open items in detail
 
 - **`HS-01`** (planned) — Complete the TSan characterization and decide promotion.
   gate: config/tsan-policy.json records three consecutive nightly.yml passes on or before its 2026-09-30 deadline with zero open confirmed races (each confirmed race becomes its own item), then the maintainer records the blocking or non-blocking decision in the policy status; deterministic and MLX runtime coverage are never weakened to pass.
-
-- **`MV-05`** (planned) — The plosive-onset burst in short clone takes is model-intrinsic and still unjudged.
-  gate: Either the generator no longer produces the plosive-onset cluster on the clone short cell, or MV-06's clip-level judge, extended with an onset-window metric if NISQA alone does not separate it, carries a validated perceptual judgement of it; in both cases the reproduction in the notes passes a machine gate without listening.
 
 ## Autonomous validation audit remediation
 

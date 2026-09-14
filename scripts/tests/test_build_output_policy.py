@@ -31,6 +31,7 @@ SPEC.loader.exec_module(POLICY)
 REQUIRED_EXPORTS = {
     "QVOICE_BUILD_ROOT",
     "QVOICE_XCODE_MACOS_DERIVED",
+    "QVOICE_XCODE_MACOS_OPTIMIZED_DERIVED",
     "QVOICE_XCODE_MACOS_TSAN_DERIVED",
     "QVOICE_XCODE_IOS_DERIVED",
     "QVOICE_XCODE_SOURCE_PACKAGES",
@@ -399,6 +400,13 @@ class BuildOutputPolicyTests(unittest.TestCase):
         ):
             failures = POLICY._symbol_identity_violations(policy)
         self.assertTrue(any("no rebuilt dSYM beside the product" in item for item in failures))
+
+    def test_a_public_link_may_point_into_an_alternate_arena(self) -> None:
+        policy = POLICY.load_policy(REPO_ROOT, REPO_ROOT / "config" / "build-output-policy.json")
+        link = next(item for item in policy.document["publicLinks"] if item["path"] == "build/vocello")
+        self.assertIn("xcode-macos-optimized-derived-data", link["alternateTargetEntries"])
+        self.assertEqual(policy.entries_by_id["xcode-macos-optimized-derived-data"]["path"],
+                         "build/cache/xcode/macos-optimized")
 
     def test_status_markdown_is_deterministic_and_manifest_owned(self) -> None:
         policy = POLICY.load_policy(self.root, self.manifest)

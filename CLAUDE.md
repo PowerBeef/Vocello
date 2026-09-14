@@ -61,7 +61,7 @@ publication and device consent are always explicit; ordinary work never needs a 
 | **One lifecycle authority** | Actor-owned lifecycle, typed cancellation, serialized prewarm, frame-bounded suspending audio; phases in `config/runtime-refactor-contract.json`. |
 | **Exact model delivery** | The production catalog is generated from `config/model-artifact-receipts.json` and activates only complete, digest-verified artifacts. |
 | **Privacy** | Never track PII, private paths, prompts, transcripts, credentials or raw diagnostics; `scripts/privacy_scan.py` enforces it. |
-| **Owned output** | `config/build-output-policy.json` owns `build/`; reuse `build/cache/xcode/{macos,macos-tsan,ios-device}`; no ad hoc DerivedData or whole-cache deletion. |
+| **Owned output** | `config/build-output-policy.json` owns `build/`; reuse `build/cache/xcode/{macos,macos-optimized,macos-tsan,ios-device}`; no ad hoc DerivedData or whole-cache deletion. |
 | **Evidence retention** | Only qualified privacy-safe PASS enters `benchmarks/runs/`; raw WAV, telemetry, screenshots and xcresult stay untracked. `rtf` is the standard real-time factor (synthesis wall ÷ audio, lower is faster; `decodeSpeedupX` is the old inverted figure) and `toolchain.optimization` comes from a hash-bound build receipt, never a literal. |
 | **Exact-source releases** | Candidates need a GitHub-verified annotated tag on `origin/main` with green `CI required`; `scripts/release_source_authority.py` fails closed and the release workflow runs Security on the tagged commit. |
 | **One work authority** | `config/roadmap.json` owns open work and generates `docs/ROADMAP.md`; finished work lives in `config/roadmap-archive.json`. |

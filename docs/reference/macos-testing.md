@@ -294,7 +294,9 @@ artifacts.
 
 ## Generated-output ownership
 
-macOS development and UI lanes reuse only `build/cache/xcode/macos/`; shared package checkouts live
+macOS -Onone development builds and deterministic tests reuse `build/cache/xcode/macos/`; the optimized
+CLI and every macOS UI lane (compiled at -O) reuse `build/cache/xcode/macos-optimized/`, so an optimized
+build never recompiles the -Onone arena; shared package checkouts live
 under `build/cache/xcode/source-packages/`. Result bundles, diagnostics, profiles, and current dSYMs
 are untracked artifacts under `build/artifacts/`, while release packaging is isolated under
 `build/scratch/derived-data/release-macos/` and `build/dist/macos/`. `build/Vocello.app` and

@@ -135,6 +135,12 @@ on the tagged commit.
   the same commit as any file added, moved or deleted under a globbed Xcode target.
 - `./scripts/build_foundation_targets.sh ios --incremental` reuses the governed
   `build/cache/xcode/ios-device` DerivedData and matches physical-device Release optimization.
+- macOS builds keep one arena per optimization level: `build/cache/xcode/macos` for the `-Onone`
+  development app, CLI and deterministic test bundles, `build/cache/xcode/macos-optimized` for
+  `scripts/build.sh cli-optimized` and every macOS XCUITest lane (compiled at `-O`). An optimized build
+  therefore never recompiles the `-Onone` arena; `build/vocello` points at whichever CLI built last.
+  `scripts/macos_test.sh test` prints how many `SwiftCompile` tasks its build ran, the number that
+  proves a warm cache locally and in CI.
 - Internal diagnostic flags are target settings, so diagnostics never rebuild MLX and the other
   dependencies. `scripts/macos_test.sh test --coverage` is an opt-in llvm-cov export and forces a full
   rebuild of the shared cache.

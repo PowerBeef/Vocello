@@ -47,6 +47,8 @@ DEBUG_MODELS = Path.home() / "Library" / "Application Support" / "QwenVoice-Debu
 SHIPPED_MODELS = Path.home() / "Library" / "Application Support" / "QwenVoice" / "models"
 CACHE_ALIASES = {
     "macos": "xcode-macos-derived-data",
+    "macos-optimized": "xcode-macos-optimized-derived-data",
+    "macos-tsan": "xcode-macos-tsan-derived-data",
     "ios": "xcode-ios-device-derived-data",
     "packages": "xcode-source-packages",
     "runtime": "swiftpm-mlx-audio-runtime",

@@ -54,7 +54,7 @@ Benchmark records take `toolchain.optimization` from the executable-digest-bound
 records; the -Onone `cli` build is for development and functional runs.
 
 `build/vocello` is the public symlink to the real binary under the policy-owned
-`build/cache/xcode/macos/…` product tree; macOS resolves it so the adjacent MLX shader bundle
+`build/cache/xcode/macos/…` (-Onone) or `build/cache/xcode/macos-optimized/…` (`cli-optimized`) product tree; macOS resolves it so the adjacent MLX shader bundle
 (`default.metallib`) stays reachable. **Do not copy only the binary**: keep the adjacent resource
 bundles and catalogs. The release workflow stages a complete `Vocello CLI` folder in a separate
 `<desktop-output-name>-cli.dmg`; copy the whole folder to any user-owned location and invoke the

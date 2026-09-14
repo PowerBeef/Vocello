@@ -317,16 +317,23 @@ build_cli() {
     # owned targets instead of recompiling MLX and the other packages.
     local testability="YES"
     local command_identity="scripts/build.sh cli"
+    # One arena per optimization level (MV-01): an optimized build in the
+    # -Onone arena flipped it and the next test or app build recompiled the
+    # whole package graph. The optimized CLI and the -O XCUITest lanes share
+    # build/cache/xcode/macos-optimized; build/vocello follows the arena.
+    DERIVED_DATA="$QVOICE_XCODE_MACOS_DERIVED"
     if [ "$optimization" = "O" ]; then
         swift_optimization="-O"
         compilation_mode="wholemodule"
         gcc_optimization="s"
         testability="NO"
         command_identity="scripts/build.sh cli-optimized"
+        DERIVED_DATA="$QVOICE_XCODE_MACOS_OPTIMIZED_DERIVED"
     elif [ "$optimization" != "Onone" ]; then
         echo "error: unsupported CLI optimization identity: $optimization" >&2
         return 2
     fi
+    CLI_BUILT="$DERIVED_DATA/Build/Products/Release/vocello"
     ensure_project_regenerated
     ensure_spm_resolved "$QVOICE_SCRATCH_PACKAGE_RESOLUTION" "$SOURCE_PACKAGES_DIR" \
         dev QwenVoice Release "$DESTINATION"

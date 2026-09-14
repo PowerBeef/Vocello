@@ -64,7 +64,7 @@ the recurring permission pain.
   process tap never prompts on macOS 26: an ungranted runner simply receives silence. Add the
   runner once by hand under System Settings → Privacy & Security → Screen & System Audio Recording
   → *System Audio Recording Only* (plus button, Cmd+Shift+G,
-  `build/cache/xcode/macos/Build/Products/Release/VocelloMacUITests-Runner.app`; the pane asks for
+  `build/cache/xcode/macos-optimized/Build/Products/Release/VocelloMacUITests-Runner.app`; the pane asks for
   the login password) **after** a benchmark lane has re-signed it. An identity-signed grant survives
   rebuilds; an ad-hoc one binds to a single code hash and needs redoing after every rebuild.
   Ungranted, the lane still passes with `playbackCaptureStatus: unavailable` or `silent` on every

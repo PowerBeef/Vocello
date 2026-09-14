@@ -12,7 +12,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT_DIR/scripts/lib/required_steps.sh"
 . "$ROOT_DIR/scripts/lib/dev_signing.sh"
 PROJECT="$ROOT_DIR/QwenVoice.xcodeproj"
-MAC_DERIVED="$QVOICE_XCODE_MACOS_DERIVED"
+# Every macOS UI lane compiles the app at -O (benchmark-grade), so it shares the
+# optimized arena with the benchmark CLI and leaves the -Onone arena alone (MV-01).
+MAC_DERIVED="$QVOICE_XCODE_MACOS_OPTIMIZED_DERIVED"
 IOS_DERIVED="$QVOICE_XCODE_IOS_DERIVED"
 BUNDLE_ID_IOS="com.patricedery.vocello"
 MAC_TAKE_MANIFEST="/tmp/vocello-bench-current-take.json"

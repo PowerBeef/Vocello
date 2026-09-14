@@ -129,10 +129,19 @@
       "id": "xcode-macos-derived-data",
       "path": "build/cache/xcode/macos",
       "class": "cache",
-      "owner": "macOS build and XCUITest lanes",
+      "owner": "macOS -Onone builds: development app, CLI and deterministic test bundles",
       "cleanup": "aggressive",
       "retention": "Persistent incremental macOS Xcode cache",
       "env": "QVOICE_XCODE_MACOS_DERIVED"
+    },
+    {
+      "id": "xcode-macos-optimized-derived-data",
+      "path": "build/cache/xcode/macos-optimized",
+      "class": "cache",
+      "owner": "Optimized (-O) macOS builds: benchmark CLI and macOS XCUITest lanes",
+      "cleanup": "aggressive",
+      "retention": "Persistent incremental optimized macOS Xcode cache; keeps the -Onone arena from recompiling after every optimized build",
+      "env": "QVOICE_XCODE_MACOS_OPTIMIZED_DERIVED"
     },
     {
       "id": "xcode-macos-tsan-derived-data",
@@ -360,7 +369,10 @@
     {
       "path": "build/vocello",
       "targetEntry": "xcode-macos-derived-data",
-      "targetSuffix": "Build/Products/Release/vocello"
+      "targetSuffix": "Build/Products/Release/vocello",
+      "alternateTargetEntries": [
+        "xcode-macos-optimized-derived-data"
+      ]
     }
   ],
   "externalXcodeDerivedData": {

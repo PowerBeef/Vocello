@@ -162,6 +162,11 @@ build_mac_test_bundles() {
     GCC_OPTIMIZATION_LEVEL="0" \
     ENABLE_TESTABILITY=YES > "$log_path" 2>&1 || xcode_status=$?
   (( xcode_status == 0 )) || return "$xcode_status"
+  # How much the arena actually rebuilt: the number that proves a warm cache
+  # (MV-01) and shows up in the CI step log.
+  local compile_tasks
+  compile_tasks="$(grep -c '^SwiftCompile ' "$log_path" 2>/dev/null || true)"
+  note "test bundles built: ${compile_tasks:-0} SwiftCompile task(s) in $derived_data"
   local products="$derived_data/Build/Products/Release"
   if [[ "$tsan" == "1" ]]; then
     assert_macos_tsan_bundle_architectures "$products/Vocello.app" || return 1

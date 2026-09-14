@@ -1098,7 +1098,7 @@
       "id": "MV-01",
       "plan": "harness-stabilization-2026-09",
       "title": "One build arena per optimization level: the macOS cache restores yet recompiles, and the optimized CLI flips the local arena",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "The warm macOS lane's deterministic-tests step compiles fewer than 100 Swift files after an exact cache hit, or the cache is replaced by a mechanism that survives the round trip (content-addressed compilation cache). Locally, a scripts/build.sh cli-optimized (gate bench, lang-bench, benchmark lanes) followed by scripts/macos_test.sh test does not recompile the package graph: the optimized CLI builds into a registered arena of its own in config/build-output-policy.json and the build receipt path follows.",
       "sourceOfTruth": [
@@ -1109,24 +1109,11 @@
         "config/build-output-policy.json",
         "scripts/lib/build_provenance.py"
       ],
-      "updated": "2026-09-13",
-      "notes": "Runs 34727403360, 34771792270 and the warm dispatch 34773187587 restored macos-xcode26.6-<graph>-2026-W37 (1331 MB) plus the 619 MB package checkout on the same Xcode 17F113 / swiftlang 6.3.3.1.3 and still compiled 927 Swift files (GRDB 174, Crypto 97, NIOCore 74, MLXLMCommon 70, ArgumentParser 55); the log shows 'Base directory status changed. Regenerating...' after ClangStatCache. Test step 332–419 s warm vs 585–726 s cold; the CLI identity step (28–48 s) proves the arena is consistent inside a run. The iOS lane restores and compiles in 83–120 s. Hypotheses: llbuild FileInfo (inode/device) mismatch after tar extraction; SDK stat-cache regeneration invalidating the module cache. Compare the two arenas' build databases first. Local side (formerly MV-02): every cli-optimized build flips build/cache/xcode/macos to -O and the next -Onone build recompiles 1281 files (about 100 s on the M2); each gate pays 150 to 185 s for the CLI.",
+      "updated": "2026-09-14",
+      "notes": "Local clause done 2026-09-14: build/cache/xcode/macos-optimized is a registered arena (env QVOICE_XCODE_MACOS_OPTIMIZED_DERIVED, cleanup alias macos-optimized); scripts/build.sh cli-optimized and every macOS XCUITest lane build there, build/vocello follows, and scripts/macos_test.sh test right after a full optimized CLI build reported 0 SwiftCompile tasks in the -Onone arena (previously 1281 files, about 100 s). The optimized CLI arena is 1.4 GB. CI clause: the warm macOS test step already fell from 419 s (dispatch 34773187587) to 148 s (run 34796586318); macos_test.sh now prints the SwiftCompile task count so the next warm push run states the number the gate asks for (fewer than 100). (Earlier history: git log -p -- config/roadmap.json.)",
       "legacyIds": [
         "MV-02"
       ]
-    },
-    {
-      "id": "MV-03",
-      "plan": "harness-stabilization-2026-09",
-      "title": "A manual ci.yml dispatch cancels the in-flight push run",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "concurrency.group keys on the event name as well as the ref, so a measurement dispatch never supersedes the gate run for a commit; a dispatch and a push on the same commit both finish.",
-      "sourceOfTruth": [
-        ".github/workflows/ci.yml"
-      ],
-      "updated": "2026-09-13",
-      "notes": "gh workflow run ci.yml on main cancelled push run 34773187624 (CI required = failure on 97c6c319 until the dispatch run reported). Deferred during the campaign because a ci.yml push would itself have cancelled the warm and cold measurement dispatches."
     },
     {
       "id": "MV-04",

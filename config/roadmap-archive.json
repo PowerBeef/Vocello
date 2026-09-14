@@ -2826,6 +2826,21 @@
       "updated": "2026-09-13",
       "gate": "A gate bench or lang-bench run followed by scripts/macos_test.sh test does not recompile the package graph; the optimized CLI builds into a registered arena of its own and the build receipt path follows.",
       "notes": "Closed 2026-09-13. Same recompilation root cause seen from the laptop; MV-01 now carries the local-arena clause."
+    },
+    {
+      "id": "MV-03",
+      "plan": "harness-stabilization-2026-09",
+      "title": "A manual ci.yml dispatch cancels the in-flight push run",
+      "status": "done",
+      "updated": "2026-09-14",
+      "gate": "concurrency.group keys on the event name as well as the ref, so a measurement dispatch never supersedes the gate run for a commit; a dispatch and a push on the same commit both finish.",
+      "evidence": [
+        "commit:d431cc03"
+      ],
+      "sourceOfTruth": [
+        ".github/workflows/ci.yml"
+      ],
+      "notes": "Closed 2026-09-14. concurrency.group is ci-<event>-<ref>; proof: push run 34797784288 and manual dispatch 34797805634 on d431cc03 ran concurrently and both succeeded (before the change the dispatch cancelled the push run within seconds)."
     }
   ]
 }

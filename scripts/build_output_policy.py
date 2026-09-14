@@ -243,6 +243,11 @@ def _validate_policy_document(document: Any) -> tuple[tuple[dict[str, Any], ...]
         target_id = link.get("targetEntry")
         if target_id not in entries_by_id:
             raise PolicyError(f"{label}.targetEntry is unknown: {target_id!r}")
+        # A link may legitimately point into more than one arena (build/vocello
+        # follows whichever CLI built last: -Onone or optimized).
+        alternates = link.get("alternateTargetEntries", [])
+        if not isinstance(alternates, list) or any(a not in entries_by_id for a in alternates):
+            raise PolicyError(f"{label}.alternateTargetEntries must name known entries")
         suffix = _relative_posix(link.get("targetSuffix"), f"{label}.targetSuffix")
         if suffix.parts[0] == "build":
             raise PolicyError(f"{label}.targetSuffix must be relative to its target entry")
@@ -1229,9 +1234,14 @@ def _public_link_violations(policy: LoadedPolicy) -> list[str]:
             violations.append(f"{link['path']}: public compatibility path must be a symlink")
             continue
         actual = (link_path.parent / os.readlink(link_path)).resolve(strict=False)
-        if actual != expected.resolve(strict=False):
+        accepted = [expected] + [
+            policy.repo_root / policy.entries_by_id[alt]["path"] / link["targetSuffix"]
+            for alt in link.get("alternateTargetEntries", [])
+        ]
+        if actual not in {candidate.resolve(strict=False) for candidate in accepted}:
             violations.append(
                 f"{link['path']}: symlink target does not match {expected.relative_to(policy.repo_root)}"
+                + (" or its alternate arenas" if len(accepted) > 1 else "")
             )
     return violations
 

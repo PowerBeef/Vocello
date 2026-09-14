@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `harness-stabilization-2026-09` | active | release-qa | 1/10 (10%) |
+| `harness-stabilization-2026-09` | active | release-qa | 2/10 (20%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 9/15 (60%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -34,8 +34,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `HS-01` | planned | Complete the TSan characterization and decide promotion | — |
-| `MV-01` | planned | One build arena per optimization level: the macOS cache restores yet recompiles, and the optimized CLI flips the local arena | — |
-| `MV-03` | planned | A manual ci.yml dispatch cancels the in-flight push run | — |
+| `MV-01` | in-flight | One build arena per optimization level: the macOS cache restores yet recompiles, and the optimized CLI flips the local arena | — |
 | `MV-04` | planned | Run the deterministic contract gate on Linux so the swift lane routes on compile inputs only | — |
 | `MV-05` | planned | The plosive-onset burst in short clone takes is model-intrinsic and still unjudged | `MV-06` |
 | `MV-06` | planned | A clip-level non-intrusive quality screen as a second machine judge | — |
@@ -48,11 +47,8 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 - **`HS-01`** (planned) — Complete the TSan characterization and decide promotion.
   gate: config/tsan-policy.json records three consecutive nightly.yml passes on or before its 2026-09-30 deadline with zero open confirmed races (each confirmed race becomes its own item), then the maintainer records the blocking or non-blocking decision in the policy status; deterministic and MLX runtime coverage are never weakened to pass.
 
-- **`MV-01`** (planned) — One build arena per optimization level: the macOS cache restores yet recompiles, and the optimized CLI flips the local arena.
+- **`MV-01`** (in-flight) — One build arena per optimization level: the macOS cache restores yet recompiles, and the optimized CLI flips the local arena.
   gate: The warm macOS lane's deterministic-tests step compiles fewer than 100 Swift files after an exact cache hit, or the cache is replaced by a mechanism that survives the round trip (content-addressed compilation cache). Locally, a scripts/build.sh cli-optimized (gate bench, lang-bench, benchmark lanes) followed by scripts/macos_test.sh test does not recompile the package graph: the optimized CLI builds into a registered arena of its own in config/build-output-policy.json and the build receipt path follows.
-
-- **`MV-03`** (planned) — A manual ci.yml dispatch cancels the in-flight push run.
-  gate: concurrency.group keys on the event name as well as the ref, so a measurement dispatch never supersedes the gate run for a commit; a dispatch and a push on the same commit both finish.
 
 - **`MV-04`** (planned) — Run the deterministic contract gate on Linux so the swift lane routes on compile inputs only.
   gate: scripts/check_project_inputs.sh runs in the ubuntu contracts job (product contracts, invariants, privacy scan, roadmap validator) and scripts/ci/classify_changes.py's swift rule shrinks to Sources, Tests, project.yml, package manifests, xcode-schemes and benchmark evidence.

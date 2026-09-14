@@ -2883,6 +2883,52 @@
         "scripts/check_project_inputs.sh"
       ],
       "notes": "Closed 2026-09-14. The ubuntu contracts job runs scripts/check_project_inputs.sh --python none on every push (green in run 34800316703 after the pinned numpy install that delivery_statistics.py needs); the macOS job keeps only the darwin-only pytest lane; the swift rule routes on compile inputs, build configs, benchmark evidence and the lane's own drivers (config/ and scripts/ changes no longer reach the macOS lane; scripts/tests/test_classify_changes.py pins the table). The closure push of this note, config and docs only, is the first routing proof."
+    },
+    {
+      "id": "PC-02",
+      "plan": "harness-stabilization-2026-09",
+      "title": "Promote the played-audio comparison from warnings to a gate",
+      "status": "done",
+      "updated": "2026-09-14",
+      "gate": "Thresholds for alignment, residual, dropouts and coverage are set from at least three canonical captured runs and a failing comparison fails the lane; the smoke lane captures too.",
+      "evidence": [
+        "commit:8fdc2ba9",
+        "commit:f069cee8",
+        "commit:fcf2fe93",
+        "file:benchmarks/runs/ui-generation/macos-xcui-benchmark-20260914-041837-5dae624f.json",
+        "file:benchmarks/runs/ui-generation/macos-xcui-benchmark-20260914-051814-db6af858.json",
+        "file:benchmarks/runs/ui-generation/macos-xcui-benchmark-20260914-055243-dfa37630.json",
+        "file:benchmarks/runs/ui-generation/macos-xcui-benchmark-20260914-062114-379db820.json"
+      ],
+      "sourceOfTruth": [
+        "scripts/check_macos_xpc_bench.py",
+        "config/orchestration-contract.json"
+      ],
+      "notes": "Closed 2026-09-14. Thresholds from three canonical captured runs (87 takes: coverage 1.00 throughout, residual never above -31.9 dBFS, zero dropouts, 86 of 87 audible onsets within 250 ms of playbackScheduledMS): a captured take fails the benchmark lane below coverage 0.98, above -25 dBFS residual, with any dropout or more than 500 ms from scheduling; unavailable, silent and unresolved captures stay warnings. Proven under the gate by macos-xcui-benchmark-20260914-062114-379db820 (29/29 captured, no gate failure) and by the smoke lane run macos-xcui-smoke-20260914-063644-1cde57ad, whose completed-generation take was captured (coverage 1.00, residual -41.9 dBFS) and summarized by scripts/analyze_playback_capture.py. Along the way the record cap forced compact trend-v1 comparison deltas (f069cee8).",
+      "blockedBy": [
+        "PC-01"
+      ]
+    },
+    {
+      "id": "PC-03",
+      "plan": "harness-stabilization-2026-09",
+      "title": "The 1.8 s between playback scheduling and audible output was the UI driver's click latency; confirm on three canonical runs",
+      "status": "done",
+      "updated": "2026-09-14",
+      "gate": "The macOS app's playback timeline accounts for the interval between playbackScheduledMS and the first audible captured frame: either the timeline gains the event that actually starts audio (device start, final-file player start) and the capture agrees with it within 250 ms on three canonical runs, or the latency is removed; the playback.capture.misaligned warning then clears on Custom/short final-file takes.",
+      "evidence": [
+        "commit:fcf2fe93",
+        "file:benchmarks/runs/ui-generation/macos-xcui-benchmark-20260914-051814-db6af858.json",
+        "file:benchmarks/runs/ui-generation/macos-xcui-benchmark-20260914-055243-dfa37630.json",
+        "file:benchmarks/runs/ui-generation/macos-xcui-benchmark-20260914-062114-379db820.json"
+      ],
+      "sourceOfTruth": [
+        "Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift",
+        "Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift",
+        "Sources/SharedSupport/Telemetry/AppGenerationTimeline.swift",
+        "scripts/lib/playback_capture.py"
+      ],
+      "notes": "Closed 2026-09-14. The 1.8 s was the UI driver, not the app: the runner stamped its click before XCUITest resolved the Generate button (click-to-submit median 1685 to 1690 ms on this accessibility tree). The app row now carries submittedAtEpochMS and the capture measures from it; three consecutive canonical runs (db6af858, dfa37630, 379db820) put every audible onset 27 to 163 ms after playbackScheduledMS, live stream and final file alike, and the misaligned warning cleared on the Custom/short cells. Scratch probes had cleared the HDMI sink (55 to 95 ms), the tap (connects within 120 ms, HAL stamps lead by 32 ms) and every AVFoundation reproduction (85 to 530 ms) first."
     }
   ]
 }

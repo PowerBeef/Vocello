@@ -1141,38 +1141,6 @@
       "notes": "Opened 2026-09-13. Scratch A/B with two data dirs differing only in speech_tokenizer/model.safetensors (fp16 88f0a51a promoted in 76bd6f3b five hours after v2.4.0; fp32 836b7b35 shipped in 2.4.0; both blobs are in the local component store), 28 seeds each on clone short: a quarter-scale step burst inside the first 50 ms in 4/28 fp16 takes and 0/28 fp32; first-50 ms peak above 0.5 in 6/28 versus 1/28; seed 11 hits full scale at 3 ms. The fp16 take starts with broadband garbage from sample 0 at -15 dBFS where fp32, the 2.4.0 binary and the fp16 non-streaming decode (--no-stream, same codes) start in digital silence, so the defect needs both the fp16 codec and the streaming decoder's first chunk (resetStreamingState then streamingStep on a fresh state; the causal-conv padding and the overlap-and-discard upsampler match the batch path). Next: per-layer fp16-versus-fp32 instrumentation of that chunk; options are decoding the first chunk at fp32, priming the streaming state, or shipping the fp32 codec again (+341 MB installed, +234 MB resident). The capture (record 256bda25) proves the app plays these files faithfully. Product change needs the maintainer's decision."
     },
     {
-      "id": "PC-02",
-      "plan": "harness-stabilization-2026-09",
-      "title": "Promote the played-audio comparison from warnings to a gate",
-      "status": "in-flight",
-      "blockedBy": [
-        "PC-01"
-      ],
-      "gate": "Thresholds for alignment, residual, dropouts and coverage are set from at least three canonical captured runs and a failing comparison fails the lane; the smoke lane captures too.",
-      "sourceOfTruth": [
-        "scripts/check_macos_xpc_bench.py",
-        "config/orchestration-contract.json"
-      ],
-      "updated": "2026-09-14",
-      "notes": "Corpus runs 1 and 2 of 3 (2026-09-14, canonical 29-take matrices, 29/29 captured each): macos-xcui-benchmark-20260914-041837-5dae624f and macos-xcui-benchmark-20260914-051814-db6af858. Across the 58 takes: coverage 1.00 on every take, dropouts 0, residual -32.9 to -59.3 dBFS (medians -39.3 and -41.0), first-audible minus playbackScheduledMS 30 to 176 ms with one 359 ms outlier in run 1 and 34 to 163 ms in run 2, alignment lead-in up to 9.1 s (a lead-in, not a fault). Run f3770939 (29/29, 51 to 163 ms) is retained as evidence only: its record hit the 256 KiB cap through the comparison deltas, fixed in f069cee8. Thresholds are set from three such runs."
-    },
-    {
-      "id": "PC-03",
-      "plan": "harness-stabilization-2026-09",
-      "title": "The 1.8 s between playback scheduling and audible output was the UI driver's click latency; confirm on three canonical runs",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "The macOS app's playback timeline accounts for the interval between playbackScheduledMS and the first audible captured frame: either the timeline gains the event that actually starts audio (device start, final-file player start) and the capture agrees with it within 250 ms on three canonical runs, or the latency is removed; the playback.capture.misaligned warning then clears on Custom/short final-file takes.",
-      "sourceOfTruth": [
-        "Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift",
-        "Sources/SharedSupport/Services/LiveStreamingPlaybackEngine.swift",
-        "Sources/SharedSupport/Telemetry/AppGenerationTimeline.swift",
-        "scripts/lib/playback_capture.py"
-      ],
-      "updated": "2026-09-14",
-      "notes": "Resolved in measurement on 2026-09-14 (fcf2fe93, record macos-xcui-benchmark-20260914-041837-5dae624f): the app row now carries submittedAtEpochMS and the capture measures first-audible from it. On the first canonical captured run the runner's click stamp preceded the app's submit by a median 1690 ms (1636 to 2691 ms; XCUITest resolving the Generate button on this accessibility tree), which is the whole 'gap'. Measured from the app's clock, audio reaches the tap 30 to 176 ms after playbackScheduledMS on 28 of 29 takes (medians per cell 50 to 149 ms, live stream and final file alike); one design/medium take took 359 ms and carries the misaligned warning. Earlier scratch probes had already cleared the HDMI sink (55 to 95 ms start), the tap (connects within 120 ms, HAL stamps lead by 32 ms) and every AVFoundation reproduction (85 to 530 ms). Run 2 (db6af858) agreed within 34 to 163 ms on all 29 takes with no misaligned warning, and its click-to-submit median was 1685 ms again. Remaining gate clause: one more canonical captured run within 250 ms; then the warning should clear on the Custom/short cells and this item closes. (Earlier history: git log -p -- config/roadmap.json.)"
-    },
-    {
       "id": "HS-01",
       "plan": "harness-stabilization-2026-09",
       "title": "Complete the TSan characterization and decide promotion",

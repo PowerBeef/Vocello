@@ -35,9 +35,18 @@ refuses the drift that hid all of this: every source path must exist, notes stop
 characters, done items must be archived, planned work behind parked work is surfaced, and the
 in-flight staleness window is 14 days.
 
-Critical path: the MV-07 and PC-03 decisions, PC-02 once three canonical captured runs exist, and
-HS-01 by 2026-09-30; release-first resumes RF-13 → RF-09 freeze → ICA-04 → ICA-05 → RF-12, and
-ISU-4's physical walk rides the next device window.
+**Harness plan, September 14.** MV-03 (a dispatch no longer cancels the push run), MV-01 (one
+macOS arena per optimization level; the warm CI lane compiles two files), MV-04 (the whole
+contract gate runs on Linux; config and scripts changes no longer reach the macOS lane), PC-03 and
+PC-02 are done. The 1.8 s "gap" was the UI driver: XCUITest takes about 1.7 s to resolve the Generate
+button, and measured from the app's own submit clock audio reaches the tap 27 to 163 ms after
+scheduling on three consecutive canonical runs. The played-audio comparison is a gate now
+(coverage 0.98, residual −25 dBFS, no dropout, 500 ms), proven by a gated canonical run and a smoke
+run that captures too. Open in the plan: MV-07 (the fp16 opening burst needs your fix decision),
+MV-06 (the second judge's dependency), MV-05 behind it, and HS-01 (TSan by 2026-09-30).
+
+Critical path: the MV-07 decision, MV-06, HS-01 by 2026-09-30; release-first resumes RF-13 → RF-09
+freeze → ICA-04 → ICA-05 → RF-12, and ISU-4's physical walk rides the next device window.
 
 ### Machinery validation (September 12 to 13)
 

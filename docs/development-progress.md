@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-12
+reviewed: 2026-09-13
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -16,6 +16,28 @@ Checkpoints older than the ones below live in git history (`git log -p -- docs/d
 last full copy at commit 25a895ed).
 
 ## Resume now
+
+### Harness stabilization first (September 13, night)
+
+The four-day flow that rebuilt the workflow, the CI, the benchmark harness, the audio QC and the
+played-audio capture left the work ledger behind it, so the roadmap was straightened in four
+commits. `harness-stabilization-2026-09` is now the primary plan: it absorbs the two plans opened
+on September 13 (MV and PC ids kept), adds HS-01 for the TSan characterization due 2026-09-30, and
+holds the two decisions that gate the next release work, MV-07 (the fp16 speech tokenizer's opening
+burst on streamed clone takes) and PC-03 (the 1.8 s gap between playback scheduling and audible
+output). `release-first-3-0-2026-09` stays active and secondary. Four duplicates retired as
+superseded (F-17 into RF-08, RF-11 into ICA-04 with RF-12 now behind ICA-05, ICA-20 into AV-13,
+MV-02 into MV-01), MV-05 waits on MV-06's judge, AV-09's controllable-clock clause became AV-15,
+ICA-06's gate is re-scoped to a reproduction by request identity, RF-09 is re-gated on the freeze
+commit behind RF-13, and twenty-four items that only wait for the paired iPhone, a signed candidate
+or an external decision are parked with the exact trigger that wakes them. The validator now
+refuses the drift that hid all of this: every source path must exist, notes stop at 1200
+characters, done items must be archived, planned work behind parked work is surfaced, and the
+in-flight staleness window is 14 days.
+
+Critical path: the MV-07 and PC-03 decisions, PC-02 once three canonical captured runs exist, and
+HS-01 by 2026-09-30; release-first resumes RF-13 → RF-09 freeze → ICA-04 → ICA-05 → RF-12, and
+ISU-4's physical walk rides the next device window.
 
 ### Machinery validation (September 12 to 13)
 
@@ -393,4 +415,5 @@ open items were inaccurate. What changed, all in the ledger and active docs, no 
   `build/artifacts`. No run id cited in the ledger is inspectable locally and `scripts/ui_test.sh ios control-audit
   --resume` has nothing to validate; the 201-take campaign restarts from take 1 on the frozen source.
 
-Critical path is unchanged: ISU-4's post-ISU-5 walk, RF-13, then RF-09's freeze.
+Critical path as of September 11: ISU-4's post-ISU-5 walk, RF-13, then RF-09's freeze (superseded on
+September 13 by the harness-stabilization order at the top of this file).

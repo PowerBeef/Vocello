@@ -101,7 +101,9 @@ it does not slow every push.
 | `CI required` | ubuntu | always | the branch-protection context; skipped lanes count as passed |
 
 `ci.yml` triggers on `push` to `main` and on `workflow_dispatch` only; it has no `pull_request`
-trigger, so `CI required` is always produced by a maintainer's push to `main`. `scripts/dev.sh ci`
+trigger, so `CI required` is always produced by a maintainer's push to `main`. Concurrency is keyed
+on the event name and the ref, so a newer push cancels the previous push run while a manual
+measurement dispatch never cancels the gate run for a commit. `scripts/dev.sh ci`
 replays that job graph serially: the supply-chain contract, `scripts/repo_invariants.sh`, the privacy
 scan, `roadmap.py validate` and `render --check`, project regeneration, the complete
 `check_project_inputs.sh`, `scripts/macos_test.sh test`, the CLI version identity,

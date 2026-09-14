@@ -23,8 +23,11 @@ on:
 permissions:
   contents: read
 
+# One group per event and ref: a superseded push cancels the previous push run,
+# but a manual measurement dispatch never cancels the gate run for a commit
+# (MV-03: run 34773187624 was cancelled by a dispatch and CI required went red).
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

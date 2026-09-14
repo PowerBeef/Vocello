@@ -540,6 +540,48 @@ class PlaybackCaptureEvidenceTests(CheckMacOSXPCBenchmarkTests):
         (captures / "capture-run.json").write_text(json.dumps({"runID": RUN_ID}))
         return captures, outputs
 
+    def test_the_bundle_path_follows_the_receipt(self) -> None:
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import check_macos_xpc_bench as checker
+        self.assertEqual(
+            checker.app_bundle_from_receipt("build/cache/xcode/macos-optimized/Build/Products/Release/Vocello.app/Contents/MacOS/Vocello"),
+            "build/cache/xcode/macos-optimized/Build/Products/Release/Vocello.app")
+        self.assertIsNone(checker.app_bundle_from_receipt("scripts/dev.sh"))
+        self.assertIsNone(checker.app_bundle_from_receipt(None))
+
+    def test_a_late_tap_and_the_app_submit_stamp_are_honoured(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            captures, outputs = self._capture_fixture(Path(temp), take_index=2, cell="custom/short/warm#0", duration=3.0)
+            sidecar_path = next(captures.glob("take-02-*.json"))
+            sidecar = json.loads(sidecar_path.read_text())
+            # The tap attached 10 s after the click (a relaunched app): the reference
+            # window must still open at the click.
+            sidecar["firstBufferEpochMS"] = sidecar["captureStartEpochMS"]   # the WAV's origin stays
+            sidecar["captureStartEpochMS"] = sidecar["submitClickEpochMS"] + 10_000
+            sidecar_path.write_text(json.dumps(sidecar))
+            click = sidecar["submitClickEpochMS"]
+
+            def stamp_app_submit(layers: dict) -> None:
+                layers["app"][1]["timingsMS"] = {"submittedAtEpochMS": click + 20}
+
+            def set_duration(rows: list[dict]) -> None:
+                rows[1]["outputMetrics"]["durationSeconds"] = 3.0
+
+            result = self.run_checker(
+                self.expected_order, mutate_engine_rows=set_duration, mutate_layers=stamp_app_submit, evidence=True,
+                extra_args=["--playback-capture-dir", str(captures), "--outputs-dir", str(outputs)],
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            captured = self.last_manifest["historyRecord"]["takes"][1]
+            self.assertEqual(captured["playbackCaptureStatus"], "captured")
+            # audible 30 ms after the runner click, 10 ms after the app's submit
+            self.assertAlmostEqual(captured["metrics"]["playbackCaptureFirstAudibleMS"], 10.0, delta=21)
+            summary = json.loads((captures / "summary.json").read_text())
+            take = next(item for item in summary["takes"] if item["takeIndex"] == 2)
+            self.assertEqual(take["submitReference"], "app")
+            self.assertAlmostEqual(take["clickToSubmitMS"], 20.0, delta=0.1)
+            self.assertNotIn("appBundleRelativePath", self.last_manifest)
+
     def test_a_captured_take_carries_status_digest_and_metrics(self) -> None:
         def pc_frame_ms() -> float:
             sys.path.insert(0, str(ROOT / "scripts"))

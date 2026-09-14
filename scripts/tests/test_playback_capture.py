@@ -107,6 +107,9 @@ class HelperTests(unittest.TestCase):
         # The WAV starts at the first delivered buffer, which wins over the arming time.
         self.assertAlmostEqual(pc.first_audible_ms(capture, 24_000, {**sidecar, "firstBufferEpochMS": 1_500.0}),
                                1_200.0, delta=pc.FRAME_MS)
+        # The app's own submit wall clock replaces the runner's click when known.
+        self.assertAlmostEqual(pc.first_audible_ms(capture, 24_000, sidecar, submit_epoch_ms=1_100.0),
+                               400.0, delta=pc.FRAME_MS)
         self.assertIsNone(pc.first_audible_ms(np.zeros(24_000), 24_000, sidecar))
         self.assertIsNone(pc.first_audible_ms(capture, 24_000, {}))
 

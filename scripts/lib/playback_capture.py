@@ -267,17 +267,22 @@ def step_burst_peak(samples: np.ndarray, rate: int) -> tuple[int, float | None]:
     return count, (first + 1) * 1000.0 / rate
 
 
-def first_audible_ms(capture: np.ndarray, rate: int, sidecar: dict[str, Any]) -> float | None:
-    """Milliseconds from the Generate click to the first audible captured frame.
+def first_audible_ms(capture: np.ndarray, rate: int, sidecar: dict[str, Any],
+                     submit_epoch_ms: float | None = None) -> float | None:
+    """Milliseconds from submit to the first audible captured frame.
 
     The capture's first sample is the first buffer the tap delivered
     (`firstBufferEpochMS`), not the moment the runner armed the tap: the tap
-    only runs once the app's output device does.
+    only runs once the app's output device does. The submit reference is the
+    app's own wall-clock stamp (`submittedAtEpochMS` on its row) when the
+    caller has it; the runner's click stamp is the fallback and precedes the
+    app's submit by the UI driver's dispatch latency (seconds on a busy
+    accessibility tree, not milliseconds).
     """
     start = sidecar.get("firstBufferEpochMS")
     if not isinstance(start, (int, float)):
         start = sidecar.get("captureStartEpochMS")
-    click = sidecar.get("submitClickEpochMS")
+    click = submit_epoch_ms if isinstance(submit_epoch_ms, (int, float)) else sidecar.get("submitClickEpochMS")
     if not isinstance(start, (int, float)) or not isinstance(click, (int, float)):
         return None
     levels = frame_dbfs(capture, rate)
@@ -358,7 +363,8 @@ def sha256_file(path: Path) -> str:
 
 
 def analyze_take(sidecar: dict[str, Any], capture_wav: Path | None,
-                 reference_wav: Path | None, playback_scheduled_ms: float | None = None) -> dict[str, Any]:
+                 reference_wav: Path | None, playback_scheduled_ms: float | None = None,
+                 submit_epoch_ms: float | None = None) -> dict[str, Any]:
     """Status, numeric metrics, warn codes and digest for one take's capture.
 
     `playback_scheduled_ms` is the app's own submit → playback-scheduled figure
@@ -382,7 +388,7 @@ def analyze_take(sidecar: dict[str, Any], capture_wav: Path | None,
         result["warnings"].append("playback.capture.silent")
         return result
     metrics: dict[str, float] = {}
-    audible = first_audible_ms(capture, REFERENCE_RATE, sidecar)
+    audible = first_audible_ms(capture, REFERENCE_RATE, sidecar, submit_epoch_ms)
     if audible is not None:
         metrics["playbackCaptureFirstAudibleMS"] = round(audible, 1)
     count, _ = step_burst_peak(capture, REFERENCE_RATE)

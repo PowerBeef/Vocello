@@ -337,6 +337,10 @@ final class VocelloPlaybackCaptureCoordinator {
     }
 
     /// Call immediately before the Generate click.
+    func markSubmitReturned() {
+        sidecar?.submitClickReturnedEpochMS = VocelloPlaybackCaptureClock.nowEpochMS
+    }
+
     func markSubmit() {
         sidecar?.submitClickEpochMS = VocelloPlaybackCaptureClock.nowEpochMS
     }

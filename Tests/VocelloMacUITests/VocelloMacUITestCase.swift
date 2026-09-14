@@ -352,7 +352,8 @@ class VocelloMacUITestCase: XCTestCase {
     func generateAndWaitForCompletion(
         mode: VocelloUIBenchMatrix.Mode,
         timeout: TimeInterval,
-        onBeforeGenerate: (() -> Void)? = nil
+        onBeforeGenerate: (() -> Void)? = nil,
+        onAfterGenerateClick: (() -> Void)? = nil
     ) {
         assertReadyToGenerate(mode: mode)
         let generate = button("textInput_generateButton")
@@ -365,6 +366,8 @@ class VocelloMacUITestCase: XCTestCase {
         // genuine click, so first-audible latency is measured on one clock.
         onBeforeGenerate?()
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: generate, timeout: 30))
+        // ...and again once the click call returned: the app's submit lies between.
+        onAfterGenerateClick?()
         XCTAssertTrue(
             VocelloUIWait.condition("generation to visibly start", timeout: 30) {
                 cancel.exists || !generate.exists || !generate.isEnabled

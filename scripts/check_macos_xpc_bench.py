@@ -500,9 +500,21 @@ def tracked_metrics(engine: dict, service: dict, app: dict) -> dict[str, float |
     return metrics
 
 
+def app_bundle_from_receipt(executable_relative_path) -> str | None:
+    """`.../Vocello.app/Contents/MacOS/Vocello` -> `.../Vocello.app`; None for anything else."""
+    if not isinstance(executable_relative_path, str):
+        return None
+    marker = "/Contents/MacOS/"
+    if marker not in executable_relative_path:
+        return None
+    bundle = executable_relative_path.split(marker)[0]
+    return bundle if bundle.endswith(".app") else None
+
+
 def evaluate_playback_capture(
     take_index: int, cell: str, mode: str, duration_seconds, captures: dict,
     capture_dir: Path | None, outputs_dir: Path | None, playback_scheduled_ms=None,
+    submit_epoch_ms=None,
 ) -> dict:
     """Played-audio capture evidence for one take (PC-01): fields, metrics, warn codes, summary.
 
@@ -519,7 +531,12 @@ def evaluate_playback_capture(
                 "summary": {"takeIndex": take_index, "cell": cell, "status": "unavailable"}}
     sidecar = entry["sidecar"]
     reference = None
-    start = sidecar.get("captureStartEpochMS")
+    # The window opens at the earlier of the click and the tap's arming: on a
+    # relaunched app the tap attaches only when the process opens its device,
+    # after the take's WAV already carries the generation's timestamp.
+    stamps = [v for v in (sidecar.get("submitClickEpochMS"), sidecar.get("captureStartEpochMS"))
+              if isinstance(v, (int, float))]
+    start = min(stamps) if stamps else None
     if outputs_dir is not None and entry["wav"] is not None and isinstance(start, (int, float)):
         stop = sidecar.get("stopEpochMS")
         if not isinstance(stop, (int, float)):
@@ -532,6 +549,7 @@ def evaluate_playback_capture(
         result = playback_capture.analyze_take(
             sidecar, entry["wav"], reference,
             playback_scheduled_ms if isinstance(playback_scheduled_ms, (int, float)) else None,
+            submit_epoch_ms if isinstance(submit_epoch_ms, (int, float)) else None,
         )
     except playback_capture.PlaybackCaptureError as error:
         result = {"status": "aborted", "metrics": {}, "warnings": [], "digest": None, "error": str(error)}
@@ -543,6 +561,14 @@ def evaluate_playback_capture(
         "reference": reference.name if reference is not None else None,
         "metrics": result["metrics"], "warnings": result["warnings"],
     }
+    click = sidecar.get("submitClickEpochMS")
+    if isinstance(submit_epoch_ms, (int, float)) and isinstance(click, (int, float)):
+        # UI-driver dispatch latency: how long after the runner's click stamp the
+        # app actually registered the submit. Diagnostic, never a record metric.
+        summary["clickToSubmitMS"] = round(float(submit_epoch_ms) - float(click), 1)
+        summary["submitReference"] = "app"
+    elif isinstance(click, (int, float)):
+        summary["submitReference"] = "runnerClick"
     if result.get("error"):
         summary["error"] = result["error"]
     return {"fields": fields, "metrics": dict(result["metrics"]), "warnings": list(result["warnings"]), "summary": summary}
@@ -564,6 +590,7 @@ def build_manifest(
     optimization: str,
     playback_capture_dir: Path | None = None,
     outputs_dir: Path | None = None,
+    app_bundle_relative_path: str | None = None,
 ) -> dict:
     memory_evidence, memory_run = qualify_memory_rows(
         rows=engine_rows,
@@ -586,9 +613,11 @@ def build_manifest(
         qc = row.get("audioQC") or output.get("audioQC") or {}
         memory = memory_by_id[row["generationID"]]
         frontend = (app_by_id.get(row["generationID"]) or {}).get("frontendMetrics") or {}
+        app_timings = (app_by_id.get(row["generationID"]) or {}).get("timingsMS") or {}
         capture = evaluate_playback_capture(
             index, cell, mode, output.get("durationSeconds"), captures,
             playback_capture_dir, outputs_dir, frontend.get("submitToPlaybackScheduledMS"),
+            app_timings.get("submittedAtEpochMS"),
         )
         capture_by_index[index] = capture
         if capture["summary"] is not None:
@@ -775,6 +804,9 @@ def build_manifest(
             "merged": {"count": expected, "complete": True},
         },
         "takes": takes,
+        # The bundle the lane built and drove; the record step hashes its
+        # executables instead of assuming an arena.
+        **({"appBundleRelativePath": app_bundle_relative_path} if app_bundle_relative_path else {}),
         "historyRecord": history_record,
     }
 
@@ -837,12 +869,15 @@ def main() -> int:
     if args.warm < 1:
         parser.error("--warm must be at least 1")
     optimization = "unverified"
+    app_bundle_relative_path = None
     if args.build_provenance:
         try:
-            optimization = load_build_provenance(args.build_provenance, platform="macos")["optimization"]
+            receipt = load_build_provenance(args.build_provenance, platform="macos")
         except ProvenanceError as error:
             print(f"FAIL: build provenance: {error}")
             return 1
+        optimization = receipt["optimization"]
+        app_bundle_relative_path = app_bundle_from_receipt(receipt.get("executableRelativePath"))
     try:
         modes = parse_list(args.modes, DEFAULT_MODES)
         lengths = parse_list(args.lengths, DEFAULT_LENGTHS)
@@ -1049,6 +1084,7 @@ def main() -> int:
             optimization=optimization,
             playback_capture_dir=args.playback_capture_dir,
             outputs_dir=args.outputs_dir,
+            app_bundle_relative_path=app_bundle_relative_path,
         )
         write_json_atomic(args.evidence_manifest, manifest)
         print(f"evidence={args.evidence_manifest}")

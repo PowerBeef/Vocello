@@ -135,6 +135,9 @@ public struct VocelloPlaybackCaptureSidecar: Codable, Equatable, Sendable {
     public var frames: Int
     public var droppedSamples: Int
     public var submitClickEpochMS: Double?
+    /// When the UI driver's click call returned; the app's own submit lies between
+    /// the two click stamps, and the row's `submittedAtEpochMS` names it exactly.
+    public var submitClickReturnedEpochMS: Double?
     public var captureStartEpochMS: Double?
     public var firstBufferEpochMS: Double?
     public var playbackEndedEpochMS: Double?
@@ -146,7 +149,7 @@ public struct VocelloPlaybackCaptureSidecar: Codable, Equatable, Sendable {
     public init(
         benchRunID: String, takeIndex: Int, cell: String, warmState: String, pid: Int,
         sampleRate: Double = 0, channels: Int = 0, frames: Int = 0, droppedSamples: Int = 0,
-        submitClickEpochMS: Double? = nil, captureStartEpochMS: Double? = nil,
+        submitClickEpochMS: Double? = nil, submitClickReturnedEpochMS: Double? = nil, captureStartEpochMS: Double? = nil,
         firstBufferEpochMS: Double? = nil, playbackEndedEpochMS: Double? = nil,
         stopEpochMS: Double? = nil, status: String = "aborted", reason: String? = nil
     ) {
@@ -160,6 +163,7 @@ public struct VocelloPlaybackCaptureSidecar: Codable, Equatable, Sendable {
         self.frames = frames
         self.droppedSamples = droppedSamples
         self.submitClickEpochMS = submitClickEpochMS
+        self.submitClickReturnedEpochMS = submitClickReturnedEpochMS
         self.captureStartEpochMS = captureStartEpochMS
         self.firstBufferEpochMS = firstBufferEpochMS
         self.playbackEndedEpochMS = playbackEndedEpochMS

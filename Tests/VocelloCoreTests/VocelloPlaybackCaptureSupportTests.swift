@@ -54,6 +54,7 @@ final class VocelloPlaybackCaptureSupportTests: XCTestCase {
         sidecar.channels = 1
         sidecar.frames = 96_000
         sidecar.submitClickEpochMS = 1_000
+        sidecar.submitClickReturnedEpochMS = 1_450
         sidecar.captureStartEpochMS = 990
         sidecar.stopEpochMS = 5_000
         sidecar.status = "captured"

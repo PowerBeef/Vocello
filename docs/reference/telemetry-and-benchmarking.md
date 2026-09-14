@@ -334,9 +334,12 @@ output during every take (a Core Audio process tap with the physical output mute
 `take-NN-<cell>.wav` plus a sidecar under `<run>/playback-capture/`, and
 `scripts/lib/playback_capture.py` compares the capture with the published take WAV. The take then
 carries `playbackCaptureStatus` (`captured`, `silent`, `unavailable`, `referenceUnresolved`,
-`aborted`), `playbackCaptureDigest` and, when captured, `playbackCaptureFirstAudibleMS` (Generate
-click → first frame above −50 dBFS, all on the runner clock; the capture's first sample is the
-first buffer the tap delivered, which arrives only once the app's output device runs),
+`aborted`), `playbackCaptureDigest` and, when captured, `playbackCaptureFirstAudibleMS` (submit →
+first frame above −50 dBFS; the submit reference is the app row's own wall-clock stamp
+`timingsMS.submittedAtEpochMS` when present, else the runner's click stamp, which precedes the
+app's submit by the UI driver's dispatch latency; the capture's first sample is the first buffer
+the tap delivered, which arrives only once the app's output device runs; the capture
+`summary.json` records `clickToSubmitMS` per take),
 `playbackCaptureAlignmentMS` (where the published WAV starts inside the capture, a lead-in, not a
 fault),
 `playbackCaptureResidualDBFS` (after gain match), `playbackCaptureDropoutCount` /

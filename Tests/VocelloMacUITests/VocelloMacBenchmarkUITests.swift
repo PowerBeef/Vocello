@@ -91,7 +91,8 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
                 generateAndWaitForCompletion(
                     mode: take.mode,
                     timeout: timeout(for: take),
-                    onBeforeGenerate: { capture?.markSubmit() }
+                    onBeforeGenerate: { capture?.markSubmit() },
+                    onAfterGenerateClick: { capture?.markSubmitReturned() }
                 )
                 if let capture, !capture.isIdle {
                     // Let the take play out; the tap stops once the captured audio

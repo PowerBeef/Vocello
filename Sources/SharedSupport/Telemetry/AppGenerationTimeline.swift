@@ -19,6 +19,11 @@ final class AppGenerationTimeline {
 
     private struct Marks {
         let submittedAt: ContinuousClock.Instant
+        /// Wall-clock twin of `submittedAt` (ms since 1970) so evidence recorded
+        /// by another process on the same host (the played-audio capture) can
+        /// be placed on this row's timeline without guessing the click-to-submit
+        /// latency of the UI driver. Correlation only, never a throughput figure.
+        let submittedAtEpochMS: Int
         var firstChunkAt: ContinuousClock.Instant?
         var playbackScheduledAt: ContinuousClock.Instant?
         var mode: String?
@@ -55,6 +60,7 @@ final class AppGenerationTimeline {
         let memorySampler = Self.makeAppMemorySampler(mode: telemetryMode)
         marksByID[key] = Marks(
             submittedAt: clock.now,
+            submittedAtEpochMS: Int((Date().timeIntervalSince1970 * 1000).rounded()),
             mode: mode,
             memorySampler: memorySampler,
             telemetryMode: telemetryMode
@@ -227,6 +233,7 @@ final class AppGenerationTimeline {
             if let minimumAudioMS = marks.playbackHealth.minimumQueuedAudioMS {
                 timingsMS["playbackMinimumQueuedAudioMS"] = minimumAudioMS
             }
+            timingsMS["submittedAtEpochMS"] = marks.submittedAtEpochMS
             timingsMS["submitToCompletedMS"] = Self.milliseconds(from: marks.submittedAt, to: now)
             timingsMS["submitToCompletedNS"] = Self.nanoseconds(from: marks.submittedAt, to: now)
             if let firstChunkAt = marks.firstChunkAt {

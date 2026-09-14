@@ -51,6 +51,29 @@ through the governed test route, never a shipping unlock or production credentia
   Access uses verified StoreKit entitlements and its offline cache, not a local paid flag. No app
   server, cloud inference, login, diagnostics bypass or receipt logging was introduced.
 
+### Outward export inventory (audited 2026-09-14, source-side)
+
+Every path that lets audio leave the iOS app, its provenance source, and the boundary it crosses.
+`scripts/repo_invariants.sh` keeps the inventory honest: an activity or share surface may exist only
+in `IOSExportGate` across `Sources/iOS`, `Sources/iOSSupport` and the shared views (a shared view
+sharing audio must carry an `#if os(iOS)` branch through the gate), and nothing but the two import
+pickers' default folder and the headless enrollment staging path touches the Files-visible
+Documents directory (`UIFileSharingEnabled`); generated output lives in the App Group container.
+
+| Surface | Source | Provenance | Boundary |
+| --- | --- | --- | --- |
+| Studio inline player Save / Download | `IOSStudioInlinePlayerCard` | finished output's mode | `IOSExportGate.perform` / `.share` |
+| Expanded player Save / Share (Studio, History, Saved Voices, previews) | `IOSPlayerSheet` | item's recorded mode; saved voice `generatedSourceMode` or `.originalReference`; bundled previews `.builtIn` | `IOSExportGate` |
+| History row export | `HistoryScreen` | row's recorded mode | `IOSExportGate.share` |
+| History failed-storage recovery files | `HistoryScreen` | `.recoveryRecord` (free by policy) | `IOSExportGate.share` |
+| Unqueued-generation banner export | `GenerationHistoryEnqueueWarning` (iOS branch) | `.recoveryRecord` (free by policy) | `IOSExportGate.share`; the `ShareLink` is macOS-only |
+| Saved-outputs folder copy after generation (single take and long-form joined output) | `IOSSavedOutputsDestination.exportIfConfigured` | generation mode of the saved row | `IOSExportCommerce.permits` before any copy; never starts a purchase |
+| Inbound `onOpenURL` audio, Files import pickers | `RootView`, `IOSVoicesView` | not an export (import only) | none needed |
+| Headless enrollment staging (`ios_device.sh enroll-clone-fixture`) | `IOSDeviceDiagnosticsRunner` | reads a staged reference from Documents, deletes it after enrollment | not an export |
+
+No App Intent, Shortcut, URL scheme, drag, pasteboard, Quick Look or document-browser route exists on
+iOS. Long-form projects export only through their joined History row and the folder copy above.
+
 The existing stateful control audit owns options-sheet reachability/dismissal and explicitly blocks
 purchase actions pending an approved StoreKit/sandbox session. It never buys or invokes Restore.
 The opt-in `scripts/ui_test.sh ios purchase --retain-result` lane uses Apple StoreKitTest and a

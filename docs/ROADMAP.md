@@ -35,10 +35,10 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-02` | parked | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
 | `RF-06` | parked | characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred) | `RF-05` |
 | `RF-08` | parked | package the downloadable optimized CLI | — |
-| `RF-09` | planned | verify the coherent tree and freeze the 3.0.0 candidate | `RF-13` |
+| `RF-09` | parked | verify the coherent tree and freeze the 3.0.0 candidate | `RF-13` |
 | `RF-10` | parked | independently qualify macOS and downloadable CLI | `RF-09` |
-| `RF-12` | planned | verify the distribution iOS candidate and finish submission preparation | `ICA-05` |
-| `RF-13` | in-flight | implement the one-time iOS Design and Clone export unlock before freeze | — |
+| `RF-12` | parked | verify the distribution iOS candidate and finish submission preparation | `ICA-05` |
+| `RF-13` | parked | implement the one-time iOS Design and Clone export unlock before freeze | — |
 
 ### Open items in detail
 
@@ -54,18 +54,21 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: In the existing release workflow (formerly F-17): separate optimized arm64 CLI DMG, complete libraries/resources/notices/instructions, checkout-independent discovery, signatures, notarization/stapling, checksums and source/version supply-chain identity. Copied-package tests cover paths with spaces, version/JSON, all three modes, a real two-item batch, cancellation, failure exits and resource loading. The F-21 batch-admission regression must use production-built requests against the real engine policy; keep index/total outside ordinary requests. No Homebrew route, privileged installer, shell-profile edits, or second release system.
   unparkWhen: The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.
 
-- **`RF-09`** (planned) — verify the coherent tree and freeze the 3.0.0 candidate.
+- **`RF-09`** (parked) — verify the coherent tree and freeze the 3.0.0 candidate.
   gate: On the freeze commit: (1) scripts/dev.sh regen is clean and the full project-input gate, macOS deterministic tests and app build, the generic physical-iOS SDK compile, the website check and the release/privacy/attribution/supply-chain fixtures pass; (2) project.yml MARKETING_VERSION 3.0.0 / CURRENT_PROJECT_VERSION 24 (already set) still match config/public-product-facts.json candidateRelease and a fresh read-only scripts/app_store_build_preflight.py check finds build 24 unused (ASR-08 owns account reconciliation); (3) the commit is on main with exact-SHA CI required and Security green, scripts/quality_promotion.py names the required lanes from config/quality-promotion-contract.json before expensive QA, and the annotated v3.0.0 tag is a separate maintainer authorization proved by scripts/release_source_authority.py; (4) the pre-freeze source amendment is discharged: F-19/F-22 done, F-18/F-20/F-21/F-01/F-06 source-complete with their candidate clauses left to RF-10/RF-12, F-16's recovery/retention source work and RF-13's remaining source-side export surfaces landed or explicitly deferred; (5) no unrelated source or docs edits and no full-tree identity bypass during ICA-04's frozen campaign.
+  unparkWhen: RF-13 unparks (the paired iPhone is available for its remaining device gates) and lands; the freeze commit follows it.
 
 - **`RF-10`** (parked) — independently qualify macOS and downloadable CLI.
   gate: Close F-05 with actual signed/notarized packaged-app startup/XPC evidence, verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.
   unparkWhen: The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.
 
-- **`RF-12`** (planned) — verify the distribution iOS candidate and finish submission preparation.
+- **`RF-12`** (parked) — verify the distribution iOS candidate and finish submission preparation.
   gate: Under ASR-05 through ASR-12, verify archive/IPA entitlements/privacy/notices/architecture/UUID identity and absence of internal diagnostics. Separately authorize any internal TestFlight upload, then black-box test the processed candidate through the same XCUITest stack without replacing it with a diagnostics build. Preserve personal data during upgrade; fresh install needs another phone or explicit verified backup/reinstallation authorization. Verify reviewer-critical downloads/modes/import/transcription/permissions/offline/recovery/long-form/export, storage/screenshots, manual-only gaps, fresh regional hosting and all qualified account/privacy/rights decisions. No unexplained required failure; App Review submission requires separate explicit authorization and approval is not guaranteed.
+  unparkWhen: ICA-05 closes the frozen campaign and RF-02 supplies the App Store Connect account setup for the processed-candidate purchase proof.
 
-- **`RF-13`** (in-flight) — implement the one-time iOS Design and Clone export unlock before freeze.
+- **`RF-13`** (parked) — implement the one-time iOS Design and Clone export unlock before freeze.
   gate: Implement one verified StoreKit non-consumable entitlement for Design/Clone output export. All other functionality, generation/listening/internal History in every mode and Built-in output export remain free. Define local StoreKit test configuration first; centralize entitlement and output-provenance-based export authorization across Studio/full player/History, Files/share/save destination, long-form/segments, recovery and applicable automation. Audit document sharing/storage bypasses without deleting personal files or paywalling original reference recovery. Test purchased/unpurchased, cancelled/pending/failed/unverified transactions, restore, relaunch/offline owned access, refund/revocation and free-mode controls using deterministic policy/StoreKit tests and focused physical XCUITest. Preserve model/QC/seed policies and macOS/CLI behavior. RF-02 owns product ID/name/price/Family Sharing and live account setup; RF-12 owns processed-candidate purchase and first-IAP review proof. No live purchase or account mutation without separate authorization. Source/focused verification precedes RF-09 freeze and RF-11 full campaign; local test configuration is not a live product. Monetization and App Store submission are iOS-only. macOS remains distributed through GitHub Releases; macOS/CLI exports must not depend on StoreKit entitlements. Do not introduce a Mac App Store submission route.
+  unparkWhen: The paired iPhone is available for the remaining device gates on current source: true offline owned access, the outward-export surfaces the acceptance lane does not drive (Studio inline card, saved-outputs folder copy, long-form joined output, recovery banners), then the App Store sandbox pass once RF-02 supplies the account setup.
 
 ## Autonomous validation audit remediation
 
@@ -275,18 +278,20 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `ICA-04` | planned | Execute the complete physical-device campaign | `RF-09` |
-| `ICA-05` | planned | Publish the evidence-linked device findings checkpoint | `ICA-04` |
+| `ICA-04` | parked | Execute the complete physical-device campaign | `RF-09` |
+| `ICA-05` | parked | Publish the evidence-linked device findings checkpoint | `ICA-04` |
 | `ICA-06` | parked | P1 — localize the long-Chinese non-EOS generation failure and terminal message | — |
 | `ICA-15` | parked | P1 — bound deterministic CustomVoice over-continuation without truncating valid speech | — |
 
 ### Open items in detail
 
-- **`ICA-04`** (planned) — Execute the complete physical-device campaign.
+- **`ICA-04`** (parked) — Execute the complete physical-device campaign.
   gate: On the paired unlocked, charged, thermally nominal iPhone, complete inventory, stateful, external, accessibility, saved-voice, isolated model diagnose/queue/acceptance, generation, smoke, and perf phases against one frozen source identity. Every row must receive a terminal classification, every generated take must correlate visible request, receipt, QC, History and playback, and no failed row may be automatically retried or replaced. Run in bounded mode-grouped shards with frozen seeds and corpus, reserve collection at least 20 minutes before each device deadline, verify unattended screen protection, termination and cleanup, and correlate UI, receipt, QC, History, playback and cleanup after every shard. Accounted-for is not PASS: no difficult, failed or missing row may be dropped or substituted.
+  unparkWhen: RF-09 lands the 3.0 freeze commit (itself behind RF-13's device gates); the frozen 201-take campaign runs on that commit.
 
-- **`ICA-05`** (planned) — Publish the evidence-linked device findings checkpoint.
+- **`ICA-05`** (parked) — Publish the evidence-linked device findings checkpoint.
   gate: After ICA-04, re-pin the historical audit report with every control and generation row represented, P0-P3 findings separated into product, harness, infrastructure, prerequisite, preservation-policy, not-applicable and post-failure categories, exact untracked artifact references, restoration proof, and objective remediation gates. No product fix may be folded into the audit without a separate request.
+  unparkWhen: ICA-04's frozen campaign completes on the freeze commit.
 
 - **`ICA-06`** (parked) — P1 — localize the long-Chinese non-EOS generation failure and terminal message.
   gate: One no-retry physical reproduction by request identity (mode, speaker, language, text, delivery: Aiden, angry.normal, Chinese output, Consistent variation, the long corpus script) showing the typed generation.incomplete terminal after published audio, the exact receipt, the safety discard and no seed substitution, plus deterministic regression coverage of that terminal; the exact-seed clause is withdrawn because the production UI has no seed entry and the rejected take left no History row.

@@ -73,19 +73,28 @@ public enum IOSSavedOutputsDestination {
 
     /// Copy a just-generated clip into the chosen folder. No-op when the destination is "On My
     /// iPhone". Best-effort + off the main actor — a failure here never propagates to the caller.
-    @MainActor
-    public static func exportIfConfigured(internalAudioPath: String, generationMode: String) {
+    ///
+    /// `permits` is the export policy for the clip's provenance: the app passes the one verified
+    /// StoreKit owner (`IOSSavedOutputsDestination+Commerce.swift`), tests pass a fixture. Returns
+    /// `nil` when nothing leaves the app (no folder, or the policy refuses), otherwise the copy task,
+    /// which resolves to whether the file landed in the folder.
+    @MainActor @discardableResult
+    static func exportIfConfigured(
+        internalAudioPath: String, generationMode: String,
+        permits: (IOSExportProvenance) -> Bool
+    ) -> Task<Bool, Never>? {
         // Never start a purchase, change the folder, or fail generation here.
         // Unknown/checking access keeps paid output in internal History.
-        guard IOSExportCommerce.shared.permits([IOSExportProvenance(generationMode: generationMode)]) else { return }
-        guard let folder = resolveFolderURL() else { return }
+        guard permits(IOSExportProvenance(generationMode: generationMode)) else { return nil }
+        guard let folder = resolveFolderURL() else { return nil }
         let source = URL(fileURLWithPath: internalAudioPath)
-        Task.detached(priority: .utility) {
+        return Task.detached(priority: .utility) {
             let didAccess = folder.startAccessingSecurityScopedResource()
             defer { if didAccess { folder.stopAccessingSecurityScopedResource() } }
 
             let destination = folder.appendingPathComponent(source.lastPathComponent)
             var coordinationError: NSError?
+            var copied = false
             // Coordinated write so iCloud-Drive destinations sync cleanly.
             NSFileCoordinator().coordinate(
                 writingItemAt: destination,
@@ -95,8 +104,9 @@ public enum IOSSavedOutputsDestination {
                 if FileManager.default.fileExists(atPath: writeURL.path) {
                     try? FileManager.default.removeItem(at: writeURL)
                 }
-                try? FileManager.default.copyItem(at: source, to: writeURL)
+                copied = (try? FileManager.default.copyItem(at: source, to: writeURL)) != nil
             }
+            return copied && coordinationError == nil
         }
     }
 }

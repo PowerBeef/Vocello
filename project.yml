@@ -524,6 +524,7 @@ targets:
       - path: Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
       - path: Sources/iOSSupport/Services/IOSExportAccessPolicy.swift
       - path: Sources/iOSSupport/Services/IOSExportPurchaseState.swift
+      - path: Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift
     dependencies:
       - target: QwenVoiceCore
       - target: QwenVoiceNative
@@ -570,6 +571,7 @@ targets:
       - path: Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
       - path: Sources/iOSSupport/Services/IOSExportAccessPolicy.swift
       - path: Sources/iOSSupport/Services/IOSExportPurchaseState.swift
+      - path: Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift
       - path: Sources/SharedSupport/Services/VocelloPresentationText.swift
       - path: Sources/SharedSupport/Services/VocelloLocalization.swift
       - path: Sources/iOSSupport/Services/IOSAppLanguage.swift

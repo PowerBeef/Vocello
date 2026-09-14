@@ -76,6 +76,19 @@ refuses a blocking status without the recorded passes and a dated decision. Ever
 `harness-stabilization-2026-09` is done; `release-first-3-0-2026-09` is the primary plan again and
 resumes at RF-13 → RF-09.
 
+**RF-13 source side, September 14 (phone-free).** The outward-export inventory is audited and
+written down (app guide): every path that lets audio leave the iOS app goes through the one gate
+with the output's recorded mode, recovery surfaces stay free by policy, and generated output never
+reaches the Files-visible Documents folder. The repository invariants now pin that boundary over
+every source root the iOS app compiles, the saved-outputs folder copy takes an injected policy
+with host tests proving a locked Design clip never leaves the app, and a read-only IAP audit found
+no defect. RF-13 and RF-09 are parked on the paired iPhone for the offline, remaining-surface and
+sandbox gates, and the freeze-dependent chain behind them (ICA-04, ICA-05, RF-12) carries the same
+trigger, so the release plan has no open item until a device window. Phone-free work that remains
+open elsewhere: F-16, F-25 and F-26 (engineering review), DP-28, DP-29 and DP-31 (delivery prompting),
+AV-07, AV-13 and AV-15 (autonomous validation), ISU-4 and ISU-5 (iOS settings), ASR-02, ASR-04 and
+ASR-10 (App Store readiness).
+
 Critical path (the harness plan completed on September 14): RF-13 → RF-09 freeze → ICA-04 → ICA-05
 → RF-12, and ISU-4's physical walk rides the next device window.
 

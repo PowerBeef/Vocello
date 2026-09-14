@@ -147,9 +147,21 @@ out="$(rg -n 'UserDefaults|RuntimeDebugGate' \
 [[ -z "$out" ]] || fail "paid access is derived from verified transactions, never persisted or debug-gated:\n$out"
 
 # Monetization: one export boundary on iOS; macOS and the CLI export freely.
-out="$(rg -n 'UIActivityViewController\(|ShareLink\(' Sources/iOS 2>/dev/null \
+# Every source root the iOS app compiles (Sources/iOS, Sources/iOSSupport and the
+# shared views) presents an activity or share surface only through IOSExportGate.
+out="$(rg -n 'UIActivityViewController\(|ShareLink\(' Sources/iOS Sources/iOSSupport 2>/dev/null \
   | rg -v '^Sources/iOS/Commerce/IOSExportGate\.swift:' || true)"
 [[ -z "$out" ]] || fail "iOS exports must route through IOSExportGate:\n$out"
+for shared in $(rg -l 'UIActivityViewController\(|ShareLink\(' Sources/SharedSupport 2>/dev/null || true); do
+  rg -q '^\s*#if os\(iOS\)' "$shared" && rg -q 'IOSExportGate' "$shared" \
+    || fail "shared view $shared shares audio without an iOS branch through IOSExportGate"
+done
+# Generated output never lands in the Files-visible Documents directory (UIFileSharingEnabled):
+# the only Documents users are the two import pickers' default folder and the headless
+# enrollment staging path, which reads references in and deletes them.
+out="$(rg -n '\.documentDirectory' Sources/iOS Sources/iOSSupport Sources/SharedSupport 2>/dev/null \
+  | rg -v '^Sources/iOS/(IOSVoicesView|IOSDeviceDiagnosticsRunner|App/RootView)\.swift:' || true)"
+[[ -z "$out" ]] || fail "iOS writes outside the App Group container reach the Files app; keep outputs in AppPaths:\n$out"
 out="$(rg -n 'IOSExportCommerce' Sources/VocelloCLI Sources/Views Sources/Services 2>/dev/null || true)"
 [[ -z "$out" ]] || fail "macOS and CLI exports must not consult iOS commerce:\n$out"
 

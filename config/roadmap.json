@@ -164,7 +164,7 @@
       "id": "RF-09",
       "plan": "release-first-3-0-2026-09",
       "title": "verify the coherent tree and freeze the 3.0.0 candidate",
-      "status": "planned",
+      "status": "parked",
       "gate": "On the freeze commit: (1) scripts/dev.sh regen is clean and the full project-input gate, macOS deterministic tests and app build, the generic physical-iOS SDK compile, the website check and the release/privacy/attribution/supply-chain fixtures pass; (2) project.yml MARKETING_VERSION 3.0.0 / CURRENT_PROJECT_VERSION 24 (already set) still match config/public-product-facts.json candidateRelease and a fresh read-only scripts/app_store_build_preflight.py check finds build 24 unused (ASR-08 owns account reconciliation); (3) the commit is on main with exact-SHA CI required and Security green, scripts/quality_promotion.py names the required lanes from config/quality-promotion-contract.json before expensive QA, and the annotated v3.0.0 tag is a separate maintainer authorization proved by scripts/release_source_authority.py; (4) the pre-freeze source amendment is discharged: F-19/F-22 done, F-18/F-20/F-21/F-01/F-06 source-complete with their candidate clauses left to RF-10/RF-12, F-16's recovery/retention source work and RF-13's remaining source-side export surfaces landed or explicitly deferred; (5) no unrelated source or docs edits and no full-tree identity bypass during ICA-04's frozen campaign.",
       "sourceOfTruth": [
         "project.yml",
@@ -173,11 +173,12 @@
         "scripts/release_evidence.py",
         "scripts/quality_promotion.py"
       ],
-      "updated": "2026-09-13",
+      "updated": "2026-09-14",
       "notes": "Re-gated 2026-09-13: the September 7 verification on 3272d17e is 85 commits behind main and void, 3.0.0/build 24 are already set, and the promotion inputs are config/quality-promotion-contract.json plus scripts/quality_promotion.py (no quality-promotion.json exists). No tag, signing or account mutation has been performed; build 24 is not reserved; no v3.x tag exists. Planned behind RF-13 because the export purchase must be source-complete before the freeze. (Earlier history: git log -p -- config/roadmap.json.)",
       "blockedBy": [
         "RF-13"
-      ]
+      ],
+      "unparkWhen": "RF-13 unparks (the paired iPhone is available for its remaining device gates) and lands; the freeze commit follows it."
     },
     {
       "id": "RF-10",
@@ -202,7 +203,7 @@
       "id": "RF-12",
       "plan": "release-first-3-0-2026-09",
       "title": "verify the distribution iOS candidate and finish submission preparation",
-      "status": "planned",
+      "status": "parked",
       "blockedBy": [
         "ICA-05"
       ],
@@ -212,14 +213,15 @@
         "scripts/app_store_connect_readiness.py",
         "docs/reference/ios-appstore-submission.md"
       ],
-      "updated": "2026-09-13",
-      "notes": "September 7 addition: processed candidate must verify RF-13 purchase/restore, relevant offline/refund behavior, free Built-in exports and all-mode free generation/listening/internal History. RF-02 owns product review screenshot, localized product details and first-IAP app-version attachment with separate account/upload/submission approval. StoreKit source is now implemented under RF-13; no processed purchase evidence yet. Earlier checkpoint: September 6: black-box navigation route implemented in the existing ui_test.sh stack, with command-bound release identity, standalone runner, before/after installed identity, crash/attachment collection and no diagnostics dependency. This is not full processed-candidate acceptance; no distribution app was tested. Generation, downloads, long-form, enrollment, upgrade and protected fresh-install acceptance remain required after separate upload authorization. September 6 class: candidate verification and external dependencies. Fail-closed preinstalled-candidate route before authorized TestFlight. Only-phone fresh install needs usable encrypted recovery and immediate uninstall approval. (Earlier history: git log -p -- config/roadmap.json.)"
+      "updated": "2026-09-14",
+      "notes": "September 7 addition: processed candidate must verify RF-13 purchase/restore, relevant offline/refund behavior, free Built-in exports and all-mode free generation/listening/internal History. RF-02 owns product review screenshot, localized product details and first-IAP app-version attachment with separate account/upload/submission approval. StoreKit source is now implemented under RF-13; no processed purchase evidence yet. Earlier checkpoint: September 6: black-box navigation route implemented in the existing ui_test.sh stack, with command-bound release identity, standalone runner, before/after installed identity, crash/attachment collection and no diagnostics dependency. This is not full processed-candidate acceptance; no distribution app was tested. Generation, downloads, long-form, enrollment, upgrade and protected fresh-install acceptance remain required after separate upload authorization. September 6 class: candidate verification and external dependencies. Fail-closed preinstalled-candidate route before authorized TestFlight. Only-phone fresh install needs usable encrypted recovery and immediate uninstall approval. (Earlier history: git log -p -- config/roadmap.json.)",
+      "unparkWhen": "ICA-05 closes the frozen campaign and RF-02 supplies the App Store Connect account setup for the processed-candidate purchase proof."
     },
     {
       "id": "RF-13",
       "plan": "release-first-3-0-2026-09",
       "title": "implement the one-time iOS Design and Clone export unlock before freeze",
-      "status": "in-flight",
+      "status": "parked",
       "gate": "Implement one verified StoreKit non-consumable entitlement for Design/Clone output export. All other functionality, generation/listening/internal History in every mode and Built-in output export remain free. Define local StoreKit test configuration first; centralize entitlement and output-provenance-based export authorization across Studio/full player/History, Files/share/save destination, long-form/segments, recovery and applicable automation. Audit document sharing/storage bypasses without deleting personal files or paywalling original reference recovery. Test purchased/unpurchased, cancelled/pending/failed/unverified transactions, restore, relaunch/offline owned access, refund/revocation and free-mode controls using deterministic policy/StoreKit tests and focused physical XCUITest. Preserve model/QC/seed policies and macOS/CLI behavior. RF-02 owns product ID/name/price/Family Sharing and live account setup; RF-12 owns processed-candidate purchase and first-IAP review proof. No live purchase or account mutation without separate authorization. Source/focused verification precedes RF-09 freeze and RF-11 full campaign; local test configuration is not a live product. Monetization and App Store submission are iOS-only. macOS remains distributed through GitHub Releases; macOS/CLI exports must not depend on StoreKit entitlements. Do not introduce a Mac App Store submission route.",
       "sourceOfTruth": [
         "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift",
@@ -235,10 +237,15 @@
         "Tests/Fixtures/VocelloExports.storekit",
         "Tests/VocelloiOSUITests/VocelloiOSPurchaseUITests.swift",
         "scripts/ios_purchase_acceptance.py",
-        "scripts/tests/test_ios_purchase_acceptance.py"
+        "scripts/tests/test_ios_purchase_acceptance.py",
+        "Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift",
+        "Sources/iOS/Commerce/IOSSavedOutputsDestination+Commerce.swift",
+        "Tests/VocelloiOSLogicTests/IOSSavedOutputsDestinationTests.swift",
+        "scripts/repo_invariants.sh"
       ],
-      "updated": "2026-09-10",
-      "notes": "September 10 expanded-localization device acceptance: ios-xcui-purchase-20260910-145728-79fd9b31 passed ten local lifecycle phases (54.4s); ios-xcui-purchase-20260910-150003-613fa5c8 passed all 23 lifecycle/export phases (295.6s). Xcode environment only, schema-3 complete restoration, cleared owned test transactions, original tab/History filter restored, app stopped; full runner and crash-delta gates passed. Built-in free and Design/Clone owned/revoked History/full-player export and internal playback qualified. No real charge, external transfer, account edit, actual offline or processed-candidate proof. Remaining outward-export/offline/sandbox/candidate gates unchanged. Earlier checkpoints: Publication checkpoint: local StoreKit/export implementation and tests committed and pushed as 3247b566 on main after deterministic verification. RF-13 remains in flight: 23-phase local proof does not close actual offline, remaining outward-export surfaces, sandbox or processed-candidate requirements. (Earlier history: git log -p -- config/roadmap.json.)"
+      "updated": "2026-09-14",
+      "notes": "Source side closed 2026-09-14 (phone-free). Outward-export inventory audited and written to ios-app-guide.md: Studio card, expanded player, History rows, failed-storage recovery, the unqueued-generation banner (iOS branch), the saved-outputs folder copy (single take and long-form); no App Intent, URL scheme, drag, pasteboard, Quick Look or document-browser route; generated output lives in the App Group container while UIFileSharingEnabled exposes only import defaults and enrollment staging. repo_invariants.sh pins the export boundary over Sources/iOS, iOSSupport and the shared views and refuses new Documents writers. The folder copy takes an injected policy and IOSSavedOutputsDestinationTests prove a locked Design clip never leaves the app. IAP audit (read-only): no defect; risks recorded: unverified transactions are never finished so their notice repeats each launch, and a wrong-type product reads like offline. September 10 device acceptance stands (79fd9b31: 10 phases; 613fa5c8: 23 phases). Parked on the phone for offline, remaining surfaces and sandbox. (Earlier history: git log -p -- config/roadmap.json.)",
+      "unparkWhen": "The paired iPhone is available for the remaining device gates on current source: true offline owned access, the outward-export surfaces the acceptance lane does not drive (Studio inline card, saved-outputs folder copy, long-form joined output, recovery banners), then the App Store sandbox pass once RF-02 supplies the account setup."
     },
     {
       "id": "F-15",
@@ -876,7 +883,7 @@
       "id": "ICA-04",
       "plan": "ios-control-audit-2026-08",
       "title": "Execute the complete physical-device campaign",
-      "status": "planned",
+      "status": "parked",
       "gate": "On the paired unlocked, charged, thermally nominal iPhone, complete inventory, stateful, external, accessibility, saved-voice, isolated model diagnose/queue/acceptance, generation, smoke, and perf phases against one frozen source identity. Every row must receive a terminal classification, every generated take must correlate visible request, receipt, QC, History and playback, and no failed row may be automatically retried or replaced. Run in bounded mode-grouped shards with frozen seeds and corpus, reserve collection at least 20 minutes before each device deadline, verify unattended screen protection, termination and cleanup, and correlate UI, receipt, QC, History, playback and cleanup after every shard. Accounted-for is not PASS: no difficult, failed or missing row may be dropped or substituted.",
       "sourceOfTruth": [
         "scripts/ui_test.sh",
@@ -886,7 +893,7 @@
         "scripts/ios_control_audit.py",
         "docs/reference/ios-device-testing.md"
       ],
-      "updated": "2026-09-13",
+      "updated": "2026-09-14",
       "retentionCheckpoint": "September 5 device generation/collection stopped with failed smoke 101844 preserved and supplemental telemetry collected. Final screen-protection 104057 passed with French 3-minute readback. No historical source cursor may resume across the source/docs checkpoint. Next phone window requires preflight, retained-state inspection and a new source-bound bounded pilot; preserve unrelated History, voices and models.",
       "notes": "September 11 reconciliation: config/ios-control-audit.json gained five control families after the September 5 notes (app-language-options, export-purchase-actions, export-purchase-settings, history-unqueued, settings-navigation); config/ios-control-audit-contract-20260904.json stays the frozen snapshot for validating the historical plan and intentionally diverges from the live contract. Every retained run bundle and diagnostics directory under build/artifacts was removed by a host cleanup on 2026-09-11, so no cited run id is inspectable locally and scripts/ui_test.sh --resume has nothing to validate: the campaign restarts from take 1 on the frozen source. September 11 reconciliation: re-statused from in-flight to planned, blocked by RF-09. The campaign runs only on one frozen source identity; RF-09 has not frozen it. No source work is pending on this item until the blocker moves; status reflects that, not a regression. Later September 5 pilot 133921-8541d6f1: two genuine generation/player/History journeys, restoration and crash collection completed; host correlation failed missing warm coverage. (Earlier history: git log -p -- config/roadmap.json.)",
       "blockedBy": [
@@ -894,23 +901,25 @@
       ],
       "legacyIds": [
         "RF-11"
-      ]
+      ],
+      "unparkWhen": "RF-09 lands the 3.0 freeze commit (itself behind RF-13's device gates); the frozen 201-take campaign runs on that commit."
     },
     {
       "id": "ICA-05",
       "plan": "ios-control-audit-2026-08",
       "title": "Publish the evidence-linked device findings checkpoint",
-      "status": "planned",
+      "status": "parked",
       "gate": "After ICA-04, re-pin the historical audit report with every control and generation row represented, P0-P3 findings separated into product, harness, infrastructure, prerequisite, preservation-policy, not-applicable and post-failure categories, exact untracked artifact references, restoration proof, and objective remediation gates. No product fix may be folded into the audit without a separate request.",
       "sourceOfTruth": [
         "config/roadmap.json",
         "scripts/ios_control_audit.py"
       ],
-      "updated": "2026-09-11",
+      "updated": "2026-09-14",
       "notes": "Planned behind ICA-04: the report is re-pinned only after every campaign row is terminal, and it will cite the new frozen campaign because the September run bundles were removed from build/artifacts on 2026-09-11. The September 5 pilot 133921-8541d6f1 is recorded without laundering: XCTest/UI shard pass, runner/correlation failure, ledger optional-step gap, cold-only coverage, Chinese cadence warning, ten authentic observations, absent generation screenshots/WAVs reported. Pinned historical reports stay unchanged. (Earlier history: git log -p -- config/roadmap.json.)",
       "blockedBy": [
         "ICA-04"
-      ]
+      ],
+      "unparkWhen": "ICA-04's frozen campaign completes on the freeze commit."
     },
     {
       "id": "ICA-06",

@@ -103,8 +103,11 @@ See the [app guide](ios-app-guide.md#ios-export-purchase) for routes and compati
 
 Phone-independent checks: `scripts/macos_test.sh core-test --only IOSExportPurchaseTests` executes
 production state/policy with deterministic StoreKit-boundary fixtures, including StoreKit-fixture
-parity; `scripts/repo_invariants.sh` (run by `scripts/dev.sh contracts` and by CI) holds the
-one-StoreKit-owner, one-export-boundary and fixture-ownership greps.
+parity, and `--only IOSSavedOutputsDestinationTests` proves the automatic folder copy never moves a
+locked Design/Clone clip; `scripts/repo_invariants.sh` (run by `scripts/dev.sh contracts` and by CI)
+holds the one-StoreKit-owner grep, the one-export-boundary grep over every source root the iOS app
+compiles, the Files-visible-Documents rule and the fixture-ownership greps. The audited surface list
+is the [outward export inventory](ios-app-guide.md#outward-export-inventory-audited-2026-09-14-source-side).
 These **do not execute an Apple transaction**. Generic iOS compilation checks the real adapter/UI.
 For explicitly authorized **local** physical-device transaction testing, run:
 

@@ -55,8 +55,12 @@ TERMINAL = ("done", "declined", "superseded")
 OWNERS = ("backend-mlx", "release-qa", "ios", "macos", "backend-and-platform")
 
 # An in-flight item untouched for this long is surfaced. Not a failure: real work
-# stalls for real reasons. Silence is the problem, not slowness.
-IN_FLIGHT_STALE_DAYS = 21
+# stalls for real reasons. Silence is the problem, not slowness. Two weeks: the
+# September 2026 drift hid twelve idle items behind the previous 21-day window.
+IN_FLIGHT_STALE_DAYS = 14
+# Notes state the current position; history lives in git. Longer notes read as
+# narrative and stop being checked.
+NOTES_MAX_CHARS = 1200
 
 
 class RoadmapError(RuntimeError):
@@ -282,6 +286,10 @@ def validate(root: pathlib.Path, today: _dt.date | None = None) -> dict:
         evidence = item.get("evidence", [])
         if status == "done" and not evidence:
             errors.append(f"item {iid}: done requires evidence")
+        if status == "done":
+            errors.append(
+                f"item {iid}: done items belong in {ARCHIVE_PATH} (finished work leaves the open ledger)"
+            )
         if status == "declined" and not item.get("reason"):
             errors.append(f"item {iid}: declined requires a reason")
         if status == "parked" and not item.get("unparkWhen"):
@@ -293,6 +301,17 @@ def validate(root: pathlib.Path, today: _dt.date | None = None) -> dict:
             problem = resolve_evidence(root, reference)
             if problem:
                 errors.append(f"item {iid}: evidence {problem}")
+
+        # A source that does not exist cannot bind a claim; the September 2026
+        # cleanup found four such paths behind open items.
+        for source in item.get("sourceOfTruth", []):
+            if not (root / source).exists():
+                errors.append(f"item {iid}: sourceOfTruth not found: {source}")
+        if len(item.get("notes") or "") > NOTES_MAX_CHARS:
+            errors.append(
+                f"item {iid}: notes exceed {NOTES_MAX_CHARS} characters "
+                f"({len(item['notes'])}); keep the current position, leave history to git"
+            )
 
         warnings.extend(f"item {iid}: {f}" for f in staleness_findings(root, item, today))
 
@@ -311,6 +330,12 @@ def validate(root: pathlib.Path, today: _dt.date | None = None) -> dict:
                 errors.append(
                     f"item {iid} is {item['status']} but its blocker {blocker} is "
                     f"{items[blocker].get('status')}"
+                )
+            # Planned work behind parked work is parked in all but name.
+            if item.get("status") == "planned" and items[blocker].get("status") == "parked":
+                warnings.append(
+                    f"item {iid} is effectively parked behind {blocker}; "
+                    f"park it with unparkWhen or unpark {blocker}"
                 )
         if item.get("supersededBy") and item["supersededBy"] not in items:
             errors.append(f"item {iid}: supersededBy unknown item {item['supersededBy']}")
@@ -445,7 +470,11 @@ def render(root: pathlib.Path) -> str:
                 detail = item.get("gate") or item.get("unparkWhen") or "(no gate text)"
                 label = "unparkWhen" if (not item.get("gate") and item.get("unparkWhen")) else "gate"
                 lines += [f"- **`{item['id']}`** ({item['status']}) — {item['title']}.",
-                          f"  {label}: {detail}", ""]
+                          f"  {label}: {detail}"]
+                # A parked item shows what would wake it next to what it must do.
+                if item["status"] == "parked" and item.get("gate") and item.get("unparkWhen"):
+                    lines.append(f"  unparkWhen: {item['unparkWhen']}")
+                lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
 

@@ -53,6 +53,13 @@ class Harness(unittest.TestCase):
     def errors_from(self, mutate):
         return " | ".join(self.check(mutate)["errors"])
 
+    ARCHIVE_RULE = "done items belong in"
+
+    def errors_except_archive_rule(self, mutate):
+        """A done item written into the synthetic open ledger trips the
+        archive rule by design; these tests are about the other obligations."""
+        return [e for e in self.check(mutate)["errors"] if self.ARCHIVE_RULE not in e]
+
 
 class AccuracyTests(Harness):
     def _done_with(self, evidence):
@@ -77,7 +84,7 @@ class AccuracyTests(Harness):
 
     def test_a_real_commit_passes(self):
         # The commit that introduced this file's subject matter.
-        self.assertTrue(self.check(self._done_with(["commit:c14651c"]))["ok"])
+        self.assertEqual(self.errors_except_archive_rule(self._done_with(["commit:c14651c"])), [])
 
     def test_a_missing_benchmark_record_is_caught(self):
         self.assertIn("benchmark record not found",
@@ -92,8 +99,8 @@ class AccuracyTests(Harness):
             self._done_with(["doc:docs/reference/qwen3-tts-guide.md#nope"])))
 
     def test_a_real_anchor_passes(self):
-        self.assertTrue(self.check(self._done_with(
-            ["doc:docs/reference/qwen3-tts-guide.md#5-generation-modes"]))["ok"])
+        self.assertEqual(self.errors_except_archive_rule(self._done_with(
+            ["doc:docs/reference/qwen3-tts-guide.md#5-generation-modes"])), [])
 
     def test_an_unknown_evidence_kind_is_rejected(self):
         self.assertIn("unknown evidence kind",
@@ -115,6 +122,27 @@ class ObligationTests(Harness):
     def test_superseded_requires_a_pointer(self):
         self.assertIn("superseded requires supersededBy",
                       self.errors_from(lambda d: d["items"][0].update(status="superseded")))
+
+    def test_a_done_item_may_not_remain_in_the_open_ledger(self):
+        self.assertIn("done items belong in config/roadmap-archive.json",
+                      self.errors_from(lambda d: d["items"][0].update(
+                          status="done", evidence=["commit:c14651c"])))
+
+    def test_a_missing_source_of_truth_path_is_caught(self):
+        self.assertIn("sourceOfTruth not found: scripts/nope.py",
+                      self.errors_from(lambda d: d["items"][0].update(
+                          sourceOfTruth=["scripts/nope.py"])))
+
+    def test_a_source_of_truth_directory_is_accepted(self):
+        self.assertTrue(self.check(lambda d: d["items"][0].update(
+            sourceOfTruth=["Sources/QwenVoiceCore", "scripts/roadmap.py"]))["ok"])
+
+    def test_notes_over_the_cap_are_rejected(self):
+        self.assertIn("notes exceed 1200 characters",
+                      self.errors_from(lambda d: d["items"][0].update(notes="x" * 1201)))
+
+    def test_notes_at_the_cap_pass(self):
+        self.assertTrue(self.check(lambda d: d["items"][0].update(notes="x" * 1200))["ok"])
 
     def test_an_unknown_status_is_rejected(self):
         self.assertIn("status must be one of",
@@ -151,7 +179,32 @@ class IntegrityTests(Harness):
             self._two_items(data)
             data["items"][0].update(status="done", evidence=["commit:c14651c"])
             data["items"][1].update(status="in-flight", blockedBy=["A-1"])
-        self.assertTrue(self.check(mutate)["ok"])
+        self.assertEqual(self.errors_except_archive_rule(mutate), [])
+
+    def test_a_done_blocker_in_the_archive_satisfies_its_dependent(self):
+        def mutate(data):
+            data["items"][0].update(id="A-2", status="in-flight", blockedBy=["A-1"])
+        archive = {"items": [{"id": "A-1", "plan": "p1", "title": "finished", "status": "done",
+                              "updated": "2026-08-01", "evidence": ["commit:c14651c"]}]}
+        with mock.patch.object(roadmap, "load_archive", return_value=archive):
+            report = self.check(mutate)
+        self.assertTrue(report["ok"], "; ".join(report["errors"]))
+
+    def test_a_planned_item_behind_a_parked_blocker_is_surfaced(self):
+        def mutate(data):
+            self._two_items(data)
+            data["items"][0].update(status="parked", unparkWhen="a phone")
+            data["items"][1].update(blockedBy=["A-1"])
+        report = self.check(mutate)
+        self.assertTrue(report["ok"])
+        self.assertTrue(any("effectively parked behind A-1" in w for w in report["warnings"]))
+
+    def test_a_parked_item_behind_a_parked_blocker_is_quiet(self):
+        def mutate(data):
+            self._two_items(data)
+            data["items"][0].update(status="parked", unparkWhen="a phone")
+            data["items"][1].update(status="parked", unparkWhen="A-1 unparks", blockedBy=["A-1"])
+        self.assertEqual(self.check(mutate)["warnings"], [])
 
     def test_an_unknown_blocker_is_caught(self):
         self.assertIn("blockedBy unknown item",
@@ -198,6 +251,14 @@ class StalenessTests(Harness):
             status="in-flight", updated="2026-08-01"))
         self.assertEqual(report["warnings"], [])
 
+    def test_fourteen_days_is_the_in_flight_limit(self):
+        fifteen = self.check(lambda d: d["items"][0].update(
+            status="in-flight", updated=str(TODAY - datetime.timedelta(days=15))))
+        self.assertTrue(any("untouched for 15 days" in w for w in fifteen["warnings"]))
+        thirteen = self.check(lambda d: d["items"][0].update(
+            status="in-flight", updated=str(TODAY - datetime.timedelta(days=13))))
+        self.assertEqual(thirteen["warnings"], [])
+
     def test_a_done_item_whose_source_moved_afterwards_is_surfaced(self):
         report = self.check(lambda d: d["items"][0].update(
             status="done", evidence=["commit:c14651c"], updated="2026-01-01",
@@ -220,6 +281,22 @@ class ProgressTests(unittest.TestCase):
         self.assertLess(rendered.index("## Primary programme"), rendered.index("## Plan one"))
         self.assertIn("`A-1`", rendered)
         self.assertIn("`RF-01`", rendered)
+
+    def test_a_parked_item_renders_gate_and_unpark_condition(self):
+        data = copy.deepcopy(MINIMAL)
+        data["items"][0].update(status="parked", gate="do the thing", unparkWhen="the phone returns")
+        with mock.patch.object(roadmap, "load", return_value=data):
+            rendered = roadmap.render(REPO_ROOT)
+        self.assertIn("  gate: do the thing\n  unparkWhen: the phone returns", rendered)
+
+    def test_archived_items_count_toward_a_live_plan(self):
+        data = copy.deepcopy(MINIMAL)
+        archive = {"items": [{"id": "A-0", "plan": "p1", "title": "finished", "status": "done",
+                              "updated": "2026-08-01", "evidence": ["commit:c14651c"]}]}
+        with mock.patch.object(roadmap, "load", return_value=data), \
+                mock.patch.object(roadmap, "load_archive", return_value=archive):
+            plan = roadmap.progress(REPO_ROOT)["plans"][0]
+        self.assertEqual((plan["items"], plan["finished"], plan["percent"]), (2, 1, 50))
 
     def test_the_shipped_roadmap_is_valid_and_tracks_several_plans(self):
         report = roadmap.validate(REPO_ROOT)

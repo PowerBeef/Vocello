@@ -1,8 +1,17 @@
 {
   "schemaVersion": 1,
-  "primaryPlan": "release-first-3-0-2026-09",
+  "primaryPlan": "macos-ui-fidelity-2026-09",
   "description": "Single source of truth for open work: active plans and their unfinished items. Finished items and completed plans live in config/roadmap-archive.json (history and progress counts only). Validated by scripts/roadmap.py; rendered to docs/ROADMAP.md.",
   "plans": [
+    {
+      "id": "macos-ui-fidelity-2026-09",
+      "title": "macOS UI fidelity — the Mac screens read like the iOS app",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "adopted": "2026-09-15",
+      "goal": "The convergence plan adopted the iOS screens but re-implemented every surface by hand, so the Mac drifted: chips that hug their labels and wrap, a Generate button stranded at the left edge, a flat canvas with no mode wash, a readiness paragraph the phone never shows, and library screens with different row, icon and button metrics. Each commit brings one surface back to the iOS composition and moves the primitive that defines it into SharedSupport so the two apps cannot drift apart again. Maintainer decisions (2026-09-15): chip labels are full words on one line, the Studio title row goes and Speed/Quality moves to the window toolbar, search and filter chips come inline on History and Saved Voices while the sort menu and the enroll button stay window chrome.",
+      "authority": "docs/reference/macos-ios-convergence-2026-09.md"
+    },
     {
       "id": "release-first-3-0-2026-09",
       "title": "Vocello 3.0 — release-first execution plan (secondary while harness-stabilization-2026-09 is primary)",
@@ -86,6 +95,67 @@
     }
   ],
   "items": [
+    {
+      "id": "UIF-01",
+      "title": "Studio canvas: the phone's chip row, dock and mode wash",
+      "status": "in-flight",
+      "gate": "The three Studio screens carry no title row and MacGenerationVariantSelector is in MacWindowToolbar; the chips share the row at equal widths on one line at 46 pt; the Generate CTA is full width at 56 pt; the canvas paints VocelloModeBackdrop at the mode tint; the readiness note is one caption in the meta line keeping <prefix>_readiness with its Ready/Waiting value; the counter reads N / 900 from the shared limit policy; localization, smoke, perf and the short custom benchmark pass.",
+      "sourceOfTruth": [
+        "Sources/Views/Studio/MacStudioCanvas.swift",
+        "Sources/Views/Studio/MacStudioSetupChip.swift",
+        "Sources/SharedSupport/Views/VocelloModeBackdrop.swift",
+        "Sources/Views/Shell/MacWindowToolbar.swift"
+      ],
+      "notes": "Opened 2026-09-15 after the CONV-18 marketing captures showed the drift. Measured against Sources/iOS: chips 46 pt one line vs 44 pt two-line hugging, CTA 56 pt full width vs 34 pt hugging, composer 22 pt/-0.22 tracking with 20 pt gutters vs 20 pt with 24, meta line 'Built-in voice · Clear · 4 / 900' vs a verbose label and 'N characters', dock floor 64 pt, and IOSModeBackdrop's radial mode wash which macOS never had.",
+      "plan": "macos-ui-fidelity-2026-09",
+      "blockedBy": [],
+      "updated": "2026-09-15"
+    },
+    {
+      "id": "UIF-02",
+      "title": "One copy of each shared view primitive",
+      "status": "planned",
+      "gate": "The iOS bodies of the stable-hash, waveform thumbnail, mode dot, voice avatar, surface and empty cards, status badge, section heading, filter chip row, icon button, primary CTA, subtle glass surface, product lockup and settings row family live under Sources/SharedSupport/Views with IOS<Name> forwards; the macOS twins are deleted and the call sites point at the shared types; VocelloShape replaces the hand-written rounded rectangles; the diff changes no constant; the generic iOS device-SDK compile and the macOS unit lane are green.",
+      "sourceOfTruth": [
+        "Sources/SharedSupport/Views/VocelloGlassSurface.swift",
+        "Sources/SharedSupport/Theme/VocelloShape.swift",
+        "Sources/Views/Primitives/MacListPrimitives.swift"
+      ],
+      "notes": "Opened 2026-09-15. Every type named is SwiftUI-only on the iOS side; the genuinely UIKit-bound pieces (haptics, the scroll-view bridges, the UIColor twins, the bottom-sheet family) stay per platform. Sizes that differ between the platforms become parameters, so no call site changes behavior. iOS edits are pure moves with forwards left behind and are re-verified on the phone under CONV-20.",
+      "plan": "macos-ui-fidelity-2026-09",
+      "blockedBy": [],
+      "updated": "2026-09-15"
+    },
+    {
+      "id": "UIF-03",
+      "title": "History and Saved Voices on the iOS row and chip metrics",
+      "status": "planned",
+      "gate": "Filter chips are equal width at 32 pt with 13 pt labels; History rows use the 15 pt title with -0.15 tracking, 10 pt padding and one ellipsis menu carrying every action identifier; both screens show the inline search field; Saved Voices gains the All/Built-in/Saved filters, the built-in speakers section and the dashed save-a-new-voice card, and drops the extra glass layer; sort and enroll stay in the toolbar; localization, smoke and perf pass.",
+      "sourceOfTruth": [
+        "Sources/Views/History/MacHistoryScreen.swift",
+        "Sources/Views/History/MacHistoryItemCard.swift",
+        "Sources/Views/Voices/MacVoicesScreen.swift"
+      ],
+      "notes": "Opened 2026-09-15. The desktop keeps hover affordances, the context menu's Reveal in Finder, the 960 pt content cap and the toolbar's sort and enroll controls; everything else matches the phone.",
+      "plan": "macos-ui-fidelity-2026-09",
+      "blockedBy": [],
+      "updated": "2026-09-15"
+    },
+    {
+      "id": "UIF-04",
+      "title": "Settings and shell polish",
+      "status": "planned",
+      "gate": "Settings icons are 20 pt symbols in the 28 pt slot, action buttons 44 pt tall, the section border the clipped hairline, gutters 16/12/16, and the nested package cards flattened to the iOS model-row shape so no label truncates; the inline player card adopts the iOS card geometry; the sidebar selection pill matches the phone's; MacWaveformBars gains the third band and the playhead; the marketing captures are retaken and sent; localization, smoke and perf pass.",
+      "sourceOfTruth": [
+        "Sources/Views/Settings/MacSettingsRows.swift",
+        "Sources/Views/Settings/MacModelRow.swift",
+        "Sources/Views/Shell/MacInlinePlayerCard.swift"
+      ],
+      "notes": "Opened 2026-09-15. The Mac keeps its flat single-scroll Settings rather than the phone's hub and drill-down, and keeps the 680 pt cap; the sidebar and the persistent footer player stay, both convergence-plan decisions.",
+      "plan": "macos-ui-fidelity-2026-09",
+      "blockedBy": [],
+      "updated": "2026-09-15"
+    },
     {
       "id": "CONV-20",
       "plan": "release-first-3-0-2026-09",

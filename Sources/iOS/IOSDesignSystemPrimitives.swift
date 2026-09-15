@@ -20,64 +20,28 @@ import QwenVoiceCore
 /// `.vc-mode-backdrop` (`design_references/Vocello iOS/app.css:36-48`),
 /// including the CSS `mix-blend-mode: plus-lighter` semantics via
 /// `.blendMode(.plusLighter)`.
+/// Forwards to the shared `VocelloModeBackdrop`; macOS draws the same wash
+/// behind its Studio screens. The recipe moved unchanged, so this type keeps
+/// its name, its intensity cases and its Reduce Transparency source.
 struct IOSModeBackdrop: View {
     let tint: Color
-    let intensity: Intensity
+    let intensity: VocelloModeBackdrop.Intensity
 
     @Environment(\.iosReduceTransparencyEnabled) private var reduceTransparency
 
-    enum Intensity {
-        case whisper
-        case warm
-        case loud
+    typealias Intensity = VocelloModeBackdrop.Intensity
 
-        /// Top-edge opacity for the tint stop in the linear gradient.
-        /// Calibrated against the reference image: at 0.45 (warm) the
-        /// gold tint reads as a subtle warm wash at the top quarter,
-        /// fading to dark grey by mid-screen — matches the design's
-        /// intensity-warm behavior against the `#161823` canvas base.
-        var topOpacity: Double {
-            switch self {
-            case .whisper: return 0.25
-            case .warm:    return 0.45
-            case .loud:    return 0.70
-            }
-        }
-    }
-
-    init(tint: Color, intensity: Intensity = .warm) {
+    init(tint: Color, intensity: VocelloModeBackdrop.Intensity = .warm) {
         self.tint = tint
         self.intensity = intensity
     }
 
     var body: some View {
-        if reduceTransparency {
-            // Flat fallback — design system requires opaque alternatives.
-            Theme.Surface.canvas
-                .ignoresSafeArea()
-        } else {
-            GeometryReader { proxy in
-                let radius = max(proxy.size.width * 0.72, proxy.size.height * 0.52)
-
-                ZStack {
-                    Theme.Surface.canvas
-                    RadialGradient(
-                        stops: [
-                            .init(color: tint.opacity(intensity.topOpacity), location: 0.0),
-                            .init(color: tint.opacity(intensity.topOpacity * 0.42), location: 0.34),
-                            .init(color: .clear, location: 0.62)
-                        ],
-                        center: UnitPoint(x: 0.5, y: 0.0),
-                        startRadius: 0,
-                        endRadius: radius
-                    )
-                    .scaleEffect(x: 1.55, y: 0.92, anchor: .top)
-                    .blendMode(.plusLighter)
-                    .allowsHitTesting(false)
-                }
-            }
-            .ignoresSafeArea()
-        }
+        VocelloModeBackdrop(
+            tint: tint,
+            intensity: intensity,
+            reduceTransparency: reduceTransparency
+        )
     }
 }
 

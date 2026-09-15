@@ -1,4 +1,5 @@
 import AppKit
+import QwenVoiceCore
 import SwiftUI
 
 /// Window-toolbar controls of the current destination: History sort, clear
@@ -24,6 +25,32 @@ struct MacWindowToolbar: ToolbarContent {
                 MacVoicesToolbarControls()
             }
         }
+
+        // The Studio screens carry no title row — the sidebar names the mode,
+        // as the phone's capsule does — so the desktop's Speed/Quality switch
+        // lives in the window chrome with the other per-destination controls.
+        if let mode = selectedItem?.generationMode, let prefix = selectedItem?.accessibilityPrefix {
+            ToolbarItem {
+                MacStudioToolbarControls(mode: mode, accessibilityPrefix: prefix)
+            }
+        }
+    }
+}
+
+private struct MacStudioToolbarControls: View {
+    @Environment(MacAppModel.self) private var appModel
+
+    let mode: GenerationMode
+    let accessibilityPrefix: String
+
+    var body: some View {
+        MacGenerationVariantSelector(
+            mode: mode,
+            tint: MacTheme.tint(for: mode),
+            accessibilityPrefix: accessibilityPrefix,
+            isDisabled: appModel.coordinator(for: mode).isGenerating,
+            showsLabel: false
+        )
     }
 }
 

@@ -42,6 +42,17 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Identifier prefix the mode's screen stamps on its controls
+    /// (`customVoice_readiness`), so window chrome can address them too.
+    var accessibilityPrefix: String? {
+        switch self {
+        case .customVoice: "customVoice"
+        case .voiceDesign: "voiceDesign"
+        case .voiceCloning: "voiceCloning"
+        case .history, .voices, .settings: nil
+        }
+    }
+
     var requiredModel: TTSModel? {
         generationMode.flatMap(TTSModel.model(for:))
     }

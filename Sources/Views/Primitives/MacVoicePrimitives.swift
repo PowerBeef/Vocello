@@ -47,10 +47,23 @@ struct MacVoiceAvatar: View {
 /// The iOS primary call to action (`IOSPrimaryCTAButton`): a tinted capsule
 /// with an optional leading symbol, solid under Reduce Transparency.
 struct MacPrimaryCTAButton: View {
+    /// `.dock` is the Studio's Generate button: the phone's full-width 56 pt
+    /// capsule with its sheen and glow, which is what anchors the canvas.
+    /// `.compact` is the sheet button that hugs its label.
+    enum Size {
+        case dock
+        case compact
+
+        var height: CGFloat { self == .dock ? 56 : 34 }
+        var horizontalPadding: CGFloat { self == .dock ? 20 : 18 }
+        var spansWidth: Bool { self == .dock }
+    }
+
     let title: String
     let symbol: String?
     let tint: Color
     let isEnabled: Bool
+    let size: Size
     let action: () -> Void
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -60,12 +73,14 @@ struct MacPrimaryCTAButton: View {
         symbol: String? = nil,
         tint: Color,
         isEnabled: Bool = true,
+        size: Size = .compact,
         action: @escaping () -> Void
     ) {
         self.title = title
         self.symbol = symbol
         self.tint = tint
         self.isEnabled = isEnabled
+        self.size = size
         self.action = action
     }
 
@@ -91,22 +106,57 @@ struct MacPrimaryCTAButton: View {
             HStack(alignment: .center, spacing: 8) {
                 if let symbol {
                     Image(systemName: symbol)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: size == .dock ? 18 : 14, weight: .semibold))
                         .symbolRenderingMode(.hierarchical)
                 }
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(size == .dock ? .headline : .system(size: 13, weight: .semibold))
+                    .tracking(size == .dock ? -0.17 : 0)
                     .lineLimit(1)
             }
             .foregroundStyle(isEnabled ? MacTheme.Text.primary : MacTheme.Text.secondary)
-            .padding(.horizontal, 18)
-            .frame(minHeight: 34)
+            .padding(.horizontal, size.horizontalPadding)
+            .frame(maxWidth: size.spansWidth ? .infinity : nil)
+            .frame(height: size.height)
             .background { Capsule(style: .continuous).fill(backgroundFill) }
-            .overlay { Capsule(style: .continuous).stroke(tint.opacity(isEnabled ? 0.45 : 0.18), lineWidth: 0.75) }
+            .overlay { Capsule(style: .continuous).stroke(strokeColor, lineWidth: size == .dock ? 0.8 : 0.75) }
+            .overlay { if size == .dock { innerStroke } }
+            .overlay { if size == .dock { topSheen } }
+            .shadow(color: glowColor, radius: 16, y: 4)
+            .shadow(color: size == .dock ? Color.black.opacity(0.22) : .clear, radius: 10, y: 6)
             .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
+    }
+
+    private var strokeColor: Color {
+        size == .dock ? Color.white.opacity(0.16) : tint.opacity(isEnabled ? 0.45 : 0.18)
+    }
+
+    /// The dock button's glow is what lifts it off the canvas; it goes with
+    /// Reduce Transparency, like every other tinted bloom in the app.
+    private var glowColor: Color {
+        guard size == .dock, isEnabled, !reduceTransparency else { return .clear }
+        return tint.opacity(0.35)
+    }
+
+    private var innerStroke: some View {
+        Capsule(style: .continuous)
+            .inset(by: 0.65)
+            .stroke(Color.white.opacity(0.06), lineWidth: 0.55)
+    }
+
+    private var topSheen: some View {
+        Capsule(style: .continuous)
+            .stroke(Color.white.opacity(0.22), lineWidth: 0.6)
+            .mask {
+                LinearGradient(
+                    colors: [.white, .clear],
+                    startPoint: .top,
+                    endPoint: .center
+                )
+            }
     }
 }
 

@@ -70,3 +70,26 @@ verified by the generic device-SDK compile) and CONV-21 decides the toolchain bu
 cost that landed as predicted: push CI pins Xcode 26.6 while the Mac runs Xcode 27, so a
 main-actor call from a nonisolated test override compiled locally and failed on CI until fixed
 forward (ea795cde); the rule is to read CI after every push.
+
+## UI fidelity follow-up (2026-09-15)
+
+The close-out captures showed that adopting the iOS screens had not adopted the iOS design: the
+skeleton matched, but nearly every surface had been re-implemented by hand at different numbers —
+chips that hugged their labels and wrapped to two rows, a Generate button stranded at the left edge
+of its row, a flat canvas where the phone paints a mode-tinted wash, a readiness paragraph the phone
+never shows, and library rows, icons and buttons at their own sizes. Plan `macos-ui-fidelity-2026-09`
+(UIF-01 to UIF-04) brings each surface back and moves the primitive that defines it into
+`Sources/SharedSupport/Views`, so one edit changes both apps.
+
+Maintainer decisions for that plan:
+
+1. **Chip labels are full words on one line** (Aiden, Neutral, English). The pill shape, height, tint
+   and equal-width row are the phone's; only the label uses the width a Mac window has and the phone
+   does not, where it shows a two-letter code.
+2. **The Studio title row goes** and the Speed/Quality picker moves to the window toolbar. The sidebar
+   already names the mode, which is what the phone's capsule does.
+3. **Search and filter chips come inline** on History and Saved Voices. The desktop-only sort menu and
+   the enroll button stay in the toolbar.
+4. Kept desktop-only against the phone: the sidebar instead of the tab dock, the persistent footer
+   player, Voice Cloning's inline transcript field and consent stack, the inline Voice Design brief
+   editor, and Settings' flat single scroll.

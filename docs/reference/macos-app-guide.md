@@ -65,6 +65,17 @@ XCUITest inspects the real accessibility state. Destination containers use `scre
 controls expose stable identifiers, and `{mode}_readiness` values report `ready=true` or `ready=false`.
 Tests assert these visible production surfaces directly.
 
+### Studio composition
+
+The three Studio screens are one canvas (`MacStudioCanvas`) over a mode-tinted backdrop
+(`VocelloModeBackdrop`, shared with iOS): the composer fills the height, then the meta line (mode,
+readiness, Clear, counter), then one row of equal-width setup chips, then the dock. The dock holds
+the full-width Generate button, the generating bar, the error bar that retries when clicked, or the
+player card, and never falls below 64 pt so its silhouette does not jump between states. There is no
+title row — the sidebar names the mode, as the phone's capsule does — so the desktop's Speed/Quality
+switch (`<prefix>_speedVariantButton`, `<prefix>_qualityVariantButton`, `<prefix>_heavyBadge`) lives
+in the window toolbar. Below roughly 700 pt of canvas the chip row wraps instead of squeezing.
+
 ### Built-in Voice (`sidebar_customVoice` → `screen_customVoice`)
 
 | Element | Identifier |
@@ -72,8 +83,8 @@ Tests assert these visible production surfaces directly.
 | Speaker chip | `customVoice_speakerPicker` (menu anchored to the chip; the selected speaker is its accessibility value; "Recommended for your script" section from the detected language) inside `customVoice_voiceSetup` |
 | Language chip | `customVoice_languagePicker` inside `customVoice_languageSetup`; native-speaker hint `customVoice_languageHint` |
 | Delivery chip | `delivery_tonePicker` inside `customVoice_toneSpeed`, sectioned since DP-14 into "Distinct deliveries" (Neutral/Calm/Whisper/Sad), "Directional hints" (Happy/Angry/Fearful/Surprised) and Custom; a hint shows `delivery_hintAdvisory`, Custom shows the field `delivery_toneField` (duration advisory `delivery_durationAdvisory`); `customVoice_deliveryUnsupported` when the package has no delivery control |
-| Script editor | `textInput_textEditor` / `textInput_charCount` ("N characters") / `textInput_clearButton` / `textInput_modeMetaLabel` |
-| Readiness | `customVoice_readiness` (value "Ready" or "Waiting") |
+| Script editor | `textInput_textEditor` / `textInput_charCount` (reads "96 / 900" against the shared script ceiling; its spoken value stays "N characters") / `textInput_clearButton` / `textInput_modeMetaLabel` |
+| Readiness | `customVoice_readiness` (value "Ready" or "Waiting"), one caption after the mode label in the meta line, where the phone puts it |
 | Generate CTA | `textInput_generateButton`; error bar `textInput_generationError` retries |
 | Generating | `textInput_generatingBar` with `textInput_cancelButton`; once audio streams, the player card `studio_livePreview_card` carries the same cancel |
 | Completed take | `studio_inlinePlayer_generation_<id>` with play/pause, `studio_inlinePlayer_retry`, `studio_inlinePlayer_saveAs`, `studio_inlinePlayer_reveal`, `studio_inlinePlayer_dismiss` (confirmed by `studio_inlinePlayer_dismissConfirm`); the sidebar footer card mirrors the same shared player |

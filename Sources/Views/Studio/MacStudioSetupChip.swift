@@ -1,15 +1,23 @@
 import QwenVoiceCore
 import SwiftUI
 
-/// The iOS setup-chip pill (`IOSSetupChipPill`) adapted to the desktop: the
-/// tinted capsule with the glyph, and — because a Mac window has the width
-/// a phone lacks — the eyebrow and the value written out instead of a
-/// two-letter abbreviation. On macOS the chip *is* the picker: a `Menu`
-/// anchored to the pill, so the lanes' `delivery_tonePicker` and the other
-/// picker identifiers stay on the trigger and its rows stay real menu items.
+/// The iOS setup-chip pill (`IOSSetupChipPill`): the tinted capsule with a
+/// glyph, one line of value and a chevron. The one desktop liberty is the
+/// label — a Mac window has the width the phone lacks, so the value is
+/// written out ("Aiden") where the phone shows a two-letter code ("AI").
+/// On macOS the chip *is* the picker: a `Menu` anchored to the pill, so the
+/// lanes' `delivery_tonePicker` and the other picker identifiers stay on the
+/// trigger and its rows stay real menu items.
 enum MacStudioChipMetrics {
-    static let pillHeight: CGFloat = 44
-    static let minWidth: CGFloat = 120
+    /// The iOS pill height (`IOSSetupChipPill`). The chips share the row
+    /// equally and span exactly the Generate button's width, so a chip never
+    /// hugs its label and the row never wraps at a usual window size.
+    static let pillHeight: CGFloat = 46
+    /// The floor below which `MacChipFlow` wraps the row. Sized so the value
+    /// still reads after the glyph, the chevron and the padding take their
+    /// share: below this a four-chip row on a 720 pt window truncated
+    /// "Aiden" to "Aid…".
+    static let minWidth: CGFloat = 132
 }
 
 struct MacStudioSetupChip<MenuContent: View>: View {
@@ -38,7 +46,7 @@ struct MacStudioSetupChip<MenuContent: View>: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .tint(tint)
-        .vocelloFocusRing(tint, radius: 22)
+        .vocelloFocusRing(tint, radius: MacStudioChipMetrics.pillHeight / 2)
         .accessibilityLabel(spokenLabel)
         .accessibilityValue(accessibilityValue ?? value)
         .accessibilityIdentifier(accessibilityIdentifier)
@@ -71,7 +79,7 @@ struct MacStudioActionChip: View {
         .buttonStyle(.plain)
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.45)
-        .vocelloFocusRing(tint, radius: 22)
+        .vocelloFocusRing(tint, radius: MacStudioChipMetrics.pillHeight / 2)
         .accessibilityLabel(spokenLabel)
         .accessibilityIdentifier(accessibilityIdentifier)
     }
@@ -90,32 +98,26 @@ struct MacStudioSetupChipPill: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
-        HStack(spacing: 8) {
+        // One line, like the phone: glyph, value, chevron. The eyebrow the
+        // desktop used to stack above the value survives as the spoken label,
+        // because a Mac window has room for the value written out in full and
+        // a two-line pill reads as a different control.
+        HStack(spacing: 6) {
             Image(systemName: symbol)
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 18, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(MacTheme.Text.primary)
-                .frame(width: 18)
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(eyebrow)
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(0.4)
-                    .textCase(.uppercase)
-                    .foregroundStyle(MacTheme.Text.tertiary)
-                    .lineLimit(1)
-                Text(value)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(isPlaceholder ? MacTheme.Text.secondary : MacTheme.Text.primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(isPlaceholder ? MacTheme.Text.secondary : MacTheme.Text.primary)
+                .lineLimit(1)
+                .truncationMode(.tail)
 
             if showsChevron {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(tint.opacity(0.6))
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(tint.opacity(0.5))
                     .accessibilityHidden(true)
             }
         }
@@ -129,8 +131,8 @@ struct MacStudioSetupChipPill: View {
                 .inset(by: 0.65)
                 .stroke(Color.white.opacity(0.04), lineWidth: 0.55)
         }
-        .shadow(color: reduceTransparency ? .clear : tint.opacity(0.22), radius: 8, y: 1)
-        .opacity(isPlaceholder ? 0.7 : 1)
+        .shadow(color: reduceTransparency ? .clear : tint.opacity(0.28), radius: 8, y: 1)
+        .opacity(isPlaceholder ? 0.55 : 1)
         .contentShape(Capsule(style: .continuous))
         // One accessibility element per chip: the menu's identifier and value
         // land on a single control the size of the pill, not on each glyph.

@@ -13,6 +13,9 @@ struct MacGenerationVariantSelector: View {
     let tint: Color
     let accessibilityPrefix: String
     var isDisabled = false
+    /// The window toolbar has little room and its position already says what
+    /// the control is, so the caption is dropped there.
+    var showsLabel = true
 
     private var selectedModel: TTSModel? {
         modelManager.generationActiveVariant(for: mode)
@@ -25,9 +28,11 @@ struct MacGenerationVariantSelector: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
-            Text(MacInterfaceText.workflowModel)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(MacTheme.Text.secondary)
+            if showsLabel {
+                Text(MacInterfaceText.workflowModel)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(MacTheme.Text.secondary)
+            }
             variantControl
             heavyBadge
         }

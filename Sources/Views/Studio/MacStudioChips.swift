@@ -271,63 +271,83 @@ struct MacStudioBatchChip: View {
             accessibilityIdentifier: "textInput_batchButton",
             action: action
         )
-        .frame(maxWidth: 160)
     }
 }
 
-/// Lays the setup chips out in rows: a chip that no longer fits the column
-/// starts a new row instead of pushing the column past the viewport (an
-/// `HStack` of pills never compresses, so on a 720 pt window it overflowed and
-/// the pinned canvas clipped both edges of the composer and the chips).
+/// The phone's chip row: every chip takes an equal share of the width, so the
+/// row spans exactly the Generate button beneath it and no chip hugs its
+/// label. Where the phone can rely on a plain `HStack` — three chips always
+/// fit a phone — a Mac window can be narrowed until equal shares would be
+/// unreadable, so the chips then wrap onto further rows instead of pushing the
+/// column past the viewport (an `HStack` of pills never compresses, and the
+/// pinned canvas would clip both edges of the composer and the chips).
 struct MacChipFlow: Layout {
     var spacing: CGFloat = 8
     var rowSpacing: CGFloat = 8
-
-    private struct Row {
-        var indices: [Int] = []
-        var width: CGFloat = 0
-        var height: CGFloat = 0
-    }
+    /// Narrowest a chip may become before the row breaks.
+    var minimumChipWidth: CGFloat = MacStudioChipMetrics.minWidth
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard !subviews.isEmpty else { return .zero }
         let width = proposal.width.flatMap { $0.isFinite ? $0 : nil }
-        let rows = arrange(subviews, width: width ?? .infinity)
-        let height = rows.map(\.height).reduce(0, +) + rowSpacing * CGFloat(max(rows.count - 1, 0))
-        let widest = rows.map(\.width).max() ?? 0
-        return CGSize(width: width ?? widest, height: height)
+        let rowHeight = subviews.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
+        guard let width else {
+            // Unconstrained: report the ideal single row.
+            let ideal = subviews.reduce(CGFloat(0)) { $0 + $1.sizeThatFits(.unspecified).width }
+                + spacing * CGFloat(subviews.count - 1)
+            return CGSize(width: ideal, height: rowHeight)
+        }
+        let rows = rowCount(for: subviews.count, width: width)
+        return CGSize(
+            width: width,
+            height: rowHeight * CGFloat(rows) + rowSpacing * CGFloat(max(rows - 1, 0))
+        )
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard !subviews.isEmpty else { return }
+        let rowHeight = subviews.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
+        let perRow = chipsPerRow(for: subviews.count, width: bounds.width)
+        var index = 0
         var y = bounds.minY
-        for row in arrange(subviews, width: bounds.width) {
+
+        // Equal shares, like `.frame(maxWidth: .infinity)` inside the phone's
+        // HStack. One share for every row, so a trailing row that holds fewer
+        // chips lines up under the row above instead of stretching its last
+        // chip across the whole width.
+        let fullRowAvailable = bounds.width - spacing * CGFloat(perRow - 1)
+        let share = (fullRowAvailable / CGFloat(perRow)).rounded(.down)
+
+        while index < subviews.count {
+            let count = min(perRow, subviews.count - index)
+            let isFullRow = count == perRow
             var x = bounds.minX
-            for index in row.indices {
-                let size = subviews[index].sizeThatFits(.unspecified)
-                subviews[index].place(
-                    at: CGPoint(x: x, y: y + (row.height - size.height) / 2),
-                    proposal: ProposedViewSize(size)
+
+            for offset in 0..<count {
+                // The last chip of a full row absorbs the rounding remainder so
+                // the row ends exactly on the container's trailing edge.
+                let width = (isFullRow && offset == count - 1) ? bounds.maxX - x : share
+                subviews[index + offset].place(
+                    at: CGPoint(x: x, y: y),
+                    anchor: .topLeading,
+                    proposal: ProposedViewSize(width: width, height: rowHeight)
                 )
-                x += size.width + spacing
+                x += width + spacing
             }
-            y += row.height + rowSpacing
+
+            index += count
+            y += rowHeight + rowSpacing
         }
     }
 
-    private func arrange(_ subviews: Subviews, width: CGFloat) -> [Row] {
-        var rows: [Row] = []
-        var current = Row()
-        for index in subviews.indices {
-            let size = subviews[index].sizeThatFits(.unspecified)
-            let proposedWidth = current.indices.isEmpty ? size.width : current.width + spacing + size.width
-            if !current.indices.isEmpty, proposedWidth > width {
-                rows.append(current)
-                current = Row()
-            }
-            current.indices.append(index)
-            current.width = current.indices.count == 1 ? size.width : current.width + spacing + size.width
-            current.height = max(current.height, size.height)
-        }
-        if !current.indices.isEmpty { rows.append(current) }
-        return rows
+    private func chipsPerRow(for count: Int, width: CGFloat) -> Int {
+        guard count > 0, width.isFinite, width > 0 else { return max(count, 1) }
+        let fitting = Int(((width + spacing) / (minimumChipWidth + spacing)).rounded(.down))
+        return max(1, min(count, fitting))
+    }
+
+    private func rowCount(for count: Int, width: CGFloat) -> Int {
+        let perRow = chipsPerRow(for: count, width: width)
+        return Int((Double(count) / Double(perRow)).rounded(.up))
     }
 }

@@ -201,13 +201,22 @@ struct MacVoiceCloningScreen: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
             MacStudioCanvas(
                 mode: .clone,
                 accessibilityPrefix: "voiceCloning",
                 script: $draft.text,
                 placeholder: MacInterfaceText.cloningScriptPlaceholder,
                 modeMetaLabel: modeMetaLabel,
+                readiness: MacStudioReadinessState(
+                    isReady: readinessDescriptor.noteIsReady && !isGenerationActive,
+                    title: isGenerationActive
+                        ? MacInterfaceText.customGeneratingFinalAudio
+                        : readinessDescriptor.title,
+                    detail: isGenerationActive
+                        ? MacInterfaceText.customGeneratingFinalAudioDetail
+                        : readinessDescriptor.detail,
+                    accessibilityIdentifier: "voiceCloning_readiness"
+                ),
                 tint: tint,
                 genState: studioGenState,
                 errorMessage: coordinator.errorMessage,
@@ -222,7 +231,7 @@ struct MacVoiceCloningScreen: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(MacTheme.canvasGradient.ignoresSafeArea())
+        .background(MacModeBackdrop(tint: tint).ignoresSafeArea())
         .overlay {
             if session.isDragOver {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -287,39 +296,6 @@ struct MacVoiceCloningScreen: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: MacTheme.modeGlyph(for: .clone))
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(tint)
-                .frame(width: MacShellMetrics.sidebarGlyphTile, height: MacShellMetrics.sidebarGlyphTile)
-                .background {
-                    RoundedRectangle(cornerRadius: MacShellMetrics.sidebarGlyphTileRadius, style: .continuous)
-                        .fill(tint.opacity(0.16))
-                }
-                .accessibilityHidden(true)
-
-            Text(MacInterfaceText.menuVoiceCloning)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(MacTheme.Text.primary)
-                .lineLimit(1)
-
-            Spacer(minLength: 12)
-
-            MacGenerationVariantSelector(
-                mode: .clone,
-                tint: tint,
-                accessibilityPrefix: "voiceCloning",
-                isDisabled: isGenerationActive
-            )
-        }
-        .padding(.horizontal, MacStudioMetrics.horizontalInset)
-        .padding(.top, 16)
-        .padding(.bottom, 4)
-        .frame(maxWidth: MacStudioMetrics.contentMaxWidth)
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .contain)
-    }
 
     // MARK: - Chips (two rows: the reference and its sources, then the take)
 
@@ -523,14 +499,6 @@ struct MacVoiceCloningScreen: View {
             }
         }
 
-        MacStudioReadinessNote(
-            isReady: readinessDescriptor.noteIsReady && !isGenerationActive,
-            title: isGenerationActive ? MacInterfaceText.customGeneratingFinalAudio : readinessDescriptor.title,
-            detail: isGenerationActive ? MacInterfaceText.customGeneratingFinalAudioDetail : readinessDescriptor.detail,
-            tint: tint,
-            isBusy: isGenerationActive,
-            accessibilityIdentifier: "voiceCloning_readiness"
-        )
     }
 
     @ViewBuilder

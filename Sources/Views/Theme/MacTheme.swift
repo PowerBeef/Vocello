@@ -25,7 +25,20 @@ enum MacTheme {
     static let voicesTint = Color(red: 0.541, green: 0.690, blue: 0.784)
     static let settingsTint = Color(red: 0.631, green: 0.659, blue: 0.722)
 
-    static let textMutedNSColor = NSColor(red: 0.62, green: 0.60, blue: 0.55, alpha: 1)
+    /// AppKit twins of the shared text tokens, for the `NSTextView` bridges.
+    /// The composer used `.labelColor` and drifted a shade off every other
+    /// label on the screen.
+    static let textPrimaryNSColor = NSColor(red: 0.95, green: 0.94, blue: 0.92, alpha: 1)
+    static let textTertiaryNSColor = NSColor(red: 0.62, green: 0.60, blue: 0.55, alpha: 1)
+    static let textMutedNSColor = textTertiaryNSColor
+
+    static func tint(for mode: GenerationMode) -> Color {
+        switch mode {
+        case .custom: Brand.modeCustom
+        case .design: Brand.modeDesign
+        case .clone: Brand.modeClone
+        }
+    }
 
     static func tint(for item: SidebarItem) -> Color {
         switch item {
@@ -77,6 +90,24 @@ enum MacTheme {
             colors: [Surface.canvas, Surface.canvasBottom],
             startPoint: .top,
             endPoint: .bottom
+        )
+    }
+}
+
+/// The Studio screens' backdrop: the shared mode wash, with macOS resolving
+/// Reduce Transparency from its own environment key. The library screens keep
+/// `MacTheme.canvasGradient`, which is what the phone shows outside Studio.
+struct MacModeBackdrop: View {
+    let tint: Color
+    var intensity: VocelloModeBackdrop.Intensity = .warm
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        VocelloModeBackdrop(
+            tint: tint,
+            intensity: intensity,
+            reduceTransparency: reduceTransparency
         )
     }
 }

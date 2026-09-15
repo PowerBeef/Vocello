@@ -112,25 +112,28 @@ struct MacCustomVoiceScreen: View {
         ttsEngineStore.isReady && isModelAvailable && !ttsEngineStore.hasActiveGeneration
     }
 
+    /// The phone's meta line names the mode and nothing else; the package is
+    /// the toolbar's Speed/Quality switch, and the readiness caption follows.
     private var modeMetaLabel: String {
-        var parts = [MacInterfaceText.modeName(.custom)]
-        if let activeModel {
-            parts.append(modelManager.generationVariantDisplayName(for: activeModel))
-        }
-        return parts.joined(separator: " · ")
+        MacInterfaceText.modeName(.custom)
     }
 
     // MARK: - Body
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
             MacStudioCanvas(
                 mode: .custom,
                 accessibilityPrefix: "customVoice",
                 script: $draft.text,
                 placeholder: MacInterfaceText.textInputPlaceholder,
                 modeMetaLabel: modeMetaLabel,
+                readiness: MacStudioReadinessState(
+                    isReady: readinessPresentation.isReady,
+                    title: readinessPresentation.title,
+                    detail: readinessPresentation.detail,
+                    accessibilityIdentifier: "customVoice_readiness"
+                ),
                 tint: tint,
                 genState: studioGenState,
                 errorMessage: coordinator.errorMessage,
@@ -145,7 +148,7 @@ struct MacCustomVoiceScreen: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(MacTheme.canvasGradient.ignoresSafeArea())
+        .background(MacModeBackdrop(tint: tint).ignoresSafeArea())
         .accessibilityIdentifier("screen_customVoice")
         .onAppear {
             reconcileGenerationVariantSelection()
@@ -173,40 +176,6 @@ struct MacCustomVoiceScreen: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: MacTheme.modeGlyph(for: .custom))
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(tint)
-                .frame(width: MacShellMetrics.sidebarGlyphTile, height: MacShellMetrics.sidebarGlyphTile)
-                .background {
-                    RoundedRectangle(cornerRadius: MacShellMetrics.sidebarGlyphTileRadius, style: .continuous)
-                        .fill(tint.opacity(0.16))
-                }
-                .accessibilityHidden(true)
-
-            Text(MacInterfaceText.menuBuiltInVoice)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(MacTheme.Text.primary)
-                .lineLimit(1)
-
-            Spacer(minLength: 12)
-
-            MacGenerationVariantSelector(
-                mode: .custom,
-                tint: tint,
-                accessibilityPrefix: "customVoice",
-                isDisabled: isGenerationActive
-            )
-        }
-        .padding(.horizontal, MacStudioMetrics.horizontalInset)
-        .padding(.top, 16)
-        .padding(.bottom, 4)
-        .frame(maxWidth: MacStudioMetrics.contentMaxWidth)
-        .frame(maxWidth: .infinity)
-        // Keeps the variant selector's identifiers under the screen identifier.
-        .accessibilityElement(children: .contain)
-    }
 
     // MARK: - Chips
 
@@ -303,16 +272,6 @@ struct MacCustomVoiceScreen: View {
                 .foregroundStyle(MacTheme.Text.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("customVoice_languageHint")
-        }
-        HStack(alignment: .top, spacing: 12) {
-            MacStudioReadinessNote(
-                isReady: readinessPresentation.isReady,
-                title: readinessPresentation.title,
-                detail: readinessPresentation.detail,
-                tint: tint,
-                isBusy: readinessPresentation.isBusy,
-                accessibilityIdentifier: "customVoice_readiness"
-            )
         }
     }
 

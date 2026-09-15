@@ -1,100 +1,30 @@
 import Foundation
 import QwenVoiceCore
 
-struct IOSGenerationTextLimitPolicy {
-    /// Single-take spoken-script ceiling. Matches the delivery-validated 900-character
-    /// boundary shared with the macOS long-form router: the engine's 2,048-token cap
-    /// (~170 s of audio) comfortably covers ~900 characters, and the raise is gated on
-    /// an on-device memory-qualified proof at this length (2026-07-24). Scripts beyond
-    /// it route to a long-form project (sequential streaming segments) rather than
-    /// being blocked.
-    private static let sharedScriptLimit = 900
+/// The counts and routing live in the shared `GenerationTextLimitPolicy`
+/// (`Sources/SharedSupport/Services`) since 2026-09-15; the iOS name and the
+/// interface-language messages stay here so every call site is unchanged.
+typealias IOSGenerationTextLimitPolicy = GenerationTextLimitPolicy
 
-    /// Hard editor ceiling for long-form scripts. Generously above any validated
-    /// project while still bounding the planner input; the planner's 100-segment cap
-    /// is the authoritative project-size gate.
-    static let longFormScriptLimit = 30_000
-
-    /// Voice Design BRIEF (the voice DESCRIPTION) limit — deliberately decoupled from the
-    /// spoken-script limit above. Sourced from the shared catalog so the iOS sheet and the
-    /// macOS inline editor stay in lockstep.
-    static let descriptionLimit = VoiceDesignBriefCatalog.descriptionLimit
-
-    /// Delivery instruction / custom tone limit. The instruction is passed to the model as an
-    /// emotion/delivery style string.
-    ///
-    /// Research (Qwen3-TTS hosted API) allows up to 1,600 tokens for `instructions`, and the
-    /// open-weights examples are short phrases. 500 characters gives users 2–3 dense,
-    /// multidimensional sentences (emotion + pace + pitch + timbre) while discouraging
-    /// paragraph-length prompts. It also leaves room for the English diction reinforcement
-    /// clause appended during prompt assembly.
-    static let deliveryInstructionLimit = 500
-
-    struct State: Equatable {
-        let count: Int
-        let limit: Int
-        let trimmedIsEmpty: Bool
-
-        var remainingCount: Int {
-            max(limit - count, 0)
+extension GenerationTextLimitPolicy.State {
+    @MainActor var helperMessage: String {
+        if isOverLimit {
+            return warningMessage
         }
-
-        /// Scripts above the single-take limit run as a long-form project.
-        var routesToLongForm: Bool {
-            count > limit
+        if routesToLongForm {
+            return IOSAppLanguage.shared.presentation.longFormGuidance
         }
-
-        /// Only the hard long-form ceiling blocks generation now.
-        var isOverLimit: Bool {
-            count > IOSGenerationTextLimitPolicy.longFormScriptLimit
+        if remainingCount == 0 {
+            return IOSAppLanguage.shared.presentation.longFormLimit
         }
-
-        /// The ceiling the editor counter should show: the single-take limit for
-        /// ordinary scripts, the long-form ceiling once routing engages.
-        var displayLimit: Int {
-            routesToLongForm ? IOSGenerationTextLimitPolicy.longFormScriptLimit : limit
-        }
-
-        var counterText: String {
-            "\(count)/\(displayLimit)"
-        }
-
-        @MainActor var helperMessage: String {
-            if isOverLimit {
-                return warningMessage
-            }
-            if routesToLongForm {
-                return IOSAppLanguage.shared.presentation.longFormGuidance
-            }
-            if remainingCount == 0 {
-                return IOSAppLanguage.shared.presentation.longFormLimit
-            }
-            return IOSAppLanguage.shared.presentation.charactersRemaining(remainingCount)
-        }
-
-        @MainActor var warningMessage: String {
-            IOSAppLanguage.shared.presentation.shortenScript(IOSGenerationTextLimitPolicy.longFormScriptLimit)
-        }
-
-        @MainActor var readinessTitle: String {
-            IOSAppLanguage.shared.presentation.shortenScriptTitle(IOSGenerationTextLimitPolicy.longFormScriptLimit)
-        }
+        return IOSAppLanguage.shared.presentation.charactersRemaining(remainingCount)
     }
 
-    static func state(for text: String, mode: GenerationMode) -> State {
-        State(
-            count: text.count,
-            limit: limit(for: mode),
-            trimmedIsEmpty: text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        )
+    @MainActor var warningMessage: String {
+        IOSAppLanguage.shared.presentation.shortenScript(GenerationTextLimitPolicy.longFormScriptLimit)
     }
 
-    static func clamped(_ text: String, mode: GenerationMode) -> String {
-        guard text.count > longFormScriptLimit else { return text }
-        return String(text.prefix(longFormScriptLimit))
-    }
-
-    static func limit(for mode: GenerationMode) -> Int {
-        sharedScriptLimit
+    @MainActor var readinessTitle: String {
+        IOSAppLanguage.shared.presentation.shortenScriptTitle(GenerationTextLimitPolicy.longFormScriptLimit)
     }
 }

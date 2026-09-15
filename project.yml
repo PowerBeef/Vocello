@@ -436,6 +436,9 @@ targets:
       - path: Sources/iOSSupport/Services/IOSReferenceAudioImportPolicy.swift
       - path: Sources/iOSSupport/Services/IOSPullableDiagnosticsMirror.swift
       - path: Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift
+      - path: Sources/SharedSupport/Services/VoiceDesignBriefCatalog.swift
+      - path: Sources/SharedSupport/Services/GenerationTextLimitPolicy.swift
+      - path: Sources/SharedSupport/Services/WordTimingPlanner.swift
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
       - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift

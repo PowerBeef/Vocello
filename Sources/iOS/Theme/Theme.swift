@@ -4,8 +4,11 @@ import QwenVoiceCore
 
 /// Canonical iOS design tokens for the Vocello iOS app.
 ///
-/// The values derive from `design_references/Vocello iOS/tokens.css`
-/// (which in turn mirrors the macOS `AppTheme.swift`); where a shipped
+/// Since 2026-09-15 the color, radius, spacing and motion values live in the
+/// shared `VocelloTheme` (`Sources/SharedSupport/Theme`), which both apps
+/// read; this namespace forwards to it so every iOS call site keeps its name
+/// and the `UIColor` twins the UIKit bridges need stay here. The values
+/// derive from `design_references/Vocello iOS/tokens.css`; where a shipped
 /// value diverged from tokens.css, the shipped value wins and the token's
 /// comment records the delta. The legacy `IOSBrandTheme`, `IOSAppTheme`,
 /// `IOSCornerRadius`, `IOSDesignMotion`, and `IOSSelectionMotion`
@@ -21,7 +24,7 @@ enum Theme {
 
     enum Brand {
         /// Vocello primary — warm golden. `--vocello-gold` in tokens.css.
-        static let gold = Color(uiColor: UIColor(red: 0.929, green: 0.800, blue: 0.541, alpha: 1))
+        static let gold = VocelloTheme.Brand.gold
 
         /// 18% wash of the brand color used for chip / tab tints.
         static let goldSoft = gold.opacity(0.18)
@@ -29,21 +32,21 @@ enum Theme {
         /// Per-mode hues.
         static let modeCustom = gold
         /// `#BFAADC` — `--mode-design`.
-        static let modeDesign = Color(uiColor: UIColor(red: 0.749, green: 0.667, blue: 0.863, alpha: 1))
+        static let modeDesign = VocelloTheme.Brand.modeDesign
         /// `#DBA887` — `--mode-cloning`.
-        static let modeClone = Color(uiColor: UIColor(red: 0.859, green: 0.659, blue: 0.529, alpha: 1))
+        static let modeClone = VocelloTheme.Brand.modeClone
 
         /// Neutral silver used for the settings tab.
-        static let silver = Color(uiColor: UIColor(red: 0.68, green: 0.71, blue: 0.76, alpha: 1))
+        static let silver = VocelloTheme.Brand.silver
 
         /// Warm neutral used for the library (Voices) tab.
-        static let library = Color(uiColor: UIColor(red: 0.75, green: 0.74, blue: 0.71, alpha: 1))
+        static let library = VocelloTheme.Brand.library
 
         /// 12% gold glow behind primary actions.
         static let goldGlow = gold.opacity(0.12)
 
         /// 7% warm-white sheen for highlighted chrome.
-        static let highlightGlow = Color(uiColor: UIColor(red: 0.90, green: 0.84, blue: 0.72, alpha: 0.07))
+        static let highlightGlow = VocelloTheme.Brand.highlightGlow
 
         static func modeColor(_ mode: GenerationMode) -> Color {
             switch mode {
@@ -58,48 +61,48 @@ enum Theme {
 
     enum Surface {
         /// `#161823` — the app's underlay. `--canvas-bg`.
-        static let canvas = Color(uiColor: UIColor(red: 0.086, green: 0.094, blue: 0.137, alpha: 1))
+        static let canvas = VocelloTheme.Surface.canvas
 
         /// Slightly darker base for screen bottoms. Matches the existing
         /// `IOSBrandTheme.canvasBottom` gradient end-point.
-        static let canvasBottom = Color(uiColor: UIColor(red: 0.038, green: 0.044, blue: 0.056, alpha: 1))
+        static let canvasBottom = VocelloTheme.Surface.canvasBottom
 
         /// `#1C1E26` — stage holds the configuration panel area.
-        static let stage = Color(uiColor: UIColor(red: 0.110, green: 0.118, blue: 0.149, alpha: 1))
+        static let stage = VocelloTheme.Surface.stage
 
         /// `#0D0E12` — darker recess inside the stage. `--card-fill`.
-        static let card = Color(uiColor: UIColor(red: 0.051, green: 0.055, blue: 0.071, alpha: 1))
+        static let card = VocelloTheme.Surface.card
 
         /// `#11131A` — recessed surface between card + field. `--inline-fill`.
-        static let inline = Color(uiColor: UIColor(red: 0.067, green: 0.075, blue: 0.102, alpha: 1))
+        static let inline = VocelloTheme.Surface.inline
 
         /// Text input fill. Shipped truth (D10b): the app has always rendered
         /// this darker fill (was `IOSBrandTheme.inputFill`); the tokens.css
         /// `--field-fill` value `#2A2C36` never shipped. Changing it is a
         /// deliberate design decision, not a cleanup.
-        static let field = Color(uiColor: UIColor(red: 0.120, green: 0.126, blue: 0.148, alpha: 1))
+        static let field = VocelloTheme.Surface.field
         static let fieldUIColor = UIColor(red: 0.120, green: 0.126, blue: 0.148, alpha: 1)
 
         /// Warm hairline stroke on input fields (was `IOSBrandTheme.inputStroke`).
-        static let fieldStroke = Color(uiColor: UIColor(red: 0.96, green: 0.92, blue: 0.82, alpha: 0.12))
+        static let fieldStroke = VocelloTheme.Surface.fieldStroke
 
         /// Elevated panel fill for cards over the canvas (was `IOSBrandTheme.surface`).
-        static let panel = Color(uiColor: UIColor(red: 0.105, green: 0.112, blue: 0.132, alpha: 0.86))
+        static let panel = VocelloTheme.Surface.panel
 
         /// Muted sibling of `panel` (was `IOSBrandTheme.surfaceMuted`).
-        static let panelMuted = Color(uiColor: UIColor(red: 0.145, green: 0.152, blue: 0.174, alpha: 0.74))
+        static let panelMuted = VocelloTheme.Surface.panelMuted
 
         /// Warm hairline stroke on panels (was `IOSBrandTheme.surfaceStroke`).
-        static let panelStroke = Color(uiColor: UIColor(red: 0.97, green: 0.92, blue: 0.82, alpha: 0.10))
+        static let panelStroke = VocelloTheme.Surface.panelStroke
 
         /// Opaque banner / toast fill (was `IOSBrandTheme.bannerFill`).
-        static let banner = Color(uiColor: UIColor(red: 0.18, green: 0.19, blue: 0.22, alpha: 0.92))
+        static let banner = VocelloTheme.Surface.banner
 
         /// Mode-switcher pill fill (was `IOSBrandTheme.modeSwitcherFill`).
-        static let selector = Color(uiColor: UIColor(red: 0.135, green: 0.142, blue: 0.164, alpha: 0.82))
+        static let selector = VocelloTheme.Surface.selector
 
         /// Warm hairline on the mode-switcher pill (was `IOSBrandTheme.modeSwitcherStroke`).
-        static let selectorStroke = Color(uiColor: UIColor(red: 0.97, green: 0.92, blue: 0.82, alpha: 0.08))
+        static let selectorStroke = VocelloTheme.Surface.selectorStroke
 
         /// Solid base under glassy card surfaces (was `IOSAppTheme.glassSurfaceFill`).
         static let glassSurface = panel.opacity(0.82)
@@ -110,7 +113,7 @@ enum Theme {
         /// Tab bar / dock smoke. Shipped truth (D10b): the app has always used
         /// this darker smoke (was `IOSBrandTheme.tabBarBackground`); the
         /// tokens.css `--rail-bg` value `#171A1F` never shipped.
-        static let dock = Color(uiColor: UIColor(red: 0.075, green: 0.083, blue: 0.102, alpha: 0.93))
+        static let dock = VocelloTheme.Surface.dock
 
         /// Glassy floating panel fill (was `IOSAppTheme.glassFloatingFill`).
         static let glassFloating = dock.opacity(0.66)
@@ -127,30 +130,30 @@ enum Theme {
 
     enum Text {
         /// `#F2EFEA` — primary text on dark canvas.
-        static let primary = Color(uiColor: UIColor(red: 0.95, green: 0.94, blue: 0.92, alpha: 1))
+        static let primary = VocelloTheme.Text.primary
         static let primaryUIColor = UIColor(red: 0.95, green: 0.94, blue: 0.92, alpha: 1)
 
         /// `#C5BFAE` — warm-tinted secondary text.
-        static let secondary = Color(uiColor: UIColor(red: 0.78, green: 0.76, blue: 0.72, alpha: 1))
+        static let secondary = VocelloTheme.Text.secondary
 
         /// `#7E7868` — warm-tinted tertiary text (placeholders, eyebrows).
-        static let tertiary = Color(uiColor: UIColor(red: 0.62, green: 0.60, blue: 0.55, alpha: 1))
+        static let tertiary = VocelloTheme.Text.tertiary
         /// Cool-gray placeholder text. Lightened from (0.50,0.53,0.58) so it clears
         /// WCAG-AA 4.5:1 on every surface incl. the lightest field fill (was 3.84:1
         /// on `Surface.field`; now ≥5.3:1) while staying clearly dimmer than entered text.
         static let placeholderUIColor = UIColor(red: 0.60, green: 0.63, blue: 0.68, alpha: 1)
 
         /// Foreground ink on accent-filled buttons. Warm near-black.
-        static let onAccent = Color(uiColor: UIColor(red: 0.10, green: 0.085, blue: 0.055, alpha: 0.82))
-        static let onAccentPressed = Color(uiColor: UIColor(red: 0.10, green: 0.085, blue: 0.055, alpha: 0.74))
+        static let onAccent = VocelloTheme.Text.onAccent
+        static let onAccentPressed = VocelloTheme.Text.onAccentPressed
     }
 
     // MARK: - Status / health
 
     enum Status {
-        static let healthy = Color(uiColor: UIColor(red: 0.55, green: 0.70, blue: 0.55, alpha: 1))
-        static let guarded = Color(uiColor: UIColor(red: 0.85, green: 0.70, blue: 0.45, alpha: 1))
-        static let critical = Color(uiColor: UIColor(red: 0.85, green: 0.50, blue: 0.50, alpha: 1))
+        static let healthy = VocelloTheme.Status.healthy
+        static let guarded = VocelloTheme.Status.guarded
+        static let critical = VocelloTheme.Status.critical
     }
 
     // MARK: - Accent helpers

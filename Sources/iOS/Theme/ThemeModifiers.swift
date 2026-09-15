@@ -24,19 +24,18 @@ struct IOSGatedGlassModifier<S: Shape>: ViewModifier {
     @Environment(\.iosReduceTransparencyEnabled) private var reduceTransparency
     @Environment(\.iosGenerationPerformanceGate) private var performanceGate
 
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if reduceTransparency || performanceGate {
-            if let gatedFill {
-                content.background { shape.fill(gatedFill) }
-            } else {
-                content
-            }
-        } else if interactive {
-            content.glassEffect(.regular.tint(tint).interactive(), in: shape)
-        } else {
-            content.glassEffect(.regular.tint(tint), in: shape)
-        }
+        // The gate decision stays here; the shared body renders it identically
+        // on both platforms (`Sources/SharedSupport/Views/VocelloGlassSurface.swift`).
+        content.modifier(
+            VocelloGlassSurface(
+                tint: tint,
+                shape: shape,
+                interactive: interactive,
+                gatedFill: gatedFill,
+                isGated: reduceTransparency || performanceGate
+            )
+        )
     }
 }
 
@@ -119,27 +118,8 @@ extension View {
 
 // MARK: - Common shape factories
 
-enum ThemeShape {
-    static func card() -> RoundedRectangle {
-        RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-    }
-
-    static func input() -> RoundedRectangle {
-        RoundedRectangle(cornerRadius: Theme.Radius.input, style: .continuous)
-    }
-
-    static func stage() -> RoundedRectangle {
-        RoundedRectangle(cornerRadius: Theme.Radius.stage, style: .continuous)
-    }
-
-    static func chip() -> RoundedRectangle {
-        RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
-    }
-
-    static func pill() -> Capsule {
-        Capsule(style: .continuous)
-    }
-}
+/// The shared shape factories (`Sources/SharedSupport/Theme/VocelloShape.swift`).
+typealias ThemeShape = VocelloShape
 
 // MARK: - Accent foreground convenience
 

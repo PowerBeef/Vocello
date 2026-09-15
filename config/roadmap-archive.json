@@ -112,6 +112,16 @@
       "goal": "Decide the two September 13 findings before release work resumes: MV-07 (the fp16 speech tokenizer opens streamed clone takes with a burst: fix the first streamed chunk, decode it at fp32, or ship the fp32 codec again) and PC-03 (1.8 s between playbackScheduledMS and audible output). Around them: close the machinery gaps the validation campaign measured but did not fix (one build arena, CI concurrency, the Linux contract gate), give the QC a second machine judge, promote the played-audio comparison to a gate once three canonical captured runs exist, and finish the TSan characterization before its 2026-09-30 deadline. Absorbs machinery-validation-follow-ups-2026-09 and playback-capture-evidence-2026-09 with their ids kept. release-first-3-0-2026-09 stays active and secondary and returns to primaryPlan when MV-07 and PC-03 are decided.",
       "authority": "docs/development-progress.md",
       "completed": "2026-09-14"
+    },
+    {
+      "id": "macos-ios-convergence-2026-09",
+      "title": "macOS converges on the iOS architecture and UI",
+      "status": "complete",
+      "owner": "backend-and-platform",
+      "adopted": "2026-09-14",
+      "goal": "The iOS app is the reference. The macOS app hosts the engine in-process on the shared iOS TTSEngineStore (A1-A3: seams, in-process swap behind the legacy screens, XPC removal with its contracts), then adopts the iOS screens adapted to macOS with the desktop features that already exist (B1-B9, one screen per commit, identifiers unchanged), dark-only. iOS behavior is frozen; changes there are forwards, seams with iOS defaults and pure splits, compile-verified until the phone returns.",
+      "authority": "docs/reference/macos-ios-convergence-2026-09.md",
+      "completed": "2026-09-15"
     }
   ],
   "items": [
@@ -3339,6 +3349,29 @@
         "file:Sources/Services/MacLineBatchRunner.swift",
         "file:Sources/iOS/Studio/IOSLongFormProject.swift"
       ]
+    },
+    {
+      "id": "CONV-18",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Perf re-baseline, marketing captures and documentation of the new macOS app",
+      "status": "done",
+      "gate": "config/ui-perf-thresholds.json cites at least three perf sessions on the new tree in a dated decision; the README and website screenshots are recaptured from the new app; macos-release-qa.md walks the new screens; the plan is archived.",
+      "sourceOfTruth": [
+        "config/ui-perf-thresholds.json",
+        "Tests/VocelloMacUITests/VocelloMacMarketingCaptureUITests.swift",
+        "docs/reference/macos-release-qa.md"
+      ],
+      "updated": "2026-09-15",
+      "evidence": [
+        "commit:55c8cd9b",
+        "run:macos-xcui-perf-20260915-220611-0bb33592",
+        "run:macos-xcui-perf-20260915-221935-636488c2",
+        "run:macos-xcui-perf-20260915-222752-64610737",
+        "file:config/ui-perf-thresholds.json",
+        "file:Tests/VocelloMacUITests/VocelloMacMarketingCaptureUITests.swift",
+        "file:docs/reference/macos-release-qa.md"
+      ],
+      "notes": "Closed 2026-09-15 with 55c8cd9b. config/ui-perf-thresholds.json re-baselined (baseline-v3) from three perf sessions on the converged tree: 220611-0bb33592, 221935-636488c2, 222752-64610737 (all nine scenarios passed, no warnings); ceilings = 2x hitch median / 1.5x gap median, never below 1.25x the observed maximum, floors 5 ms/s and 40 ms, warn-only kept. Marketing captures retaken through VocelloMacMarketingCaptureUITests (explicit run, QVOICE_MARKETING_CAPTURE=1, English pinned, debug History staged empty and restored) with a new Voice Design + Settings capture; six README and website images replaced. macos-release-qa.md gained the attended walk of the converged screens; the convergence doc records the outcome; CONV-20 and CONV-21 re-homed to release-first, which is primary again; the plan is archived complete."
     }
   ]
 }

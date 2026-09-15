@@ -1,17 +1,8 @@
 {
   "schemaVersion": 1,
-  "primaryPlan": "macos-ios-convergence-2026-09",
+  "primaryPlan": "release-first-3-0-2026-09",
   "description": "Single source of truth for open work: active plans and their unfinished items. Finished items and completed plans live in config/roadmap-archive.json (history and progress counts only). Validated by scripts/roadmap.py; rendered to docs/ROADMAP.md.",
   "plans": [
-    {
-      "id": "macos-ios-convergence-2026-09",
-      "title": "macOS converges on the iOS architecture and UI",
-      "status": "active",
-      "owner": "backend-and-platform",
-      "adopted": "2026-09-14",
-      "goal": "The iOS app is the reference. The macOS app hosts the engine in-process on the shared iOS TTSEngineStore (A1-A3: seams, in-process swap behind the legacy screens, XPC removal with its contracts), then adopts the iOS screens adapted to macOS with the desktop features that already exist (B1-B9, one screen per commit, identifiers unchanged), dark-only. iOS behavior is frozen; changes there are forwards, seams with iOS defaults and pure splits, compile-verified until the phone returns.",
-      "authority": "docs/reference/macos-ios-convergence-2026-09.md"
-    },
     {
       "id": "release-first-3-0-2026-09",
       "title": "Vocello 3.0 — release-first execution plan (secondary while harness-stabilization-2026-09 is primary)",
@@ -96,22 +87,8 @@
   ],
   "items": [
     {
-      "id": "CONV-18",
-      "plan": "macos-ios-convergence-2026-09",
-      "title": "Perf re-baseline, marketing captures and documentation of the new macOS app",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "config/ui-perf-thresholds.json cites at least three perf sessions on the new tree in a dated decision; the README and website screenshots are recaptured from the new app; macos-release-qa.md walks the new screens; the plan is archived.",
-      "sourceOfTruth": [
-        "config/ui-perf-thresholds.json",
-        "Tests/VocelloMacUITests/VocelloMacMarketingCaptureUITests.swift",
-        "docs/reference/macos-release-qa.md"
-      ],
-      "updated": "2026-09-15"
-    },
-    {
       "id": "CONV-20",
-      "plan": "macos-ios-convergence-2026-09",
+      "plan": "release-first-3-0-2026-09",
       "title": "Device re-verification of the frozen iOS behavior",
       "status": "parked",
       "blockedBy": [],
@@ -120,12 +97,13 @@
         "config/ios-control-audit.json",
         "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift"
       ],
-      "updated": "2026-09-14",
-      "unparkWhen": "the paired iPhone is available and unlocked for a consented lane"
+      "updated": "2026-09-15",
+      "unparkWhen": "the paired iPhone is available and unlocked for a consented lane",
+      "notes": "Re-homed 2026-09-15 from macos-ios-convergence-2026-09 when that plan completed; the phone-side re-verification and the toolchain bump are release-first work."
     },
     {
       "id": "CONV-21",
-      "plan": "macos-ios-convergence-2026-09",
+      "plan": "release-first-3-0-2026-09",
       "title": "Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages",
       "status": "planned",
       "blockedBy": [],
@@ -136,7 +114,7 @@
         "Packages/VocelloQwen3Core/Package.swift",
         "scripts/macos_test.sh"
       ],
-      "notes": "Opened 2026-09-15 after the maintainer's Mac moved to macOS 27 with Xcode 27.0 (27A266a, Swift 6.4, macOS 27.0 SDK) and the iPhone to iOS 27; the app's minimum stays 26 (maintainer note). Maintainer decision: newer dependency versions are welcome when they do not jeopardize the project. Local state: the app builds cleanly on Xcode 27 with the deployment targets at 26; Xcode 27 needs `xcodebuild -downloadComponent MetalToolchain` once; SwiftPM defaults to the Swift Build engine, so the unit lane pins `--build-system native` while the switch exists (4743110a5). CI stays on the pinned Xcode 26.6 / Swift 6.3.3 until the runners offer 27. Not started.",
+      "notes": "Opened 2026-09-15 after the maintainer's Mac moved to macOS 27 with Xcode 27.0 (27A266a, Swift 6.4, macOS 27.0 SDK) and the iPhone to iOS 27; the app's minimum stays 26 (maintainer note). Maintainer decision: newer dependency versions are welcome when they do not jeopardize the project. Local state: the app builds cleanly on Xcode 27 with the deployment targets at 26; Xcode 27 needs `xcodebuild -downloadComponent MetalToolchain` once; SwiftPM defaults to the Swift Build engine, so the unit lane pins `--build-system native` while the switch exists (4743110a5). CI stays on the pinned Xcode 26.6 / Swift 6.3.3 until the runners offer 27. Not started. Re-homed 2026-09-15 from macos-ios-convergence-2026-09 when that plan completed; the phone-side re-verification and the toolchain bump are release-first work.",
       "updated": "2026-09-15"
     },
     {

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-14
+reviewed: 2026-09-15
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -24,8 +24,9 @@ standard. The macOS app drops its XPC engine service for the in-process engine t
 on the same `TTSEngineStore`, then drops its legacy screens for the iOS screens adapted to macOS
 with the desktop features that already exist (batch and long-form, variant picker, repair and
 update, output folder, Save As and Reveal, ⌘ menus, drag-and-drop, sort, replace reference, the
-Cmd+, window), dark-only. `macos-ios-convergence-2026-09` is the primary plan; its authority is
-`docs/reference/macos-ios-convergence-2026-09.md`. Order: engine first (CONV-01 seams, CONV-02
+Cmd+, window), dark-only. `macos-ios-convergence-2026-09` was the primary plan until it completed
+on September 15 (archived; `release-first-3-0-2026-09` is primary again); its authority is
+`docs/reference/macos-ios-convergence-2026-09.md`, which now records the outcome. Order: engine first (CONV-01 seams, CONV-02
 in-process swap behind the legacy screens, CONV-03 XPC removal with its contracts, CONV-04 memory
 relief), then the screens one per commit (CONV-10 to CONV-18), with CONV-20 re-verifying the frozen
 iOS behavior when the phone is back. Accepted costs: no crash isolation, and 8 GB relief from
@@ -81,8 +82,17 @@ announce and catalog card titles), and the legacy remainder is gone: BatchGenera
 AppTheme, LayoutConstants and the macOS drafts, replaced by the shared iOS drafts. Its lanes passed
 (localization 215251-77c1665d, smoke 215552-ae7e4fe4 7/7 with the batch and long-form journeys on
 the new sheet, perf 220611-0bb33592 nine scenarios clean, custom benchmark 221418-0b947118) and
-CONV-22 is closed. Every legacy macOS screen is now replaced; CONV-18 (perf re-baseline from at
-least three sessions, marketing captures, documentation) is the close-out and is in flight.
+CONV-22 is closed. Every legacy macOS screen is now replaced. CONV-18 closed the plan (55c8cd9b):
+the UI perf thresholds moved to baseline-v3 from three sessions on the converged tree (220611,
+221935, 222752; nine scenarios each, no warnings), the six macOS README and website images were
+retaken through the explicit capture class (now with a Voice Design and Settings capture) and the
+first capture at a 720 pt window exposed two narrow-window defects the lanes never see, both
+fixed: the Studio chips now wrap through MacChipFlow instead of pushing the canvas past the
+viewport, and the Settings package label keeps its width over the badge. The release QA doc gained
+an attended walk of the converged screens. The plan is archived complete; CONV-20 (device
+re-verification of the frozen iOS behavior) and CONV-21 (the toolchain bump) moved to
+`release-first-3-0-2026-09`, which is the primary plan again and remains parked on the phone for
+its release path; phone-free work continues in the other plans.
 Its lanes needed three fixes on the way (an NSTextView bridge answering an infinite proposal with
 its document height, then the screen identifier erasing the dock identifiers) and passed on
 62279fc7 (localization 183823-bca6adf5, smoke 184118-afaded1b 7/7, perf 185131-61165de6, custom

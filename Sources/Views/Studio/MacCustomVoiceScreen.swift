@@ -21,11 +21,9 @@ struct MacCustomVoiceScreen: View {
 
     @State private var detectedPromptLanguage: Qwen3SupportedLanguage = .auto
     @State private var presentedSheet: CustomVoicePresentedSheet?
-    @State private var isCustomToneMode = false
-    @State private var customToneText = ""
+    @State private var deliverySelection = MacDeliverySelection()
 
     private let tint = MacTheme.Brand.modeCustom
-    private let customToneCharacterLimit = GenerationTextLimitPolicy.deliveryInstructionLimit
 
     private var coordinator: StudioGenerationCoordinator { appModel.customCoordinator }
 
@@ -58,24 +56,6 @@ struct MacCustomVoiceScreen: View {
 
     private var effectiveLanguage: Qwen3SupportedLanguage {
         LanguageSelectionPresentation.effective(selected: draft.selectedLanguage, detected: detectedPromptLanguage)
-    }
-
-    private var isFollowingDetection: Bool {
-        LanguageSelectionPresentation.isFollowingDetection(selected: draft.selectedLanguage, detected: detectedPromptLanguage)
-    }
-
-    private var selectedPreset: EmotionPreset? {
-        guard !isCustomToneMode else { return nil }
-        return EmotionPreset.matchInstruction(draft.emotion.trimmingCharacters(in: .whitespacesAndNewlines))?.preset
-            ?? (DeliveryProfile.isNeutralInstruction(draft.emotion) ? EmotionPreset.all.first : nil)
-    }
-
-    private var deliveryChipValue: String {
-        if isCustomToneMode {
-            let trimmed = customToneText.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? MacInterfaceText.emotionCustom : trimmed
-        }
-        return selectedPreset?.label ?? draft.emotion
     }
 
     private var languageHintMessage: String? {
@@ -169,7 +149,7 @@ struct MacCustomVoiceScreen: View {
         .accessibilityIdentifier("screen_customVoice")
         .onAppear {
             reconcileGenerationVariantSelection()
-            syncDeliveryModeFromDraft()
+            deliverySelection = MacDeliverySelection.synced(from: draft.emotion)
         }
         .task(id: draft.text) {
             // Debounced: the detector loads a language recognizer per call, so it
@@ -243,32 +223,29 @@ struct MacCustomVoiceScreen: View {
 
     @ViewBuilder
     private var setupChips: some View {
-        chipContainer("customVoice_voiceSetup") { speakerChip }
+        MacStudioChipContainer(accessibilityIdentifier: "customVoice_voiceSetup") { speakerChip }
         if supportsDeliveryControl {
-            chipContainer("customVoice_toneSpeed") { deliveryChip }
+            MacStudioChipContainer(accessibilityIdentifier: "customVoice_toneSpeed") {
+                MacStudioDeliveryChip(
+                    selection: $deliverySelection,
+                    emotion: $draft.emotion,
+                    deliveryProfile: $draft.deliveryProfile,
+                    tint: tint
+                )
+            }
         }
-        chipContainer("customVoice_languageSetup") { languageChip }
+        MacStudioChipContainer(accessibilityIdentifier: "customVoice_languageSetup") {
+            MacStudioLanguageChip(
+                selectedLanguage: $draft.selectedLanguage,
+                detectedLanguage: detectedPromptLanguage,
+                tint: tint,
+                accessibilityIdentifier: "customVoice_languagePicker"
+            )
+        }
         MacSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: tint)
-        MacStudioActionChip(
-            eyebrow: MacInterfaceText.studioChipBatch,
-            value: MacInterfaceText.textInputBatch,
-            leadingSymbol: "list.bullet.rectangle",
-            tint: tint,
-            isEnabled: canRunBatch,
-            accessibilityIdentifier: "textInput_batchButton",
-            action: { presentedSheet = .batch(.custom(draft: draft)) }
-        )
-        .frame(maxWidth: 160)
-    }
-
-    /// The legacy container identifiers stay on a genuine parent of the chip,
-    /// never on the chip's own node, so the picker identifier keeps resolving.
-    private func chipContainer<Chip: View>(_ identifier: String, @ViewBuilder chip: () -> Chip) -> some View {
-        HStack(spacing: 0) {
-            chip()
+        MacStudioBatchChip(tint: tint, isEnabled: canRunBatch) {
+            presentedSheet = .batch(.custom(draft: draft))
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(identifier)
     }
 
     private var recommendedSpeakers: [String] {
@@ -316,99 +293,18 @@ struct MacCustomVoiceScreen: View {
         )
     }
 
-    private var deliveryChip: some View {
-        MacStudioSetupChip(
-            eyebrow: MacInterfaceText.delivery,
-            value: deliveryChipValue,
-            leadingSymbol: "theatermasks.fill",
-            tint: MacTheme.emotionColor(for: selectedPreset?.id, fallback: tint),
-            accessibilityIdentifier: "delivery_tonePicker",
-            accessibilityValue: draft.emotion
-        ) {
-            // The measured split (DP-12): distinct deliveries first, directional
-            // hints second, so the menu tells the truth about what each half can promise.
-            Section(MacInterfaceText.emotionDistinctDeliveries) {
-                ForEach(EmotionPreset.all.filter { !$0.isDirectionalHint }) { preset in
-                    presetRow(preset)
-                }
-            }
-            Section(MacInterfaceText.emotionDirectionalHints) {
-                ForEach(EmotionPreset.all.filter(\.isDirectionalHint)) { preset in
-                    presetRow(preset)
-                }
-            }
-            Section {
-                Toggle(
-                    MacInterfaceText.emotionCustom,
-                    isOn: Binding(get: { isCustomToneMode }, set: { _ in enterCustomToneMode() })
-                )
-            }
-        }
-    }
-
-    private func presetRow(_ preset: EmotionPreset) -> some View {
-        Toggle(
-            preset.label,
-            isOn: Binding(
-                get: { !isCustomToneMode && selectedPreset?.id == preset.id },
-                set: { _ in selectPreset(preset) }
-            )
-        )
-    }
-
-    private var languageChip: some View {
-        let options = Qwen3SupportedLanguage.allCases
-        let recommended: Qwen3SupportedLanguage? = detectedPromptLanguage == .auto ? nil : detectedPromptLanguage
-        let label = LanguageSelectionPresentation.buttonLabel(selected: draft.selectedLanguage, detected: detectedPromptLanguage)
-        return MacStudioSetupChip(
-            eyebrow: isFollowingDetection ? MacInterfaceText.languageAutoDetail : MacInterfaceText.sectionLanguage,
-            value: label,
-            leadingSymbol: "globe",
-            tint: tint,
-            accessibilityIdentifier: "customVoice_languagePicker",
-            accessibilityValue: isFollowingDetection ? "\(label), auto" : label
-        ) {
-            if let recommended {
-                Section(MacInterfaceText.recommendedForScript) {
-                    languageRow(recommended, title: MacInterfaceText.workflowDetectedLanguage(recommended.displayName))
-                }
-                Section(MacInterfaceText.workflowAllLanguages) {
-                    ForEach(options.filter { $0 != recommended }, id: \.self) { language in
-                        languageRow(language)
-                    }
-                }
-            } else {
-                ForEach(options, id: \.self) { language in
-                    languageRow(language)
-                }
-            }
-        }
-    }
-
-    private func languageRow(_ language: Qwen3SupportedLanguage, title: String? = nil) -> some View {
-        Toggle(
-            title ?? language.displayName,
-            isOn: Binding(
-                get: { draft.selectedLanguage == language },
-                set: { _ in draft.selectedLanguage = language }
-            )
-        )
-    }
-
     // MARK: - Footer rows under the chips
 
     @ViewBuilder
     private var chipFooter: some View {
-        if isCustomToneMode, supportsDeliveryControl {
-            customToneField
-        }
-        if !isCustomToneMode, supportsDeliveryControl, selectedPreset?.isDirectionalHint == true {
-            Label(EmotionPreset.directionalHintAdvisory, systemImage: "wand.and.sparkles")
-                .font(.caption2)
-                .foregroundStyle(MacTheme.Text.secondary)
-                .accessibilityIdentifier("delivery_hintAdvisory")
-        }
-        if !supportsDeliveryControl {
+        if supportsDeliveryControl {
+            MacStudioDeliveryFooter(
+                selection: $deliverySelection,
+                emotion: $draft.emotion,
+                deliveryProfile: $draft.deliveryProfile,
+                tint: tint
+            )
+        } else {
             Label(MacInterfaceText.customDeliveryUnsupported, systemImage: "slider.horizontal.3")
                 .font(.caption2)
                 .foregroundStyle(MacTheme.Text.secondary)
@@ -431,78 +327,6 @@ struct MacCustomVoiceScreen: View {
                 accessibilityIdentifier: "customVoice_readiness"
             )
         }
-    }
-
-    private var customToneField: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            TextField(MacInterfaceText.emotionCustomTonePlaceholder, text: $customToneText)
-                .textFieldStyle(.plain)
-                .font(.callout)
-                .foregroundStyle(MacTheme.Text.primary)
-                .vocelloFocusRing(tint, radius: 10)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background {
-                    RoundedRectangle(cornerRadius: MacTheme.Radius.input, style: .continuous)
-                        .fill(MacTheme.Surface.field)
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: MacTheme.Radius.input, style: .continuous)
-                        .stroke(MacTheme.Surface.fieldStroke, lineWidth: 0.5)
-                }
-                .accessibilityLabel(MacInterfaceText.emotionCustomTone)
-                .accessibilityIdentifier("delivery_toneField")
-                .onChange(of: customToneText) { _, newValue in
-                    if newValue.count > customToneCharacterLimit {
-                        customToneText = String(newValue.prefix(customToneCharacterLimit))
-                    }
-                    applyCustomTone()
-                }
-
-            if DeliveryInstructionAdvisor.hasDurationDirective(customToneText) {
-                Label(DeliveryInstructionAdvisor.advisoryMessage, systemImage: "exclamationmark.triangle")
-                    .font(.caption2)
-                    .foregroundStyle(MacTheme.Status.guarded)
-                    .accessibilityIdentifier("delivery_durationAdvisory")
-            }
-        }
-    }
-
-    // MARK: - Delivery state
-
-    /// The draft stores the instruction and the profile; the chip derives its
-    /// preset from them, and Custom keeps its own text so an empty custom
-    /// field stays neutral in the request.
-    private func syncDeliveryModeFromDraft() {
-        let trimmed = draft.emotion.trimmingCharacters(in: .whitespacesAndNewlines)
-        if EmotionPreset.matchInstruction(trimmed) != nil || DeliveryProfile.isNeutralInstruction(trimmed) {
-            isCustomToneMode = false
-            customToneText = ""
-        } else {
-            isCustomToneMode = true
-            customToneText = trimmed
-        }
-    }
-
-    private func selectPreset(_ preset: EmotionPreset) {
-        // A new selection always ships the preset's shipped tier (the DP-8
-        // strong anchor; happy/angry ship normal, DP-22 branch (a)).
-        isCustomToneMode = false
-        customToneText = ""
-        let profile = DeliveryProfile.preset(preset, intensity: preset.shippedIntensity)
-        draft.emotion = profile.finalInstruction
-        draft.deliveryProfile = profile
-    }
-
-    private func enterCustomToneMode() {
-        isCustomToneMode = true
-        applyCustomTone()
-    }
-
-    private func applyCustomTone() {
-        let profile = DeliveryProfile.custom(customToneText)
-        draft.emotion = profile.finalInstruction
-        draft.deliveryProfile = profile
     }
 
     // MARK: - Actions

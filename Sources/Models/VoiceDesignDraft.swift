@@ -23,3 +23,24 @@ struct VoiceDesignDraft: Equatable {
         return [voiceDescription, selectedLanguage.rawValue, emotion, text].joined(separator: "|")
     }
 }
+
+/// The designed take of the current brief that can become a saved voice; it
+/// stays offered only while the brief, delivery and script still match.
+struct VoiceDesignSavedVoiceCandidate: Equatable {
+    let audioPath: String
+    let transcript: String
+    let voiceDescription: String
+    let emotion: String
+    let text: String
+    private(set) var savedVoiceName: String?
+
+    var isSaved: Bool { savedVoiceName != nil }
+
+    func matches(draft: VoiceDesignDraft) -> Bool {
+        voiceDescription == draft.voiceDescription && emotion == draft.emotion && text == draft.text
+    }
+
+    mutating func markSaved(as voiceName: String) {
+        savedVoiceName = voiceName
+    }
+}

@@ -429,9 +429,7 @@ targets:
       - path: Sources/iOS/Commerce/IOSCommercePresentationText.swift
       - path: Sources/iOSSupport/Services/IOSSettingsModelNavigation.swift
       - path: Sources/Services/MacStudioGenerationRequestFactory.swift
-      - path: Sources/Models/VoiceDesignDraft.swift
       - path: Sources/Models/ScriptTextState.swift
-      - path: Sources/ViewModels/VoiceDesignCoordinator.swift
       - path: Sources/Services/MacInterfaceText.swift
       - path: Sources/Services/MacInterfaceLanguage.swift
       - path: Sources/ViewModels/GenerationLifecycleExecutor.swift

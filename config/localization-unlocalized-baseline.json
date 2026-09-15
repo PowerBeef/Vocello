@@ -7,12 +7,6 @@
       "path": "Sources/Views/Components/TextInputView.swift"
     },
     {
-      "call": "Text",
-      "count": 1,
-      "literalSha256": "04f4943ec0b4e068cfdd00baeb91191c41edb789df0ed1aed28d84dd2675d0d7",
-      "path": "Sources/Views/Components/VoiceBriefEditor.swift"
-    },
-    {
       "call": "Button",
       "count": 1,
       "literalSha256": "565339bc4d33d72817b583024112eb7f5cdf3e5eef0252d6ec1b9c9a94e12bb3",

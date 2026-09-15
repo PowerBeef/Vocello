@@ -61,6 +61,9 @@ shows the same screen; its lanes passed (localization 172237-799a37c7, smoke 172
 173808-8adae46d) and CONV-14 is closed. CONV-15 put Built-in Voice on the iOS Studio canvas
 (composer, chip menus, dock with the player card) over the shared single-take pipeline; the batch
 sheet and runner wait for CONV-22 because the legacy Design and Cloning screens still present them.
+CONV-16 followed with Voice Design on the same canvas: the brief editor inline above the composer,
+the shared Delivery and Language chips (now `MacStudioChips`), and the save-as-voice action for the
+last take over the shared pipeline.
 Its lanes needed three fixes on the way (an NSTextView bridge answering an infinite proposal with
 its document height, then the screen identifier erasing the dock identifiers) and passed on
 62279fc7 (localization 183823-bca6adf5, smoke 184118-afaded1b 7/7, perf 185131-61165de6, custom

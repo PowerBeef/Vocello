@@ -2,7 +2,7 @@ import Foundation
 
 /// Single source of truth for the Voice Design brief product copy + limits,
 /// shared by the iOS brief sheet (`IOSVoiceDesignBriefSheet`) and the macOS
-/// inline editor (`VoiceBriefEditor`).
+/// inline editor (`MacVoiceBriefEditor`).
 enum VoiceDesignBriefCatalog {
     /// Voice Design BRIEF (the voice DESCRIPTION) limit — deliberately
     /// decoupled from the spoken-script limit. Research on the official

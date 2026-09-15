@@ -84,12 +84,12 @@ Tests assert these visible production surfaces directly.
 
 | Element | Identifier |
 |---|---|
-| Voice brief field | `voiceDesign_voiceDescriptionField` (visible field; current brief is its accessibility value) |
-| Brief starters | `voiceDesign_briefStarter_<n>` |
-| Brief char count | `voiceDesign_briefCharCount` |
-| Language + delivery | `voiceDesign_toneSpeed` / `voiceDesign_languageSetup`; delivery menu `voiceDesign_tonePicker` with the same DP-14 sectioning and `voiceDesign_hintAdvisory` caption as Custom |
-| Save voice | `voiceDesign_saveVoiceButton` / `voiceDesign_saveVoiceCompleted` |
-| Script + CTAs | `textInput_*` (shared) |
+| Voice brief | inline editor `voiceDesign_voiceDescriptionField` inside `voiceDesign_voiceSetup` (the brief is the container's accessibility value); starters menu `voiceDesign_briefStarters` with `voiceDesign_briefStarter_<n>`; count `voiceDesign_briefCharCount` |
+| Delivery chip | `delivery_tonePicker` inside `voiceDesign_toneSpeed` (same sections, `delivery_hintAdvisory`, `delivery_toneField` as Built-in Voice) |
+| Language chip | `voiceDesign_languagePicker` inside `voiceDesign_languageSetup` |
+| Readiness | `voiceDesign_readiness` (value "Ready" or "Waiting") |
+| Save voice | `voiceDesign_saveVoiceButton` beside the readiness line after a take; `voiceDesign_saveVoiceCompleted` once saved |
+| Script + CTAs + dock | `textInput_*` and `studio_inlinePlayer_*` (shared) |
 
 ### Voice Cloning (`sidebar_voiceCloning` → `screen_voiceCloning`)
 

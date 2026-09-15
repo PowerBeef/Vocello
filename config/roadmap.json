@@ -116,12 +116,14 @@
       "title": "Voice Design on the iOS screen",
       "status": "in-flight",
       "blockedBy": [],
-      "gate": "VoiceDesignView.swift, VoiceBriefEditor.swift, ContinuousVoiceDescriptionField.swift and VoiceDesignCoordinator.swift are absent; voiceDesign_* identifiers unchanged; localization and benchmark --modes design PASS.",
+      "gate": "VoiceDesignView.swift, VoiceBriefEditor.swift, ContinuousVoiceDescriptionField.swift, VoiceDesignCoordinator.swift and its test are absent; MacVoiceDesignScreen renders the iOS Studio canvas with the inline brief editor and the shared chips; voiceDesign_* identifiers unchanged; localization, smoke and benchmark --modes design PASS.",
       "sourceOfTruth": [
-        "Sources/Views/Generate/VoiceDesignView.swift",
-        "Sources/ViewModels/VoiceDesignCoordinator.swift"
+        "Sources/Views/Studio/MacVoiceDesignScreen.swift",
+        "Sources/Views/Studio/MacStudioChips.swift",
+        "Sources/Services/MacStudioGenerationRequestFactory.swift"
       ],
-      "updated": "2026-09-15"
+      "updated": "2026-09-15",
+      "notes": "Voice Design landed 2026-09-15: MacVoiceDesignScreen on MacStudioCanvas (brief editor inline in MacVoiceBriefEditor with the shared starters menu, so the benchmark keeps typing into voiceDesign_voiceDescriptionField; Delivery and Language chips extracted into MacStudioChips and shared with Built-in Voice; save-as-voice action beside the readiness line over MacSavedVoiceSheet; MacAppModel.designCoordinator; the Design request still comes from the tested factory). VoiceDesignView, VoiceBriefEditor, ContinuousVoiceDescriptionField, VoiceDesignCoordinator and its test are gone (F-15 re-pointed); VoiceDesignDraft.swift stays until the drafts swap (CONV-17). Remaining gate: localization, smoke and benchmark --modes design PASS run ids."
     },
     {
       "id": "CONV-17",
@@ -353,7 +355,7 @@
       "status": "parked",
       "gate": "Capture the complete Design draft and variation before asynchronous startup. Behavioral request-path tests prove explicit French, Auto, pinned/default seed, and subsequent UI edits cannot change the prepared request. Focused tests and macOS build pass; candidate acceptance proves visible selection-to-engine parity.",
       "sourceOfTruth": [
-        "Sources/ViewModels/VoiceDesignCoordinator.swift",
+        "Sources/Views/Studio/MacVoiceDesignScreen.swift",
         "Sources/Services/MacStudioGenerationRequestFactory.swift"
       ],
       "updated": "2026-09-13",

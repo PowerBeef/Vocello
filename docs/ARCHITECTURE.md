@@ -566,10 +566,11 @@ back, complete a post-publication commit, or finish a user-confirmed delete with
 The legacy `enrollPreparedVoice` entry remains only as a prepare-plus-commit compatibility route
 for noninteractive CLI and diagnostics.
 
-macOS generation flows through three coordinators in `Sources/ViewModels/`:
-`CustomVoiceCoordinator`, `VoiceDesignCoordinator`, `VoiceCloningCoordinator`
-(all `@MainActor @Observable`). Each builds a `GenerationRequest` from its draft
-and runs it through the shared `GenerationLifecycleExecutor`
+macOS Built-in Voice and Voice Design generate through the shared Studio pipeline
+(`StudioGenerationCoordinator` owned by `MacAppModel`, `IOSSingleTakeGenerationExecutor`,
+`MacStudioSingleTakeGenerationHooks`). Voice Cloning still runs through its legacy
+`VoiceCloningCoordinator` (`@MainActor @Observable`) until its port: it builds a
+`GenerationRequest` from its draft and runs it through the legacy `GenerationLifecycleExecutor`
 (`Sources/ViewModels/GenerationLifecycleExecutor.swift`, extracted in the 2026-08
 UI review's wave 2): the executor owns the single-take prepare/run/cancel
 sequencing against `TTSEngineStore.generate(...)` — a nil prepared take aborts
@@ -579,9 +580,8 @@ additionally primes the clone reference via `ensureCloneReferencePrimed(...)`. D
 request assembly is centralized in the pure `MacStudioGenerationRequestFactory`, which preserves
 the exact UI language, reference transcript/voice identity, prompt, seed, variation, and generation
 identity before the engine call. Clone Auto is then resolved by shared `GenerationSemantics` from
-the target text; reference-language metadata never selects output language. The Studio screens of
-plan `macos-ios-convergence-2026-09` replace these coordinators with the shared
-`StudioGenerationCoordinator` and `IOSSingleTakeGenerationExecutor`.
+the target text; reference-language metadata never selects output language. The Cloning port of
+plan `macos-ios-convergence-2026-09` retires the last coordinator and the executor.
 
 ---
 
@@ -685,7 +685,7 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   and the desktop preference rows on one screen for the sidebar item and the Cmd+, scene. Studio
   (`Sources/Views/Studio`) renders the iOS canvas per mode; Built-in Voice generates through the
   shared `StudioGenerationCoordinator` and `IOSSingleTakeGenerationExecutor` with
-  `MacStudioSingleTakeGenerationHooks` (Design and Cloning follow with their ports).
+  `MacStudioSingleTakeGenerationHooks` (Cloning follows with its port).
 - State: coordinators and `ModelManagerViewModel` are `@MainActor @Observable`;
   the shared `TTSEngineStore` and `AudioPlayerViewModel` are `ObservableObject`s
   injected as environment objects, with the store's `snapshotChanges` and

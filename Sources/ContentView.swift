@@ -431,19 +431,8 @@ private struct CustomVoiceScreenHost: View {
 private struct VoiceDesignScreenHost: View {
     @Binding var draft: VoiceDesignDraft
 
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @Environment(ModelManagerViewModel.self) private var modelManager
-    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
-
     var body: some View {
-        VoiceDesignView(
-            draft: $draft,
-            ttsEngineStore: ttsEngineStore,
-            audioPlayer: audioPlayer,
-            modelManager: modelManager,
-            savedVoicesViewModel: savedVoicesViewModel
-        )
+        MacVoiceDesignScreen(draft: $draft)
     }
 }
 

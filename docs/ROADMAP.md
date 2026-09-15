@@ -43,7 +43,7 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 ### Open items in detail
 
 - **`CONV-16`** (in-flight) — Voice Design on the iOS screen.
-  gate: VoiceDesignView.swift, VoiceBriefEditor.swift, ContinuousVoiceDescriptionField.swift and VoiceDesignCoordinator.swift are absent; voiceDesign_* identifiers unchanged; localization and benchmark --modes design PASS.
+  gate: VoiceDesignView.swift, VoiceBriefEditor.swift, ContinuousVoiceDescriptionField.swift, VoiceDesignCoordinator.swift and its test are absent; MacVoiceDesignScreen renders the iOS Studio canvas with the inline brief editor and the shared chips; voiceDesign_* identifiers unchanged; localization, smoke and benchmark --modes design PASS.
 
 - **`CONV-17`** (planned) — Voice Cloning on the iOS screen and removal of the legacy remainder.
   gate: VoiceCloningView.swift, VoiceCloningCoordinator.swift, GenerationLifecycleExecutor.swift (with its test and project.yml entry), TextInputView.swift, GenerationWorkflowView.swift, EmotionPickerView.swift, WaveformView.swift, LayoutConstants.swift and AppTheme.swift are absent and the shared iOS GenerationDrafts replace the macOS drafts; voiceCloning_* identifiers unchanged; native.md and the app guide describe the new screens; localization, all seven smoke journeys, all nine perf scenarios and the canonical benchmark PASS.

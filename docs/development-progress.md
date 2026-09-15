@@ -73,8 +73,16 @@ views) is gone. Its lanes passed (localization 202046-d7f04ed1, smoke 202348-6a2
 203408-f0d2bd13 nine scenarios clean, clone benchmark 204218-674a9e13) and CONV-17 is closed. Push
 CI had been red since the Settings commit on one test fixture calling a main-actor bootstrap from a
 nonisolated setUp (Xcode 26.6 on CI refuses what Xcode 27 accepts locally); ea795cde fixed it
-forward. CONV-22 (batch and long-form on the shared pipeline, then AppTheme, LayoutConstants and
-the drafts swap) is next.
+forward. CONV-22 landed as 606faa1f: MacBatchGenerationSheet serves all three modes, line batch
+loops the shared single-take executor through MacLineBatchRunner on MacAppModel, long-form runs the
+shared iOS coordinator and runner through a platform-hooks seam (the iOS adapter reproduces the
+inline calls, the macOS adapter supplies Settings variation and language, telemetry merge, History
+announce and catalog card titles), and the legacy remainder is gone: BatchGenerationRunner,
+AppTheme, LayoutConstants and the macOS drafts, replaced by the shared iOS drafts. Its lanes passed
+(localization 215251-77c1665d, smoke 215552-ae7e4fe4 7/7 with the batch and long-form journeys on
+the new sheet, perf 220611-0bb33592 nine scenarios clean, custom benchmark 221418-0b947118) and
+CONV-22 is closed. Every legacy macOS screen is now replaced; CONV-18 (perf re-baseline from at
+least three sessions, marketing captures, documentation) is the close-out and is in flight.
 Its lanes needed three fixes on the way (an NSTextView bridge answering an infinite proposal with
 its document height, then the screen identifier erasing the dock identifiers) and passed on
 62279fc7 (localization 183823-bca6adf5, smoke 184118-afaded1b 7/7, perf 185131-61165de6, custom

@@ -3314,6 +3314,31 @@
         "file:Sources/Views/Studio/MacVoiceCloningScreen.swift",
         "file:Sources/Models/VoiceCloningReferenceAudioSupport.swift"
       ]
+    },
+    {
+      "id": "CONV-22",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Line batch and long-form on the shared runner",
+      "status": "done",
+      "gate": "BatchGenerationSheet.swift and BatchGenerationRunner.swift are absent; MacBatchGenerationSheet and MacLineBatchRunner run line batch over the shared single-take executor and long-form projects over IOSLongFormProject for all three modes; batch_* identifiers and TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS unchanged; F-16 sourceOfTruth re-pointed; AppTheme.swift and LayoutConstants.swift are absent and the shared iOS GenerationDrafts replace the macOS drafts; smoke (test06, test07) PASS.",
+      "sourceOfTruth": [
+        "Sources/Views/Studio/MacBatchGenerationSheet.swift",
+        "Sources/Services/MacLineBatchRunner.swift",
+        "Sources/Services/MacStudioLongFormPlatformHooks.swift",
+        "Sources/iOS/Studio/IOSLongFormProject.swift"
+      ],
+      "notes": "Closed 2026-09-15 with 606faa1f. MacBatchGenerationSheet + MacLineBatchRunner (owned by MacAppModel) run line batch over IOSSingleTakeGenerationExecutor with the mac hooks under one StudioGenerationCoordinator attempt; long-form runs the shared IOSLongFormCoordinator/IOSLongFormProjectRunner through the new IOSLongFormPlatformHooks seam (iOS adapter reproduces the inline calls; mac adapter = variation preference, waveform hash, telemetry merge, History announce, Settings-language presentation). Deleted: BatchGenerationSheet, BatchGenerationRunner, AppTheme, LayoutConstants, macOS GenerationDrafts/VoiceDesignDraft (iOS drafts compiled by path; MacVoiceCloningReadiness keeps the catalog copy; libraryContentMaxWidth 960). Every batch_* id kept; 9 vocello.mac.batch keys added with French, 23 dead keys pruned; F-16 re-pointed. Lanes: localization macos-xcui-localization-20260915-215251-77c1665d, smoke macos-xcui-smoke-20260915-215552-ae7e4fe4 (7/7), perf macos-xcui-perf-20260915-220611-0bb33592 (9 scenarios passed, no warnings), custom benchmark macos-xcui-benchmark-20260915-221418-0b947118.",
+      "updated": "2026-09-15",
+      "evidence": [
+        "commit:606faa1f",
+        "run:macos-xcui-localization-20260915-215251-77c1665d",
+        "run:macos-xcui-smoke-20260915-215552-ae7e4fe4",
+        "run:macos-xcui-perf-20260915-220611-0bb33592",
+        "run:macos-xcui-benchmark-20260915-221418-0b947118",
+        "file:Sources/Views/Studio/MacBatchGenerationSheet.swift",
+        "file:Sources/Services/MacLineBatchRunner.swift",
+        "file:Sources/iOS/Studio/IOSLongFormProject.swift"
+      ]
     }
   ]
 }

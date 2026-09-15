@@ -1289,6 +1289,12 @@ trend percentages carry their direction in words.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-13 | [`macos-xcui-benchmark-20260913-202238-83dcb7d1`](runs/ui-generation/macos-xcui-benchmark-20260913-202238-83dcb7d1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | 0.82 | `220a887bae19` | `25798e92e423` | baseline | capture-smoke-1 |
 
+## ui-generation / macos / mac-mini-m2-8gb / config `2a9b9e90bc10`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-15 | [`macos-xcui-benchmark-20260915-221418-0b947118`](runs/ui-generation/macos-xcui-benchmark-20260915-221418-0b947118.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | 0.78 | `606faa1fe93c` | `2a9b9e90bc10` | baseline | macos-xcui-benchmark-20260915-221418-0b947118 |
+
 ## ui-generation / macos / mac-mini-m2-8gb / config `2fa1bcbeb993`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
@@ -1554,6 +1560,12 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-15 | [`macos-xcui-perf-20260915-164002-0177f946`](runs/ui-perf/macos-xcui-perf-20260915-164002-0177f946.json) | canonical | canonical | passed | not-applicable | 9 | — | `1e2780bbd780` | `3eb6ed9e4625` | baseline | macos-xcui-perf-20260915-164002-0177f946 |
+
+## ui-perf / macos / mac-mini-m2-8gb / config `98cc9677aeef`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-15 | [`macos-xcui-perf-20260915-220611-0bb33592`](runs/ui-perf/macos-xcui-perf-20260915-220611-0bb33592.json) | canonical | canonical | passed | not-applicable | 9 | — | `606faa1fe93c` | `98cc9677aeef` | baseline | macos-xcui-perf-20260915-220611-0bb33592 |
 
 ## ui-perf / macos / mac-mini-m2-8gb / config `b9aa3720228c`
 

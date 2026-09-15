@@ -96,26 +96,10 @@
   ],
   "items": [
     {
-      "id": "CONV-22",
-      "plan": "macos-ios-convergence-2026-09",
-      "title": "Line batch and long-form on the shared runner",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "BatchGenerationSheet.swift and BatchGenerationRunner.swift are absent; MacBatchGenerationSheet and MacLineBatchRunner run line batch over the shared single-take executor and long-form projects over IOSLongFormProject for all three modes; batch_* identifiers and TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS unchanged; F-16 sourceOfTruth re-pointed; AppTheme.swift and LayoutConstants.swift are absent and the shared iOS GenerationDrafts replace the macOS drafts; smoke (test06, test07) PASS.",
-      "sourceOfTruth": [
-        "Sources/Views/Studio/MacBatchGenerationSheet.swift",
-        "Sources/Services/MacLineBatchRunner.swift",
-        "Sources/Services/MacStudioLongFormPlatformHooks.swift",
-        "Sources/iOS/Studio/IOSLongFormProject.swift"
-      ],
-      "notes": "Split out of CONV-15 on 2026-09-15: the batch sheet and runner are shared by the legacy Design and Cloning screens, so they can only leave once the shared sheet serves all three modes.",
-      "updated": "2026-09-15"
-    },
-    {
       "id": "CONV-18",
       "plan": "macos-ios-convergence-2026-09",
       "title": "Perf re-baseline, marketing captures and documentation of the new macOS app",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "config/ui-perf-thresholds.json cites at least three perf sessions on the new tree in a dated decision; the README and website screenshots are recaptured from the new app; macos-release-qa.md walks the new screens; the plan is archived.",
       "sourceOfTruth": [
@@ -123,7 +107,7 @@
         "Tests/VocelloMacUITests/VocelloMacMarketingCaptureUITests.swift",
         "docs/reference/macos-release-qa.md"
       ],
-      "updated": "2026-09-14"
+      "updated": "2026-09-15"
     },
     {
       "id": "CONV-20",

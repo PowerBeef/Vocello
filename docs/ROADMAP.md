@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `macos-ios-convergence-2026-09` | active | backend-and-platform | 12/16 (75%) |
+| `macos-ios-convergence-2026-09` | active | backend-and-platform | 13/16 (81%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -33,14 +33,13 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `CONV-18` | planned | Perf re-baseline, marketing captures and documentation of the new macOS app | — |
+| `CONV-18` | in-flight | Perf re-baseline, marketing captures and documentation of the new macOS app | — |
 | `CONV-20` | parked | Device re-verification of the frozen iOS behavior | — |
 | `CONV-21` | planned | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
-| `CONV-22` | in-flight | Line batch and long-form on the shared runner | — |
 
 ### Open items in detail
 
-- **`CONV-18`** (planned) — Perf re-baseline, marketing captures and documentation of the new macOS app.
+- **`CONV-18`** (in-flight) — Perf re-baseline, marketing captures and documentation of the new macOS app.
   gate: config/ui-perf-thresholds.json cites at least three perf sessions on the new tree in a dated decision; the README and website screenshots are recaptured from the new app; macos-release-qa.md walks the new screens; the plan is archived.
 
 - **`CONV-20`** (parked) — Device re-verification of the frozen iOS behavior.
@@ -49,9 +48,6 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 - **`CONV-21`** (planned) — Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages.
   gate: config/toolchain.json pins a CI toolchain that GitHub's runners provide; the macOS and iOS deployment targets stay at 26 in project.yml; any mlx-swift, mlx-swift-lm or swift-transformers move is one authorized change reviewed with the gate benchmark (medians of three warm takes) and a clean unit lane; scripts/dev.sh ci is green on the new pin.
-
-- **`CONV-22`** (in-flight) — Line batch and long-form on the shared runner.
-  gate: BatchGenerationSheet.swift and BatchGenerationRunner.swift are absent; MacBatchGenerationSheet and MacLineBatchRunner run line batch over the shared single-take executor and long-form projects over IOSLongFormProject for all three modes; batch_* identifiers and TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS unchanged; F-16 sourceOfTruth re-pointed; AppTheme.swift and LayoutConstants.swift are absent and the shared iOS GenerationDrafts replace the macOS drafts; smoke (test06, test07) PASS.
 
 ## Autonomous validation audit remediation
 

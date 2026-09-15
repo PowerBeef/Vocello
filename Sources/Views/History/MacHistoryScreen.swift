@@ -3,17 +3,29 @@ import QwenVoiceCore
 import SwiftUI
 
 /// One loaded History row with everything a card needs precomputed once, off
-/// the main thread, in `reloadHistory` (the per-row work used to be redone on
-/// every body invalidation).
+/// the main thread, in `reloadHistory`. Nothing here may be expensive: the
+/// screen's `@State` initial value copies the session cache on every
+/// `ContentView` body evaluation, which typing in the toolbar search field
+/// triggers per keystroke. The saved-voice sheet configuration is built on
+/// demand because its reference-language detection runs an on-device
+/// language model (about a tenth of a second per row on the main thread);
+/// building it here for every clone and design row made each keystroke a
+/// one-second hang (2026-09-15, Time Profiler on smoke test02).
 private struct MacHistoryListItem: Identifiable, Sendable {
+    /// What "Save to Saved Voices" enrolls; nil for modes whose take cannot
+    /// become a saved voice.
+    enum SaveVoiceSource: Sendable {
+        case cloneResult(suggestedName: String)
+        case designResult(voiceDescription: String)
+    }
+
     let generation: Generation
     let audioFileExists: Bool
     let textPreview: String
     let formattedDate: String
     let searchKey: String
     let waveformSeed: Int
-    /// Nil for modes whose take cannot become a saved voice.
-    let saveVoiceConfiguration: SavedVoiceSheetConfiguration?
+    let saveVoiceSource: SaveVoiceSource?
 
     var id: String { generation.historyAccessibilityID }
 
@@ -25,23 +37,36 @@ private struct MacHistoryListItem: Identifiable, Sendable {
         self.searchKey = "\(generation.text)\n\(generation.voice ?? "")".lowercased()
         self.waveformSeed = generation.id.map { Int(truncatingIfNeeded: $0) }
             ?? MacStableVisualHash.int(generation.audioPath)
-        self.saveVoiceConfiguration = Self.makeSaveVoiceConfiguration(for: generation)
+        self.saveVoiceSource = Self.makeSaveVoiceSource(for: generation)
     }
 
-    private static func makeSaveVoiceConfiguration(for generation: Generation) -> SavedVoiceSheetConfiguration? {
+    /// The sheet configuration, built when the user asks for it: this is the
+    /// only place the reference-language detector runs for a History row.
+    func makeSaveVoiceConfiguration() -> SavedVoiceSheetConfiguration? {
+        switch saveVoiceSource {
+        case .cloneResult(let suggestedName):
+            return .cloneResult(
+                suggestedName: suggestedName,
+                audioPath: generation.audioPath,
+                transcript: generation.text
+            )
+        case .designResult(let voiceDescription):
+            return .designResult(
+                voiceDescription: voiceDescription,
+                audioPath: generation.audioPath,
+                transcript: generation.text
+            )
+        case nil:
+            return nil
+        }
+    }
+
+    private static func makeSaveVoiceSource(for generation: Generation) -> SaveVoiceSource? {
         switch generation.mode {
         case GenerationMode.clone.rawValue:
-            return .cloneResult(
-                suggestedName: suggestedSavedVoiceName(for: generation),
-                audioPath: generation.audioPath,
-                transcript: generation.text
-            )
+            return .cloneResult(suggestedName: suggestedSavedVoiceName(for: generation))
         case GenerationMode.design.rawValue:
-            return .designResult(
-                voiceDescription: generation.voice ?? "",
-                audioPath: generation.audioPath,
-                transcript: generation.text
-            )
+            return .designResult(voiceDescription: generation.voice ?? "")
         default:
             return nil
         }
@@ -167,8 +192,10 @@ private struct MacHistoryActionAlert: Identifiable {
     var onConfirm: (() -> Void)? = nil
 }
 
+/// Built rows of the last load, so a re-created screen starts from them
+/// without stat-ing files or re-deriving row data.
 @MainActor private enum MacHistorySessionCache {
-    static var generations: [Generation] = []
+    static var items: [MacHistoryListItem] = []
 }
 
 /// Database- and file-manager-backed effects for the pure sequencing engine
@@ -204,7 +231,7 @@ struct MacHistoryScreen: View {
     /// draft as the pinned seed. Nil hides the action.
     var onPinSeed: ((Generation) -> Void)? = nil
 
-    @State private var items: [MacHistoryListItem] = MacHistorySessionCache.generations.map(MacHistoryListItem.init)
+    @State private var items: [MacHistoryListItem] = MacHistorySessionCache.items
     @State private var isLoading = false
     @State private var loadTask: Task<Void, Never>?
     @State private var loadError: String?
@@ -399,8 +426,8 @@ struct MacHistoryScreen: View {
                 onPlay: {
                     audioPlayer.playFile(item.generation.audioPath, title: item.textPreview)
                 },
-                onSaveToSavedVoices: item.saveVoiceConfiguration.map { configuration in
-                    { savedVoiceSheetConfiguration = configuration }
+                onSaveToSavedVoices: item.saveVoiceSource == nil ? nil : {
+                    savedVoiceSheetConfiguration = item.makeSaveVoiceConfiguration()
                 },
                 onSaveAs: { exportGeneration(item) },
                 onDelete: {
@@ -503,7 +530,7 @@ private extension MacHistoryScreen {
             items.append(MacHistoryListItem(generation: generation))
         }
         itemsRevision &+= 1
-        MacHistorySessionCache.generations = items.map(\.generation)
+        MacHistorySessionCache.items = items
     }
 
     func handleDisappear() {
@@ -640,7 +667,7 @@ private extension MacHistoryScreen {
                 await MainActor.run {
                     items = loadedItems
                     itemsRevision &+= 1
-                    MacHistorySessionCache.generations = loadedItems.map(\.generation)
+                    MacHistorySessionCache.items = loadedItems
                     loadError = nil
                     databaseUnavailable = false
                     isLoading = false
@@ -748,12 +775,7 @@ private extension MacHistoryScreen {
 
         items.removeAll { $0.id == item.id }
         itemsRevision &+= 1
-        MacHistorySessionCache.generations.removeAll { generation in
-            guard let generationID = generation.id, let itemID = item.generation.id else {
-                return generation.audioPath == item.generation.audioPath
-            }
-            return generationID == itemID
-        }
+        MacHistorySessionCache.items = items
         return outcome
     }
 
@@ -782,7 +804,7 @@ private extension MacHistoryScreen {
                 databaseUnavailable = false
                 items = []
                 itemsRevision &+= 1
-                MacHistorySessionCache.generations = []
+                MacHistorySessionCache.items = []
 
                 if failures > 0 {
                     presentActionAlert(

@@ -27,7 +27,7 @@ struct VoiceBriefEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .topLeading) {
-                ScriptTextEditor(
+                MacScriptTextEditor(
                     text: $text,
                     placeholder: "",
                     font: .systemFont(ofSize: NSFont.systemFontSize),

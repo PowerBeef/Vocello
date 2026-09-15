@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `macos-ios-convergence-2026-09` | active | backend-and-platform | 9/15 (60%) |
+| `macos-ios-convergence-2026-09` | active | backend-and-platform | 9/16 (56%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -33,23 +33,24 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `CONV-15` | in-flight | Studio canvas, Built-in Voice and line batch on the shared coordinators | — |
+| `CONV-15` | in-flight | Studio canvas and Built-in Voice on the shared single-take pipeline | — |
 | `CONV-16` | planned | Voice Design on the iOS screen | `CONV-15` |
 | `CONV-17` | planned | Voice Cloning on the iOS screen and removal of the legacy remainder | `CONV-16` |
 | `CONV-18` | planned | Perf re-baseline, marketing captures and documentation of the new macOS app | `CONV-17` |
 | `CONV-20` | parked | Device re-verification of the frozen iOS behavior | — |
 | `CONV-21` | planned | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
+| `CONV-22` | planned | Line batch and long-form on the shared runner | `CONV-15` |
 
 ### Open items in detail
 
-- **`CONV-15`** (in-flight) — Studio canvas, Built-in Voice and line batch on the shared coordinators.
-  gate: CustomVoiceView, TextInputView, BatchGenerationSheet, BatchGenerationRunner, CustomVoiceCoordinator and GenerationLifecycleExecutor are absent; StudioGenerationCoordinator, IOSSingleTakeGenerationExecutor and IOSLongFormProject drive macOS generation with requests from MacStudioGenerationRequestFactory; no prewarm call under Sources/Views/Studio; customVoice_*, textInput_* and batch_* identifiers unchanged; smoke (test02, test03, test06, test07), perf and benchmark --modes custom PASS.
+- **`CONV-15`** (in-flight) — Studio canvas and Built-in Voice on the shared single-take pipeline.
+  gate: CustomVoiceView and CustomVoiceCoordinator are absent; MacCustomVoiceScreen renders the iOS Studio canvas; StudioGenerationCoordinator and IOSSingleTakeGenerationExecutor drive Built-in Voice with requests from MacStudioGenerationRequestFactory through MacStudioSingleTakeGenerationHooks; no prewarm call under Sources/Views/Studio; customVoice_*, textInput_* and delivery_tonePicker identifiers unchanged; localization, smoke (test02, test03, test06, test07), perf (composer-typing, delivery-menu, generation-active) and benchmark --modes custom PASS.
 
 - **`CONV-16`** (planned) — Voice Design on the iOS screen.
   gate: VoiceDesignView.swift, VoiceBriefEditor.swift, ContinuousVoiceDescriptionField.swift and VoiceDesignCoordinator.swift are absent; voiceDesign_* identifiers unchanged; localization and benchmark --modes design PASS.
 
 - **`CONV-17`** (planned) — Voice Cloning on the iOS screen and removal of the legacy remainder.
-  gate: VoiceCloningView.swift, VoiceCloningCoordinator.swift, GenerationWorkflowView.swift, EmotionPickerView.swift, WaveformView.swift, LayoutConstants.swift and AppTheme.swift are absent; voiceCloning_* identifiers unchanged; native.md and the app guide describe the new screens; localization, all seven smoke journeys, all nine perf scenarios and the canonical benchmark PASS.
+  gate: VoiceCloningView.swift, VoiceCloningCoordinator.swift, GenerationLifecycleExecutor.swift (with its test and project.yml entry), TextInputView.swift, GenerationWorkflowView.swift, EmotionPickerView.swift, WaveformView.swift, LayoutConstants.swift and AppTheme.swift are absent and the shared iOS GenerationDrafts replace the macOS drafts; voiceCloning_* identifiers unchanged; native.md and the app guide describe the new screens; localization, all seven smoke journeys, all nine perf scenarios and the canonical benchmark PASS.
 
 - **`CONV-18`** (planned) — Perf re-baseline, marketing captures and documentation of the new macOS app.
   gate: config/ui-perf-thresholds.json cites at least three perf sessions on the new tree in a dated decision; the README and website screenshots are recaptured from the new app; macos-release-qa.md walks the new screens; the plan is archived.
@@ -60,6 +61,9 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 - **`CONV-21`** (planned) — Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages.
   gate: config/toolchain.json pins a CI toolchain that GitHub's runners provide; the macOS and iOS deployment targets stay at 26 in project.yml; any mlx-swift, mlx-swift-lm or swift-transformers move is one authorized change reviewed with the gate benchmark (medians of three warm takes) and a clean unit lane; scripts/dev.sh ci is green on the new pin.
+
+- **`CONV-22`** (planned) — Line batch and long-form on the shared runner.
+  gate: BatchGenerationSheet.swift and BatchGenerationRunner.swift are absent; MacBatchGenerationSheet and MacLineBatchRunner run line batch over the shared single-take executor and long-form projects over IOSLongFormProject for all three modes; batch_* identifiers and TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS unchanged; F-16 sourceOfTruth re-pointed; smoke (test06, test07) PASS.
 
 ## Autonomous validation audit remediation
 

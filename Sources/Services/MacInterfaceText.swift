@@ -1544,6 +1544,58 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.status.starting", defaultValue: "Starting engine…",
                comment: "macOS interface: sidebar engine status. Presentation only.")
     }
+    static var studioChipBatch: String {
+        localization.string(localized: "vocello.mac.studio.chipBatch", defaultValue: "Lines",
+               comment: "macOS interface: eyebrow of the Studio chip that opens the line-batch sheet; the value below it reads Batch. Presentation only.")
+    }
+    static var studioChipSeed: String {
+        localization.string(localized: "vocello.mac.studio.chipSeed", defaultValue: "Seed",
+               comment: "macOS interface: eyebrow of the pinned-seed Studio chip. Presentation only.")
+    }
+    static var studioClearScript: String {
+        localization.string(localized: "vocello.mac.studio.clearScript", defaultValue: "Clear",
+               comment: "macOS interface: composer action that empties the script. Presentation only.")
+    }
+    static var studioCloningVoice: String {
+        localization.string(localized: "vocello.mac.studio.cloningVoice", defaultValue: "Cloning voice…",
+               comment: "macOS interface: generating-bar subline in Voice Cloning. Presentation only.")
+    }
+    static var studioDesigningVoice: String {
+        localization.string(localized: "vocello.mac.studio.designingVoice", defaultValue: "Designing voice…",
+               comment: "macOS interface: generating-bar subline in Voice Design. Presentation only.")
+    }
+    static var studioDismissTake: String {
+        localization.string(localized: "vocello.mac.studio.dismissTake", defaultValue: "Dismiss this take?",
+               comment: "macOS interface: title of the confirmation that closes the Studio player card. Presentation only.")
+    }
+    static var studioDismissTakeDetail: String {
+        localization.string(localized: "vocello.mac.studio.dismissTakeDetail", defaultValue: "The take stays in History; only the player closes.",
+               comment: "macOS interface: detail of the confirmation that closes the Studio player card. Presentation only.")
+    }
+    static var studioGenerateAgain: String {
+        localization.string(localized: "vocello.mac.studio.generateAgain", defaultValue: "Generate again",
+               comment: "macOS interface: VoiceOver label of the Studio player card action that generates the same script again. Presentation only.")
+    }
+    static var studioGenerationFailed: String {
+        localization.string(localized: "vocello.mac.studio.generationFailed", defaultValue: "Generation failed",
+               comment: "macOS interface: title of the Studio dock error bar. Presentation only.")
+    }
+    static var studioRenderingAudio: String {
+        localization.string(localized: "vocello.mac.studio.renderingAudio", defaultValue: "Rendering audio…",
+               comment: "macOS interface: generating-bar subline in Built-in Voice. Presentation only.")
+    }
+    static var studioReviewTake: String {
+        localization.string(localized: "vocello.mac.studio.reviewTake", defaultValue: "Listen before you use this take; the pacing measured unusual.",
+               comment: "macOS interface: detail of the cadence notice on a completed take. Presentation only.")
+    }
+    static var studioStopGenerating: String {
+        localization.string(localized: "vocello.mac.studio.stopGenerating", defaultValue: "Stop generating",
+               comment: "macOS interface: VoiceOver label of the Studio cancel control while a take renders. Presentation only.")
+    }
+    static var studioUnusualPacing: String {
+        localization.string(localized: "vocello.mac.studio.unusualPacing", defaultValue: "Unusual pacing",
+               comment: "macOS interface: title of the cadence notice on a completed take. Presentation only.")
+    }
     static var textInputBatch: String {
         localization.string(localized: "vocello.mac.textInput.batch", defaultValue: "Batch",
                comment: "macOS interface: opens the batch generation sheet. Presentation only.")

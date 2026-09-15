@@ -85,6 +85,10 @@ XCUITest lanes only when explicitly requested.
   `AppLaunchConfiguration.performAnimated`; no color-only signal; `accessibilityIdentifier`s such as
   `voicesRow_*`, `textInput_*`, `studioChip_*` survive refactors; test-only code lives in the UI test
   target.
+- **Studio generation runs on the shared pipeline.** `StudioGenerationCoordinator` (owned by `MacAppModel`)
+  holds the attempt-scoped terminal state, `IOSSingleTakeGenerationExecutor` runs the take through
+  `MacStudioSingleTakeGenerationHooks` (timeline, playback handoff, History, telemetry merge) and
+  `MacStudioGenerationActions` cancels through the engine barrier; no view starts a task of its own.
 - **Requests are built by `MacStudioGenerationRequestFactory`** so language, identity, seed, variation
   and prompt are testable before the engine call. Reference language is conditioning metadata only:
   Clone Auto follows the target script, an explicit Studio language wins.

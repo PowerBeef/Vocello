@@ -16956,6 +16956,240 @@
           }
         }
       }
+    },
+    "vocello.mac.studio.chipBatch": {
+      "comment": "macOS interface: eyebrow of the Studio chip that opens the line-batch sheet; the value below it reads Batch. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lines"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lignes"
+          }
+        }
+      }
+    },
+    "vocello.mac.studio.chipSeed": {
+      "comment": "macOS interface: eyebrow of the pinned-seed Studio chip. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seed"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Graine"
+          }
+        }
+      }
+    },
+    "vocello.mac.studio.clearScript": {
+      "comment": "macOS interface: composer action that empties the script. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effacer"
+          }
+        }
+      }
+    },
+    "vocello.mac.studio.cloningVoice": {
+      "comment": "macOS interface: generating-bar subline in Voice Cloning. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cloning voice…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clonage de la voix…"
+          }
+        }
+      }
+    },
+    "vocello.mac.studio.designingVoice": {
+      "comment": "macOS interface: generating-bar subline in Voice Design. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Designing voice…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conception de la voix…"
+          }
+        }
+      }
+    },
+    "vocello.mac.studio.dismissTake": {
+      "comment": "macOS interface: title of the confirmation that closes the Studio player card. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dismiss this take?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fermer cette prise ?"
+          }
+        }
+      }
+    },
+    "vocello.mac.studio.dismissTakeDetail": {
+      "comment": "macOS interface: detail of the confirmation that closes the Studio player card. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The take stays in History; only the player closes."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La prise reste dans l’historique ; seul le lecteur se ferme."
+          }
+        }
+      }
+    },
+    "vocello.mac.studio.generateAgain": {
+      "comment": "macOS interface: VoiceOver label of the Studio player card action that generates the same script again. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generate again"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Générer à nouveau"
+          }
+        }
+      }
+    },
+    "vocello.mac.studio.generationFailed": {
+      "comment": "macOS interface: title of the Studio dock error bar. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generation failed"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échec de la génération"
+          }
+        }
+      }
+    },
+    "vocello.mac.studio.renderingAudio": {
+      "comment": "macOS interface: generating-bar subline in Built-in Voice. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rendering audio…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rendu de l’audio…"
+          }
+        }
+      }
+    },
+    "vocello.mac.studio.reviewTake": {
+      "comment": "macOS interface: detail of the cadence notice on a completed take. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listen before you use this take; the pacing measured unusual."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Écoutez cette prise avant de l’utiliser ; le rythme mesuré est inhabituel."
+          }
+        }
+      }
+    },
+    "vocello.mac.studio.stopGenerating": {
+      "comment": "macOS interface: VoiceOver label of the Studio cancel control while a take renders. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop generating"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêter la génération"
+          }
+        }
+      }
+    },
+    "vocello.mac.studio.unusualPacing": {
+      "comment": "macOS interface: title of the cadence notice on a completed take. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unusual pacing"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rythme inhabituel"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

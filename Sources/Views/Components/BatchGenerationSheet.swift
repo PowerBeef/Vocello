@@ -125,7 +125,7 @@ struct BatchGenerationSheet: View {
             .accessibilityIdentifier("batch_deliverySummary")
         }
 
-        ScriptTextEditor(
+        MacScriptTextEditor(
             text: $batchText,
             placeholder: MacInterfaceText.batchPlaceholder,
             font: .systemFont(ofSize: NSFont.systemFontSize),

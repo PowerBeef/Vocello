@@ -176,6 +176,10 @@ targets:
       - path: Sources/iOSSupport/Models/Voice.swift
       - path: Sources/iOSSupport/ViewModels/SavedVoicesViewModel.swift
       - path: Sources/iOSSupport/Services/IOSAppLanguage.swift
+      - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
+      - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
+      - path: Sources/iOS/Studio/StudioGenerationCoordinator.swift
+      - path: Sources/iOS/Studio/StudioGenerationItems.swift
     resources:
       - path: Sources/Resources
         buildPhase: resources

@@ -106,7 +106,7 @@ for entry in Packages/VocelloQwen3Core/Tests/*/; do
 done
 
 # One lifecycle authority: generation views never start model prewarm themselves.
-out="$(rg -n 'prewarmModelIfNeeded' Sources/Views/Generate --glob '*.swift' 2>/dev/null || true)"
+out="$(rg -n 'prewarmModelIfNeeded' Sources/Views/Generate Sources/Views/Studio --glob '*.swift' 2>/dev/null || true)"
 [[ -z "$out" ]] || fail "generation views must not start model prewarm directly:\n$out"
 
 # Routing views observe the player through their owners, not directly.

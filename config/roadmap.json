@@ -98,16 +98,35 @@
     {
       "id": "CONV-15",
       "plan": "macos-ios-convergence-2026-09",
-      "title": "Studio canvas, Built-in Voice and line batch on the shared coordinators",
+      "title": "Studio canvas and Built-in Voice on the shared single-take pipeline",
       "status": "in-flight",
       "blockedBy": [],
-      "gate": "CustomVoiceView, TextInputView, BatchGenerationSheet, BatchGenerationRunner, CustomVoiceCoordinator and GenerationLifecycleExecutor are absent; StudioGenerationCoordinator, IOSSingleTakeGenerationExecutor and IOSLongFormProject drive macOS generation with requests from MacStudioGenerationRequestFactory; no prewarm call under Sources/Views/Studio; customVoice_*, textInput_* and batch_* identifiers unchanged; smoke (test02, test03, test06, test07), perf and benchmark --modes custom PASS.",
+      "gate": "CustomVoiceView and CustomVoiceCoordinator are absent; MacCustomVoiceScreen renders the iOS Studio canvas; StudioGenerationCoordinator and IOSSingleTakeGenerationExecutor drive Built-in Voice with requests from MacStudioGenerationRequestFactory through MacStudioSingleTakeGenerationHooks; no prewarm call under Sources/Views/Studio; customVoice_*, textInput_* and delivery_tonePicker identifiers unchanged; localization, smoke (test02, test03, test06, test07), perf (composer-typing, delivery-menu, generation-active) and benchmark --modes custom PASS.",
       "sourceOfTruth": [
-        "Sources/Views/Generate/CustomVoiceView.swift",
-        "Sources/Services/BatchGenerationRunner.swift",
+        "Sources/Views/Studio/MacCustomVoiceScreen.swift",
+        "Sources/Views/Studio/MacStudioCanvas.swift",
+        "Sources/Services/MacStudioSingleTakeGenerationHooks.swift",
         "Sources/iOS/Studio/StudioGenerationCoordinator.swift",
         "Sources/Services/MacStudioGenerationRequestFactory.swift"
       ],
+      "updated": "2026-09-15",
+      "notes": "Built-in Voice landed 2026-09-15 on the iOS Studio canvas: MacCustomVoiceScreen, MacStudioCanvas (composer, chips, dock), MacStudioPlayerCard, MacStudioSetupChip (chips are menus on the desktop), MacGenerationVariantSelector, MacScriptTextEditor; generation on StudioGenerationCoordinator (owned by MacAppModel) + IOSSingleTakeGenerationExecutor + MacStudioSingleTakeGenerationHooks + MacStudioGenerationActions; CustomVoiceView and CustomVoiceCoordinator gone; the coordinator's payload types split into Sources/iOS/Studio/StudioGenerationItems.swift (pure move). Cut changed from the plan: GenerationLifecycleExecutor, TextInputView, BatchGenerationSheet and BatchGenerationRunner still serve the legacy Design and Cloning screens, so the executor and TextInputView leave with CONV-17 and the batch sheet and runner move to CONV-22; the macOS CustomVoiceDraft keeps its shape (the drafts swap follows the last legacy screen). 13 new vocello.mac.studio keys with French. Remaining gate: localization, smoke (test02, test03, test06, test07), perf and benchmark --modes custom PASS run ids."
+    },
+    {
+      "id": "CONV-22",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Line batch and long-form on the shared runner",
+      "status": "planned",
+      "blockedBy": [
+        "CONV-15"
+      ],
+      "gate": "BatchGenerationSheet.swift and BatchGenerationRunner.swift are absent; MacBatchGenerationSheet and MacLineBatchRunner run line batch over the shared single-take executor and long-form projects over IOSLongFormProject for all three modes; batch_* identifiers and TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS unchanged; F-16 sourceOfTruth re-pointed; smoke (test06, test07) PASS.",
+      "sourceOfTruth": [
+        "Sources/Views/Components/BatchGenerationSheet.swift",
+        "Sources/Services/BatchGenerationRunner.swift",
+        "Sources/iOS/Studio/IOSLongFormProject.swift"
+      ],
+      "notes": "Split out of CONV-15 on 2026-09-15: the batch sheet and runner are shared by the legacy Design and Cloning screens, so they can only leave once the shared sheet serves all three modes.",
       "updated": "2026-09-15"
     },
     {
@@ -133,13 +152,13 @@
       "blockedBy": [
         "CONV-16"
       ],
-      "gate": "VoiceCloningView.swift, VoiceCloningCoordinator.swift, GenerationWorkflowView.swift, EmotionPickerView.swift, WaveformView.swift, LayoutConstants.swift and AppTheme.swift are absent; voiceCloning_* identifiers unchanged; native.md and the app guide describe the new screens; localization, all seven smoke journeys, all nine perf scenarios and the canonical benchmark PASS.",
+      "gate": "VoiceCloningView.swift, VoiceCloningCoordinator.swift, GenerationLifecycleExecutor.swift (with its test and project.yml entry), TextInputView.swift, GenerationWorkflowView.swift, EmotionPickerView.swift, WaveformView.swift, LayoutConstants.swift and AppTheme.swift are absent and the shared iOS GenerationDrafts replace the macOS drafts; voiceCloning_* identifiers unchanged; native.md and the app guide describe the new screens; localization, all seven smoke journeys, all nine perf scenarios and the canonical benchmark PASS.",
       "sourceOfTruth": [
         "Sources/Views/Generate/VoiceCloningView.swift",
         "Sources/Views/Components/AppTheme.swift",
         "docs/reference/macos-app-guide.md"
       ],
-      "updated": "2026-09-14"
+      "updated": "2026-09-15"
     },
     {
       "id": "CONV-18",

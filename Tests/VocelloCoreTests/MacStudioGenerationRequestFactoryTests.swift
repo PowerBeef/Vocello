@@ -123,4 +123,54 @@ final class MacStudioGenerationRequestFactoryTests: XCTestCase {
         XCTAssertEqual(voiceDescription, "A warm, mature narrator.")
         XCTAssertEqual(deliveryStyle, "Speak calmly.")
     }
+
+    func testCustomVoiceRequestCarriesSpeakerDeliveryAndSeed() throws {
+        let generationID = UUID(uuidString: "5B0B7E52-1F9E-4C7A-9C41-6A2E9B3E1D10")!
+        let request = MacStudioGenerationRequestFactory.customVoice(
+            modelID: "pro_custom_speed",
+            text: "Bonjour tout le monde.",
+            outputPath: "/tmp/custom.wav",
+            language: .auto,
+            speakerID: "ryan",
+            deliveryStyle: "Calm and steady",
+            deliveryInstructionCellID: "calm/strong",
+            seed: 42,
+            variation: .balanced,
+            generationID: generationID
+        )
+        XCTAssertEqual(request.mode, .custom)
+        XCTAssertEqual(request.modelID, "pro_custom_speed")
+        XCTAssertEqual(request.languageHint, "auto")
+        XCTAssertEqual(request.generationID, generationID)
+        XCTAssertEqual(request.seed, 42)
+        XCTAssertEqual(request.variation, .balanced)
+        XCTAssertEqual(request.deliveryInstructionCellID, "calm/strong")
+        XCTAssertTrue(request.shouldStream)
+        XCTAssertEqual(request.streamingTitle, "Bonjour tout le monde.")
+        guard case .custom(let speakerID, let deliveryStyle) = request.payload else {
+            return XCTFail("expected a custom payload")
+        }
+        XCTAssertEqual(speakerID, "ryan")
+        XCTAssertEqual(deliveryStyle, "Calm and steady")
+    }
+
+    func testCustomVoiceRequestDropsTheDeliveryCellWithoutInstructionControl() {
+        let request = MacStudioGenerationRequestFactory.customVoice(
+            modelID: "pro_custom_speed",
+            text: "Hello.",
+            outputPath: "/tmp/custom.wav",
+            language: .english,
+            speakerID: "ryan",
+            deliveryStyle: nil,
+            deliveryInstructionCellID: "calm/strong",
+            seed: nil,
+            variation: nil
+        )
+        XCTAssertNil(request.deliveryInstructionCellID)
+        XCTAssertEqual(request.languageHint, "english")
+        guard case .custom(_, let deliveryStyle) = request.payload else {
+            return XCTFail("expected a custom payload")
+        }
+        XCTAssertNil(deliveryStyle)
+    }
 }

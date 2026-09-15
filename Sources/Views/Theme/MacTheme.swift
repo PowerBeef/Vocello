@@ -48,6 +48,24 @@ enum MacTheme {
         }
     }
 
+    /// Delivery preset tint of the Studio delivery chip; `fallback` (the mode
+    /// tint) covers Neutral, Custom and unknown ids. Always paired with the
+    /// preset's label, never the only signal.
+    static func emotionColor(for presetID: String?, fallback: Color) -> Color {
+        switch presetID {
+        case "happy": Color(red: 0.95, green: 0.78, blue: 0.30)
+        case "sad": Color(red: 0.55, green: 0.62, blue: 0.78)
+        case "angry": Color(red: 0.78, green: 0.32, blue: 0.20)
+        case "fearful": Color(red: 0.62, green: 0.50, blue: 0.78)
+        case "surprised": Color(red: 0.38, green: 0.72, blue: 0.72)
+        case "whisper": Color(red: 0.62, green: 0.62, blue: 0.66)
+        case "calm": Color(red: 0.62, green: 0.74, blue: 0.62)
+        case "narrator": Color(red: 0.72, green: 0.58, blue: 0.42)
+        case "news": Color(red: 0.40, green: 0.56, blue: 0.74)
+        default: fallback
+        }
+    }
+
     static func glassTint(_ tint: Color? = nil, intensity: Double = 1.0) -> Color {
         VocelloTheme.glassTint(tint, intensity: intensity)
     }

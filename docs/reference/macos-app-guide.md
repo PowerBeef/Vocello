@@ -69,14 +69,16 @@ Tests assert these visible production surfaces directly.
 
 | Element | Identifier |
 |---|---|
-| Speaker picker | `customVoice_speakerPicker` (visible menu; selected speaker is its accessibility value) |
-| Language picker | `customVoice_languageSetup` |
-| Delivery (tone) | `customVoice_toneSpeed` row; the menu itself is `customVoice_tonePicker`, sectioned since DP-14 into "Distinct deliveries" (Neutral/Calm/Whisper/Sad), "Directional hints" (Happy/Angry/Fearful/Surprised), and Custom; selecting a hint shows the advisory caption `customVoice_hintAdvisory` |
-| Script editor | `textInput_textEditor` / `textInput_charCount` |
-| Generate CTA | `textInput_generateButton` |
-| Cancel | `textInput_cancelButton` |
-| Batch | `textInput_batchButton` |
-| Pinned seed chip | `textInput_seedPinChip` beside Generate while a seed is pinned (DP-15); `textInput_seedUnpin` clears it back to fresh-seed-per-take. Shared across all three modes |
+| Speaker chip | `customVoice_speakerPicker` (menu anchored to the chip; the selected speaker is its accessibility value; "Recommended for your script" section from the detected language) inside `customVoice_voiceSetup` |
+| Language chip | `customVoice_languagePicker` inside `customVoice_languageSetup`; native-speaker hint `customVoice_languageHint` |
+| Delivery chip | `delivery_tonePicker` inside `customVoice_toneSpeed`, sectioned since DP-14 into "Distinct deliveries" (Neutral/Calm/Whisper/Sad), "Directional hints" (Happy/Angry/Fearful/Surprised) and Custom; a hint shows `delivery_hintAdvisory`, Custom shows the field `delivery_toneField` (duration advisory `delivery_durationAdvisory`); `customVoice_deliveryUnsupported` when the package has no delivery control |
+| Script editor | `textInput_textEditor` / `textInput_charCount` ("N characters") / `textInput_clearButton` / `textInput_modeMetaLabel` |
+| Readiness | `customVoice_readiness` (value "Ready" or "Waiting") |
+| Generate CTA | `textInput_generateButton`; error bar `textInput_generationError` retries |
+| Generating | `textInput_generatingBar` with `textInput_cancelButton`; once audio streams, the player card `studio_livePreview_card` carries the same cancel |
+| Completed take | `studio_inlinePlayer_generation_<id>` with play/pause, `studio_inlinePlayer_retry`, `studio_inlinePlayer_saveAs`, `studio_inlinePlayer_reveal`, `studio_inlinePlayer_dismiss` (confirmed by `studio_inlinePlayer_dismissConfirm`); the sidebar footer card mirrors the same shared player |
+| Batch | `textInput_batchButton` chip (opens the batch sheet) |
+| Pinned seed chip | `textInput_seedPinChip` while a seed is pinned (DP-15); its confirmation's `textInput_seedUnpin` clears it back to fresh-seed-per-take. Shared across all three modes |
 
 ### Voice Design (`sidebar_voiceDesign` → `screen_voiceDesign`)
 

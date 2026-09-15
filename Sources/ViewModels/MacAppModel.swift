@@ -5,8 +5,9 @@ import QwenVoiceCore
 /// Shell state of the macOS window, the desktop twin of the iOS `AppModel`:
 /// the selected destination (persisted across launches), the pending Settings
 /// highlight after a disabled mode was clicked, and the window-toolbar state
-/// the History and Saved Voices screens read. Generation drafts stay with the
-/// screens until the Studio port (CONV-15).
+/// the History and Saved Voices screens read, and the per-mode
+/// `StudioGenerationCoordinator`s of the Studio screens (the iOS `AppModel`
+/// owns the same three). Generation drafts stay with `ContentView`.
 @MainActor
 @Observable
 final class MacAppModel {
@@ -30,6 +31,10 @@ final class MacAppModel {
     var historySortOrder: HistorySortOrder = .newest
     var historyClearRequest: HistoryClearRequest?
     var voicesEnrollRequestID: UUID?
+
+    /// Built-in Voice generation lifecycle (attempt-scoped terminal state);
+    /// Design and Cloning follow with their ports.
+    let customCoordinator = StudioGenerationCoordinator(mode: .custom)
 
     @ObservationIgnored private let defaults: UserDefaults
 

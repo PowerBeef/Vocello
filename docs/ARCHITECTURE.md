@@ -682,7 +682,10 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   `Sources/Views/{Sidebar,Shell}` and read the shared `VocelloTheme` tokens through `MacTheme`
   (`Sources/Views/Theme`). Dark-only, like iOS. Settings (`Sources/Views/Settings`) hosts the
   model packages, the interface-language picker (`IOSAppLanguage` through `MacInterfaceLanguage`)
-  and the desktop preference rows on one screen for the sidebar item and the Cmd+, scene.
+  and the desktop preference rows on one screen for the sidebar item and the Cmd+, scene. Studio
+  (`Sources/Views/Studio`) renders the iOS canvas per mode; Built-in Voice generates through the
+  shared `StudioGenerationCoordinator` and `IOSSingleTakeGenerationExecutor` with
+  `MacStudioSingleTakeGenerationHooks` (Design and Cloning follow with their ports).
 - State: coordinators and `ModelManagerViewModel` are `@MainActor @Observable`;
   the shared `TTSEngineStore` and `AudioPlayerViewModel` are `ObservableObject`s
   injected as environment objects, with the store's `snapshotChanges` and

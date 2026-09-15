@@ -13,7 +13,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `release-first-3-0-2026-09` | active | release-qa | 6/13 (46%) |
-| `autonomous-validation-remediation-2026-08` | active | release-qa | 9/16 (56%) |
+| `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
@@ -86,7 +86,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `AV-13` | planned | XCUITest coverage for the identifiers never exercised (78 macOS, 34 iOS) | — |
 | `AV-14` | parked | re-baseline the benchmark harness under the standard RTF definition (consent-bound runs) | — |
 | `AV-15` | planned | Download scheduling tests drive a controllable clock | — |
-| `AV-16` | in-flight | Long-string layout robustness on macOS: stable saved-voice rows, a mechanical layout gate and catalog-owned interface copy | — |
 
 ### Open items in detail
 
@@ -110,9 +109,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 - **`AV-15`** (planned) — Download scheduling tests drive a controllable clock.
   gate: HuggingFaceDownloader's throttle windows take an injected clock instead of ProcessInfo.systemUptime and ModelDownloadChunkSchedulingTests advance it deterministically without sleeping, while one real-throttle integration proof remains; the deterministic macOS test lane runs the suite in under a second.
-
-- **`AV-16`** (in-flight) — Long-string layout robustness on macOS: stable saved-voice rows, a mechanical layout gate and catalog-owned interface copy.
-  gate: The pseudo-localized readiness journey (localization lane; first smoke journey) asserts single-line Saved Voices names, chips and warning pills, single-line Settings package status and badge labels, and action controls inside the window; VoiceRow chooses its layout from the List width and the action cluster's intrinsic width, never its own rendered width; every direct presentation literal under Sources/Views and the app command menus, and the model-driven macOS labels the views display (sidebar items, toolbar, mode and variant names, warning short labels, statuses), is a vocello.mac. catalog entry with English and French bound once by MacInterfaceText, so a French-system Mac sees one language; the literal baseline holds only the remaining iOS records; one scripts/ui_test.sh macos localization run passes on the migrated source.
 
 ## Delivery instruction quality and Qwen3-TTS prompting
 

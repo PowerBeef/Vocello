@@ -89,17 +89,17 @@ open elsewhere: F-16, F-25 and F-26 (engineering review), DP-28, DP-29 and DP-31
 AV-07, AV-13 and AV-15 (autonomous validation), ISU-4 and ISU-5 (iOS settings), ASR-02, ASR-04 and
 ASR-10 (App Store readiness).
 
-**Doubled text in UI-lane screenshots explained, September 14.** The maintainer's photos of "VOCELLO
+**Doubled text in UI-lane screenshots explained, September 14 to 15.** The maintainer's photos of "VOCELLO
 VOCELLO" and doubled French menu titles came from the pseudo-localized readiness journey (Foundation's
 double-length and untranslated-string arguments, launched by the first smoke test and the localization
 lane; process-scoped, never persisted). The stress exposed a real fragility: the saved-voice row chose
 its layout from its own rendered width and locked into a collapsed column once long titles overflowed
-the action cluster. AV-16 fixes the row from container and action widths, gives chips and badges line
-limits, makes the journey assert single-line rows and in-window controls, and then migrates the 157
-macOS interface literals into the String Catalog with French, in three batches. Because the catalog
-carries French, a French-system Mac now shows those strings in French while model-driven labels stay
-English; the maintainer chose to finish French on macOS, so a fourth batch moves the remaining
-sidebar, toolbar, mode, variant, warning and status labels into the catalog.
+the action cluster. AV-16 (done) fixed the row from container and action widths, gave chips and badges
+line limits, made the journey assert single-line rows and in-window controls, and migrated the macOS
+interface copy into the String Catalog with French in four batches: the view literals first, then the
+model-driven labels (sidebar, variants, statuses, readiness, batch, alerts) once a French-system Mac
+showed a mixed-language app. `MacInterfaceText` owns 379 `vocello.mac.` entries; the literal baseline
+holds only the 13 iOS records; the localization lane passed on every batch.
 
 Critical path (the harness plan completed on September 14): RF-13 → RF-09 freeze → ICA-04 → ICA-05
 → RF-12, and ISU-4's physical walk rides the next device window.

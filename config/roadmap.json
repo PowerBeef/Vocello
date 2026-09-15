@@ -1093,26 +1093,6 @@
       "updated": "2026-09-13",
       "notes": "macOS clauses done on September 13: (1) gate bench PASS after three harness fixes (6ab8c461 clock divisor, b1824091 warm-only verdict, b88d6d03 footprint dispersion), baseline re-saved from mac-gate-bench-20260912-225643-0fd52c77, first standard-RTF gate record mac-gate-bench-20260912-234613-c8f8a8c6; (2) canonical UI records macos-xcui-benchmark-20260913-170946-488a9ed0 and 181112-6cb80773, the latter paired with CLI matrix macos-engine-20260913-180702-42b26142 (engine rtf equal within 0.04; the UI adds 60 to 120 ms to the first chunk); (3) macos-xcui-perf-20260913-174907-79e014f2 after ee97e92c; (4) charts and website repinned (ae676061, 4ea74266); (5) mac-lang-bench-20260913-000655-546b90cf after acba7581 and 5ca95a73. Open: the iOS halves of (2) and (3); run ios-xcui-benchmark-20260913-184908-a94cbc47 aborted before its build because CoreDevice reported the paired iPhone unavailable. The replay cache-policy flake is fixed in 5619004c.",
       "unparkWhen": "The paired iPhone is available for one ios benchmark and one ios perf run (the macOS clauses are done)."
-    },
-    {
-      "id": "AV-16",
-      "plan": "autonomous-validation-remediation-2026-08",
-      "title": "Long-string layout robustness on macOS: stable saved-voice rows, a mechanical layout gate and catalog-owned interface copy",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "The pseudo-localized readiness journey (localization lane; first smoke journey) asserts single-line Saved Voices names, chips and warning pills, single-line Settings package status and badge labels, and action controls inside the window; VoiceRow chooses its layout from the List width and the action cluster's intrinsic width, never its own rendered width; every direct presentation literal under Sources/Views and the app command menus, and the model-driven macOS labels the views display (sidebar items, toolbar, mode and variant names, warning short labels, statuses), is a vocello.mac. catalog entry with English and French bound once by MacInterfaceText, so a French-system Mac sees one language; the literal baseline holds only the remaining iOS records; one scripts/ui_test.sh macos localization run passes on the migrated source.",
-      "sourceOfTruth": [
-        "Sources/Views/Library/VoicesView.swift",
-        "Sources/Views/Settings/SettingsView.swift",
-        "Tests/UIAutomationSupport/VocelloUIInteractionPolicy.swift",
-        "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift",
-        "Tests/VocelloMacUITests/VocelloMacUITestCase.swift",
-        "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift",
-        "Sources/Resources/Localizable.xcstrings",
-        "scripts/localization_contract.py"
-      ],
-      "updated": "2026-09-14",
-      "notes": "Opened 2026-09-14 from screenshots of doubled text in macOS UI lanes. Not a defect: test01_NavigationAndReadiness launches with -NSDoubleLocalizedStrings/-NSShowNonLocalizedStrings (process-scoped), alone in the localization lane and first in every smoke lane; uppercase marks literals absent from the catalog. Step 1 (0ffb94a1, dd871aef): VoiceRow layout from container and action widths, chip and badge line limits, VocelloUILayoutBounds, journey assertions, attachment mac-smoke-readiness-pseudolocalized. Batches 1-3 (f8a5192f, 8a22d7c5, this): 155 vocello.mac. entries through MacInterfaceText, contract binding, baseline refreshed to 13 records. Consequence seen on the maintainer's French Mac: catalog strings now render in French while model-driven labels stay English, so the app is mixed; maintainer decision 2026-09-14: finish French on macOS. Batch 4 moves the remaining model-driven labels into the catalog. The lane passed on every batch (latest macos-xcui-localization-20260915-005433-3ae0c4e6). (Earlier history: git log -p -- config/roadmap.json.)"
     }
   ]
 }

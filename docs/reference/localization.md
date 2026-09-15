@@ -69,8 +69,12 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
   sheets read plain `String`s from `vocello.mac.*` entries with English, French and translator context.
   Since 2026-09-14 no direct presentation literal remains under `Sources/Views` except the empty
   keyboard-shortcut bridge button and the brief starters label, whose interpolation key holds two
-  placeholders and no words (`Text + Text` is deprecated on macOS 26); the validator binds every
-  `vocello.mac.` key to exactly one default there, like the iOS and shared prefixes.
+  placeholders and no words (`Text + Text` is deprecated on macOS 26); since 2026-09-15 the
+  model-driven labels (sidebar items and sections, variant names, model statuses, readiness copy,
+  batch and alert text) read the catalog too, through the owner's hand-maintained `modeName`,
+  `qualityWarningShortLabel` and `activityLabel` helpers, so `GenerationMode.displayName` and
+  `EngineActivityLabels` stay English identities for the engine, CLI and telemetry. The validator
+  binds every `vocello.mac.` key to exactly one default there, like the iOS and shared prefixes.
 - `project.yml` enables String Catalog symbol generation, emitted localization strings, and catalog
   preference globally. The macOS app receives the catalog through its existing Resources bundle;
   the iOS app lists it explicitly in `sources:` with `buildPhase: resources`, as required by the

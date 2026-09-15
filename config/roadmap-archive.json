@@ -3018,6 +3018,34 @@
         "scripts/runtime_security_contract.py"
       ],
       "notes": "Closed 2026-09-14. Three consecutive scheduled nightly passes on record (runs 34683488068 2026-09-12, 34749309445 2026-09-13, 34829408217 2026-09-14): 654 core and 19 transport tests, the two registered skips, zero race reports (the artifact logs mention the sanitizer only in the skip reasons). Maintainer decision: blocking on push CI. ci.yml gains macos-tsan (routed with the Swift lane, own macos-tsan cache, 5-11 min on a second runner) inside CI required; nightly.yml keeps its cold run; dev.sh ci mirrors it. config/tsan-policy.json records the passes, status blocking-on-push-ci and the dated decision; runtime_security_contract.py refuses a blocking status without the recorded passes, zero open confirmed races and that decision (policy-internal rules only, per the release rule against asserting workflow wording). Coverage unchanged. (Earlier history: git log -p -- config/roadmap.json.)"
+    },
+    {
+      "id": "AV-16",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "Long-string layout robustness on macOS: stable saved-voice rows, a mechanical layout gate and catalog-owned interface copy",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "The pseudo-localized readiness journey (localization lane; first smoke journey) asserts single-line Saved Voices names, chips and warning pills, single-line Settings package status and badge labels, and action controls inside the window; VoiceRow chooses its layout from the List width and the action cluster's intrinsic width, never its own rendered width; every direct presentation literal under Sources/Views and the app command menus, and the model-driven macOS labels the views display (sidebar items, toolbar, mode and variant names, warning short labels, statuses), is a vocello.mac. catalog entry with English and French bound once by MacInterfaceText, so a French-system Mac sees one language; the literal baseline holds only the remaining iOS records; one scripts/ui_test.sh macos localization run passes on the migrated source.",
+      "sourceOfTruth": [
+        "Sources/Views/Library/VoicesView.swift",
+        "Sources/Views/Settings/SettingsView.swift",
+        "Tests/UIAutomationSupport/VocelloUIInteractionPolicy.swift",
+        "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift",
+        "Tests/VocelloMacUITests/VocelloMacUITestCase.swift",
+        "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift",
+        "Sources/Resources/Localizable.xcstrings",
+        "scripts/localization_contract.py"
+      ],
+      "updated": "2026-09-15",
+      "notes": "Closed 2026-09-15. Opened 2026-09-14 from screenshots of doubled text in macOS UI lanes. Not a defect: test01_NavigationAndReadiness launches with -NSDoubleLocalizedStrings/-NSShowNonLocalizedStrings (process-scoped), alone in the localization lane and first in every smoke lane; uppercase marks literals absent from the catalog. Step 1 (0ffb94a1, dd871aef): VoiceRow layout from container and action widths, chip and badge line limits, VocelloUILayoutBounds, journey assertions, attachment mac-smoke-readiness-pseudolocalized. Batches 1-4 (f8a5192f, 8a22d7c5, 0b0c59e7, 48dd9413): 379 vocello.mac. entries through MacInterfaceText (modeName, qualityWarningShortLabel and activityLabel map the model-driven labels), contract binding, baseline 13 iOS-only records. A French Mac showed mixed languages after batch 3; maintainer decision 2026-09-14: finish French, done in batch 4. Lane passed on every batch, last macos-xcui-localization-20260915-021934-640b7e59.",
+      "evidence": [
+        "file:Sources/Services/MacInterfaceText.swift",
+        "file:Sources/Resources/Localizable.xcstrings",
+        "file:config/localization-unlocalized-baseline.json",
+        "file:Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift",
+        "doc:docs/reference/localization.md",
+        "doc:docs/reference/macos-testing.md"
+      ]
     }
   ]
 }

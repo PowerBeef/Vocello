@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `macos-ios-convergence-2026-09` | active | backend-and-platform | 10/16 (62%) |
+| `macos-ios-convergence-2026-09` | active | backend-and-platform | 11/16 (69%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -33,8 +33,7 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `CONV-16` | in-flight | Voice Design on the iOS screen | — |
-| `CONV-17` | planned | Voice Cloning on the iOS screen and removal of the legacy remainder | `CONV-16` |
+| `CONV-17` | in-flight | Voice Cloning on the iOS screen and removal of the legacy remainder | — |
 | `CONV-18` | planned | Perf re-baseline, marketing captures and documentation of the new macOS app | `CONV-17` |
 | `CONV-20` | parked | Device re-verification of the frozen iOS behavior | — |
 | `CONV-21` | planned | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
@@ -42,10 +41,7 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 ### Open items in detail
 
-- **`CONV-16`** (in-flight) — Voice Design on the iOS screen.
-  gate: VoiceDesignView.swift, VoiceBriefEditor.swift, ContinuousVoiceDescriptionField.swift, VoiceDesignCoordinator.swift and its test are absent; MacVoiceDesignScreen renders the iOS Studio canvas with the inline brief editor and the shared chips; voiceDesign_* identifiers unchanged; localization, smoke and benchmark --modes design PASS.
-
-- **`CONV-17`** (planned) — Voice Cloning on the iOS screen and removal of the legacy remainder.
+- **`CONV-17`** (in-flight) — Voice Cloning on the iOS screen and removal of the legacy remainder.
   gate: VoiceCloningView.swift, VoiceCloningCoordinator.swift, GenerationLifecycleExecutor.swift (with its test and project.yml entry), TextInputView.swift, GenerationWorkflowView.swift, EmotionPickerView.swift, WaveformView.swift, LayoutConstants.swift and AppTheme.swift are absent and the shared iOS GenerationDrafts replace the macOS drafts; voiceCloning_* identifiers unchanged; native.md and the app guide describe the new screens; localization, all seven smoke journeys, all nine perf scenarios and the canonical benchmark PASS.
 
 - **`CONV-18`** (planned) — Perf re-baseline, marketing captures and documentation of the new macOS app.

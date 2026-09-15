@@ -3269,6 +3269,28 @@
         "file:Sources/Views/Studio/MacCustomVoiceScreen.swift",
         "file:Sources/Services/MacStudioSingleTakeGenerationHooks.swift"
       ]
+    },
+    {
+      "id": "CONV-16",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Voice Design on the iOS screen",
+      "status": "done",
+      "gate": "VoiceDesignView.swift, VoiceBriefEditor.swift, ContinuousVoiceDescriptionField.swift, VoiceDesignCoordinator.swift and its test are absent; MacVoiceDesignScreen renders the iOS Studio canvas with the inline brief editor and the shared chips; voiceDesign_* identifiers unchanged; localization, smoke and benchmark --modes design PASS.",
+      "sourceOfTruth": [
+        "Sources/Views/Studio/MacVoiceDesignScreen.swift",
+        "Sources/Views/Studio/MacStudioChips.swift",
+        "Sources/Services/MacStudioGenerationRequestFactory.swift"
+      ],
+      "updated": "2026-09-15",
+      "notes": "Closed 2026-09-15 with 69413d6f. MacVoiceDesignScreen on MacStudioCanvas: the brief editor inline above the composer (MacVoiceBriefEditor with the shared starters menu, so the benchmark keeps typing into voiceDesign_voiceDescriptionField), the Delivery and Language chips extracted into MacStudioChips and shared with Built-in Voice, the save-as-voice action beside the readiness line over MacSavedVoiceSheet with the candidate on MacAppModel.designSavedVoiceCandidate, MacAppModel.designCoordinator, the Design request from the tested factory. VoiceDesignView, VoiceBriefEditor, ContinuousVoiceDescriptionField, VoiceDesignCoordinator and its test are gone (its shared doubles moved out first; F-15 re-pointed); the localization baseline lost the brief editor's wordless literal. Lanes: localization macos-xcui-localization-20260915-193652-7fbe0a64, smoke macos-xcui-smoke-20260915-193951-08d0c88c (7/7), design benchmark macos-xcui-benchmark-20260915-195002-89555f53.",
+      "evidence": [
+        "commit:69413d6f",
+        "run:macos-xcui-localization-20260915-193652-7fbe0a64",
+        "run:macos-xcui-smoke-20260915-193951-08d0c88c",
+        "run:macos-xcui-benchmark-20260915-195002-89555f53",
+        "file:Sources/Views/Studio/MacVoiceDesignScreen.swift",
+        "file:Sources/Views/Studio/MacStudioChips.swift"
+      ]
     }
   ]
 }

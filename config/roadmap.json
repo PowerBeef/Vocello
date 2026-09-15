@@ -111,28 +111,11 @@
       "updated": "2026-09-15"
     },
     {
-      "id": "CONV-16",
-      "plan": "macos-ios-convergence-2026-09",
-      "title": "Voice Design on the iOS screen",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "VoiceDesignView.swift, VoiceBriefEditor.swift, ContinuousVoiceDescriptionField.swift, VoiceDesignCoordinator.swift and its test are absent; MacVoiceDesignScreen renders the iOS Studio canvas with the inline brief editor and the shared chips; voiceDesign_* identifiers unchanged; localization, smoke and benchmark --modes design PASS.",
-      "sourceOfTruth": [
-        "Sources/Views/Studio/MacVoiceDesignScreen.swift",
-        "Sources/Views/Studio/MacStudioChips.swift",
-        "Sources/Services/MacStudioGenerationRequestFactory.swift"
-      ],
-      "updated": "2026-09-15",
-      "notes": "Voice Design landed 2026-09-15: MacVoiceDesignScreen on MacStudioCanvas (brief editor inline in MacVoiceBriefEditor with the shared starters menu, so the benchmark keeps typing into voiceDesign_voiceDescriptionField; Delivery and Language chips extracted into MacStudioChips and shared with Built-in Voice; save-as-voice action beside the readiness line over MacSavedVoiceSheet; MacAppModel.designCoordinator; the Design request still comes from the tested factory). VoiceDesignView, VoiceBriefEditor, ContinuousVoiceDescriptionField, VoiceDesignCoordinator and its test are gone (F-15 re-pointed); VoiceDesignDraft.swift stays until the drafts swap (CONV-17). Remaining gate: localization, smoke and benchmark --modes design PASS run ids."
-    },
-    {
       "id": "CONV-17",
       "plan": "macos-ios-convergence-2026-09",
       "title": "Voice Cloning on the iOS screen and removal of the legacy remainder",
-      "status": "planned",
-      "blockedBy": [
-        "CONV-16"
-      ],
+      "status": "in-flight",
+      "blockedBy": [],
       "gate": "VoiceCloningView.swift, VoiceCloningCoordinator.swift, GenerationLifecycleExecutor.swift (with its test and project.yml entry), TextInputView.swift, GenerationWorkflowView.swift, EmotionPickerView.swift, WaveformView.swift, LayoutConstants.swift and AppTheme.swift are absent and the shared iOS GenerationDrafts replace the macOS drafts; voiceCloning_* identifiers unchanged; native.md and the app guide describe the new screens; localization, all seven smoke journeys, all nine perf scenarios and the canonical benchmark PASS.",
       "sourceOfTruth": [
         "Sources/Views/Generate/VoiceCloningView.swift",

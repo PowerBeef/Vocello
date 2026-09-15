@@ -14,6 +14,9 @@ struct MacScriptTextEditor: NSViewRepresentable {
     var accessibilityIdentifier: String = "textInput_textEditor"
     var textColor: NSColor = .labelColor
     var placeholderColor: NSColor = MacTheme.textMutedNSColor
+    /// Height reported when the layout asks for the ideal size; callers bound
+    /// the editor with `frame(minHeight:maxHeight:)` around it.
+    var idealHeight: CGFloat = 120
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self, initialText: text)
@@ -60,6 +63,16 @@ struct MacScriptTextEditor: NSViewRepresentable {
         textView.textContainer?.widthTracksTextView = true
 
         return scrollView
+    }
+
+    /// The scroll view never reports its document's height: without this the
+    /// vertically resizable text view's frame became the editor's size and a
+    /// flexible composer inflated the whole window past its bounds.
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSScrollView, context: Context) -> CGSize? {
+        CGSize(
+            width: proposal.width ?? 240,
+            height: proposal.height ?? idealHeight
+        )
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {

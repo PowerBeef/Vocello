@@ -149,7 +149,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
                 font: .systemFont(ofSize: 20, weight: .medium),
                 isFocused: $isScriptFocused
             )
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 96, maxHeight: .infinity, alignment: .topLeading)
 
             HStack(alignment: .center, spacing: 12) {
                 Text(modeMetaLabel)

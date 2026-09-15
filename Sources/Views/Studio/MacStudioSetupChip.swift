@@ -132,6 +132,9 @@ struct MacStudioSetupChipPill: View {
         .shadow(color: reduceTransparency ? .clear : tint.opacity(0.22), radius: 8, y: 1)
         .opacity(isPlaceholder ? 0.7 : 1)
         .contentShape(Capsule(style: .continuous))
+        // One accessibility element per chip: the menu's identifier and value
+        // land on a single control the size of the pill, not on each glyph.
+        .accessibilityElement(children: .ignore)
     }
 
     private var fillStyle: AnyShapeStyle {

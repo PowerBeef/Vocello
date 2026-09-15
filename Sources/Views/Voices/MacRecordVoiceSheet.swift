@@ -1,26 +1,25 @@
 import AppKit
 import SwiftUI
 
-/// Mac-native reference-clip capture sheet — the macOS counterpart of the iOS
-/// `IOSRecordingOverlay`. Records a 24 kHz mono PCM WAV via the shared
-/// `ReferenceClipRecorder`, shows a live amplitude meter, and gates "Use This
-/// Clip" to the 10–20 s window required by the Voice Cloning reference
-/// contract. After capture the clip can be reviewed in place (`ClipReviewPlayer`)
-/// before committing.
-///
-/// Presented as a `.sheet` from `SavedVoiceSheet` ("Record…" next to
-/// "Browse…") and `VoiceCloningView`. The completed WAV is copied out of the
-/// recorder's temp dir before dismissal (the recorder deletes its own file on
-/// teardown) and handed to `onComplete`.
-struct RecordReferenceClipSheet: View {
-    // The timer is the sheet's focal reading; it must grow with Larger Text.
-    @ScaledMetric(relativeTo: .largeTitle) private var timerFontSize: CGFloat = 44
+/// Reference-clip capture sheet in the iOS recording-overlay language: a
+/// tracked phase label, the large monospaced timer, the live level meter
+/// driven by the real input, the coaching line, then review in place before
+/// committing. Records a 24 kHz mono WAV through the shared
+/// `ReferenceClipRecorder` and gates "Use This Clip" to the 10–20 s window
+/// of the Voice Cloning reference contract. Presented as a window sheet from
+/// the enrollment sheet and Voice Cloning; the `recordClip_*` identifiers are
+/// the lane contract. The completed WAV is copied out of the recorder's temp
+/// dir before dismissal and handed to `onComplete`.
+struct MacRecordVoiceSheet: View {
+    @ScaledMetric(relativeTo: .largeTitle) private var timerFontSize: CGFloat = 52
     var onComplete: (URL) -> Void
 
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var recorder = ReferenceClipRecorder()
     @StateObject private var reviewPlayer = ClipReviewPlayer()
+
+    private let tint = MacTheme.Brand.modeClone
 
     private enum Stage {
         case idle, recording, captured
@@ -39,19 +38,19 @@ struct RecordReferenceClipSheet: View {
     private var timerColor: Color {
         if recorder.elapsed >= ReferenceClipRecorder.minDuration
             && recorder.elapsed <= ReferenceClipRecorder.maxDuration {
-            return AppTheme.voiceCloning
+            return tint
         }
         if recorder.elapsed > ReferenceClipRecorder.maxDuration {
-            return .orange
+            return MacTheme.Status.guarded
         }
-        return .secondary
+        return MacTheme.Text.tertiary
     }
 
     private var phaseLabel: String {
         switch stage {
-        case .recording: return MacInterfaceText.recordPhaseRecording
-        case .captured: return MacInterfaceText.recordPhaseCaptured
-        case .idle: return MacInterfaceText.recordPhaseIdle
+        case .recording: MacInterfaceText.recordPhaseRecording
+        case .captured: MacInterfaceText.recordPhaseCaptured
+        case .idle: MacInterfaceText.recordPhaseIdle
         }
     }
 
@@ -93,34 +92,52 @@ struct RecordReferenceClipSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(MacInterfaceText.recordTitle)
-                .font(.title2.weight(.bold))
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(MacInterfaceText.recordTitle)
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(MacTheme.Text.primary)
+                Spacer()
+                MacIconButton(
+                    symbol: "xmark",
+                    label: MacInterfaceText.cancel,
+                    accessibilityIdentifier: "recordClip_cancel",
+                    size: 30,
+                    symbolSize: 12
+                ) {
+                    recorder.stopWithoutSaving()
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+            }
 
-            VStack(spacing: 14) {
+            VStack(spacing: 18) {
                 Text(phaseLabel.uppercased())
-                    .font(.caption.weight(.semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .tracking(1.4)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(MacTheme.Text.secondary)
+                    .lineLimit(1)
 
                 Text(timeString)
                     .font(.system(size: timerFontSize, weight: .bold, design: .monospaced))
                     .monospacedDigit()
                     .foregroundStyle(timerColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .accessibilityIdentifier("recordClip_timer")
 
-                LiveLevelMeterBars(
+                MacLiveLevelMeter(
                     levels: recorder.levels,
-                    tint: AppTheme.voiceCloning,
+                    tint: tint,
                     isActive: recorder.isRecording
                 )
-                .frame(height: 64)
+                .frame(height: 72)
                 .opacity(recorder.isRecording ? 1 : (recorder.elapsed > 0 ? 0.8 : 0.4))
                 .accessibilityIdentifier("recordClip_levelMeter")
 
                 Text(statusLabel)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(MacTheme.Text.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: 340)
@@ -133,68 +150,63 @@ struct RecordReferenceClipSheet: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
-            .appAnimation(AppTheme.Motion.state, value: recorder.isRecording)
+            .appAnimation(MacTheme.Motion.stateChange, value: recorder.isRecording)
 
             HStack(spacing: 10) {
-                Button(MacInterfaceText.cancel) {
-                    recorder.stopWithoutSaving()
-                    dismiss()
-                }
-                .keyboardShortcut(.cancelAction)
-                .accessibilityIdentifier("recordClip_cancel")
-
                 Spacer()
 
                 switch stage {
                 case .idle:
-                    Button {
+                    MacPrimaryCTAButton(
+                        title: MacInterfaceText.recordRecord,
+                        symbol: "mic.fill",
+                        tint: tint,
+                        isEnabled: !recorder.permissionDenied && hasInputDevice
+                    ) {
                         Task { await recorder.start() }
-                    } label: {
-                        Label(MacInterfaceText.recordRecord, systemImage: "mic.fill")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(AppTheme.voiceCloning)
-                    .disabled(recorder.permissionDenied || !hasInputDevice)
                     .accessibilityIdentifier("recordClip_record")
                 case .recording:
-                    Button {
+                    MacPrimaryCTAButton(
+                        title: MacInterfaceText.recordStop,
+                        symbol: "stop.fill",
+                        tint: tint
+                    ) {
                         _ = recorder.stopAndSave()
-                    } label: {
-                        Label(MacInterfaceText.recordStop, systemImage: "stop.fill")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(AppTheme.voiceCloning)
                     .accessibilityIdentifier("recordClip_stop")
                 case .captured:
                     Button(MacInterfaceText.recordRetake) {
                         reviewPlayer.stop()
                         recorder.reset()
                     }
+                    .buttonStyle(.bordered)
                     .accessibilityIdentifier("recordClip_retake")
 
-                    Button {
+                    MacPrimaryCTAButton(
+                        title: canUse ? MacInterfaceText.recordUseClip : MacInterfaceText.recordNeedTenSeconds,
+                        symbol: canUse ? "checkmark" : nil,
+                        tint: tint,
+                        isEnabled: canUse
+                    ) {
                         useClip()
-                    } label: {
-                        Label(canUse ? "Use This Clip" : "Need 10 s", systemImage: "checkmark")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(AppTheme.voiceCloning)
-                    .disabled(!canUse)
                     .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("recordClip_use")
                 }
             }
         }
         .padding(20)
-        // Min instead of fixed: at large accessibility text sizes the
-        // fixed 480 squeezed the coaching copy instead of growing.
+        // Min instead of fixed: at large accessibility text sizes a fixed
+        // width squeezed the coaching copy instead of growing.
         .frame(minWidth: 480, maxWidth: 560)
+        .background(MacTheme.canvasGradient)
         .task {
             await recorder.requestPermissionIfNeeded()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // The user may have just granted the microphone in System
-            // Settings — clear the denied state without a relaunch.
+            // Settings; clear the denied state without a relaunch.
             recorder.refreshPermissionState()
         }
         .onDisappear {
@@ -227,25 +239,29 @@ struct RecordReferenceClipSheet: View {
     // MARK: - Review
 
     private var reviewRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             Button {
                 reviewPlayer.toggle()
             } label: {
-                Image(systemName: reviewPlayer.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.body.weight(.semibold))
-                    .frame(width: 28, height: 28)
+                ZStack {
+                    Circle().fill(tint.opacity(0.2))
+                    Image(systemName: reviewPlayer.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(tint)
+                }
+                .frame(width: 36, height: 36)
+                .contentShape(Circle())
             }
-            .buttonStyle(.bordered)
-            .clipShape(Circle())
-            .accessibilityLabel(reviewPlayer.isPlaying ? "Pause review" : "Play review")
+            .buttonStyle(.plain)
+            .accessibilityLabel(reviewPlayer.isPlaying ? MacInterfaceText.recordPauseReview : MacInterfaceText.recordPlayReview)
             .accessibilityIdentifier("recordClip_reviewToggle")
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule(style: .continuous)
-                        .fill(AppTheme.fieldFill)
+                        .fill(Color.white.opacity(0.10))
                     Capsule(style: .continuous)
-                        .fill(AppTheme.voiceCloning.opacity(0.75))
+                        .fill(tint.opacity(0.75))
                         .frame(width: max(4, geo.size.width * reviewPlayer.progress))
                 }
             }
@@ -253,7 +269,7 @@ struct RecordReferenceClipSheet: View {
 
             Text(durationString)
                 .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(MacTheme.Text.secondary)
         }
         .padding(.horizontal, 24)
     }
@@ -266,72 +282,13 @@ struct RecordReferenceClipSheet: View {
     // MARK: - Completion
 
     /// Copy the finished recording out of the recorder's temp dir so the
-    /// recorder's `.onDisappear` cleanup can't delete it before enrollment,
-    /// then hand the stable URL to the caller.
+    /// recorder's teardown cannot delete it before enrollment, then hand the
+    /// stable URL to the caller.
     private func useClip() {
         guard let url = recorder.lastSavedURL else { return }
         reviewPlayer.stop()
         let stable = ReferenceClipRecordingStash.copyToStableTemp(url) ?? url
         onComplete(stable)
         dismiss()
-    }
-}
-
-// MARK: - Live level meter
-
-/// Scrolling mic-level meter (newest sample on the right), driven by the REAL
-/// input (`recorder.levels`) so it visibly rises when the user speaks — honest
-/// feedback that the voice is heard + recorded. Data-driven (no decorative
-/// animation), so it stays truthful under Reduce Motion.
-private struct LiveLevelMeterBars: View {
-    let levels: [Double]
-    let tint: Color
-    var isActive: Bool = true
-
-    private let barCount = 48
-    private let spacing: CGFloat = 3
-
-    var body: some View {
-        // Canvas instead of a 48-Capsule ForEach: the meter redraws at
-        // 12.5 Hz while recording, so one draw call beats 48 view updates
-        // (matters on the 8 GB tier when generation runs concurrently).
-        Canvas { context, size in
-            let barWidth = max(2.5, (size.width - spacing * CGFloat(barCount - 1)) / CGFloat(barCount))
-            for i in 0..<barCount {
-                let level = sample(at: i)
-                let height = max(3, size.height * CGFloat(0.04 + 0.96 * level))
-                let x = CGFloat(i) * (barWidth + spacing)
-                let y = (size.height - height) / 2
-                let rect = CGRect(x: x, y: y, width: barWidth, height: height)
-                let gradient = Gradient(colors: [
-                    tint.opacity(opacity(at: i)),
-                    tint.opacity(0.55 * opacity(at: i)),
-                ])
-                context.fill(
-                    Path(roundedRect: rect, cornerRadius: barWidth / 2),
-                    with: .linearGradient(
-                        gradient,
-                        startPoint: CGPoint(x: rect.midX, y: rect.minY),
-                        endPoint: CGPoint(x: rect.midX, y: rect.maxY)
-                    )
-                )
-            }
-        }
-    }
-
-    /// Bar index 0 = left/oldest … `barCount-1` = right/newest; left-pad with
-    /// silence until the buffer fills so the live edge scrolls in from the right.
-    private func sample(at index: Int) -> Double {
-        let offsetFromNewest = (barCount - 1) - index
-        let srcIndex = levels.count - 1 - offsetFromNewest
-        guard srcIndex >= 0, srcIndex < levels.count else { return 0 }
-        return min(1, max(0, levels[srcIndex]))
-    }
-
-    /// Gentle left-fade so the live leading edge (the current voice) reads brightest.
-    private func opacity(at index: Int) -> Double {
-        guard isActive else { return 0.3 }
-        let t = Double(index) / Double(max(1, barCount - 1))
-        return 0.4 + 0.6 * t
     }
 }

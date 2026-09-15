@@ -111,7 +111,7 @@ The app process is the TCC client for everything; the CLI never triggers prompts
 
 ## User-facing permission UX inventory
 
-- **Record sheet** (`RecordReferenceClipSheet`): mic-denied alert + status
+- **Record sheet** (`MacRecordVoiceSheet`): mic-denied alert + status
   label with an Open System Settings (Privacy → Microphone) path; a
   "No microphone detected" state when there's no input device; permission
   state refreshes on app activation.

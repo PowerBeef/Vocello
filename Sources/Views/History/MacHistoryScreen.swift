@@ -217,7 +217,7 @@ extension HistoryDeletionEngine {
 /// sort, search and clear, Save As, Reveal in Finder and pinned seed.
 struct MacHistoryScreen: View {
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
+    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
     @EnvironmentObject private var generationLibraryEvents: GenerationLibraryEvents
     /// Plain reference, not `@EnvironmentObject` (W1-D): History uses the
     /// store only to forward into the saved-voice sheet and for one
@@ -347,7 +347,7 @@ struct MacHistoryScreen: View {
             }
         }
         .sheet(item: $savedVoiceSheetConfiguration) { configuration in
-            SavedVoiceSheet(configuration: configuration) { voice in
+            MacSavedVoiceSheet(configuration: configuration) { voice in
                 handleSavedVoice(voice)
             }
             .environmentObject(ttsEngineStore)

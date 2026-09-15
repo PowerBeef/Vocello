@@ -16560,6 +16560,258 @@
           }
         }
       }
+    },
+    "vocello.mac.record.needTenSeconds": {
+      "comment": "macOS interface: record sheet disabled confirm label while the clip is shorter than ten seconds. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Need 10 s"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "10 s requises"
+          }
+        }
+      }
+    },
+    "vocello.mac.record.pauseReview": {
+      "comment": "macOS interface: VoiceOver label of the record sheet review pause button. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause review"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mettre l’extrait en pause"
+          }
+        }
+      }
+    },
+    "vocello.mac.record.playReview": {
+      "comment": "macOS interface: VoiceOver label of the record sheet review play button. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play review"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Écouter l’extrait"
+          }
+        }
+      }
+    },
+    "vocello.mac.record.useClip": {
+      "comment": "macOS interface: record sheet confirm action once the clip is long enough. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use This Clip"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utiliser cet extrait"
+          }
+        }
+      }
+    },
+    "vocello.mac.savedVoice.openSiriSettings": {
+      "comment": "macOS interface: enrollment sheet button that opens the Siri settings pane when dictation is disabled. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Siri Settings"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir les réglages Siri"
+          }
+        }
+      }
+    },
+    "vocello.mac.savedVoice.saveFailedTitle": {
+      "comment": "macOS interface: enrollment review alert title when committing the candidate failed. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't save voice"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible d’enregistrer la voix"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.deleteAction": {
+      "comment": "macOS interface: Saved Voices row delete action label. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete voice"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer la voix"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.engineStarting": {
+      "comment": "macOS interface: Saved Voices state title while the engine is not ready yet. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting speech engine…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrage du moteur vocal…"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.loadFailedTitle": {
+      "comment": "macOS interface: Saved Voices error-state title. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load saved voices"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de charger les voix enregistrées"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.noVoicesTitle": {
+      "comment": "macOS interface: Saved Voices empty-state title. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No saved voices"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune voix enregistrée"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.useHelp": {
+      "comment": "macOS interface: tooltip of the Saved Voices row action that opens Voice Cloning. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Voice Cloning with this saved voice selected."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir Clonage vocal avec cette voix enregistrée sélectionnée."
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.useHelpInstall": {
+      "comment": "macOS interface: tooltip of the Saved Voices row action when the Voice Cloning model is not installed. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Voice Cloning with this saved voice selected. Install the Voice Cloning model in Settings to generate from it."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir Clonage vocal avec cette voix enregistrée sélectionnée. Installez le modèle de clonage vocal dans Réglages pour générer avec elle."
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.voiceBank": {
+      "comment": "macOS interface: Saved Voices row caption for a voice-bank member; %@ is the delivery preset name. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice bank · %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Banque de voix · %@"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.yourVoices": {
+      "comment": "macOS interface: Saved Voices list section heading. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your voices"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vos voix"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

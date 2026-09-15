@@ -50,6 +50,8 @@ unchanged and the legacy screens still hosted underneath; the localization lane 
 design (date buckets, mode filter chips, tinted thumbnail tiles) with the desktop's toolbar sort,
 search and clear, Save As, Reveal in Finder and pinned seed, over the shared `Generation` and
 `DatabaseService` now compiled into both apps; `HistoryView.swift` and the macOS twins are gone.
+CONV-13 followed with Saved Voices: the iOS avatar rows, the enrollment sheet and the record
+sheet in the iOS language, over the shared `PreparedVoice` and the shared saved-voices view model.
 The maintainer consented to the Step B lanes for every screen commit; they run one at a time as
 each commit lands.
 

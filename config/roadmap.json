@@ -151,11 +151,13 @@
       ],
       "gate": "VoicesView.swift, SavedVoiceSheet.swift and RecordReferenceClipSheet.swift are absent; scripts/saved_voice_lifecycle_contract.py passes on the new sheet; voicesRow_*, voicesEnroll_* and recordClip_* identifiers unchanged and single-line under pseudo-localization; localization and smoke (test04, test05) PASS.",
       "sourceOfTruth": [
-        "Sources/Views/Library/VoicesView.swift",
-        "Sources/Views/Library/SavedVoiceSheet.swift",
+        "Sources/Views/Voices/MacVoicesScreen.swift",
+        "Sources/Views/Voices/MacSavedVoiceSheet.swift",
+        "Sources/Views/Voices/MacRecordVoiceSheet.swift",
         "scripts/saved_voice_lifecycle_contract.py"
       ],
-      "updated": "2026-09-14"
+      "updated": "2026-09-15",
+      "notes": "Saved Voices landed 2026-09-15: MacVoicesScreen (iOS avatar rows with the transcript badge, bank caption, preview, use-in-Cloning and delete, the quality chip with its Replace reference popover, the AV-16 container-width layout rule), MacSavedVoiceSheet (same candidate lifecycle and voicesEnroll_* surface, iOS field chrome and primary capsule) and MacRecordVoiceSheet (recordClip_*; also used by the legacy Voice Cloning screen). Voice is the shared PreparedVoice and the shared SavedVoicesViewModel (ObservableObject) replaces the macOS twin; VoicesView, SavedVoiceSheet, RecordReferenceClipSheet and the macOS Voice and view-model files are gone; the lifecycle contract and its fixture point at the new sheet; 14 new vocello.mac keys with French. Remaining gate: localization, smoke (test04, test05) and a short clone benchmark PASS run ids."
     },
     {
       "id": "CONV-14",
@@ -249,6 +251,22 @@
       ],
       "updated": "2026-09-14",
       "unparkWhen": "the paired iPhone is available and unlocked for a consented lane"
+    },
+    {
+      "id": "CONV-21",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "config/toolchain.json pins a CI toolchain that GitHub's runners provide; the macOS and iOS deployment targets stay at 26 in project.yml; any mlx-swift, mlx-swift-lm or swift-transformers move is one authorized change reviewed with the gate benchmark (medians of three warm takes) and a clean unit lane; scripts/dev.sh ci is green on the new pin.",
+      "sourceOfTruth": [
+        "config/toolchain.json",
+        "project.yml",
+        "Packages/VocelloQwen3Core/Package.swift",
+        "scripts/macos_test.sh"
+      ],
+      "notes": "Opened 2026-09-15 after the maintainer's Mac moved to macOS 27 with Xcode 27.0 (27A266a, Swift 6.4, macOS 27.0 SDK) and the iPhone to iOS 27; the app's minimum stays 26 (maintainer note). Maintainer decision: newer dependency versions are welcome when they do not jeopardize the project. Local state: the app builds cleanly on Xcode 27 with the deployment targets at 26; Xcode 27 needs `xcodebuild -downloadComponent MetalToolchain` once; SwiftPM defaults to the Swift Build engine, so the unit lane pins `--build-system native` while the switch exists (4743110a5). CI stays on the pinned Xcode 26.6 / Swift 6.3.3 until the runners offer 27. Not started.",
+      "updated": "2026-09-15"
     },
     {
       "id": "RF-02",
@@ -536,7 +554,7 @@
       "sourceOfTruth": [
         "Sources/iOS/Voices/IOSRecordVoiceSheet.swift",
         "Sources/iOS/IOSGenerationModeViews.swift",
-        "Sources/Views/Library/SavedVoiceSheet.swift",
+        "Sources/Views/Voices/MacSavedVoiceSheet.swift",
         "Sources/iOS/IOSVoicesView.swift",
         "Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
         "Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift"
@@ -1192,7 +1210,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/MLXTTSEngine.swift",
         "Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
-        "Sources/ViewModels/SavedVoicesViewModel.swift",
+        "Sources/iOSSupport/ViewModels/SavedVoicesViewModel.swift",
         "Sources/iOS/IOSVoicesView.swift",
         "Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift"
       ],

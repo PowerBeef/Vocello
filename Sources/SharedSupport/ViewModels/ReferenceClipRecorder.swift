@@ -4,7 +4,7 @@ import QwenVoiceCore
 
 /// Records a 10–20 s reference clip as a 24 kHz mono Int16 PCM WAV for Voice Cloning enrollment,
 /// exposing a live amplitude history that drives the level meters on both platforms (iOS
-/// `IOSRecordingOverlay`, macOS `RecordReferenceClipSheet`). Does its own permission request;
+/// `IOSRecordingOverlay`, macOS `MacRecordVoiceSheet`). Does its own permission request;
 /// callers don't need to pre-check microphone access.
 @MainActor
 final class ReferenceClipRecorder: NSObject, ObservableObject {

@@ -31,7 +31,7 @@ class SavedVoiceLifecycleContractTests(unittest.TestCase):
             "Sources/iOS/App/RootView.swift",
             "Sources/iOS/Sheets/IOSBottomSheets.swift",
             "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift",
-            "Sources/Views/Library/SavedVoiceSheet.swift",
+            "Sources/Views/Voices/MacSavedVoiceSheet.swift",
             "Sources/iOS/IOSVoicesView.swift",
             "Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift",
             "scripts/ui_test.sh",
@@ -53,7 +53,7 @@ class SavedVoiceLifecycleContractTests(unittest.TestCase):
             saved_voice_lifecycle_contract.validate(self.root)
 
     def test_missing_discard_path_fails(self) -> None:
-        path = self.root / "Sources/Views/Library/SavedVoiceSheet.swift"
+        path = self.root / "Sources/Views/Voices/MacSavedVoiceSheet.swift"
         text = path.read_text(encoding="utf-8").replace(
             "discardPreparedVoiceCandidate(id:",
             "discardCandidateRemoved(id:",

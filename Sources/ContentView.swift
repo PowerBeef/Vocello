@@ -22,7 +22,7 @@ struct ContentView: View {
     /// their own environment-object injection.
     private let ttsEngineStore: TTSEngineStore
     @StateObject private var gateModel: GenerationPerformanceGateModel
-    @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
+    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
     @EnvironmentObject private var appCommandRouter: AppCommandRouter
 
     @State private var appModel: MacAppModel
@@ -192,7 +192,7 @@ struct ContentView: View {
                 }
             )
         case .voices:
-            VoicesView(
+            MacVoicesScreen(
                 enrollRequestID: appModel.voicesEnrollRequestID,
                 canUseInVoiceCloning: canUseSavedVoicesInVoiceCloning,
                 onUseInVoiceCloning: { voice in
@@ -433,7 +433,7 @@ private struct VoiceDesignScreenHost: View {
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(ModelManagerViewModel.self) private var modelManager
-    @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
+    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
 
     var body: some View {
         VoiceDesignView(
@@ -453,7 +453,7 @@ private struct VoiceCloningScreenHost: View {
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(ModelManagerViewModel.self) private var modelManager
-    @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
+    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
 
     var body: some View {
         VoiceCloningView(

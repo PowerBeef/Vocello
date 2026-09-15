@@ -135,7 +135,7 @@ warning; it does not repair or delete them.
 | Element | Identifier |
 |---|---|
 | Enroll | `voices_enrollButton` (toolbar) |
-| Row | `voicesRow_<voiceID>` / `voicesRow_play_<voiceID>` / `voicesRow_use_<voiceID>` / `voicesRow_delete_<voiceID>` |
+| Row | `voicesRow_<voiceID>` (name) / `voicesRow_<voiceID>_transcriptStatus` (badge) / `voicesRow_<voiceID>_qualityWarning` (chip, opens the popover with `voicesRow_<voiceID>_replaceReference`) / `voicesRow_play_<voiceID>` / `voicesRow_use_<voiceID>` / `voicesRow_delete_<voiceID>`; rows lay out from the List width and the action cluster width, never their own rendered width |
 | Enrollment sheet | `voicesEnroll_nameField` / `_audioPathField` / `_browseButton` / `_recordButton` / `_transcriptField` / `_transcriptionStatus` / `_referenceLanguagePicker` / `_useAudioOnlyButton` / `_confirmButton` / `_cancelButton` |
 
 Confirm prepares a private candidate first. A clean candidate commits immediately; a warned

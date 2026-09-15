@@ -1,59 +1,63 @@
 import AppKit
 import QwenVoiceCore
 import SwiftUI
-import UniformTypeIdentifiers
 
-private struct VoicesAlertState: Identifiable {
+private struct MacVoicesAlertState: Identifiable {
     let id = UUID()
     let title: String
     let message: String
 }
 
-struct VoicesView: View {
+/// Saved Voices in the iOS card language (`IOSVoicesView`): avatar rows with
+/// the name, the transcript status badge and a caption, the preview button
+/// and the desktop actions (use in Voice Cloning, delete), the quality
+/// warning chip with its Replace reference popover, and the enrollment and
+/// record sheets. Every `voicesRow_*` identifier and its single-line layout
+/// rule (the row lays out from the List width and the action cluster width,
+/// never its own rendered width) is the lane contract.
+struct MacVoicesScreen: View {
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
+    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
 
     let enrollRequestID: UUID?
     let canUseInVoiceCloning: Bool
     let onUseInVoiceCloning: (Voice) -> Void
 
     @State private var savedVoiceSheetConfiguration: SavedVoiceSheetConfiguration?
-    @State private var actionAlert: VoicesAlertState?
+    @State private var actionAlert: MacVoicesAlertState?
     @State private var voiceToDelete: Voice?
     @State private var showDeleteConfirmation = false
     @State private var pendingRevealVoiceID: String?
     @State private var highlightedVoiceID: String?
     @State private var highlightResetTask: Task<Void, Never>?
-    /// Set when the user starts a "Replace reference" flow from a
-    /// flagged saved voice. The repository replaces the old assets in the
-    /// same commit that publishes the new reference (see
-    /// `handleSavedVoiceSheetCompletion`). Nil for normal add flows.
+    /// Set when the user starts a "Replace reference" flow from a flagged
+    /// saved voice; the repository replaces the old assets in the same commit
+    /// that publishes the new reference. Nil for normal add flows.
     @State private var voiceBeingReplaced: Voice?
     /// One width signal for every row: the List is clipped to its proposal, so
-    /// an overflowing row can never inflate it (W1-F kept one signal, but a
-    /// row's own rendered width fed back into its layout choice).
+    /// an overflowing row can never inflate it.
     @State private var listWidth: CGFloat = 0
 
-    private var voices: [Voice] {
-        savedVoicesViewModel.voices
-    }
-
-    private var isLoading: Bool {
-        savedVoicesViewModel.isLoading
-    }
-
-    private var loadError: String? {
-        savedVoicesViewModel.loadError
-    }
+    private var voices: [Voice] { savedVoicesViewModel.voices }
+    private var isLoading: Bool { savedVoicesViewModel.isLoading }
+    private var loadError: String? { savedVoicesViewModel.loadError }
 
     private var loadTaskID: String {
         "\(ttsEngineStore.isReady)"
     }
 
+    /// Bank membership by naming convention; every voice stays listed, the
+    /// caption just tells which rows are one persona. Cached: the catalog is
+    /// a pure function of the (id, name) list.
+    private var bankCatalog: VoiceBankCatalog {
+        MacVoiceBankCatalogCache.catalog(for: voices.map { (id: $0.id, name: $0.name) })
+    }
+
     var body: some View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(MacTheme.canvasGradient.ignoresSafeArea())
             .accessibilityIdentifier("screen_voices")
             .task(id: loadTaskID) {
                 guard ttsEngineStore.isReady else { return }
@@ -68,7 +72,7 @@ struct VoicesView: View {
                 highlightResetTask = nil
             }
             .sheet(item: $savedVoiceSheetConfiguration) { configuration in
-                SavedVoiceSheet(configuration: configuration) { voice in
+                MacSavedVoiceSheet(configuration: configuration) { voice in
                     handleSavedVoiceSheetCompletion(voice)
                 }
                 .environmentObject(ttsEngineStore)
@@ -97,74 +101,70 @@ struct VoicesView: View {
     @ViewBuilder
     private var content: some View {
         if !ttsEngineStore.isReady {
-            voicesStateContainer(
-                identifier: "voices_emptyState"
-            ) {
-                ContentUnavailableView(
-                    "Starting speech engine...",
-                    systemImage: "arrow.triangle.2.circlepath.circle",
-                    description: Text(MacInterfaceText.voicesWaitingForEngine)
+            voicesStateContainer(identifier: "voices_emptyState") {
+                MacEmptyStateCard(
+                    title: MacInterfaceText.voicesEngineStarting,
+                    message: MacInterfaceText.voicesWaitingForEngine,
+                    symbolName: "arrow.triangle.2.circlepath.circle",
+                    tint: MacTheme.voicesTint
                 )
             }
         } else if let loadError, voices.isEmpty, !isLoading {
             voicesStateContainer(identifier: "voices_errorState") {
-                VStack(alignment: .leading, spacing: 12) {
-                    ContentUnavailableView(
-                        "Couldn't load saved voices",
-                        systemImage: "exclamationmark.triangle",
-                        description: Text(loadError)
-                    )
-
-                    Button(MacInterfaceText.tryAgain) {
-                        retryLoadVoices()
-                    }
-                    .buttonStyle(.bordered)
-                    .accessibilityIdentifier("voices_retryButton")
+                MacEmptyStateCard(
+                    title: MacInterfaceText.voicesLoadFailedTitle,
+                    message: loadError,
+                    symbolName: "exclamationmark.triangle",
+                    tint: MacTheme.Status.guarded
+                )
+                Button(MacInterfaceText.tryAgain) {
+                    retryLoadVoices()
                 }
+                .buttonStyle(.bordered)
+                .tint(MacTheme.voicesTint)
+                .accessibilityIdentifier("voices_retryButton")
             }
         } else if isLoading && voices.isEmpty {
             voicesStateContainer(identifier: "voices_loadingState") {
-                VStack(spacing: 12) {
-                    ProgressView()
-                    Text(MacInterfaceText.voicesLoading)
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                }
+                ProgressView(MacInterfaceText.voicesLoading)
+                    .tint(MacTheme.voicesTint)
             }
         } else if voices.isEmpty {
             voicesStateContainer(identifier: "voices_emptyState") {
-                ContentUnavailableView(
-                    "No saved voices",
-                    systemImage: "person.2.wave.2",
-                    description: Text(MacInterfaceText.voicesEmpty)
+                MacEmptyStateCard(
+                    title: MacInterfaceText.voicesNoVoicesTitle,
+                    message: MacInterfaceText.voicesEmpty,
+                    symbolName: "person.2.fill",
+                    tint: MacTheme.voicesTint
                 )
             }
         } else {
+            let bankCatalog = self.bankCatalog
             ScrollViewReader { proxy in
                 List {
-                    ForEach(voices) { voice in
-                        VoiceRow(
-                            voice: voice,
-                            availableWidth: listWidth,
-                            isHighlighted: highlightedVoiceID == voice.id,
-                            canUseInVoiceCloning: canUseInVoiceCloning,
-                            onUseInVoiceCloning: {
-                                onUseInVoiceCloning(voice)
-                            },
-                            onPlay: {
-                                playVoicePreview(voice)
-                            },
-                            onDelete: {
-                                requestDeleteVoice(voice)
-                            },
-                            onReplaceReference: {
-                                requestReplaceReference(voice)
-                            }
-                        )
-                        .id(voice.id)
+                    Section {
+                        ForEach(voices) { voice in
+                            MacVoiceRow(
+                                voice: voice,
+                                caption: rowCaption(for: voice, bankCatalog: bankCatalog),
+                                availableWidth: listWidth,
+                                isHighlighted: highlightedVoiceID == voice.id,
+                                canUseInVoiceCloning: canUseInVoiceCloning,
+                                onUseInVoiceCloning: { onUseInVoiceCloning(voice) },
+                                onPlay: { playVoicePreview(voice) },
+                                onDelete: { requestDeleteVoice(voice) },
+                                onReplaceReference: { requestReplaceReference(voice) }
+                            )
+                            .id(voice.id)
+                            .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                        }
+                    } header: {
+                        MacSectionHeading(MacInterfaceText.voicesYourVoices)
                     }
                 }
-                .listStyle(.inset)
+                .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .frame(maxWidth: LayoutConstants.contentMaxWidth)
                 .frame(maxWidth: .infinity)
@@ -181,20 +181,32 @@ struct VoicesView: View {
             }
         }
     }
+
+    private func rowCaption(for voice: Voice, bankCatalog: VoiceBankCatalog) -> String {
+        if let persona = bankCatalog.persona(containing: voice.id) {
+            let delivery = persona.presetID(for: voice.id)
+                .flatMap { EmotionPreset.preset(id: $0)?.label }
+                ?? MacInterfaceText.deliveryNeutral
+            return MacInterfaceText.voicesVoiceBank(delivery)
+        }
+        return voice.hasTranscript
+            ? MacInterfaceText.voicesDetailTranscript
+            : MacInterfaceText.voicesDetailAudioOnly
+    }
 }
 
 @MainActor
-private extension VoicesView {
+private extension MacVoicesScreen {
     @ViewBuilder
     func voicesStateContainer<Content: View>(
         identifier: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack {
+        VStack(alignment: .leading, spacing: 12) {
             content()
         }
         .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(identifier)
     }
@@ -204,14 +216,10 @@ private extension VoicesView {
         savedVoiceSheetConfiguration = .manualAdd
     }
 
-    /// Opens the SavedVoiceSheet pre-filled for replacing the given
-    /// voice's reference clip. The transcript is loaded best-effort
-    /// from the sidecar `.txt` file; a missing/unreadable transcript
-    /// just means the user has to retype it.
+    /// Opens the enrollment sheet pre-filled for replacing the given voice's
+    /// reference clip. The transcript loads best-effort from the sidecar; a
+    /// missing one just means the user retypes it.
     func requestReplaceReference(_ voice: Voice) {
-        // `Voice.loadTranscript()` is `() throws -> String?`; `try?`
-        // collapses any throw into `nil`, then `flatMap` drops the
-        // missing-file `nil` case so we end up with `String?`.
         let transcript = (try? voice.loadTranscript()).flatMap { $0 } ?? ""
         voiceBeingReplaced = voice
         savedVoiceSheetConfiguration = .replaceReference(
@@ -233,10 +241,8 @@ private extension VoicesView {
         // were already tombstoned before the new voice was published.
         if let replacedVoice, replacedVoice.id != voice.id {
             savedVoicesViewModel.removeVoiceFromVisibleState(id: replacedVoice.id)
-            Task { await savedVoicesViewModel.refresh(using: ttsEngineStore) }
-        } else {
-            Task { await savedVoicesViewModel.refresh(using: ttsEngineStore) }
         }
+        Task { await savedVoicesViewModel.refresh(using: ttsEngineStore) }
     }
 
     func retryLoadVoices() {
@@ -263,7 +269,7 @@ private extension VoicesView {
         pendingRevealVoiceID = nil
         highlightedVoiceID = voiceID
 
-        AppLaunchConfiguration.performAnimated(.easeInOut(duration: 0.2)) {
+        AppLaunchConfiguration.performAnimated(MacTheme.Motion.easeOut) {
             proxy.scrollTo(voiceID, anchor: .center)
         }
 
@@ -301,12 +307,34 @@ private extension VoicesView {
     }
 
     func presentActionAlert(title: String, message: String) {
-        actionAlert = VoicesAlertState(title: title, message: message)
+        actionAlert = MacVoicesAlertState(title: title, message: message)
     }
 }
 
-private struct VoiceRow: View {
+/// Single-entry memo for `VoiceBankCatalog.build`: the catalog is a pure
+/// function of the saved-voice (id, name) list and rows share one build.
+@MainActor
+enum MacVoiceBankCatalogCache {
+    private static var cachedKey: [String] = []
+    private static var cached: VoiceBankCatalog?
+
+    static func catalog(for voices: [(id: String, name: String)]) -> VoiceBankCatalog {
+        let key = voices.flatMap { [$0.id, $0.name] }
+        if let cached, key == cachedKey {
+            return cached
+        }
+        let built = VoiceBankCatalog.build(voices: voices)
+        cachedKey = key
+        cached = built
+        return built
+    }
+}
+
+// MARK: - Row
+
+private struct MacVoiceRow: View {
     let voice: Voice
+    let caption: String
     /// The List's width (container-owned, never the row's own rendered size).
     let availableWidth: CGFloat
     let isHighlighted: Bool
@@ -316,101 +344,55 @@ private struct VoiceRow: View {
     let onDelete: () -> Void
     let onReplaceReference: () -> Void
 
-    private var highlightFill: Color {
-        isHighlighted ? AppTheme.accent.opacity(0.12) : .clear
-    }
-
-    private var highlightStroke: Color {
-        isHighlighted ? AppTheme.accent.opacity(0.22) : .clear
-    }
-
-    private var transcriptStatus: String {
-        voice.hasTranscript ? MacInterfaceText.voicesTranscriptBacked : MacInterfaceText.voicesAudioOnlyFallback
-    }
-
-    private var detailCopy: String {
-        voice.hasTranscript
-            ? MacInterfaceText.voicesDetailTranscript
-            : MacInterfaceText.voicesDetailAudioOnly
-    }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: "person.2.wave.2")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(AppTheme.accent)
-                .frame(width: 24, alignment: .center)
-                .padding(.top, 4)
-
-            rowContent
-        }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 6)
-        .background {
-            GatedGlass {
-                if isHighlighted {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(.clear)
-                        .glassEffect(.regular.tint(AppTheme.accent), in: .rect(cornerRadius: 12))
-                } else {
-                    highlightBackground
-                }
-            } fallback: {
-                highlightBackground
-            }
-        }
-    }
-
-    private var highlightBackground: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .fill(highlightFill)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(highlightStroke, lineWidth: isHighlighted ? 1 : 0)
-            )
-    }
-
-    /// W1-F: one width signal + `AnyLayout` replaces the `ViewThatFits`
-    /// that built and measured BOTH full row layouts for every visible row
-    /// on every layout pass. Child identity is preserved across the flip.
-    ///
-    /// The two inputs are stable by construction: the List's width comes from
-    /// the container, and the action cluster is horizontally fixed-size, so its
-    /// width does not depend on which layout wraps it. Measuring the row's own
-    /// rendered width (the previous rule, wide when >= 430) fed back into the
-    /// choice: once the action cluster overflowed under long titles, the wide
-    /// HStack reported an inflated width and the row locked into a near-zero
-    /// metadata column (pseudo-localized readiness journey, 2026-09-13).
-    /// Width 0 (pre-first-layout) renders wide, matching the default window.
+    /// One width signal plus `AnyLayout`: the two inputs are stable by
+    /// construction (the List's width comes from the container, the action
+    /// cluster is horizontally fixed-size), so an overflowing title can never
+    /// feed back into the layout choice (pseudo-localized readiness journey,
+    /// 2026-09-13).
     @State private var actionsWidth: CGFloat = 0
+    @State private var isHovered = false
 
-    /// Name plus status chip at body/caption sizes.
+    /// Name plus status badge at body/caption sizes.
     private static let minimumMetadataWidth: CGFloat = 220
-    /// Leading icon, its gap, the layout gap, horizontal padding and List insets.
-    private static let rowChrome: CGFloat = 24 + 14 + 14 + 12 + 40
+    /// Avatar, its gap, the layout gap, card padding and List insets.
+    private static let rowChrome: CGFloat = 44 + 12 + 14 + 24 + 32
 
     private var usesWideLayout: Bool {
         guard availableWidth > 0, actionsWidth > 0 else { return true }
         return availableWidth - Self.rowChrome - actionsWidth >= Self.minimumMetadataWidth
     }
 
-    private var rowContent: some View {
+    private var transcriptStatus: String {
+        voice.hasTranscript ? MacInterfaceText.voicesTranscriptBacked : MacInterfaceText.voicesAudioOnlyFallback
+    }
+
+    private var qualityHeadline: String? {
+        voice.qualityWarnings.first.flatMap(PreparedVoiceQualityWarning.headline(for:))
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: MacTheme.Radius.card, style: .continuous)
         let layout = usesWideLayout
             ? AnyLayout(HStackLayout(alignment: .center, spacing: 14))
             : AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
-        return layout {
-            VoiceRowMetadata(
-                voiceName: voice.name,
-                voiceID: voice.id,
-                transcriptStatus: transcriptStatus,
-                detailCopy: detailCopy,
-                qualityHeadline: voice.qualityHeadline,
-                qualityWarnings: voice.qualityWarnings,
-                onReplaceReference: onReplaceReference
-            )
+
+        layout {
+            HStack(alignment: .center, spacing: 12) {
+                MacVoiceAvatar(seed: voice.id, initials: voice.name, diameter: 44)
+
+                MacVoiceRowMetadata(
+                    voiceName: voice.name,
+                    voiceID: voice.id,
+                    transcriptStatus: transcriptStatus,
+                    caption: caption,
+                    qualityHeadline: qualityHeadline,
+                    qualityWarnings: voice.qualityWarnings,
+                    onReplaceReference: onReplaceReference
+                )
+            }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            VoiceRowActions(
+            MacVoiceRowActions(
                 voiceID: voice.id,
                 canUseInVoiceCloning: canUseInVoiceCloning,
                 onPlay: onPlay,
@@ -423,14 +405,35 @@ private struct VoiceRow: View {
                 actionsWidth = width
             }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            shape.fill(Color.white.opacity(isHovered ? 0.06 : 0.04))
+        }
+        .overlay {
+            shape.stroke(
+                isHighlighted ? MacTheme.voicesTint.opacity(0.55) : Color.white.opacity(0.08),
+                lineWidth: isHighlighted ? 1 : 0.5
+            )
+        }
+        .macGatedGlass(
+            tint: MacTheme.glassTint(isHighlighted ? MacTheme.voicesTint : nil, intensity: isHighlighted ? 1.4 : 0.6),
+            in: shape
+        )
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .appAnimation(MacTheme.Motion.stateChange, value: isHovered)
+        .appAnimation(MacTheme.Motion.easeOut, value: isHighlighted)
     }
 }
 
-private struct VoiceRowMetadata: View {
+private struct MacVoiceRowMetadata: View {
     let voiceName: String
     let voiceID: String
     let transcriptStatus: String
-    let detailCopy: String
+    let caption: String
     let qualityHeadline: String?
     let qualityWarnings: [String]
     let onReplaceReference: () -> Void
@@ -438,53 +441,35 @@ private struct VoiceRowMetadata: View {
     @State private var showsWarningDetails = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 // Display-only humanization: sanitized voice names carry
-                // underscores (stable IDs, CLI, and test identifiers keep
-                // the raw form).
+                // underscores (stable IDs, CLI and test identifiers keep the
+                // raw form).
                 Text(voiceName.replacingOccurrences(of: "_", with: " "))
-                    .font(.body.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(MacTheme.Text.primary)
                     .lineLimit(1)
                     .accessibilityIdentifier("voicesRow_\(voiceID)")
 
-                Text(transcriptStatus)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                MacStatusBadge(text: transcriptStatus, tone: .muted)
                     .fixedSize(horizontal: true, vertical: false)
                     .accessibilityIdentifier("voicesRow_\(voiceID)_transcriptStatus")
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    #if QW_UI_LIQUID
-                    .glassBadge()
-                    #else
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(Color.secondary.opacity(0.12))
-                    )
-                    #endif
-
-                // Title-row triangle removed: the warning chip below
-                // carries the warning visual; doubling it on the title
-                // row was the redundancy that made the row look busy.
             }
 
             if qualityHeadline != nil {
                 warningChip
             } else {
-                Text(detailCopy)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                Text(caption)
+                    .font(.caption)
+                    .foregroundStyle(MacTheme.Text.secondary)
+                    .lineLimit(1)
             }
         }
     }
 
-    /// Compact tappable status pill that replaces the wrapping orange
-    /// sentence + inline "Why?" link. Single visual element, single
-    /// tap target — the full explanation lives in the popover behind
-    /// it (unchanged).
+    /// Compact tappable status pill; the full explanation lives in the
+    /// popover behind it.
     private var warningChip: some View {
         let token = qualityWarnings.first ?? ""
         let label = MacInterfaceText.qualityWarningShortLabel(token: token)
@@ -504,17 +489,12 @@ private struct VoiceRowMetadata: View {
                     .opacity(0.7)
             }
             .fixedSize(horizontal: true, vertical: false)
-            .foregroundStyle(.orange)
+            .foregroundStyle(MacTheme.Status.guarded)
             .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Color.orange.opacity(0.12))
-            )
-            .overlay(
-                Capsule(style: .continuous)
-                    .stroke(Color.orange.opacity(0.24), lineWidth: 1.0)
-            )
+            .padding(.vertical, 4)
+            .background(Capsule(style: .continuous).fill(MacTheme.Status.guarded.opacity(0.12)))
+            .overlay(Capsule(style: .continuous).stroke(MacTheme.Status.guarded.opacity(0.30), lineWidth: 0.75))
+            .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(MacInterfaceText.voicesQualityWarningAccessibility)
@@ -529,7 +509,7 @@ private struct VoiceRowMetadata: View {
         VStack(alignment: .leading, spacing: 12) {
             Label(MacInterfaceText.voicesReferenceOutsideRange, systemImage: "exclamationmark.triangle.fill")
                 .font(.headline)
-                .foregroundStyle(.orange)
+                .foregroundStyle(MacTheme.Status.guarded)
 
             Text(PreparedVoiceQualityWarning.summary(for: qualityWarnings))
                 .font(.body)
@@ -541,6 +521,7 @@ private struct VoiceRowMetadata: View {
                     onReplaceReference()
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(MacTheme.Brand.modeClone)
                 .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("voicesRow_\(voiceID)_replaceReference")
 
@@ -557,7 +538,7 @@ private struct VoiceRowMetadata: View {
     }
 }
 
-private struct VoiceRowActions: View {
+private struct MacVoiceRowActions: View {
     let voiceID: String
     let canUseInVoiceCloning: Bool
     let onPlay: () -> Void
@@ -566,29 +547,43 @@ private struct VoiceRowActions: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Button(MacInterfaceText.voicesOpenInCloning, action: onUseInVoiceCloning)
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .fixedSize(horizontal: true, vertical: false)
-                .help(
-                    canUseInVoiceCloning
-                        ? "Open Voice Cloning with this saved voice selected."
-                        : "Open Voice Cloning with this saved voice selected. Install the Voice Cloning model in Models to generate from it."
-                )
-                .accessibilityIdentifier("voicesRow_use_\(voiceID)")
+            MacIconButton(
+                symbol: "play.fill",
+                label: MacInterfaceText.voicesPreview,
+                accessibilityIdentifier: "voicesRow_play_\(voiceID)",
+                size: 32,
+                symbolSize: 13,
+                action: onPlay
+            )
 
-            Button(MacInterfaceText.voicesPreview, action: onPlay)
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .fixedSize(horizontal: true, vertical: false)
-                .accessibilityIdentifier("voicesRow_play_\(voiceID)")
-
-            Button(role: .destructive, action: onDelete) {
-                Image(systemName: "trash")
+            Button(action: onUseInVoiceCloning) {
+                HStack(spacing: 6) {
+                    Image(systemName: MacTheme.modeGlyph(for: .clone))
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(MacInterfaceText.voicesOpenInCloning)
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(MacTheme.Brand.modeClone)
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .background { Capsule(style: .continuous).fill(MacTheme.Brand.modeClone.opacity(0.14)) }
+                .overlay { Capsule(style: .continuous).stroke(MacTheme.Brand.modeClone.opacity(0.32), lineWidth: 0.75) }
+                .contentShape(Capsule(style: .continuous))
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .accessibilityIdentifier("voicesRow_delete_\(voiceID)")
+            .buttonStyle(.plain)
+            .fixedSize(horizontal: true, vertical: false)
+            .help(canUseInVoiceCloning ? MacInterfaceText.voicesUseHelp : MacInterfaceText.voicesUseHelpInstall)
+            .accessibilityIdentifier("voicesRow_use_\(voiceID)")
+
+            MacIconButton(
+                symbol: "trash",
+                label: MacInterfaceText.voicesDeleteAction,
+                accessibilityIdentifier: "voicesRow_delete_\(voiceID)",
+                size: 32,
+                symbolSize: 13,
+                action: onDelete
+            )
         }
         .fixedSize(horizontal: true, vertical: false)
     }

@@ -13,7 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 INTERACTIVE_REVIEW_SOURCES = (
     "Sources/iOS/Voices/IOSRecordVoiceSheet.swift",
     "Sources/iOS/IOSGenerationModeViews.swift",
-    "Sources/Views/Library/SavedVoiceSheet.swift",
+    "Sources/Views/Voices/MacSavedVoiceSheet.swift",
 )
 
 
@@ -142,7 +142,7 @@ def validate(root: Path) -> None:
         if token not in ios_record_sheet:
             raise ContractError(f"transcription review enrollment is missing {token!r}")
 
-    mac_saved_voice_sheet = _read(root, "Sources/Views/Library/SavedVoiceSheet.swift")
+    mac_saved_voice_sheet = _read(root, "Sources/Views/Voices/MacSavedVoiceSheet.swift")
     for token in (
         "ReferenceTranscriptionReviewState(",
         "VoiceClipTranscriber.enrollmentResult(",

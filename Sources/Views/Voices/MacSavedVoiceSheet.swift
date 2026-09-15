@@ -14,10 +14,9 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
     let initialReferenceLanguage: Qwen3SupportedLanguage
     let initialTranscriptReadySource: ReferenceTranscriptionReviewState.ReadySource
     /// Normalized name of an existing saved voice that this enrollment
-    /// is intended to replace. The duplicate-name guard ignores this
-    /// name so the user can keep the same identifier; the caller is
-    /// responsible for deleting the old voice after successful save.
-    /// Nil for the standard add / cloneResult / designResult flows.
+    /// replaces. The duplicate-name guard ignores this name so the user can
+    /// keep the same identifier; the repository replaces the old assets in
+    /// the same commit. Nil for the add, cloneResult and designResult flows.
     let replacingNormalizedName: String?
 
     init(
@@ -83,13 +82,9 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
         )
     }
 
-    /// Used by the saved-voices "Replace reference" flow. Pre-fills the
-    /// existing name + transcript and leaves the audio path blank so the
-    /// user has to pick a new clip. The duplicate-name guard skips the
-    /// existing entry (`replacingNormalizedName`) so the user can reuse
-    /// the same identifier. The caller is responsible for deleting the
-    /// old voice on successful completion (see
-    /// `VoicesView.handleSavedVoiceSheetCompletion`).
+    /// The Saved Voices "Replace reference" flow: the existing name and
+    /// transcript are pre-filled and the audio path stays blank so the user
+    /// picks a new clip. The duplicate-name guard skips the existing entry.
     static func replaceReference(
         name: String,
         transcript: String,
@@ -155,7 +150,15 @@ enum SavedVoiceNameSuggestion {
     }
 }
 
-struct SavedVoiceSheet: View {
+/// The saved-voice enrollment sheet in the iOS save-voice language
+/// (`IOSSaveVoiceSheet`): labeled field sections on the dark canvas, the
+/// transcription review status with its audio-only confirmation, the
+/// reference-language picker, and one primary capsule action. The candidate
+/// lifecycle is unchanged: Confirm stages a private candidate, a clean one
+/// commits, a warned one waits for Keep, and Discard, Cancel or outside
+/// dismissal discards it. Every `voicesEnroll_*` identifier is the lane and
+/// contract surface.
+struct MacSavedVoiceSheet: View {
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @Environment(\.dismiss) private var dismiss
 
@@ -173,13 +176,16 @@ struct SavedVoiceSheet: View {
     @State private var existingNormalizedNames: Set<String> = []
     /// When non-nil, the staged voice has quality warnings and the user is
     /// being asked whether to publish it or discard the private candidate.
-    /// Driven by `MLXTTSEngine.savedReferenceQualityWarnings(forAudioAt:)`
-    /// at enrollment time.
     @State private var pendingVoiceForReview: PreparedVoiceCandidate?
     @State private var isReviewDecisionInFlight = false
     @State private var isRecordSheetPresented = false
     @State private var transcriptionTask: Task<Void, Never>?
     @State private var speechAvailability: VoiceClipTranscriber.TranscriptionAvailability = .available
+    @FocusState private var isNameFocused: Bool
+    @FocusState private var isAudioPathFocused: Bool
+    @FocusState private var isTranscriptFocused: Bool
+
+    private let tint = MacTheme.Brand.modeClone
 
     init(
         configuration: SavedVoiceSheetConfiguration,
@@ -215,9 +221,8 @@ struct SavedVoiceSheet: View {
             return MacInterfaceText.savedVoiceNameNeedsCharacters
         }
 
-        // In the replace-reference flow the user is expected to keep the
-        // same identifier; only flag an existing-name collision when the
-        // name belongs to a different saved voice.
+        // In the replace-reference flow the user keeps the same identifier;
+        // only a different saved voice's name is a collision.
         if existingNormalizedNames.contains(normalizedName)
             && normalizedName != configuration.replacingNormalizedName {
             return MacInterfaceText.savedVoiceNameExists(normalizedName)
@@ -251,151 +256,123 @@ struct SavedVoiceSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(configuration.title)
-                .font(.title2.weight(.bold))
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(configuration.title)
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(MacTheme.Text.primary)
+                Text(configuration.subtitle)
+                    .font(.callout)
+                    .foregroundStyle(MacTheme.Text.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
-            Text(configuration.subtitle)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            fieldSection(label: MacInterfaceText.savedVoiceNameSection) {
+                TextField(MacInterfaceText.savedVoiceNamePlaceholder, text: $name)
+                    .textFieldStyle(.plain)
+                    .focused($isNameFocused)
+                    .autocorrectionDisabled(true)
+                    .modifier(MacFieldChrome(tint: tint, isFocused: isNameFocused))
+                    .accessibilityIdentifier("voicesEnroll_nameField")
+            }
 
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(MacInterfaceText.savedVoiceNameSection)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    TextField(MacInterfaceText.savedVoiceNamePlaceholder, text: $name)
+            fieldSection(label: MacInterfaceText.savedVoiceAudioSection) {
+                HStack(spacing: 8) {
+                    TextField(MacInterfaceText.savedVoiceAudioPlaceholder, text: $audioPath)
                         .textFieldStyle(.plain)
-                        .vocelloFocusRing(AppTheme.accent, radius: 8)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                        .glassTextField(radius: 8)
-                        .accessibilityIdentifier("voicesEnroll_nameField")
+                        .focused($isAudioPathFocused)
+                        .modifier(MacFieldChrome(tint: tint, isFocused: isAudioPathFocused))
+                        .accessibilityIdentifier("voicesEnroll_audioPathField")
+
+                    Button(MacInterfaceText.savedVoiceBrowse) {
+                        browseForAudio()
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("voicesEnroll_browseButton")
+
+                    Button {
+                        isRecordSheetPresented = true
+                    } label: {
+                        Label(MacInterfaceText.savedVoiceRecord, systemImage: "mic.fill")
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("voicesEnroll_recordButton")
+                }
+            }
+
+            fieldSection(label: MacInterfaceText.savedVoiceTranscriptSection, caption: MacInterfaceText.savedVoiceTranscriptHelp) {
+                if let issue = speechIssueMessage {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(MacTheme.Status.guarded)
+                        Text(issue)
+                            .font(.caption)
+                            .foregroundStyle(MacTheme.Text.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("voicesEnroll_speechUnavailable")
+                        Button(speechIssueButtonLabel) {
+                            openSpeechSettings()
+                        }
+                        .controlSize(.small)
+                        .accessibilityIdentifier("voicesEnroll_speechSettingsButton")
+                    }
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(MacInterfaceText.savedVoiceAudioSection)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                TextEditor(text: transcriptBinding)
+                    .font(.body)
+                    .scrollContentBackground(.hidden)
+                    .focused($isTranscriptFocused)
+                    .frame(minHeight: 96)
+                    .padding(6)
+                    .modifier(MacFieldChrome(tint: tint, isFocused: isTranscriptFocused, radius: 14))
+                    .accessibilityIdentifier("voicesEnroll_transcriptField")
 
-                    HStack {
-                        TextField(MacInterfaceText.savedVoiceAudioPlaceholder, text: $audioPath)
-                            .textFieldStyle(.plain)
-                            .vocelloFocusRing(AppTheme.accent, radius: 8)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 6)
-                            .glassTextField(radius: 8)
-                            .accessibilityIdentifier("voicesEnroll_audioPathField")
+                transcriptionStatus
 
-                        Button(MacInterfaceText.savedVoiceBrowse) {
-                            browseForAudio()
-                        }
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier("voicesEnroll_browseButton")
+                if transcriptionReview.offersAudioOnlyConfirmation {
+                    Button {
+                        confirmAudioOnly()
+                    } label: {
+                        Label(VocelloPresentationText.useAudioOnly, systemImage: "waveform")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(tint)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 30)
+                            .background { Capsule(style: .continuous).fill(tint.opacity(0.12)) }
+                            .overlay { Capsule(style: .continuous).stroke(tint.opacity(0.35), lineWidth: 0.75) }
+                            .contentShape(Capsule(style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(VocelloPresentationText.useAudioOnlyHint)
+                    .accessibilityIdentifier("voicesEnroll_useAudioOnlyButton")
+                }
+            }
 
-                        Button {
-                            isRecordSheetPresented = true
-                        } label: {
-                            Label(MacInterfaceText.savedVoiceRecord, systemImage: "mic.fill")
-                        }
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier("voicesEnroll_recordButton")
+            fieldSection(
+                label: VocelloPresentationText.referenceLanguageTitle,
+                caption: requiresReferenceLanguageConfirmation
+                    ? VocelloPresentationText.referenceLanguageConfirmation
+                    : VocelloPresentationText.referenceLanguageDetail,
+                captionTint: requiresReferenceLanguageConfirmation ? MacTheme.Status.guarded : nil
+            ) {
+                Picker(VocelloPresentationText.referenceLanguageTitle, selection: $referenceLanguage) {
+                    Text(VocelloPresentationText.referenceLanguagePlaceholder)
+                        .tag(Qwen3SupportedLanguage.auto)
+                    ForEach(Qwen3SupportedLanguage.selectableCases, id: \.self) { language in
+                        Text(language.displayName).tag(language)
                     }
                 }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(MacInterfaceText.savedVoiceTranscriptSection)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-
-                    if let issue = speechIssueMessage {
-                        HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                            Text(issue)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .accessibilityIdentifier("voicesEnroll_speechUnavailable")
-                            Button(speechIssueButtonLabel) {
-                                openSpeechSettings()
-                            }
-                            .controlSize(.small)
-                            .accessibilityIdentifier("voicesEnroll_speechSettingsButton")
-                        }
-                    }
-
-                    TextEditor(text: transcriptBinding)
-                        .font(.body)
-                        .vocelloFocusRing(AppTheme.accent, radius: 10)
-                        .frame(minHeight: 100)
-                        .padding(8)
-                        .background {
-                            GatedGlass {
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(AppTheme.sheetWellFill)
-                                    .glassEffect(.regular.tint(AppTheme.smokedGlassTint), in: .rect(cornerRadius: 10))
-                            } fallback: {
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .fill(Color(nsColor: .textBackgroundColor))
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .stroke(AppTheme.cardStroke.opacity(0.45), lineWidth: 1)
-                                }
-                            }
-                        }
-                        .accessibilityIdentifier("voicesEnroll_transcriptField")
-
-                    transcriptionStatus
-
-                    if transcriptionReview.offersAudioOnlyConfirmation {
-                        Button {
-                            confirmAudioOnly()
-                        } label: {
-                            Label(VocelloPresentationText.useAudioOnly, systemImage: "waveform")
-                        }
-                        .buttonStyle(.bordered)
-                        .accessibilityHint(VocelloPresentationText.useAudioOnlyHint)
-                        .accessibilityIdentifier("voicesEnroll_useAudioOnlyButton")
-                    }
-
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(VocelloPresentationText.referenceLanguageTitle)
-                                .font(.caption.weight(.semibold))
-                            Text(requiresReferenceLanguageConfirmation
-                                ? VocelloPresentationText.referenceLanguageConfirmation
-                                : VocelloPresentationText.referenceLanguageDetail)
-                                .font(.caption)
-                                .foregroundStyle(requiresReferenceLanguageConfirmation ? .orange : .secondary)
-                        }
-
-                        Spacer(minLength: 8)
-
-                        Picker(VocelloPresentationText.referenceLanguageTitle, selection: $referenceLanguage) {
-                            Text(VocelloPresentationText.referenceLanguagePlaceholder)
-                                .tag(Qwen3SupportedLanguage.auto)
-                            ForEach(Qwen3SupportedLanguage.selectableCases, id: \.self) { language in
-                                Text(language.displayName).tag(language)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(minWidth: 170)
-                        .accessibilityIdentifier("voicesEnroll_referenceLanguagePicker")
-                    }
-
-                    Text(MacInterfaceText.savedVoiceTranscriptHelp)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                .labelsHidden()
+                .frame(maxWidth: 240, alignment: .leading)
+                .accessibilityIdentifier("voicesEnroll_referenceLanguagePicker")
             }
 
             if let activeMessage = validationMessage ?? errorMessage {
                 Text(activeMessage)
-                    .foregroundStyle(.red)
-                    .font(.callout)
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(MacTheme.Status.critical)
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("voicesEnroll_errorMessage")
             }
 
@@ -403,24 +380,29 @@ struct SavedVoiceSheet: View {
                 Button(MacInterfaceText.cancel) {
                     dismiss()
                 }
+                .buttonStyle(.bordered)
                 .keyboardShortcut(.cancelAction)
                 .accessibilityIdentifier("voicesEnroll_cancelButton")
 
                 Spacer()
 
-                Button(configuration.confirmLabel) {
+                MacPrimaryCTAButton(
+                    title: configuration.confirmLabel,
+                    symbol: "checkmark",
+                    tint: tint,
+                    isEnabled: canSubmit
+                ) {
                     saveVoice()
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(!canSubmit)
                 .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("voicesEnroll_confirmButton")
             }
         }
         .padding(20)
-        // Min instead of fixed: the fixed 520 squeezed content at large
+        // Min instead of fixed: a fixed width squeezed content at large
         // accessibility text sizes.
         .frame(minWidth: 520, maxWidth: 600)
+        .background(MacTheme.canvasGradient)
         .task {
             speechAvailability = VoiceClipTranscriber.availability()
             await loadExistingVoiceNames()
@@ -443,7 +425,7 @@ struct SavedVoiceSheet: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             // The user may have just granted speech recognition in System
-            // Settings — refresh the caption and retry the auto-fill.
+            // Settings; refresh the caption and retry the auto-fill.
             let refreshed = VoiceClipTranscriber.availability()
             if refreshed != speechAvailability {
                 speechAvailability = refreshed
@@ -457,7 +439,7 @@ struct SavedVoiceSheet: View {
             transcriptionReview.invalidate()
         }
         .sheet(isPresented: $isRecordSheetPresented) {
-            RecordReferenceClipSheet { url in
+            MacRecordVoiceSheet { url in
                 audioPath = url.path
             }
         }
@@ -475,9 +457,8 @@ struct SavedVoiceSheet: View {
             ),
             presenting: pendingVoiceForReview
         ) { candidate in
-            // Hard-block tier (>60 s) hides the "Keep voice" button so
-            // the user has to discard or cancel; soft-warn tier keeps
-            // all three buttons.
+            // The hard-block tier (>60 s) hides "Keep voice" so the user has to
+            // discard or cancel; the soft-warn tier keeps all three buttons.
             if !PreparedVoiceQualityWarning.isHardBlocking(candidate.qualityWarnings) {
                 Button(MacInterfaceText.savedVoiceKeepVoice) {
                     acceptPendingVoice(candidate)
@@ -497,6 +478,56 @@ struct SavedVoiceSheet: View {
         }
     }
 
+    // MARK: - Sections
+
+    private func fieldSection<Content: View>(
+        label: String,
+        caption: String? = nil,
+        captionTint: Color? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(MacTheme.Text.secondary)
+                if let caption {
+                    Text(caption)
+                        .font(.caption)
+                        .foregroundStyle(captionTint ?? MacTheme.Text.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            content()
+        }
+    }
+
+    @ViewBuilder
+    private var transcriptionStatus: some View {
+        let status = transcriptionReview.status
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            if status.showsProgress {
+                ProgressView()
+                    .controlSize(.mini)
+                    .accessibilityHidden(true)
+            } else {
+                Image(systemName: status.symbolName)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(tint)
+                    .accessibilityHidden(true)
+            }
+            Text(status.message)
+                .font(.caption)
+                .foregroundStyle(MacTheme.Text.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(status.message)
+        .accessibilityIdentifier("voicesEnroll_transcriptionStatus")
+    }
+
+    // MARK: - Speech availability
+
     private func loadExistingVoiceNames() async {
         do {
             let voices = try await ttsEngineStore.listPreparedVoices()
@@ -510,9 +541,8 @@ struct SavedVoiceSheet: View {
         }
     }
 
-    /// Caption shown when automatic transcription can't run — silent denial
-    /// was the old behavior and left users wondering why the transcript
-    /// never auto-filled.
+    /// Caption shown when automatic transcription cannot run; silent denial
+    /// left users wondering why the transcript never auto-filled.
     private var speechIssueMessage: String? {
         switch speechAvailability {
         case .available, .notDetermined:
@@ -525,7 +555,9 @@ struct SavedVoiceSheet: View {
     }
 
     private var speechIssueButtonLabel: String {
-        speechAvailability == .siriDisabled ? "Open Siri Settings" : "Open System Settings"
+        speechAvailability == .siriDisabled
+            ? MacInterfaceText.savedVoiceOpenSiriSettings
+            : MacInterfaceText.recordOpenSystemSettings
     }
 
     private func openSpeechSettings() {
@@ -537,8 +569,11 @@ struct SavedVoiceSheet: View {
         }
     }
 
-    /// Starts the existing on-device transcriber and binds its result to one operation
-    /// generation. Cancellation is cooperative, so the generation check is the final authority.
+    // MARK: - Transcription review
+
+    /// Starts the on-device transcriber and binds its result to one operation
+    /// generation; cancellation is cooperative, so the generation check is the
+    /// final authority.
     private func autoTranscribeIfNeeded(path: String) {
         speechAvailability = VoiceClipTranscriber.availability()
         transcriptionTask?.cancel()
@@ -625,28 +660,7 @@ struct SavedVoiceSheet: View {
         }
     }
 
-    @ViewBuilder
-    private var transcriptionStatus: some View {
-        let status = transcriptionReview.status
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            if status.showsProgress {
-                ProgressView()
-                    .controlSize(.mini)
-                    .accessibilityHidden(true)
-            } else {
-                Image(systemName: status.symbolName)
-                    .foregroundStyle(AppTheme.accent)
-                    .accessibilityHidden(true)
-            }
-            Text(status.message)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(status.message)
-        .accessibilityIdentifier("voicesEnroll_transcriptionStatus")
-    }
+    // MARK: - Actions
 
     private func browseForAudio() {
         let panel = NSOpenPanel()
@@ -684,7 +698,7 @@ struct SavedVoiceSheet: View {
                     do {
                         let savedVoice = try await ttsEngineStore.commitPreparedVoiceCandidate(id: candidate.id)
                         await MainActor.run {
-                            onComplete(Voice(preparedVoice: savedVoice))
+                            onComplete(savedVoice)
                             dismiss()
                         }
                     } catch {
@@ -713,7 +727,7 @@ struct SavedVoiceSheet: View {
                 let savedVoice = try await ttsEngineStore.commitPreparedVoiceCandidate(id: candidate.id)
                 pendingVoiceForReview = nil
                 isReviewDecisionInFlight = false
-                onComplete(Voice(preparedVoice: savedVoice))
+                onComplete(savedVoice)
                 dismiss()
             } catch {
                 errorMessage = error.localizedDescription
@@ -737,10 +751,38 @@ struct SavedVoiceSheet: View {
     }
 
     private var reviewAlertTitle: String {
-        errorMessage == nil ? "Reference outside recommended range" : "Couldn't save voice"
+        errorMessage == nil ? MacInterfaceText.voicesReferenceOutsideRange : MacInterfaceText.savedVoiceSaveFailedTitle
     }
 
     private func reviewAlertMessage(for candidate: PreparedVoiceCandidate) -> String {
         errorMessage ?? PreparedVoiceQualityWarning.summary(for: candidate.qualityWarnings)
+    }
+}
+
+/// Field chrome of the iOS sheets (`iosSelectionFieldChrome`): a muted glass
+/// surface with a focus-aware hairline.
+struct MacFieldChrome: ViewModifier {
+    let tint: Color
+    let isFocused: Bool
+    var radius: CGFloat = 12
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        content
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .macSubtleGlassSurface(
+                in: shape,
+                tint: isFocused ? tint : MacTheme.Brand.silver,
+                fill: MacTheme.Surface.glassSurfaceMuted.opacity(isFocused ? 0.72 : 0.56),
+                strokeOpacity: isFocused ? 0.18 : 0.12,
+                interactive: true
+            )
+            .overlay {
+                shape
+                    .stroke(isFocused ? tint.opacity(0.35) : Color.white.opacity(0.06), lineWidth: isFocused ? 1 : 0.5)
+                    .allowsHitTesting(false)
+            }
+            .appAnimation(MacTheme.Motion.highlight, value: isFocused)
     }
 }

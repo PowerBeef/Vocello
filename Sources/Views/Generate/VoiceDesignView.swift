@@ -112,7 +112,7 @@ struct VoiceDesignView: View {
                 .environmentObject(ttsEngineStore)
                 .environmentObject(audioPlayer)
             case .saveVoice(let configuration):
-                SavedVoiceSheet(configuration: configuration) { voice in
+                MacSavedVoiceSheet(configuration: configuration) { voice in
                     coordinator.handleSavedVoice(
                         voice,
                         draft: draft,

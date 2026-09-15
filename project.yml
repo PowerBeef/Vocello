@@ -173,6 +173,8 @@ targets:
       - path: Sources/iOSSupport/Services/AppNotifications.swift
       - path: Sources/iOSSupport/Models/Generation.swift
       - path: Sources/iOSSupport/Services/DatabaseService.swift
+      - path: Sources/iOSSupport/Models/Voice.swift
+      - path: Sources/iOSSupport/ViewModels/SavedVoicesViewModel.swift
     resources:
       - path: Sources/Resources
         buildPhase: resources

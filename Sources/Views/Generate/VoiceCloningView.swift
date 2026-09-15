@@ -49,7 +49,7 @@ struct VoiceCloningView: View {
     private let ttsEngineStore: TTSEngineStore
     private var modelManager: ModelManagerViewModel
     private let audioPlayer: AudioPlayerViewModel
-    private let savedVoicesViewModel: SavedVoicesViewModel
+    @ObservedObject private var savedVoicesViewModel: SavedVoicesViewModel
 
     private var cloneModel: TTSModel? {
         modelManager.generationActiveVariant(for: .clone)
@@ -300,7 +300,7 @@ struct VoiceCloningView: View {
             }
         }
         .sheet(isPresented: $isRecordSheetPresented) {
-            RecordReferenceClipSheet { url in
+            MacRecordVoiceSheet { url in
                 coordinator.replaceReference(with: url.path, draft: $draft)
             }
         }
@@ -714,7 +714,9 @@ private struct CloneReferenceStatus: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("voiceCloning_referenceWarning")
-        .accessibilityHint(selectedVoice?.qualityHeadline ?? shortLabel)
+        .accessibilityHint(
+            selectedVoice?.qualityWarnings.first.flatMap(PreparedVoiceQualityWarning.headline(for:)) ?? shortLabel
+        )
         .popover(isPresented: $showsWarningDetails, arrowEdge: .top) {
             warningDetailsPopover(warnings: selectedVoice?.qualityWarnings ?? [token])
         }

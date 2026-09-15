@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `macos-ios-convergence-2026-09` | active | backend-and-platform | 4/14 (29%) |
+| `macos-ios-convergence-2026-09` | active | backend-and-platform | 4/15 (27%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -43,6 +43,7 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 | `CONV-17` | planned | Voice Cloning on the iOS screen and removal of the legacy remainder | `CONV-16` |
 | `CONV-18` | planned | Perf re-baseline, marketing captures and documentation of the new macOS app | `CONV-17` |
 | `CONV-20` | parked | Device re-verification of the frozen iOS behavior | — |
+| `CONV-21` | planned | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
 
 ### Open items in detail
 
@@ -76,6 +77,9 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 - **`CONV-20`** (parked) — Device re-verification of the frozen iOS behavior.
   gate: On the paired iPhone, scripts/ui_test.sh ios smoke and the control audit pass on the source that shares the store, tokens and policies with macOS; no iOS identifier or control count changed.
   unparkWhen: the paired iPhone is available and unlocked for a consented lane
+
+- **`CONV-21`** (planned) — Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages.
+  gate: config/toolchain.json pins a CI toolchain that GitHub's runners provide; the macOS and iOS deployment targets stay at 26 in project.yml; any mlx-swift, mlx-swift-lm or swift-transformers move is one authorized change reviewed with the gate benchmark (medians of three warm takes) and a clean unit lane; scripts/dev.sh ci is green on the new pin.
 
 ## Autonomous validation audit remediation
 

@@ -214,3 +214,8 @@ extension TTSModel {
         Qwen3SupportedLanguage.nativeLanguage(speakerDescriptor(id: id)?.nativeLanguage)
     }
 }
+
+/// A saved (enrolled) voice is the engine's `PreparedVoice` on both platforms
+/// since 2026-09-15 (CONV-13); the iOS extension compiled by path adds
+/// `wavPath`, `loadTranscript(fileManager:)` and the name-based initializer.
+typealias Voice = PreparedVoice

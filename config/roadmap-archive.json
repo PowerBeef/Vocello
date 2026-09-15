@@ -3129,6 +3129,77 @@
         "file:Tests/VocelloCoreTests/GenerationTextLimitPolicyTests.swift"
       ],
       "notes": "Closed 2026-09-15 with b7b62075. Sources/SharedSupport carries VocelloTheme (the shipped iOS colors as Color(red:green:blue:opacity:), radii, spacing, motion), VocelloShape, VocelloGlassSurface (the glass-or-solid body behind each platform gate), WordTimingPlanner and GenerationTextLimitPolicy, none importing UIKit or AppKit. The iOS files forward (tokens, UIColor twins kept, IOSGatedGlassModifier still owns the gate, typealiases for the shape, the planner and the limit policy; the interface-language messages stay in an iOS extension). The macOS long-form router reads the shared 900-character limit. Two new VocelloCoreTests pass in the unit lane (core 0, runtime 0), the generic iOS compile is green and config/ios-control-audit.json is unchanged."
+    },
+    {
+      "id": "CONV-11",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "New macOS shell in the iOS visual language hosting the legacy screens",
+      "status": "done",
+      "gate": "SidebarView, the inline player card, the status strip and the window toolbar render the iOS design over the shared store; SidebarPlayerView, SidebarStatusView and StartupDiagnosticsView are gone; repo_invariants, the literal scanner and its baseline pass unchanged; scripts/ui_test.sh macos localization, smoke and perf PASS with run ids.",
+      "sourceOfTruth": [
+        "Sources/ContentView.swift",
+        "Sources/Views/Sidebar/SidebarView.swift",
+        "Sources/QwenVoiceApp.swift"
+      ],
+      "updated": "2026-09-15",
+      "notes": "Closed 2026-09-15. Shell landed with f0fce93b: SidebarView in the iOS visual language over the shared tokens (MacTheme, MacGlass, MacMotion), MacInlinePlayerCard and MacStatusStrip in the footer, MacWindowToolbar and MacStartupDiagnosticsView out of ContentView, MacAppModel, SidebarItem in Sources/Models, dark-only; identifiers unchanged. The first smoke run (065808-248f7748) lost keystrokes in the History search field: Time Profiler showed ~1 s main-thread hangs per keystroke from PromptLanguageDetector (NLLanguageRecognizer) run per History row by the row model that ContentView.body rebuilt on every keystroke, legacy code exposed once the smoke database held clone and design rows. Fixed in 1bea0876 (sheet configuration built on click) and ff5512bb (toolbar controls and the History host observe MacAppModel themselves, so ContentView.body depends only on the selection). Lanes on the final source: localization macos-xcui-localization-20260915-162652-a093f4a3, smoke macos-xcui-smoke-20260915-162950-777019e3 (7/7), perf macos-xcui-perf-20260915-164002-0177f946 (gate PASS, 9 scenarios, window-resize measured after 068dff7a).",
+      "evidence": [
+        "commit:f0fce93b",
+        "commit:1bea0876",
+        "commit:ff5512bb",
+        "run:macos-xcui-localization-20260915-162652-a093f4a3",
+        "run:macos-xcui-smoke-20260915-162950-777019e3",
+        "run:macos-xcui-perf-20260915-164002-0177f946",
+        "file:Sources/Views/Sidebar/SidebarView.swift",
+        "file:Sources/ViewModels/MacAppModel.swift"
+      ]
+    },
+    {
+      "id": "CONV-12",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "History on the iOS screen with sort, Save As and Reveal",
+      "status": "done",
+      "gate": "Sources/Views/Library/HistoryView.swift is absent; the shared Generation and DatabaseService replace the macOS twins; history_*, historyRow_* and historyRecovery_* identifiers unchanged; localization, smoke (test02, test05) and perf (history-scroll, history-filter) PASS.",
+      "sourceOfTruth": [
+        "Sources/Views/History/MacHistoryScreen.swift",
+        "Sources/Models/HistoryPresentation.swift",
+        "Sources/iOSSupport/Services/DatabaseService.swift"
+      ],
+      "updated": "2026-09-15",
+      "notes": "Closed 2026-09-15 with 4373e817. MacHistoryScreen, MacHistoryItemCard, MacHistoryRecoveryBanner and MacHistoryFileActions render the iOS design (date buckets, mode filter chips, tinted thumbnail tiles) with the desktop's toolbar sort, search and clear, Save As, Reveal in Finder and pinned seed; HistorySortOrder and HistoryClearRequest live in Sources/Models/HistoryPresentation.swift; the shared Generation and DatabaseService replace the macOS twins and the mac-database concurrency entry is gone; HistoryView.swift deleted; 24 vocello.mac.history.* keys with French; history_*, historyRow_* and historyRecovery_* unchanged. The saved-voice sheet configuration is built on click (1bea0876) after the language-detector stall found under CONV-11. Lanes: localization macos-xcui-localization-20260915-162652-a093f4a3, smoke macos-xcui-smoke-20260915-162950-777019e3 (test02, test05), perf macos-xcui-perf-20260915-164002-0177f946 (history-scroll, history-filter; gate PASS, 9 scenarios, window-resize measured after 068dff7a).",
+      "evidence": [
+        "commit:4373e817",
+        "commit:1bea0876",
+        "run:macos-xcui-localization-20260915-162652-a093f4a3",
+        "run:macos-xcui-smoke-20260915-162950-777019e3",
+        "run:macos-xcui-perf-20260915-164002-0177f946",
+        "file:Sources/Views/History/MacHistoryScreen.swift",
+        "file:Sources/Models/HistoryPresentation.swift"
+      ]
+    },
+    {
+      "id": "CONV-13",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Saved Voices, the enrollment sheet and the record sheet on the iOS screens",
+      "status": "done",
+      "gate": "VoicesView.swift, SavedVoiceSheet.swift and RecordReferenceClipSheet.swift are absent; scripts/saved_voice_lifecycle_contract.py passes on the new sheet; voicesRow_*, voicesEnroll_* and recordClip_* identifiers unchanged and single-line under pseudo-localization; localization and smoke (test04, test05) PASS.",
+      "sourceOfTruth": [
+        "Sources/Views/Voices/MacVoicesScreen.swift",
+        "Sources/Views/Voices/MacSavedVoiceSheet.swift",
+        "Sources/Views/Voices/MacRecordVoiceSheet.swift",
+        "scripts/saved_voice_lifecycle_contract.py"
+      ],
+      "updated": "2026-09-15",
+      "notes": "Closed 2026-09-15 with 1e2780bb. MacVoicesScreen (iOS avatar rows with the transcript badge, bank caption, preview, use-in-Cloning and delete, the quality chip with its Replace reference popover, the AV-16 container-width layout rule), MacSavedVoiceSheet (same candidate lifecycle and voicesEnroll_* surface, iOS field chrome and primary capsule) and MacRecordVoiceSheet (recordClip_*; also used by the legacy Voice Cloning screen). Voice is the shared PreparedVoice and the shared SavedVoicesViewModel (ObservableObject) replaces the macOS twin; VoicesView, SavedVoiceSheet, RecordReferenceClipSheet and the macOS Voice and view-model files are gone; the lifecycle contract and its fixture point at the new sheet; 14 vocello.mac keys with French. Lanes: localization macos-xcui-localization-20260915-162652-a093f4a3, smoke macos-xcui-smoke-20260915-162950-777019e3 (test04, test05), clone benchmark macos-xcui-benchmark-20260915-164814-b6dd6b2d.",
+      "evidence": [
+        "commit:1e2780bb",
+        "run:macos-xcui-localization-20260915-162652-a093f4a3",
+        "run:macos-xcui-smoke-20260915-162950-777019e3",
+        "run:macos-xcui-benchmark-20260915-164814-b6dd6b2d",
+        "file:Sources/Views/Voices/MacVoicesScreen.swift",
+        "file:Sources/Views/Voices/MacSavedVoiceSheet.swift",
+        "file:scripts/saved_voice_lifecycle_contract.py"
+      ]
     }
   ]
 }

@@ -53,7 +53,9 @@ search and clear, Save As, Reveal in Finder and pinned seed, over the shared `Ge
 CONV-13 followed with Saved Voices: the iOS avatar rows, the enrollment sheet and the record
 sheet in the iOS language, over the shared `PreparedVoice` and the shared saved-voices view model.
 The maintainer consented to the Step B lanes for every screen commit; they run one at a time as
-each commit lands.
+each commit lands. On the Saved Voices commit all four passed and closed CONV-11, CONV-12 and
+CONV-13: localization 162652-a093f4a3, smoke 162950-777019e3 (7/7), perf 164002-0177f946 (nine
+scenarios) and the short clone benchmark 164814-b6dd6b2d.
 
 ### Harness stabilization first (September 13, night)
 

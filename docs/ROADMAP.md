@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `macos-ios-convergence-2026-09` | active | backend-and-platform | 4/15 (27%) |
+| `macos-ios-convergence-2026-09` | active | backend-and-platform | 7/15 (47%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -34,10 +34,7 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `CONV-04` | in-flight | In-process memory relief on 8 GB Macs | — |
-| `CONV-11` | in-flight | New macOS shell in the iOS visual language hosting the legacy screens | — |
-| `CONV-12` | planned | History on the iOS screen with sort, Save As and Reveal | `CONV-11` |
-| `CONV-13` | planned | Saved Voices, the enrollment sheet and the record sheet on the iOS screens | `CONV-12` |
-| `CONV-14` | planned | Settings on the iOS screen with the desktop rows and the interface-language picker | `CONV-13` |
+| `CONV-14` | in-flight | Settings on the iOS screen with the desktop rows and the interface-language picker | — |
 | `CONV-15` | planned | Studio canvas, Built-in Voice and line batch on the shared coordinators | `CONV-14` |
 | `CONV-16` | planned | Voice Design on the iOS screen | `CONV-15` |
 | `CONV-17` | planned | Voice Cloning on the iOS screen and removal of the legacy remainder | `CONV-16` |
@@ -50,16 +47,7 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 - **`CONV-04`** (in-flight) — In-process memory relief on 8 GB Macs.
   gate: The macOS store runs a Mac memory budget policy; kernel pressure drives trim and full unload through the store's terminal barrier; idle unload follows NativeMemoryPolicyResolver; one consented scripts/macos_test.sh memory run shows no critical pressure, warning, hardTrim or fullUnload during a qualified take on the canonical 8 GB Mac.
 
-- **`CONV-11`** (in-flight) — New macOS shell in the iOS visual language hosting the legacy screens.
-  gate: SidebarView, the inline player card, the status strip and the window toolbar render the iOS design over the shared store; SidebarPlayerView, SidebarStatusView and StartupDiagnosticsView are gone; repo_invariants, the literal scanner and its baseline pass unchanged; scripts/ui_test.sh macos localization, smoke and perf PASS with run ids.
-
-- **`CONV-12`** (planned) — History on the iOS screen with sort, Save As and Reveal.
-  gate: Sources/Views/Library/HistoryView.swift is absent; the shared Generation and DatabaseService replace the macOS twins; history_*, historyRow_* and historyRecovery_* identifiers unchanged; localization, smoke (test02, test05) and perf (history-scroll, history-filter) PASS.
-
-- **`CONV-13`** (planned) — Saved Voices, the enrollment sheet and the record sheet on the iOS screens.
-  gate: VoicesView.swift, SavedVoiceSheet.swift and RecordReferenceClipSheet.swift are absent; scripts/saved_voice_lifecycle_contract.py passes on the new sheet; voicesRow_*, voicesEnroll_* and recordClip_* identifiers unchanged and single-line under pseudo-localization; localization and smoke (test04, test05) PASS.
-
-- **`CONV-14`** (planned) — Settings on the iOS screen with the desktop rows and the interface-language picker.
+- **`CONV-14`** (in-flight) — Settings on the iOS screen with the desktop rows and the interface-language picker.
   gate: Sources/Views/Settings/SettingsView.swift is absent; the Cmd+, scene and the sidebar item show the same screen; settings_*, preferences_* and voiceCloning_consentAcknowledgment identifiers unchanged; IOSAppLanguage selects the macOS interface language; localization, smoke (test05) and perf (settings-scroll) PASS.
 
 - **`CONV-15`** (planned) — Studio canvas, Built-in Voice and line batch on the shared coordinators.

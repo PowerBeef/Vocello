@@ -77,7 +77,7 @@ enum AppEngineSelection: Equatable {
             if snapshot.isReady {
                 return .running(
                     ActivityStatus(
-                        label: "Preparing model…",
+                        label: MacInterfaceText.activityPreparingModel,
                         fraction: nil,
                         presentation: prefersInlinePresentation ? .inlinePlayer : .standaloneCard
                     )
@@ -87,7 +87,7 @@ enum AppEngineSelection: Equatable {
         case .running(_, let label, let fraction):
             return .running(
                 ActivityStatus(
-                    label: label ?? "Generating audio…",
+                    label: label.map(MacInterfaceText.activityLabel) ?? MacInterfaceText.activityGeneratingAudio,
                     fraction: fraction,
                     presentation: prefersInlinePresentation ? .inlinePlayer : .standaloneCard
                 )

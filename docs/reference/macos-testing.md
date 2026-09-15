@@ -113,7 +113,11 @@ UPPERCASE labels in its attachment `mac-smoke-readiness-pseudolocalized` are the
 defect: doubling is the long-string stress and uppercase marks a key absent from the String Catalog.
 Under that stress the journey asserts single-line Saved Voices rows, chips and Settings badges and
 in-window controls (`assertSavedVoicesLayoutIntact`, `assertSettingsPackageRowsLayoutIntact`), the
-check that caught the 2026-09-13 row collapse. The arguments are process-scoped and never persist.
+check that caught the 2026-09-13 row collapse. Every macOS journey also launches with
+`-AppleLanguages (en) -AppleLocale en_US` (`VocelloMacUITestCase.englishLaunchArguments`), so the
+few English values the journeys read ("Ready", "N characters") do not depend on the host's system
+language now that the catalog carries French. All of these arguments are process-scoped and never
+persist.
 Lanes:
 
 ```sh

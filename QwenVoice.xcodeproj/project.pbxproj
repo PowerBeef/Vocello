@@ -347,6 +347,7 @@
 		92671248BD664D9F6371CEA2 /* HuggingFace in Frameworks */ = {isa = PBXBuildFile; productRef = 9F6C672A4B0FEBA5A605A0A3 /* HuggingFace */; };
 		92F06E31DB00E95AD4422FC4 /* GenerationTerminalCleanupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5960CF846A51D1D956565A39 /* GenerationTerminalCleanupTests.swift */; };
 		9314A3EA67AF59D9B361DD97 /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = 197C02DEBAE4CD7083953F31 /* MLX */; };
+		933923A5D1C8383CB08D38B0 /* MacInterfaceText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BABBA7A7BD639B7281CDF97 /* MacInterfaceText.swift */; };
 		93C367D91CF159A1C1565B35 /* CLIBatchExecution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27AF7C0700A42D7B19A46D20 /* CLIBatchExecution.swift */; };
 		9403DC2894861D0C2CDAE70F /* IOSMetricKitMemoryReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FAC50A3E9EBBE7417EBF975 /* IOSMetricKitMemoryReporter.swift */; };
 		940F6E64A6613D0A4F1CD843 /* IOSGenerateFlowViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D4D8DFF4CFC912BE52FF1E /* IOSGenerateFlowViews.swift */; };
@@ -3007,6 +3008,7 @@
 				949F4B0977647EFE6CCD7DC2 /* LongFormHistoryAcceptance.swift in Sources */,
 				DF3DAF9007342D3E300F75BF /* LongFormHistoryAcceptanceTests.swift in Sources */,
 				239B41803755A4BB2741E159 /* LongFormPlanningTests.swift in Sources */,
+				933923A5D1C8383CB08D38B0 /* MacInterfaceText.swift in Sources */,
 				811875416367B05F054402AC /* MacStudioGenerationRequestFactory.swift in Sources */,
 				F7DE4CD745E7C945795C2B5A /* MacStudioGenerationRequestFactoryTests.swift in Sources */,
 				64531299DDEF9DB9352ED082 /* MainThreadStallWatchdog.swift in Sources */,

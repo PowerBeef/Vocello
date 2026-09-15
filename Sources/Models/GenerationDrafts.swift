@@ -153,8 +153,8 @@ enum VoiceCloningReadiness {
         if !engineReady {
             return VoiceCloningReadinessDescriptor(
                 noteIsReady: false,
-                title: "Engine starting",
-                detail: "The engine is still preparing.",
+                title: MacInterfaceText.readinessEngineStarting,
+                detail: MacInterfaceText.readinessEngineStartingDetail,
                 trailingText: nil
             )
         }
@@ -162,8 +162,8 @@ enum VoiceCloningReadiness {
         if !isModelAvailable {
             return VoiceCloningReadinessDescriptor(
                 noteIsReady: false,
-                title: "Install the active model",
-                detail: "Install \(modelDisplayName) in Models to enable generation.",
+                title: MacInterfaceText.readinessInstallActiveModel,
+                detail: MacInterfaceText.readinessInstallActiveModelDetail(modelDisplayName),
                 trailingText: nil
             )
         }
@@ -175,8 +175,8 @@ enum VoiceCloningReadiness {
         if !cloneConsentAcknowledged {
             return VoiceCloningReadinessDescriptor(
                 noteIsReady: false,
-                title: "Acknowledge voice cloning consent",
-                detail: "Confirm the one-time acknowledgment below: clone only voices you have permission to use.",
+                title: MacInterfaceText.cloningConsentTitle,
+                detail: MacInterfaceText.cloningConsentDetail,
                 trailingText: nil
             )
         }
@@ -184,8 +184,8 @@ enum VoiceCloningReadiness {
         guard referenceAudioPath != nil else {
             return VoiceCloningReadinessDescriptor(
                 noteIsReady: false,
-                title: "Add a reference",
-                detail: "Saved voices or imported clips both work. Pick one before writing the line.",
+                title: MacInterfaceText.cloningAddReference,
+                detail: MacInterfaceText.cloningAddReferenceDetail,
                 trailingText: nil
             )
         }
@@ -193,8 +193,8 @@ enum VoiceCloningReadiness {
         if case .waitingForHydration = contextStatus {
             return VoiceCloningReadinessDescriptor(
                 noteIsReady: false,
-                title: "Preparing saved voice",
-                detail: "Loading the saved transcript and voice context.",
+                title: MacInterfaceText.cloningPreparingSavedVoice,
+                detail: MacInterfaceText.cloningPreparingSavedVoiceDetail,
                 trailingText: nil
             )
         }
@@ -202,8 +202,8 @@ enum VoiceCloningReadiness {
         if case .preparing = contextStatus {
             return VoiceCloningReadinessDescriptor(
                 noteIsReady: false,
-                title: "Preparing voice context",
-                detail: "Priming this reference so final generation starts cleanly.",
+                title: MacInterfaceText.cloningPreparingContext,
+                detail: MacInterfaceText.cloningPreparingContextDetail,
                 trailingText: nil
             )
         }
@@ -211,8 +211,8 @@ enum VoiceCloningReadiness {
         if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return VoiceCloningReadinessDescriptor(
                 noteIsReady: false,
-                title: "Add a script",
-                detail: "Reference is ready. Add the line for the cloned voice.",
+                title: MacInterfaceText.readinessAddScript,
+                detail: MacInterfaceText.cloningAddScriptDetail,
                 trailingText: nil
             )
         }
@@ -225,26 +225,26 @@ enum VoiceCloningReadiness {
         if !hasReferenceTranscript {
             return VoiceCloningReadinessDescriptor(
                 noteIsReady: true,
-                title: "Ready — identity only",
-                detail: "This reference has no transcript, so only the voice's identity is cloned. Add a transcript to carry its pacing and emotion into the take.",
-                trailingText: "Ready"
+                title: MacInterfaceText.cloningReadyIdentityOnly,
+                detail: MacInterfaceText.cloningReadyIdentityOnlyDetail,
+                trailingText: MacInterfaceText.statusReady
             )
         }
 
         if case .fallback(let message) = contextStatus {
             return VoiceCloningReadinessDescriptor(
                 noteIsReady: true,
-                title: "Reference ready with slower first run",
+                title: MacInterfaceText.cloningReadySlowerFirstRun,
                 detail: message,
-                trailingText: "Ready"
+                trailingText: MacInterfaceText.statusReady
             )
         }
 
         return VoiceCloningReadinessDescriptor(
             noteIsReady: true,
-            title: "Ready to generate",
-            detail: "Ready to generate and save.",
-            trailingText: "Ready"
+            title: MacInterfaceText.readinessReadyToGenerate,
+            detail: MacInterfaceText.readinessReadyToGenerateAndSave,
+            trailingText: MacInterfaceText.statusReady
         )
     }
 }

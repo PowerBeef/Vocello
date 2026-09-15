@@ -49,9 +49,9 @@ struct RecordReferenceClipSheet: View {
 
     private var phaseLabel: String {
         switch stage {
-        case .recording: return "Recording"
-        case .captured: return "Captured"
-        case .idle: return "Reference clip"
+        case .recording: return MacInterfaceText.recordPhaseRecording
+        case .captured: return MacInterfaceText.recordPhaseCaptured
+        case .idle: return MacInterfaceText.recordPhaseIdle
         }
     }
 
@@ -63,27 +63,27 @@ struct RecordReferenceClipSheet: View {
         switch stage {
         case .idle:
             if !hasInputDevice {
-                return "No microphone detected. Connect a microphone or audio-input device to record."
+                return MacInterfaceText.recordNoMicrophone
             }
             if recorder.permissionDenied {
-                return "Microphone access is denied. Enable it in System Settings to record."
+                return MacInterfaceText.recordMicrophoneDenied
             }
             if recorder.recordingFailed {
-                return "Recording couldn't start. Check your microphone in System Settings → Sound, then try again."
+                return MacInterfaceText.recordFailedToStart
             }
-            return "Click Record, then read 10–20 s of clean, natural speech. Quiet room. One voice."
+            return MacInterfaceText.recordIdleHint
         case .recording:
             if recorder.elapsed < ReferenceClipRecorder.minDuration {
-                return "Keep recording. 10 second minimum."
+                return MacInterfaceText.recordKeepGoing
             }
             if recorder.elapsed <= ReferenceClipRecorder.maxDuration {
-                return "Sounds good. Click Stop when ready."
+                return MacInterfaceText.recordSoundsGood
             }
-            return "Over 20 seconds. Stop now."
+            return MacInterfaceText.recordOverLimit
         case .captured:
             return canUse
-                ? "Review the clip, then use it or retake."
-                : "Clip is under 10 seconds. Retake a longer one."
+                ? MacInterfaceText.recordReviewClip
+                : MacInterfaceText.recordClipTooShort
         }
     }
 

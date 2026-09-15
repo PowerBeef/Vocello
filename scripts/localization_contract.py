@@ -23,7 +23,14 @@ MAC_INTERFACE_SOURCE = Path("Sources/Services/MacInterfaceText.swift")
 COMMERCE_SOURCE = Path("Sources/iOS/Commerce/IOSCommercePresentationText.swift")
 UI_TEST_SOURCE = Path("Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift")
 MAC_UI_TEST_SOURCE = Path("Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift")
-SCAN_ROOTS = (Path("Sources/iOS"), Path("Sources/Views"), Path("Sources/SharedSupport"))
+SCAN_ROOTS = (
+    Path("Sources/iOS"),
+    Path("Sources/Views"),
+    Path("Sources/SharedSupport"),
+    # The macOS scene and toolbar live beside the view tree, not under it.
+    Path("Sources/ContentView.swift"),
+    Path("Sources/QwenVoiceApp.swift"),
+)
 ALLOWED_CALLS = {
     "Text", "Button", "Label", "Toggle", "Picker", "Section", "GroupBox", "Link",
     "navigationTitle", "alert", "confirmationDialog", "accessibilityLabel", "accessibilityHint",
@@ -316,9 +323,13 @@ def scan_unlocalized_literals(root: Path) -> list[dict[str, Any]]:
     counts: Counter[tuple[str, str, str]] = Counter()
     for scan_root in SCAN_ROOTS:
         absolute_root = root / scan_root
-        if not absolute_root.is_dir():
+        if absolute_root.is_file():
+            paths = [absolute_root]
+        elif absolute_root.is_dir():
+            paths = sorted(absolute_root.rglob("*.swift"))
+        else:
             raise ContractError(f"localization scan root is missing: {scan_root}")
-        for path in sorted(absolute_root.rglob("*.swift")):
+        for path in paths:
             relative = path.relative_to(root).as_posix()
             text = path.read_text(encoding="utf-8")
             for match in CALL_PATTERN.finditer(text):

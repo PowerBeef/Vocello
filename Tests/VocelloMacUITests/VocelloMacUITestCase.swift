@@ -64,7 +64,16 @@ class VocelloMacUITestCase: XCTestCase {
             environment[key] = value
         }
 
-        session.launch(environment: environment, arguments: additionalArguments)
+        // The journeys read a few English values ("Ready", "N characters"), and
+        // since 2026-09-14 the catalog carries French, so a French-system host
+        // would otherwise render the app in French. Pin the process language
+        // through the argument domain (never persisted; `-AppleLanguages` here is
+        // Foundation's launch override, not an app-side mutation) so every lane
+        // sees the same English strings regardless of the host's settings.
+        session.launch(
+            environment: environment,
+            arguments: Self.englishLaunchArguments + additionalArguments
+        )
         XCTAssertTrue(
             VocelloUIWait.exists(app.windows.firstMatch, timeout: 30),
             "Vocello must expose one host-app window after launch"
@@ -78,6 +87,8 @@ class VocelloMacUITestCase: XCTestCase {
         )
         navigate(to: .customVoice)
     }
+
+    static let englishLaunchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
 
     func relaunchApp(additionalEnvironment: [String: String]) {
         session.terminate()

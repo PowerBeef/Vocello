@@ -234,7 +234,7 @@ private struct SidebarRow: View {
                     .foregroundStyle(iconColor)
                     .frame(width: iconSlotWidth, alignment: .center)
 
-                Text(item.rawValue)
+                Text(item.title)
                     .font(.system(size: labelSize, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(textColor)
                     .lineLimit(1)
@@ -260,7 +260,7 @@ private struct SidebarRow: View {
             .appAnimation(AppTheme.Motion.state, value: isHovered)
             .appAnimation(AppTheme.Motion.state, value: isSelected)
             .disabled(isDisabled)
-            .accessibilityLabel(item.rawValue)
+            .accessibilityLabel(item.title)
             .accessibilityValue(accessibilityStateValue)
             .accessibilityIdentifier(item.accessibilityID)
     }
@@ -317,7 +317,7 @@ struct SidebarView: View {
                 // a header would restate the row directly beneath it.
                 if section != .settings {
                     NavigationSectionHeader(
-                        title: section.rawValue,
+                        title: section.title,
                         accessibilityID: section.accessibilityID
                     )
                 }

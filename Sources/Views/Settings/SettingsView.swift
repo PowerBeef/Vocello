@@ -250,11 +250,11 @@ struct SettingsView: View {
                 return ""
             }
         }()
-        return "This will delete \(model.mode.displayName) \(variant)\(sizeText) from disk. You can download it again later."
+        return MacInterfaceText.settingsDeleteModelMessage(MacInterfaceText.modeName(model.mode), variant, sizeText)
     }
 
     private var outputDirectorySummary: String {
-        if outputDirectory.isEmpty { return "Default" }
+        if outputDirectory.isEmpty { return MacInterfaceText.settingsOutputDefault }
         return outputDirectory
     }
 
@@ -365,9 +365,12 @@ private struct ModelSetupSummaryRow: View {
     private func setupProgressText(_ progress: ModelManagerViewModel.RecommendedSetupProgress) -> String {
         if let modelID = progress.currentModelID,
            let model = TTSModel.model(id: modelID) {
-            return "Downloading \(model.mode.displayName) \(viewModel.activeVariantLabel(for: model)) · \(progress.completedCount) of \(progress.totalCount) complete"
+            return MacInterfaceText.settingsDownloadingProgress(
+                MacInterfaceText.modeName(model.mode), viewModel.activeVariantLabel(for: model),
+                String(progress.completedCount), String(progress.totalCount)
+            )
         }
-        return "\(progress.completedCount) of \(progress.totalCount) complete"
+        return MacInterfaceText.settingsProgressComplete(String(progress.completedCount), String(progress.totalCount))
     }
 }
 
@@ -406,7 +409,7 @@ private struct ModelDownloadRow: View {
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(mode.displayName)
+                    Text(MacInterfaceText.modeName(mode))
                         .font(.callout.weight(.semibold))
                         .lineLimit(1)
                     // Mode-constant facts live here once (size, capability)
@@ -536,9 +539,8 @@ private struct ModelPackageLine: View {
 
     /// "Speed · 4-bit" — the tier plus only the per-row fact (bit depth).
     private var compactVariantLabel: String {
-        let kind = model.variantKind?.displayName ?? model.name
-        guard let bits = model.variantKind?.bitDepthLabel,
-              let depth = bits.split(separator: " ").last else {
+        let kind = model.variantKind?.displayName ?? MacInterfaceText.modeName(model.mode)
+        guard let depth = model.variantKind?.depthLabel else {
             return kind
         }
         return "\(kind) · \(depth)"
@@ -652,7 +654,7 @@ private struct ActionButton: View {
                     Text(MacInterfaceText.settingsManage)
                 }
                 .background(NSViewHostAccessor(holder: manageHostHolder))
-                .help(MacInterfaceText.settingsManageHelp(model.variantKind?.displayName ?? model.name))
+                .help(MacInterfaceText.settingsManageHelp(model.variantKind?.displayName ?? MacInterfaceText.modeName(model.mode)))
                 .controlSize(.small)
                 .accessibilityIdentifier("settings_manage_\(model.id)")
             }
@@ -665,7 +667,7 @@ private struct ActionButton: View {
                 .frame(maxWidth: .infinity)
             }
             .background(NSViewHostAccessor(holder: manageHostHolder))
-            .help(MacInterfaceText.settingsManageHelp(model.variantKind?.displayName ?? model.name))
+            .help(MacInterfaceText.settingsManageHelp(model.variantKind?.displayName ?? MacInterfaceText.modeName(model.mode)))
             .controlSize(.small)
             .accessibilityIdentifier("settings_manage_\(model.id)")
         }
@@ -677,9 +679,9 @@ private struct ActionButton: View {
 
     private var downloadHelp: String {
         if let size = viewModel.sizeText(for: model) {
-            return "Download \(size)"
+            return MacInterfaceText.settingsDownloadSize(size)
         }
-        return "Download"
+        return MacInterfaceText.download
     }
 
     /// Build a real AppKit NSMenu and pop it up from the Manage

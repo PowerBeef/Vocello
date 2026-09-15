@@ -5,7 +5,7 @@ struct TextInputView: View {
     @Binding var text: String
 
     var isGenerating: Bool
-    var placeholder: String = "Type or paste your script"
+    var placeholder: String = MacInterfaceText.textInputPlaceholder
     var buttonColor: Color = AppTheme.customVoice
     var batchAction: (() -> Void)? = nil
     var batchDisabled: Bool = true
@@ -150,7 +150,7 @@ struct TextInputView: View {
     private var characterCount: some View {
         let count = text.count
         let isLong = count > 500
-        let baseLabel = "\(count) characters"
+        let baseLabel = MacInterfaceText.textInputCharacterCount(String(count))
         return HStack(spacing: 6) {
             if isLong {
                 Image(systemName: "exclamationmark.circle.fill")

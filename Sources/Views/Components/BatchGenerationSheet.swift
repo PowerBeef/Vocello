@@ -128,7 +128,7 @@ struct BatchGenerationSheet: View {
 
         ScriptTextEditor(
             text: $batchText,
-            placeholder: "Enter one line per generation...",
+            placeholder: MacInterfaceText.batchPlaceholder,
             font: .systemFont(ofSize: NSFont.systemFontSize),
             isFocused: $isEditorFocused,
             accessibilityIdentifier: "batch_textEditor"
@@ -233,7 +233,7 @@ struct BatchGenerationSheet: View {
         }
         .frame(maxWidth: .infinity)
 
-        batchItemStatusList(outcome.items, title: "Batch results")
+        batchItemStatusList(outcome.items, title: MacInterfaceText.batchResults)
 
         Spacer()
 
@@ -300,10 +300,10 @@ struct BatchGenerationSheet: View {
 
     private var progressStatusMessage: String {
         if coordinator.isCancelling {
-            return "Cancelling..."
+            return MacInterfaceText.batchCancelling
         }
         let message = coordinator.progressSnapshot.statusMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-        return message.isEmpty ? "Preparing batch..." : message
+        return message.isEmpty ? MacInterfaceText.batchPreparing : message
     }
 
     private func completionMessage(for outcome: BatchGenerationOutcome) -> String {
@@ -311,18 +311,18 @@ struct BatchGenerationSheet: View {
         case .completed(let items):
             let count = items.filter(\.isSaved).count
             return count == 1
-                ? "1 clip generated successfully."
-                : "\(count) clips generated successfully."
+                ? MacInterfaceText.batchOneClipGenerated
+                : MacInterfaceText.batchClipsGenerated(String(count))
         case .cancelled(let items, let restartFailedMessage):
             let count = items.filter(\.isSaved).count
             let total = items.count
             if count == 0 {
                 if let restartFailedMessage, !restartFailedMessage.isEmpty {
-                    return "Generation was cancelled before any clips were created. \(restartFailedMessage)"
+                    return "\(MacInterfaceText.batchCancelledNone) \(restartFailedMessage)"
                 }
-                return "Generation was cancelled before any clips were created."
+                return MacInterfaceText.batchCancelledNone
             }
-            let base = "\(count) of \(total) clips generated before cancellation."
+            let base = MacInterfaceText.batchCancelledPartial(String(count), String(total))
             if let restartFailedMessage, !restartFailedMessage.isEmpty {
                 return "\(base) \(restartFailedMessage)"
             }
@@ -330,20 +330,20 @@ struct BatchGenerationSheet: View {
         case .failed(let items, let message):
             let completedCount = items.filter(\.isSaved).count
             if completedCount == 0 {
-                return "Batch generation stopped before any clips were saved. \(message)"
+                return MacInterfaceText.batchStoppedNone(message)
             }
-            return "\(completedCount) of \(items.count) clips were saved before the batch stopped. \(message)"
+            return MacInterfaceText.batchStoppedPartial(String(completedCount), String(items.count), message)
         }
     }
 
     private func completionTitle(for outcome: BatchGenerationOutcome) -> String {
         switch outcome {
         case .completed:
-            return "Batch Complete"
+            return MacInterfaceText.batchComplete
         case .cancelled:
-            return "Batch Cancelled"
+            return MacInterfaceText.batchCancelledTitle
         case .failed:
-            return "Batch Stopped"
+            return MacInterfaceText.batchStoppedTitle
         }
     }
 

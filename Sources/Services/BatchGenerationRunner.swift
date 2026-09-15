@@ -46,7 +46,7 @@ struct BatchProgressSnapshot: Equatable {
         // contradictory text such as "Generating item 2/2… 0 of 2 clips
         // completed · Item 1 active". `statusMessage` already tells the user
         // which item is in flight, so the count line just reports completion.
-        return "\(completedCount) of \(totalCount) clips completed"
+        return MacInterfaceText.batchClipsCompleted(String(completedCount), String(totalCount))
     }
 }
 
@@ -93,15 +93,17 @@ struct BatchGenerationItemState: Identifiable, Equatable {
     var statusLabel: String {
         switch status {
         case .pending:
-            return "Pending"
+            return MacInterfaceText.batchStatusPending
         case .running:
-            return "Running"
+            return MacInterfaceText.batchStatusRunning
         case .saved:
-            return historyRecord?.longFormProjectID == nil ? "Saved" : VocelloPresentationText.longFormSegmentGenerated
+            return historyRecord?.longFormProjectID == nil
+                ? MacInterfaceText.batchStatusSaved
+                : VocelloPresentationText.longFormSegmentGenerated
         case .failed:
-            return "Failed"
+            return MacInterfaceText.batchStatusFailed
         case .cancelled:
-            return "Cancelled"
+            return MacInterfaceText.batchStatusCancelled
         }
     }
 
@@ -199,11 +201,11 @@ struct BatchGenerationRequest {
         }
 
         if mode == .design && (voiceDescription ?? "").isEmpty {
-            return "Enter a voice description before starting batch generation."
+            return MacInterfaceText.batchNeedsVoiceDescription
         }
 
         if mode == .clone && refAudio == nil {
-            return "Select a reference audio file before starting batch generation."
+            return MacInterfaceText.batchNeedsReference
         }
 
         return nil
@@ -807,18 +809,18 @@ final class BatchGenerationRunner {
                     publishItems()
                     return .failed(
                         items: items,
-                        message: "A previously generated long-form segment no longer passes audio quality checks."
+                        message: MacInterfaceText.batchSegmentNoLongerPasses
                     )
                 }
                 completedCount += 1
-                publishProgress(activeItemIndex: index, message: "Reusing item \(index + 1)/\(total)...")
+                publishProgress(activeItemIndex: index, message: MacInterfaceText.batchReusingItem(String(index + 1), String(total)))
                 publishItems()
                 continue
             }
 
             items[index].status = .running
             publishItems()
-            publishProgress(activeItemIndex: index, message: "Generating item \(index + 1)/\(total)...")
+            publishProgress(activeItemIndex: index, message: MacInterfaceText.batchGeneratingItem(String(index + 1), String(total)))
 
             let suggestedPath = makeOutputPath(request.model.outputSubfolder, line)
             let outputPath = request.segmentationMode == .longForm
@@ -853,12 +855,12 @@ final class BatchGenerationRunner {
                         publishItems()
                         return .failed(
                             items: items,
-                            message: "Long-form batch failed audio quality checks. Review the failed segment details before retrying."
+                            message: MacInterfaceText.batchLongFormFailedQuality
                         )
                     }
                 }
 
-                publishProgress(activeItemIndex: index, message: "Saving item \(index + 1)/\(total)...")
+                publishProgress(activeItemIndex: index, message: MacInterfaceText.batchSavingItem(String(index + 1), String(total)))
 
                 let generation = request.makeHistoryRecord(for: line, result: result)
                 if request.segmentationMode == .longForm {
@@ -905,7 +907,7 @@ final class BatchGenerationRunner {
         }
 
         if request.segmentationMode == .longForm {
-            publishProgress(activeItemIndex: nil, message: "Joining segments...")
+            publishProgress(activeItemIndex: nil, message: MacInterfaceText.batchJoiningSegments)
             var candidateJoinedURL: URL?
             defer { if let candidateJoinedURL { try? FileManager.default.removeItem(at: candidateJoinedURL) } }
             do {
@@ -918,7 +920,7 @@ final class BatchGenerationRunner {
                 if !joinedReport.passed {
                     return .failed(
                         items: items,
-                        message: "Long-form joined output failed audio quality checks: \(joinedReport.failureSummary)"
+                        message: MacInterfaceText.batchJoinedFailedQuality(joinedReport.failureSummary)
                     )
                 }
                 if let joinedRecord = request.makeJoinedHistoryRecord(
@@ -940,12 +942,12 @@ final class BatchGenerationRunner {
                 if error is CancellationError { return .cancelled(items: items, restartFailedMessage: nil) }
                 return .failed(
                     items: items,
-                    message: "Long-form assembly failed: \(error.localizedDescription)"
+                    message: MacInterfaceText.batchAssemblyFailed(error.localizedDescription)
                 )
             }
         }
 
-        publishProgress(activeItemIndex: nil, message: "Done")
+        publishProgress(activeItemIndex: nil, message: MacInterfaceText.done)
         return .completed(items: items)
     }
 
@@ -977,7 +979,7 @@ final class BatchGenerationRunner {
               priorItems.count == request.lines.count,
               priorItems.allSatisfy(\.isSaved) else {
             return (
-                .failed(items: priorItems, message: "The segment to regenerate is not part of this long-form project."),
+                .failed(items: priorItems, message: MacInterfaceText.batchSegmentNotInProject),
                 priorReplacements
             )
         }
@@ -1030,7 +1032,7 @@ final class BatchGenerationRunner {
                 return (
                     .failed(
                         items: items,
-                        message: "The regenerated take failed audio quality checks; the previous take is unchanged. \(qualityReport.failureSummary)"
+                        message: MacInterfaceText.batchRegeneratedFailedQuality(qualityReport.failureSummary)
                     ),
                     priorReplacements
                 )
@@ -1075,7 +1077,7 @@ final class BatchGenerationRunner {
                 return (
                     .failed(
                         items: priorItems,
-                        message: "Long-form joined output failed audio quality checks after regeneration: \(joinedReport.failureSummary)"
+                        message: MacInterfaceText.batchJoinedFailedQualityAfterRegeneration(joinedReport.failureSummary)
                     ),
                     priorReplacements
                 )
@@ -1112,7 +1114,7 @@ final class BatchGenerationRunner {
                 return (.cancelled(items: items, restartFailedMessage: nil), priorReplacements)
             }
             return (
-                .failed(items: items, message: "Segment regeneration failed: \(error.localizedDescription)"),
+                .failed(items: items, message: MacInterfaceText.batchSegmentRegenerationFailed(error.localizedDescription)),
                 priorReplacements
             )
         }
@@ -1144,9 +1146,9 @@ final class BatchGenerationRunner {
         var errorDescription: String? {
             switch self {
             case .missingPlan:
-                return "The long-form run is missing its segmentation plan."
+                return MacInterfaceText.batchMissingPlan
             case .missingSegmentAudio(let index):
-                return "Segment \(index + 1) has no generated audio to join."
+                return MacInterfaceText.batchSegmentMissingAudio(String(index + 1))
             }
         }
     }

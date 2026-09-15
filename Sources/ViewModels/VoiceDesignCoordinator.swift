@@ -94,8 +94,8 @@ final class VoiceDesignCoordinator {
             await savedVoicesViewModel.refresh(using: ttsEngineStore)
         }
         actionAlert = VoiceDesignActionAlert(
-            title: "Saved Voice Added",
-            message: "\"\(voice.name)\" is ready in Saved Voices."
+            title: MacInterfaceText.savedVoiceAddedTitle,
+            message: MacInterfaceText.savedVoiceAddedMessage(voice.name)
         )
     }
 

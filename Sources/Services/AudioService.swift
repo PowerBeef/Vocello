@@ -41,10 +41,10 @@ enum AudioService {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: expandedPath, isDirectory: &isDirectory),
               isDirectory.boolValue else {
-            return "The chosen folder no longer exists — new audio saves to the default outputs folder."
+            return MacInterfaceText.audioFolderMissing
         }
         guard FileManager.default.isWritableFile(atPath: expandedPath) else {
-            return "The chosen folder isn't writable — new audio saves to the default outputs folder."
+            return MacInterfaceText.audioFolderNotWritable
         }
         return nil
     }

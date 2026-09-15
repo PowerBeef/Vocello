@@ -4,7 +4,7 @@ import SwiftUI
 struct EmotionPickerView: View {
     @Binding var emotion: String
     var deliveryProfile: Binding<DeliveryProfile?>? = nil
-    var title: String = "Tone"
+    var title: String = MacInterfaceText.emotionTone
     var accentColor: Color = AppTheme.accent
     var accessibilityPrefix: String = "delivery"
     var showsLabel: Bool = true
@@ -40,7 +40,7 @@ struct EmotionPickerView: View {
 
     private var currentToneLabel: String {
         if isCustomMode {
-            return "Custom"
+            return MacInterfaceText.emotionCustom
         }
 
         guard let selectedPreset else {
@@ -186,10 +186,10 @@ struct EmotionPickerView: View {
                 }
 
                 HStack(alignment: .top, spacing: 12) {
-                    ConfigurationColumn(label: "Delivery") { tonePicker }
+                    ConfigurationColumn(label: MacInterfaceText.delivery) { tonePicker }
 
                     if reservesIntensitySlot {
-                        ConfigurationColumn(label: "Intensity", isEnabled: showsIntensityPicker) {
+                        ConfigurationColumn(label: MacInterfaceText.emotionIntensity, isEnabled: showsIntensityPicker) {
                             intensityPicker
                         }
                     }
@@ -204,10 +204,10 @@ struct EmotionPickerView: View {
             leadingColumns
         }
 
-        ConfigurationColumn(label: "Delivery") { tonePicker }
+        ConfigurationColumn(label: MacInterfaceText.delivery) { tonePicker }
 
         if reservesIntensitySlot {
-            ConfigurationColumn(label: "Intensity", isEnabled: showsIntensityPicker) {
+            ConfigurationColumn(label: MacInterfaceText.emotionIntensity, isEnabled: showsIntensityPicker) {
                 intensityPicker
             }
         }

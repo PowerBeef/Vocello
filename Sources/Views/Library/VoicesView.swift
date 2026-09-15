@@ -291,8 +291,8 @@ private extension VoicesView {
             } catch {
                 await MainActor.run {
                     presentActionAlert(
-                        title: "Delete Failed",
-                        message: "Failed to remove the saved voice: \(error.localizedDescription)"
+                        title: MacInterfaceText.voicesDeleteFailed,
+                        message: MacInterfaceText.voicesDeleteFailedMessage(error.localizedDescription)
                     )
                 }
             }
@@ -487,7 +487,7 @@ private struct VoiceRowMetadata: View {
     /// it (unchanged).
     private var warningChip: some View {
         let token = qualityWarnings.first ?? ""
-        let label = PreparedVoiceQualityWarning.shortLabel(for: token)
+        let label = MacInterfaceText.qualityWarningShortLabel(token: token)
             ?? MacInterfaceText.voicesReferenceOutsideRangeShort
 
         return Button {

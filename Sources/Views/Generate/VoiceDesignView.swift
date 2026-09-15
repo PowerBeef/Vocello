@@ -143,7 +143,7 @@ struct VoiceDesignView: View {
 private extension VoiceDesignView {
     var configurationPanel: some View {
         CompactConfigurationSection(
-            title: "Configuration",
+            title: MacInterfaceText.sectionConfiguration,
             iconName: "slider.horizontal.3",
             accentColor: AppTheme.voiceDesign,
             trailingText: nil,
@@ -171,10 +171,10 @@ private extension VoiceDesignView {
 
     var composerPanel: some View {
         StudioSectionCard(
-            title: "Script",
+            title: MacInterfaceText.sectionScript,
             iconName: "text.alignleft",
             accentColor: AppTheme.voiceDesign,
-            trailingText: isGenerationActive ? "Generating" : (canGenerate ? "Ready" : nil),
+            trailingText: isGenerationActive ? MacInterfaceText.statusGenerating : (canGenerate ? MacInterfaceText.statusReady : nil),
             fillsAvailableHeight: true,
             accessibilityIdentifier: "voiceDesign_script"
         ) {
@@ -182,7 +182,7 @@ private extension VoiceDesignView {
                 TextInputView(
                     text: $draft.text,
                     isGenerating: isGenerationActive,
-                    placeholder: "Type or paste your script",
+                    placeholder: MacInterfaceText.textInputPlaceholder,
                     buttonColor: AppTheme.voiceDesign,
                     batchAction: { coordinator.presentBatch(draft: draft) },
                     batchDisabled: !canRunBatch,
@@ -247,7 +247,7 @@ private extension VoiceDesignView {
 
     var languageColumn: some View {
         ConfigurationColumn(
-            label: "Language",
+            label: MacInterfaceText.sectionLanguage,
             detail: LanguageSelectionPresentation.isFollowingDetection(
                 selected: draft.selectedLanguage,
                 detected: detectedPromptLanguage
@@ -277,32 +277,32 @@ private extension VoiceDesignView {
 
     var readinessTitle: String {
         if !ttsEngineStore.isReady {
-            return "Engine starting"
+            return MacInterfaceText.readinessEngineStarting
         }
         if !isModelAvailable {
-            return "Install the active model"
+            return MacInterfaceText.readinessInstallActiveModel
         }
         if !draft.hasVoiceDescription {
-            return "Add a voice brief"
+            return MacInterfaceText.designAddVoiceBrief
         }
         if !draft.hasText {
-            return "Add a script"
+            return MacInterfaceText.readinessAddScript
         }
-        return "Review the take"
+        return MacInterfaceText.designReviewTake
     }
 
     var readinessDetail: String {
         if !ttsEngineStore.isReady {
-            return "The engine is still preparing."
+            return MacInterfaceText.readinessEngineStartingDetail
         }
         if !isModelAvailable {
-            return "Install \(modelDisplayName) in Models to enable generation."
+            return MacInterfaceText.readinessInstallActiveModelDetail(modelDisplayName)
         }
         if !draft.hasVoiceDescription {
-            return "Describe the voice before writing the final line."
+            return MacInterfaceText.designDescribeVoiceDetail
         }
         if !draft.hasText {
-            return "The generated voice uses this brief and delivery once a line is written."
+            return MacInterfaceText.designBriefUsedDetail
         }
         switch GenerationEnginePresentation.modelWarmPath(
             snapshot: ttsEngineStore.snapshot,
@@ -311,9 +311,9 @@ private extension VoiceDesignView {
         case .modelCold:
             return GenerationEnginePresentation.coldStartDetail()
         case .modelWarming, .modelActivePrep:
-            return "Preparing Voice Design. You can generate now; preparation finishes in the background."
+            return MacInterfaceText.designPreparingDetail
         default:
-            return "Ready to generate and save."
+            return MacInterfaceText.readinessReadyToGenerateAndSave
         }
     }
 
@@ -365,7 +365,7 @@ private struct VoiceDesignBriefSettings: View {
 
     var body: some View {
         GenerationSetupRow(
-            label: "Voice brief",
+            label: MacInterfaceText.designVoiceBriefLabel,
             accessibilityIdentifier: "voiceDesign_voiceSetup"
         ) {
             VoiceBriefEditor(

@@ -8,7 +8,7 @@ enum VoiceCloningReferenceAudioSupport {
         "wav", "mp3", "aiff", "aif", "m4a", "flac", "ogg", "webm",
     ]
 
-    static let supportedFormatDescription = "WAV, MP3, AIFF, M4A, FLAC, OGG, or WebM"
+    static var supportedFormatDescription: String { MacInterfaceText.cloningSupportedFormats }
 
     static let webMType = UTType(filenameExtension: "webm")
         ?? UTType(mimeType: "audio/webm")
@@ -144,7 +144,7 @@ struct VoiceCloningView: View {
 
     private var savedVoicesLoadError: String? {
         guard let loadError = savedVoicesViewModel.loadError else { return nil }
-        return "Couldn't load saved voices right now. You can still clone from a file. \(loadError)"
+        return MacInterfaceText.cloningSavedVoicesLoadError(loadError)
     }
 
     private var selectedSavedVoiceID: Binding<String?> {
@@ -331,7 +331,7 @@ private extension VoiceCloningContextStatus {
 private extension VoiceCloningView {
     var configurationPanel: some View {
         CompactConfigurationSection(
-            title: "Reference",
+            title: MacInterfaceText.cloningReferenceSection,
             iconName: "slider.horizontal.3",
             accentColor: AppTheme.voiceCloning,
             trailingText: nil,
@@ -377,10 +377,10 @@ private extension VoiceCloningView {
 
     var composerPanel: some View {
         StudioSectionCard(
-            title: "Script",
+            title: MacInterfaceText.sectionScript,
             iconName: "text.alignleft",
             accentColor: AppTheme.voiceCloning,
-            trailingText: isGenerationActive ? "Generating" : readinessDescriptor.trailingText,
+            trailingText: isGenerationActive ? MacInterfaceText.statusGenerating : readinessDescriptor.trailingText,
             fillsAvailableHeight: true,
             accessibilityIdentifier: "voiceCloning_script"
         ) {
@@ -388,7 +388,7 @@ private extension VoiceCloningView {
                 TextInputView(
                     text: $draft.text,
                     isGenerating: isGenerationActive,
-                    placeholder: "Type the line for the cloned voice",
+                    placeholder: MacInterfaceText.cloningScriptPlaceholder,
                     buttonColor: AppTheme.voiceCloning,
                     batchAction: { coordinator.presentBatch(draft: draft) },
                     batchDisabled: !canRunBatch,
@@ -486,7 +486,7 @@ private struct VoiceCloningReferenceSettings: View {
 
     var body: some View {
         GenerationSetupRow(
-            label: "Source",
+            label: MacInterfaceText.cloningSourceLabel,
             accessibilityIdentifier: "voiceCloning_voiceSetup"
         ) {
             CloneSourceRow(
@@ -498,7 +498,7 @@ private struct VoiceCloningReferenceSettings: View {
             )
         } supporting: {
             GenerationSetupHint(
-                message: "Use permitted clips only.",
+                message: MacInterfaceText.cloningPermittedClipsOnly,
                 accessibilityIdentifier: "voiceCloning_consentNotice"
             )
             CloneReferenceStatus(
@@ -540,7 +540,7 @@ private struct VoiceCloningTranscriptSettings: View {
 
     var body: some View {
         GenerationSetupRow(
-            label: "Transcript",
+            label: MacInterfaceText.cloningTranscriptAccessibility,
             accessibilityIdentifier: "voiceCloning_transcriptField"
         ) {
             TextField(
@@ -645,7 +645,7 @@ private struct CloneReferenceStatus: View {
                         .lineLimit(1)
 
                     if let token = selectedVoice?.qualityWarnings.first,
-                       let shortLabel = PreparedVoiceQualityWarning.shortLabel(for: token) {
+                       let shortLabel = MacInterfaceText.qualityWarningShortLabel(token: token) {
                         warningChip(token: token, shortLabel: shortLabel)
                     } else {
                         Text(referenceDetail)
@@ -813,7 +813,7 @@ private struct CloneSourceRow: View {
                 } else {
                     tag = persona.baseVoiceID
                 }
-                entries.append(SourceEntry(id: tag, label: "\(persona.name) · voice bank"))
+                entries.append(SourceEntry(id: tag, label: MacInterfaceText.cloningVoiceBankEntry(persona.name)))
             } else {
                 entries.append(SourceEntry(
                     id: voice.id,

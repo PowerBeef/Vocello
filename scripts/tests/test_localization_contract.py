@@ -72,6 +72,9 @@ class LocalizationContractTests(unittest.TestCase):
         (self.root / "Sources/iOS/Studio").mkdir(parents=True)
         (self.root / "Sources/iOSSupport/Services").mkdir(parents=True)
         (self.root / "Sources/Views").mkdir(parents=True)
+        # The macOS scene and toolbar files are scan roots in their own right.
+        (self.root / "Sources/ContentView.swift").write_text("struct ContentView {}\n", encoding="utf-8")
+        (self.root / "Sources/QwenVoiceApp.swift").write_text("struct QwenVoiceApp {}\n", encoding="utf-8")
         (self.root / "Tests/VocelloiOSUITests").mkdir(parents=True)
         (self.root / "Tests/VocelloMacUITests").mkdir(parents=True)
         (self.root / "config").mkdir(parents=True)

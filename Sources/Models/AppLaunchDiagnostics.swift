@@ -6,7 +6,7 @@ enum AppLaunchIssue: String, Equatable, Sendable {
     var summary: String {
         switch self {
         case .invalidContract:
-            return "Vocello couldn't load its native model contract."
+            return MacInterfaceText.startupInvalidContract
         }
     }
 }

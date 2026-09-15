@@ -503,6 +503,7 @@ targets:
       - path: Sources/Models/VoiceDesignDraft.swift
       - path: Sources/Models/ScriptTextState.swift
       - path: Sources/ViewModels/VoiceDesignCoordinator.swift
+      - path: Sources/Services/MacInterfaceText.swift
       - path: Sources/ViewModels/GenerationLifecycleExecutor.swift
       - path: Sources/VocelloCLI/CLIProcessSupervisor.swift
       - path: Sources/VocelloCLI/CLIBatchExecution.swift

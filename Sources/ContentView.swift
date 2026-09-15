@@ -25,6 +25,18 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// Catalog-owned sidebar label; the rawValue stays the stored identity.
+    var title: String {
+        switch self {
+        case .customVoice: MacInterfaceText.menuBuiltInVoice
+        case .voiceDesign: MacInterfaceText.menuVoiceDesign
+        case .voiceCloning: MacInterfaceText.menuVoiceCloning
+        case .history: MacInterfaceText.menuHistory
+        case .voices: MacInterfaceText.menuSavedVoices
+        case .settings: MacInterfaceText.settingsTitle
+        }
+    }
+
     var accessibilityID: String { "sidebar_\(String(describing: self))" }
 
     var screenAccessibilityID: String {
@@ -81,6 +93,15 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 
         var accessibilityID: String {
             "sidebarSection_\(String(describing: self))"
+        }
+
+        /// Catalog-owned section header; the rawValue stays the internal identity.
+        var title: String {
+            switch self {
+            case .generate: MacInterfaceText.sidebarSectionGenerate
+            case .library: MacInterfaceText.sidebarSectionLibrary
+            case .settings: MacInterfaceText.settingsTitle
+            }
         }
 
         var items: [SidebarItem] {
@@ -616,7 +637,7 @@ private struct MainWindowToolbar: ToolbarContent {
             ToolbarItem {
                 HStack(spacing: 10) {
                     Menu {
-                        Picker("Sort", selection: $historySortOrder) {
+                        Picker(MacInterfaceText.historySortPicker, selection: $historySortOrder) {
                             ForEach(HistorySortOrder.allCases) { order in
                                 Text(order.label).tag(order)
                             }
@@ -624,27 +645,27 @@ private struct MainWindowToolbar: ToolbarContent {
                     } label: {
                         Image(systemName: "arrow.up.arrow.down.circle")
                     }
-                    .accessibilityLabel("Sort history")
+                    .accessibilityLabel(MacInterfaceText.historySortAccessibility)
                     .accessibilityIdentifier("history_sortPicker")
 
                     Menu {
-                        Button("Clear History (Keep Audio Files)…") {
+                        Button(MacInterfaceText.historyClearKeepFiles) {
                             historyClearRequest = HistoryClearRequest(scope: .keepFiles)
                         }
                         .accessibilityIdentifier("history_clearKeepFiles")
-                        Button("Clear History and Delete Audio…", role: .destructive) {
+                        Button(MacInterfaceText.historyClearDeleteFiles, role: .destructive) {
                             historyClearRequest = HistoryClearRequest(scope: .deleteFiles)
                         }
                         .accessibilityIdentifier("history_clearDeleteFiles")
                     } label: {
                         Image(systemName: "trash.circle")
                     }
-                    .accessibilityLabel("Clear history")
+                    .accessibilityLabel(MacInterfaceText.historyClearAccessibility)
                     .accessibilityIdentifier("history_clearMenu")
 
                     ToolbarSearchField(
                         text: $historySearchText,
-                        placeholder: "Search history",
+                        placeholder: MacInterfaceText.sidebarSearchHistory,
                         accessibilityIdentifier: "history_searchField"
                     )
                     // Fixed width on purpose: flexible or generous frames
@@ -659,7 +680,7 @@ private struct MainWindowToolbar: ToolbarContent {
 
         if selectedItem == .voices {
             ToolbarItem {
-                Button("Add Voice Sample") {
+                Button(MacInterfaceText.voicesAddVoiceSampleAction) {
                     voicesEnrollRequestID = UUID()
                 }
                 .buttonStyle(.borderedProminent)

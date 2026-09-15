@@ -175,15 +175,15 @@ enum HistorySortOrder: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .newest:
-            return "Newest"
+            return MacInterfaceText.historySortNewest
         case .oldest:
-            return "Oldest"
+            return MacInterfaceText.historySortOldest
         case .longestDuration:
-            return "Longest"
+            return MacInterfaceText.historySortLongest
         case .shortestDuration:
-            return "Shortest"
+            return MacInterfaceText.historySortShortest
         case .mode:
-            return "Mode"
+            return MacInterfaceText.historySortMode
         }
     }
 }
@@ -281,28 +281,28 @@ struct HistoryView: View {
                 Task { @MainActor in clearRequest = nil }
                 guard !databaseUnavailable else {
                     presentActionAlert(
-                        title: "History Unavailable",
-                        message: "Retry loading History before deleting any entries. Your existing database was preserved."
+                        title: MacInterfaceText.historyUnavailableTitle,
+                        message: MacInterfaceText.historyUnavailableMessage
                     )
                     return
                 }
                 guard !items.isEmpty else {
-                    presentActionAlert(title: "History Is Empty", message: "There are no history entries to clear.")
+                    presentActionAlert(title: MacInterfaceText.historyEmptyTitle, message: MacInterfaceText.historyEmptyMessage)
                     return
                 }
                 switch request.scope {
                 case .keepFiles:
                     actionAlert = HistoryActionAlert(
-                        title: "Clear History?",
-                        message: "This removes all \(items.count) history entries. The generated audio files stay on disk in your outputs folder.",
-                        confirmTitle: "Clear History",
+                        title: MacInterfaceText.historyClearTitle,
+                        message: MacInterfaceText.historyClearMessage(String(items.count)),
+                        confirmTitle: MacInterfaceText.historyClearConfirm,
                         onConfirm: { performClearAll(deleteAudio: false) }
                     )
                 case .deleteFiles:
                     actionAlert = HistoryActionAlert(
-                        title: "Clear History and Delete Audio?",
-                        message: "This permanently deletes all \(items.count) history entries and their audio files.",
-                        confirmTitle: "Delete Everything",
+                        title: MacInterfaceText.historyClearDeleteTitle,
+                        message: MacInterfaceText.historyClearDeleteMessage(String(items.count)),
+                        confirmTitle: MacInterfaceText.historyDeleteEverything,
                         onConfirm: { performClearAll(deleteAudio: true) }
                     )
                 }
@@ -495,10 +495,12 @@ struct HistoryView: View {
             return VocelloPresentationText.historyUnqueuedDetail
         }
         if recoverySnapshot.issueCount > 0 {
-            return "Vocello preserved the recovery record but could not verify or commit it. Retry before clearing History."
+            return MacInterfaceText.historyRecoveryUnverified
         }
         let count = recoverySnapshot.pendingCount
-        return "\(count) take\(count == 1 ? "" : "s") remain safely queued. You can retry, reveal, or export the audio."
+        return count == 1
+            ? MacInterfaceText.historyRecoveryQueuedOne
+            : MacInterfaceText.historyRecoveryQueuedMany(String(count))
     }
 
 }
@@ -542,8 +544,8 @@ private extension HistoryView {
         savedVoicesViewModel.insertOrReplace(voice)
         Task { await savedVoicesViewModel.refresh(using: ttsEngineStore) }
         presentActionAlert(
-            title: "Saved Voice Added",
-            message: "\"\(voice.name)\" is ready in Saved Voices."
+            title: MacInterfaceText.savedVoiceAddedTitle,
+            message: MacInterfaceText.savedVoiceAddedMessage(voice.name)
         )
     }
 
@@ -643,7 +645,7 @@ private extension HistoryView {
                     databaseUnavailable = true
                     if hasExistingItems {
                         presentActionAlert(
-                            title: "Couldn't refresh history",
+                            title: MacInterfaceText.historyRefreshFailed,
                             message: error.localizedDescription
                         )
                     } else {
@@ -702,8 +704,8 @@ private extension HistoryView {
                 try fileManager.copyItem(at: sourceURL, to: url)
             } catch {
                 presentActionAlert(
-                    title: "Export Error",
-                    message: "The file could not be exported: \(error.localizedDescription) Choose another destination and try again."
+                    title: MacInterfaceText.historyExportError,
+                    message: MacInterfaceText.historyExportErrorMessage(error.localizedDescription)
                 )
             }
         }
@@ -735,7 +737,7 @@ private extension HistoryView {
         }
         if failures > 0 {
             presentActionAlert(
-                title: "Export Warning",
+                title: MacInterfaceText.historyExportWarning,
                 message: VocelloPresentationText.recoveryExportFailure(failures)
             )
         }
@@ -757,13 +759,13 @@ private extension HistoryView {
             break
         case .databaseFailure(let message):
             presentActionAlert(
-                title: "Delete Error",
-                message: "The generation could not be removed from History: \(message) Try again after closing anything using the file."
+                title: MacInterfaceText.historyDeleteError,
+                message: MacInterfaceText.historyDeleteErrorMessage(message)
             )
         case .audioCleanupFailure(let message):
             presentActionAlert(
-                title: "Delete Warning",
-                message: "Generation removed from history, but the audio file could not be deleted: \(message)"
+                title: MacInterfaceText.historyDeleteWarning,
+                message: MacInterfaceText.historyDeleteWarningMessage(message)
             )
         }
     }
@@ -805,7 +807,7 @@ private extension HistoryView {
                 await MainActor.run {
                     databaseUnavailable = true
                     presentActionAlert(
-                        title: "Clear History Error",
+                        title: MacInterfaceText.historyClearError,
                         message: error.localizedDescription
                     )
                 }
@@ -821,8 +823,10 @@ private extension HistoryView {
 
                 if failures > 0 {
                     presentActionAlert(
-                        title: "Clear History Warning",
-                        message: "History cleared, but \(failures) audio file\(failures == 1 ? "" : "s") could not be deleted."
+                        title: MacInterfaceText.historyClearWarning,
+                        message: failures == 1
+                            ? MacInterfaceText.historyClearWarningOne
+                            : MacInterfaceText.historyClearWarningMany(String(failures))
                     )
                 }
                 NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)

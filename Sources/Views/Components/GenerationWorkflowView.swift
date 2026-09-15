@@ -603,7 +603,7 @@ struct GenerationVariantSelector: View {
             }
         }
         .fixedSize(horizontal: true, vertical: false)
-        .help(MacInterfaceText.workflowPackageHelp(mode.displayName, statusCaption))
+        .help(MacInterfaceText.workflowPackageHelp(MacInterfaceText.modeName(mode), statusCaption))
     }
 
     // The memory-risk signal used to live only in this control's hover
@@ -719,17 +719,17 @@ struct GenerationVariantSelector: View {
     }
 
     private var statusCaption: String {
-        guard let selectedModel else { return "No model" }
+        guard let selectedModel else { return MacInterfaceText.workflowNoModel }
         var parts: [String] = []
         if let bitDepth = selectedModel.variantKind?.bitDepthLabel {
             parts.append(bitDepth)
         }
         if !selectedModel.supportsInstructionControl {
-            parts.append("No delivery control")
+            parts.append(MacInterfaceText.workflowNoDeliveryControl)
         }
         if modelManager.isHardwareRisky(selectedModel),
            case .ready = modelManager.packagePresentation(for: selectedModel).kind {
-            parts.append("Heavy on this Mac")
+            parts.append(MacInterfaceText.workflowHeavyOnThisMac)
         } else {
             parts.append(modelManager.generationVariantStatusLabel(for: selectedModel))
         }
@@ -738,18 +738,18 @@ struct GenerationVariantSelector: View {
 
     private func variantAccessibilityStatus(for kind: TTSModelVariantKind) -> String {
         guard let model = modelManager.variant(for: mode, kind: kind) else {
-            return "unavailable"
+            return MacInterfaceText.workflowVariantUnavailable
         }
         let status = modelManager.generationVariantStatusLabel(for: model)
         switch modelManager.packagePresentation(for: model).kind {
         case .ready:
-            return "\(kind.bitDepthLabel), ready"
+            return MacInterfaceText.workflowVariantReady(kind.bitDepthLabel)
         case .notInstalled:
-            return "\(kind.bitDepthLabel), not installed"
+            return MacInterfaceText.workflowVariantNotInstalled(kind.bitDepthLabel)
         case .needsRepair:
-            return "\(kind.bitDepthLabel), needs repair"
+            return MacInterfaceText.workflowVariantNeedsRepair(kind.bitDepthLabel)
         case .updateAvailable:
-            return "\(kind.bitDepthLabel), update available"
+            return MacInterfaceText.workflowVariantUpdateAvailable(kind.bitDepthLabel)
         case .checking, .downloading:
             return "\(kind.bitDepthLabel), \(status)"
         }
@@ -757,14 +757,14 @@ struct GenerationVariantSelector: View {
 
     private func variantHelp(for kind: TTSModelVariantKind) -> String {
         guard modelManager.isGenerationVariantSelectable(for: mode, kind: kind) else {
-            return "\(mode.displayName) \(kind.displayName) is not installed. Open Settings to manage model downloads."
+            return MacInterfaceText.workflowVariantNotInstalledHelp(MacInterfaceText.modeName(mode), kind.displayName)
         }
         guard let model = modelManager.variant(for: mode, kind: kind) else {
-            return "\(mode.displayName) \(kind.displayName) is unavailable."
+            return MacInterfaceText.workflowVariantUnavailableHelp(MacInterfaceText.modeName(mode), kind.displayName)
         }
-        var details = "Use the \(kind.displayName) model for \(mode.displayName)."
+        var details = MacInterfaceText.workflowUseVariantHelp(kind.displayName, MacInterfaceText.modeName(mode))
         if !model.supportsInstructionControl {
-            details += " Delivery controls are disabled for this Qwen3 family."
+            details += " " + MacInterfaceText.workflowDeliveryDisabledFamily
         }
         return details
     }
@@ -885,7 +885,7 @@ struct QwenLanguagePicker: View {
         Menu {
             if let recommendedOption {
                 Section(MacInterfaceText.recommendedForScript) {
-                    languageRow(recommendedOption, title: "\(recommendedOption.displayName) — Detected")
+                    languageRow(recommendedOption, title: MacInterfaceText.workflowDetectedLanguage(recommendedOption.displayName))
                 }
                 Section(MacInterfaceText.workflowAllLanguages) {
                     ForEach(options.filter { $0 != recommendedOption }, id: \.self) { language in
@@ -946,7 +946,7 @@ struct QwenLanguagePickerRow: View {
 
     var body: some View {
         GenerationSetupRow(
-            label: "Language",
+            label: MacInterfaceText.sectionLanguage,
             accessibilityIdentifier: "\(accessibilityPrefix)_languageSetup"
         ) {
             QwenLanguagePicker(
@@ -964,7 +964,7 @@ struct QwenLanguagePickerRow: View {
                 )
             } else if showsDefaultHelp {
                 GenerationSetupHint(
-                    message: "Choose Auto or one of Qwen3-TTS's supported languages.",
+                    message: MacInterfaceText.workflowLanguageHelp,
                     accessibilityIdentifier: "\(accessibilityPrefix)_languageHelp"
                 )
             }

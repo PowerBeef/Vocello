@@ -73,9 +73,9 @@ final class ModelManagerViewModel {
 
         var text: String {
             if installedRecommendedCount == totalRecommendedCount {
-                return "Recommended models ready"
+                return MacInterfaceText.modelsRecommendedReady
             }
-            return "\(installedRecommendedCount) of \(totalRecommendedCount) recommended models installed"
+            return MacInterfaceText.modelsRecommendedInstalled(String(installedRecommendedCount), String(totalRecommendedCount))
         }
     }
 
@@ -324,13 +324,13 @@ final class ModelManagerViewModel {
         case .checking:
             return ModelPackagePresentation(
                 kind: .checking,
-                label: "Checking",
-                detail: "Looking for local model files."
+                label: MacInterfaceText.modelsChecking,
+                detail: MacInterfaceText.modelsCheckingDetail
             )
         case .notDownloaded(let message):
             return ModelPackagePresentation(
                 kind: .notInstalled,
-                label: "Not installed",
+                label: MacInterfaceText.modelsNotInstalled,
                 detail: message
             )
         case .downloading(let progress):
@@ -342,48 +342,48 @@ final class ModelManagerViewModel {
         case .repairAvailable(_, let missingRequiredPaths, let message):
             return ModelPackagePresentation(
                 kind: .needsRepair,
-                label: "Needs repair",
+                label: MacInterfaceText.modelsNeedsRepair,
                 detail: message ?? repairDetail(missingRequiredPaths: missingRequiredPaths)
             )
         case .updateAvailable:
             return ModelPackagePresentation(
                 kind: .updateAvailable,
-                label: "Update available",
-                detail: "A newer model package is pinned. Update to download it."
+                label: MacInterfaceText.modelsUpdateAvailable,
+                detail: MacInterfaceText.modelsUpdateAvailableDetail
             )
         case .downloaded:
             return ModelPackagePresentation(
                 kind: .ready,
-                label: "Ready",
+                label: MacInterfaceText.statusReady,
                 detail: nil
             )
         }
     }
 
     func activeVariantLabel(for model: TTSModel) -> String {
-        let kind = model.variantKind?.displayName ?? model.name
+        let kind = model.variantKind?.displayName ?? MacInterfaceText.modeName(model.mode)
         let bits = model.variantKind?.bitDepthLabel
         guard let bits, !bits.isEmpty else { return kind }
         return "\(kind) (\(bits))"
     }
 
     func generationVariantDisplayName(for model: TTSModel) -> String {
-        "\(model.name) \(activeVariantLabel(for: model))"
+        "\(MacInterfaceText.modeName(model.mode)) \(activeVariantLabel(for: model))"
     }
 
     func generationVariantStatusLabel(for model: TTSModel) -> String {
         let presentation = packagePresentation(for: model)
         switch presentation.kind {
         case .checking:
-            return "Checking"
+            return MacInterfaceText.modelsChecking
         case .ready:
-            return "Ready"
+            return MacInterfaceText.statusReady
         case .notInstalled:
-            return "Download"
+            return MacInterfaceText.download
         case .needsRepair:
-            return "Repair"
+            return MacInterfaceText.modelsRepair
         case .updateAvailable:
-            return "Update"
+            return MacInterfaceText.modelsUpdate
         case .downloading:
             return presentation.label
         }
@@ -392,11 +392,11 @@ final class ModelManagerViewModel {
     func modePurpose(for mode: GenerationMode) -> String {
         switch mode {
         case .custom:
-            return "Built-in speakers"
+            return MacInterfaceText.modelsPurposeCustom
         case .design:
-            return "Describe a new voice"
+            return MacInterfaceText.modelsPurposeDesign
         case .clone:
-            return "Use a reference clip"
+            return MacInterfaceText.modelsPurposeClone
         }
     }
 
@@ -521,15 +521,15 @@ final class ModelManagerViewModel {
 
     private func downloadDetail(for progress: DownloadProgress) -> String? {
         if progress.isStalled {
-            return "No progress for 20 seconds."
+            return MacInterfaceText.modelsStalled
         }
         var details: [String] = []
         if let totalBytes = progress.totalBytes, totalBytes > 0 {
             let downloaded = Self.formattedFileSize(progress.downloadedBytes)
             let total = Self.formattedFileSize(totalBytes)
-            details.append("\(downloaded) of \(total)")
+            details.append(MacInterfaceText.modelsBytesProgress(downloaded, total))
         } else if let totalFiles = progress.totalFiles, totalFiles > 0 {
-            details.append("\(progress.completedFiles) of \(totalFiles) files")
+            details.append(MacInterfaceText.modelsFilesProgress(String(progress.completedFiles), String(totalFiles)))
         }
         if let bytesPerSecond = progress.bytesPerSecond, bytesPerSecond > 0,
            progress.phase == .downloading {
@@ -537,10 +537,10 @@ final class ModelManagerViewModel {
         }
         if let eta = progress.estimatedSecondsRemaining, eta.isFinite,
            progress.phase == .downloading {
-            details.append("about \(max(1, Int(eta.rounded())))s remaining")
+            details.append(MacInterfaceText.modelsEtaSeconds(String(max(1, Int(eta.rounded())))))
         }
         if progress.phase == .retrying, progress.retryCount > 0 {
-            details.append("retry \(progress.retryCount); verified files will be reused")
+            details.append(MacInterfaceText.modelsRetryReuse(String(progress.retryCount)))
         }
         if let statusMessage = progress.statusMessage, !statusMessage.isEmpty {
             details.append(statusMessage)
@@ -550,12 +550,12 @@ final class ModelManagerViewModel {
 
     private func repairDetail(missingRequiredPaths: [String]) -> String {
         if missingRequiredPaths.isEmpty {
-            return "The local model folder is incomplete."
+            return MacInterfaceText.modelsFolderIncomplete
         }
         if missingRequiredPaths.count == 1 {
-            return "One required file is missing."
+            return MacInterfaceText.modelsOneFileMissing
         }
-        return "\(missingRequiredPaths.count) required files are missing."
+        return MacInterfaceText.modelsFilesMissing(String(missingRequiredPaths.count))
     }
 
     private nonisolated static func formattedFileSize(_ bytes: Int64) -> String {
@@ -576,11 +576,11 @@ final class ModelManagerViewModel {
         let displayName = generationVariantDisplayName(for: model)
         if snapshot.requiresRepair {
             if !snapshot.missingRequiredPaths.isEmpty {
-                return "Some required files are missing. Repair \(displayName) to finish installing it."
+                return MacInterfaceText.modelsRepairToFinish(displayName)
             }
-            return "The local model files are incomplete. Repair \(displayName) to keep using \(model.mode.displayName)."
+            return MacInterfaceText.modelsRepairToKeepUsing(displayName, MacInterfaceText.modeName(model.mode))
         }
-        return "Install \(displayName) to enable \(model.mode.displayName)."
+        return MacInterfaceText.modelsInstallToEnable(displayName, MacInterfaceText.modeName(model.mode))
     }
 
     /// Request a model download. Returns immediately; the download runs on the bounded
@@ -1212,19 +1212,19 @@ private extension ModelManagerViewModel.DownloadProgress.Phase {
     var displayLabel: String {
         switch self {
         case .queued:
-            return "Queued"
+            return MacInterfaceText.modelsPhaseQueued
         case .waitingForConnectivity:
-            return "Waiting for network"
+            return MacInterfaceText.modelsPhaseWaitingForNetwork
         case .downloading:
-            return "Downloading"
+            return MacInterfaceText.modelsPhaseDownloading
         case .retrying:
-            return "Retrying"
+            return MacInterfaceText.modelsPhaseRetrying
         case .verifying:
-            return "Verifying"
+            return MacInterfaceText.modelsPhaseVerifying
         case .installing:
-            return "Installing"
+            return MacInterfaceText.modelsPhaseInstalling
         case .cancelling:
-            return "Cancelling"
+            return MacInterfaceText.modelsPhaseCancelling
         }
     }
 

@@ -9,24 +9,28 @@ enum TTSModelVariantKind: String, CaseIterable, Codable, Hashable, Sendable {
 
     var displayName: String {
         switch self {
-        case .compactSpeed: return "Lite"
-        case .compactQuality: return "Lite+"
-        case .speed: return "Speed"
-        case .quality: return "Quality"
+        case .compactSpeed: return MacInterfaceText.variantLite
+        case .compactQuality: return MacInterfaceText.variantLitePlus
+        case .speed: return MacInterfaceText.variantSpeed
+        case .quality: return MacInterfaceText.variantQuality
         }
     }
 
     var bitDepthLabel: String {
         switch self {
-        case .compactSpeed: return "0.6B 4-bit"
-        case .compactQuality: return "0.6B 8-bit"
-        case .speed: return "1.7B 4-bit"
-        case .quality: return "1.7B 8-bit"
+        case .compactSpeed: return MacInterfaceText.variantBits06B4
+        case .compactQuality: return MacInterfaceText.variantBits06B8
+        case .speed: return MacInterfaceText.variantBits17B4
+        case .quality: return MacInterfaceText.variantBits17B8
         }
     }
 
-    var variantLabel: String {
-        "\(displayName) variant"
+    /// Quantization depth alone ("4-bit"), for rows that already show the size.
+    var depthLabel: String {
+        switch self {
+        case .compactSpeed, .speed: return MacInterfaceText.variantDepth4
+        case .compactQuality, .quality: return MacInterfaceText.variantDepth8
+        }
     }
 }
 

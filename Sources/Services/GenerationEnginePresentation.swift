@@ -71,9 +71,9 @@ enum GenerationEnginePresentation {
     static func coldStartDetail(deviceClass: NativeDeviceMemoryClass = NativeMemoryPolicyResolver.deviceClass()) -> String {
         switch deviceClass {
         case .floor8GBMac:
-            return "Model unloaded to save memory. First generate reloads it — normal on 8 GB Macs."
+            return MacInterfaceText.engineColdStartLowMemory
         case .mid16GBMac, .highMemoryMac, .iPhonePro:
-            return "Model is unloaded. First generate reloads it."
+            return MacInterfaceText.engineColdStart
         }
     }
 }

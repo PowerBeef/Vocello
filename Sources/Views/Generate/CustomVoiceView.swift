@@ -20,9 +20,9 @@ struct CustomVoiceReadinessPresentation: Equatable {
         if isGenerating {
             return CustomVoiceReadinessPresentation(
                 isReady: false,
-                title: "Generating final audio",
-                detail: "Rendering the complete take. The file lands in the player when ready.",
-                trailingText: "Generating",
+                title: MacInterfaceText.customGeneratingFinalAudio,
+                detail: MacInterfaceText.customGeneratingFinalAudioDetail,
+                trailingText: MacInterfaceText.statusGenerating,
                 isBusy: true
             )
         }
@@ -30,8 +30,8 @@ struct CustomVoiceReadinessPresentation: Equatable {
         guard snapshot.isReady else {
             return CustomVoiceReadinessPresentation(
                 isReady: false,
-                title: "Engine starting",
-                detail: "The engine is still preparing.",
+                title: MacInterfaceText.readinessEngineStarting,
+                detail: MacInterfaceText.readinessEngineStartingDetail,
                 trailingText: nil,
                 isBusy: snapshot.loadState == .starting
             )
@@ -40,8 +40,8 @@ struct CustomVoiceReadinessPresentation: Equatable {
         guard isModelAvailable else {
             return CustomVoiceReadinessPresentation(
                 isReady: false,
-                title: "Install the active model",
-                detail: "Install \(modelDisplayName) in Models to enable generation.",
+                title: MacInterfaceText.readinessInstallActiveModel,
+                detail: MacInterfaceText.readinessInstallActiveModelDetail(modelDisplayName),
                 trailingText: nil,
                 isBusy: false
             )
@@ -50,8 +50,8 @@ struct CustomVoiceReadinessPresentation: Equatable {
         guard hasText else {
             return CustomVoiceReadinessPresentation(
                 isReady: false,
-                title: "Add a script",
-                detail: "Speaker and delivery are set. Add a line to generate.",
+                title: MacInterfaceText.readinessAddScript,
+                detail: MacInterfaceText.customAddScriptDetail,
                 trailingText: nil,
                 isBusy: false
             )
@@ -64,47 +64,47 @@ struct CustomVoiceReadinessPresentation: Equatable {
         case .modelReady:
             return CustomVoiceReadinessPresentation(
                 isReady: true,
-                title: "Ready to generate",
-                detail: "Takes save to History automatically.",
-                trailingText: "Ready",
+                title: MacInterfaceText.readinessReadyToGenerate,
+                detail: MacInterfaceText.customReadyDetail,
+                trailingText: MacInterfaceText.statusReady,
                 isBusy: false
             )
         case .modelCold:
             return CustomVoiceReadinessPresentation(
                 isReady: true,
-                title: "Ready to generate",
+                title: MacInterfaceText.readinessReadyToGenerate,
                 detail: GenerationEnginePresentation.coldStartDetail(),
-                trailingText: "Ready",
+                trailingText: MacInterfaceText.statusReady,
                 isBusy: false
             )
         case .modelWarming, .modelActivePrep:
             return CustomVoiceReadinessPresentation(
                 isReady: true,
-                title: "Preparing Built-in Voice",
-                detail: "Loading the Built-in Voice path. You can generate now; preparation finishes in the background.",
-                trailingText: "Preparing",
+                title: MacInterfaceText.customPreparing,
+                detail: MacInterfaceText.customPreparingDetail,
+                trailingText: MacInterfaceText.statusPreparing,
                 isBusy: true
             )
         case .engineBusy:
             return CustomVoiceReadinessPresentation(
                 isReady: false,
-                title: "Engine busy",
-                detail: "Finishing another engine task before Built-in Voice can be ready.",
+                title: MacInterfaceText.customEngineBusy,
+                detail: MacInterfaceText.customEngineBusyDetail,
                 trailingText: nil,
                 isBusy: true
             )
         case .modelMismatch:
             return CustomVoiceReadinessPresentation(
                 isReady: true,
-                title: "Ready to generate",
-                detail: "A different model is loaded. The engine switches to Built-in Voice on generate.",
-                trailingText: "Ready",
+                title: MacInterfaceText.readinessReadyToGenerate,
+                detail: MacInterfaceText.customModelMismatchDetail,
+                trailingText: MacInterfaceText.statusReady,
                 isBusy: false
             )
         case .failed(let message):
             return CustomVoiceReadinessPresentation(
                 isReady: false,
-                title: "Engine needs attention",
+                title: MacInterfaceText.customEngineNeedsAttention,
                 detail: message,
                 trailingText: nil,
                 isBusy: false
@@ -112,8 +112,8 @@ struct CustomVoiceReadinessPresentation: Equatable {
         case .engineUnavailable:
             return CustomVoiceReadinessPresentation(
                 isReady: false,
-                title: "Engine starting",
-                detail: "The engine is still preparing.",
+                title: MacInterfaceText.readinessEngineStarting,
+                detail: MacInterfaceText.readinessEngineStartingDetail,
                 trailingText: nil,
                 isBusy: snapshot.loadState == .starting
             )
@@ -171,7 +171,9 @@ struct CustomVoiceView: View {
         }
         let speakerName = TTSModel.speakerDescriptor(id: draft.selectedSpeaker)?.displayName
             ?? draft.selectedSpeaker.capitalized
-        return "\(speakerName) is native to \(speakerNativeLanguage.displayName). \(effectiveLanguage.displayName) can still work, but pronunciation is usually best in the speaker's native language."
+        return MacInterfaceText.customSpeakerNativeLanguageHint(
+            speakerName, speakerNativeLanguage.displayName, effectiveLanguage.displayName
+        )
     }
 
     private var readinessPresentation: CustomVoiceReadinessPresentation {
@@ -274,7 +276,7 @@ struct CustomVoiceView: View {
 private extension CustomVoiceView {
     var configurationPanel: some View {
         CompactConfigurationSection(
-            title: "Configuration",
+            title: MacInterfaceText.sectionConfiguration,
             iconName: "slider.horizontal.3",
             accentColor: AppTheme.customVoice,
             trailingAccessory: AnyView(variantSelector),
@@ -307,7 +309,7 @@ private extension CustomVoiceView {
 
     var composerPanel: some View {
         StudioSectionCard(
-            title: "Script",
+            title: MacInterfaceText.sectionScript,
             iconName: "text.alignleft",
             accentColor: AppTheme.customVoice,
             trailingText: readinessPresentation.trailingText,
@@ -318,7 +320,7 @@ private extension CustomVoiceView {
                 TextInputView(
                     text: $draft.text,
                     isGenerating: isGenerationActive,
-                    placeholder: "Type or paste your script",
+                    placeholder: MacInterfaceText.textInputPlaceholder,
                     buttonColor: AppTheme.customVoice,
                     batchAction: { coordinator.presentBatch(draft: draft) },
                     batchDisabled: !canRunBatch,
@@ -415,11 +417,11 @@ private extension CustomVoiceView {
 
     var languageColumn: some View {
         ConfigurationColumn(
-            label: "Language",
+            label: MacInterfaceText.sectionLanguage,
             detail: LanguageSelectionPresentation.isFollowingDetection(
                 selected: draft.selectedLanguage,
                 detected: detectedPromptLanguage
-            ) ? "· Auto" : nil
+            ) ? MacInterfaceText.languageAutoDetail : nil
         ) {
             QwenLanguagePicker(
                 selectedLanguage: $draft.selectedLanguage,
@@ -434,7 +436,7 @@ private extension CustomVoiceView {
 
     var deliveryUnsupportedHint: some View {
         GenerationSetupNotice(
-            message: "Delivery controls are available with the active 1.7B Built-in Voice models.",
+            message: MacInterfaceText.customDeliveryUnsupported,
             iconName: "slider.horizontal.3",
             accentColor: AppTheme.customVoice,
             accessibilityIdentifier: "customVoice_deliveryUnsupported"
@@ -504,7 +506,7 @@ private struct SpeakerPickerRow: View {
 
     var body: some View {
         GenerationSetupRow(
-            label: "Speaker",
+            label: MacInterfaceText.customSpeaker,
             accessibilityIdentifier: "customVoice_voiceSetup"
         ) {
             Picker(MacInterfaceText.customSpeaker, selection: speakerSelection) {

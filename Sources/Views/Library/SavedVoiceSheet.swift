@@ -44,9 +44,9 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
     }
 
     static let manualAdd = SavedVoiceSheetConfiguration(
-        title: "Add Voice Sample",
-        subtitle: "Save a reference clip you own or have permission to use, then use it in Voice Cloning.",
-        confirmLabel: "Add Saved Voice",
+        title: MacInterfaceText.savedVoiceAddTitle,
+        subtitle: MacInterfaceText.savedVoiceAddSubtitle,
+        confirmLabel: MacInterfaceText.savedVoiceAddConfirm,
         initialName: "",
         initialAudioPath: "",
         initialTranscript: ""
@@ -58,9 +58,9 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
         transcript: String
     ) -> SavedVoiceSheetConfiguration {
         SavedVoiceSheetConfiguration(
-            title: "Save to Saved Voices",
-            subtitle: "Keep this clone as a reusable reference for Voice Cloning when you have permission to use it.",
-            confirmLabel: "Save to Saved Voices",
+            title: MacInterfaceText.historySaveToSavedVoices,
+            subtitle: MacInterfaceText.savedVoiceCloneSubtitle,
+            confirmLabel: MacInterfaceText.historySaveToSavedVoices,
             initialName: suggestedName,
             initialAudioPath: audioPath,
             initialTranscript: transcript,
@@ -74,9 +74,9 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
         transcript: String
     ) -> SavedVoiceSheetConfiguration {
         SavedVoiceSheetConfiguration(
-            title: "Save Designed Voice",
-            subtitle: "Keep this designed voice as a reusable reference for Voice Cloning when you have permission to use it.",
-            confirmLabel: "Save to Saved Voices",
+            title: MacInterfaceText.savedVoiceDesignTitle,
+            subtitle: MacInterfaceText.savedVoiceDesignSubtitle,
+            confirmLabel: MacInterfaceText.historySaveToSavedVoices,
             initialName: SavedVoiceNameSuggestion.designResultName(from: voiceDescription),
             initialAudioPath: audioPath,
             initialTranscript: transcript,
@@ -97,9 +97,9 @@ struct SavedVoiceSheetConfiguration: Identifiable, Sendable {
         referenceLanguage: Qwen3SupportedLanguage = .auto
     ) -> SavedVoiceSheetConfiguration {
         SavedVoiceSheetConfiguration(
-            title: "Replace Voice Reference",
-            subtitle: "Pick a longer, cleaner clip (10–20 seconds works best). The existing reference will be replaced after the new one saves successfully.",
-            confirmLabel: "Replace Reference",
+            title: MacInterfaceText.savedVoiceReplaceTitle,
+            subtitle: MacInterfaceText.savedVoiceReplaceSubtitle,
+            confirmLabel: MacInterfaceText.savedVoiceReplaceConfirm,
             initialName: name,
             initialAudioPath: "",
             initialTranscript: transcript,
@@ -213,7 +213,7 @@ struct SavedVoiceSheet: View {
         guard !trimmedName.isEmpty else { return nil }
 
         if normalizedName.isEmpty {
-            return "Enter a name with letters or numbers."
+            return MacInterfaceText.savedVoiceNameNeedsCharacters
         }
 
         // In the replace-reference flow the user is expected to keep the
@@ -221,7 +221,7 @@ struct SavedVoiceSheet: View {
         // name belongs to a different saved voice.
         if existingNormalizedNames.contains(normalizedName)
             && normalizedName != configuration.replacingNormalizedName {
-            return "A saved voice named \"\(normalizedName)\" already exists. Choose a different name."
+            return MacInterfaceText.savedVoiceNameExists(normalizedName)
         }
 
         return nil
@@ -519,9 +519,9 @@ struct SavedVoiceSheet: View {
         case .available, .notDetermined:
             return nil
         case .denied:
-            return "Speech recognition is off for Vocello — the transcript won't auto-fill."
+            return MacInterfaceText.savedVoiceSpeechDenied
         case .siriDisabled:
-            return "Auto-transcription needs Siri enabled (macOS requirement) — the transcript won't auto-fill."
+            return MacInterfaceText.savedVoiceSiriDisabled
         }
     }
 

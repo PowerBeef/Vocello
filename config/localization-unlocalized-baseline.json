@@ -84,6 +84,8 @@
   "scope": [
     "Sources/iOS",
     "Sources/Views",
-    "Sources/SharedSupport"
+    "Sources/SharedSupport",
+    "Sources/ContentView.swift",
+    "Sources/QwenVoiceApp.swift"
   ]
 }

@@ -69,10 +69,11 @@ struct MacScriptTextEditor: NSViewRepresentable {
     /// vertically resizable text view's frame became the editor's size and a
     /// flexible composer inflated the whole window past its bounds.
     func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSScrollView, context: Context) -> CGSize? {
-        CGSize(
-            width: proposal.width ?? 240,
-            height: proposal.height ?? idealHeight
-        )
+        // An infinite proposal (a flexible frame asking for the ideal) must not
+        // come back as an infinite size; it answers the ideal height instead.
+        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? 240
+        let height = proposal.height.flatMap { $0.isFinite ? $0 : nil } ?? idealHeight
+        return CGSize(width: width, height: height)
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {

@@ -107,6 +107,18 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     }
 
     var body: some View {
+        // Pinned to the viewport (as the legacy page scaffold did): every
+        // child then receives a finite proposal, and the canvas's own minimum
+        // size is zero, so the window never grows to fit the composer.
+        GeometryReader { proxy in
+            canvasColumn
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(shortcutBridge)
+    }
+
+    private var canvasColumn: some View {
         VStack(alignment: .leading, spacing: 0) {
             composerPad
                 .frame(maxHeight: .infinity)
@@ -136,7 +148,6 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         .frame(maxWidth: MacStudioMetrics.contentMaxWidth)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .appAnimation(MacTheme.Motion.stateChange, value: genState)
-        .background(shortcutBridge)
     }
 
     // MARK: - Composer pad

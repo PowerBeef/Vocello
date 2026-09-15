@@ -1,12 +1,15 @@
-import SwiftUI
 import AppKit
-import QwenVoiceNative
+import SwiftUI
 
 @main
 struct QwenVoiceApp: App {
     @NSApplicationDelegateAdaptor(QwenVoiceApplicationDelegate.self)
     private var appDelegate
-    @State private var ttsEngineStore: TTSEngineStore
+    /// The shared engine store over the in-process `MLXTTSEngine`; nil only
+    /// when the bootstrap failed, in which case the window shows the startup
+    /// diagnostics instead of the shell.
+    @State private var ttsEngineStore: TTSEngineStore?
+    @State private var engineBootstrapDiagnostics: AppLaunchDiagnosticsSnapshot?
     @State private var didInitializeSelectedTTSEngine = false
     @StateObject private var audioPlayer = AudioPlayerViewModel()
     @State private var modelManager = ModelManagerViewModel()
@@ -14,17 +17,21 @@ struct QwenVoiceApp: App {
     @StateObject private var appCommandRouter = AppCommandRouter.shared
     @StateObject private var generationLibraryEvents = GenerationLibraryEvents.shared
     @StateObject private var appStartupCoordinator = AppStartupCoordinator()
-    private let appEngineSelection: AppEngineSelection
 
     init() {
-        let appEngineSelection = AppEngineSelection.current()
-        self.appEngineSelection = appEngineSelection
-        let engine = appEngineSelection.makeEngine()
-        _ttsEngineStore = State(
-            initialValue: TTSEngineStore(
-                engine: engine
+        do {
+            _ttsEngineStore = State(initialValue: try MacEngineBootstrap.makeEngineStore())
+        } catch {
+            _engineBootstrapDiagnostics = State(
+                initialValue: AppLaunchDiagnosticsSnapshot(
+                    issue: .engineBootstrapFailed,
+                    manifestPath: TTSContract.manifestURL?.path,
+                    bundlePath: Bundle.main.bundlePath,
+                    resourcesPath: Bundle.main.resourceURL?.path,
+                    underlyingError: error.localizedDescription
+                )
             )
-        )
+        }
     }
 
     var body: some Scene {
@@ -114,16 +121,16 @@ struct QwenVoiceApp: App {
     @ViewBuilder
     private var mainWindowContent: some View {
         Group {
-            if let launchDiagnostics = appStartupCoordinator.launchDiagnostics {
+            if let launchDiagnostics = appStartupCoordinator.launchDiagnostics ?? engineBootstrapDiagnostics {
                 StartupDiagnosticsView(
                     snapshot: launchDiagnostics,
                     onRetry: retryLaunchPreflight
                 )
                 .frame(minWidth: 520, minHeight: 420)
-            } else {
+            } else if let ttsEngineStore {
                 ContentView(ttsEngineStore: ttsEngineStore)
                     .safeAreaInset(edge: .top, spacing: 0) { GenerationHistoryEnqueueWarning() }
-                    .environment(ttsEngineStore)
+                    .environmentObject(ttsEngineStore)
                     .environmentObject(audioPlayer)
                     .environmentObject(audioPlayer.playbackProgress)
                     .environment(modelManager)
@@ -165,15 +172,14 @@ struct QwenVoiceApp: App {
     }
 
     private func startSelectedTTSEngineIfNeeded() {
-        guard appEngineSelection.requiresManualInitialization() else { return }
-        guard !didInitializeSelectedTTSEngine else { return }
+        guard let ttsEngineStore, !didInitializeSelectedTTSEngine else { return }
         didInitializeSelectedTTSEngine = true
 
         Task {
             do {
                 try await ttsEngineStore.initialize(appSupportDirectory: Self.appSupportDir)
             } catch {
-                // Native engine initialization publishes its own failure snapshot.
+                // The engine publishes its own failure state through the store.
             }
         }
     }

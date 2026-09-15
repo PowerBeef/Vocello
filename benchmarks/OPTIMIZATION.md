@@ -408,7 +408,7 @@ in-process iOS model would be more elegant. Verdict: **keep XPC** —
 4. **Service retirement-to-reclaim** — the XPC-only lever: model unload returns weights, but MLX heap
    fragmentation + Metal shader caches stay resident until process exit. `shutdownWhenIdle` IPC +
    `MacEngineServiceLifecycleCoordinator` (floor tier, idle + hardTrim-or-5-min-dwell + 30 s grace;
-   `QWENVOICE_ENGINE_RETIRE_DWELL_SECONDS` dev override). Client marks the exit expected → no error UI,
+   dev dwell override; retired 2026-09-15 with the XPC service, CONV-02). Client marks the exit expected → no error UI,
    no auto-reconnect, lazy relaunch. Measured: service exited on schedule (RSS → 0), follow-up
    generation relaunched transparently, `warmState: cold`, TTFC 2814 ms vs ~1220 ms warm.
 

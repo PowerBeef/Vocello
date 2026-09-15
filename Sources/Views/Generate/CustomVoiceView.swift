@@ -260,7 +260,7 @@ struct CustomVoiceView: View {
                     initialText: configuration.initialText,
                     initialSegmentationMode: configuration.initialSegmentationMode
                 )
-                .environment(ttsEngineStore)
+                .environmentObject(ttsEngineStore)
                 .environmentObject(audioPlayer)
             }
         }

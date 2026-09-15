@@ -6,8 +6,8 @@
 
 ## Product and authority
 
-**Vocello** is local-first Qwen3-TTS on MLX in Swift 6: a macOS app with an XPC engine service, an iOS
-app with an in-process engine, the `vocello` CLI, Python automation and benchmarks, and a React/Vite
+**Vocello** is local-first Qwen3-TTS on MLX in Swift 6: a macOS app and an iOS app that both host the
+engine in-process on one shared store, the `vocello` CLI, Python automation and benchmarks, and a React/Vite
 website. No bundled weights or cloud inference; approved assets download from Hugging Face through the
 production catalog. Monetization is iOS-only (one StoreKit owner, one export boundary); UI language
 belongs to `IOSAppLanguage`, separate from speech and reference languages.

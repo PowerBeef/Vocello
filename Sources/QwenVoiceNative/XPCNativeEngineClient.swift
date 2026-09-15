@@ -730,9 +730,7 @@ public final class XPCNativeEngineClient: MacTTSEngine, @unchecked Sendable {
     private let coordinator: XPCNativeEngineCoordinator
 
     public convenience init() {
-        self.init(onChunk: { event in
-            GenerationChunkBroker.publish(event)
-        })
+        self.init(onChunk: { _ in })
     }
 
     convenience init(onChunk: @escaping @Sendable (GenerationEvent) -> Void) {
@@ -752,9 +750,7 @@ public final class XPCNativeEngineClient: MacTTSEngine, @unchecked Sendable {
         timeoutResolver: @escaping XPCNativeEngineTimeoutResolver = { command in
             command.transportTimeout
         },
-        onChunk: @escaping @Sendable (GenerationEvent) -> Void = { event in
-            GenerationChunkBroker.publish(event)
-        },
+        onChunk: @escaping @Sendable (GenerationEvent) -> Void = { _ in },
         reconnectDelays: [Duration] = [.milliseconds(250), .seconds(1)]
     ) {
         let initialSnapshot = TTSEngineSnapshot(

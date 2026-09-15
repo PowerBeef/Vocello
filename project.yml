@@ -170,6 +170,15 @@ targets:
           - "Resources/**/*.whl"
           - "Resources/**/__pycache__/**"
           - "Resources/**/*.pyc"
+      # The iOS engine-hosting stack is the reference implementation (maintainer
+      # decision 2026-09-14, plan macos-ios-convergence-2026-09): the macOS app
+      # compiles these iOS files by path and hosts MLXTTSEngine in-process on the
+      # same TTSEngineStore. The files keep their paths and their iOS behavior.
+      - path: Sources/iOS/TTSEngineStore.swift
+      - path: Sources/iOSSupport/Services/IOSGenerationOwnershipAuthority.swift
+      - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
+      - path: Sources/iOSSupport/Services/IOSDeviceDiagnosticsRecorder.swift
+      - path: Sources/iOSSupport/Services/AppNotifications.swift
     resources:
       - path: Sources/Resources
         buildPhase: resources

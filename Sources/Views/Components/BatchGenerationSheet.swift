@@ -3,7 +3,7 @@ import QwenVoiceNative
 import SwiftUI
 
 struct BatchGenerationSheet: View {
-    @Environment(TTSEngineStore.self) var ttsEngineStore
+    @EnvironmentObject var ttsEngineStore: TTSEngineStore
     @EnvironmentObject var audioPlayer: AudioPlayerViewModel
     @Environment(ModelManagerViewModel.self) var modelManager
     @EnvironmentObject var appCommandRouter: AppCommandRouter

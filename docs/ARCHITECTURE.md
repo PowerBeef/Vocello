@@ -550,8 +550,14 @@ regeneration device-accepted 2026-08-01. See
 
 ## 5. Request lifecycle — macOS
 
-The macOS app never touches `MLXTTSEngine` directly. It goes through the XPC
-stack:
+Since 2026-09-14 (plan `macos-ios-convergence-2026-09`, CONV-02) the macOS app
+hosts `MLXTTSEngine` in its own process: `MacEngineBootstrap` builds the runtime
+through `NativeRuntimeFactory` and wraps it in the shared iOS `TTSEngineStore`
+(`Sources/iOS/TTSEngineStore.swift`, compiled into the macOS target by path).
+Coordinators call `store.generate`, chunks reach `AudioPlayerViewModel` through
+the store's `generationChunkReceived` notification, and telemetry merges two
+layers (app + engine). The sequence below documents the retired XPC path; CONV-03
+removes those targets and rewrites this section.
 
 ```mermaid
 sequenceDiagram

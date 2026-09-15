@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `macos-ios-convergence-2026-09` | active | backend-and-platform | 0/14 (0%) |
+| `macos-ios-convergence-2026-09` | active | backend-and-platform | 2/14 (14%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -33,10 +33,8 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `CONV-01` | in-flight | Seams for the shared engine store: backend wrapper in Core, snapshot bridge, one GenerationMode | — |
-| `CONV-02` | planned | macOS hosts the engine in-process on the shared store behind the legacy screens | `CONV-01` |
-| `CONV-03` | planned | Remove the XPC stack and rewrite its contracts, scripts and documents | `CONV-02` |
-| `CONV-04` | planned | In-process memory relief on 8 GB Macs | `CONV-02` |
+| `CONV-03` | in-flight | Remove the XPC stack and rewrite its contracts, scripts and documents | — |
+| `CONV-04` | in-flight | In-process memory relief on 8 GB Macs | — |
 | `CONV-10` | planned | Shared theme tokens, glass surface, word timing and text-limit policy | `CONV-03` |
 | `CONV-11` | planned | New macOS shell in the iOS visual language hosting the legacy screens | `CONV-10` |
 | `CONV-12` | planned | History on the iOS screen with sort, Save As and Reveal | `CONV-11` |
@@ -50,16 +48,10 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 ### Open items in detail
 
-- **`CONV-01`** (in-flight) — Seams for the shared engine store: backend wrapper in Core, snapshot bridge, one GenerationMode.
-  gate: AnyTTSEngineBackend lives in Sources/QwenVoiceCore and the iOS store exposes snapshotUpdates; no app-local GenerationMode remains in the macOS module; the macOS unit lane, the generic iOS compile and the iOS logic tests compiled into VocelloCoreTests pass unchanged.
-
-- **`CONV-02`** (planned) — macOS hosts the engine in-process on the shared store behind the legacy screens.
-  gate: The macOS app constructs MLXTTSEngine through NativeRuntimeFactory and the iOS TTSEngineStore (compiled by explicit path); AppEngineSelection and MacEngineServiceLifecycleCoordinator are gone; telemetry merges app and engine rows; scripts/macos_test.sh gate passes; one scripts/ui_test.sh macos smoke run and one short benchmark record on the 2-layer pipeline PASS with run ids recorded.
-
-- **`CONV-03`** (planned) — Remove the XPC stack and rewrite its contracts, scripts and documents.
+- **`CONV-03`** (in-flight) — Remove the XPC stack and rewrite its contracts, scripts and documents.
   gate: Sources/QwenVoiceEngineService, Sources/QwenVoiceEngineSupport, Sources/QwenVoiceNative and Tests/VocelloEngineIntegrationTests are absent with their targets; the entitlement, concurrency-safety, runtime-refactor and TSan contracts pass with dated decisions; build, release, test and CI scripts carry no XPCServices path; scripts/dev.sh ci is green; CLAUDE.md, native.md, SECURITY.md and ARCHITECTURE.md describe in-process hosting.
 
-- **`CONV-04`** (planned) — In-process memory relief on 8 GB Macs.
+- **`CONV-04`** (in-flight) — In-process memory relief on 8 GB Macs.
   gate: The macOS store runs a Mac memory budget policy; kernel pressure drives trim and full unload through the store's terminal barrier; idle unload follows NativeMemoryPolicyResolver; one consented scripts/macos_test.sh memory run shows no critical pressure, warning, hardTrim or fullUnload during a qualified take on the canonical 8 GB Mac.
 
 - **`CONV-10`** (planned) — Shared theme tokens, glass surface, word timing and text-limit policy.

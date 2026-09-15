@@ -110,7 +110,7 @@ struct VoiceDesignView: View {
                     initialText: configuration.initialText,
                     initialSegmentationMode: configuration.initialSegmentationMode
                 )
-                .environment(ttsEngineStore)
+                .environmentObject(ttsEngineStore)
                 .environmentObject(audioPlayer)
             case .saveVoice(let configuration):
                 SavedVoiceSheet(configuration: configuration) { voice in
@@ -121,7 +121,7 @@ struct VoiceDesignView: View {
                         ttsEngineStore: ttsEngineStore
                     )
                 }
-                .environment(ttsEngineStore)
+                .environmentObject(ttsEngineStore)
             }
         }
         .alert(item: $coordinator.actionAlert) { alert in

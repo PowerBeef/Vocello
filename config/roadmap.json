@@ -96,45 +96,11 @@
   ],
   "items": [
     {
-      "id": "CONV-01",
-      "plan": "macos-ios-convergence-2026-09",
-      "title": "Seams for the shared engine store: backend wrapper in Core, snapshot bridge, one GenerationMode",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "AnyTTSEngineBackend lives in Sources/QwenVoiceCore and the iOS store exposes snapshotUpdates; no app-local GenerationMode remains in the macOS module; the macOS unit lane, the generic iOS compile and the iOS logic tests compiled into VocelloCoreTests pass unchanged.",
-      "sourceOfTruth": [
-        "Sources/QwenVoiceCore/AnyTTSEngineBackend.swift",
-        "Sources/iOS/TTSEngineStore.swift",
-        "Sources/Models/TTSModel.swift"
-      ],
-      "updated": "2026-09-14",
-      "notes": "Opened 2026-09-14 with the convergence decision. iOS behavior is frozen: the wrapper move and the publisher change nothing on the phone; IOSDeviceDiagnosticsRecorder reads UIKit only behind canImport so the store compiles on macOS."
-    },
-    {
-      "id": "CONV-02",
-      "plan": "macos-ios-convergence-2026-09",
-      "title": "macOS hosts the engine in-process on the shared store behind the legacy screens",
-      "status": "planned",
-      "blockedBy": [
-        "CONV-01"
-      ],
-      "gate": "The macOS app constructs MLXTTSEngine through NativeRuntimeFactory and the iOS TTSEngineStore (compiled by explicit path); AppEngineSelection and MacEngineServiceLifecycleCoordinator are gone; telemetry merges app and engine rows; scripts/macos_test.sh gate passes; one scripts/ui_test.sh macos smoke run and one short benchmark record on the 2-layer pipeline PASS with run ids recorded.",
-      "sourceOfTruth": [
-        "project.yml",
-        "Sources/QwenVoiceApp.swift",
-        "Sources/Services/GenerationTelemetryMerger.swift",
-        "scripts/check_macos_xpc_bench.py"
-      ],
-      "updated": "2026-09-14"
-    },
-    {
       "id": "CONV-03",
       "plan": "macos-ios-convergence-2026-09",
       "title": "Remove the XPC stack and rewrite its contracts, scripts and documents",
-      "status": "planned",
-      "blockedBy": [
-        "CONV-02"
-      ],
+      "status": "in-flight",
+      "blockedBy": [],
       "gate": "Sources/QwenVoiceEngineService, Sources/QwenVoiceEngineSupport, Sources/QwenVoiceNative and Tests/VocelloEngineIntegrationTests are absent with their targets; the entitlement, concurrency-safety, runtime-refactor and TSan contracts pass with dated decisions; build, release, test and CI scripts carry no XPCServices path; scripts/dev.sh ci is green; CLAUDE.md, native.md, SECURITY.md and ARCHITECTURE.md describe in-process hosting.",
       "sourceOfTruth": [
         "config/macos-entitlement-policy.json",
@@ -144,23 +110,21 @@
         "scripts/release.sh",
         "scripts/macos_test.sh"
       ],
-      "updated": "2026-09-14"
+      "updated": "2026-09-15"
     },
     {
       "id": "CONV-04",
       "plan": "macos-ios-convergence-2026-09",
       "title": "In-process memory relief on 8 GB Macs",
-      "status": "planned",
-      "blockedBy": [
-        "CONV-02"
-      ],
+      "status": "in-flight",
+      "blockedBy": [],
       "gate": "The macOS store runs a Mac memory budget policy; kernel pressure drives trim and full unload through the store's terminal barrier; idle unload follows NativeMemoryPolicyResolver; one consented scripts/macos_test.sh memory run shows no critical pressure, warning, hardTrim or fullUnload during a qualified take on the canonical 8 GB Mac.",
       "sourceOfTruth": [
         "Sources/iOS/TTSEngineStore.swift",
         "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift",
         "Sources/Services/MacWarmupAdmissionPolicy.swift"
       ],
-      "updated": "2026-09-14"
+      "updated": "2026-09-15"
     },
     {
       "id": "CONV-10",

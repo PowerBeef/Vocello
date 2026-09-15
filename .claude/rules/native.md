@@ -64,19 +64,21 @@ XCUITest lanes only when explicitly requested.
   called RTF. Wall time for any throughput figure comes from `ContinuousClock`, never `Date()`.
 - **Telemetry semantics are typed.** Since telemetry schema v8 (the engine now emits v9), frontend
   latency stops at playback scheduling; process
-  memory belongs to the process that measured it; a macOS UI benchmark is authoritative only when app,
-  XPC and engine layers are complete.
+  memory belongs to the process that measured it; a macOS UI benchmark is authoritative only when the app
+  and engine layers are complete (the merged record names its required layers).
 
-## macOS app and XPC (`Sources/QwenVoiceApp.swift`, `Sources/Views`, `ViewModels`, `Services`, `QwenVoiceEngineSupport`, `QwenVoiceEngineService`)
+## macOS app (`Sources/QwenVoiceApp.swift`, `Sources/Views`, `ViewModels`, `Services`)
 
-- **XPC event forwarding drains off `MainActor`** (`Task.detached(.utility)` in `EngineServiceHost`);
-  only `lastPublishedEvent` hops to `MainActor`. Reserve, bind accepted state, then open generation; a
-  rejected concurrent request creates no state and does not perturb the accepted one.
-- **Service retirement is expected.** `shutdownWhenIdle` retirement is `expectedRetirement`: no error UI,
-  no auto-reconnect, lazy relaunch. `isStillTerminatingSession` treats `activeSession == nil` as still
-  terminating.
-- **Single envelope method.** The wire protocol is one `perform(_:withReply:)` carrying an
-  `EngineCommand`.
+- **The engine runs in-process on the shared store.** `MacEngineBootstrap` builds `MLXTTSEngine` through
+  `NativeRuntimeFactory` (bundled contract → macOS-expanded registry, floor-tier prewarm policy) and wraps
+  it in the iOS `TTSEngineStore` (compiled by path from `Sources/iOS`, behavior frozen). No XPC service,
+  no service retirement, no wire protocol: the XPC targets are retired by CONV-03 and must not be
+  reintroduced. Views inject the store as `@EnvironmentObject`; the root shell subscribes to
+  `snapshotChanges` with `onReceive` and never reads the store in `body` (W1-D/W2-A).
+- **Memory relief is in-process.** The engine's own kernel-pressure responder trims and unloads; the
+  store's `MacMemoryBudgetPolicy` gates admission on footprint and Metal working set; idle unload follows
+  `NativeMemoryPolicyResolver`; `MacWarmupAdmissionPolicy` defers proactive warms. No hard
+  `Memory.memoryLimit` on macOS.
 - **Liquid Glass is gated.** Every glass surface renders through `GatedGlass` (`AppTheme.swift`): the
   `generationPerformanceGate` value, Reduce Transparency and the solid fallback live in one place.
 - **Accessibility.** Reduce Motion and Reduce Transparency route through `appAnimation` /
@@ -84,14 +86,13 @@ XCUITest lanes only when explicitly requested.
   `voicesRow_*`, `textInput_*`, `studioChip_*` survive refactors; test-only code lives in the UI test
   target.
 - **Requests are built by `MacStudioGenerationRequestFactory`** so language, identity, seed, variation
-  and prompt are testable before the XPC boundary. Reference language is conditioning metadata only:
+  and prompt are testable before the engine call. Reference language is conditioning metadata only:
   Clone Auto follows the target script, an explicit Studio language wins.
 - **Saved-voice review is shared and typed** (`ReferenceTranscriptionReviewState`); Save stays blocked
   while recognition is unresolved; user edits win; persisted metadata comes only from
   `VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(...)`.
-- **Entitlements are role-scoped.** App sandbox stays off for MLX; the engine XPC uses the narrower
-  `QwenVoiceEmbeddedRuntime.entitlements`; `config/macos-entitlement-policy.json` changes need a security
-  review.
+- **Entitlements.** App sandbox stays off for MLX; `config/macos-entitlement-policy.json` changes need a
+  security review (the XPC role and `QwenVoiceEmbeddedRuntime.entitlements` leave with CONV-03).
 - **Memory evidence pairs samples by uptime**; independent per-process maxima are not a system peak.
 
 ## iOS app (`Sources/iOS`, `Sources/iOSSupport`, `Tests/VocelloiOSLogicTests`)
@@ -138,8 +139,7 @@ XCUITest lanes only when explicitly requested.
 ## Common mistakes
 
 - Editing `project.pbxproj`; adding a generic `#if DEBUG` fork; touching the Simulator.
-- Draining XPC events on `MainActor`; showing error UI on normal service retirement; blocking the main
-  thread during model load.
+- Blocking the main thread during model load; observing the whole engine store in the root shell's body.
 - Using the saved-reference language as Clone output language; assembling requests in a view.
 - Treating `.cancelled` as failure or releasing ownership before the terminal barrier.
-- Using raw `ScrollView` on iOS; making color the only indicator; linking the macOS XPC stack into iOS.
+- Using raw `ScrollView` on iOS; making color the only indicator; reintroducing a separate engine process.

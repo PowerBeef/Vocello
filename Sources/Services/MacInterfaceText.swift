@@ -1314,6 +1314,10 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.startup.copyDiagnostics", defaultValue: "Copy Diagnostics",
                comment: "macOS interface: startup diagnostics button. Presentation only.")
     }
+    static var startupEngineBootstrapFailed: String {
+        localization.string(localized: "vocello.mac.startup.engineBootstrapFailed", defaultValue: "Vocello couldn't start its speech engine.",
+               comment: "macOS interface: startup diagnostics summary when the in-process engine could not be built. Presentation only.")
+    }
     static var startupInvalidContract: String {
         localization.string(localized: "vocello.mac.startup.invalidContract", defaultValue: "Vocello couldn't load its native model contract.",
                comment: "macOS interface: startup diagnostics summary when the bundled contract is unreadable. Presentation only.")

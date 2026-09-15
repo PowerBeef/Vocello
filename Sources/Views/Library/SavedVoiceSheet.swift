@@ -157,7 +157,7 @@ enum SavedVoiceNameSuggestion {
 }
 
 struct SavedVoiceSheet: View {
-    @Environment(TTSEngineStore.self) private var ttsEngineStore
+    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @Environment(\.dismiss) private var dismiss
 
     let configuration: SavedVoiceSheetConfiguration

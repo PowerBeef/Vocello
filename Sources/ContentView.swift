@@ -170,9 +170,6 @@ struct ContentView: View {
     @State private var pendingVoiceCloningHandoff: PendingVoiceCloningHandoff?
     @State private var didCompleteInitialAvailabilityRefresh = false
     @StateObject private var generationWarmupCoordinator = MacGenerationWarmupCoordinator()
-    /// Retires the idle XPC engine service on pressured 8 GB Macs (full
-    /// memory reclaim); plain @State — it publishes nothing.
-    @State private var engineLifecycleCoordinator = MacEngineServiceLifecycleCoordinator()
 
     private var disabledSidebarItems: Set<SidebarItem> {
         Set(SidebarItem.generationItems.filter { !$0.isAvailable(using: modelManager) })
@@ -284,7 +281,7 @@ struct ContentView: View {
         // `onReceive`, not `onChange`: `onChange(of:)` would need the
         // snapshot read in body, which would track the store (W1-D/W2-A).
         // The store's explicit bridge fires only on applied changes.
-        .onReceive(ttsEngineStore.snapshotUpdates) { newSnapshot in
+        .onReceive(ttsEngineStore.snapshotChanges) { newSnapshot in
             handleEngineSnapshotChange(newSnapshot)
         }
         .onReceive(appCommandRouter.sidebarSelection) { item in
@@ -438,12 +435,6 @@ struct ContentView: View {
 
     private func handleEngineSnapshotChange(_ newSnapshot: TTSEngineSnapshot) {
         generationWarmupCoordinator.observe(snapshot: newSnapshot)
-        engineLifecycleCoordinator.observe(
-            snapshot: newSnapshot,
-            hasActiveGeneration: ttsEngineStore.hasActiveGeneration,
-            ttsEngineStore: ttsEngineStore,
-            warmupCoordinator: generationWarmupCoordinator
-        )
     }
 
     private func handleGenerationDraftChange() {
@@ -564,7 +555,7 @@ struct ContentView: View {
 private struct CustomVoiceScreenHost: View {
     @Binding var draft: CustomVoiceDraft
 
-    @Environment(TTSEngineStore.self) private var ttsEngineStore
+    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(ModelManagerViewModel.self) private var modelManager
 
@@ -581,7 +572,7 @@ private struct CustomVoiceScreenHost: View {
 private struct VoiceDesignScreenHost: View {
     @Binding var draft: VoiceDesignDraft
 
-    @Environment(TTSEngineStore.self) private var ttsEngineStore
+    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(ModelManagerViewModel.self) private var modelManager
     @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
@@ -601,7 +592,7 @@ private struct VoiceCloningScreenHost: View {
     @Binding var draft: VoiceCloningDraft
     @Binding var pendingSavedVoiceHandoff: PendingVoiceCloningHandoff?
 
-    @Environment(TTSEngineStore.self) private var ttsEngineStore
+    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @Environment(ModelManagerViewModel.self) private var modelManager
     @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel

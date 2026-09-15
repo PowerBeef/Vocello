@@ -2,11 +2,14 @@ import Foundation
 
 enum AppLaunchIssue: String, Equatable, Sendable {
     case invalidContract
+    case engineBootstrapFailed
 
     var summary: String {
         switch self {
         case .invalidContract:
             return MacInterfaceText.startupInvalidContract
+        case .engineBootstrapFailed:
+            return MacInterfaceText.startupEngineBootstrapFailed
         }
     }
 }

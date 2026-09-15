@@ -1,52 +1,11 @@
 import Foundation
-import QwenVoiceNative
+import QwenVoiceCore
 
-enum AppEngineSelection: Equatable {
-    static let defaultSelection: Self = .native
-
-    case native
-
-    init(environment _: [String: String] = ProcessInfo.processInfo.environment) {
-        self = .native
-    }
-
-    static func current(environment _: [String: String] = ProcessInfo.processInfo.environment) -> Self {
-        .native
-    }
-
-    func effectiveSelection() -> Self {
-        self
-    }
-
-    func requiresManualInitialization() -> Bool {
-        true
-    }
-
-    @MainActor
-    func makeEngine() -> any MacTTSEngine {
-        return XPCNativeEngineClient()
-    }
-
-    @MainActor
-    func resolveSidebarStatus(
-        ttsEngineSnapshot: TTSEngineSnapshot,
-        prefersInlinePresentation: Bool
-    ) -> SidebarStatus {
-        Self.nativeSidebarStatus(
-            from: ttsEngineSnapshot,
-            prefersInlinePresentation: prefersInlinePresentation
-        )
-    }
-
-    @MainActor
-    func clearSidebarError(
-        ttsEngineStore: TTSEngineStore
-    ) {
-        ttsEngineStore.clearVisibleError()
-    }
-
-    private static func nativeSidebarStatus(
-        from snapshot: TTSEngineSnapshot,
+/// Maps the engine snapshot to the sidebar footer's status (formerly part of the
+/// retired `AppEngineSelection`).
+enum SidebarStatusPresentation {
+    static func resolve(
+        snapshot: TTSEngineSnapshot,
         prefersInlinePresentation: Bool
     ) -> SidebarStatus {
         if case .starting = snapshot.loadState {

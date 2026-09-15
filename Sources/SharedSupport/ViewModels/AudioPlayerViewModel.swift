@@ -612,13 +612,12 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         currentFilePath = result.audioPath
         liveFinalFilePath = result.audioPath
         // Audit Finding #2 — DO NOT add `liveSessionID` to
-        // `completedLiveSessionIDs` here. Two independent XPC paths
-        // race on MainActor: the awaited generation result (this
-        // function's caller) and the chunk broker
-        // (`Task { @MainActor in subject.send }` inside
-        // `GenerationChunkBroker.publish`). If the result-channel
-        // continuation runs first and we record the session ID
-        // immediately, any chunk still queued on the broker is
+        // `completedLiveSessionIDs` here. Two independent paths race
+        // on MainActor: the awaited generation result (this function's
+        // caller) and the chunk notifications posted by the store's
+        // forwarding task. If the result-channel continuation runs
+        // first and we record the session ID immediately, any chunk
+        // still queued behind it is
         // rejected by the guard at the top of
         // `handleGenerationChunk` and silently dropped. Defer the
         // record to the actual drain points below
@@ -685,30 +684,6 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     }
 
     private func bindGenerationEventSource() {
-#if canImport(QwenVoiceNative)
-        // The broker is `@MainActor` and its `publish(_:)` always
-        // sends from a `Task { @MainActor in ... }`, so the sink
-        // already runs on the MainActor. Dropping the previous
-        // `.receive(on: DispatchQueue.main)` saves a second scheduling
-        // hop on every chunk.
-        chunkCancellable = GenerationChunkBroker.shared.publisher
-            .sink { [weak self] event in
-                guard let self,
-                      let requestID = event.requestID,
-                      let title = event.title,
-                      event.chunkPath != nil || event.previewAudio != nil else { return }
-                let chunk = ChunkInfo(
-                    generationID: event.generationID,
-                    requestID: requestID,
-                    title: title,
-                    chunkPath: event.chunkPath,
-                    previewAudio: event.previewAudio,
-                    sessionDirectory: event.streamSessionDirectory,
-                    cumulativeDuration: event.cumulativeDurationSeconds
-                )
-                self.handleGenerationChunk(chunk)
-            }
-#else
         chunkObserver = NotificationCenter.default.addObserver(
             forName: .generationChunkReceived,
             object: nil,
@@ -752,7 +727,6 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
                 self?.handleGenerationChunk(chunk)
             }
         }
-#endif
     }
 
     private func handleGenerationChunk(_ chunk: ChunkInfo) {

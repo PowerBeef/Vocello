@@ -2,7 +2,7 @@ import Foundation
 import QwenVoiceCore
 
 /// Shared interpretation of engine snapshot + active model for macOS generation UI.
-/// Separates XPC readiness (`isReady`) from model warm-path state (`loadState`).
+/// Separates engine readiness (`isReady`) from model warm-path state (`loadState`).
 enum ModelWarmPathState: Equatable, Sendable {
     case engineUnavailable
     case modelCold

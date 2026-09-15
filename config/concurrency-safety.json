@@ -269,7 +269,6 @@
     {
       "id": "native-xpc-client",
       "sources": [
-        "Sources/QwenVoiceNative/TTSEngineStore.swift",
         "Sources/QwenVoiceNative/XPCNativeEngineClient.swift"
       ],
       "types": [

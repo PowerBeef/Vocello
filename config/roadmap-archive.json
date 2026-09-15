@@ -3046,6 +3046,46 @@
         "doc:docs/reference/localization.md",
         "doc:docs/reference/macos-testing.md"
       ]
+    },
+    {
+      "id": "CONV-01",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Seams for the shared engine store: backend wrapper in Core, snapshot bridge, one GenerationMode",
+      "status": "done",
+      "gate": "AnyTTSEngineBackend lives in Sources/QwenVoiceCore and the iOS store exposes snapshotUpdates; no app-local GenerationMode remains in the macOS module; the macOS unit lane, the generic iOS compile and the iOS logic tests compiled into VocelloCoreTests pass unchanged.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/AnyTTSEngineBackend.swift",
+        "Sources/iOS/TTSEngineStore.swift",
+        "Sources/Models/TTSModel.swift"
+      ],
+      "updated": "2026-09-15",
+      "notes": "Closed 2026-09-15 (commit 96709242). AnyTTSEngineBackend lives in QwenVoiceCore; the iOS store publishes snapshotUpdates once per applied frontend-state change; IOSDeviceDiagnosticsRecorder reads UIKit behind canImport; the macOS module uses QwenVoiceCore.GenerationMode. macOS unit lane and generic iOS compile green; CI run 34926176757 success.",
+      "evidence": [
+        "commit:96709242",
+        "file:Sources/QwenVoiceCore/AnyTTSEngineBackend.swift",
+        "file:Sources/iOS/TTSEngineStore.swift"
+      ]
+    },
+    {
+      "id": "CONV-02",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "macOS hosts the engine in-process on the shared store behind the legacy screens",
+      "status": "done",
+      "gate": "The macOS app constructs MLXTTSEngine through NativeRuntimeFactory and the iOS TTSEngineStore (compiled by explicit path); AppEngineSelection and MacEngineServiceLifecycleCoordinator are gone; telemetry merges app and engine rows; scripts/macos_test.sh gate passes; one scripts/ui_test.sh macos smoke run and one short benchmark record on the 2-layer pipeline PASS with run ids recorded.",
+      "sourceOfTruth": [
+        "project.yml",
+        "Sources/QwenVoiceApp.swift",
+        "Sources/Services/GenerationTelemetryMerger.swift",
+        "scripts/check_macos_xpc_bench.py"
+      ],
+      "updated": "2026-09-15",
+      "evidence": [
+        "run:macos-xcui-smoke-20260915-040350-f374335f",
+        "file:Sources/Services/MacEngineBootstrap.swift",
+        "file:Sources/Services/TTSEngineStore+Mac.swift",
+        "file:project.yml"
+      ],
+      "notes": "Closed 2026-09-15. MacEngineBootstrap hosts MLXTTSEngine in-process on the iOS TTSEngineStore (compiled by path with the ownership authority, release coordinator, diagnostics recorder and notification names); AppEngineSelection, MacEngineServiceLifecycleCoordinator, the QwenVoiceNative store and GenerationChunkBroker are gone; the merger declares two required layers. Smoke lane macos-xcui-smoke-20260915-040350-f374335f: 7 of 7 journeys PASS on the in-process engine (generation, cancellation, recording, long-form, line batch). The 2-layer bench pipeline is proven in CONV-03 together with the script rewrite; unit lane mac-test-20260914-235716 PASS."
     }
   ]
 }

@@ -15984,6 +15984,24 @@
           }
         }
       }
+    },
+    "vocello.mac.startup.engineBootstrapFailed": {
+      "comment": "macOS interface: startup diagnostics summary when the in-process engine could not be built. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello couldn't start its speech engine."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello n’a pas pu démarrer son moteur de synthèse vocale."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -4,14 +4,16 @@ import QwenVoiceCore
 /// Joins the per-layer telemetry rows for one generation into a single readable
 /// `generations-merged.jsonl` row, keyed by the shared `generationID`.
 ///
-/// macOS-only (app target): the engine-service runs in a process that shares the
-/// app's app-support directory, so the app can read the engine/engine-service rows
-/// directly. (iOS leans on `GenerationResult.telemetrySummary` carried back in the
-/// result instead — see the plan; that wiring is deferred with the rest of iOS.)
+/// macOS-only (app target). Since the engine runs in the app process (plan
+/// `macos-ios-convergence-2026-09`) there are two layers: the app row written by
+/// `AppGenerationTimeline` and the engine row written by the runtime; the merged
+/// record declares exactly those as required, so a 2-layer record is complete and
+/// never shares a comparison key with the retired 3-layer (app, engine-service,
+/// engine) records.
 ///
-/// Runtime-gated and fully off the main actor. The engine and engine-service rows
-/// flush slightly after the app's `completed` (both write asynchronously), so the
-/// merge polls briefly before giving up.
+/// Runtime-gated and fully off the main actor. The engine row flushes slightly
+/// after the app's `completed` (both write asynchronously), so the merge polls
+/// briefly before giving up.
 enum GenerationTelemetryMerger {
     private static let mergedFileName = "generations-merged.jsonl"
     // Audit J1: 3 s of polling at .background priority was not enough — under
@@ -19,7 +21,7 @@ enum GenerationTelemetryMerger {
     // background tasks) get starved past the window, the merge gave up, and the
     // flush marker advanced with the app row still unwritten; the bench's next
     // relaunch then terminated the app mid-write. .utility + a 15 s window keeps
-    // the marker honest (it fires early as soon as all three layers land).
+    // the marker honest (it fires early as soon as both layers land).
     private static let pollAttempts = 75
     private static let pollIntervalNanos: UInt64 = 200_000_000 // 200 ms × 75 ≈ 15 s
 
@@ -37,31 +39,29 @@ enum GenerationTelemetryMerger {
     private static func merge(generationID: String, appSupportDirectory: URL) async {
         let diagnostics = appSupportDirectory.appendingPathComponent("diagnostics", isDirectory: true)
         let appURL = diagnostics.appendingPathComponent("app/generations.jsonl", isDirectory: false)
-        let engineServiceURL = diagnostics.appendingPathComponent("engine-service/generations.jsonl", isDirectory: false)
         let engineURL = diagnostics.appendingPathComponent("engine/generations.jsonl", isDirectory: false)
 
         var app: GenerationTelemetryRecord?
-        var engineService: GenerationTelemetryRecord?
         var engine: GenerationTelemetryRecord?
 
         for attempt in 0..<pollAttempts {
             app = app ?? latestRecord(for: generationID, in: appURL)
-            engineService = engineService ?? latestRecord(for: generationID, in: engineServiceURL)
             engine = engine ?? latestRecord(for: generationID, in: engineURL)
-            if app != nil, engineService != nil, engine != nil { break }
+            if app != nil, engine != nil { break }
             if attempt < pollAttempts - 1 {
                 try? await Task.sleep(nanoseconds: pollIntervalNanos)
             }
         }
 
-        guard app != nil || engineService != nil || engine != nil else { return }
+        guard app != nil || engine != nil else { return }
 
         let merged = MergedGenerationTelemetry(
             generationID: generationID,
             recordedAt: ISO8601DateFormatter().string(from: Date()),
             app: app,
-            engineService: engineService,
-            engine: engine
+            engineService: nil,
+            engine: engine,
+            requiredLayers: [.app, .engine]
         )
         write(merged, into: diagnostics)
     }

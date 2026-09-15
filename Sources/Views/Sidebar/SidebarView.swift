@@ -328,13 +328,11 @@ struct SidebarView: View {
 
 private struct SidebarFooterRegion: View {
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @Environment(TTSEngineStore.self) private var ttsEngineStore
-
-    private let appEngineSelection = AppEngineSelection.current()
+    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
 
     private var resolvedSidebarStatus: SidebarStatus {
-        appEngineSelection.resolveSidebarStatus(
-            ttsEngineSnapshot: ttsEngineStore.snapshot,
+        SidebarStatusPresentation.resolve(
+            snapshot: ttsEngineStore.snapshot,
             prefersInlinePresentation: audioPlayer.isLiveStream
         )
     }
@@ -367,9 +365,7 @@ private struct SidebarFooterRegion: View {
                     SidebarStatusView(
                         sidebarStatus: resolvedSidebarStatus,
                         clearError: {
-                            appEngineSelection.clearSidebarError(
-                                ttsEngineStore: ttsEngineStore
-                            )
+                            ttsEngineStore.clearVisibleError()
                         }
                     )
                 }

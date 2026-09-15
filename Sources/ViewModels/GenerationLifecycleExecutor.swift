@@ -145,7 +145,7 @@ enum GenerationLifecycleExecutor {
             audioPlayer.setLivePreviewEstimate(nil)
             audioPlayer.abortLivePreviewIfNeeded()
         }
-        // Cancelling the owning task already invokes the XPC request's scoped
+        // Cancelling the owning task already runs the engine request's scoped
         // cancellation handler. A second asynchronous cancel can target B.
     }
 }

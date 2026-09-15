@@ -603,7 +603,7 @@ struct GenerationVariantSelector: View {
             }
         }
         .fixedSize(horizontal: true, vertical: false)
-        .help("Choose the Qwen3-TTS package for \(mode.displayName). Current status: \(statusCaption).")
+        .help(MacInterfaceText.workflowPackageHelp(mode.displayName, statusCaption))
     }
 
     // The memory-risk signal used to live only in this control's hover
@@ -618,19 +618,19 @@ struct GenerationVariantSelector: View {
             HStack(spacing: 4) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.caption2)
-                Text("Heavy")
+                Text(MacInterfaceText.settingsHeavy)
                     .font(.caption2.weight(.semibold))
             }
             .foregroundStyle(.orange)
-            .help("This package is heavy for this Mac's memory. Generation may be slow or unstable under pressure.")
+            .help(MacInterfaceText.workflowHeavyHelp)
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Heavy on this Mac")
+            .accessibilityLabel(MacInterfaceText.settingsHeavyOnThisMac)
             .accessibilityIdentifier("\(accessibilityPrefix)_heavyBadge")
         }
     }
 
     private var variantLabel: some View {
-        Text("Model")
+        Text(MacInterfaceText.workflowModel)
             .font(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
     }
@@ -680,7 +680,7 @@ struct GenerationVariantSelector: View {
         .buttonStyle(.plain)
         .disabled(!isEnabled)
         .opacity(isSelectable ? 1 : 0.42)
-        .accessibilityLabel("\(kind.displayName), \(variantAccessibilityStatus(for: kind))")
+        .accessibilityLabel(String("\(kind.displayName), \(variantAccessibilityStatus(for: kind))"))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("\(accessibilityPrefix)_\(kind.rawValue)VariantButton")
         .help(variantHelp(for: kind))
@@ -884,10 +884,10 @@ struct QwenLanguagePicker: View {
     var body: some View {
         Menu {
             if let recommendedOption {
-                Section("Recommended for your script") {
+                Section(MacInterfaceText.recommendedForScript) {
                     languageRow(recommendedOption, title: "\(recommendedOption.displayName) — Detected")
                 }
-                Section("All languages") {
+                Section(MacInterfaceText.workflowAllLanguages) {
                     ForEach(options.filter { $0 != recommendedOption }, id: \.self) { language in
                         languageRow(language)
                     }

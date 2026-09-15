@@ -68,7 +68,7 @@ struct TextInputView: View {
             // critique, P1-A).
             HStack(spacing: 8) {
                 if let batchAction {
-                    Button("Batch") {
+                    Button(MacInterfaceText.textInputBatch) {
                         batchAction()
                     }
                     .buttonStyle(.bordered)
@@ -80,7 +80,7 @@ struct TextInputView: View {
                     Button {
                         onCancel()
                     } label: {
-                        Label("Cancel", systemImage: "stop.fill")
+                        Label(MacInterfaceText.cancel, systemImage: "stop.fill")
                             .frame(minWidth: 100)
                     }
                     .buttonStyle(.borderedProminent)
@@ -90,7 +90,7 @@ struct TextInputView: View {
                     Button {
                         onGenerate()
                     } label: {
-                        Label("Generate", systemImage: "waveform")
+                        Label(MacInterfaceText.textInputGenerate, systemImage: "waveform")
                             .frame(minWidth: 100)
                     }
                     .buttonStyle(.borderedProminent)
@@ -118,7 +118,7 @@ struct TextInputView: View {
             Image(systemName: "pin.fill")
                 .font(.system(size: 9 * glyphScale))
                 .foregroundStyle(buttonColor)
-            Text("Seed \(String(seedValue))")
+            Text(MacInterfaceText.textInputSeed(String(seedValue)))
                 .font(.footnote.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -130,14 +130,14 @@ struct TextInputView: View {
                     .foregroundStyle(AppTheme.textMuted)
             }
             .buttonStyle(.plain)
-            .help("Unpin — new seed each take")
-            .accessibilityLabel("Unpin seed")
+            .help(MacInterfaceText.textInputUnpinHelp)
+            .accessibilityLabel(MacInterfaceText.textInputUnpinSeed)
             .accessibilityIdentifier("textInput_seedUnpin")
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
         .background(Capsule().fill(buttonColor.opacity(0.10)))
-        .help("Takes reproduce pinned seed \(String(seedValue)) with identical settings")
+        .help(MacInterfaceText.textInputSeedPinnedHelp(String(seedValue)))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("textInput_seedPinChip")
     }

@@ -96,7 +96,10 @@ lane; process-scoped, never persisted). The stress exposed a real fragility: the
 its layout from its own rendered width and locked into a collapsed column once long titles overflowed
 the action cluster. AV-16 fixes the row from container and action widths, gives chips and badges line
 limits, makes the journey assert single-line rows and in-window controls, and then migrates the 157
-macOS interface literals into the String Catalog with French, in three batches.
+macOS interface literals into the String Catalog with French, in three batches. Because the catalog
+carries French, a French-system Mac now shows those strings in French while model-driven labels stay
+English; the maintainer chose to finish French on macOS, so a fourth batch moves the remaining
+sidebar, toolbar, mode, variant, warning and status labels into the catalog.
 
 Critical path (the harness plan completed on September 14): RF-13 → RF-09 freeze → ICA-04 → ICA-05
 → RF-12, and ISU-4's physical walk rides the next device window.

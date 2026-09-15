@@ -32,7 +32,7 @@ struct SidebarStatusView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Engine")
+            Text(MacInterfaceText.statusEngine)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
 
@@ -70,7 +70,7 @@ struct SidebarStatusView: View {
             Circle()
                 .fill(AppTheme.accent)
                 .frame(width: 5, height: 5)
-            Text("Ready")
+            Text(MacInterfaceText.statusReady)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
         }
@@ -83,7 +83,7 @@ struct SidebarStatusView: View {
             Circle()
                 .fill(Color.secondary.opacity(0.55))
                 .frame(width: 5, height: 5)
-            Text("Standby")
+            Text(MacInterfaceText.statusStandby)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
         }
@@ -102,7 +102,7 @@ struct SidebarStatusView: View {
             Image(systemName: "bolt.horizontal")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
-            Text("Starting engine…")
+            Text(MacInterfaceText.statusStarting)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
         }
@@ -142,7 +142,7 @@ struct SidebarStatusView: View {
                     ProgressView(value: min(max(fraction, 0.0), 1.0), total: 1.0)
                         .tint(AppTheme.statusProgressTint)
                         .scaleEffect(y: 0.6)
-                    Text("\(percent)%")
+                    Text(verbatim: "\(percent)%")
                         .font(.caption2.monospacedDigit().weight(.medium))
                         .foregroundStyle(AppTheme.textMuted)
                 }
@@ -163,7 +163,7 @@ struct SidebarStatusView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.orange)
-                Text("Error")
+                Text(MacInterfaceText.statusError)
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.primary)
                 Spacer()

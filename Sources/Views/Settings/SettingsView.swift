@@ -295,7 +295,7 @@ private extension View {
     @ViewBuilder
     func settingsNavigationTitle(_ isVisible: Bool) -> some View {
         if isVisible {
-            navigationTitle("Settings")
+            navigationTitle(MacInterfaceText.settingsTitle)
         } else {
             self
         }

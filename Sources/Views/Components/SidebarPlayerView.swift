@@ -9,7 +9,7 @@ struct SidebarPlayerView: View {
     var body: some View {
         if audioPlayer.hasAudio {
             VStack(alignment: .leading, spacing: 7) {
-                Text("Player")
+                Text(MacInterfaceText.playerTitle)
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
 
@@ -20,7 +20,7 @@ struct SidebarPlayerView: View {
                         .foregroundStyle(.primary)
 
                     if audioPlayer.isLiveStream {
-                        Text("Live")
+                        Text(MacInterfaceText.playerLive)
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(AppTheme.accent)
                             .padding(.horizontal, 5)
@@ -48,7 +48,7 @@ struct SidebarPlayerView: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Close player")
+                    .accessibilityLabel(MacInterfaceText.playerClose)
                     .accessibilityIdentifier("sidebarPlayer_dismiss")
                 }
 
@@ -63,7 +63,7 @@ struct SidebarPlayerView: View {
                 }
                 .frame(height: 24)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Playback position")
+                .accessibilityLabel(MacInterfaceText.playerPosition)
                 .opacity(audioPlayer.canSeek ? 1.0 : 0.75)
                 .accessibilityIdentifier("sidebarPlayer_waveform")
                 .accessibilityValue("\(Int((playbackProgress.progress * 100).rounded())) percent")
@@ -92,7 +92,7 @@ struct SidebarPlayerView: View {
                     .accessibilityIdentifier("sidebarPlayer_playPause")
                     .accessibilityValue(audioPlayer.isPlaying ? "pause" : "play")
 
-                    Text("\(playbackProgress.formattedCurrentTime) / \(audioPlayer.durationDisplayText)")
+                    Text(verbatim: "\(playbackProgress.formattedCurrentTime) / \(audioPlayer.durationDisplayText)")
                         .font(.caption.monospacedDigit().weight(.medium))
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("sidebarPlayer_time")

@@ -507,14 +507,14 @@ private struct SpeakerPickerRow: View {
             label: "Speaker",
             accessibilityIdentifier: "customVoice_voiceSetup"
         ) {
-            Picker("Speaker", selection: speakerSelection) {
+            Picker(MacInterfaceText.customSpeaker, selection: speakerSelection) {
                 if !recommendedSpeakers.isEmpty {
-                    Section("Recommended for your script") {
+                    Section(MacInterfaceText.recommendedForScript) {
                         ForEach(recommendedSpeakers, id: \.self) { speaker in
                             Text(TTSModel.speakerPickerLabel(for: speaker)).tag(speaker)
                         }
                     }
-                    Section("All speakers") {
+                    Section(MacInterfaceText.customAllSpeakers) {
                         ForEach(TTSModel.allSpeakers.filter { !recommendedSpeakers.contains($0) }, id: \.self) { speaker in
                             Text(TTSModel.speakerPickerLabel(for: speaker)).tag(speaker)
                         }

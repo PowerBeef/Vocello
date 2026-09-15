@@ -67,7 +67,7 @@ struct VoiceBriefEditor: View {
             // caption; actions and the counter share the row below. The old
             // single row wrapped the helper mid-sentence beside the menu
             // and counter and read as a jumble.
-            Text("Combine character, age, accent, and texture.")
+            Text(MacInterfaceText.briefHelper)
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -76,7 +76,7 @@ struct VoiceBriefEditor: View {
 
                 Spacer(minLength: 8)
 
-                Text("\(text.count)/\(VoiceDesignBriefCatalog.descriptionLimit)")
+                Text(verbatim: "\(text.count)/\(VoiceDesignBriefCatalog.descriptionLimit)")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(isAtLimit ? accentColor : Color.secondary)
                     .accessibilityIdentifier("voiceDesign_briefCharCount")
@@ -94,13 +94,15 @@ struct VoiceBriefEditor: View {
                 Button(starterItemLabel(for: starter)) {
                     text = starter
                 }
-                .accessibilityLabel("Starting point: \(starter)")
+                .accessibilityLabel(MacInterfaceText.briefStartingPointAccessibility(starter))
                 .accessibilityIdentifier("voiceDesign_briefStarter_\(index)")
             }
         } label: {
             // Single concatenated Text so the bordered button style cannot
             // reorder a decomposable label (same pattern as QwenLanguagePicker).
-            Text("\(Text("Starting points  "))\(Text(Image(systemName: "chevron.up.chevron.down")).font(.caption2.weight(.semibold)).foregroundColor(.secondary))")
+            // The interpolation key holds two placeholders and no words; it is the one
+            // deliberately baselined direct literal on macOS (`Text + Text` is deprecated).
+            Text("\(Text(verbatim: MacInterfaceText.briefStartingPoints + "  "))\(Text(Image(systemName: "chevron.up.chevron.down")).font(.caption2.weight(.semibold)).foregroundColor(.secondary))")
                 .font(.caption)
                 .lineLimit(1)
         }

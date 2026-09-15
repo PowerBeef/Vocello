@@ -9,6 +9,7 @@ sourceOfTruth:
   - Sources/iOS/InfoPlist.xcstrings
   - Sources/iOS/IOSRootNavigationModels.swift
   - Sources/SharedSupport/Services/VocelloPresentationText.swift
+  - Sources/Services/MacInterfaceText.swift
   - Sources/SharedSupport/Services/VocelloLocalization.swift
   - Sources/iOSSupport/Services/IOSAppLanguage.swift
   - scripts/localization_contract.py
@@ -63,6 +64,13 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
 - `VocelloPresentationText` owns dynamic errors and statuses that would otherwise concatenate
   independently translated fragments. Callers pass substitutions into complete localized format
   strings.
+- `MacInterfaceText` (`Sources/Services/MacInterfaceText.swift`, macOS target only) owns the macOS
+  interface copy: sidebar, menus, Settings, Saved Voices, History, the generation surfaces and their
+  sheets read plain `String`s from `vocello.mac.*` entries with English, French and translator context.
+  Since 2026-09-14 no direct presentation literal remains under `Sources/Views` except the empty
+  keyboard-shortcut bridge button and the brief starters label, whose interpolation key holds two
+  placeholders and no words (`Text + Text` is deprecated on macOS 26); the validator binds every
+  `vocello.mac.` key to exactly one default there, like the iOS and shared prefixes.
 - `project.yml` enables String Catalog symbol generation, emitted localization strings, and catalog
   preference globally. The macOS app receives the catalog through its existing Resources bundle;
   the iOS app lists it explicitly in `sources:` with `buildPhase: resources`, as required by the
@@ -74,7 +82,8 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
 
 `config/localization-unlocalized-baseline.json` records content-addressed identities for existing
 direct string-literal arguments to common SwiftUI presentation APIs under `Sources/iOS`,
-`Sources/Views`, and `Sources/SharedSupport`. The validator permits removal but rejects a new or
+`Sources/Views`, and `Sources/SharedSupport`. After the 2026-09-14 macOS migration it holds eleven iOS records
+and two macOS exceptions: the empty bridge button and the wordless starters-label key. The validator permits removal but rejects a new or
 additional occurrence. It is an incremental migration boundary, not proof that every indirect or
 computed string is localized.
 

@@ -10782,6 +10782,1068 @@
           }
         }
       }
+    },
+    "vocello.mac.common.clear": {
+      "comment": "macOS interface: clears the current selection or field. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effacer"
+          }
+        }
+      }
+    },
+    "vocello.mac.common.done": {
+      "comment": "macOS interface: closes a finished sheet. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminé"
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.transcriptAccessibility": {
+      "comment": "macOS interface: VoiceOver label of the Voice Cloning transcript field. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcript"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription"
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.transcriptHelp": {
+      "comment": "macOS interface: tooltip of the Voice Cloning transcript field. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Best quality uses reference audio plus an accurate transcript. Audio-only cloning remains available as a lower-guidance fallback."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La meilleure qualité combine l’audio de référence et une transcription exacte. Le clonage audio seulement reste disponible comme repli moins guidé."
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.consentOneTime": {
+      "comment": "macOS interface: note under the inline cloning consent. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One-time acknowledgment. Review it anytime in Settings."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirmation unique. Vous pouvez la revoir à tout moment dans les Réglages."
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.noReference": {
+      "comment": "macOS interface: Voice Cloning placeholder when no reference is chosen. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No reference selected."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune référence sélectionnée."
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.sourceHelp": {
+      "comment": "macOS interface: tooltip of the Voice Cloning source section. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a saved voice, import a reference clip, or record one with your microphone. Use clips you own or have permission to clone."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez une voix enregistrée, importez un clip de référence ou enregistrez-en un avec votre microphone. Utilisez des clips qui vous appartiennent ou que vous avez la permission de cloner."
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.savedVoice": {
+      "comment": "macOS interface: Voice Cloning saved-voice picker label. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved voice"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voix enregistrée"
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.chooseSavedVoice": {
+      "comment": "macOS interface: Voice Cloning saved-voice picker empty choice. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a saved voice"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisir une voix enregistrée"
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.delivery": {
+      "comment": "macOS interface: label and picker title for a voice bank's delivery variants. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delivery"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interprétation"
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.deliveryNeutral": {
+      "comment": "macOS interface: the base delivery of a voice bank persona. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neutral"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Neutre"
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.importedFileReady": {
+      "comment": "macOS interface: Voice Cloning source status for an imported clip. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imported file ready"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fichier importé prêt"
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.transcriptBackedSavedVoice": {
+      "comment": "macOS interface: Voice Cloning source status for a saved voice with a transcript. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcript-backed saved voice"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voix enregistrée avec transcription"
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.audioOnlySavedVoice": {
+      "comment": "macOS interface: Voice Cloning source status for a saved voice without a transcript. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio-only saved voice"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voix enregistrée audio seulement"
+          }
+        }
+      }
+    },
+    "vocello.mac.custom.speaker": {
+      "comment": "macOS interface: Built-in Voice speaker picker label. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speaker"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locuteur"
+          }
+        }
+      }
+    },
+    "vocello.mac.common.recommendedForScript": {
+      "comment": "macOS interface: picker section of speakers or languages matching the script. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recommended for your script"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recommandés pour votre texte"
+          }
+        }
+      }
+    },
+    "vocello.mac.custom.allSpeakers": {
+      "comment": "macOS interface: Built-in Voice speaker picker section. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All speakers"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tous les locuteurs"
+          }
+        }
+      }
+    },
+    "vocello.mac.design.savedToSavedVoices": {
+      "comment": "macOS interface: Voice Design confirmation after saving the designed voice. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved to Saved Voices"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrée dans les voix enregistrées"
+          }
+        }
+      }
+    },
+    "vocello.mac.brief.helper": {
+      "comment": "macOS interface: caption of the Voice Design brief editor. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Combine character, age, accent, and texture."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Combinez caractère, âge, accent et texture."
+          }
+        }
+      }
+    },
+    "vocello.mac.brief.startingPoints": {
+      "comment": "macOS interface: Voice Design brief starters menu title. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting points"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Points de départ"
+          }
+        }
+      }
+    },
+    "vocello.mac.brief.startingPointAccessibility": {
+      "comment": "macOS interface: VoiceOver label of one brief starter. %1$@ is the starter text shown as editable model content, never translated.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting point: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Point de départ : %1$@"
+          }
+        }
+      }
+    },
+    "vocello.mac.textInput.batch": {
+      "comment": "macOS interface: opens the batch generation sheet. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batch"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lot"
+          }
+        }
+      }
+    },
+    "vocello.mac.textInput.generate": {
+      "comment": "macOS interface: primary generate action. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generate"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Générer"
+          }
+        }
+      }
+    },
+    "vocello.mac.textInput.seed": {
+      "comment": "macOS interface: pinned seed chip. %1$@ is the numeric seed, never translated.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seed %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Graine %1$@"
+          }
+        }
+      }
+    },
+    "vocello.mac.textInput.unpinHelp": {
+      "comment": "macOS interface: tooltip of the seed unpin button. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unpin — new seed each take"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Désépingler — nouvelle graine à chaque prise"
+          }
+        }
+      }
+    },
+    "vocello.mac.textInput.unpinSeed": {
+      "comment": "macOS interface: VoiceOver label of the seed unpin button. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unpin seed"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Désépingler la graine"
+          }
+        }
+      }
+    },
+    "vocello.mac.textInput.seedPinnedHelp": {
+      "comment": "macOS interface: tooltip of the pinned seed chip. %1$@ is the numeric seed, never translated.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Takes reproduce pinned seed %1$@ with identical settings"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les prises reproduisent la graine épinglée %1$@ avec des réglages identiques"
+          }
+        }
+      }
+    },
+    "vocello.mac.player.title": {
+      "comment": "macOS interface: sidebar player title. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Player"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lecteur"
+          }
+        }
+      }
+    },
+    "vocello.mac.player.live": {
+      "comment": "macOS interface: sidebar player badge while streaming audio plays. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En direct"
+          }
+        }
+      }
+    },
+    "vocello.mac.player.close": {
+      "comment": "macOS interface: VoiceOver label of the sidebar player close button. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close player"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fermer le lecteur"
+          }
+        }
+      }
+    },
+    "vocello.mac.player.position": {
+      "comment": "macOS interface: VoiceOver label of the sidebar player scrubber. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playback position"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Position de lecture"
+          }
+        }
+      }
+    },
+    "vocello.mac.status.engine": {
+      "comment": "macOS interface: sidebar status heading. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moteur"
+          }
+        }
+      }
+    },
+    "vocello.mac.status.ready": {
+      "comment": "macOS interface: sidebar engine status. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prêt"
+          }
+        }
+      }
+    },
+    "vocello.mac.status.standby": {
+      "comment": "macOS interface: sidebar engine status. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standby"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En veille"
+          }
+        }
+      }
+    },
+    "vocello.mac.status.starting": {
+      "comment": "macOS interface: sidebar engine status. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starting engine…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrage du moteur…"
+          }
+        }
+      }
+    },
+    "vocello.mac.status.error": {
+      "comment": "macOS interface: sidebar engine status. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erreur"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.title": {
+      "comment": "macOS interface: batch sheet title. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batch Generation"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Génération par lot"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.instructions": {
+      "comment": "macOS interface: batch sheet instructions. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter one line per generation, or drag a `.txt` file onto this sheet."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saisissez une ligne par génération ou glissez un fichier `.txt` sur cette fenêtre."
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.segmentation": {
+      "comment": "macOS interface: batch sheet picker label. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segmentation"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Découpage"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.lineByLine": {
+      "comment": "macOS interface: batch segmentation choice. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Line-by-line"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ligne par ligne"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.longForm": {
+      "comment": "macOS interface: batch segmentation choice. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Long form"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Format long"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.currentDelivery": {
+      "comment": "macOS interface: batch sheet group box title. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current delivery"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interprétation actuelle"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.resumeMissing": {
+      "comment": "macOS interface: batch sheet action. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resume Missing Segments"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reprendre les segments manquants"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.retryRemaining": {
+      "comment": "macOS interface: batch sheet action. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry Remaining"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer le reste"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.retryFailed": {
+      "comment": "macOS interface: batch sheet action. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry Failed"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer les échecs"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.revealOutputs": {
+      "comment": "macOS interface: batch sheet action that reveals the output folder. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reveal Outputs"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher les sorties"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.regenerate": {
+      "comment": "macOS interface: batch row action. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regenerate"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Régénérer"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.line": {
+      "comment": "macOS interface: batch row caption. %1$@ is the 1-based line number.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Line %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ligne %1$@"
+          }
+        }
+      }
+    },
+    "vocello.mac.emotion.distinctDeliveries": {
+      "comment": "macOS interface: delivery picker section. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distinct deliveries"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interprétations distinctes"
+          }
+        }
+      }
+    },
+    "vocello.mac.emotion.directionalHints": {
+      "comment": "macOS interface: delivery picker section. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Directional hints"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indications de direction"
+          }
+        }
+      }
+    },
+    "vocello.mac.emotion.custom": {
+      "comment": "macOS interface: delivery picker choice for a free-text tone. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Personnalisé"
+          }
+        }
+      }
+    },
+    "vocello.mac.emotion.intensity": {
+      "comment": "macOS interface: delivery intensity label and picker title. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intensity"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Intensité"
+          }
+        }
+      }
+    },
+    "vocello.mac.emotion.customTone": {
+      "comment": "macOS interface: label of the free-text delivery field. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom tone"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ton personnalisé"
+          }
+        }
+      }
+    },
+    "vocello.mac.emotion.customTonePlaceholder": {
+      "comment": "macOS interface: placeholder of the free-text delivery field. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "e.g. whispered, close-mic and breathy"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "p. ex. chuchoté, micro proche et soufflé"
+          }
+        }
+      }
+    },
+    "vocello.mac.workflow.packageHelp": {
+      "comment": "macOS interface: tooltip of the package picker. %1$@ is the mode name, %2$@ the status caption; both already localized.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose the Qwen3-TTS package for %1$@. Current status: %2$@."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez le paquet Qwen3-TTS pour %1$@. État actuel : %2$@."
+          }
+        }
+      }
+    },
+    "vocello.mac.workflow.heavyHelp": {
+      "comment": "macOS interface: tooltip of the Heavy badge in the generation workflow. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This package is heavy for this Mac's memory. Generation may be slow or unstable under pressure."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce paquet est lourd pour la mémoire de ce Mac. La génération peut être lente ou instable sous pression."
+          }
+        }
+      }
+    },
+    "vocello.mac.workflow.model": {
+      "comment": "macOS interface: package picker label. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèle"
+          }
+        }
+      }
+    },
+    "vocello.mac.workflow.allLanguages": {
+      "comment": "macOS interface: language picker section. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All languages"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toutes les langues"
+          }
+        }
+      }
+    },
+    "vocello.mac.settings.title": {
+      "comment": "macOS interface: Settings screen navigation title. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réglages"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

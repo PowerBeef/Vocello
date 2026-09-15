@@ -98,23 +98,23 @@ struct BatchGenerationSheet: View {
 
     @ViewBuilder
     private var editorView: some View {
-        Text("Batch Generation")
+        Text(MacInterfaceText.batchTitle)
             .font(.title.weight(.bold))
 
-        Text("Enter one line per generation, or drag a `.txt` file onto this sheet.")
+        Text(MacInterfaceText.batchInstructions)
             .font(.callout)
             .foregroundStyle(.secondary)
 
-        Picker("Segmentation", selection: $segmentationMode) {
-            Text("Line-by-line").tag(BatchSegmentationMode.lineSeparated)
-            Text("Long form").tag(BatchSegmentationMode.longForm)
+        Picker(MacInterfaceText.batchSegmentation, selection: $segmentationMode) {
+            Text(MacInterfaceText.batchLineByLine).tag(BatchSegmentationMode.lineSeparated)
+            Text(MacInterfaceText.batchLongForm).tag(BatchSegmentationMode.longForm)
         }
         .pickerStyle(.segmented)
         .disabled(coordinator.isProcessing)
         .accessibilityIdentifier("batch_segmentationMode")
 
         if !deliverySummary.isEmpty {
-            GroupBox("Current delivery") {
+            GroupBox(MacInterfaceText.batchCurrentDelivery) {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(deliverySummary, id: \.self) { line in
                         Text(line)
@@ -189,7 +189,7 @@ struct BatchGenerationSheet: View {
         }
 
         HStack {
-            Button("Cancel") {
+            Button(MacInterfaceText.cancel) {
                 coordinator.cancelBatch(
                     dismiss: { dismiss() }
                 )
@@ -238,7 +238,7 @@ struct BatchGenerationSheet: View {
         Spacer()
 
         HStack {
-            Button("Done") {
+            Button(MacInterfaceText.done) {
                 dismiss()
             }
             .buttonStyle(.bordered)
@@ -248,7 +248,7 @@ struct BatchGenerationSheet: View {
             if segmentationMode == .longForm {
                 if coordinator.canOperateOnLongFormOutcome,
                    outcome.items.contains(where: { !$0.isSaved }) {
-                    Button("Resume Missing Segments") {
+                    Button(MacInterfaceText.batchResumeMissing) {
                         coordinator.resumeLongForm(engineStore: ttsEngineStore)
                     }
                     .buttonStyle(.bordered)
@@ -256,14 +256,14 @@ struct BatchGenerationSheet: View {
                 }
             } else {
                 if shouldShowRetryRemaining(for: outcome) {
-                    Button("Retry Remaining") {
+                    Button(MacInterfaceText.batchRetryRemaining) {
                         retryBatch(with: outcome.retryRemainingLines)
                     }
                     .buttonStyle(.bordered)
                 }
 
                 if shouldShowRetryFailed(for: outcome) {
-                    Button("Retry Failed") {
+                    Button(MacInterfaceText.batchRetryFailed) {
                         retryBatch(with: outcome.retryFailedLines)
                     }
                     .buttonStyle(.bordered)
@@ -273,7 +273,7 @@ struct BatchGenerationSheet: View {
             Spacer()
 
             if !outcome.savedAudioPaths.isEmpty {
-                Button("Reveal Outputs") {
+                Button(MacInterfaceText.batchRevealOutputs) {
                     revealOutputs(for: outcome.savedAudioPaths)
                 }
                 .buttonStyle(.bordered)
@@ -382,7 +382,7 @@ struct BatchGenerationSheet: View {
                                    coordinator.canOperateOnLongFormOutcome,
                                    item.isSaved {
                                     Spacer(minLength: 4)
-                                    Button("Regenerate") {
+                                    Button(MacInterfaceText.batchRegenerate) {
                                         coordinator.regenerateLongFormSegment(
                                             item.index,
                                             engineStore: ttsEngineStore
@@ -495,7 +495,7 @@ private struct BatchGenerationItemRow: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(statusColor)
 
-                Text("Line \(item.index + 1)")
+                Text(MacInterfaceText.batchLine(String(item.index + 1)))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

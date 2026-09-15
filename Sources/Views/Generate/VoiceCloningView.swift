@@ -553,10 +553,10 @@ private struct VoiceCloningTranscriptSettings: View {
             .padding(.vertical, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .glassTextField(radius: 10)
-            .accessibilityLabel("Transcript")
+            .accessibilityLabel(MacInterfaceText.cloningTranscriptAccessibility)
             .accessibilityIdentifier("voiceCloning_transcriptInput")
         }
-        .help("Best quality uses reference audio plus an accurate transcript. Audio-only cloning remains available as a lower-guidance fallback.")
+        .help(MacInterfaceText.cloningTranscriptHelp)
     }
 }
 
@@ -591,7 +591,7 @@ private struct VoiceCloningComposerFooter: View {
                     onAcknowledgeConsent()
                 } label: {
                     Label(
-                        "I own or have permission to clone the voices I use",
+                        MacInterfaceText.settingsCloneConsent,
                         systemImage: "checkmark.circle"
                     )
                     .font(.callout.weight(.semibold))
@@ -600,7 +600,7 @@ private struct VoiceCloningComposerFooter: View {
                 .tint(AppTheme.voiceCloning)
                 .accessibilityIdentifier("voiceCloning_inlineConsent")
 
-                Text("One-time acknowledgment. Review it anytime in Settings.")
+                Text(MacInterfaceText.cloningConsentOneTime)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -656,7 +656,7 @@ private struct CloneReferenceStatus: View {
 
                 Spacer(minLength: 0)
 
-                Button("Clear") {
+                Button(MacInterfaceText.clear) {
                     AppLaunchConfiguration.performAnimated(.default) {
                         clearReference()
                     }
@@ -671,7 +671,7 @@ private struct CloneReferenceStatus: View {
                 Image(systemName: "waveform.badge.exclamationmark")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-                Text("No reference selected.")
+                Text(MacInterfaceText.cloningNoReference)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -681,11 +681,11 @@ private struct CloneReferenceStatus: View {
 
     private var referenceDetail: String {
         guard let selectedVoice else {
-            return "Imported file ready"
+            return MacInterfaceText.cloningImportedFileReady
         }
         return selectedVoice.hasTranscript
-            ? "Transcript-backed saved voice"
-            : "Audio-only saved voice"
+            ? MacInterfaceText.cloningTranscriptBackedSavedVoice
+            : MacInterfaceText.cloningAudioOnlySavedVoice
     }
 
     @ViewBuilder
@@ -724,7 +724,7 @@ private struct CloneReferenceStatus: View {
     @ViewBuilder
     private func warningDetailsPopover(warnings: [String]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Reference outside recommended range",
+            Label(MacInterfaceText.voicesReferenceOutsideRange,
                   systemImage: "exclamationmark.triangle.fill")
                 .font(.headline)
                 .foregroundStyle(.orange)
@@ -781,7 +781,7 @@ private struct CloneSourceRow: View {
 
             bankDeliveryPicker(catalog: catalog)
         }
-        .help("Choose a saved voice, import a reference clip, or record one with your microphone. Use clips you own or have permission to clone.")
+        .help(MacInterfaceText.cloningSourceHelp)
     }
 
     /// Emotion reference banks group by naming convention alone
@@ -829,8 +829,8 @@ private struct CloneSourceRow: View {
     @ViewBuilder
     private func savedVoicePicker(catalog: VoiceBankCatalog) -> some View {
         if !savedVoices.isEmpty {
-            Picker("Saved voice", selection: $selectedSavedVoiceID) {
-                Text("Choose a saved voice")
+            Picker(MacInterfaceText.cloningSavedVoice, selection: $selectedSavedVoiceID) {
+                Text(MacInterfaceText.cloningChooseSavedVoice)
                     .tag(Optional<String>.none)
 
                 ForEach(sourceEntries(catalog: catalog)) { entry in
@@ -852,12 +852,12 @@ private struct CloneSourceRow: View {
         if let selectedSavedVoiceID,
            let persona = catalog.persona(containing: selectedSavedVoiceID) {
             HStack(alignment: .center, spacing: 8) {
-                Text("Delivery")
+                Text(MacInterfaceText.delivery)
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.secondary)
 
-                Picker("Delivery", selection: $selectedSavedVoiceID) {
-                    Text("Neutral")
+                Picker(MacInterfaceText.delivery, selection: $selectedSavedVoiceID) {
+                    Text(MacInterfaceText.deliveryNeutral)
                         .tag(Optional(persona.baseVoiceID))
 
                     ForEach(persona.orderedVariants, id: \.voiceID) { variant in
@@ -894,7 +894,7 @@ private struct CloneSourceRow: View {
         Button {
             recordReference()
         } label: {
-            Label("Record", systemImage: "mic.fill")
+            Label(MacInterfaceText.recordRecord, systemImage: "mic.fill")
                 .font(.callout.weight(.semibold))
         }
         .buttonStyle(.bordered)

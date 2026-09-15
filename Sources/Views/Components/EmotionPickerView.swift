@@ -102,14 +102,14 @@ struct EmotionPickerView: View {
         // hints second, so the menu itself tells the truth about what each
         // half can promise.
         Picker(title, selection: selectedOptionID) {
-            Section("Distinct deliveries") {
+            Section(MacInterfaceText.emotionDistinctDeliveries) {
                 ForEach(EmotionPreset.all.filter { !$0.isDirectionalHint }) { preset in
                     Text(preset.label)
                         .tag(preset.id)
                 }
             }
 
-            Section("Directional hints") {
+            Section(MacInterfaceText.emotionDirectionalHints) {
                 ForEach(EmotionPreset.all.filter(\.isDirectionalHint)) { preset in
                     Text(preset.label)
                         .tag(preset.id)
@@ -117,7 +117,7 @@ struct EmotionPickerView: View {
             }
 
             Section {
-                Text("Custom")
+                Text(MacInterfaceText.emotionCustom)
                     .tag("custom")
             }
         }
@@ -215,7 +215,7 @@ struct EmotionPickerView: View {
 
     private var intensityInlineSlot: some View {
         HStack(alignment: .center, spacing: 10) {
-            Text("Intensity")
+            Text(MacInterfaceText.emotionIntensity)
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(showsIntensityPicker ? AppTheme.textSecondary : AppTheme.textMuted)
 
@@ -224,7 +224,7 @@ struct EmotionPickerView: View {
     }
 
     private var intensityPicker: some View {
-        Picker("Intensity", selection: $intensity) {
+        Picker(MacInterfaceText.emotionIntensity, selection: $intensity) {
             ForEach(EmotionIntensity.allCases) { level in
                 Text(level.label).tag(level)
             }
@@ -249,11 +249,11 @@ struct EmotionPickerView: View {
 
     private var customToneField: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Custom tone")
+            Text(MacInterfaceText.emotionCustomTone)
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(isCustomMode ? AppTheme.textSecondary : AppTheme.textMuted)
 
-            TextField("e.g. whispered, close-mic and breathy", text: $customText)
+            TextField(MacInterfaceText.emotionCustomTonePlaceholder, text: $customText)
                 .textFieldStyle(.plain)
                 .vocelloFocusRing(accentColor, radius: 8)
                 .padding(.horizontal, 8)

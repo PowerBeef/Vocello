@@ -128,7 +128,7 @@ struct VoiceDesignView: View {
             Alert(
                 title: Text(alert.title),
                 message: Text(alert.message),
-                dismissButton: .default(Text("OK"))
+                dismissButton: .default(Text(MacInterfaceText.ok))
             )
         }
     }
@@ -339,7 +339,7 @@ private extension VoiceDesignView {
     var saveVoiceAction: some View {
         if let candidate = currentSavedVoiceCandidate {
             if candidate.isSaved {
-                Label("Saved to Saved Voices", systemImage: "checkmark.circle.fill")
+                Label(MacInterfaceText.designSavedToSavedVoices, systemImage: "checkmark.circle.fill")
                     .font(.callout.weight(.medium))
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("voiceDesign_saveVoiceCompleted")
@@ -348,7 +348,7 @@ private extension VoiceDesignView {
                 Button {
                     coordinator.presentSavedVoiceSheet(for: draft)
                 } label: {
-                    Label("Save to Saved Voices", systemImage: "person.crop.circle.badge.plus")
+                    Label(MacInterfaceText.historySaveToSavedVoices, systemImage: "person.crop.circle.badge.plus")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)

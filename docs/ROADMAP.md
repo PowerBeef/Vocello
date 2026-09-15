@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `macos-ios-convergence-2026-09` | active | backend-and-platform | 8/15 (53%) |
+| `macos-ios-convergence-2026-09` | active | backend-and-platform | 9/15 (60%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -33,8 +33,7 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `CONV-14` | in-flight | Settings on the iOS screen with the desktop rows and the interface-language picker | — |
-| `CONV-15` | planned | Studio canvas, Built-in Voice and line batch on the shared coordinators | `CONV-14` |
+| `CONV-15` | in-flight | Studio canvas, Built-in Voice and line batch on the shared coordinators | — |
 | `CONV-16` | planned | Voice Design on the iOS screen | `CONV-15` |
 | `CONV-17` | planned | Voice Cloning on the iOS screen and removal of the legacy remainder | `CONV-16` |
 | `CONV-18` | planned | Perf re-baseline, marketing captures and documentation of the new macOS app | `CONV-17` |
@@ -43,10 +42,7 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 ### Open items in detail
 
-- **`CONV-14`** (in-flight) — Settings on the iOS screen with the desktop rows and the interface-language picker.
-  gate: Sources/Views/Settings/SettingsView.swift is absent; the Cmd+, scene and the sidebar item show the same screen; settings_*, preferences_* and voiceCloning_consentAcknowledgment identifiers unchanged; IOSAppLanguage selects the macOS interface language; localization, smoke (test05) and perf (settings-scroll) PASS.
-
-- **`CONV-15`** (planned) — Studio canvas, Built-in Voice and line batch on the shared coordinators.
+- **`CONV-15`** (in-flight) — Studio canvas, Built-in Voice and line batch on the shared coordinators.
   gate: CustomVoiceView, TextInputView, BatchGenerationSheet, BatchGenerationRunner, CustomVoiceCoordinator and GenerationLifecycleExecutor are absent; StudioGenerationCoordinator, IOSSingleTakeGenerationExecutor and IOSLongFormProject drive macOS generation with requests from MacStudioGenerationRequestFactory; no prewarm call under Sources/Views/Studio; customVoice_*, textInput_* and batch_* identifiers unchanged; smoke (test02, test03, test06, test07), perf and benchmark --modes custom PASS.
 
 - **`CONV-16`** (planned) — Voice Design on the iOS screen.

@@ -96,29 +96,11 @@
   ],
   "items": [
     {
-      "id": "CONV-14",
-      "plan": "macos-ios-convergence-2026-09",
-      "title": "Settings on the iOS screen with the desktop rows and the interface-language picker",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "Sources/Views/Settings/SettingsView.swift is absent; the Cmd+, scene and the sidebar item show the same screen; settings_*, preferences_* and voiceCloning_consentAcknowledgment identifiers unchanged; IOSAppLanguage selects the macOS interface language; localization, smoke (test05) and perf (settings-scroll) PASS.",
-      "sourceOfTruth": [
-        "Sources/Views/Settings/MacSettingsScreen.swift",
-        "Sources/Views/Settings/MacModelRow.swift",
-        "Sources/Services/MacInterfaceLanguage.swift",
-        "Sources/iOSSupport/Services/IOSAppLanguage.swift"
-      ],
-      "updated": "2026-09-15",
-      "notes": "Settings landed 2026-09-15: MacSettingsScreen (iOS row sections: recommended-setup summary, per-mode Speed/Quality package lines with Download, Cancel, Repair, Update and the AppKit Manage menu, App Language, auto-play, variation, lower-memory toggle, output folder with warning and reset, Application data, clone consent last), MacSettingsRows (section, row, switch, capsule action, transfer bar) and MacModelRow; SettingsView.swift is gone; the Cmd+, scene hosts the same screen with its own default size; the sidebar host binds the pending highlight itself. MacInterfaceLanguage owns the macOS interface language: an IOSAppLanguage (compiled by path) over AppDefaults.store, republished to MacInterfaceText (observable read on the main thread, published snapshot elsewhere; unit-tested in VocelloCoreTests); the app re-resolves System Default when it becomes active. Eight new vocello.mac keys with French (Interface header, App Language row, System Default, auto-play detail, three variation names); the IOSSettingsText split the plan listed is unnecessary. Smoke test05 asserts settings_appLanguage. Remaining gate: localization, smoke (test05) and perf (settings-scroll) PASS run ids."
-    },
-    {
       "id": "CONV-15",
       "plan": "macos-ios-convergence-2026-09",
       "title": "Studio canvas, Built-in Voice and line batch on the shared coordinators",
-      "status": "planned",
-      "blockedBy": [
-        "CONV-14"
-      ],
+      "status": "in-flight",
+      "blockedBy": [],
       "gate": "CustomVoiceView, TextInputView, BatchGenerationSheet, BatchGenerationRunner, CustomVoiceCoordinator and GenerationLifecycleExecutor are absent; StudioGenerationCoordinator, IOSSingleTakeGenerationExecutor and IOSLongFormProject drive macOS generation with requests from MacStudioGenerationRequestFactory; no prewarm call under Sources/Views/Studio; customVoice_*, textInput_* and batch_* identifiers unchanged; smoke (test02, test03, test06, test07), perf and benchmark --modes custom PASS.",
       "sourceOfTruth": [
         "Sources/Views/Generate/CustomVoiceView.swift",
@@ -126,7 +108,7 @@
         "Sources/iOS/Studio/StudioGenerationCoordinator.swift",
         "Sources/Services/MacStudioGenerationRequestFactory.swift"
       ],
-      "updated": "2026-09-14"
+      "updated": "2026-09-15"
     },
     {
       "id": "CONV-16",

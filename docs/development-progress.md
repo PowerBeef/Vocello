@@ -57,7 +57,8 @@ CONV-14 put Settings on the iOS row design: the recommended-setup summary and th
 and Quality packages with their desktop actions, the interface-language picker (an `IOSAppLanguage`
 over the app's defaults store, owned by `MacInterfaceLanguage`), auto-play, variation, the
 lower-memory toggle, the output folder and Application data, clone consent last; the Cmd+, scene
-shows the same screen.
+shows the same screen; its lanes passed (localization 172237-799a37c7, smoke 172745-96a732fb, perf
+173808-8adae46d) and CONV-14 is closed.
 The maintainer consented to the Step B lanes for every screen commit; they run one at a time as
 each commit lands. On the Saved Voices commit all four passed and closed CONV-11, CONV-12 and
 CONV-13: localization 162652-a093f4a3, smoke 162950-777019e3 (7/7), perf 164002-0177f946 (nine

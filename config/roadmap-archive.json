@@ -3220,6 +3220,29 @@
         "file:config/memory-qualification-policy.json"
       ],
       "notes": "Closed 2026-09-15. The in-process relief that replaced XPC service retirement (CONV-02/03): the store runs MacMemoryBudgetPolicy over footprint and the Metal working set, the engine's kernel-pressure responder trims and unloads through the store's terminal barrier, idle unload follows NativeMemoryPolicyResolver and MacWarmupAdmissionPolicy defers proactive warms. Consented scripts/macos_test.sh memory run mac-memory-qualification-20260915-165501-b1cb1ebc on 51560226 (Custom, Design, Clone; Speed, medium, three retained takes per mode; retained-memory-v1): qualification PASS, eleven takes, no critical pressure, warning, hard trim or full unload; one soft trim per take; phys_footprint peak 2.4 to 2.9 GB, GPU working set 0.42 to 0.46, thermal nominal, QC pass; record published to benchmarks/runs/memory-qualification."
+    },
+    {
+      "id": "CONV-14",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Settings on the iOS screen with the desktop rows and the interface-language picker",
+      "status": "done",
+      "gate": "Sources/Views/Settings/SettingsView.swift is absent; the Cmd+, scene and the sidebar item show the same screen; settings_*, preferences_* and voiceCloning_consentAcknowledgment identifiers unchanged; IOSAppLanguage selects the macOS interface language; localization, smoke (test05) and perf (settings-scroll) PASS.",
+      "sourceOfTruth": [
+        "Sources/Views/Settings/MacSettingsScreen.swift",
+        "Sources/Views/Settings/MacModelRow.swift",
+        "Sources/Services/MacInterfaceLanguage.swift",
+        "Sources/iOSSupport/Services/IOSAppLanguage.swift"
+      ],
+      "updated": "2026-09-15",
+      "notes": "Closed 2026-09-15 with c27a7d3f. MacSettingsScreen (iOS row sections: recommended-setup summary, per-mode Speed/Quality package lines with Download, Cancel, Repair, Update and the AppKit Manage menu, App Language, auto-play, variation, lower-memory toggle, output folder with warning and reset, Application data, clone consent last), MacSettingsRows and MacModelRow; SettingsView.swift gone; the Cmd+, scene hosts the same screen with its own default size; the sidebar host binds the pending highlight itself. MacInterfaceLanguage owns the macOS interface language: an IOSAppLanguage (compiled by path) bootstrapped by the app over AppDefaults.store, republished to MacInterfaceText (observable read on the main thread, published snapshot elsewhere; unit-tested over a fixture suite); the window root re-resolves System Default on activation. Eight vocello.mac keys with French; the plan's IOSSettingsText split proved unnecessary. Lanes: localization macos-xcui-localization-20260915-172237-799a37c7, smoke macos-xcui-smoke-20260915-172745-96a732fb (7/7, test05 asserts settings_appLanguage), perf macos-xcui-perf-20260915-173808-8adae46d (gate PASS, nine scenarios).",
+      "evidence": [
+        "commit:c27a7d3f",
+        "run:macos-xcui-localization-20260915-172237-799a37c7",
+        "run:macos-xcui-smoke-20260915-172745-96a732fb",
+        "run:macos-xcui-perf-20260915-173808-8adae46d",
+        "file:Sources/Views/Settings/MacSettingsScreen.swift",
+        "file:Sources/Services/MacInterfaceLanguage.swift"
+      ]
     }
   ]
 }

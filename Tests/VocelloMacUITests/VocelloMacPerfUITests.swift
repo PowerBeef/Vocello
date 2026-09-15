@@ -187,15 +187,18 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
         }
     }
 
-    /// Exploratory: macOS XCUITest has no window-resize API; the bottom-right
-    /// corner drag is the only native mechanism and the flakiest surface in
-    /// this suite (individual drags miss nondeterministically even with
-    /// cursor parking between presses). The scenario therefore counts
-    /// successful resizes across up to 8 alternating attempts and requires at
-    /// least one grow and one shrink; only a *size* change counts, so a drag
-    /// that merely moved the window cannot masquerade as a resize. On total
-    /// failure no marker is emitted and the gate fails loudly on the missing
-    /// scenario. `actionCount` reports the observed resize count.
+    /// Exploratory: macOS XCUITest has no window-resize API; an edge drag is
+    /// the only native mechanism and the flakiest surface in this suite
+    /// (individual drags miss nondeterministically even with cursor parking
+    /// between presses). The drag starts on the right edge's midpoint: the
+    /// bottom-right corner used until 2026-09-15 sits inside the window's
+    /// rounded corner on macOS 27, where the press lands on the desktop and
+    /// no drag ever resized. The scenario counts successful resizes across up
+    /// to 8 alternating attempts and requires at least one grow and one
+    /// shrink; only a *size* change counts, so a drag that merely moved the
+    /// window cannot masquerade as a resize. On total failure no marker is
+    /// emitted and the gate fails loudly on the missing scenario.
+    /// `actionCount` reports the observed resize count.
     func test08WindowResize() {
         beginScenario("window-resize")
         let window = app.windows.firstMatch
@@ -207,11 +210,11 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
         for attempt in 0..<8 {
             let sizeBefore = window.frame.size
             let delta: CGFloat = attempt.isMultiple(of: 2) ? 250 : -250
-            let corner = window
-                .coordinate(withNormalizedOffset: CGVector(dx: 1.0, dy: 1.0))
-                .withOffset(CGVector(dx: -2, dy: -2))
-            let target = corner.withOffset(CGVector(dx: delta, dy: delta / 2))
-            corner.click(forDuration: 0.3, thenDragTo: target)
+            let edge = window
+                .coordinate(withNormalizedOffset: CGVector(dx: 1.0, dy: 0.5))
+                .withOffset(CGVector(dx: -1, dy: 0))
+            let target = edge.withOffset(CGVector(dx: delta, dy: 0))
+            edge.click(forDuration: 0.3, thenDragTo: target)
             Thread.sleep(forTimeInterval: 0.8)
             if window.frame.size != sizeBefore {
                 resizes += 1
@@ -226,7 +229,7 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
         let end = Int64(Date().timeIntervalSince1970 * 1000)
         XCTAssertTrue(
             grew && shrank && resizes >= 2,
-            "expected at least one grow and one shrink across 8 corner drags; "
+            "expected at least one grow and one shrink across 8 edge drags; "
                 + "observed \(resizes) resizes (grew: \(grew), shrank: \(shrank))"
         )
         VocelloUIPerfScenarioMarker(

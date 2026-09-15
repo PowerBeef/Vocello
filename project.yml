@@ -175,6 +175,7 @@ targets:
       - path: Sources/iOSSupport/Services/DatabaseService.swift
       - path: Sources/iOSSupport/Models/Voice.swift
       - path: Sources/iOSSupport/ViewModels/SavedVoicesViewModel.swift
+      - path: Sources/iOSSupport/Services/IOSAppLanguage.swift
     resources:
       - path: Sources/Resources
         buildPhase: resources
@@ -428,6 +429,7 @@ targets:
       - path: Sources/Models/ScriptTextState.swift
       - path: Sources/ViewModels/VoiceDesignCoordinator.swift
       - path: Sources/Services/MacInterfaceText.swift
+      - path: Sources/Services/MacInterfaceLanguage.swift
       - path: Sources/ViewModels/GenerationLifecycleExecutor.swift
       - path: Sources/VocelloCLI/CLIProcessSupervisor.swift
       - path: Sources/VocelloCLI/CLIBatchExecution.swift

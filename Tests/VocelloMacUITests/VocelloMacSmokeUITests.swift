@@ -245,6 +245,11 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         XCTAssertTrue(VocelloUIWait.exists(element("history_sortPicker"), timeout: 20))
         navigate(to: .settings)
         XCTAssertTrue(VocelloUIWait.exists(element("settings_modelDownloadsSummary"), timeout: 20))
+        // The interface-language picker is a genuine control (CONV-14); the
+        // lane never selects a language, so it reads System Default here.
+        let appLanguage = element("settings_appLanguage")
+        XCTAssertTrue(VocelloUIWait.exists(appLanguage, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.value(appLanguage, contains: "System Default", timeout: 10))
         VocelloUIScreenshot.attach(app, named: "mac-smoke-library")
     }
 

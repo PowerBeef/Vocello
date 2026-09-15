@@ -8,7 +8,8 @@ import QwenVoiceCore
 /// exactly one default here. Stored names, model ids, seeds, license bodies and generation text
 /// never enter this vocabulary.
 enum MacInterfaceText {
-    private static let localization = VocelloLocalization()
+    /// The interface language selected in Settings (`MacInterfaceLanguage`).
+    private static var localization: VocelloLocalization { MacInterfaceLanguage.current }
     static func activityGenerating(_ mode: String) -> String {
         localization.format(localization.string(localized: "vocello.mac.activity.generating",
             defaultValue: "Generating %@…",
@@ -1262,6 +1263,14 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.section.script", defaultValue: "Script",
                comment: "macOS interface: title of the script card on the generation screens. Presentation only.")
     }
+    static var settingsAppLanguage: String {
+        localization.string(localized: "vocello.mac.settings.appLanguage", defaultValue: "App Language",
+               comment: "macOS interface: Settings row title of the interface-language picker (the interface, not generated speech). Presentation only.")
+    }
+    static var settingsAppLanguageDetail: String {
+        localization.string(localized: "vocello.mac.settings.appLanguageDetail", defaultValue: "Changes the app interface, not the language of generated speech.",
+               comment: "macOS interface: Settings row detail under the interface-language picker. Presentation only.")
+    }
     static var settingsApplicationData: String {
         localization.string(localized: "vocello.mac.settings.applicationData", defaultValue: "Application data",
                comment: "macOS interface: Settings labeled row title. Presentation only.")
@@ -1269,6 +1278,10 @@ enum MacInterfaceText {
     static var settingsAutoPlay: String {
         localization.string(localized: "vocello.mac.settings.autoPlay", defaultValue: "Auto-play generated audio",
                comment: "macOS interface: Settings toggle. Presentation only.")
+    }
+    static var settingsAutoPlayDetail: String {
+        localization.string(localized: "vocello.mac.settings.autoPlayDetail", defaultValue: "Automatically play each finished take.",
+               comment: "macOS interface: Settings row detail under the auto-play switch. Presentation only.")
     }
     static var settingsCancelDownloadHelp: String {
         localization.string(localized: "vocello.mac.settings.cancelDownloadHelp", defaultValue: "Cancel the download (discards partial data)",
@@ -1329,6 +1342,10 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.settings.heavyOnThisMac", defaultValue: "Heavy on this Mac",
                comment: "macOS interface: tooltip and VoiceOver label of the Heavy badge. Presentation only.")
     }
+    static var settingsInterface: String {
+        localization.string(localized: "vocello.mac.settings.interface", defaultValue: "Interface",
+               comment: "macOS interface: Settings section header over the interface-language picker. Presentation only.")
+    }
     static var settingsManage: String {
         localization.string(localized: "vocello.mac.settings.manage", defaultValue: "Manage",
                comment: "macOS interface: package action that opens the Manage menu; must fit a 92-point slot. Presentation only.")
@@ -1387,6 +1404,10 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.settings.storage", defaultValue: "Storage",
                comment: "macOS interface: Settings section header. Presentation only.")
     }
+    static var settingsSystemLanguage: String {
+        localization.string(localized: "vocello.mac.settings.systemLanguage", defaultValue: "System Default",
+               comment: "macOS interface: interface-language picker option that follows the system language. Presentation only.")
+    }
     static var settingsTitle: String {
         localization.string(localized: "vocello.mac.settings.title", defaultValue: "Settings",
                comment: "macOS interface: Settings screen navigation title. Presentation only.")
@@ -1402,6 +1423,18 @@ enum MacInterfaceText {
     static var settingsVariation: String {
         localization.string(localized: "vocello.mac.settings.variation", defaultValue: "Variation",
                comment: "macOS interface: Settings picker label for sampling variation. Presentation only.")
+    }
+    static var settingsVariationBalanced: String {
+        localization.string(localized: "vocello.mac.settings.variationBalanced", defaultValue: "Balanced",
+               comment: "macOS interface: Settings variation picker option between Expressive and Consistent. Presentation only.")
+    }
+    static var settingsVariationConsistent: String {
+        localization.string(localized: "vocello.mac.settings.variationConsistent", defaultValue: "Consistent",
+               comment: "macOS interface: Settings variation picker option with the steadiest takes. Presentation only.")
+    }
+    static var settingsVariationExpressive: String {
+        localization.string(localized: "vocello.mac.settings.variationExpressive", defaultValue: "Expressive",
+               comment: "macOS interface: Settings variation picker option, the model's official sampling. Presentation only.")
     }
     static var settingsVariationHelp: String {
         localization.string(localized: "vocello.mac.settings.variationHelp", defaultValue: "How much takes vary when regenerating the same text. Expressive is the model's official sampling (liveliest); Balanced and Consistent trade some liveliness for steadier, more repeatable takes.",
@@ -1796,6 +1829,16 @@ enum MacInterfaceText {
     }
 
     // MARK: - Model-driven labels
+
+    /// Sampling variation names for the Settings picker; `Qwen3SamplingVariation.rawValue`
+    /// stays the stored preference and the engine identity.
+    static func settingsVariationName(_ variation: Qwen3SamplingVariation) -> String {
+        switch variation {
+        case .expressive: settingsVariationExpressive
+        case .balanced: settingsVariationBalanced
+        case .consistent: settingsVariationConsistent
+        }
+    }
     // Hand-maintained: each branch reads a catalog entry above, so enum cases and
     // engine activity labels reach the interface language without leaving the owner.
 

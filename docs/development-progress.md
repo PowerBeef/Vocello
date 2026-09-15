@@ -53,6 +53,11 @@ search and clear, Save As, Reveal in Finder and pinned seed, over the shared `Ge
 `DatabaseService` now compiled into both apps; `HistoryView.swift` and the macOS twins are gone.
 CONV-13 followed with Saved Voices: the iOS avatar rows, the enrollment sheet and the record
 sheet in the iOS language, over the shared `PreparedVoice` and the shared saved-voices view model.
+CONV-14 put Settings on the iOS row design: the recommended-setup summary and the per-mode Speed
+and Quality packages with their desktop actions, the interface-language picker (an `IOSAppLanguage`
+over the app's defaults store, owned by `MacInterfaceLanguage`), auto-play, variation, the
+lower-memory toggle, the output folder and Application data, clone consent last; the Cmd+, scene
+shows the same screen.
 The maintainer consented to the Step B lanes for every screen commit; they run one at a time as
 each commit lands. On the Saved Voices commit all four passed and closed CONV-11, CONV-12 and
 CONV-13: localization 162652-a093f4a3, smoke 162950-777019e3 (7/7), perf 164002-0177f946 (nine

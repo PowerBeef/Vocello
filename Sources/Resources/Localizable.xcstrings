@@ -16812,6 +16812,150 @@
           }
         }
       }
+    },
+    "vocello.mac.settings.interface": {
+      "comment": "macOS interface: Settings section header over the interface-language picker. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interface"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interface"
+          }
+        }
+      }
+    },
+    "vocello.mac.settings.appLanguage": {
+      "comment": "macOS interface: Settings row title of the interface-language picker (the interface, not generated speech). Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Language"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Langue de l’app"
+          }
+        }
+      }
+    },
+    "vocello.mac.settings.appLanguageDetail": {
+      "comment": "macOS interface: Settings row detail under the interface-language picker. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes the app interface, not the language of generated speech."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifie l’interface de l’app, pas la langue de la parole générée."
+          }
+        }
+      }
+    },
+    "vocello.mac.settings.autoPlayDetail": {
+      "comment": "macOS interface: Settings row detail under the auto-play switch. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatically play each finished take."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lire automatiquement chaque prise terminée."
+          }
+        }
+      }
+    },
+    "vocello.mac.settings.systemLanguage": {
+      "comment": "macOS interface: interface-language picker option that follows the system language. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Default"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réglage du système"
+          }
+        }
+      }
+    },
+    "vocello.mac.settings.variationBalanced": {
+      "comment": "macOS interface: Settings variation picker option between Expressive and Consistent. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Balanced"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Équilibré"
+          }
+        }
+      }
+    },
+    "vocello.mac.settings.variationConsistent": {
+      "comment": "macOS interface: Settings variation picker option with the steadiest takes. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consistent"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cohérent"
+          }
+        }
+      }
+    },
+    "vocello.mac.settings.variationExpressive": {
+      "comment": "macOS interface: Settings variation picker option, the model's official sampling. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expressive"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expressif"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

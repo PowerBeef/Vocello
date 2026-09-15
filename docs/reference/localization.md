@@ -12,6 +12,7 @@ sourceOfTruth:
   - Sources/Services/MacInterfaceText.swift
   - Sources/SharedSupport/Services/VocelloLocalization.swift
   - Sources/iOSSupport/Services/IOSAppLanguage.swift
+  - Sources/Services/MacInterfaceLanguage.swift
   - scripts/localization_contract.py
   - config/localization-unlocalized-baseline.json
   - Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift
@@ -48,7 +49,12 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
   The SwiftUI locale retains the current region; StoreKit prices remain opaque supplied strings.
 - `VocelloLocalization` resolves the selected compiled catalog bundle. `IOSInterfaceText` and
   `IOSSettingsText` read the observable owner; iOS dynamic copy uses its `presentation` context.
-  Shared/macOS callers retain default-bundle text through the existing static interfaces.
+  Since 2026-09-15 (CONV-14) macOS has the same owner type: `MacInterfaceLanguage` holds an
+  `IOSAppLanguage` over `AppDefaults.store` (the same `vocello.ios.interfaceLanguage` key, in the
+  debug suite under `QWENVOICE_DEBUG=1`, so a lane never sees a maintainer's pick) and republishes
+  its localization to `MacInterfaceText`: the observable owner on the main thread, the last
+  published snapshot for nonisolated callers. Shared callers retain default-bundle text through
+  the existing static interfaces.
   Startup and unsupported-device presentation receive the same app-boundary locale.
   Already stored error strings are not reverse-translated; completing indirect error/status
   ownership remains part of the EN/FR review. Do not claim whole-app live switching from catalog tests.

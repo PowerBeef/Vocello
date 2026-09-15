@@ -680,7 +680,9 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   (selection, toolbar state, pending Settings highlight) lives in `MacAppModel`; the sidebar,
   inline player card, status strip, window toolbar and startup diagnostics live under
   `Sources/Views/{Sidebar,Shell}` and read the shared `VocelloTheme` tokens through `MacTheme`
-  (`Sources/Views/Theme`). Dark-only, like iOS.
+  (`Sources/Views/Theme`). Dark-only, like iOS. Settings (`Sources/Views/Settings`) hosts the
+  model packages, the interface-language picker (`IOSAppLanguage` through `MacInterfaceLanguage`)
+  and the desktop preference rows on one screen for the sidebar item and the Cmd+, scene.
 - State: coordinators and `ModelManagerViewModel` are `@MainActor @Observable`;
   the shared `TTSEngineStore` and `AudioPlayerViewModel` are `ObservableObject`s
   injected as environment objects, with the store's `snapshotChanges` and
@@ -805,7 +807,8 @@ then removes outbox entries and requested WAVs; an interrupted cleanup resumes b
 append can replay.
 
 **`UserDefaults` keys**: `vocello.voiceCloningConsent.v1` (visible Settings-owned clone-consent
-acknowledgment), per-mode variant choices (`QwenVoice.MacModelVariantPreference.<mode>`) and the
+acknowledgment), `vocello.ios.interfaceLanguage` (the interface language, in `AppDefaults.store` on
+macOS through `MacInterfaceLanguage`), per-mode variant choices (`QwenVoice.MacModelVariantPreference.<mode>`) and the
 global `QwenVoice.PreferSpeedEverywhere` override, and UI state
 (`QwenVoice.LastSelectedSidebarItem`, `QwenVoice.LastVoiceCloningSavedVoiceID`). Debug mode is not
 persisted — `DebugMode.isEnabled` reads `RuntimeDebugGate.isEnabled()` (internal-build capability

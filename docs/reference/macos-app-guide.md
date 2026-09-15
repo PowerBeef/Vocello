@@ -158,14 +158,16 @@ language boundary.
 
 | Element | Identifier |
 |---|---|
-| Model summary | `settings_modelDownloadsSummary` |
-| Mode row | `settings_mode_<mode>` |
-| Package row | `settings_package_<modelID>` / `settings_packageStatus_<modelID>` |
-| Download / cancel / repair / update | `settings_download_<id>` / `settings_cancel_<id>` / `settings_repair_<id>` / `settings_update_<id>` / `settings_manage_<id>` |
+| Model summary | `settings_modelDownloadsSummary`; recommended setup `settings_downloadRecommendedModels` / `settings_cancelRecommendedSetup` / `settings_recommendedSetupProgress` |
+| Mode row | `settings_mode_<mode>` (scrolled to and flashed when a disabled sidebar mode redirects here) |
+| Package row | `settings_package_<modelID>` / `settings_packageBadge_<modelID>` (Recommended or Heavy) / `settings_packageStatus_<modelID>` / `settings_downloadProgress_<modelID>` |
+| Download / cancel / repair / update | `settings_download_<id>` / `settings_cancel_<id>` / `settings_repair_<id>` / `settings_update_<id>` / `settings_manage_<id>` (AppKit menu: Reveal in Finder, Delete Model) |
+| App language | `settings_appLanguage` (menu: System Default plus the bundle's languages; `MacInterfaceLanguage` owns the selection in `AppDefaults.store` and feeds it to `MacInterfaceText`; smoke test05 reads System Default) |
 | Auto-play | `preferences_autoPlayToggle` |
 | Variation | `settings_generationVariation` (segmented: Expressive/Balanced/Consistent) |
-| Clone consent | `voiceCloning_consentAcknowledgment`; persistent and required before Clone Generate |
-| Output dir | `preferences_outputDirectory` / `preferences_browseButton` / `preferences_openFinderButton` |
+| Prefer lower-memory models | `settings_preferSpeedEverywhere` |
+| Clone consent | `voiceCloning_consentAcknowledgment`; persistent and required before Clone Generate; deliberately the last section |
+| Output dir | `preferences_outputDirectory` / `preferences_browseButton` / `preferences_outputResetButton` / `preferences_outputDirectoryWarning` / `preferences_outputDirectoryIssue` / `preferences_openFinderButton` |
 | Version label | read-only `version (build)` caption in the Application data row (beside `preferences_openFinderButton`); the runtime debug gate is a launch environment (`QWENVOICE_DEBUG=1`, internal-diagnostics builds only), not an in-app toggle |
 
 ### Sidebar player + engine status

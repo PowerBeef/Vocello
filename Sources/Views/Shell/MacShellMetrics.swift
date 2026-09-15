@@ -6,6 +6,8 @@ enum MacShellMetrics {
     static let windowMinSize = CGSize(width: 720, height: 560)
     static let windowDefaultSize = CGSize(width: 880, height: 640)
     static let diagnosticsMinSize = CGSize(width: 520, height: 420)
+    static let settingsWindowMinSize = CGSize(width: 600, height: 520)
+    static let settingsWindowDefaultSize = CGSize(width: 680, height: 720)
 
     static let sidebarMinWidth: CGFloat = 220
     static let sidebarIdealWidth: CGFloat = 250

@@ -158,7 +158,6 @@ struct ContentView: View {
 
     @ViewBuilder
     private func screenView(for item: SidebarItem) -> some View {
-        @Bindable var appModel = appModel
         switch item {
         case .customVoice:
             CustomVoiceScreenHost(draft: $customVoiceDraft)
@@ -207,10 +206,7 @@ struct ContentView: View {
                 }
             )
         case .settings:
-            SettingsView(
-                highlightedMode: $appModel.pendingHighlightedMode,
-                showsNavigationTitle: false
-            )
+            SettingsScreenHost()
         }
     }
 
@@ -406,6 +402,20 @@ private struct HistoryScreenHost: View {
             sortOrder: $appModel.historySortOrder,
             clearRequest: $appModel.historyClearRequest,
             onPinSeed: onPinSeed
+        )
+    }
+}
+
+/// Settings binds the shell's pending highlight itself, so a redirect to
+/// a missing model re-renders this host and the screen, never the shell.
+private struct SettingsScreenHost: View {
+    @Environment(MacAppModel.self) private var appModel
+
+    var body: some View {
+        @Bindable var appModel = appModel
+        MacSettingsScreen(
+            highlightedMode: $appModel.pendingHighlightedMode,
+            showsNavigationTitle: false
         )
     }
 }

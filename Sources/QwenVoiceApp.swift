@@ -19,6 +19,7 @@ struct QwenVoiceApp: App {
     @StateObject private var appStartupCoordinator = AppStartupCoordinator()
 
     init() {
+        MacInterfaceLanguage.bootstrap(IOSAppLanguage(defaults: AppDefaults.store))
         do {
             _ttsEngineStore = State(initialValue: try MacEngineBootstrap.makeEngineStore())
         } catch {
@@ -43,16 +44,12 @@ struct QwenVoiceApp: App {
             height: MacShellMetrics.windowDefaultSize.height
         )
         Settings {
-            // The Cmd+, scene hosts the same SettingsView the
-            // sidebar shows, so muscle memory keeps working. Deep
-            // link highlighting is a no-op in this surface (the
-            // sidebar has no notion of "the user just clicked a
-            // disabled mode" inside the standalone settings
-            // window).
-            SettingsView(highlightedMode: .constant(nil))
-                .environment(modelManager)
-                .preferredColorScheme(.dark)
+            settingsWindowContent
         }
+        .defaultSize(
+            width: MacShellMetrics.settingsWindowDefaultSize.width,
+            height: MacShellMetrics.settingsWindowDefaultSize.height
+        )
         .commands {
             CommandGroup(replacing: .newItem) { }
 
@@ -153,6 +150,11 @@ struct QwenVoiceApp: App {
         // Dark-only, like iOS (maintainer decision 2026-09-14); the delegate
         // pins the AppKit appearance, this pins the SwiftUI environment.
         .preferredColorScheme(.dark)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            // System Default re-resolves if the system language changed while
+            // the user was away.
+            MacInterfaceLanguage.refreshSystemLanguage()
+        }
         .onAppear {
             appStartupCoordinator.setupAppSupport()
             reconcilePendingHistory()
@@ -160,6 +162,19 @@ struct QwenVoiceApp: App {
             appStartupCoordinator.refreshLaunchDiagnostics()
             AppLaunchConfiguration.openSettingsWindowIfNeeded()
         }
+    }
+
+    /// The Cmd+, scene hosts the same screen the sidebar shows, so muscle
+    /// memory keeps working; the screen reads only the model manager, and the
+    /// deep-link highlight is a no-op in this window.
+    private var settingsWindowContent: some View {
+        MacSettingsScreen(highlightedMode: .constant(nil))
+            .frame(
+                minWidth: MacShellMetrics.settingsWindowMinSize.width,
+                minHeight: MacShellMetrics.settingsWindowMinSize.height
+            )
+            .environment(modelManager)
+            .preferredColorScheme(.dark)
     }
 
     static var voicesDir: URL { AppPaths.voicesDir }

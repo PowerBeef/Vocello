@@ -138,11 +138,17 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             }
             .padding(.horizontal, MacStudioMetrics.horizontalInset)
             .padding(.bottom, 12)
+            // Accessibility containers: the screen root carries `screen_<mode>`
+            // and SwiftUI hands that identifier to every descendant element
+            // that is not inside a container, which would erase the chip,
+            // readiness and dock identifiers the lanes read.
+            .accessibilityElement(children: .contain)
             .layoutPriority(2)
 
             dockArea
                 .padding(.horizontal, MacStudioMetrics.horizontalInset)
                 .padding(.bottom, 16)
+                .accessibilityElement(children: .contain)
                 .layoutPriority(3)
         }
         .frame(maxWidth: MacStudioMetrics.contentMaxWidth)

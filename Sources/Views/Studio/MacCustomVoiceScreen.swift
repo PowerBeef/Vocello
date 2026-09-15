@@ -235,6 +235,8 @@ struct MacCustomVoiceScreen: View {
         .padding(.bottom, 4)
         .frame(maxWidth: MacStudioMetrics.contentMaxWidth)
         .frame(maxWidth: .infinity)
+        // Keeps the variant selector's identifiers under the screen identifier.
+        .accessibilityElement(children: .contain)
     }
 
     // MARK: - Chips

@@ -46,47 +46,47 @@ struct QwenVoiceApp: App {
             CommandGroup(replacing: .newItem) { }
 
             // Playback commands
-            CommandMenu("Playback") {
-                Button("Play / Pause") {
+            CommandMenu(MacInterfaceText.menuPlayback) {
+                Button(MacInterfaceText.menuPlayPause) {
                     audioPlayer.togglePlayPause()
                 }
                 .keyboardShortcut(.space, modifiers: [])
                 .disabled(!audioPlayer.hasAudio)
 
-                Button("Stop") {
+                Button(MacInterfaceText.menuStop) {
                     audioPlayer.dismiss()
                 }
                 .keyboardShortcut(".", modifiers: .command)
                 .disabled(!audioPlayer.hasAudio)
             }
 
-            CommandMenu("Navigate") {
-                Button("Built-in Voice") {
+            CommandMenu(MacInterfaceText.menuNavigate) {
+                Button(MacInterfaceText.menuBuiltInVoice) {
                     appCommandRouter.navigate(to: .customVoice)
                 }
                 .keyboardShortcut("1", modifiers: .command)
 
-                Button("Voice Design") {
+                Button(MacInterfaceText.menuVoiceDesign) {
                     appCommandRouter.navigate(to: .voiceDesign)
                 }
                 .keyboardShortcut("2", modifiers: .command)
 
-                Button("Voice Cloning") {
+                Button(MacInterfaceText.menuVoiceCloning) {
                     appCommandRouter.navigate(to: .voiceCloning)
                 }
                 .keyboardShortcut("3", modifiers: .command)
 
-                Button("History") {
+                Button(MacInterfaceText.menuHistory) {
                     appCommandRouter.navigate(to: .history)
                 }
                 .keyboardShortcut("4", modifiers: .command)
 
-                Button("Saved Voices") {
+                Button(MacInterfaceText.menuSavedVoices) {
                     appCommandRouter.navigate(to: .voices)
                 }
                 .keyboardShortcut("5", modifiers: .command)
 
-                Button("Models") {
+                Button(MacInterfaceText.menuModels) {
                     appCommandRouter.navigate(to: .settings)
                 }
                 .keyboardShortcut("6", modifiers: .command)
@@ -95,12 +95,12 @@ struct QwenVoiceApp: App {
             // File menu additions
             CommandGroup(after: .saveItem) {
                 Divider()
-                Button("Open Output Folder") {
+                Button(MacInterfaceText.menuOpenOutputFolder) {
                     NSWorkspace.shared.open(Self.outputsDir)
                 }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
 
-                Button("Reveal in Finder") {
+                Button(MacInterfaceText.revealInFinder) {
                     if let path = audioPlayer.currentFilePath {
                         NSWorkspace.shared.selectFile(path, inFileViewerRootedAtPath: "")
                     }

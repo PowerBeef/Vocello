@@ -8,13 +8,13 @@ struct StartupDiagnosticsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
-                Label("Vocello", systemImage: "waveform")
+                Label(MacInterfaceText.brandName, systemImage: "waveform")
                     .font(.title.weight(.semibold))
 
                 Text(snapshot.issue.summary)
                     .font(.title3.weight(.semibold))
 
-                Text("The app can't continue until its native resources are valid. You can retry the startup checks or copy the diagnostics for troubleshooting.")
+                Text(MacInterfaceText.startupCannotContinue)
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -22,13 +22,13 @@ struct StartupDiagnosticsView: View {
 
             GroupBox {
                 VStack(alignment: .leading, spacing: 10) {
-                    diagnosticsRow("Manifest path", snapshot.manifestPath)
-                    diagnosticsRow("Bundle path", snapshot.bundlePath)
-                    diagnosticsRow("Resources path", snapshot.resourcesPath)
+                    diagnosticsRow(MacInterfaceText.startupManifestPath, snapshot.manifestPath)
+                    diagnosticsRow(MacInterfaceText.startupBundlePath, snapshot.bundlePath)
+                    diagnosticsRow(MacInterfaceText.startupResourcesPath, snapshot.resourcesPath)
 
                     Divider()
 
-                    Text("Underlying error")
+                    Text(MacInterfaceText.startupUnderlyingError)
                         .font(.subheadline.weight(.semibold))
 
                     Text(snapshot.underlyingError)
@@ -42,12 +42,12 @@ struct StartupDiagnosticsView: View {
             .profileGroupBoxStyle()
 
             HStack(spacing: 12) {
-                Button("Retry", action: onRetry)
+                Button(MacInterfaceText.retry, action: onRetry)
                     .buttonStyle(.borderedProminent)
                     .tint(AppTheme.accent)
                     .accessibilityIdentifier("startupDiagnostics_retryButton")
 
-                Button("Copy Diagnostics") {
+                Button(MacInterfaceText.startupCopyDiagnostics) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(snapshot.diagnosticsText, forType: .string)
                 }

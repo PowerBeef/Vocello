@@ -57,7 +57,7 @@ struct SettingsView: View {
     var body: some View {
         ScrollViewReader { proxy in
             Form {
-                Section("Model downloads") {
+                Section(MacInterfaceText.settingsModelDownloads) {
                     ModelSetupSummaryRow(viewModel: viewModel)
 
                     ForEach(GenerationMode.allCases, id: \.self) { mode in
@@ -71,14 +71,14 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("Playback") {
-                    Toggle("Auto-play generated audio", isOn: $autoPlay)
+                Section(MacInterfaceText.settingsPlayback) {
+                    Toggle(MacInterfaceText.settingsAutoPlay, isOn: $autoPlay)
                         .tint(AppTheme.preferences)
                         .accessibilityIdentifier("preferences_autoPlayToggle")
                 }
 
                 Section {
-                    Picker("Variation", selection: $generationVariation) {
+                    Picker(MacInterfaceText.settingsVariation, selection: $generationVariation) {
                         ForEach(Qwen3SamplingVariation.allCases, id: \.rawValue) { variation in
                             Text(variation.displayName).tag(variation.rawValue)
                         }
@@ -88,28 +88,20 @@ struct SettingsView: View {
                     // in the app was removed in the accent unification.
                     .tint(AppTheme.accent)
                     .accessibilityIdentifier("settings_generationVariation")
-                    Text(
-                        "How much takes vary when regenerating the same text. " +
-                        "Expressive is the model's official sampling (liveliest); " +
-                        "Balanced and Consistent trade some liveliness for steadier, more repeatable takes."
-                    )
+                    Text(MacInterfaceText.settingsVariationHelp)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 } header: {
-                    Text("Generation")
+                    Text(MacInterfaceText.settingsGeneration)
                 }
 
                 Section {
                     Toggle(isOn: $preferSpeedEverywhere) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Prefer lower-memory models")
+                            Text(MacInterfaceText.settingsPreferLowerMemory)
                                 .font(.body)
-                            Text(
-                                "Pins every generation mode to the Speed package. " +
-                                "Speed uses less memory and is safer on lower-RAM Macs, with lower fidelity than Quality. " +
-                                "You can still switch per-generation in the mode screens; this toggle just changes the defaults."
-                            )
+                            Text(MacInterfaceText.settingsPreferLowerMemoryDetail)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -118,11 +110,11 @@ struct SettingsView: View {
                     .tint(AppTheme.preferences)
                     .accessibilityIdentifier("settings_preferSpeedEverywhere")
                 } header: {
-                    Text("Performance")
+                    Text(MacInterfaceText.settingsPerformance)
                 }
 
-                Section("Storage") {
-                    LabeledContent("Output directory") {
+                Section(MacInterfaceText.settingsStorage) {
+                    LabeledContent(MacInterfaceText.settingsOutputDirectory) {
                         HStack(spacing: 6) {
                             if outputDirectoryIssue != nil {
                                 Image(systemName: "exclamationmark.triangle.fill")
@@ -137,11 +129,11 @@ struct SettingsView: View {
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                                 .accessibilityIdentifier("preferences_outputDirectory")
-                            Button("Choose…") { browseForOutputDirectory() }
+                            Button(MacInterfaceText.settingsChoose) { browseForOutputDirectory() }
                                 .controlSize(.small)
                                 .accessibilityIdentifier("preferences_browseButton")
                             if !outputDirectory.isEmpty {
-                                Button("Reset") { outputDirectory = "" }
+                                Button(MacInterfaceText.settingsReset) { outputDirectory = "" }
                                     .controlSize(.small)
                                     .buttonStyle(.borderless)
                                     .accessibilityIdentifier("preferences_outputResetButton")
@@ -163,12 +155,12 @@ struct SettingsView: View {
                     // the About box (menu Vocello -> About Vocello)
                     // already covers full version detail in the
                     // standard macOS spot.
-                    LabeledContent("Application data") {
+                    LabeledContent(MacInterfaceText.settingsApplicationData) {
                         HStack(spacing: 8) {
                             Text(appVersion)
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(AppTheme.textMuted)
-                            Button("Reveal in Finder") {
+                            Button(MacInterfaceText.revealInFinder) {
                                 NSWorkspace.shared.open(QwenVoiceApp.appSupportDir)
                             }
                             .controlSize(.small)
@@ -180,16 +172,16 @@ struct SettingsView: View {
                 // Last, not first: this is the persistent record of the
                 // one-time acknowledgment (also offered inline in the
                 // cloning flow) — a policy row, not the screen's job.
-                Section("Voice cloning") {
+                Section(MacInterfaceText.settingsVoiceCloning) {
                     Toggle(isOn: $cloneConsentAcknowledged) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("I own or have permission to clone the voices I use")
-                            Text("Only clone voices you own or have explicit permission to use.")
+                            Text(MacInterfaceText.settingsCloneConsent)
+                            Text(MacInterfaceText.settingsCloneConsentDetail)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             // CP-1 option D: the users' own EU AI Act Article
                             // 50(4) disclosure duty, beside the rights gate.
-                            Text("If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may require this.")
+                            Text(MacInterfaceText.settingsCloneDisclosure)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -225,9 +217,9 @@ struct SettingsView: View {
                 outputDirectoryIssue = AudioService.configuredOutputDirectoryIssue()
             }
         }
-        .alert("Delete Model?", isPresented: $showDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { modelToDelete = nil }
-            Button("Delete", role: .destructive) {
+        .alert(MacInterfaceText.settingsDeleteModelTitle, isPresented: $showDeleteConfirmation) {
+            Button(MacInterfaceText.cancel, role: .cancel) { modelToDelete = nil }
+            Button(MacInterfaceText.delete, role: .destructive) {
                 if let model = modelToDelete {
                     Task { await viewModel.delete(model) }
                 }
@@ -335,13 +327,13 @@ private struct ModelSetupSummaryRow: View {
                 Spacer(minLength: 12)
 
                 if setupProgress != nil {
-                    Button("Cancel") {
+                    Button(MacInterfaceText.cancel) {
                         viewModel.cancelRecommendedSetup()
                     }
                     .controlSize(.small)
                     .accessibilityIdentifier("settings_cancelRecommendedSetup")
                 } else if !viewModel.recommendedSetupCandidates().isEmpty {
-                    Button("Download recommended") {
+                    Button(MacInterfaceText.settingsDownloadRecommended) {
                         viewModel.setUpRecommendedModels()
                     }
                     .controlSize(.small)
@@ -528,15 +520,15 @@ private struct ModelPackageLine: View {
     @ViewBuilder
     private var packageBadge: some View {
         if viewModel.isHardwareRisky(model) {
-            Text("Heavy")
+            Text(MacInterfaceText.settingsHeavy)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.orange)
-                .help("Heavy on this Mac")
-                .accessibilityLabel("Heavy on this Mac")
+                .help(MacInterfaceText.settingsHeavyOnThisMac)
+                .accessibilityLabel(MacInterfaceText.settingsHeavyOnThisMac)
         } else if viewModel.isHardwareRecommended(model) {
             // Quiet, not green: this is static guidance — install state is
             // the row's one semantic color.
-            Text("Recommended")
+            Text(MacInterfaceText.settingsRecommended)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
         }
@@ -635,32 +627,32 @@ private struct ActionButton: View {
             .accessibilityIdentifier("settings_download_\(model.id)")
 
         case .downloading:
-            HoverableActionButton(title: "Cancel") {
+            HoverableActionButton(title: MacInterfaceText.cancel) {
                 Task { await viewModel.cancelDownload(model) }
             }
-            .help("Cancel the download (discards partial data)")
+            .help(MacInterfaceText.settingsCancelDownloadHelp)
             .accessibilityIdentifier("settings_cancel_\(model.id)")
 
         case .repairAvailable:
-            HoverableActionButton(title: "Repair", tint: .orange) {
+            HoverableActionButton(title: MacInterfaceText.settingsRepair, tint: .orange) {
                 Task { await viewModel.download(model) }
             }
             .accessibilityIdentifier("settings_repair_\(model.id)")
 
         case .updateAvailable:
             HStack(spacing: 6) {
-                HoverableActionButton(title: "Update", tint: .blue) {
+                HoverableActionButton(title: MacInterfaceText.settingsUpdate, tint: .blue) {
                     Task { await viewModel.download(model) }
                 }
-                .help("Download the updated model package")
+                .help(MacInterfaceText.settingsUpdateHelp)
                 .accessibilityIdentifier("settings_update_\(model.id)")
                 Button {
                     presentManageMenu()
                 } label: {
-                    Text("Manage")
+                    Text(MacInterfaceText.settingsManage)
                 }
                 .background(NSViewHostAccessor(holder: manageHostHolder))
-                .help("Manage \(model.variantKind?.displayName ?? model.name) variant")
+                .help(MacInterfaceText.settingsManageHelp(model.variantKind?.displayName ?? model.name))
                 .controlSize(.small)
                 .accessibilityIdentifier("settings_manage_\(model.id)")
             }
@@ -669,11 +661,11 @@ private struct ActionButton: View {
             Button {
                 presentManageMenu()
             } label: {
-                Text("Manage")
+                Text(MacInterfaceText.settingsManage)
                 .frame(maxWidth: .infinity)
             }
             .background(NSViewHostAccessor(holder: manageHostHolder))
-            .help("Manage \(model.variantKind?.displayName ?? model.name) variant")
+            .help(MacInterfaceText.settingsManageHelp(model.variantKind?.displayName ?? model.name))
             .controlSize(.small)
             .accessibilityIdentifier("settings_manage_\(model.id)")
         }
@@ -699,7 +691,7 @@ private struct ActionButton: View {
 
         let menu = NSMenu()
         menu.addItem(ClosureMenuItem(
-            title: "Reveal in Finder",
+            title: MacInterfaceText.revealInFinder,
             systemImage: "folder",
             handler: {
                 let url = model.installDirectory(in: QwenVoiceApp.modelsDir)
@@ -712,7 +704,7 @@ private struct ActionButton: View {
         ))
         menu.addItem(.separator())
         menu.addItem(ClosureMenuItem(
-            title: "Delete Model",
+            title: MacInterfaceText.settingsDeleteModel,
             systemImage: "trash",
             isDestructive: true,
             handler: onDelete

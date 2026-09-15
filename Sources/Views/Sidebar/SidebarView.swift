@@ -51,11 +51,11 @@ private struct SidebarBrandHeader: View {
                     dimension[.bottom] - 2
                 }
 
-            Text("Vocello")
+            Text(MacInterfaceText.brandName)
                 .font(.system(size: brandWordmarkSize, weight: .semibold, design: .rounded))
                 .foregroundStyle(.primary)
 
-            Text("AI·TTS")
+            Text(MacInterfaceText.brandTagline)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
         }
@@ -67,7 +67,7 @@ private struct SidebarBrandHeader: View {
         .padding(.top, 14)
         .padding(.bottom, 14)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Vocello, AI text to speech")
+        .accessibilityLabel(MacInterfaceText.brandAccessibility)
     }
 }
 

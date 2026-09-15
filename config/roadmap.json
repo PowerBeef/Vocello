@@ -96,30 +96,11 @@
   ],
   "items": [
     {
-      "id": "CONV-15",
-      "plan": "macos-ios-convergence-2026-09",
-      "title": "Studio canvas and Built-in Voice on the shared single-take pipeline",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "CustomVoiceView and CustomVoiceCoordinator are absent; MacCustomVoiceScreen renders the iOS Studio canvas; StudioGenerationCoordinator and IOSSingleTakeGenerationExecutor drive Built-in Voice with requests from MacStudioGenerationRequestFactory through MacStudioSingleTakeGenerationHooks; no prewarm call under Sources/Views/Studio; customVoice_*, textInput_* and delivery_tonePicker identifiers unchanged; localization, smoke (test02, test03, test06, test07), perf (composer-typing, delivery-menu, generation-active) and benchmark --modes custom PASS.",
-      "sourceOfTruth": [
-        "Sources/Views/Studio/MacCustomVoiceScreen.swift",
-        "Sources/Views/Studio/MacStudioCanvas.swift",
-        "Sources/Services/MacStudioSingleTakeGenerationHooks.swift",
-        "Sources/iOS/Studio/StudioGenerationCoordinator.swift",
-        "Sources/Services/MacStudioGenerationRequestFactory.swift"
-      ],
-      "updated": "2026-09-15",
-      "notes": "Built-in Voice landed 2026-09-15 on the iOS Studio canvas: MacCustomVoiceScreen, MacStudioCanvas (composer, chips, dock), MacStudioPlayerCard, MacStudioSetupChip (chips are menus on the desktop), MacGenerationVariantSelector, MacScriptTextEditor; generation on StudioGenerationCoordinator (owned by MacAppModel) + IOSSingleTakeGenerationExecutor + MacStudioSingleTakeGenerationHooks + MacStudioGenerationActions; CustomVoiceView and CustomVoiceCoordinator gone; the coordinator's payload types split into Sources/iOS/Studio/StudioGenerationItems.swift (pure move). Cut changed from the plan: GenerationLifecycleExecutor, TextInputView, BatchGenerationSheet and BatchGenerationRunner still serve the legacy Design and Cloning screens, so the executor and TextInputView leave with CONV-17 and the batch sheet and runner move to CONV-22; the macOS CustomVoiceDraft keeps its shape (the drafts swap follows the last legacy screen). 13 new vocello.mac.studio keys with French. Remaining gate: localization, smoke (test02, test03, test06, test07), perf and benchmark --modes custom PASS run ids."
-    },
-    {
       "id": "CONV-22",
       "plan": "macos-ios-convergence-2026-09",
       "title": "Line batch and long-form on the shared runner",
       "status": "planned",
-      "blockedBy": [
-        "CONV-15"
-      ],
+      "blockedBy": [],
       "gate": "BatchGenerationSheet.swift and BatchGenerationRunner.swift are absent; MacBatchGenerationSheet and MacLineBatchRunner run line batch over the shared single-take executor and long-form projects over IOSLongFormProject for all three modes; batch_* identifiers and TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS unchanged; F-16 sourceOfTruth re-pointed; smoke (test06, test07) PASS.",
       "sourceOfTruth": [
         "Sources/Views/Components/BatchGenerationSheet.swift",
@@ -133,16 +114,14 @@
       "id": "CONV-16",
       "plan": "macos-ios-convergence-2026-09",
       "title": "Voice Design on the iOS screen",
-      "status": "planned",
-      "blockedBy": [
-        "CONV-15"
-      ],
+      "status": "in-flight",
+      "blockedBy": [],
       "gate": "VoiceDesignView.swift, VoiceBriefEditor.swift, ContinuousVoiceDescriptionField.swift and VoiceDesignCoordinator.swift are absent; voiceDesign_* identifiers unchanged; localization and benchmark --modes design PASS.",
       "sourceOfTruth": [
         "Sources/Views/Generate/VoiceDesignView.swift",
         "Sources/ViewModels/VoiceDesignCoordinator.swift"
       ],
-      "updated": "2026-09-14"
+      "updated": "2026-09-15"
     },
     {
       "id": "CONV-17",

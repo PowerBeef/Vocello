@@ -1418,6 +1418,12 @@ trend percentages carry their direction in words.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-14 | [`macos-xcui-benchmark-20260914-062114-379db820`](runs/ui-generation/macos-xcui-benchmark-20260914-062114-379db820.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | 0.60 | `8fdc2ba9ff38` | `a11a699c19e7` | baseline | pc02-gate-proof |
 
+## ui-generation / macos / mac-mini-m2-8gb / config `a141ac8c8b94`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-15 | [`macos-xcui-benchmark-20260915-185941-08c5a2e8`](runs/ui-generation/macos-xcui-benchmark-20260915-185941-08c5a2e8.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | 0.72 | `62279fc7111f` | `a141ac8c8b94` | baseline | macos-xcui-benchmark-20260915-185941-08c5a2e8 |
+
 ## ui-generation / macos / mac-mini-m2-8gb / config `aba33145f662`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
@@ -1518,6 +1524,12 @@ trend percentages carry their direction in words.
 | 2026-09-05 | [`macos-xcui-perf-20260905-005605-bb711355`](runs/ui-perf/macos-xcui-perf-20260905-005605-bb711355.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` | `13c54095581f` | vs macos-xcui-perf-20260905-004759-01f5becf: compatible | ui-audit-baseline-03-20260904 |
 | 2026-09-05 | [`macos-xcui-perf-20260905-010411-715c63f2`](runs/ui-perf/macos-xcui-perf-20260905-010411-715c63f2.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` | `13c54095581f` | vs macos-xcui-perf-20260905-005605-bb711355: compatible | ui-audit-baseline-04-20260904 |
 | 2026-09-05 | [`macos-xcui-perf-20260905-011217-c4d5591f`](runs/ui-perf/macos-xcui-perf-20260905-011217-c4d5591f.json) | canonical | canonical | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` | `13c54095581f` | vs macos-xcui-perf-20260905-010411-715c63f2: compatible | ui-audit-baseline-05-20260904 |
+
+## ui-perf / macos / mac-mini-m2-8gb / config `27fdcbf14de6`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-15 | [`macos-xcui-perf-20260915-185131-61165de6`](runs/ui-perf/macos-xcui-perf-20260915-185131-61165de6.json) | canonical | canonical | passed | not-applicable | 9 | — | `62279fc7111f` | `27fdcbf14de6` | baseline | macos-xcui-perf-20260915-185131-61165de6 |
 
 ## ui-perf / macos / mac-mini-m2-8gb / config `3eb6ed9e4625`
 

@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `macos-ios-convergence-2026-09` | active | backend-and-platform | 9/16 (56%) |
+| `macos-ios-convergence-2026-09` | active | backend-and-platform | 10/16 (62%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -33,20 +33,16 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `CONV-15` | in-flight | Studio canvas and Built-in Voice on the shared single-take pipeline | — |
-| `CONV-16` | planned | Voice Design on the iOS screen | `CONV-15` |
+| `CONV-16` | in-flight | Voice Design on the iOS screen | — |
 | `CONV-17` | planned | Voice Cloning on the iOS screen and removal of the legacy remainder | `CONV-16` |
 | `CONV-18` | planned | Perf re-baseline, marketing captures and documentation of the new macOS app | `CONV-17` |
 | `CONV-20` | parked | Device re-verification of the frozen iOS behavior | — |
 | `CONV-21` | planned | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
-| `CONV-22` | planned | Line batch and long-form on the shared runner | `CONV-15` |
+| `CONV-22` | planned | Line batch and long-form on the shared runner | — |
 
 ### Open items in detail
 
-- **`CONV-15`** (in-flight) — Studio canvas and Built-in Voice on the shared single-take pipeline.
-  gate: CustomVoiceView and CustomVoiceCoordinator are absent; MacCustomVoiceScreen renders the iOS Studio canvas; StudioGenerationCoordinator and IOSSingleTakeGenerationExecutor drive Built-in Voice with requests from MacStudioGenerationRequestFactory through MacStudioSingleTakeGenerationHooks; no prewarm call under Sources/Views/Studio; customVoice_*, textInput_* and delivery_tonePicker identifiers unchanged; localization, smoke (test02, test03, test06, test07), perf (composer-typing, delivery-menu, generation-active) and benchmark --modes custom PASS.
-
-- **`CONV-16`** (planned) — Voice Design on the iOS screen.
+- **`CONV-16`** (in-flight) — Voice Design on the iOS screen.
   gate: VoiceDesignView.swift, VoiceBriefEditor.swift, ContinuousVoiceDescriptionField.swift and VoiceDesignCoordinator.swift are absent; voiceDesign_* identifiers unchanged; localization and benchmark --modes design PASS.
 
 - **`CONV-17`** (planned) — Voice Cloning on the iOS screen and removal of the legacy remainder.

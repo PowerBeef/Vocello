@@ -3243,6 +3243,32 @@
         "file:Sources/Views/Settings/MacSettingsScreen.swift",
         "file:Sources/Services/MacInterfaceLanguage.swift"
       ]
+    },
+    {
+      "id": "CONV-15",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Studio canvas and Built-in Voice on the shared single-take pipeline",
+      "status": "done",
+      "gate": "CustomVoiceView and CustomVoiceCoordinator are absent; MacCustomVoiceScreen renders the iOS Studio canvas; StudioGenerationCoordinator and IOSSingleTakeGenerationExecutor drive Built-in Voice with requests from MacStudioGenerationRequestFactory through MacStudioSingleTakeGenerationHooks; no prewarm call under Sources/Views/Studio; customVoice_*, textInput_* and delivery_tonePicker identifiers unchanged; localization, smoke (test02, test03, test06, test07), perf (composer-typing, delivery-menu, generation-active) and benchmark --modes custom PASS.",
+      "sourceOfTruth": [
+        "Sources/Views/Studio/MacCustomVoiceScreen.swift",
+        "Sources/Views/Studio/MacStudioCanvas.swift",
+        "Sources/Services/MacStudioSingleTakeGenerationHooks.swift",
+        "Sources/iOS/Studio/StudioGenerationCoordinator.swift",
+        "Sources/Services/MacStudioGenerationRequestFactory.swift"
+      ],
+      "updated": "2026-09-15",
+      "notes": "Closed 2026-09-15 with f3ca0a75 (+ 5ef28fbb, 07a418da, 62279fc7). Built-in Voice on the iOS Studio canvas: MacCustomVoiceScreen, MacStudioCanvas, MacStudioPlayerCard, MacStudioSetupChip (chips are menus on the desktop), MacGenerationVariantSelector, MacScriptTextEditor; generation on StudioGenerationCoordinator (MacAppModel) + IOSSingleTakeGenerationExecutor + MacStudioSingleTakeGenerationHooks + MacStudioGenerationActions; CustomVoiceView and CustomVoiceCoordinator gone; payload types split into StudioGenerationItems.swift. Cut changed: the executor and TextInputView leave with CONV-17, the batch sheet and runner with CONV-22. Three lane runs found two layout bugs: an NSTextView bridge answering an infinite proposal with its document height (GeometryReader-pinned canvas + sizeThatFits clamp) and the screen identifier erasing the dock identifiers (accessibility containers). Lanes on 62279fc7: localization macos-xcui-localization-20260915-183823-bca6adf5, smoke macos-xcui-smoke-20260915-184118-afaded1b (7/7), perf macos-xcui-perf-20260915-185131-61165de6 (9 scenarios), custom benchmark macos-xcui-benchmark-20260915-185941-08c5a2e8.",
+      "evidence": [
+        "commit:f3ca0a75",
+        "commit:62279fc7",
+        "run:macos-xcui-localization-20260915-183823-bca6adf5",
+        "run:macos-xcui-smoke-20260915-184118-afaded1b",
+        "run:macos-xcui-perf-20260915-185131-61165de6",
+        "run:macos-xcui-benchmark-20260915-185941-08c5a2e8",
+        "file:Sources/Views/Studio/MacCustomVoiceScreen.swift",
+        "file:Sources/Services/MacStudioSingleTakeGenerationHooks.swift"
+      ]
     }
   ]
 }

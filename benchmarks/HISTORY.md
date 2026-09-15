@@ -1029,6 +1029,12 @@ trend percentages carry their direction in words.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-26 | [`mac-memory-qualification-20260726-115343-5a1c8a85`](runs/memory-qualification/mac-memory-qualification-20260726-115343-5a1c8a85.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 11 | — | `baad20e4d442` dirty | `excluded` | baseline | st-residency-check |
 
+## memory-qualification / macos / mac-mini-m2-8gb / config `4bea094f73b9`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-15 | [`mac-memory-qualification-20260915-165501-b1cb1ebc`](runs/memory-qualification/mac-memory-qualification-20260915-165501-b1cb1ebc.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 11 | 0.56 | `515602266367` | `4bea094f73b9` | baseline | memory-qualification |
+
 ## memory-qualification / macos / mac-mini-m2-8gb / config `664a0267b9b5`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

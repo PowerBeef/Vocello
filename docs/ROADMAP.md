@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `macos-ios-convergence-2026-09` | active | backend-and-platform | 7/15 (47%) |
+| `macos-ios-convergence-2026-09` | active | backend-and-platform | 8/15 (53%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -33,7 +33,6 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `CONV-04` | in-flight | In-process memory relief on 8 GB Macs | — |
 | `CONV-14` | in-flight | Settings on the iOS screen with the desktop rows and the interface-language picker | — |
 | `CONV-15` | planned | Studio canvas, Built-in Voice and line batch on the shared coordinators | `CONV-14` |
 | `CONV-16` | planned | Voice Design on the iOS screen | `CONV-15` |
@@ -43,9 +42,6 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 | `CONV-21` | planned | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
 
 ### Open items in detail
-
-- **`CONV-04`** (in-flight) — In-process memory relief on 8 GB Macs.
-  gate: The macOS store runs a Mac memory budget policy; kernel pressure drives trim and full unload through the store's terminal barrier; idle unload follows NativeMemoryPolicyResolver; one consented scripts/macos_test.sh memory run shows no critical pressure, warning, hardTrim or fullUnload during a qualified take on the canonical 8 GB Mac.
 
 - **`CONV-14`** (in-flight) — Settings on the iOS screen with the desktop rows and the interface-language picker.
   gate: Sources/Views/Settings/SettingsView.swift is absent; the Cmd+, scene and the sidebar item show the same screen; settings_*, preferences_* and voiceCloning_consentAcknowledgment identifiers unchanged; IOSAppLanguage selects the macOS interface language; localization, smoke (test05) and perf (settings-scroll) PASS.

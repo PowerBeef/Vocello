@@ -96,20 +96,6 @@
   ],
   "items": [
     {
-      "id": "CONV-04",
-      "plan": "macos-ios-convergence-2026-09",
-      "title": "In-process memory relief on 8 GB Macs",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "The macOS store runs a Mac memory budget policy; kernel pressure drives trim and full unload through the store's terminal barrier; idle unload follows NativeMemoryPolicyResolver; one consented scripts/macos_test.sh memory run shows no critical pressure, warning, hardTrim or fullUnload during a qualified take on the canonical 8 GB Mac.",
-      "sourceOfTruth": [
-        "Sources/iOS/TTSEngineStore.swift",
-        "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift",
-        "Sources/Services/MacWarmupAdmissionPolicy.swift"
-      ],
-      "updated": "2026-09-15"
-    },
-    {
       "id": "CONV-14",
       "plan": "macos-ios-convergence-2026-09",
       "title": "Settings on the iOS screen with the desktop rows and the interface-language picker",

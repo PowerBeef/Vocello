@@ -35,8 +35,9 @@ store compiled by path, two-layer telemetry, and all seven smoke journeys passin
 (macos-xcui-smoke-20260915-040350-f374335f). CONV-03 removed the XPC service, its two frameworks,
 the transport test bundle and every contract, script and document that named them; the smoke lane
 passed again (macos-xcui-smoke-20260915-054806-55c7c01b) and the first two-layer benchmark record
-published (macos-xcui-benchmark-20260915-060047-cf740c28). CONV-04 (memory-lane validation of the
-in-process relief) waits for a consented `scripts/macos_test.sh memory` run. The screens started
+published (macos-xcui-benchmark-20260915-060047-cf740c28). CONV-04 closed on the consented memory lane
+(mac-memory-qualification-20260915-165501-b1cb1ebc: eleven takes, one soft trim each, no
+warning or critical pressure, footprint peak under 3 GB). The screens started
 with CONV-10 (b7b62075): `Sources/SharedSupport` now holds the theme tokens, the glass surface body,
 the word-timing planner and the script-limit policy, the iOS files forward to them unchanged in
 behavior, and the macOS long-form router reads the shared limit. CONV-11 put the new shell in

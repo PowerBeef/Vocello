@@ -3200,6 +3200,26 @@
         "file:Sources/Views/Voices/MacSavedVoiceSheet.swift",
         "file:scripts/saved_voice_lifecycle_contract.py"
       ]
+    },
+    {
+      "id": "CONV-04",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "In-process memory relief on 8 GB Macs",
+      "status": "done",
+      "gate": "The macOS store runs a Mac memory budget policy; kernel pressure drives trim and full unload through the store's terminal barrier; idle unload follows NativeMemoryPolicyResolver; one consented scripts/macos_test.sh memory run shows no critical pressure, warning, hardTrim or fullUnload during a qualified take on the canonical 8 GB Mac.",
+      "sourceOfTruth": [
+        "Sources/iOS/TTSEngineStore.swift",
+        "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift",
+        "Sources/Services/MacWarmupAdmissionPolicy.swift"
+      ],
+      "updated": "2026-09-15",
+      "evidence": [
+        "run:mac-memory-qualification-20260915-165501-b1cb1ebc",
+        "commit:51560226",
+        "file:Sources/Services/MacEngineBootstrap.swift",
+        "file:config/memory-qualification-policy.json"
+      ],
+      "notes": "Closed 2026-09-15. The in-process relief that replaced XPC service retirement (CONV-02/03): the store runs MacMemoryBudgetPolicy over footprint and the Metal working set, the engine's kernel-pressure responder trims and unloads through the store's terminal barrier, idle unload follows NativeMemoryPolicyResolver and MacWarmupAdmissionPolicy defers proactive warms. Consented scripts/macos_test.sh memory run mac-memory-qualification-20260915-165501-b1cb1ebc on 51560226 (Custom, Design, Clone; Speed, medium, three retained takes per mode; retained-memory-v1): qualification PASS, eleven takes, no critical pressure, warning, hard trim or full unload; one soft trim per take; phys_footprint peak 2.4 to 2.9 GB, GPU working set 0.42 to 0.46, thermal nominal, QC pass; record published to benchmarks/runs/memory-qualification."
     }
   ]
 }

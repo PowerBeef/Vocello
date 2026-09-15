@@ -8,22 +8,30 @@ import XCTest
 final class MacInterfaceLanguageTests: XCTestCase {
     private let suiteName = "vocello.tests.MacInterfaceLanguage"
 
-    override func setUp() {
-        super.setUp()
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
-        // The test bundle carries the catalog, so English and French are available.
-        MacInterfaceLanguage.bootstrap(IOSAppLanguage(
-            defaults: defaults,
-            bundle: Bundle(for: MacInterfaceLanguageTests.self),
-            preferredLanguages: { ["en-CA"] }
-        ))
+    // `setUp`/`tearDown` overrides keep XCTestCase's nonisolated signature whatever the
+    // class annotation says, so the owner swap hops to the main actor explicitly.
+    override func setUp() async throws {
+        try await super.setUp()
+        let suiteName = suiteName
+        await MainActor.run {
+            let defaults = UserDefaults(suiteName: suiteName)!
+            defaults.removePersistentDomain(forName: suiteName)
+            // The test bundle carries the catalog, so English and French are available.
+            MacInterfaceLanguage.bootstrap(IOSAppLanguage(
+                defaults: defaults,
+                bundle: Bundle(for: MacInterfaceLanguageTests.self),
+                preferredLanguages: { ["en-CA"] }
+            ))
+        }
     }
 
-    override func tearDown() {
-        UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
-        MacInterfaceLanguage.bootstrap(IOSAppLanguage())
-        super.tearDown()
+    override func tearDown() async throws {
+        let suiteName = suiteName
+        await MainActor.run {
+            UserDefaults(suiteName: suiteName)?.removePersistentDomain(forName: suiteName)
+            MacInterfaceLanguage.bootstrap(IOSAppLanguage())
+        }
+        try await super.tearDown()
     }
 
     func testSystemDefaultFollowsThePreferredLanguage() {

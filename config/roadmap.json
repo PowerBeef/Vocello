@@ -1,8 +1,17 @@
 {
   "schemaVersion": 1,
-  "primaryPlan": "release-first-3-0-2026-09",
+  "primaryPlan": "macos-ios-convergence-2026-09",
   "description": "Single source of truth for open work: active plans and their unfinished items. Finished items and completed plans live in config/roadmap-archive.json (history and progress counts only). Validated by scripts/roadmap.py; rendered to docs/ROADMAP.md.",
   "plans": [
+    {
+      "id": "macos-ios-convergence-2026-09",
+      "title": "macOS converges on the iOS architecture and UI",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "adopted": "2026-09-14",
+      "goal": "The iOS app is the reference. The macOS app hosts the engine in-process on the shared iOS TTSEngineStore (A1-A3: seams, in-process swap behind the legacy screens, XPC removal with its contracts), then adopts the iOS screens adapted to macOS with the desktop features that already exist (B1-B9, one screen per commit, identifiers unchanged), dark-only. iOS behavior is frozen; changes there are forwards, seams with iOS defaults and pure splits, compile-verified until the phone returns.",
+      "authority": "docs/reference/macos-ios-convergence-2026-09.md"
+    },
     {
       "id": "release-first-3-0-2026-09",
       "title": "Vocello 3.0 — release-first execution plan (secondary while harness-stabilization-2026-09 is primary)",
@@ -86,6 +95,231 @@
     }
   ],
   "items": [
+    {
+      "id": "CONV-01",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Seams for the shared engine store: backend wrapper in Core, snapshot bridge, one GenerationMode",
+      "status": "in-flight",
+      "blockedBy": [],
+      "gate": "AnyTTSEngineBackend lives in Sources/QwenVoiceCore and the iOS store exposes snapshotUpdates; no app-local GenerationMode remains in the macOS module; the macOS unit lane, the generic iOS compile and the iOS logic tests compiled into VocelloCoreTests pass unchanged.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/AnyTTSEngineBackend.swift",
+        "Sources/iOS/TTSEngineStore.swift",
+        "Sources/Models/TTSModel.swift"
+      ],
+      "updated": "2026-09-14",
+      "notes": "Opened 2026-09-14 with the convergence decision. iOS behavior is frozen: the wrapper move and the publisher change nothing on the phone; IOSDeviceDiagnosticsRecorder reads UIKit only behind canImport so the store compiles on macOS."
+    },
+    {
+      "id": "CONV-02",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "macOS hosts the engine in-process on the shared store behind the legacy screens",
+      "status": "planned",
+      "blockedBy": [
+        "CONV-01"
+      ],
+      "gate": "The macOS app constructs MLXTTSEngine through NativeRuntimeFactory and the iOS TTSEngineStore (compiled by explicit path); AppEngineSelection and MacEngineServiceLifecycleCoordinator are gone; telemetry merges app and engine rows; scripts/macos_test.sh gate passes; one scripts/ui_test.sh macos smoke run and one short benchmark record on the 2-layer pipeline PASS with run ids recorded.",
+      "sourceOfTruth": [
+        "project.yml",
+        "Sources/QwenVoiceApp.swift",
+        "Sources/Services/GenerationTelemetryMerger.swift",
+        "scripts/check_macos_xpc_bench.py"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "CONV-03",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Remove the XPC stack and rewrite its contracts, scripts and documents",
+      "status": "planned",
+      "blockedBy": [
+        "CONV-02"
+      ],
+      "gate": "Sources/QwenVoiceEngineService, Sources/QwenVoiceEngineSupport, Sources/QwenVoiceNative and Tests/VocelloEngineIntegrationTests are absent with their targets; the entitlement, concurrency-safety, runtime-refactor and TSan contracts pass with dated decisions; build, release, test and CI scripts carry no XPCServices path; scripts/dev.sh ci is green; CLAUDE.md, native.md, SECURITY.md and ARCHITECTURE.md describe in-process hosting.",
+      "sourceOfTruth": [
+        "config/macos-entitlement-policy.json",
+        "config/tsan-policy.json",
+        "config/concurrency-safety.json",
+        "config/runtime-refactor-contract.json",
+        "scripts/release.sh",
+        "scripts/macos_test.sh"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "CONV-04",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "In-process memory relief on 8 GB Macs",
+      "status": "planned",
+      "blockedBy": [
+        "CONV-02"
+      ],
+      "gate": "The macOS store runs a Mac memory budget policy; kernel pressure drives trim and full unload through the store's terminal barrier; idle unload follows NativeMemoryPolicyResolver; one consented scripts/macos_test.sh memory run shows no critical pressure, warning, hardTrim or fullUnload during a qualified take on the canonical 8 GB Mac.",
+      "sourceOfTruth": [
+        "Sources/iOS/TTSEngineStore.swift",
+        "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift",
+        "Sources/Services/MacWarmupAdmissionPolicy.swift"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "CONV-10",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Shared theme tokens, glass surface, word timing and text-limit policy",
+      "status": "planned",
+      "blockedBy": [
+        "CONV-03"
+      ],
+      "gate": "Sources/SharedSupport carries the tokens, the glass surface body, WordTimingPlanner and GenerationTextLimitPolicy with no UIKit or AppKit import; the iOS files forward to them; two new VocelloCoreTests pass; the generic iOS compile is green; config/ios-control-audit.json is unchanged.",
+      "sourceOfTruth": [
+        "Sources/SharedSupport",
+        "Sources/iOS/Theme/Theme.swift",
+        "Sources/iOS/Theme/ThemeModifiers.swift"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "CONV-11",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "New macOS shell in the iOS visual language hosting the legacy screens",
+      "status": "planned",
+      "blockedBy": [
+        "CONV-10"
+      ],
+      "gate": "SidebarView, the inline player card, the status strip and the window toolbar render the iOS design over the shared store; SidebarPlayerView, SidebarStatusView and StartupDiagnosticsView are gone; repo_invariants, the literal scanner and its baseline pass unchanged; scripts/ui_test.sh macos localization, smoke and perf PASS with run ids.",
+      "sourceOfTruth": [
+        "Sources/ContentView.swift",
+        "Sources/Views/Sidebar/SidebarView.swift",
+        "Sources/QwenVoiceApp.swift"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "CONV-12",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "History on the iOS screen with sort, Save As and Reveal",
+      "status": "planned",
+      "blockedBy": [
+        "CONV-11"
+      ],
+      "gate": "Sources/Views/Library/HistoryView.swift is absent; the shared Generation and DatabaseService replace the macOS twins; history_*, historyRow_* and historyRecovery_* identifiers unchanged; localization, smoke (test02, test05) and perf (history-scroll, history-filter) PASS.",
+      "sourceOfTruth": [
+        "Sources/Views/Library/HistoryView.swift",
+        "Sources/iOSSupport/Services/DatabaseService.swift"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "CONV-13",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Saved Voices, the enrollment sheet and the record sheet on the iOS screens",
+      "status": "planned",
+      "blockedBy": [
+        "CONV-12"
+      ],
+      "gate": "VoicesView.swift, SavedVoiceSheet.swift and RecordReferenceClipSheet.swift are absent; scripts/saved_voice_lifecycle_contract.py passes on the new sheet; voicesRow_*, voicesEnroll_* and recordClip_* identifiers unchanged and single-line under pseudo-localization; localization and smoke (test04, test05) PASS.",
+      "sourceOfTruth": [
+        "Sources/Views/Library/VoicesView.swift",
+        "Sources/Views/Library/SavedVoiceSheet.swift",
+        "scripts/saved_voice_lifecycle_contract.py"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "CONV-14",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Settings on the iOS screen with the desktop rows and the interface-language picker",
+      "status": "planned",
+      "blockedBy": [
+        "CONV-13"
+      ],
+      "gate": "Sources/Views/Settings/SettingsView.swift is absent; the Cmd+, scene and the sidebar item show the same screen; settings_*, preferences_* and voiceCloning_consentAcknowledgment identifiers unchanged; IOSAppLanguage selects the macOS interface language; localization, smoke (test05) and perf (settings-scroll) PASS.",
+      "sourceOfTruth": [
+        "Sources/Views/Settings/SettingsView.swift",
+        "Sources/iOSSupport/Services/IOSAppLanguage.swift"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "CONV-15",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Studio canvas, Built-in Voice and line batch on the shared coordinators",
+      "status": "planned",
+      "blockedBy": [
+        "CONV-14"
+      ],
+      "gate": "CustomVoiceView, TextInputView, BatchGenerationSheet, BatchGenerationRunner, CustomVoiceCoordinator and GenerationLifecycleExecutor are absent; StudioGenerationCoordinator, IOSSingleTakeGenerationExecutor and IOSLongFormProject drive macOS generation with requests from MacStudioGenerationRequestFactory; no prewarm call under Sources/Views/Studio; customVoice_*, textInput_* and batch_* identifiers unchanged; smoke (test02, test03, test06, test07), perf and benchmark --modes custom PASS.",
+      "sourceOfTruth": [
+        "Sources/Views/Generate/CustomVoiceView.swift",
+        "Sources/Services/BatchGenerationRunner.swift",
+        "Sources/iOS/Studio/StudioGenerationCoordinator.swift",
+        "Sources/Services/MacStudioGenerationRequestFactory.swift"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "CONV-16",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Voice Design on the iOS screen",
+      "status": "planned",
+      "blockedBy": [
+        "CONV-15"
+      ],
+      "gate": "VoiceDesignView.swift, VoiceBriefEditor.swift, ContinuousVoiceDescriptionField.swift and VoiceDesignCoordinator.swift are absent; voiceDesign_* identifiers unchanged; localization and benchmark --modes design PASS.",
+      "sourceOfTruth": [
+        "Sources/Views/Generate/VoiceDesignView.swift",
+        "Sources/ViewModels/VoiceDesignCoordinator.swift"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "CONV-17",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Voice Cloning on the iOS screen and removal of the legacy remainder",
+      "status": "planned",
+      "blockedBy": [
+        "CONV-16"
+      ],
+      "gate": "VoiceCloningView.swift, VoiceCloningCoordinator.swift, GenerationWorkflowView.swift, EmotionPickerView.swift, WaveformView.swift, LayoutConstants.swift and AppTheme.swift are absent; voiceCloning_* identifiers unchanged; native.md and the app guide describe the new screens; localization, all seven smoke journeys, all nine perf scenarios and the canonical benchmark PASS.",
+      "sourceOfTruth": [
+        "Sources/Views/Generate/VoiceCloningView.swift",
+        "Sources/Views/Components/AppTheme.swift",
+        "docs/reference/macos-app-guide.md"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "CONV-18",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Perf re-baseline, marketing captures and documentation of the new macOS app",
+      "status": "planned",
+      "blockedBy": [
+        "CONV-17"
+      ],
+      "gate": "config/ui-perf-thresholds.json cites at least three perf sessions on the new tree in a dated decision; the README and website screenshots are recaptured from the new app; macos-release-qa.md walks the new screens; the plan is archived.",
+      "sourceOfTruth": [
+        "config/ui-perf-thresholds.json",
+        "Tests/VocelloMacUITests/VocelloMacMarketingCaptureUITests.swift",
+        "docs/reference/macos-release-qa.md"
+      ],
+      "updated": "2026-09-14"
+    },
+    {
+      "id": "CONV-20",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Device re-verification of the frozen iOS behavior",
+      "status": "parked",
+      "blockedBy": [
+        "CONV-10"
+      ],
+      "gate": "On the paired iPhone, scripts/ui_test.sh ios smoke and the control audit pass on the source that shares the store, tokens and policies with macOS; no iOS identifier or control count changed.",
+      "sourceOfTruth": [
+        "config/ios-control-audit.json",
+        "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift"
+      ],
+      "updated": "2026-09-14",
+      "unparkWhen": "the paired iPhone is available and unlocked for a consented lane"
+    },
     {
       "id": "RF-02",
       "plan": "release-first-3-0-2026-09",
@@ -1059,7 +1293,9 @@
       "plan": "autonomous-validation-remediation-2026-08",
       "title": "XCUITest coverage for the identifiers never exercised (78 macOS, 34 iOS)",
       "status": "planned",
-      "blockedBy": [],
+      "blockedBy": [
+        "CONV-17"
+      ],
       "gate": "The 2026-09-11 XCUITest audit found 78 of 102 macOS and 34 of 93 iOS accessibility identifiers never exercised. macOS: add acceptance coverage, in the existing lane structure, for Voice Design and Voice Cloning generation through the visible controls, saved-voice enrollment (recording to enrollment and Save), History playback, export and delete, the seed pin, the Settings model download route, and batch cancel; each lane asserts real persisted state and restores user data. iOS: extend the control-audit plan (config/ios-control-audit.json) and the smoke or control-audit classes so onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings are source-bound, observed on the paired iPhone through genuine controls and cleaned up, and replace the remaining English-label lookups (History clear and delete confirmations, seed unpin menu, Play/Pause labels) with stable identifiers or accessibility values in Sources/iOS. No hidden markers or seeded state. Validated only by explicitly requested scripts/ui_test.sh macos <lane> and scripts/ui_test.sh ios <lane> runs.",
       "sourceOfTruth": [
         "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift",
@@ -1069,8 +1305,8 @@
         "config/ios-control-audit.json",
         "scripts/ios_control_audit.py"
       ],
-      "updated": "2026-09-13",
-      "notes": "Opened from the 2026-09-11 review of the XCUITest suites (commits 458a7410 onward); the iOS half was ICA-20 until 2026-09-13. The label-dependent iOS sites are VocelloiOSControlAuditUITests (History clear and delete dialogs, seed unpin, inline player Play/Pause) and VocelloiOSPurchaseUITests (player Play/Pause; the system share sheet's close button stays a system control). Tests written without a lane run stay unproven, so both halves wait for explicit UI QA scope. (Earlier history: git log -p -- config/roadmap.json.)",
+      "updated": "2026-09-14",
+      "notes": "Opened from the 2026-09-11 review of the XCUITest suites (commits 458a7410 onward); the iOS half was ICA-20 until 2026-09-13. The label-dependent iOS sites are VocelloiOSControlAuditUITests (History clear and delete dialogs, seed unpin, inline player Play/Pause) and VocelloiOSPurchaseUITests (player Play/Pause; the system share sheet's close button stays a system control). Tests written without a lane run stay unproven, so both halves wait for explicit UI QA scope. (Earlier history: git log -p -- config/roadmap.json.) 2026-09-14: blocked behind CONV-17 so coverage is written against the converged macOS screens.",
       "legacyIds": [
         "ICA-20"
       ]

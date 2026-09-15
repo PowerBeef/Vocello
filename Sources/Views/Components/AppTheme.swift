@@ -1,4 +1,5 @@
 import AppKit
+import QwenVoiceCore
 import SwiftUI
 
 /// Generation performance gate (benchmarks/OPTIMIZATION.md §K): Liquid Glass's

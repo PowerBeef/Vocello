@@ -1,4 +1,5 @@
 import Foundation
+import QwenVoiceCore
 
 struct ModelInfo: Identifiable, Codable, Equatable, Sendable {
     let id: String

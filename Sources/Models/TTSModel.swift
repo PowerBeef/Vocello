@@ -161,32 +161,8 @@ enum MacModelVariantPreferences {
     }
 }
 
-enum GenerationMode: String, CaseIterable, Codable, Hashable, Sendable {
-    case custom
-    case design
-    case clone
-
-    var displayName: String {
-        switch self {
-        // User-facing rename 2026-08-15 (maintainer call): the mode named after
-        // upstream's CustomVoice checkpoint reads as "Built-in Voice" — it
-        // speaks with the built-in speakers, and "Custom" confused end users.
-        // Every internal identity stays `custom` (mode rawValue, model ID
-        // pro_custom, bench cells, telemetry, accessibility identifiers).
-        case .custom: return "Built-in Voice"
-        case .design: return "Voice Design"
-        case .clone: return "Voice Cloning"
-        }
-    }
-
-    var iconName: String {
-        switch self {
-        case .custom: return "person.wave.2"
-        case .design: return "text.bubble"
-        case .clone: return "waveform.badge.plus"
-        }
-    }
-}
+// `GenerationMode` is `QwenVoiceCore.GenerationMode` (shared with the CLI, the iOS app
+// and telemetry); the app no longer declares a shadowing copy.
 
 // MARK: - Model Registry
 

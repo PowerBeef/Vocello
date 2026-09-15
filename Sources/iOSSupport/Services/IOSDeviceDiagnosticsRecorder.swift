@@ -1,6 +1,8 @@
 import Foundation
 import QwenVoiceCore
+#if canImport(UIKit)
 import UIKit
+#endif
 
 @MainActor
 final class IOSDeviceDiagnosticsRecorder {
@@ -31,6 +33,18 @@ final class IOSDeviceDiagnosticsRecorder {
         }
         self.encoder = JSONEncoder()
         self.encoder.outputFormatting = [.sortedKeys]
+    }
+
+    /// Host identity for the manifest. UIKit's `UIDevice` on iOS; on macOS
+    /// (where the same recorder runs for the in-process engine) Foundation's
+    /// process information.
+    private static var hostDescriptor: (model: String, systemName: String, systemVersion: String) {
+        #if canImport(UIKit)
+        return (UIDevice.current.model, UIDevice.current.systemName, UIDevice.current.systemVersion)
+        #else
+        let version = ProcessInfo.processInfo.operatingSystemVersion
+        return ("Mac", "macOS", "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)")
+        #endif
     }
 
     static func makeIfEnabled(
@@ -168,9 +182,9 @@ final class IOSDeviceDiagnosticsRecorder {
             bundleIdentifier: Bundle.main.bundleIdentifier ?? "unknown",
             marketingVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
             buildVersion: Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String,
-            deviceModel: UIDevice.current.model,
-            systemName: UIDevice.current.systemName,
-            systemVersion: UIDevice.current.systemVersion,
+            deviceModel: Self.hostDescriptor.model,
+            systemName: Self.hostDescriptor.systemName,
+            systemVersion: Self.hostDescriptor.systemVersion,
             appSupportDirectory: AppPaths.appSupportDir.path,
             memoryContextsPath: target.memoryContextsURL.lastPathComponent,
             nativeEventsPath: target.nativeEventsURL.lastPathComponent

@@ -1642,11 +1642,7 @@ enum MacInterfaceText {
         if label == EngineActivityLabels.preparingVoiceReference {
             return activityPreparingVoiceReference
         }
-        // The app declares its own `GenerationMode` (same raw values as the core enum);
-        // match on the core identities the engine emits, then present the app's case.
-        for coreMode in QwenVoiceCore.GenerationMode.allCases
-        where label == EngineActivityLabels.generating(mode: coreMode) {
-            guard let mode = GenerationMode(rawValue: coreMode.rawValue) else { return label }
+        for mode in GenerationMode.allCases where label == EngineActivityLabels.generating(mode: mode) {
             return activityGenerating(modeName(mode))
         }
         return label

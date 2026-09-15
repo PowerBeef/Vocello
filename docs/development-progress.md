@@ -17,6 +17,21 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### macOS converges on the iOS architecture (September 14)
+
+The maintainer decided that the iOS app's design and architecture are the project's gold
+standard. The macOS app drops its XPC engine service for the in-process engine the iOS app runs,
+on the same `TTSEngineStore`, then drops its legacy screens for the iOS screens adapted to macOS
+with the desktop features that already exist (batch and long-form, variant picker, repair and
+update, output folder, Save As and Reveal, ⌘ menus, drag-and-drop, sort, replace reference, the
+Cmd+, window), dark-only. `macos-ios-convergence-2026-09` is the primary plan; its authority is
+`docs/reference/macos-ios-convergence-2026-09.md`. Order: engine first (CONV-01 seams, CONV-02
+in-process swap behind the legacy screens, CONV-03 XPC removal with its contracts, CONV-04 memory
+relief), then the screens one per commit (CONV-10 to CONV-18), with CONV-20 re-verifying the frozen
+iOS behavior when the phone is back. Accepted costs: no crash isolation, and 8 GB relief from
+in-process trim and unload instead of service retirement. CONV-01 is in flight: the backend
+wrapper moved to Core, the store publishes `snapshotUpdates`, the app-local `GenerationMode` is gone.
+
 ### Harness stabilization first (September 13, night)
 
 The four-day flow that rebuilt the workflow, the CI, the benchmark harness, the audio QC and the

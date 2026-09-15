@@ -89,6 +89,9 @@ XCUITest lanes only when explicitly requested.
   holds the attempt-scoped terminal state, `IOSSingleTakeGenerationExecutor` runs the take through
   `MacStudioSingleTakeGenerationHooks` (timeline, playback handoff, History, telemetry merge) and
   `MacStudioGenerationActions` cancels through the engine barrier; no view starts a task of its own.
+  Line batch loops the same executor through `MacLineBatchRunner`; long-form runs the iOS
+  `IOSLongFormCoordinator` with `MacStudioLongFormPlatformHooks`; both are owned by `MacAppModel` and
+  the batch sheet (`MacBatchGenerationSheet`) only projects their state.
 - **Requests are built by `MacStudioGenerationRequestFactory`** so language, identity, seed, variation
   and prompt are testable before the engine call. Reference language is conditioning metadata only:
   Clone Auto follows the target script, an explicit Studio language wins.
@@ -109,7 +112,10 @@ XCUITest lanes only when explicitly requested.
   cancelled take never lands in History.
 - **One short-form executor** (`IOSSingleTakeGenerationExecutor`) owns timeline, engine, cleanup,
   playback, persistence and export; long-form projects run sequential streaming takes through
-  `IOSLongFormProjectRunner`. No line batch on iOS.
+  `IOSLongFormProjectRunner`, whose platform side effects (variation, waveform seed, diagnostics
+  mirror, export, haptics, presentation copy) go through `IOSLongFormPlatformHooks`
+  (`IOSStudioLongFormPlatformHooks` on iOS; macOS compiles the file by path with its own adapter).
+  No line batch on iOS.
 - **Resources are `sources:` entries with `buildPhase: resources`** in `project.yml` (XcodeGen 2.45+
   otherwise drops iOS resources); never a `resources:` key.
 - **UI conventions.** `IOSScrollView` for vertical scroll surfaces; mode color pairs with icon, label or

@@ -6,7 +6,7 @@ import UIKit
 
 // MARK: - Gated glass (the one condition)
 
-/// iOS twin of the macOS `GatedGlass` container in `AppTheme.swift`
+/// iOS twin of the macOS `GatedGlass` container in `Views/Theme/MacGlass.swift`
 /// (IUI-5 D10a): the ONE place that decides whether a Liquid Glass surface
 /// may render glass. Reduce Transparency and the fixed-refresh generation
 /// performance gate share the same solid-fallback branch; every glass

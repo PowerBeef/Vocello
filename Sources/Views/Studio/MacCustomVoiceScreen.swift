@@ -166,18 +166,7 @@ struct MacCustomVoiceScreen: View {
         .sheet(item: $presentedSheet) { presentedSheet in
             switch presentedSheet {
             case .batch(let configuration):
-                BatchGenerationSheet(
-                    mode: configuration.mode,
-                    voice: configuration.voice,
-                    emotion: configuration.emotion,
-                    languageHint: draft.selectedLanguage.rawValue,
-                    deliveryProfile: configuration.deliveryProfile,
-                    voiceDescription: configuration.voiceDescription,
-                    refAudio: configuration.refAudio,
-                    refText: configuration.refText,
-                    initialText: configuration.initialText,
-                    initialSegmentationMode: configuration.initialSegmentationMode
-                )
+                MacBatchGenerationSheet(configuration: configuration)
                 .environmentObject(ttsEngineStore)
                 .environmentObject(audioPlayer)
             }
@@ -229,7 +218,6 @@ struct MacCustomVoiceScreen: View {
                 MacStudioDeliveryChip(
                     selection: $deliverySelection,
                     emotion: $draft.emotion,
-                    deliveryProfile: $draft.deliveryProfile,
                     tint: tint
                 )
             }
@@ -244,7 +232,7 @@ struct MacCustomVoiceScreen: View {
         }
         MacSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: tint)
         MacStudioBatchChip(tint: tint, isEnabled: canRunBatch) {
-            presentedSheet = .batch(.custom(draft: draft))
+            presentedSheet = .batch(.custom(draft: draft, model: activeModel))
         }
     }
 
@@ -301,7 +289,6 @@ struct MacCustomVoiceScreen: View {
             MacStudioDeliveryFooter(
                 selection: $deliverySelection,
                 emotion: $draft.emotion,
-                deliveryProfile: $draft.deliveryProfile,
                 tint: tint
             )
         } else {
@@ -357,7 +344,7 @@ struct MacCustomVoiceScreen: View {
             return
         }
         if LongTextGenerationRouter.shouldRouteToLongFormBatch(draft.text) {
-            presentedSheet = .batch(.custom(draft: draft, initialText: draft.text, initialSegmentationMode: .longForm))
+            presentedSheet = .batch(.custom(draft: draft, model: model, initialText: draft.text, initialSegmentationMode: .longForm))
             return
         }
 
@@ -383,7 +370,7 @@ struct MacCustomVoiceScreen: View {
             language: draft.selectedLanguage,
             speakerID: speaker,
             deliveryStyle: model.supportsInstructionControl ? draft.emotion : nil,
-            deliveryInstructionCellID: draft.deliveryProfile?.instructionCellID,
+            deliveryInstructionCellID: draft.resolvedDeliveryProfile.instructionCellID,
             seed: draft.pinnedSeed,
             variation: GenerationVariationPreference.requestValue()
         )

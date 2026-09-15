@@ -166,7 +166,7 @@ struct MacVoicesScreen: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
-                .frame(maxWidth: LayoutConstants.contentMaxWidth)
+                .frame(maxWidth: MacShellMetrics.libraryContentMaxWidth)
                 .frame(maxWidth: .infinity)
                 .onGeometryChange(for: CGFloat.self) { proxy in
                     proxy.size.width

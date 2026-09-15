@@ -103,8 +103,9 @@
       "blockedBy": [],
       "gate": "BatchGenerationSheet.swift and BatchGenerationRunner.swift are absent; MacBatchGenerationSheet and MacLineBatchRunner run line batch over the shared single-take executor and long-form projects over IOSLongFormProject for all three modes; batch_* identifiers and TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS unchanged; F-16 sourceOfTruth re-pointed; AppTheme.swift and LayoutConstants.swift are absent and the shared iOS GenerationDrafts replace the macOS drafts; smoke (test06, test07) PASS.",
       "sourceOfTruth": [
-        "Sources/Views/Components/BatchGenerationSheet.swift",
-        "Sources/Services/BatchGenerationRunner.swift",
+        "Sources/Views/Studio/MacBatchGenerationSheet.swift",
+        "Sources/Services/MacLineBatchRunner.swift",
+        "Sources/Services/MacStudioLongFormPlatformHooks.swift",
         "Sources/iOS/Studio/IOSLongFormProject.swift"
       ],
       "notes": "Split out of CONV-15 on 2026-09-15: the batch sheet and runner are shared by the legacy Design and Cloning screens, so they can only leave once the shared sheet serves all three modes.",
@@ -340,13 +341,13 @@
       "gate": "Both platforms stage and QC candidate segment/joined audio and a throwing manifest before accepted History mutation. Journaled atomic-file/database recovery is idempotent; normal failure preserves the accepted project and removes only unreferenced owned candidates. Fault tests cover serialization, writes, assembly, QC, database commits, cancellation and interruption; unchanged QC/seeds survive replacement, reused segments count once, and segment/project terminals are distinct. Existing manifests decode. Native long-form/regeneration acceptance passes on both platforms. Before RF-09 freeze, qualify recoveryRequired with an actual non-destructive recovery/export path and usable unrelated History where safe, cross-referencing F-06. Define accepted/candidate/recovery/session-resume/discardable ownership and test abandon/new-project/relaunch/replacement/delete/clear-all; retain anything referenced by accepted History, a journal, pending outbox, active playback or export. Intentional retention must be bounded and documented, not silently deleted.",
       "sourceOfTruth": [
         "Sources/iOS/Studio/IOSLongFormProject.swift",
-        "Sources/Services/BatchGenerationRunner.swift",
+        "Sources/Views/Studio/MacBatchGenerationSheet.swift",
         "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift",
         "Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift",
         "Sources/iOSSupport/Services/DatabaseService.swift",
         "Sources/QwenVoiceCore/HistoryDeletionEngine.swift"
       ],
-      "updated": "2026-09-11",
+      "updated": "2026-09-15",
       "notes": "Shared journaled long-form acceptance is implemented on both platforms with fault tests for rollback, reconcile, corrupt state, identity refusal and compatibility, plus bounded-assembly tests; the coherent-tree checkpoint passed. The iOS native acceptance clause passed on September 7 (clean-source smoke 225523-62a57c2f: long-form and regeneration UI, exact initial and replacement transcripts, joined History IDs retained). Open: macOS native long-form/regeneration acceptance, the ownership-policy fixtures named in the gate, candidate acceptance under RF-10, and the September 4 V26-08/V26-10 findings (corrupt journals fail closed but block History without a repair journey; replaced joined WAVs and abandoned session candidates need a retention/ownership policy). Groups VRA-002 to VRA-007; VRA-020 is session-only continuation. Cross-reference F-06 (enqueue failure) and F-08 (terminal ownership). (Earlier history: git log -p -- config/roadmap.json.)",
       "evidence": [
         "file:Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift",

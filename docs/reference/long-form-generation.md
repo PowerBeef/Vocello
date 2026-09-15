@@ -6,7 +6,7 @@ summary: The shipping long-form v4 path on both platforms — planner-owned segm
 sourceOfTruth:
   - Sources/QwenVoiceCore/LongFormPlanning.swift
   - Sources/iOS/Studio/IOSLongFormProject.swift
-  - Sources/Services/BatchGenerationRunner.swift
+  - Sources/Views/Studio/MacBatchGenerationSheet.swift
   - Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift
   - config/runtime-refactor-contract.json
 ---
@@ -31,12 +31,15 @@ segmenter's historical threshold, kept so routing behavior is unchanged) into a 
    with typed transformation risks, protected spans (decimals, versions, URLs, abbreviations),
    CJK-aware boundary precedence, a delivery-validated 300-unit runtime token ceiling per segment,
    and per-segment stable IDs with deterministic sub-seeds derived from the base seed.
-2. **Sequential streaming execution.** `BatchGenerationRunner` runs one ordinary streaming take per
-   planned segment — the same shipping path as a single take, with mandatory per-segment engine
-   Fast QC, standard streaming telemetry, and live segment preview (auto-play-gated; the
-   request-local `suppressStreamingPreview` flag remains available for silent contexts). Batch
-   markers are never sent; the legacy XPC `generateBatch` route was retired 2026-07-24 (the
-   in-process engine batch API remains available, while the CLI now owns per-item result accounting).
+2. **Sequential streaming execution.** The shared `IOSLongFormProjectRunner`
+   (`Sources/iOS/Studio/IOSLongFormProject.swift`, driven on the desktop by the batch sheet through
+   `IOSLongFormCoordinator` with `MacStudioLongFormPlatformHooks`) runs one ordinary streaming take
+   per planned segment — the same shipping path as a single take, with mandatory per-segment engine
+   Fast QC, standard streaming telemetry, app-layer timeline rows, and live segment preview
+   (auto-play-gated; the request-local `suppressStreamingPreview` flag remains available for silent
+   contexts). Batch markers are never sent; the legacy XPC `generateBatch` route was retired
+   2026-07-24 (the in-process engine batch API remains available, while the CLI now owns per-item
+   result accounting).
 3. **Bounded assembly.** `BoundedLongFormAssembler` joins the persisted PCM16 segment WAVs in fixed
    blocks (bounded gain, edge trim/fade over verified non-speech, declared pauses, atomic publish)
    and the joined output passes its own duration-aware Fast QC with the plan's pause budget.
@@ -56,8 +59,9 @@ segmenter's historical threshold, kept so routing behavior is unchanged) into a 
    accepted-replacement history (revision ≥ 2, strictly increasing, with recorded seeds).
    This is session-scoped generation continuation, not restart-after-relaunch support.
 
-Ordinary line-separated batch runs on the same sequential streaming path with the same QC,
-telemetry, and preview semantics; only the planning and assembly stages are long-form-specific.
+The ordinary line-separated batch (`MacLineBatchRunner`, macOS only) loops the shared single-take
+executor over the lines with the same QC, telemetry, and preview semantics; only the planning and
+assembly stages are long-form-specific.
 The sustained performance gate (`TTSEngineStore.hasSustainedPerformanceActivity`) holds across the
 whole run — segments, QC, and assembly — so the UI performance posture matches a single take.
 

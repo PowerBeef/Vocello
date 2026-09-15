@@ -180,6 +180,12 @@ targets:
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
       - path: Sources/iOS/Studio/StudioGenerationCoordinator.swift
       - path: Sources/iOS/Studio/StudioGenerationItems.swift
+      # CONV-22: long-form projects and the generation drafts are the iOS ones;
+      # the long-form runner's platform side effects go through
+      # MacStudioLongFormPlatformHooks (Sources/Services).
+      - path: Sources/iOS/Studio/IOSLongFormProject.swift
+      - path: Sources/iOSSupport/Models/GenerationDrafts.swift
+      - path: Sources/iOSSupport/Models/PendingVoiceCloningHandoff.swift
     resources:
       - path: Sources/Resources
         buildPhase: resources
@@ -429,6 +435,7 @@ targets:
       - path: Sources/iOS/Commerce/IOSCommercePresentationText.swift
       - path: Sources/iOSSupport/Services/IOSSettingsModelNavigation.swift
       - path: Sources/Services/MacStudioGenerationRequestFactory.swift
+      - path: Sources/Services/MacLineBatchRequest.swift
       - path: Sources/Models/ScriptTextState.swift
       - path: Sources/Services/MacInterfaceText.swift
       - path: Sources/Services/MacInterfaceLanguage.swift

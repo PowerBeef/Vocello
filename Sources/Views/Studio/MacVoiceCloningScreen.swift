@@ -149,7 +149,7 @@ struct MacVoiceCloningScreen: View {
     }
 
     private var readinessDescriptor: VoiceCloningReadinessDescriptor {
-        VoiceCloningReadiness.describe(
+        MacVoiceCloningReadiness.describe(
             engineReady: ttsEngineStore.isReady,
             isModelAvailable: isModelAvailable,
             modelDisplayName: modelDisplayName,
@@ -275,17 +275,7 @@ struct MacVoiceCloningScreen: View {
         .sheet(item: $presentedSheet) { presentedSheet in
             switch presentedSheet {
             case .batch(let configuration):
-                BatchGenerationSheet(
-                    mode: configuration.mode,
-                    voice: configuration.voice,
-                    emotion: configuration.emotion,
-                    languageHint: draft.selectedLanguage.rawValue,
-                    voiceDescription: configuration.voiceDescription,
-                    refAudio: configuration.refAudio,
-                    refText: configuration.refText,
-                    initialText: configuration.initialText,
-                    initialSegmentationMode: configuration.initialSegmentationMode
-                )
+                MacBatchGenerationSheet(configuration: configuration)
                 .environmentObject(ttsEngineStore)
                 .environmentObject(audioPlayer)
             }
@@ -368,7 +358,7 @@ struct MacVoiceCloningScreen: View {
                 }
                 MacSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: tint)
                 MacStudioBatchChip(tint: tint, isEnabled: canRunBatch) {
-                    presentedSheet = .batch(.clone(draft: draft))
+                    presentedSheet = .batch(.clone(draft: draft, voice: selectedVoice?.name))
                 }
             }
         }
@@ -925,7 +915,9 @@ struct MacVoiceCloningScreen: View {
             return
         }
         if LongTextGenerationRouter.shouldRouteToLongFormBatch(currentDraft.text) {
-            presentedSheet = .batch(.clone(draft: currentDraft, initialText: currentDraft.text, initialSegmentationMode: .longForm))
+            presentedSheet = .batch(.clone(
+                draft: currentDraft, voice: selectedVoice?.name, initialText: currentDraft.text, initialSegmentationMode: .longForm
+            ))
             return
         }
 

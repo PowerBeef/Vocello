@@ -35,10 +35,9 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.audio.folderNotWritable", defaultValue: "The chosen folder isn't writable — new audio saves to the default outputs folder.",
                comment: "macOS interface: Settings notice when the custom output folder is read-only. Presentation only.")
     }
-    static func batchAssemblyFailed(_ error: String) -> String {
-        localization.format(localization.string(localized: "vocello.mac.batch.assemblyFailed",
-            defaultValue: "Long-form assembly failed: %@",
-            comment: "macOS interface: long-form failure; %@ is the error text. Presentation only."), error)
+    static var batchBusy: String {
+        localization.string(localized: "vocello.mac.batch.busy", defaultValue: "Wait for the current generation to finish.",
+               comment: "macOS interface: batch sheet message when Generate All is pressed while the engine is already generating. Presentation only.")
     }
     static var batchCancelledNone: String {
         localization.string(localized: "vocello.mac.batch.cancelledNone", defaultValue: "Generation was cancelled before any clips were created.",
@@ -71,9 +70,17 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.batch.complete", defaultValue: "Batch Complete",
                comment: "macOS interface: batch completion title. Presentation only.")
     }
+    static var batchCurrentBatch: String {
+        localization.string(localized: "vocello.mac.batch.currentBatch", defaultValue: "Current batch",
+               comment: "macOS interface: batch sheet heading of the item list while the batch runs. Presentation only.")
+    }
     static var batchCurrentDelivery: String {
         localization.string(localized: "vocello.mac.batch.currentDelivery", defaultValue: "Current delivery",
                comment: "macOS interface: batch sheet group box title. Presentation only.")
+    }
+    static var batchGenerateAll: String {
+        localization.string(localized: "vocello.mac.batch.generateAll", defaultValue: "Generate All",
+               comment: "macOS interface: batch sheet primary button that starts the batch. Presentation only.")
     }
     static func batchGeneratingItem(_ index: String, _ total: String) -> String {
         localization.format(localization.string(localized: "vocello.mac.batch.generatingItem",
@@ -83,20 +90,6 @@ enum MacInterfaceText {
     static var batchInstructions: String {
         localization.string(localized: "vocello.mac.batch.instructions", defaultValue: "Enter one line per generation, or drag a `.txt` file onto this sheet.",
                comment: "macOS interface: batch sheet instructions. Presentation only.")
-    }
-    static func batchJoinedFailedQuality(_ summary: String) -> String {
-        localization.format(localization.string(localized: "vocello.mac.batch.joinedFailedQuality",
-            defaultValue: "Long-form joined output failed audio quality checks: %@",
-            comment: "macOS interface: long-form failure; %@ is the quality summary. Presentation only."), summary)
-    }
-    static func batchJoinedFailedQualityAfterRegeneration(_ summary: String) -> String {
-        localization.format(localization.string(localized: "vocello.mac.batch.joinedFailedQualityAfterRegeneration",
-            defaultValue: "Long-form joined output failed audio quality checks after regeneration: %@",
-            comment: "macOS interface: segment regeneration failure; %@ is the quality summary. Presentation only."), summary)
-    }
-    static var batchJoiningSegments: String {
-        localization.string(localized: "vocello.mac.batch.joiningSegments", defaultValue: "Joining segments...",
-               comment: "macOS interface: batch progress status while segments are joined. Presentation only.")
     }
     static func batchLine(_ number: String) -> String {
         localization.format(localization.string(localized: "vocello.mac.batch.line",
@@ -111,13 +104,17 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.batch.longForm", defaultValue: "Long form",
                comment: "macOS interface: batch segmentation choice. Presentation only.")
     }
-    static var batchLongFormFailedQuality: String {
-        localization.string(localized: "vocello.mac.batch.longFormFailedQuality", defaultValue: "Long-form batch failed audio quality checks. Review the failed segment details before retrying.",
-               comment: "macOS interface: long-form batch failure when a new segment fails quality checks. Presentation only.")
+    static var batchLongFormMode: String {
+        localization.string(localized: "vocello.mac.batch.longFormMode", defaultValue: "Long-form",
+               comment: "macOS interface: mode label of the long-form live and joined cards in the Studio dock. Presentation only.")
     }
-    static var batchMissingPlan: String {
-        localization.string(localized: "vocello.mac.batch.missingPlan", defaultValue: "The long-form run is missing its segmentation plan.",
-               comment: "macOS interface: long-form assembly error. Presentation only.")
+    static var batchLongFormProject: String {
+        localization.string(localized: "vocello.mac.batch.longFormProject", defaultValue: "Long-form project",
+               comment: "macOS interface: voice name of the joined long-form card in the Studio dock. Presentation only.")
+    }
+    static var batchModelConfigurationMissing: String {
+        localization.string(localized: "vocello.mac.batch.modelConfigurationMissing", defaultValue: "Model configuration not found",
+               comment: "macOS interface: batch validation error when no model package is selected for the mode. Presentation only.")
     }
     static var batchNeedsReference: String {
         localization.string(localized: "vocello.mac.batch.needsReference", defaultValue: "Select a reference audio file before starting batch generation.",
@@ -127,6 +124,10 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.batch.needsVoiceDescription", defaultValue: "Enter a voice description before starting batch generation.",
                comment: "macOS interface: batch validation message for Voice Design. Presentation only.")
     }
+    static var batchNewBatch: String {
+        localization.string(localized: "vocello.mac.batch.newBatch", defaultValue: "New Batch",
+               comment: "macOS interface: batch completion button that returns to the editor for another batch. Presentation only.")
+    }
     static var batchOneClipGenerated: String {
         localization.string(localized: "vocello.mac.batch.oneClipGenerated", defaultValue: "1 clip generated successfully.",
                comment: "macOS interface: batch completion message for one clip. Presentation only.")
@@ -135,18 +136,31 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.batch.placeholder", defaultValue: "Enter one line per generation...",
                comment: "macOS interface: placeholder of the batch text editor. Presentation only.")
     }
+    static func batchPlanningFailed(_ error: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.batch.planningFailed",
+            defaultValue: "Long-form planning failed: %@",
+            comment: "macOS interface: batch validation error when the long-form planner rejects the script; %@ is the error text. Presentation only."), error)
+    }
+    static var batchPreparedItems: String {
+        localization.string(localized: "vocello.mac.batch.preparedItems", defaultValue: "Prepared items",
+               comment: "macOS interface: batch sheet heading of the item list while no batch runs. Presentation only.")
+    }
     static var batchPreparing: String {
         localization.string(localized: "vocello.mac.batch.preparing", defaultValue: "Preparing batch...",
                comment: "macOS interface: batch progress status before the first item starts. Presentation only.")
+    }
+    static var batchProcessing: String {
+        localization.string(localized: "vocello.mac.batch.processing", defaultValue: "Processing…",
+               comment: "macOS interface: batch sheet primary button label while the batch runs. Presentation only.")
     }
     static var batchRegenerate: String {
         localization.string(localized: "vocello.mac.batch.regenerate", defaultValue: "Regenerate",
                comment: "macOS interface: batch row action. Presentation only.")
     }
-    static func batchRegeneratedFailedQuality(_ summary: String) -> String {
-        localization.format(localization.string(localized: "vocello.mac.batch.regeneratedFailedQuality",
-            defaultValue: "The regenerated take failed audio quality checks; the previous take is unchanged. %@",
-            comment: "macOS interface: segment regeneration failure; %@ is the quality summary. Presentation only."), summary)
+    static func batchRestartFailed(_ error: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.batch.restartFailed",
+            defaultValue: "Batch generation was interrupted, but the backend could not be restarted: %@",
+            comment: "macOS interface: appended to the cancelled batch message when the engine cancellation barrier failed; %@ is the error text. Presentation only."), error)
     }
     static var batchResults: String {
         localization.string(localized: "vocello.mac.batch.results", defaultValue: "Batch results",
@@ -164,37 +178,14 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.batch.retryRemaining", defaultValue: "Retry Remaining",
                comment: "macOS interface: batch sheet action. Presentation only.")
     }
-    static func batchReusingItem(_ index: String, _ total: String) -> String {
-        localization.format(localization.string(localized: "vocello.mac.batch.reusingItem",
-            defaultValue: "Reusing item %1$@/%2$@...",
-            comment: "macOS interface: batch progress status; %1$@ item number, %2$@ total. Presentation only."), index, total)
-    }
     static var batchRevealOutputs: String {
         localization.string(localized: "vocello.mac.batch.revealOutputs", defaultValue: "Reveal Outputs",
                comment: "macOS interface: batch sheet action that reveals the output folder. Presentation only.")
     }
-    static func batchSavingItem(_ index: String, _ total: String) -> String {
-        localization.format(localization.string(localized: "vocello.mac.batch.savingItem",
-            defaultValue: "Saving item %1$@/%2$@...",
-            comment: "macOS interface: batch progress status; %1$@ item number, %2$@ total. Presentation only."), index, total)
-    }
-    static func batchSegmentMissingAudio(_ index: String) -> String {
-        localization.format(localization.string(localized: "vocello.mac.batch.segmentMissingAudio",
-            defaultValue: "Segment %@ has no generated audio to join.",
-            comment: "macOS interface: long-form assembly error; %@ is the segment number. Presentation only."), index)
-    }
-    static var batchSegmentNoLongerPasses: String {
-        localization.string(localized: "vocello.mac.batch.segmentNoLongerPasses", defaultValue: "A previously generated long-form segment no longer passes audio quality checks.",
-               comment: "macOS interface: long-form batch failure when a reused segment fails quality checks. Presentation only.")
-    }
-    static var batchSegmentNotInProject: String {
-        localization.string(localized: "vocello.mac.batch.segmentNotInProject", defaultValue: "The segment to regenerate is not part of this long-form project.",
-               comment: "macOS interface: segment regeneration failure. Presentation only.")
-    }
-    static func batchSegmentRegenerationFailed(_ error: String) -> String {
-        localization.format(localization.string(localized: "vocello.mac.batch.segmentRegenerationFailed",
-            defaultValue: "Segment regeneration failed: %@",
-            comment: "macOS interface: segment regeneration failure; %@ is the error text. Presentation only."), error)
+    static func batchSegmentTitle(_ number: String, _ total: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.batch.segmentTitle",
+            defaultValue: "Segment %@ of %@",
+            comment: "macOS interface: live card and streaming title of one long-form segment; the first %@ is the segment number, the second the total. Presentation only."), number, total)
     }
     static var batchSegmentation: String {
         localization.string(localized: "vocello.mac.batch.segmentation", defaultValue: "Segmentation",
@@ -237,6 +228,20 @@ enum MacInterfaceText {
     static var batchTitle: String {
         localization.string(localized: "vocello.mac.batch.title", defaultValue: "Batch Generation",
                comment: "macOS interface: batch sheet title. Presentation only.")
+    }
+    static func batchToneSummary(_ emotion: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.batch.toneSummary",
+            defaultValue: "Tone: %@",
+            comment: "macOS interface: batch sheet delivery summary line; %@ is the delivery instruction. Presentation only."), emotion)
+    }
+    static func batchTooLarge(_ count: String, _ maximum: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.batch.tooLarge",
+            defaultValue: "Batch is too large: %@ segments exceeds the maximum of %@. Please split the text and try again.",
+            comment: "macOS interface: batch validation error; the first %@ is the segment count, the second the maximum. Presentation only."), count, maximum)
+    }
+    static var batchViewHistory: String {
+        localization.string(localized: "vocello.mac.batch.viewHistory", defaultValue: "View History",
+               comment: "macOS interface: batch completion button that closes the sheet and opens History. Presentation only.")
     }
     static var brandAccessibility: String {
         localization.string(localized: "vocello.mac.sidebar.brandAccessibility", defaultValue: "Vocello, AI text to speech",
@@ -385,14 +390,6 @@ enum MacInterfaceText {
     static var cloningSiriRequired: String {
         localization.string(localized: "vocello.mac.cloning.siriRequired", defaultValue: "Auto-transcription needs Siri enabled (macOS requirement) — type the transcript or enable Siri in System Settings.",
                comment: "macOS interface: hint under the transcript field when speech recognition needs Siri. Presentation only.")
-    }
-    static var cloningSourceHelp: String {
-        localization.string(localized: "vocello.mac.cloning.sourceHelp", defaultValue: "Choose a saved voice, import a reference clip, or record one with your microphone. Use clips you own or have permission to clone.",
-               comment: "macOS interface: tooltip of the Voice Cloning source section. Presentation only.")
-    }
-    static var cloningSourceLabel: String {
-        localization.string(localized: "vocello.mac.cloning.sourceLabel", defaultValue: "Source",
-               comment: "macOS interface: label of the reference source row. Presentation only.")
     }
     static var cloningSpeechRecognitionOff: String {
         localization.string(localized: "vocello.mac.cloning.speechRecognitionOff", defaultValue: "Speech recognition is off for Vocello — type the transcript or enable it in System Settings → Privacy & Security.",
@@ -561,14 +558,6 @@ enum MacInterfaceText {
     static var emotionDistinctDeliveries: String {
         localization.string(localized: "vocello.mac.emotion.distinctDeliveries", defaultValue: "Distinct deliveries",
                comment: "macOS interface: delivery picker section. Presentation only.")
-    }
-    static var emotionIntensity: String {
-        localization.string(localized: "vocello.mac.emotion.intensity", defaultValue: "Intensity",
-               comment: "macOS interface: delivery intensity label and picker title. Presentation only.")
-    }
-    static var emotionTone: String {
-        localization.string(localized: "vocello.mac.emotion.tone", defaultValue: "Tone",
-               comment: "macOS interface: default title of the delivery tone picker. Presentation only.")
     }
     static var engineColdStart: String {
         localization.string(localized: "vocello.mac.engine.coldStart", defaultValue: "Model is unloaded. First generate reloads it.",
@@ -1048,10 +1037,6 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.player.position", defaultValue: "Playback position",
                comment: "macOS interface: VoiceOver label of the sidebar player scrubber. Presentation only.")
     }
-    static var playerTitle: String {
-        localization.string(localized: "vocello.mac.player.title", defaultValue: "Player",
-               comment: "macOS interface: sidebar player title. Presentation only.")
-    }
     static var readinessAddScript: String {
         localization.string(localized: "vocello.mac.readiness.addScript", defaultValue: "Add a script",
                comment: "macOS interface: readiness title when the script field is empty. Presentation only.")
@@ -1295,17 +1280,9 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.savedVoice.transcriptSection", defaultValue: "Transcript (recommended for reusable clones)",
                comment: "macOS interface: Saved Voice sheet section header. Presentation only.")
     }
-    static var sectionConfiguration: String {
-        localization.string(localized: "vocello.mac.section.configuration", defaultValue: "Configuration",
-               comment: "macOS interface: title of the configuration card on the generation screens. Presentation only.")
-    }
     static var sectionLanguage: String {
         localization.string(localized: "vocello.mac.section.language", defaultValue: "Language",
                comment: "macOS interface: label of the language picker column on the generation screens. Presentation only.")
-    }
-    static var sectionScript: String {
-        localization.string(localized: "vocello.mac.section.script", defaultValue: "Script",
-               comment: "macOS interface: title of the script card on the generation screens. Presentation only.")
     }
     static var settingsAppLanguage: String {
         localization.string(localized: "vocello.mac.settings.appLanguage", defaultValue: "App Language",
@@ -1516,10 +1493,6 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.sidebar.searchHistory", defaultValue: "Search history",
                comment: "macOS interface: toolbar search field placeholder shown on the History screen. Presentation only.")
     }
-    static var sidebarSectionGenerate: String {
-        localization.string(localized: "vocello.mac.sidebar.sectionGenerate", defaultValue: "Generate",
-               comment: "macOS interface: sidebar section header above the three generation modes. Presentation only.")
-    }
     static var sidebarSectionLibrary: String {
         localization.string(localized: "vocello.mac.sidebar.sectionLibrary", defaultValue: "Library",
                comment: "macOS interface: sidebar section header above History and Saved Voices. Presentation only.")
@@ -1559,10 +1532,6 @@ enum MacInterfaceText {
     static var startupUnderlyingError: String {
         localization.string(localized: "vocello.mac.startup.underlyingError", defaultValue: "Underlying error",
                comment: "macOS interface: startup diagnostics heading above the raw error text. Presentation only.")
-    }
-    static var statusEngine: String {
-        localization.string(localized: "vocello.mac.status.engine", defaultValue: "Engine",
-               comment: "macOS interface: sidebar status heading. Presentation only.")
     }
     static var statusError: String {
         localization.string(localized: "vocello.mac.status.error", defaultValue: "Error",
@@ -1666,10 +1635,6 @@ enum MacInterfaceText {
         localization.format(localization.string(localized: "vocello.mac.textInput.seedPinnedHelp",
             defaultValue: "Takes reproduce pinned seed %1$@ with identical settings",
             comment: "macOS interface: tooltip of the pinned seed chip. %1$@ is the numeric seed, never translated."), seed)
-    }
-    static var textInputUnpinHelp: String {
-        localization.string(localized: "vocello.mac.textInput.unpinHelp", defaultValue: "Unpin — new seed each take",
-               comment: "macOS interface: tooltip of the seed unpin button. Presentation only.")
     }
     static var textInputUnpinSeed: String {
         localization.string(localized: "vocello.mac.textInput.unpinSeed", defaultValue: "Unpin seed",
@@ -1862,10 +1827,6 @@ enum MacInterfaceText {
     static var workflowHeavyOnThisMac: String {
         localization.string(localized: "vocello.mac.workflow.heavyOnThisMac", defaultValue: "Heavy on this Mac",
                comment: "macOS interface: model picker caption part when the model strains this Mac's memory. Presentation only.")
-    }
-    static var workflowLanguageHelp: String {
-        localization.string(localized: "vocello.mac.workflow.languageHelp", defaultValue: "Choose Auto or one of Qwen3-TTS's supported languages.",
-               comment: "macOS interface: default hint under the language picker. Presentation only.")
     }
     static var workflowModel: String {
         localization.string(localized: "vocello.mac.workflow.model", defaultValue: "Model",

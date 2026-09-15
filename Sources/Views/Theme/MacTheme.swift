@@ -3,10 +3,10 @@ import QwenVoiceCore
 import SwiftUI
 
 /// The macOS face of the shared `VocelloTheme` tokens (plan
-/// `macos-ios-convergence-2026-09`): the new shell and screens read colors,
-/// radii, spacing and motion from here, so the two apps share one palette. The
-/// legacy `AppTheme` survives only under the screens that are still to be
-/// replaced and forwards its brand colors to the same tokens.
+/// `macos-ios-convergence-2026-09`): the shell, the screens and the sheets
+/// read colors, radii, spacing and motion from here, so the two apps share one
+/// palette. It is the only macOS theme namespace; the legacy `AppTheme` left
+/// with the last legacy screen (CONV-22).
 enum MacTheme {
     typealias Brand = VocelloTheme.Brand
     typealias Surface = VocelloTheme.Surface

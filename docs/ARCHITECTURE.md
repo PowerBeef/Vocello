@@ -510,17 +510,20 @@ Long-form v4 is the shipping macOS path (stages A–E since 2026-07-23; contract
 `longFormV4`). `SpokenTextPlanning.swift` + `LongFormPlanning.swift` plan the project (typed
 transformation risk, UTF-8 ranges, protected spans, CJK-aware boundary precedence, per-segment
 stable IDs and deterministic sub-seeds, a delivery-validated 300-unit runtime token ceiling);
-`BatchGenerationRunner` executes one ordinary sequential streaming take per segment with mandatory
-per-segment engine Fast QC and live preview; `BoundedLongFormAssembler` joins the persisted PCM16
+the shared `IOSLongFormProjectRunner` (`Sources/iOS/Studio/IOSLongFormProject.swift`, compiled
+by both apps; macOS through `MacStudioLongFormPlatformHooks`) executes one ordinary sequential
+streaming take per segment with mandatory per-segment engine Fast QC and live preview;
+`BoundedLongFormAssembler` joins the persisted PCM16
 segments in fixed blocks into one atomic WAV with a privacy-safe frame map; `LongFormManifestV4`
 records plan + execution + assembly + replacement evidence fail-closed, with schema-v3 documents
 readable only as a limited legacy summary. Resume reuses saved takes, single-segment regeneration
 appends revision-≥2 replacement lineage, and migration v5 History project columns group the joined
-output as one accepted row. Line-separated batch runs on the same sequential streaming path.
-Long-form v4 ships on both platforms: iOS runs the same planner-owned
-sequential-streaming design through `IOSLongFormProjectRunner` (one ordinary
-streaming take per segment, never a concurrent batch), with single-segment
-regeneration device-accepted 2026-08-01. See
+output as one accepted row. The macOS line-separated batch (`MacLineBatchRunner`) loops the
+shared single-take executor over the lines instead.
+Long-form v4 ships on both platforms on one runner: the planner-owned
+sequential-streaming design (one ordinary streaming take per segment, never a
+concurrent batch), with single-segment regeneration device-accepted on iOS
+2026-08-01 and the macOS batch sheet driving the same coordinator since CONV-22. See
 [`reference/long-form-generation.md`](reference/long-form-generation.md).
 
 ---
@@ -571,7 +574,13 @@ The three macOS Studio modes generate through the shared pipeline: a per-mode
 `IOSSingleTakeGenerationExecutor` runs the take, and `MacStudioSingleTakeGenerationHooks` owns the
 frontend timeline, the live-preview estimate, the playback handoff with autoplay, History
 persistence and the two-layer telemetry merge; `MacStudioGenerationActions` cancels through the
-engine's barrier. Voice Cloning primes the clone reference proactively (`ensureCloneReferencePrimed`)
+engine's barrier. The batch sheet (`MacBatchGenerationSheet`) runs the two batch shapes on the same
+pipeline: a line-by-line batch on `MacLineBatchRunner` (one ordinary take per line through the
+single-take executor and the macOS hooks) and a long-form project on the shared iOS
+`IOSLongFormCoordinator` / `IOSLongFormProjectRunner` with `MacStudioLongFormPlatformHooks`, both
+owned by `MacAppModel` and both under the mode's `StudioGenerationCoordinator` attempt, so the
+canvas locks and shows the live card as during a single take. Voice Cloning primes the clone
+reference proactively (`ensureCloneReferencePrimed`)
 and again on demand before the take. Request assembly for every mode is centralized in the pure
 `MacStudioGenerationRequestFactory`, which preserves the exact UI language, reference
 transcript/voice identity, prompt, seed, variation, and generation identity before the engine call.
@@ -687,13 +696,17 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   `performanceActivityUpdates` bridges for the root shell and the gate model.
 - `Sources/Services/` — app-level services: `MacEngineBootstrap` (in-process
   engine + `MacMemoryBudgetPolicy`), `DatabaseService` (GRDB),
-  `BatchGenerationRunner`, `GenerationTelemetryMerger` (app + engine rows),
+  `MacLineBatchRunner` (line batch over the shared single-take executor),
+  `MacStudioLongFormPlatformHooks` (desktop adapter of the shared long-form
+  runner), `GenerationTelemetryMerger` (app + engine rows),
   `MacGenerationWarmupCoordinator`, `AudioService`, `WaveformService`.
 - `Sources/ViewModels/` — `ModelManagerViewModel` (model install/variant).
 - `Sources/QwenVoiceCore/` — `HuggingFaceDownloader` (SwiftHuggingFace + SHA-256).
 - `Sources/Models/` — `TTSModel`, `Generation` (GRDB record), `Voice`,
-  `GenerationDrafts` (`CustomVoiceDraft` / `VoiceDesignDraft` /
-  `VoiceCloningDraft`), `TTSContract` (contract loader).
+  `TTSContract` (contract loader), `MacBatchSheetConfiguration`; the generation
+  drafts (`CustomVoiceDraft` / `VoiceDesignDraft` / `VoiceCloningDraft`) are the
+  shared iOS ones (`Sources/iOSSupport/Models/GenerationDrafts.swift`, compiled
+  by path) with desktop conveniences in `MacGenerationDraftSupport`.
 
 ### iOS app (`Sources/iOS/`, module `QVoiceiOS`)
 

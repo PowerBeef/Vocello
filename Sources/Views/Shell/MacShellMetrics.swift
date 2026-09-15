@@ -14,6 +14,10 @@ enum MacShellMetrics {
     static let sidebarMaxWidth: CGFloat = 300
     /// Below this window width the composer chip rows wrap (B6 onwards).
     static let compactBreakpoint: CGFloat = 860
+    /// Content column of the History and Saved Voices lists; wider than the
+    /// Studio column (`MacStudioMetrics.contentMaxWidth`) so rows keep their
+    /// legacy width and do not tear apart on wide displays.
+    static let libraryContentMaxWidth: CGFloat = 960
 
     static let sidebarInset: CGFloat = 12
     static let sidebarRowMinHeight: CGFloat = 40

@@ -9,7 +9,7 @@ private struct IOSReduceTransparencyEnabledKey: EnvironmentKey {
     static let defaultValue = false
 }
 
-/// iOS counterpart to the macOS `generationPerformanceGate` (AppTheme.swift):
+/// iOS counterpart to the macOS `generationPerformanceGate` (Views/Theme/MacGlass.swift):
 /// while a generation is active, glass surfaces render their shipped
 /// solid-fill fallback so Liquid Glass compositor work cannot compete with the
 /// engine. On iPhone the gate engages only on fixed-refresh (non-ProMotion)
@@ -51,7 +51,7 @@ enum IOSDisplayCapability {
 }
 
 // iOS counterpart to the macOS `appAnimation` helper at
-// Sources/Views/Components/AppTheme.swift. Honors Reduce Motion via the
+// Sources/Views/Theme/MacMotion.swift. Honors Reduce Motion via the
 // SwiftUI environment so animations are skipped when the user has the
 // accessibility setting enabled. .claude/rules/ios.md requires Reduce Motion to be
 // honored across the app.

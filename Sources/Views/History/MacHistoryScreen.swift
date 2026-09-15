@@ -284,7 +284,7 @@ struct MacHistoryScreen: View {
             .padding(.horizontal, 20)
             .padding(.top, 14)
             .padding(.bottom, 4)
-            .frame(maxWidth: LayoutConstants.contentMaxWidth)
+            .frame(maxWidth: MacShellMetrics.libraryContentMaxWidth)
             .frame(maxWidth: .infinity)
 
             content
@@ -406,7 +406,7 @@ struct MacHistoryScreen: View {
             .scrollContentBackground(.hidden)
             // Match the generation screens' content column: uncapped rows
             // tear apart on wide displays.
-            .frame(maxWidth: LayoutConstants.contentMaxWidth)
+            .frame(maxWidth: MacShellMetrics.libraryContentMaxWidth)
             .frame(maxWidth: .infinity)
         }
     }

@@ -153,7 +153,7 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .profileBackground(Color(nsColor: .windowBackgroundColor))
+        .background(MacTheme.Surface.canvas)
     }
 
     @ViewBuilder
@@ -335,7 +335,7 @@ struct ContentView: View {
                 speakerID: customVoiceDraft.selectedSpeaker,
                 deliveryStyle: model.supportsInstructionControl ? customVoiceDraft.emotion : nil,
                 deliveryInstructionCellID: model.supportsInstructionControl
-                    ? customVoiceDraft.deliveryProfile?.instructionCellID
+                    ? customVoiceDraft.resolvedDeliveryProfile.instructionCellID
                     : nil,
                 languageHint: customVoiceDraft.selectedLanguage.rawValue
             )

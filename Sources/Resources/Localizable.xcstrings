@@ -10891,24 +10891,6 @@
         }
       }
     },
-    "vocello.mac.cloning.sourceHelp": {
-      "comment": "macOS interface: tooltip of the Voice Cloning source section. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choose a saved voice, import a reference clip, or record one with your microphone. Use clips you own or have permission to clone."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choisissez une voix enregistrée, importez un clip de référence ou enregistrez-en un avec votre microphone. Utilisez des clips qui vous appartiennent ou que vous avez la permission de cloner."
-          }
-        }
-      }
-    },
     "vocello.mac.cloning.savedVoice": {
       "comment": "macOS interface: Voice Cloning saved-voice picker label. Presentation only.",
       "extractionState": "manual",
@@ -11215,24 +11197,6 @@
         }
       }
     },
-    "vocello.mac.textInput.unpinHelp": {
-      "comment": "macOS interface: tooltip of the seed unpin button. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Unpin — new seed each take"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Désépingler — nouvelle graine à chaque prise"
-          }
-        }
-      }
-    },
     "vocello.mac.textInput.unpinSeed": {
       "comment": "macOS interface: VoiceOver label of the seed unpin button. Presentation only.",
       "extractionState": "manual",
@@ -11265,24 +11229,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Les prises reproduisent la graine épinglée %1$@ avec des réglages identiques"
-          }
-        }
-      }
-    },
-    "vocello.mac.player.title": {
-      "comment": "macOS interface: sidebar player title. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Player"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lecteur"
           }
         }
       }
@@ -11337,24 +11283,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Position de lecture"
-          }
-        }
-      }
-    },
-    "vocello.mac.status.engine": {
-      "comment": "macOS interface: sidebar status heading. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Engine"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Moteur"
           }
         }
       }
@@ -11701,24 +11629,6 @@
         }
       }
     },
-    "vocello.mac.emotion.intensity": {
-      "comment": "macOS interface: delivery intensity label and picker title. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Intensity"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Intensité"
-          }
-        }
-      }
-    },
     "vocello.mac.emotion.customTone": {
       "comment": "macOS interface: label of the free-text delivery field. Presentation only.",
       "extractionState": "manual",
@@ -11841,24 +11751,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Réglages"
-          }
-        }
-      }
-    },
-    "vocello.mac.sidebar.sectionGenerate": {
-      "comment": "macOS interface: sidebar section header above the three generation modes. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Generate"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Générer"
           }
         }
       }
@@ -12237,42 +12129,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Préparation"
-          }
-        }
-      }
-    },
-    "vocello.mac.section.configuration": {
-      "comment": "macOS interface: title of the configuration card on the generation screens. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Configuration"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Configuration"
-          }
-        }
-      }
-    },
-    "vocello.mac.section.script": {
-      "comment": "macOS interface: title of the script card on the generation screens. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Script"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Texte"
           }
         }
       }
@@ -12853,24 +12709,6 @@
         }
       }
     },
-    "vocello.mac.cloning.sourceLabel": {
-      "comment": "macOS interface: label of the reference source row. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Source"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Source"
-          }
-        }
-      }
-    },
     "vocello.mac.cloning.permittedClipsOnly": {
       "comment": "macOS interface: consent hint under the reference source row. Presentation only.",
       "extractionState": "manual",
@@ -13245,42 +13083,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ — Détectée"
-          }
-        }
-      }
-    },
-    "vocello.mac.workflow.languageHelp": {
-      "comment": "macOS interface: default hint under the language picker. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choose Auto or one of Qwen3-TTS's supported languages."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choisissez Auto ou l’une des langues prises en charge par Qwen3-TTS."
-          }
-        }
-      }
-    },
-    "vocello.mac.emotion.tone": {
-      "comment": "macOS interface: default title of the delivery tone picker. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tone"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ton"
           }
         }
       }
@@ -13663,42 +13465,6 @@
         }
       }
     },
-    "vocello.mac.batch.segmentNoLongerPasses": {
-      "comment": "macOS interface: long-form batch failure when a reused segment fails quality checks. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A previously generated long-form segment no longer passes audio quality checks."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Un segment long déjà généré ne passe plus les contrôles de qualité audio."
-          }
-        }
-      }
-    },
-    "vocello.mac.batch.reusingItem": {
-      "comment": "macOS interface: batch progress status; %1$@ item number, %2$@ total. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reusing item %1$@/%2$@..."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Réutilisation de l’élément %1$@/%2$@…"
-          }
-        }
-      }
-    },
     "vocello.mac.batch.generatingItem": {
       "comment": "macOS interface: batch progress status; %1$@ item number, %2$@ total. Presentation only.",
       "extractionState": "manual",
@@ -13713,204 +13479,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Génération de l’élément %1$@/%2$@…"
-          }
-        }
-      }
-    },
-    "vocello.mac.batch.savingItem": {
-      "comment": "macOS interface: batch progress status; %1$@ item number, %2$@ total. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Saving item %1$@/%2$@..."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enregistrement de l’élément %1$@/%2$@…"
-          }
-        }
-      }
-    },
-    "vocello.mac.batch.longFormFailedQuality": {
-      "comment": "macOS interface: long-form batch failure when a new segment fails quality checks. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Long-form batch failed audio quality checks. Review the failed segment details before retrying."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le lot long a échoué aux contrôles de qualité audio. Consultez les détails du segment en échec avant de réessayer."
-          }
-        }
-      }
-    },
-    "vocello.mac.batch.joiningSegments": {
-      "comment": "macOS interface: batch progress status while segments are joined. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Joining segments..."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Assemblage des segments…"
-          }
-        }
-      }
-    },
-    "vocello.mac.batch.joinedFailedQuality": {
-      "comment": "macOS interface: long-form failure; %@ is the quality summary. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Long-form joined output failed audio quality checks: %@"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La sortie longue assemblée a échoué aux contrôles de qualité audio : %@"
-          }
-        }
-      }
-    },
-    "vocello.mac.batch.assemblyFailed": {
-      "comment": "macOS interface: long-form failure; %@ is the error text. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Long-form assembly failed: %@"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "L’assemblage long a échoué : %@"
-          }
-        }
-      }
-    },
-    "vocello.mac.batch.segmentNotInProject": {
-      "comment": "macOS interface: segment regeneration failure. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The segment to regenerate is not part of this long-form project."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le segment à régénérer ne fait pas partie de ce projet long."
-          }
-        }
-      }
-    },
-    "vocello.mac.batch.regeneratedFailedQuality": {
-      "comment": "macOS interface: segment regeneration failure; %@ is the quality summary. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The regenerated take failed audio quality checks; the previous take is unchanged. %@"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La prise régénérée a échoué aux contrôles de qualité audio ; la prise précédente est inchangée. %@"
-          }
-        }
-      }
-    },
-    "vocello.mac.batch.joinedFailedQualityAfterRegeneration": {
-      "comment": "macOS interface: segment regeneration failure; %@ is the quality summary. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Long-form joined output failed audio quality checks after regeneration: %@"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La sortie longue assemblée a échoué aux contrôles de qualité audio après régénération : %@"
-          }
-        }
-      }
-    },
-    "vocello.mac.batch.segmentRegenerationFailed": {
-      "comment": "macOS interface: segment regeneration failure; %@ is the error text. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Segment regeneration failed: %@"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La régénération du segment a échoué : %@"
-          }
-        }
-      }
-    },
-    "vocello.mac.batch.missingPlan": {
-      "comment": "macOS interface: long-form assembly error. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The long-form run is missing its segmentation plan."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le plan de segmentation de l’exécution longue est manquant."
-          }
-        }
-      }
-    },
-    "vocello.mac.batch.segmentMissingAudio": {
-      "comment": "macOS interface: long-form assembly error; %@ is the segment number. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Segment %@ has no generated audio to join."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Le segment %@ n’a aucun audio généré à assembler."
           }
         }
       }
@@ -17367,6 +16935,276 @@
           "stringUnit": {
             "state": "translated",
             "value": "Type de fichier non pris en charge « .%1$@ ». Déposez un fichier audio (%2$@)."
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.currentBatch": {
+      "comment": "macOS interface: batch sheet heading of the item list while the batch runs. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current batch"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lot en cours"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.generateAll": {
+      "comment": "macOS interface: batch sheet primary button that starts the batch. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generate All"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tout générer"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.modelConfigurationMissing": {
+      "comment": "macOS interface: batch validation error when no model package is selected for the mode. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model configuration not found"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configuration du modèle introuvable"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.planningFailed": {
+      "comment": "macOS interface: batch validation error when the long-form planner rejects the script; %@ is the error text. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Long-form planning failed: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La planification du format long a échoué : %@"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.preparedItems": {
+      "comment": "macOS interface: batch sheet heading of the item list while no batch runs. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prepared items"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Éléments préparés"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.processing": {
+      "comment": "macOS interface: batch sheet primary button label while the batch runs. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Processing…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traitement…"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.restartFailed": {
+      "comment": "macOS interface: appended to the cancelled batch message when the engine cancellation barrier failed; %@ is the error text. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batch generation was interrupted, but the backend could not be restarted: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La génération par lot a été interrompue, mais le moteur n’a pas pu redémarrer : %@"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.tooLarge": {
+      "comment": "macOS interface: batch validation error; the first %@ is the segment count, the second the maximum. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batch is too large: %@ segments exceeds the maximum of %@. Please split the text and try again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le lot est trop volumineux : %@ segments dépassent le maximum de %@. Divisez le texte et réessayez."
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.viewHistory": {
+      "comment": "macOS interface: batch completion button that closes the sheet and opens History. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View History"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher l’historique"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.busy": {
+      "comment": "macOS interface: batch sheet message when Generate All is pressed while the engine is already generating. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait for the current generation to finish."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attendez la fin de la génération en cours."
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.longFormMode": {
+      "comment": "macOS interface: mode label of the long-form live and joined cards in the Studio dock. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Long-form"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Longue forme"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.longFormProject": {
+      "comment": "macOS interface: voice name of the joined long-form card in the Studio dock. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Long-form project"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Projet longue forme"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.newBatch": {
+      "comment": "macOS interface: batch completion button that returns to the editor for another batch. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Batch"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nouveau lot"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.segmentTitle": {
+      "comment": "macOS interface: live card and streaming title of one long-form segment; the first %@ is the segment number, the second the total. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segment %@ of %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segment %@ sur %@"
+          }
+        }
+      }
+    },
+    "vocello.mac.batch.toneSummary": {
+      "comment": "macOS interface: batch sheet delivery summary line; %@ is the delivery instruction. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tone: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ton : %@"
           }
         }
       }

@@ -194,9 +194,19 @@ language boundary.
 | Long-form resume | `batch_resumeLongFormButton` (shown when a stopped project has reusable takes) |
 | Delivery summary | `batch_deliverySummary` |
 
+The sheet (`MacBatchGenerationSheet`) only projects two runners owned by `MacAppModel`: a
+line-by-line batch runs on `MacLineBatchRunner`, one ordinary Studio take per line on the shared
+`IOSSingleTakeGenerationExecutor` with `MacStudioSingleTakeGenerationHooks` (timeline, live preview,
+History append, telemetry merge); a long-form project runs on the shared iOS
+`IOSLongFormCoordinator` / `IOSLongFormProjectRunner` with `MacStudioLongFormPlatformHooks`. Both run
+under the mode's `StudioGenerationCoordinator`, so the canvas behind the sheet locks and shows the
+live card exactly as during a single take, and the batch uses the Settings Speed/Quality variant.
 Every item — line-separated and long-form — is an ordinary sequential streaming take (mandatory
 engine Fast QC, streaming telemetry, live preview). Long-form additionally plans segments, joins
-them into one WAV, and lands a single project row in History.
+them into one WAV, and lands a single project row in History. Resume and per-segment regeneration
+follow the iOS semantics — resume after a stopped project, regenerate after a completed one — and
+survive closing the sheet because the coordinator lives on the shell model; a reopened sheet starts
+a line batch blank.
 Segments are saved individually to History before continuing and remain exportable/deletable
 after abandoning a draft or relaunching. Segment completion is not project acceptance.
 Both initial completion and segment replacement await the shared `LongFormHistoryAcceptanceStore`:

@@ -176,17 +176,7 @@ struct MacVoiceDesignScreen: View {
         .sheet(item: $presentedSheet) { presentedSheet in
             switch presentedSheet {
             case .batch(let configuration):
-                BatchGenerationSheet(
-                    mode: configuration.mode,
-                    voice: configuration.voice,
-                    emotion: configuration.emotion,
-                    languageHint: draft.selectedLanguage.rawValue,
-                    voiceDescription: configuration.voiceDescription,
-                    refAudio: configuration.refAudio,
-                    refText: configuration.refText,
-                    initialText: configuration.initialText,
-                    initialSegmentationMode: configuration.initialSegmentationMode
-                )
+                MacBatchGenerationSheet(configuration: configuration)
                 .environmentObject(ttsEngineStore)
                 .environmentObject(audioPlayer)
             case .saveVoice(let configuration):

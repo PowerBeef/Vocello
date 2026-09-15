@@ -8,7 +8,7 @@ sourceOfTruth:
   - Sources/QwenVoiceCore/GenerationOutputAdapter.swift
   - Sources/QwenVoiceCore/MLXTTSEngine.swift
   - Sources/QwenVoiceCore/PreparedVoiceRepository.swift
-  - Sources/ViewModels/GenerationLifecycleExecutor.swift
+  - Sources/Services/MacStudioSingleTakeGenerationHooks.swift
   - Sources/VocelloCLI/VocelloMain.swift
   - Sources/VocelloCLI/BatchCommand.swift
   - Sources/SharedSupport/Services/GenerationOutputVerifier.swift
@@ -90,7 +90,7 @@ Source line numbers below refer to `75ecb740`; links resolve to the maintained s
 | --- | --- | --- |
 | V26-01 | **Confirmed, P1, high confidence.** Unsuccessful output cleanup can delete a destination belonging to an earlier take. | [Adapter](../../Sources/QwenVoiceCore/GenerationOutputAdapter.swift), lines 1401–1449 and 1759/1807; [engine](../../Sources/QwenVoiceCore/MLXTTSEngine.swift), lines 1207/1246/1280. New **F-18**, backend-and-platform. |
 | V26-02 | **Confirmed, P1, high confidence.** Replacement/delete catches swallow restore failure and then remove the backup directory; post-publication housekeeping shares the rollback catch. | [PreparedVoiceRepository](../../Sources/QwenVoiceCore/PreparedVoiceRepository.swift), lines 291–338, 381–387, 437–447, 459–521. Reopen **F-01**, preserving prior success evidence. |
-| V26-03 | **P1-impact risk, not runtime-reproduced.** Old macOS callbacks/task clearing have no attempt identity. | [Executor](../../Sources/ViewModels/GenerationLifecycleExecutor.swift), lines 44–104/117–132; the Design coordinator (retired 2026-09-15 with the Voice Design port), lines 133–141; same executor used by Custom and Clone. New **F-19**, macos; cross-reference F-08/F-15. |
+| V26-03 | **P1-impact risk, not runtime-reproduced.** Old macOS callbacks/task clearing have no attempt identity. | the legacy executor (retired 2026-09-15 with the Voice Cloning port; the shared `IOSSingleTakeGenerationExecutor` and `MacStudioSingleTakeGenerationHooks` replace it), lines 44–104/117–132; the Design coordinator (retired 2026-09-15 with the Voice Design port), lines 133–141; same executor used by Custom and Clone. New **F-19**, macos; cross-reference F-08/F-15. |
 | V26-04 | **Confirmed behavior, P2, high confidence.** Ctrl-C calls process exit, not the engine cancellation barrier. | [VocelloMain](../../Sources/VocelloCLI/VocelloMain.swift), lines 9–12. New **F-20**, under F-17/RF-08. Host qualifier improvements do not change it. |
 | V26-05 | **Confirmed contract gap, P2, high confidence.** A later batch error prevents reporting the array containing earlier accepted outputs. | [BatchCommand](../../Sources/VocelloCLI/BatchCommand.swift), request loop and post-`generateBatch` emission; [engine](../../Sources/QwenVoiceCore/MLXTTSEngine.swift), lines 1100–1116. New **F-21**, under F-17. |
 | V26-06 | **Confirmed assurance gap, P2, high confidence.** Live duration acquisition uses `try?`; nil takes the compatibility path and skips the edge guard. | [Verifier](../../Sources/SharedSupport/Services/GenerationOutputVerifier.swift), lines 100–185. Extend **VLR-07/RF-06**; missing duration is not proof that an unreadable WAV has actually passed Speech. |

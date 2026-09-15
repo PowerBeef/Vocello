@@ -32,10 +32,11 @@ final class MacAppModel {
     var historyClearRequest: HistoryClearRequest?
     var voicesEnrollRequestID: UUID?
 
-    /// Per-mode generation lifecycle (attempt-scoped terminal state);
-    /// Cloning follows with its port.
+    /// Per-mode generation lifecycle (attempt-scoped terminal state), one
+    /// per Studio mode like the iOS `AppModel`.
     let customCoordinator = StudioGenerationCoordinator(mode: .custom)
     let designCoordinator = StudioGenerationCoordinator(mode: .design)
+    let cloneCoordinator = StudioGenerationCoordinator(mode: .clone)
     /// The last designed take that can still become a saved voice; it lives
     /// beside the coordinator so leaving Voice Design keeps both or neither.
     var designSavedVoiceCandidate: VoiceDesignSavedVoiceCandidate?

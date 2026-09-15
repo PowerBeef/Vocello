@@ -86,7 +86,7 @@ struct ContentView: View {
                 savedVoiceID: voice.id,
                 wavPath: voice.wavPath,
                 transcript: "",
-                transcriptLoadError: "Couldn't load the saved transcript for \"\(voice.name)\". You can still clone from the audio file alone."
+                transcriptLoadError: MacInterfaceText.cloningTranscriptLoadFailed(voice.name)
             )
         }
 
@@ -440,19 +440,7 @@ private struct VoiceCloningScreenHost: View {
     @Binding var draft: VoiceCloningDraft
     @Binding var pendingSavedVoiceHandoff: PendingVoiceCloningHandoff?
 
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @Environment(ModelManagerViewModel.self) private var modelManager
-    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
-
     var body: some View {
-        VoiceCloningView(
-            draft: $draft,
-            pendingSavedVoiceHandoff: $pendingSavedVoiceHandoff,
-            ttsEngineStore: ttsEngineStore,
-            audioPlayer: audioPlayer,
-            modelManager: modelManager,
-            savedVoicesViewModel: savedVoicesViewModel
-        )
+        MacVoiceCloningScreen(draft: $draft, pendingSavedVoiceHandoff: $pendingSavedVoiceHandoff)
     }
 }

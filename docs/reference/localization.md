@@ -93,7 +93,7 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
 `config/localization-unlocalized-baseline.json` records content-addressed identities for existing
 direct string-literal arguments to common SwiftUI presentation APIs under `Sources/iOS`,
 `Sources/Views`, and `Sources/SharedSupport`. After the 2026-09-14 macOS migration it holds eleven iOS records
-and one macOS exception: the empty keyboard-shortcut bridge button (the wordless starters-label key left with the legacy brief editor on 2026-09-15). The validator permits removal but rejects a new or
+and no macOS exception since 2026-09-15 (the empty keyboard-shortcut bridge button left with the legacy composer, the wordless starters-label key with the legacy brief editor). The validator permits removal but rejects a new or
 additional occurrence. It is an incremental migration boundary, not proof that every indirect or
 computed string is localized.
 

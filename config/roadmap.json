@@ -101,7 +101,7 @@
       "title": "Line batch and long-form on the shared runner",
       "status": "planned",
       "blockedBy": [],
-      "gate": "BatchGenerationSheet.swift and BatchGenerationRunner.swift are absent; MacBatchGenerationSheet and MacLineBatchRunner run line batch over the shared single-take executor and long-form projects over IOSLongFormProject for all three modes; batch_* identifiers and TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS unchanged; F-16 sourceOfTruth re-pointed; smoke (test06, test07) PASS.",
+      "gate": "BatchGenerationSheet.swift and BatchGenerationRunner.swift are absent; MacBatchGenerationSheet and MacLineBatchRunner run line batch over the shared single-take executor and long-form projects over IOSLongFormProject for all three modes; batch_* identifiers and TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS unchanged; F-16 sourceOfTruth re-pointed; AppTheme.swift and LayoutConstants.swift are absent and the shared iOS GenerationDrafts replace the macOS drafts; smoke (test06, test07) PASS.",
       "sourceOfTruth": [
         "Sources/Views/Components/BatchGenerationSheet.swift",
         "Sources/Services/BatchGenerationRunner.swift",
@@ -113,16 +113,17 @@
     {
       "id": "CONV-17",
       "plan": "macos-ios-convergence-2026-09",
-      "title": "Voice Cloning on the iOS screen and removal of the legacy remainder",
+      "title": "Voice Cloning on the iOS screen and removal of the legacy pipeline",
       "status": "in-flight",
       "blockedBy": [],
-      "gate": "VoiceCloningView.swift, VoiceCloningCoordinator.swift, GenerationLifecycleExecutor.swift (with its test and project.yml entry), TextInputView.swift, GenerationWorkflowView.swift, EmotionPickerView.swift, WaveformView.swift, LayoutConstants.swift and AppTheme.swift are absent and the shared iOS GenerationDrafts replace the macOS drafts; voiceCloning_* identifiers unchanged; native.md and the app guide describe the new screens; localization, all seven smoke journeys, all nine perf scenarios and the canonical benchmark PASS.",
+      "gate": "VoiceCloningView.swift, VoiceCloningCoordinator.swift, GenerationLifecycleExecutor.swift (with its test, doubles and project.yml entry), TextInputView.swift, GenerationWorkflowView.swift, EmotionPickerView.swift and WaveformView.swift are absent; MacVoiceCloningScreen renders the iOS Studio canvas with the reference, Import, Record and bank-delivery chips, drag-and-drop import and the record sheet; voiceCloning_* identifiers unchanged; native.md and the app guide describe the new screens; localization, all seven smoke journeys, all nine perf scenarios and a short clone benchmark PASS.",
       "sourceOfTruth": [
-        "Sources/Views/Generate/VoiceCloningView.swift",
-        "Sources/Views/Components/AppTheme.swift",
+        "Sources/Views/Studio/MacVoiceCloningScreen.swift",
+        "Sources/Models/VoiceCloningReferenceAudioSupport.swift",
         "docs/reference/macos-app-guide.md"
       ],
-      "updated": "2026-09-15"
+      "updated": "2026-09-15",
+      "notes": "Voice Cloning landed 2026-09-15: MacVoiceCloningScreen on MacStudioCanvas (reference chip as a saved-voice menu with Import/Record/Clear, Import and Record chips, bank delivery chip per persona, Language, seed and Batch chips on a second row; reference status with the quality-warning popover, saved-voices and transcript warnings, transcript field with the auto-transcription hint, inline one-time consent, readiness line; drag-and-drop import; MacRecordVoiceSheet). Proactive and on-demand clone priming ported from the coordinator; MacAppModel.cloneCoordinator; VoiceCloningReferenceAudioSupport moved to Sources/Models. The last legacy pipeline pieces are gone: VoiceCloningView, VoiceCloningCoordinator, GenerationLifecycleExecutor (+ test, doubles, project.yml entry), TextInputView, GenerationWorkflowView, EmotionPickerView, WaveformView; the localization baseline has no macOS exception left. AppTheme, LayoutConstants and the drafts swap wait for CONV-22 (the legacy batch sheet still uses them). 11 new vocello.mac.cloning keys with French. Remaining gate: localization, smoke (7), perf (9) and clone benchmark PASS run ids."
     },
     {
       "id": "CONV-18",

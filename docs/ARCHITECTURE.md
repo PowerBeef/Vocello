@@ -566,22 +566,17 @@ back, complete a post-publication commit, or finish a user-confirmed delete with
 The legacy `enrollPreparedVoice` entry remains only as a prepare-plus-commit compatibility route
 for noninteractive CLI and diagnostics.
 
-macOS Built-in Voice and Voice Design generate through the shared Studio pipeline
-(`StudioGenerationCoordinator` owned by `MacAppModel`, `IOSSingleTakeGenerationExecutor`,
-`MacStudioSingleTakeGenerationHooks`). Voice Cloning still runs through its legacy
-`VoiceCloningCoordinator` (`@MainActor @Observable`) until its port: it builds a
-`GenerationRequest` from its draft and runs it through the legacy `GenerationLifecycleExecutor`
-(`Sources/ViewModels/GenerationLifecycleExecutor.swift`, extracted in the 2026-08
-UI review's wave 2): the executor owns the single-take prepare/run/cancel
-sequencing against `TTSEngineStore.generate(...)` — a nil prepared take aborts
-silently, a throw is the failure path, and `cancelActiveWork` resets task,
-generating-flag, and player state in one place. `VoiceCloningCoordinator`
-additionally primes the clone reference via `ensureCloneReferencePrimed(...)`. Design and Clone
-request assembly is centralized in the pure `MacStudioGenerationRequestFactory`, which preserves
-the exact UI language, reference transcript/voice identity, prompt, seed, variation, and generation
-identity before the engine call. Clone Auto is then resolved by shared `GenerationSemantics` from
-the target text; reference-language metadata never selects output language. The Cloning port of
-plan `macos-ios-convergence-2026-09` retires the last coordinator and the executor.
+The three macOS Studio modes generate through the shared pipeline: a per-mode
+`StudioGenerationCoordinator` owned by `MacAppModel` holds the attempt-scoped terminal state,
+`IOSSingleTakeGenerationExecutor` runs the take, and `MacStudioSingleTakeGenerationHooks` owns the
+frontend timeline, the live-preview estimate, the playback handoff with autoplay, History
+persistence and the two-layer telemetry merge; `MacStudioGenerationActions` cancels through the
+engine's barrier. Voice Cloning primes the clone reference proactively (`ensureCloneReferencePrimed`)
+and again on demand before the take. Request assembly for every mode is centralized in the pure
+`MacStudioGenerationRequestFactory`, which preserves the exact UI language, reference
+transcript/voice identity, prompt, seed, variation, and generation identity before the engine call.
+Clone Auto is then resolved by shared `GenerationSemantics` from the target text; reference-language
+metadata never selects output language.
 
 ---
 
@@ -685,7 +680,7 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   and the desktop preference rows on one screen for the sidebar item and the Cmd+, scene. Studio
   (`Sources/Views/Studio`) renders the iOS canvas per mode; Built-in Voice generates through the
   shared `StudioGenerationCoordinator` and `IOSSingleTakeGenerationExecutor` with
-  `MacStudioSingleTakeGenerationHooks` (Cloning follows with its port).
+  `MacStudioSingleTakeGenerationHooks`.
 - State: coordinators and `ModelManagerViewModel` are `@MainActor @Observable`;
   the shared `TTSEngineStore` and `AudioPlayerViewModel` are `ObservableObject`s
   injected as environment objects, with the store's `snapshotChanges` and

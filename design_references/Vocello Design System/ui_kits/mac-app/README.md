@@ -18,7 +18,7 @@ view trees. The kit covers the entire app surface area:
 |---|---|
 | Custom Voice | `Sources/Views/Studio/MacCustomVoiceScreen.swift` |
 | Voice Design | `Sources/Views/Studio/MacVoiceDesignScreen.swift` |
-| Voice Cloning | `Sources/Views/Generate/VoiceCloningView.swift` |
+| Voice Cloning | `Sources/Views/Studio/MacVoiceCloningScreen.swift` |
 | History | `Sources/Views/Library/HistoryView.swift` |
 | Saved Voices | `Sources/Views/Library/VoicesView.swift` |
 | Settings | `Sources/Views/Settings/*` |

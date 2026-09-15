@@ -17190,6 +17190,186 @@
           }
         }
       }
+    },
+    "vocello.mac.cloning.entryAudioOnly": {
+      "comment": "macOS interface: reference menu row for a saved voice without a transcript; %@ is the voice name. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · audio only"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · audio seulement"
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.entryTranscript": {
+      "comment": "macOS interface: reference menu row for a transcript-backed saved voice; %@ is the voice name. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · transcript"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · transcription"
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.import": {
+      "comment": "macOS interface: chip that opens the file panel for a reference clip. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importer"
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.referenceRequired": {
+      "comment": "macOS interface: Voice Cloning error when Generate runs without a reference. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a reference audio file before generating."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionnez un fichier audio de référence avant de générer."
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.replace": {
+      "comment": "macOS interface: chip that opens the file panel to replace the reference clip. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replace"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remplacer"
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.siriRequired": {
+      "comment": "macOS interface: hint under the transcript field when speech recognition needs Siri. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-transcription needs Siri enabled (macOS requirement) — type the transcript or enable Siri in System Settings."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La transcription automatique nécessite Siri (exigence de macOS) — saisissez la transcription ou activez Siri dans Réglages Système."
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.speechRecognitionOff": {
+      "comment": "macOS interface: hint under the transcript field when speech recognition was denied. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speech recognition is off for Vocello — type the transcript or enable it in System Settings → Privacy & Security."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La reconnaissance vocale est désactivée pour Vocello — saisissez la transcription ou activez-la dans Réglages Système → Confidentialité et sécurité."
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.transcriptLoadFailed": {
+      "comment": "macOS interface: warning when a saved voice's transcript file cannot be read; %@ is the voice name. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load the saved transcript for “%@”. You can still clone from the audio file alone."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de charger la transcription enregistrée de « %@ ». Vous pouvez tout de même cloner à partir de l’audio seul."
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.transcriptPlaceholder": {
+      "comment": "macOS interface: placeholder of the reference transcript field. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What does the reference audio say? (optional)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Que dit l’audio de référence ? (facultatif)"
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.unsupportedFile": {
+      "comment": "macOS interface: error when a dropped file is not audio; %1$@ is the extension, %2$@ the supported formats. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unsupported file type “.%1$@”. Drop an audio file (%2$@)."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type de fichier non pris en charge « .%1$@ ». Déposez un fichier audio (%2$@)."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

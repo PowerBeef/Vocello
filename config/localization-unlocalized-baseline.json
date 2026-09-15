@@ -3,12 +3,6 @@
     {
       "call": "Button",
       "count": 1,
-      "literalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "path": "Sources/Views/Components/TextInputView.swift"
-    },
-    {
-      "call": "Button",
-      "count": 1,
       "literalSha256": "565339bc4d33d72817b583024112eb7f5cdf3e5eef0252d6ec1b9c9a94e12bb3",
       "path": "Sources/iOS/App/RootView.swift"
     },

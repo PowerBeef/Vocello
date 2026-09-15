@@ -432,7 +432,6 @@ targets:
       - path: Sources/Models/ScriptTextState.swift
       - path: Sources/Services/MacInterfaceText.swift
       - path: Sources/Services/MacInterfaceLanguage.swift
-      - path: Sources/ViewModels/GenerationLifecycleExecutor.swift
       - path: Sources/VocelloCLI/CLIProcessSupervisor.swift
       - path: Sources/VocelloCLI/CLIBatchExecution.swift
       - path: Sources/iOSSupport/Models/Generation.swift

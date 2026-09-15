@@ -303,6 +303,20 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.cloning.consentTitle", defaultValue: "Acknowledge voice cloning consent",
                comment: "macOS interface: Voice Cloning readiness title before the one-time consent. Presentation only.")
     }
+    static func cloningEntryAudioOnly(_ name: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.cloning.entryAudioOnly",
+            defaultValue: "%@ · audio only",
+            comment: "macOS interface: reference menu row for a saved voice without a transcript; %@ is the voice name. Presentation only."), name)
+    }
+    static func cloningEntryTranscript(_ name: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.cloning.entryTranscript",
+            defaultValue: "%@ · transcript",
+            comment: "macOS interface: reference menu row for a transcript-backed saved voice; %@ is the voice name. Presentation only."), name)
+    }
+    static var cloningImport: String {
+        localization.string(localized: "vocello.mac.cloning.import", defaultValue: "Import",
+               comment: "macOS interface: chip that opens the file panel for a reference clip. Presentation only.")
+    }
     static var cloningImportedFileReady: String {
         localization.string(localized: "vocello.mac.cloning.importedFileReady", defaultValue: "Imported file ready",
                comment: "macOS interface: Voice Cloning source status for an imported clip. Presentation only.")
@@ -343,9 +357,17 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.cloning.readySlowerFirstRun", defaultValue: "Reference ready with slower first run",
                comment: "macOS interface: Voice Cloning readiness title when the context fell back to a slower path. Presentation only.")
     }
+    static var cloningReferenceRequired: String {
+        localization.string(localized: "vocello.mac.cloning.referenceRequired", defaultValue: "Select a reference audio file before generating.",
+               comment: "macOS interface: Voice Cloning error when Generate runs without a reference. Presentation only.")
+    }
     static var cloningReferenceSection: String {
         localization.string(localized: "vocello.mac.cloning.referenceSection", defaultValue: "Reference",
                comment: "macOS interface: title of the Voice Cloning configuration card. Presentation only.")
+    }
+    static var cloningReplace: String {
+        localization.string(localized: "vocello.mac.cloning.replace", defaultValue: "Replace",
+               comment: "macOS interface: chip that opens the file panel to replace the reference clip. Presentation only.")
     }
     static var cloningSavedVoice: String {
         localization.string(localized: "vocello.mac.cloning.savedVoice", defaultValue: "Saved voice",
@@ -360,6 +382,10 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.cloning.scriptPlaceholder", defaultValue: "Type the line for the cloned voice",
                comment: "macOS interface: placeholder of the Voice Cloning script editor. Presentation only.")
     }
+    static var cloningSiriRequired: String {
+        localization.string(localized: "vocello.mac.cloning.siriRequired", defaultValue: "Auto-transcription needs Siri enabled (macOS requirement) — type the transcript or enable Siri in System Settings.",
+               comment: "macOS interface: hint under the transcript field when speech recognition needs Siri. Presentation only.")
+    }
     static var cloningSourceHelp: String {
         localization.string(localized: "vocello.mac.cloning.sourceHelp", defaultValue: "Choose a saved voice, import a reference clip, or record one with your microphone. Use clips you own or have permission to clone.",
                comment: "macOS interface: tooltip of the Voice Cloning source section. Presentation only.")
@@ -367,6 +393,10 @@ enum MacInterfaceText {
     static var cloningSourceLabel: String {
         localization.string(localized: "vocello.mac.cloning.sourceLabel", defaultValue: "Source",
                comment: "macOS interface: label of the reference source row. Presentation only.")
+    }
+    static var cloningSpeechRecognitionOff: String {
+        localization.string(localized: "vocello.mac.cloning.speechRecognitionOff", defaultValue: "Speech recognition is off for Vocello — type the transcript or enable it in System Settings → Privacy & Security.",
+               comment: "macOS interface: hint under the transcript field when speech recognition was denied. Presentation only.")
     }
     static var cloningSupportedFormats: String {
         localization.string(localized: "vocello.mac.cloning.supportedFormats", defaultValue: "WAV, MP3, AIFF, M4A, FLAC, OGG, or WebM",
@@ -383,6 +413,20 @@ enum MacInterfaceText {
     static var cloningTranscriptHelp: String {
         localization.string(localized: "vocello.mac.cloning.transcriptHelp", defaultValue: "Best quality uses reference audio plus an accurate transcript. Audio-only cloning remains available as a lower-guidance fallback.",
                comment: "macOS interface: tooltip of the Voice Cloning transcript field. Presentation only.")
+    }
+    static func cloningTranscriptLoadFailed(_ name: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.cloning.transcriptLoadFailed",
+            defaultValue: "Couldn't load the saved transcript for “%@”. You can still clone from the audio file alone.",
+            comment: "macOS interface: warning when a saved voice's transcript file cannot be read; %@ is the voice name. Presentation only."), name)
+    }
+    static var cloningTranscriptPlaceholder: String {
+        localization.string(localized: "vocello.mac.cloning.transcriptPlaceholder", defaultValue: "What does the reference audio say? (optional)",
+               comment: "macOS interface: placeholder of the reference transcript field. Presentation only.")
+    }
+    static func cloningUnsupportedFile(_ ext: String, _ formats: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.cloning.unsupportedFile",
+            defaultValue: "Unsupported file type “.%1$@”. Drop an audio file (%2$@).",
+            comment: "macOS interface: error when a dropped file is not audio; %1$@ is the extension, %2$@ the supported formats. Presentation only."), ext, formats)
     }
     static func cloningVoiceBankEntry(_ name: String) -> String {
         localization.format(localization.string(localized: "vocello.mac.cloning.voiceBankEntry",

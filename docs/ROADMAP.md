@@ -33,7 +33,7 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `CONV-17` | in-flight | Voice Cloning on the iOS screen and removal of the legacy remainder | — |
+| `CONV-17` | in-flight | Voice Cloning on the iOS screen and removal of the legacy pipeline | — |
 | `CONV-18` | planned | Perf re-baseline, marketing captures and documentation of the new macOS app | `CONV-17` |
 | `CONV-20` | parked | Device re-verification of the frozen iOS behavior | — |
 | `CONV-21` | planned | Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages | — |
@@ -41,8 +41,8 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 ### Open items in detail
 
-- **`CONV-17`** (in-flight) — Voice Cloning on the iOS screen and removal of the legacy remainder.
-  gate: VoiceCloningView.swift, VoiceCloningCoordinator.swift, GenerationLifecycleExecutor.swift (with its test and project.yml entry), TextInputView.swift, GenerationWorkflowView.swift, EmotionPickerView.swift, WaveformView.swift, LayoutConstants.swift and AppTheme.swift are absent and the shared iOS GenerationDrafts replace the macOS drafts; voiceCloning_* identifiers unchanged; native.md and the app guide describe the new screens; localization, all seven smoke journeys, all nine perf scenarios and the canonical benchmark PASS.
+- **`CONV-17`** (in-flight) — Voice Cloning on the iOS screen and removal of the legacy pipeline.
+  gate: VoiceCloningView.swift, VoiceCloningCoordinator.swift, GenerationLifecycleExecutor.swift (with its test, doubles and project.yml entry), TextInputView.swift, GenerationWorkflowView.swift, EmotionPickerView.swift and WaveformView.swift are absent; MacVoiceCloningScreen renders the iOS Studio canvas with the reference, Import, Record and bank-delivery chips, drag-and-drop import and the record sheet; voiceCloning_* identifiers unchanged; native.md and the app guide describe the new screens; localization, all seven smoke journeys, all nine perf scenarios and a short clone benchmark PASS.
 
 - **`CONV-18`** (planned) — Perf re-baseline, marketing captures and documentation of the new macOS app.
   gate: config/ui-perf-thresholds.json cites at least three perf sessions on the new tree in a dated decision; the README and website screenshots are recaptured from the new app; macos-release-qa.md walks the new screens; the plan is archived.
@@ -55,7 +55,7 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
   gate: config/toolchain.json pins a CI toolchain that GitHub's runners provide; the macOS and iOS deployment targets stay at 26 in project.yml; any mlx-swift, mlx-swift-lm or swift-transformers move is one authorized change reviewed with the gate benchmark (medians of three warm takes) and a clean unit lane; scripts/dev.sh ci is green on the new pin.
 
 - **`CONV-22`** (planned) — Line batch and long-form on the shared runner.
-  gate: BatchGenerationSheet.swift and BatchGenerationRunner.swift are absent; MacBatchGenerationSheet and MacLineBatchRunner run line batch over the shared single-take executor and long-form projects over IOSLongFormProject for all three modes; batch_* identifiers and TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS unchanged; F-16 sourceOfTruth re-pointed; smoke (test06, test07) PASS.
+  gate: BatchGenerationSheet.swift and BatchGenerationRunner.swift are absent; MacBatchGenerationSheet and MacLineBatchRunner run line batch over the shared single-take executor and long-form projects over IOSLongFormProject for all three modes; batch_* identifiers and TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS unchanged; F-16 sourceOfTruth re-pointed; AppTheme.swift and LayoutConstants.swift are absent and the shared iOS GenerationDrafts replace the macOS drafts; smoke (test06, test07) PASS.
 
 ## Autonomous validation audit remediation
 

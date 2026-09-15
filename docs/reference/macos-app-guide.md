@@ -95,14 +95,17 @@ Tests assert these visible production surfaces directly.
 
 | Element | Identifier |
 |---|---|
-| Reference picker | `voiceCloning_savedVoicePicker` (saved voices menu). Standalone voices list as `<name> · transcript` / `<name> · audio only`; emotion-bank members collapse into one persona row labeled `<persona> · voice bank` (`VoiceBankCatalog` naming convention; [emotion-reference-banks.md](emotion-reference-banks.md)) |
-| Bank delivery menu | `voiceCloning_bankDeliveryPicker` — visible only while a bank member is selected; lists Neutral (the persona's base) plus its curated emotion variants and swaps the concrete member voice through the ordinary selection path |
-| Import | `voiceCloning_importButton` |
-| Record | `voiceCloning_recordReferenceButton` |
-| Active reference | `voiceCloning_activeReference` / `voiceCloning_referenceWarning` |
-| Transcript (optional) | `voiceCloning_transcriptInput`; blank selects genuine audio-only x-vector conditioning |
-| Record clip sheet | `recordClip_record` / `_stop` / `_retake` / `_use` / `_cancel` / `_timer` |
-| Script + CTAs | `textInput_*` (shared) |
+| Reference chip | `voiceCloning_savedVoicePicker` inside `voiceCloning_voiceSetup`: a menu of the saved voices (standalone voices as `<name> · transcript` / `<name> · audio only`; emotion-bank members collapse into one persona row, see [emotion-reference-banks.md](emotion-reference-banks.md)) plus Import, Record and Clear; the selected voice is its accessibility value |
+| Bank delivery chip | `voiceCloning_bankDeliveryPicker`, visible only while a bank member is selected; lists Neutral (the persona's base) plus its curated emotion variants and swaps the concrete member |
+| Import / Record chips | `voiceCloning_importButton` (Import or Replace) / `voiceCloning_recordReferenceButton`; audio files can also be dropped on the screen |
+| Language chip | `voiceCloning_languagePicker` inside `voiceCloning_languageSetup` |
+| Active reference | `voiceCloning_activeReference` (file name, detail or `voiceCloning_referenceWarning` chip, Clear) under the chips; `voiceCloning_consentNotice` above it |
+| Warnings | `voiceCloning_savedVoicesWarning` (+ `voiceCloning_savedVoicesRetry`) / `voiceCloning_transcriptWarning` / `voiceCloning_dropWarning` (a dropped file of an unsupported type; the dock error bar is reserved for takes) |
+| Transcript (optional) | `voiceCloning_transcriptInput` inside `voiceCloning_transcriptField`, shown once a reference exists; blank selects genuine audio-only x-vector conditioning; `voiceCloning_transcriptionUnavailable` explains a missing auto-fill |
+| Consent | `voiceCloning_inlineConsent` (one-time, same key as the Settings toggle) |
+| Readiness | `voiceCloning_readiness` (value "Ready" or "Waiting") |
+| Record clip sheet | `recordClip_record` / `_stop` / `_retake` / `_use` / `_cancel` / `_timer` / `_levelMeter` |
+| Script + CTAs + dock | `textInput_*` and `studio_inlinePlayer_*` (shared) |
 
 ### History (`sidebar_history` → `screen_history`)
 

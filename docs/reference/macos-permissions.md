@@ -69,6 +69,10 @@ the recurring permission pain.
   rebuilds; an ad-hoc one binds to a single code hash and needs redoing after every rebuild.
   Ungranted, the lane still passes with `playbackCaptureStatus: unavailable` or `silent` on every
   take. Reset with `tccutil reset AudioCapture com.qwenvoice.app.uitests.xctrunner`.
+  Every macOS lane also verifies the runner's signature before launching it and re-signs it in
+  place when a build interrupted between Xcode's Info.plist rewrite and its CodeSign step left
+  it invalid (launchd otherwise refuses to spawn it: "Runningboard has returned error 5" with
+  zero tests executed); the repair drops the UI-build fingerprint so the next lane rebuilds it.
 - **UI-lane builds are ad-hoc signed** (`scripts/ui_test.sh` builds with
   `CODE_SIGN_IDENTITY="-"`), so they never match the dev identity's TCC grant: any *real*
   microphone request from a lane-built app prompts fresh, and answering it re-keys the row to that

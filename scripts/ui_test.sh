@@ -517,6 +517,29 @@ prepare_runner_for_playback_capture() {
   fi
 }
 
+# A build-for-testing interrupted between Xcode's Info.plist rewrite and its
+# CodeSign step (2026-09-15: a lane killed a few seconds into its build) left
+# the runner with a plist newer than its signature; the next incremental build
+# rewrote the plist again without re-signing, the source fingerprint then made
+# every later lane skip the build, and launchd refused to spawn the runner
+# ("Runningboard has returned error 5", "Launchd job spawn failed") with zero
+# tests executed. Every lane therefore verifies the runner before using it and
+# repairs an invalid signature in place with the same identity the capture path
+# uses; the fingerprint marker is dropped so the next lane rebuilds it outright.
+ensure_mac_runner_signature() {
+  local runner="$MAC_DERIVED/Build/Products/Release/VocelloMacUITests-Runner.app"
+  [[ -d "$runner" ]] || return 0
+  codesign --verify --deep --strict "$runner" >/dev/null 2>&1 && return 0
+  warn "UI test runner signature is invalid (interrupted build); re-signing it in place"
+  rm -f "$MAC_DERIVED/.vocello-ui-build-fingerprint"
+  local identity
+  identity="$(resolve_dev_signing_identity)"
+  if ! codesign --force --sign "$identity" "$runner" >/dev/null 2>&1 \
+      || ! codesign --verify --deep --strict "$runner" >/dev/null 2>&1; then
+    die "could not repair the UI test runner signature; delete $runner and rerun the lane"
+  fi
+}
+
 mac_ui_preflight() {
   local tcc_db="$HOME/Library/Application Support/com.apple.TCC/TCC.db"
   local svc rows
@@ -1412,6 +1435,7 @@ WAV
       || die "macOS UI build-for-testing failed (see $out/xcodebuild.log)"
     printf '%s\n' "$mac_fingerprint" >"$mac_build_marker"
   fi
+  ensure_mac_runner_signature
   [[ "$lane" != "benchmark" && "$lane" != "smoke" ]] || prepare_runner_for_playback_capture
   arm_mac_crash_marker
   required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test-without-building \

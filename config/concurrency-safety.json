@@ -3,7 +3,7 @@
   "owner": "backend-runtime",
   "policy": "Every unchecked Sendable or nonisolated(unsafe) declaration in owned production Swift requires a registry entry, explicit owner, synchronization invariant, review date, removal condition, deterministic evidence where applicable, and room within the no-unreviewed-growth budget.",
   "budget": {
-    "maximumUncheckedSendableDeclarations": 34,
+    "maximumUncheckedSendableDeclarations": 33,
     "maximumNonisolatedUnsafeDeclarations": 7,
     "reviewCadenceDays": 365
   },
@@ -75,21 +75,6 @@
     }
   ],
   "entries": [
-    {
-      "id": "mac-database",
-      "source": "Sources/Services/DatabaseService.swift",
-      "types": [
-        "DatabaseService"
-      ],
-      "owner": "RecoverableStoreCoordinator mutex and GRDB DatabaseQueue",
-      "invariant": "Ordinary access fails closed after open or migration failure; only explicit Retry serially replaces the failed state after a complete successful reopen.",
-      "reviewedAt": "2026-08-26",
-      "removalCondition": "Remove unchecked conformance when GRDB storage ownership is fully actor-isolated or the database facade becomes a concurrency-checked immutable Sendable adapter.",
-      "tests": [
-        "Tests/VocelloCoreTests/HistoryPersistenceErrorTests.swift",
-        "Tests/VocelloCoreTests/RecoverableStoreCoordinatorTests.swift"
-      ]
-    },
     {
       "id": "ios-database",
       "source": "Sources/iOSSupport/Services/DatabaseService.swift",

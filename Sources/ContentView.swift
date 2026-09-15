@@ -177,7 +177,7 @@ struct ContentView: View {
                 pendingSavedVoiceHandoff: $pendingVoiceCloningHandoff
             )
         case .history:
-            HistoryView(
+            MacHistoryScreen(
                 ttsEngineStore: ttsEngineStore,
                 searchText: $appModel.historySearchText,
                 sortOrder: $appModel.historySortOrder,

@@ -533,6 +533,30 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.engine.coldStartLowMemory", defaultValue: "Model unloaded to save memory. First generate reloads it — normal on 8 GB Macs.",
                comment: "macOS interface: readiness detail on 8 GB Macs when the model is unloaded. Presentation only.")
     }
+    static var historyAudioUnavailable: String {
+        localization.string(localized: "vocello.mac.history.audioUnavailable", defaultValue: "Audio unavailable",
+               comment: "macOS interface: History row play tile label when the WAV is missing. Presentation only.")
+    }
+    static var historyBucketEarlier: String {
+        localization.string(localized: "vocello.mac.history.bucketEarlier", defaultValue: "Earlier",
+               comment: "macOS interface: History date section for older takes. Presentation only.")
+    }
+    static var historyBucketPrevious30: String {
+        localization.string(localized: "vocello.mac.history.bucketPrevious30", defaultValue: "Previous 30 days",
+               comment: "macOS interface: History date section for takes from the previous month. Presentation only.")
+    }
+    static var historyBucketPrevious7: String {
+        localization.string(localized: "vocello.mac.history.bucketPrevious7", defaultValue: "Previous 7 days",
+               comment: "macOS interface: History date section for takes from the previous week. Presentation only.")
+    }
+    static var historyBucketToday: String {
+        localization.string(localized: "vocello.mac.history.bucketToday", defaultValue: "Today",
+               comment: "macOS interface: History date section for takes from today. Presentation only.")
+    }
+    static var historyBucketYesterday: String {
+        localization.string(localized: "vocello.mac.history.bucketYesterday", defaultValue: "Yesterday",
+               comment: "macOS interface: History date section for takes from yesterday. Presentation only.")
+    }
     static var historyClearAccessibility: String {
         localization.string(localized: "vocello.mac.history.clearAccessibility", defaultValue: "Clear history",
                comment: "macOS interface: VoiceOver label of the History toolbar clear menu. Presentation only.")
@@ -601,6 +625,10 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.history.deleteEverything", defaultValue: "Delete Everything",
                comment: "macOS interface: confirmation button that clears History and deletes audio files. Presentation only.")
     }
+    static var historyDeleteTake: String {
+        localization.string(localized: "vocello.mac.history.deleteTake", defaultValue: "Delete take",
+               comment: "macOS interface: History row delete action label. Presentation only.")
+    }
     static var historyDeleteTitle: String {
         localization.string(localized: "vocello.mac.history.deleteTitle", defaultValue: "Delete Generation?",
                comment: "macOS interface: History delete confirmation title. Presentation only.")
@@ -631,18 +659,62 @@ enum MacInterfaceText {
             defaultValue: "The file could not be exported: %@ Choose another destination and try again.",
             comment: "macOS interface: alert message when exporting a take fails; %@ is the error text. Presentation only."), error)
     }
+    static var historyExportPrompt: String {
+        localization.string(localized: "vocello.mac.history.exportPrompt", defaultValue: "Export",
+               comment: "macOS interface: confirm button of the folder panel that exports pending recovery audio. Presentation only.")
+    }
     static var historyExportWarning: String {
         localization.string(localized: "vocello.mac.history.exportWarning", defaultValue: "Export Warning",
                comment: "macOS interface: alert title when some recovery exports failed. Presentation only.")
+    }
+    static var historyFilterAccessibility: String {
+        localization.string(localized: "vocello.mac.history.filterAccessibility", defaultValue: "Filter by mode",
+               comment: "macOS interface: VoiceOver label of the History mode filter row. Presentation only.")
+    }
+    static var historyFilterAll: String {
+        localization.string(localized: "vocello.mac.history.filterAll", defaultValue: "All",
+               comment: "macOS interface: History mode filter chip that shows every mode. Presentation only.")
     }
     static var historyFinishedAudioWaiting: String {
         localization.string(localized: "vocello.mac.history.finishedAudioWaiting", defaultValue: "Finished audio is waiting for History",
                comment: "macOS interface: History recovery banner title for unqueued generations. Presentation only.")
     }
+    static var historyLoadFailedDetail: String {
+        localization.string(localized: "vocello.mac.history.loadFailedDetail", defaultValue: "Retry reopens the history database and reads it again.",
+               comment: "macOS interface: History error-state detail above the Retry button. Presentation only.")
+    }
+    static var historyLoadFailedTitle: String {
+        localization.string(localized: "vocello.mac.history.loadFailedTitle", defaultValue: "Couldn't load history",
+               comment: "macOS interface: History error-state title when the database could not be read. Presentation only.")
+    }
+    static var historyLoading: String {
+        localization.string(localized: "vocello.mac.history.loading", defaultValue: "Loading history…",
+               comment: "macOS interface: History loading-state label. Presentation only.")
+    }
+    static var historyNoMatchesDetail: String {
+        localization.string(localized: "vocello.mac.history.noMatchesDetail", defaultValue: "Try a different search term or another mode filter.",
+               comment: "macOS interface: History empty-state detail when the search or mode filter matches nothing. Presentation only.")
+    }
+    static var historyNoMatchesTitle: String {
+        localization.string(localized: "vocello.mac.history.noMatchesTitle", defaultValue: "No matches",
+               comment: "macOS interface: History empty-state title when the search or mode filter matches nothing. Presentation only.")
+    }
+    static var historyNoTakesDetail: String {
+        localization.string(localized: "vocello.mac.history.noTakesDetail", defaultValue: "Generate some audio to see it here.",
+               comment: "macOS interface: History empty-state detail when nothing was generated. Presentation only.")
+    }
+    static var historyNoTakesTitle: String {
+        localization.string(localized: "vocello.mac.history.noTakesTitle", defaultValue: "No takes yet",
+               comment: "macOS interface: History empty-state title when nothing was generated. Presentation only.")
+    }
     static func historyPinSeed(_ seed: String) -> String {
         localization.format(localization.string(localized: "vocello.mac.history.pinSeed",
             defaultValue: "Pin seed %1$@ for new takes",
             comment: "macOS interface: History row action. %1$@ is the numeric sampling seed, never translated."), seed)
+    }
+    static var historyPlayTake: String {
+        localization.string(localized: "vocello.mac.history.playTake", defaultValue: "Play take",
+               comment: "macOS interface: History row play tile label. Presentation only.")
     }
     static func historyRecoveryQueuedMany(_ count: String) -> String {
         localization.format(localization.string(localized: "vocello.mac.history.recoveryQueuedMany",
@@ -661,6 +733,10 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.history.refreshFailed", defaultValue: "Couldn't refresh history",
                comment: "macOS interface: alert title when History fails to reload. Presentation only.")
     }
+    static var historyReloadBeforeDelete: String {
+        localization.string(localized: "vocello.mac.history.reloadBeforeDelete", defaultValue: "Reload History before deleting entries",
+               comment: "macOS interface: tooltip on a disabled History delete action while the database is unavailable. Presentation only.")
+    }
     static var historyRevealAudio: String {
         localization.string(localized: "vocello.mac.history.revealAudio", defaultValue: "Reveal Audio",
                comment: "macOS interface: History recovery banner action that reveals the retained audio in Finder. Presentation only.")
@@ -669,9 +745,30 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.history.revealInFinder", defaultValue: "Reveal in Finder",
                comment: "macOS interface: History row action. Presentation only.")
     }
+    static var historySaveAs: String {
+        localization.string(localized: "vocello.mac.history.saveAs", defaultValue: "Save As…",
+               comment: "macOS interface: History row action that copies the take's WAV where the user chooses. Presentation only.")
+    }
     static var historySaveToSavedVoices: String {
         localization.string(localized: "vocello.mac.history.saveToSavedVoices", defaultValue: "Save to Saved Voices",
                comment: "macOS interface: VoiceOver label of the History action that saves a generation as a voice. Presentation only.")
+    }
+    static var historySegmentsCollapsed: String {
+        localization.string(localized: "vocello.mac.history.segmentsCollapsed", defaultValue: "Collapsed",
+               comment: "macOS interface: VoiceOver value of a closed long-form segment map. Presentation only.")
+    }
+    static var historySegmentsExpanded: String {
+        localization.string(localized: "vocello.mac.history.segmentsExpanded", defaultValue: "Expanded",
+               comment: "macOS interface: VoiceOver value of an open long-form segment map. Presentation only.")
+    }
+    static func historySegmentsMany(_ count: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.history.segmentsMany",
+            defaultValue: "%@ segments",
+            comment: "macOS interface: long-form project disclosure label; %@ is the segment count. Presentation only."), count)
+    }
+    static var historySegmentsOne: String {
+        localization.string(localized: "vocello.mac.history.segmentsOne", defaultValue: "1 segment",
+               comment: "macOS interface: long-form project disclosure label for a single segment. Presentation only.")
     }
     static var historySortAccessibility: String {
         localization.string(localized: "vocello.mac.history.sortAccessibility", defaultValue: "Sort history",

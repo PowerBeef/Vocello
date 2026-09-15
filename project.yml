@@ -171,6 +171,8 @@ targets:
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
       - path: Sources/iOSSupport/Services/IOSDeviceDiagnosticsRecorder.swift
       - path: Sources/iOSSupport/Services/AppNotifications.swift
+      - path: Sources/iOSSupport/Models/Generation.swift
+      - path: Sources/iOSSupport/Services/DatabaseService.swift
     resources:
       - path: Sources/Resources
         buildPhase: resources
@@ -427,7 +429,7 @@ targets:
       - path: Sources/ViewModels/GenerationLifecycleExecutor.swift
       - path: Sources/VocelloCLI/CLIProcessSupervisor.swift
       - path: Sources/VocelloCLI/CLIBatchExecution.swift
-      - path: Sources/Models/Generation.swift
+      - path: Sources/iOSSupport/Models/Generation.swift
       - path: Sources/iOSSupport/Models/PendingVoiceCloningHandoff.swift
       - path: Sources/iOSSupport/Models/IOSStartupReliabilityRecord.swift
       - path: Sources/iOSSupport/Services/AppPaths.swift

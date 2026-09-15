@@ -16128,6 +16128,438 @@
           }
         }
       }
+    },
+    "vocello.mac.history.loadFailedTitle": {
+      "comment": "macOS interface: History error-state title when the database could not be read. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load history"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de charger l’historique"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.loadFailedDetail": {
+      "comment": "macOS interface: History error-state detail above the Retry button. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry reopens the history database and reads it again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayer rouvre la base de l’historique et la relit."
+          }
+        }
+      }
+    },
+    "vocello.mac.history.loading": {
+      "comment": "macOS interface: History loading-state label. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading history…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chargement de l’historique…"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.noTakesTitle": {
+      "comment": "macOS interface: History empty-state title when nothing was generated. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No takes yet"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune prise pour l’instant"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.noTakesDetail": {
+      "comment": "macOS interface: History empty-state detail when nothing was generated. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generate some audio to see it here."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Générez de l’audio pour le voir ici."
+          }
+        }
+      }
+    },
+    "vocello.mac.history.noMatchesTitle": {
+      "comment": "macOS interface: History empty-state title when the search or mode filter matches nothing. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matches"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun résultat"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.noMatchesDetail": {
+      "comment": "macOS interface: History empty-state detail when the search or mode filter matches nothing. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try a different search term or another mode filter."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Essayez un autre terme de recherche ou un autre filtre de mode."
+          }
+        }
+      }
+    },
+    "vocello.mac.history.segmentsOne": {
+      "comment": "macOS interface: long-form project disclosure label for a single segment. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 segment"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 segment"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.segmentsMany": {
+      "comment": "macOS interface: long-form project disclosure label; %@ is the segment count. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ segments"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ segments"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.segmentsExpanded": {
+      "comment": "macOS interface: VoiceOver value of an open long-form segment map. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expanded"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Déployé"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.segmentsCollapsed": {
+      "comment": "macOS interface: VoiceOver value of a closed long-form segment map. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapsed"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replié"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.playTake": {
+      "comment": "macOS interface: History row play tile label. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play take"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lire la prise"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.audioUnavailable": {
+      "comment": "macOS interface: History row play tile label when the WAV is missing. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio unavailable"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio indisponible"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.saveAs": {
+      "comment": "macOS interface: History row action that copies the take's WAV where the user chooses. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save As…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer sous…"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.deleteTake": {
+      "comment": "macOS interface: History row delete action label. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete take"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer la prise"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.reloadBeforeDelete": {
+      "comment": "macOS interface: tooltip on a disabled History delete action while the database is unavailable. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reload History before deleting entries"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechargez l’historique avant de supprimer des entrées"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.exportPrompt": {
+      "comment": "macOS interface: confirm button of the folder panel that exports pending recovery audio. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exporter"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.filterAll": {
+      "comment": "macOS interface: History mode filter chip that shows every mode. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tout"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.filterAccessibility": {
+      "comment": "macOS interface: VoiceOver label of the History mode filter row. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter by mode"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtrer par mode"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.bucketToday": {
+      "comment": "macOS interface: History date section for takes from today. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aujourd’hui"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.bucketYesterday": {
+      "comment": "macOS interface: History date section for takes from yesterday. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yesterday"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hier"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.bucketPrevious7": {
+      "comment": "macOS interface: History date section for takes from the previous week. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous 7 days"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 derniers jours"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.bucketPrevious30": {
+      "comment": "macOS interface: History date section for takes from the previous month. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous 30 days"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 derniers jours"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.bucketEarlier": {
+      "comment": "macOS interface: History date section for older takes. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earlier"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plus ancien"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

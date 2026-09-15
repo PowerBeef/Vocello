@@ -107,9 +107,10 @@ Tests assert these visible production surfaces directly.
 | Element | Identifier |
 |---|---|
 | Search | `history_searchField` (toolbar) |
-| Sort | `history_sortPicker` (menu) |
+| Sort | `history_sortPicker` (menu); date sections (Today, Yesterday, Previous 7 days, Previous 30 days, Earlier) appear only under the newest-first sort |
 | Clear | `history_clearMenu` → `history_clearKeepFiles` / `history_clearDeleteFiles` |
-| Row | `historyRow_<genID>` / `historyRow_play_<genID>` / `historyRow_saveAs_<genID>` / `historyRow_delete_<genID>` |
+| Mode filter | `history_modeFilter` → `history_modeFilter_all` / `_custom` / `_design` / `_clone` chips |
+| Row | `historyRow_<genID>` card: `historyRow_play_<genID>` (the thumbnail tile) / `historyRow_saveVoice_<genID>` (clone and design takes) / `historyRow_saveAs_<genID>` / `historyRow_delete_<genID>` |
 | Pin seed | `history_pinSeedButton` in the row context menu (only for rows with a recorded seed, DP-15): pins the take's seed into its mode's draft and switches to that mode; the composer then shows the pinned-seed chip |
 | Long-form project | joined row plus `history_longFormSegmentsToggle_<digest8>` disclosure over the per-segment map; segments collapse under the project, flatten during search, and orphans stay visible |
 | Degraded database state | `history_errorState`; destructive actions stay disabled until a later reload/read succeeds |

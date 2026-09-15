@@ -25,7 +25,7 @@ class RuntimeSecurityContractTests(unittest.TestCase):
         self.assertEqual(
             MODULE.concurrency_metadata_errors(
                 contract,
-                observed_unchecked_count=34,
+                observed_unchecked_count=33,
                 observed_unsafe_count=7,
                 today=date(2026, 9, 15),
             ),
@@ -36,7 +36,7 @@ class RuntimeSecurityContractTests(unittest.TestCase):
         contract = MODULE.load_json(ROOT / "config/concurrency-safety.json")
         errors = MODULE.concurrency_metadata_errors(
             contract,
-            observed_unchecked_count=35,
+            observed_unchecked_count=34,
             observed_unsafe_count=8,
             today=date(2026, 8, 29),
         )

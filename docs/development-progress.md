@@ -45,8 +45,13 @@ tinted glyph tiles, tint-glass selection pill, install hint on dimmed modes), `M
 and `MacStatusStrip` in the footer, `MacWindowToolbar` and `MacStartupDiagnosticsView` out of
 `ContentView`, `MacAppModel` for the shell state, `MacTheme` / `MacGlass` / `MacMotion` over the
 shared tokens, dark-only on both scenes; every `sidebar_*` and `sidebarPlayer_*` identifier
-unchanged and the legacy screens still hosted underneath. The localization, smoke and perf lanes
-that close CONV-11 run on the maintainer's consent.
+unchanged and the legacy screens still hosted underneath; the localization lane passed on it
+(macos-xcui-localization-20260915-065557-d168d6d4). CONV-12 followed with History: the iOS card
+design (date buckets, mode filter chips, tinted thumbnail tiles) with the desktop's toolbar sort,
+search and clear, Save As, Reveal in Finder and pinned seed, over the shared `Generation` and
+`DatabaseService` now compiled into both apps; `HistoryView.swift` and the macOS twins are gone.
+The maintainer consented to the Step B lanes for every screen commit; they run one at a time as
+each commit lands.
 
 ### Harness stabilization first (September 13, night)
 

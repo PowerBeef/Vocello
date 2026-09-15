@@ -122,7 +122,7 @@
         "Sources/QwenVoiceApp.swift"
       ],
       "updated": "2026-09-15",
-      "notes": "Shell landed 2026-09-15: SidebarView rewritten in the iOS visual language over the shared tokens (MacTheme, MacGlass with GatedGlass + macGatedGlass/macSubtleGlassSurface over VocelloGlassSurface, MacMotion), MacInlinePlayerCard and MacStatusStrip in the footer, MacWindowToolbar and MacStartupDiagnosticsView out of ContentView, MacAppModel for selection and toolbar state, SidebarItem in Sources/Models, dark-only on both scenes; SidebarPlayerView, SidebarStatusView, StartupDiagnosticsView, SidebarStatus and SidebarStatusPresentation deleted; seven vocello.mac.shell/startup keys with French. Identifiers unchanged. Remaining gate: scripts/ui_test.sh macos localization, smoke and perf (idle-baseline, sidebar-navigation, window-resize) PASS run ids, consent-bound."
+      "notes": "Shell landed 2026-09-15 (f0fce93b): SidebarView in the iOS visual language over the shared tokens (MacTheme, MacGlass, MacMotion), MacInlinePlayerCard and MacStatusStrip in the footer, MacWindowToolbar and MacStartupDiagnosticsView out of ContentView, MacAppModel, SidebarItem in Sources/Models, dark-only; legacy footer and diagnostics views deleted; identifiers unchanged. Lanes: localization PASS macos-xcui-localization-20260915-065557-d168d6d4; smoke macos-xcui-smoke-20260915-065808-248f7748 passed 6 of 7, test07 (line batch) failed when the History search field kept only the first typed character while the player card sat in a stale live state (stream ended, stopped); the same search flow passed three times in that run with a completed take, and the failure-time element tree had no toolbar. Under investigation; the next smoke and perf runs follow the History commit (CONV-12). Two earlier localization runs (064454, 064756) were the interrupted-build runner signature failure fixed by 516aeea5."
     },
     {
       "id": "CONV-12",
@@ -134,10 +134,12 @@
       ],
       "gate": "Sources/Views/Library/HistoryView.swift is absent; the shared Generation and DatabaseService replace the macOS twins; history_*, historyRow_* and historyRecovery_* identifiers unchanged; localization, smoke (test02, test05) and perf (history-scroll, history-filter) PASS.",
       "sourceOfTruth": [
-        "Sources/Views/Library/HistoryView.swift",
+        "Sources/Views/History/MacHistoryScreen.swift",
+        "Sources/Models/HistoryPresentation.swift",
         "Sources/iOSSupport/Services/DatabaseService.swift"
       ],
-      "updated": "2026-09-14"
+      "updated": "2026-09-15",
+      "notes": "History landed 2026-09-15: MacHistoryScreen, MacHistoryItemCard, MacHistoryRecoveryBanner and MacHistoryFileActions under Sources/Views/History render the iOS design (date buckets, mode filter chips, tinted thumbnail tiles) with the desktop's toolbar sort, search and clear, Save As, Reveal in Finder and pinned seed; HistorySortOrder and HistoryClearRequest moved to Sources/Models/HistoryPresentation.swift; the shared Generation and DatabaseService (Sources/iOSSupport) replace the macOS twins and the mac-database concurrency entry is gone; HistoryView.swift deleted; 24 vocello.mac.history.* keys with French. history_*, historyRow_* and historyRecovery_* identifiers unchanged. Remaining gate: localization, smoke (test02, test05) and perf (history-scroll, history-filter) PASS run ids."
     },
     {
       "id": "CONV-13",
@@ -437,7 +439,6 @@
         "Sources/Services/BatchGenerationRunner.swift",
         "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift",
         "Tests/VocelloCoreTests/LongFormHistoryAcceptanceTests.swift",
-        "Sources/Services/DatabaseService.swift",
         "Sources/iOSSupport/Services/DatabaseService.swift",
         "Sources/QwenVoiceCore/HistoryDeletionEngine.swift"
       ],
@@ -576,7 +577,6 @@
         "Sources/SharedSupport/Views/GenerationHistoryEnqueueWarning.swift",
         "Tests/VocelloCoreTests/GenerationHistoryEnqueueStateTests.swift",
         "Sources/QwenVoiceCore/HistoryDeletionEngine.swift",
-        "Sources/Services/DatabaseService.swift",
         "Sources/iOSSupport/Services/DatabaseService.swift",
         "Tests/VocelloCoreTests/GenerationHistoryOutboxTests.swift"
       ],

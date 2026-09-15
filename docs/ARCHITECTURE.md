@@ -755,8 +755,8 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
 
 ## 10. Persistence & storage
 
-**GRDB** (`history.sqlite`) via `Sources/Services/DatabaseService.swift` (macOS)
-and `Sources/SharedSupport/Database/GenerationMigrations.swift`. `generations`
+**GRDB** (`history.sqlite`) via `Sources/iOSSupport/Services/DatabaseService.swift` (compiled into
+both apps since 2026-09-15) and `Sources/SharedSupport/Database/GenerationMigrations.swift`. `generations`
 table (current schema, after migrations `v1_create_generations` →
 `v2_add_sortOrder` → `v3_drop_sortOrder` → `v4_index_generations_createdAt` →
 `v5_add_long_form_project` → `v6_add_seed`):

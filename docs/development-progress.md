@@ -36,8 +36,12 @@ store compiled by path, two-layer telemetry, and all seven smoke journeys passin
 the transport test bundle and every contract, script and document that named them; the smoke lane
 passed again (macos-xcui-smoke-20260915-054806-55c7c01b) and the first two-layer benchmark record
 published (macos-xcui-benchmark-20260915-060047-cf740c28). CONV-04 (memory-lane validation of the
-in-process relief) waits for a consented `scripts/macos_test.sh memory` run; the screens (CONV-10
-onwards) are next.
+in-process relief) waits for a consented `scripts/macos_test.sh memory` run. The screens started
+with CONV-10 (b7b62075): `Sources/SharedSupport` now holds the theme tokens, the glass surface body,
+the word-timing planner and the script-limit policy, the iOS files forward to them unchanged in
+behavior, and the macOS long-form router reads the shared limit. CONV-11, the new shell (sidebar,
+inline player card, status strip, window toolbar in the iOS visual language, dark-only, hosting the
+legacy screens), is in flight.
 
 ### Harness stabilization first (September 13, night)
 

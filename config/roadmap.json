@@ -110,34 +110,18 @@
       "updated": "2026-09-15"
     },
     {
-      "id": "CONV-10",
-      "plan": "macos-ios-convergence-2026-09",
-      "title": "Shared theme tokens, glass surface, word timing and text-limit policy",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "Sources/SharedSupport carries the tokens, the glass surface body, WordTimingPlanner and GenerationTextLimitPolicy with no UIKit or AppKit import; the iOS files forward to them; two new VocelloCoreTests pass; the generic iOS compile is green; config/ios-control-audit.json is unchanged.",
-      "sourceOfTruth": [
-        "Sources/SharedSupport",
-        "Sources/iOS/Theme/Theme.swift",
-        "Sources/iOS/Theme/ThemeModifiers.swift"
-      ],
-      "updated": "2026-09-15"
-    },
-    {
       "id": "CONV-11",
       "plan": "macos-ios-convergence-2026-09",
       "title": "New macOS shell in the iOS visual language hosting the legacy screens",
-      "status": "planned",
-      "blockedBy": [
-        "CONV-10"
-      ],
+      "status": "in-flight",
+      "blockedBy": [],
       "gate": "SidebarView, the inline player card, the status strip and the window toolbar render the iOS design over the shared store; SidebarPlayerView, SidebarStatusView and StartupDiagnosticsView are gone; repo_invariants, the literal scanner and its baseline pass unchanged; scripts/ui_test.sh macos localization, smoke and perf PASS with run ids.",
       "sourceOfTruth": [
         "Sources/ContentView.swift",
         "Sources/Views/Sidebar/SidebarView.swift",
         "Sources/QwenVoiceApp.swift"
       ],
-      "updated": "2026-09-14"
+      "updated": "2026-09-15"
     },
     {
       "id": "CONV-12",
@@ -254,9 +238,7 @@
       "plan": "macos-ios-convergence-2026-09",
       "title": "Device re-verification of the frozen iOS behavior",
       "status": "parked",
-      "blockedBy": [
-        "CONV-10"
-      ],
+      "blockedBy": [],
       "gate": "On the paired iPhone, scripts/ui_test.sh ios smoke and the control audit pass on the source that shares the store, tokens and policies with macOS; no iOS identifier or control count changed.",
       "sourceOfTruth": [
         "config/ios-control-audit.json",

@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `macos-ios-convergence-2026-09` | active | backend-and-platform | 3/14 (21%) |
+| `macos-ios-convergence-2026-09` | active | backend-and-platform | 4/14 (29%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -34,8 +34,7 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `CONV-04` | in-flight | In-process memory relief on 8 GB Macs | — |
-| `CONV-10` | in-flight | Shared theme tokens, glass surface, word timing and text-limit policy | — |
-| `CONV-11` | planned | New macOS shell in the iOS visual language hosting the legacy screens | `CONV-10` |
+| `CONV-11` | in-flight | New macOS shell in the iOS visual language hosting the legacy screens | — |
 | `CONV-12` | planned | History on the iOS screen with sort, Save As and Reveal | `CONV-11` |
 | `CONV-13` | planned | Saved Voices, the enrollment sheet and the record sheet on the iOS screens | `CONV-12` |
 | `CONV-14` | planned | Settings on the iOS screen with the desktop rows and the interface-language picker | `CONV-13` |
@@ -43,17 +42,14 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 | `CONV-16` | planned | Voice Design on the iOS screen | `CONV-15` |
 | `CONV-17` | planned | Voice Cloning on the iOS screen and removal of the legacy remainder | `CONV-16` |
 | `CONV-18` | planned | Perf re-baseline, marketing captures and documentation of the new macOS app | `CONV-17` |
-| `CONV-20` | parked | Device re-verification of the frozen iOS behavior | `CONV-10` |
+| `CONV-20` | parked | Device re-verification of the frozen iOS behavior | — |
 
 ### Open items in detail
 
 - **`CONV-04`** (in-flight) — In-process memory relief on 8 GB Macs.
   gate: The macOS store runs a Mac memory budget policy; kernel pressure drives trim and full unload through the store's terminal barrier; idle unload follows NativeMemoryPolicyResolver; one consented scripts/macos_test.sh memory run shows no critical pressure, warning, hardTrim or fullUnload during a qualified take on the canonical 8 GB Mac.
 
-- **`CONV-10`** (in-flight) — Shared theme tokens, glass surface, word timing and text-limit policy.
-  gate: Sources/SharedSupport carries the tokens, the glass surface body, WordTimingPlanner and GenerationTextLimitPolicy with no UIKit or AppKit import; the iOS files forward to them; two new VocelloCoreTests pass; the generic iOS compile is green; config/ios-control-audit.json is unchanged.
-
-- **`CONV-11`** (planned) — New macOS shell in the iOS visual language hosting the legacy screens.
+- **`CONV-11`** (in-flight) — New macOS shell in the iOS visual language hosting the legacy screens.
   gate: SidebarView, the inline player card, the status strip and the window toolbar render the iOS design over the shared store; SidebarPlayerView, SidebarStatusView and StartupDiagnosticsView are gone; repo_invariants, the literal scanner and its baseline pass unchanged; scripts/ui_test.sh macos localization, smoke and perf PASS with run ids.
 
 - **`CONV-12`** (planned) — History on the iOS screen with sort, Save As and Reveal.

@@ -3110,6 +3110,25 @@
         "file:scripts/check_macos_ui_bench.py"
       ],
       "notes": "Closed 2026-09-15. Deleted Sources/QwenVoiceEngineService, Sources/QwenVoiceEngineSupport, Sources/QwenVoiceNative, the embedded-runtime entitlements and Tests/VocelloEngineIntegrationTests (19 transport tests) with their targets; imports point at QwenVoiceCore; SharedSupport seams key on os(macOS). Contracts rewritten with dated notes: entitlement policy (app + framework roles, release signing refuses XPC services), concurrency-safety (34/7 budgets), runtime-refactor (phase retired, invariant renamed, amendment20260915), TSan (VocelloCoreTests only), capability matrix, risk spine, build-output policy, classifier, localization target check, saved-voice lifecycle; scripts lose XPCServices paths and the transport bundle; check_macos_ui_bench.py validates two layers from one process. Docs: CLAUDE.md, native.md, SECURITY.md, ARCHITECTURE.md, macOS guides, telemetry, benchmarking, ADR, README and chart. Evidence: unit lane mac-test-20260915-014410 (659 core + 125 runtime), smoke macos-xcui-smoke-20260915-054806-55c7c01b, benchmark macos-xcui-benchmark-20260915-060047-cf740c28 (2-layer record)."
+    },
+    {
+      "id": "CONV-10",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Shared theme tokens, glass surface, word timing and text-limit policy",
+      "status": "done",
+      "gate": "Sources/SharedSupport carries the tokens, the glass surface body, WordTimingPlanner and GenerationTextLimitPolicy with no UIKit or AppKit import; the iOS files forward to them; two new VocelloCoreTests pass; the generic iOS compile is green; config/ios-control-audit.json is unchanged.",
+      "sourceOfTruth": [
+        "Sources/SharedSupport",
+        "Sources/iOS/Theme/Theme.swift",
+        "Sources/iOS/Theme/ThemeModifiers.swift"
+      ],
+      "updated": "2026-09-15",
+      "evidence": [
+        "commit:b7b62075",
+        "file:Sources/SharedSupport/Theme/VocelloThemeTokens.swift",
+        "file:Tests/VocelloCoreTests/GenerationTextLimitPolicyTests.swift"
+      ],
+      "notes": "Closed 2026-09-15 with b7b62075. Sources/SharedSupport carries VocelloTheme (the shipped iOS colors as Color(red:green:blue:opacity:), radii, spacing, motion), VocelloShape, VocelloGlassSurface (the glass-or-solid body behind each platform gate), WordTimingPlanner and GenerationTextLimitPolicy, none importing UIKit or AppKit. The iOS files forward (tokens, UIColor twins kept, IOSGatedGlassModifier still owns the gate, typealiases for the shape, the planner and the limit policy; the interface-language messages stay in an iOS extension). The macOS long-form router reads the shared 900-character limit. Two new VocelloCoreTests pass in the unit lane (core 0, runtime 0), the generic iOS compile is green and config/ios-control-audit.json is unchanged."
     }
   ]
 }

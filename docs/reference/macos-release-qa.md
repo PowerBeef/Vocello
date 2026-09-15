@@ -1,10 +1,11 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-12
+reviewed: 2026-09-15
 summary: The standing macOS release-QA checklist — deterministic gates, the per-candidate smoke step, release-notes and performance-surface obligations, packaging and verification.
 sourceOfTruth:
   - scripts/release.sh
+  - docs/reference/macos-app-guide.md
   - .github/workflows/release.yml
   - scripts/macos_test.sh
   - scripts/cli_package.py
@@ -150,6 +151,35 @@ release-readiness and artifact checks.
    deterministic candidate and the promotion manifest before changing the draft to public. Device
    or model availability can delay public promotion, but never candidate building, signing,
    notarization, attestation, or draft upload.
+
+## Attended walk of the converged screens (per candidate, ten minutes)
+
+Since the macOS app adopted the iOS screens (plan `macos-ios-convergence-2026-09`, closed
+2026-09-15), the smoke lane proves the journeys and this walk catches what a lane does not see:
+copy, spacing and French. Run it on the candidate build with the interface language set to
+French once and to System Default once (Settings, `settings_appLanguage`); the app is dark-only.
+
+1. **Sidebar and status**: brand lockup, Studio and Library sections, Settings last; the inline
+   player card and the status strip under it (`sidebar_backendStatus`, `sidebar_generationStatus`)
+   reflect the engine's load state; ⌘1–⌘6 switch screens.
+2. **Built-in Voice**: composer with the character count, the speaker, delivery, language and seed
+   chips as menus on pills, the readiness line, the Generate CTA in the dock; generate one take and
+   confirm the live card's Cancel, then the completed card's Retry, Save As, Reveal and dismiss.
+3. **Voice Design**: the brief editor above the composer with its starters menu and character
+   count; a completed take offers Save as voice; the saved voice appears in Saved Voices.
+4. **Voice Cloning**: the reference chip lists saved voices (persona rows for emotion banks) with
+   Import, Record and Clear inside; drop an unsupported file and confirm the footer warning; the
+   transcript field, the one-time consent and the readiness line read correctly.
+5. **Batch and long-form**: the Batch chip opens the sheet in line mode; a script over 900
+   characters routes Generate to long form; run a two-line batch, cancel a long-form project and
+   resume it, regenerate one segment; the dock behind the sheet shows the live card.
+6. **History, Saved Voices, Settings**: sort and search in the toolbar, the long-form segments
+   toggle, Save As and Reveal; the enroll and record sheets; the recommended-setup summary, the
+   per-mode Speed and Quality rows with their actions, prefer-speed, variation, the output folder,
+   Application data and clone consent; Cmd+, opens the same screen in its own window.
+
+Anything that reads wrong in French is a catalog fix (`MacInterfaceText` + `Localizable.xcstrings`),
+never a code-side literal; see [`localization.md`](localization.md).
 
 ## CLI distribution and qualification
 

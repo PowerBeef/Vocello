@@ -89,6 +89,9 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
             VocelloUIWait.exists(useButton, timeout: 20),
             "marketing clone voice must be enrolled before capture (vocello voices enroll)"
         )
+        // The marketing voice sorts last; on the default window it sits below the
+        // fold of the Saved Voices list, and a primary action never auto-scrolls.
+        XCTAssertTrue(VocelloUIScroll.intoView(useButton, in: element("screen_voices")))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: useButton, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("screen_voiceCloning"), timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("voiceCloning_activeReference"), timeout: 20))
@@ -139,5 +142,39 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
         assertHistoryRows(matching: "Welcome to Vocello", expected: 1)
         assertHistoryRows(matching: "The harbor opens", expected: 1)
         assertHistoryRows(matching: "Some stories are best told", expected: 1)
+    }
+
+    /// Voice Design and Settings captures: an authored brief with its script,
+    /// ready to generate, then the model packages in Settings. Both are
+    /// window captures; no take is generated.
+    func test03_DesignAndSettingsCapture() throws {
+        beginSession()
+        defer { endSession() }
+        navigate(to: .voiceDesign)
+        let brief = element("voiceDesign_voiceDescriptionField")
+        let marketingBrief = "A warm, unhurried narrator in her fifties with a soft Irish lilt, "
+            + "gentle humor, and a clear, even pace."
+        if (brief.value as? String) != marketingBrief {
+            XCTAssertTrue(VocelloUITextEntry.replace(in: brief, with: marketingBrief, timeout: 20))
+        }
+        XCTAssertTrue(VocelloUIWait.value(brief, contains: marketingBrief, timeout: 10))
+        let designScript = "The harbor opens at first light, and the town wakes slowly "
+            + "to the sound of gulls."
+        replaceScript(with: designScript)
+        assertReadyToGenerate(mode: .design)
+        let window = app.windows.firstMatch
+        let designShot = XCTAttachment(screenshot: window.screenshot())
+        designShot.name = "marketing-voice-design"
+        designShot.lifetime = .keepAlways
+        add(designShot)
+
+        navigate(to: .settings)
+        XCTAssertTrue(
+            VocelloUIWait.exists(element("settings_packageStatus_pro_custom_speed"), timeout: 20)
+        )
+        let settingsShot = XCTAttachment(screenshot: window.screenshot())
+        settingsShot.name = "marketing-model-downloads"
+        settingsShot.lifetime = .keepAlways
+        add(settingsShot)
     }
 }

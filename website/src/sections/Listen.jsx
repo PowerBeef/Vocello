@@ -82,8 +82,8 @@ export const Listen = () => {
         <div className="listen-deliveries">
           <div className="vc-label" id="delivery-vocab-label">Delivery presets</div>
           <p className="listen-deliveries-sub">
-            Built-in Voice and Voice Design shape a take with one of ten delivery
-            presets, each at normal or strong intensity.
+            Built-in Voice and Voice Design shape a take with one of eight delivery
+            presets or a delivery you describe in your own words.
           </p>
           <div className="try-chips" role="list" aria-labelledby="delivery-vocab-label">
             {DELIVERIES.map((d) => (
@@ -99,11 +99,11 @@ export const Listen = () => {
           <div className="window">
             <img
               src="assets/screens/delivery-presets.png"
-              alt="The Vocello delivery menu open, listing all ten presets from Neutral to Excited"
+              alt="The Vocello delivery menu open, listing the eight presets, the four distinct deliveries first and the directional hints after them, plus Custom"
             />
           </div>
           <figcaption className="try-shot-caption">
-            All ten presets, each with normal and strong intensity, live in the app.
+            All eight presets and the free-text delivery live in the app.
           </figcaption>
         </figure>
       </div>

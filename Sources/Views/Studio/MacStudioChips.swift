@@ -274,3 +274,60 @@ struct MacStudioBatchChip: View {
         .frame(maxWidth: 160)
     }
 }
+
+/// Lays the setup chips out in rows: a chip that no longer fits the column
+/// starts a new row instead of pushing the column past the viewport (an
+/// `HStack` of pills never compresses, so on a 720 pt window it overflowed and
+/// the pinned canvas clipped both edges of the composer and the chips).
+struct MacChipFlow: Layout {
+    var spacing: CGFloat = 8
+    var rowSpacing: CGFloat = 8
+
+    private struct Row {
+        var indices: [Int] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil }
+        let rows = arrange(subviews, width: width ?? .infinity)
+        let height = rows.map(\.height).reduce(0, +) + rowSpacing * CGFloat(max(rows.count - 1, 0))
+        let widest = rows.map(\.width).max() ?? 0
+        return CGSize(width: width ?? widest, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(subviews, width: bounds.width) {
+            var x = bounds.minX
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(
+                    at: CGPoint(x: x, y: y + (row.height - size.height) / 2),
+                    proposal: ProposedViewSize(size)
+                )
+                x += size.width + spacing
+            }
+            y += row.height + rowSpacing
+        }
+    }
+
+    private func arrange(_ subviews: Subviews, width: CGFloat) -> [Row] {
+        var rows: [Row] = []
+        var current = Row()
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            let proposedWidth = current.indices.isEmpty ? size.width : current.width + spacing + size.width
+            if !current.indices.isEmpty, proposedWidth > width {
+                rows.append(current)
+                current = Row()
+            }
+            current.indices.append(index)
+            current.width = current.indices.count == 1 ? size.width : current.width + spacing + size.width
+            current.height = max(current.height, size.height)
+        }
+        if !current.indices.isEmpty { rows.append(current) }
+        return rows
+    }
+}

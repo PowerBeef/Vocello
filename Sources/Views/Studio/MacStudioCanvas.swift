@@ -127,7 +127,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             VStack(alignment: .leading, spacing: 10) {
                 // Lock voice, delivery and language while a take is in flight
                 // (the request already captured them); re-enabled on complete.
-                HStack(alignment: .center, spacing: 8) {
+                MacChipFlow(spacing: 8, rowSpacing: 8) {
                     setupChips
                 }
                 .disabled(genState.isGenerationActive)

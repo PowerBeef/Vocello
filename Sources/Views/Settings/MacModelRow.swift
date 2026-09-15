@@ -148,13 +148,17 @@ struct MacModelPackageLine: View {
             HStack(alignment: .center, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     // "Speed · 4-bit": the tier plus only the per-row fact.
+                    // The tier label is the row's identity and wins the width;
+                    // on a narrow window the badge truncates before the label
+                    // collapses to one letter.
                     Text(compactVariantLabel)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(MacTheme.Text.primary)
                         .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .layoutPriority(2)
                     packageBadge
                         .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
                         .accessibilityIdentifier("settings_packageBadge_\(model.id)")
                 }
                 .layoutPriority(1)

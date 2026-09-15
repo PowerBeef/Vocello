@@ -325,7 +325,7 @@ struct MacVoiceCloningScreen: View {
 
     private var setupChips: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 8) {
+            MacChipFlow(spacing: 8, rowSpacing: 8) {
                 MacStudioChipContainer(accessibilityIdentifier: "voiceCloning_voiceSetup") { referenceChip }
                 MacStudioActionChip(
                     eyebrow: MacInterfaceText.cloningReferenceSection,
@@ -347,7 +347,7 @@ struct MacVoiceCloningScreen: View {
                     bankDeliveryChip(persona)
                 }
             }
-            HStack(alignment: .center, spacing: 8) {
+            MacChipFlow(spacing: 8, rowSpacing: 8) {
                 MacStudioChipContainer(accessibilityIdentifier: "voiceCloning_languageSetup") {
                     MacStudioLanguageChip(
                         selectedLanguage: $draft.selectedLanguage,

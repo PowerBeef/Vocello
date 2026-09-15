@@ -53,3 +53,20 @@ returns (item CONV-20).
 - macOS interface copy stays catalog-owned with French; new strings enter `Localizable.xcstrings`.
 - Model delivery stays macOS-native (`ModelManagerViewModel` over `HuggingFaceDownloader`): the iOS
   catalog carries only the Speed artifacts.
+
+## Outcome (2026-09-15)
+
+The plan completed in one day of commits on `main`, every one shippable and lane-verified. The
+engine runs in-process on the shared `TTSEngineStore` (CONV-01–04, memory lane on the 8 GB Mac);
+the shell, History, Saved Voices, Settings, Built-in Voice, Voice Design and Voice Cloning are the
+iOS screens adapted to macOS under `Sources/Views` (CONV-10–17), and line batch plus long-form run
+on the shared single-take executor and the shared long-form runner behind platform-hooks seams
+(CONV-22). The legacy macOS views, coordinators, executor, theme, layout constants and drafts are
+gone; the macOS accessibility identifiers survived unchanged and the lanes prove it. The perf
+thresholds were re-baselined from three sessions on the converged tree and the marketing captures
+retaken (CONV-18). Two items moved to the release-first plan: CONV-20 re-verifies the frozen iOS
+behavior on the phone (the iOS edits were forwards, seams with iOS defaults and pure splits, each
+verified by the generic device-SDK compile) and CONV-21 decides the toolchain bump. The single
+cost that landed as predicted: push CI pins Xcode 26.6 while the Mac runs Xcode 27, so a
+main-actor call from a nonisolated test override compiled locally and failed on CI until fixed
+forward (ea795cde); the rule is to read CI after every push.

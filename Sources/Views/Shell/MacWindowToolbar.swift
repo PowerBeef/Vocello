@@ -3,13 +3,11 @@ import SwiftUI
 
 /// Window-toolbar controls of the current destination: History sort, clear
 /// and search, and the Saved Voices enroll button. Desktop-only chrome the
-/// iOS screens keep inline; the identifiers are the lane contract.
+/// iOS screens keep inline; the identifiers are the lane contract. The
+/// controls observe `MacAppModel` themselves so a keystroke in the search
+/// field re-renders the field and the History screen, never the shell.
 struct MacWindowToolbar: ToolbarContent {
     let selectedItem: SidebarItem?
-    @Binding var historySortOrder: HistorySortOrder
-    @Binding var historySearchText: String
-    @Binding var historyClearRequest: HistoryClearRequest?
-    @Binding var voicesEnrollRequestID: UUID?
 
     var body: some ToolbarContent {
         // One ToolbarItem (HStack): separate items pick up enough inter-item
@@ -17,58 +15,75 @@ struct MacWindowToolbar: ToolbarContent {
         // (regressing the smoke test's `history_searchField` assertion).
         if selectedItem == .history {
             ToolbarItem {
-                HStack(spacing: 10) {
-                    Menu {
-                        Picker(MacInterfaceText.historySortPicker, selection: $historySortOrder) {
-                            ForEach(HistorySortOrder.allCases) { order in
-                                Text(order.label).tag(order)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "arrow.up.arrow.down.circle")
-                    }
-                    .accessibilityLabel(MacInterfaceText.historySortAccessibility)
-                    .accessibilityIdentifier("history_sortPicker")
-
-                    Menu {
-                        Button(MacInterfaceText.historyClearKeepFiles) {
-                            historyClearRequest = HistoryClearRequest(scope: .keepFiles)
-                        }
-                        .accessibilityIdentifier("history_clearKeepFiles")
-                        Button(MacInterfaceText.historyClearDeleteFiles, role: .destructive) {
-                            historyClearRequest = HistoryClearRequest(scope: .deleteFiles)
-                        }
-                        .accessibilityIdentifier("history_clearDeleteFiles")
-                    } label: {
-                        Image(systemName: "trash.circle")
-                    }
-                    .accessibilityLabel(MacInterfaceText.historyClearAccessibility)
-                    .accessibilityIdentifier("history_clearMenu")
-
-                    MacToolbarSearchField(
-                        text: $historySearchText,
-                        placeholder: MacInterfaceText.sidebarSearchHistory,
-                        accessibilityIdentifier: "history_searchField"
-                    )
-                    // Fixed width on purpose: flexible or generous frames push
-                    // the trailing toolbar group into the overflow chevron at
-                    // compact window widths (smoke-verified 2026-08-06). 170
-                    // is just enough to unclip the placeholder.
-                    .frame(width: 170)
-                }
+                MacHistoryToolbarControls()
             }
         }
 
         if selectedItem == .voices {
             ToolbarItem {
-                Button(MacInterfaceText.voicesAddVoiceSampleAction) {
-                    voicesEnrollRequestID = UUID()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(MacTheme.accent)
-                .accessibilityIdentifier("voices_enrollButton")
+                MacVoicesToolbarControls()
             }
         }
+    }
+}
+
+private struct MacHistoryToolbarControls: View {
+    @Environment(MacAppModel.self) private var appModel
+
+    var body: some View {
+        @Bindable var appModel = appModel
+        HStack(spacing: 10) {
+            Menu {
+                Picker(MacInterfaceText.historySortPicker, selection: $appModel.historySortOrder) {
+                    ForEach(HistorySortOrder.allCases) { order in
+                        Text(order.label).tag(order)
+                    }
+                }
+            } label: {
+                Image(systemName: "arrow.up.arrow.down.circle")
+            }
+            .accessibilityLabel(MacInterfaceText.historySortAccessibility)
+            .accessibilityIdentifier("history_sortPicker")
+
+            Menu {
+                Button(MacInterfaceText.historyClearKeepFiles) {
+                    appModel.historyClearRequest = HistoryClearRequest(scope: .keepFiles)
+                }
+                .accessibilityIdentifier("history_clearKeepFiles")
+                Button(MacInterfaceText.historyClearDeleteFiles, role: .destructive) {
+                    appModel.historyClearRequest = HistoryClearRequest(scope: .deleteFiles)
+                }
+                .accessibilityIdentifier("history_clearDeleteFiles")
+            } label: {
+                Image(systemName: "trash.circle")
+            }
+            .accessibilityLabel(MacInterfaceText.historyClearAccessibility)
+            .accessibilityIdentifier("history_clearMenu")
+
+            MacToolbarSearchField(
+                text: $appModel.historySearchText,
+                placeholder: MacInterfaceText.sidebarSearchHistory,
+                accessibilityIdentifier: "history_searchField"
+            )
+            // Fixed width on purpose: flexible or generous frames push the
+            // trailing toolbar group into the overflow chevron at compact
+            // window widths (smoke-verified 2026-08-06). 170 is just enough
+            // to unclip the placeholder.
+            .frame(width: 170)
+        }
+    }
+}
+
+private struct MacVoicesToolbarControls: View {
+    @Environment(MacAppModel.self) private var appModel
+
+    var body: some View {
+        Button(MacInterfaceText.voicesAddVoiceSampleAction) {
+            appModel.voicesEnrollRequestID = UUID()
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(MacTheme.accent)
+        .accessibilityIdentifier("voices_enrollButton")
     }
 }
 

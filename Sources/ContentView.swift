@@ -97,7 +97,6 @@ struct ContentView: View {
     }
 
     var body: some View {
-        @Bindable var appModel = appModel
         NavigationSplitView {
             SidebarView(
                 selection: sidebarSelectionBinding,
@@ -112,13 +111,7 @@ struct ContentView: View {
             detailContent
         }
         .toolbar {
-            MacWindowToolbar(
-                selectedItem: appModel.selectedItem,
-                historySortOrder: $appModel.historySortOrder,
-                historySearchText: $appModel.historySearchText,
-                historyClearRequest: $appModel.historyClearRequest,
-                voicesEnrollRequestID: $appModel.voicesEnrollRequestID
-            )
+            MacWindowToolbar(selectedItem: appModel.selectedItem)
         }
         .navigationSplitViewStyle(.balanced)
         .environment(appModel)
@@ -177,11 +170,8 @@ struct ContentView: View {
                 pendingSavedVoiceHandoff: $pendingVoiceCloningHandoff
             )
         case .history:
-            MacHistoryScreen(
+            HistoryScreenHost(
                 ttsEngineStore: ttsEngineStore,
-                searchText: $appModel.historySearchText,
-                sortOrder: $appModel.historySortOrder,
-                clearRequest: $appModel.historyClearRequest,
                 onPinSeed: { generation in
                     guard let seedValue = generation.samplingSeed else { return }
                     // Pin into the take's own mode and surface that mode so
@@ -394,6 +384,28 @@ struct ContentView: View {
             purpose: .finalGenerationReadiness,
             deviceClass: modelManager.deviceClass,
             cloneReference: reference
+        )
+    }
+}
+
+/// Binds the History screen to the shell's toolbar state from the
+/// environment, so a keystroke in the search field re-renders this host and
+/// the screen, never `ContentView` (whose body would rebuild every hosted
+/// screen value).
+private struct HistoryScreenHost: View {
+    let ttsEngineStore: TTSEngineStore
+    let onPinSeed: (Generation) -> Void
+
+    @Environment(MacAppModel.self) private var appModel
+
+    var body: some View {
+        @Bindable var appModel = appModel
+        MacHistoryScreen(
+            ttsEngineStore: ttsEngineStore,
+            searchText: $appModel.historySearchText,
+            sortOrder: $appModel.historySortOrder,
+            clearRequest: $appModel.historyClearRequest,
+            onPinSeed: onPinSeed
         )
     }
 }

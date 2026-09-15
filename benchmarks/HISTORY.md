@@ -1239,6 +1239,12 @@ trend percentages carry their direction in words.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-01 | [`macos-xcui-benchmark-20260801-182943-b0b5a448`](runs/ui-generation/macos-xcui-benchmark-20260801-182943-b0b5a448.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.54 | `75896cfd538f` | `0fc6cb69cd79` | baseline | macos-xcui-benchmark-20260801-182943-b0b5a448 |
 
+## ui-generation / macos / mac-mini-m2-8gb / config `1084fbacc2f0`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-15 | [`macos-xcui-benchmark-20260915-204218-674a9e13`](runs/ui-generation/macos-xcui-benchmark-20260915-204218-674a9e13.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 1 | 0.76 | `d6098edfc0dd` | `1084fbacc2f0` | baseline | macos-xcui-benchmark-20260915-204218-674a9e13 |
+
 ## ui-generation / macos / mac-mini-m2-8gb / config `126311b505ce`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
@@ -1536,6 +1542,12 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-15 | [`macos-xcui-perf-20260915-185131-61165de6`](runs/ui-perf/macos-xcui-perf-20260915-185131-61165de6.json) | canonical | canonical | passed | not-applicable | 9 | — | `62279fc7111f` | `27fdcbf14de6` | baseline | macos-xcui-perf-20260915-185131-61165de6 |
+
+## ui-perf / macos / mac-mini-m2-8gb / config `37f6804d3371`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-15 | [`macos-xcui-perf-20260915-203408-f0d2bd13`](runs/ui-perf/macos-xcui-perf-20260915-203408-f0d2bd13.json) | canonical | canonical | passed | not-applicable | 9 | — | `d6098edfc0dd` | `37f6804d3371` | baseline | macos-xcui-perf-20260915-203408-f0d2bd13 |
 
 ## ui-perf / macos / mac-mini-m2-8gb / config `3eb6ed9e4625`
 

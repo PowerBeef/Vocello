@@ -65,6 +65,16 @@ CONV-16 followed with Voice Design on the same canvas: the brief editor inline a
 the shared Delivery and Language chips (now `MacStudioChips`), and the save-as-voice action for the
 last take over the shared pipeline; its lanes passed (localization 193652-7fbe0a64, smoke
 193951-08d0c88c 7/7, design benchmark 195002-89555f53) and CONV-16 is closed.
+CONV-17 put Voice Cloning on the canvas (d6098edf): the reference chip is the saved-voice menu with
+Import, Record and Clear inside it, the bank delivery chip appears for a persona, and the footer
+carries the reference status, warnings, transcript field, inline consent and readiness; the legacy
+pipeline (VoiceCloningCoordinator, GenerationLifecycleExecutor, TextInputView and the workflow
+views) is gone. Its lanes passed (localization 202046-d7f04ed1, smoke 202348-6a2e9d2f 7/7, perf
+203408-f0d2bd13 nine scenarios clean, clone benchmark 204218-674a9e13) and CONV-17 is closed. Push
+CI had been red since the Settings commit on one test fixture calling a main-actor bootstrap from a
+nonisolated setUp (Xcode 26.6 on CI refuses what Xcode 27 accepts locally); ea795cde fixed it
+forward. CONV-22 (batch and long-form on the shared pipeline, then AppTheme, LayoutConstants and
+the drafts swap) is next.
 Its lanes needed three fixes on the way (an NSTextView bridge answering an infinite proposal with
 its document height, then the screen identifier erasing the dock identifiers) and passed on
 62279fc7 (localization 183823-bca6adf5, smoke 184118-afaded1b 7/7, perf 185131-61165de6, custom

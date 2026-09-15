@@ -3291,6 +3291,29 @@
         "file:Sources/Views/Studio/MacVoiceDesignScreen.swift",
         "file:Sources/Views/Studio/MacStudioChips.swift"
       ]
+    },
+    {
+      "id": "CONV-17",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Voice Cloning on the iOS screen and removal of the legacy pipeline",
+      "status": "done",
+      "gate": "VoiceCloningView.swift, VoiceCloningCoordinator.swift, GenerationLifecycleExecutor.swift (with its test, doubles and project.yml entry), TextInputView.swift, GenerationWorkflowView.swift, EmotionPickerView.swift and WaveformView.swift are absent; MacVoiceCloningScreen renders the iOS Studio canvas with the reference, Import, Record and bank-delivery chips, drag-and-drop import and the record sheet; voiceCloning_* identifiers unchanged; native.md and the app guide describe the new screens; localization, all seven smoke journeys, all nine perf scenarios and a short clone benchmark PASS.",
+      "sourceOfTruth": [
+        "Sources/Views/Studio/MacVoiceCloningScreen.swift",
+        "Sources/Models/VoiceCloningReferenceAudioSupport.swift",
+        "docs/reference/macos-app-guide.md"
+      ],
+      "updated": "2026-09-15",
+      "notes": "Closed 2026-09-15 with d6098edf. MacVoiceCloningScreen on MacStudioCanvas: reference chip = saved-voice menu (persona rows, Import, Record, Clear), Import/Record chips, bank delivery chip per persona, Language/seed/Batch chips; reference status with quality popover, saved-voices and transcript warnings, transcript field, inline consent, readiness; drag-and-drop and MacRecordVoiceSheet kept; clone priming ported; MacAppModel.cloneCoordinator. The legacy pipeline is gone: VoiceCloningView, VoiceCloningCoordinator, GenerationLifecycleExecutor (+ test), TextInputView, GenerationWorkflowView, EmotionPickerView, WaveformView; no macOS localization exception left; 10 vocello.mac.cloning keys with French; drop rejection = voiceCloning_dropWarning. AppTheme, LayoutConstants and the drafts swap wait for CONV-22. Push CI was red from c27a7d3f (test fixture isolation under Xcode 26.6), fixed forward in ea795cde. Lanes: localization macos-xcui-localization-20260915-202046-d7f04ed1, smoke macos-xcui-smoke-20260915-202348-6a2e9d2f (7/7), perf macos-xcui-perf-20260915-203408-f0d2bd13 (9 scenarios passed, no warnings), clone benchmark macos-xcui-benchmark-20260915-204218-674a9e13.",
+      "evidence": [
+        "commit:d6098edf",
+        "run:macos-xcui-localization-20260915-202046-d7f04ed1",
+        "run:macos-xcui-smoke-20260915-202348-6a2e9d2f",
+        "run:macos-xcui-perf-20260915-203408-f0d2bd13",
+        "run:macos-xcui-benchmark-20260915-204218-674a9e13",
+        "file:Sources/Views/Studio/MacVoiceCloningScreen.swift",
+        "file:Sources/Models/VoiceCloningReferenceAudioSupport.swift"
+      ]
     }
   ]
 }

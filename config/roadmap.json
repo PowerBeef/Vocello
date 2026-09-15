@@ -99,7 +99,7 @@
       "id": "CONV-22",
       "plan": "macos-ios-convergence-2026-09",
       "title": "Line batch and long-form on the shared runner",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "BatchGenerationSheet.swift and BatchGenerationRunner.swift are absent; MacBatchGenerationSheet and MacLineBatchRunner run line batch over the shared single-take executor and long-form projects over IOSLongFormProject for all three modes; batch_* identifiers and TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS unchanged; F-16 sourceOfTruth re-pointed; AppTheme.swift and LayoutConstants.swift are absent and the shared iOS GenerationDrafts replace the macOS drafts; smoke (test06, test07) PASS.",
       "sourceOfTruth": [
@@ -111,28 +111,11 @@
       "updated": "2026-09-15"
     },
     {
-      "id": "CONV-17",
-      "plan": "macos-ios-convergence-2026-09",
-      "title": "Voice Cloning on the iOS screen and removal of the legacy pipeline",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "VoiceCloningView.swift, VoiceCloningCoordinator.swift, GenerationLifecycleExecutor.swift (with its test, doubles and project.yml entry), TextInputView.swift, GenerationWorkflowView.swift, EmotionPickerView.swift and WaveformView.swift are absent; MacVoiceCloningScreen renders the iOS Studio canvas with the reference, Import, Record and bank-delivery chips, drag-and-drop import and the record sheet; voiceCloning_* identifiers unchanged; native.md and the app guide describe the new screens; localization, all seven smoke journeys, all nine perf scenarios and a short clone benchmark PASS.",
-      "sourceOfTruth": [
-        "Sources/Views/Studio/MacVoiceCloningScreen.swift",
-        "Sources/Models/VoiceCloningReferenceAudioSupport.swift",
-        "docs/reference/macos-app-guide.md"
-      ],
-      "updated": "2026-09-15",
-      "notes": "Voice Cloning landed 2026-09-15: MacVoiceCloningScreen on MacStudioCanvas (reference chip as a saved-voice menu with Import/Record/Clear, Import and Record chips, bank delivery chip per persona, Language, seed and Batch chips on a second row; reference status with the quality-warning popover, saved-voices and transcript warnings, transcript field with the auto-transcription hint, inline one-time consent, readiness line; drag-and-drop import; MacRecordVoiceSheet). Proactive and on-demand clone priming ported from the coordinator; MacAppModel.cloneCoordinator; VoiceCloningReferenceAudioSupport moved to Sources/Models. The last legacy pipeline pieces are gone: VoiceCloningView, VoiceCloningCoordinator, GenerationLifecycleExecutor (+ test, doubles, project.yml entry), TextInputView, GenerationWorkflowView, EmotionPickerView, WaveformView; the localization baseline has no macOS exception left. AppTheme, LayoutConstants and the drafts swap wait for CONV-22 (the legacy batch sheet still uses them). 11 new vocello.mac.cloning keys with French. Remaining gate: localization, smoke (7), perf (9) and clone benchmark PASS run ids."
-    },
-    {
       "id": "CONV-18",
       "plan": "macos-ios-convergence-2026-09",
       "title": "Perf re-baseline, marketing captures and documentation of the new macOS app",
       "status": "planned",
-      "blockedBy": [
-        "CONV-17"
-      ],
+      "blockedBy": [],
       "gate": "config/ui-perf-thresholds.json cites at least three perf sessions on the new tree in a dated decision; the README and website screenshots are recaptured from the new app; macos-release-qa.md walks the new screens; the plan is archived.",
       "sourceOfTruth": [
         "config/ui-perf-thresholds.json",
@@ -1141,9 +1124,7 @@
       "plan": "autonomous-validation-remediation-2026-08",
       "title": "XCUITest coverage for the identifiers never exercised (78 macOS, 34 iOS)",
       "status": "planned",
-      "blockedBy": [
-        "CONV-17"
-      ],
+      "blockedBy": [],
       "gate": "The 2026-09-11 XCUITest audit found 78 of 102 macOS and 34 of 93 iOS accessibility identifiers never exercised. macOS: add acceptance coverage, in the existing lane structure, for Voice Design and Voice Cloning generation through the visible controls, saved-voice enrollment (recording to enrollment and Save), History playback, export and delete, the seed pin, the Settings model download route, and batch cancel; each lane asserts real persisted state and restores user data. iOS: extend the control-audit plan (config/ios-control-audit.json) and the smoke or control-audit classes so onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings are source-bound, observed on the paired iPhone through genuine controls and cleaned up, and replace the remaining English-label lookups (History clear and delete confirmations, seed unpin menu, Play/Pause labels) with stable identifiers or accessibility values in Sources/iOS. No hidden markers or seeded state. Validated only by explicitly requested scripts/ui_test.sh macos <lane> and scripts/ui_test.sh ios <lane> runs.",
       "sourceOfTruth": [
         "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift",

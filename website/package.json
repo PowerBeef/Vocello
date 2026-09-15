@@ -18,8 +18,8 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
-    "@playwright/test": "1.62.1",
-    "@vitejs/plugin-react": "^6.0.5",
-    "vite": "^8.2.0"
+    "@playwright/test": "1.63.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite": "^8.3.0"
   }
 }

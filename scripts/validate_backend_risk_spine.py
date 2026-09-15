@@ -13,7 +13,6 @@ from pathlib import Path
 TEST_ROOTS = {
     "Qwen3RuntimeTests": Path("Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests"),
     "VocelloCoreTests": Path("Tests/VocelloCoreTests"),
-    "VocelloEngineIntegrationTests": Path("Tests/VocelloEngineIntegrationTests"),
 }
 RUNTIME_CHECKS = {
     "telemetry-overhead": (Path("scripts/macos_test.sh"), re.compile(r"^\s*telemetry-overhead\)" , re.MULTILINE)),

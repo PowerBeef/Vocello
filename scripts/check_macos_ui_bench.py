@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gate one macOS XPC UI benchmark and emit exact, run-scoped evidence."""
+"""Gate one macOS UI benchmark (in-process engine, app + engine telemetry) and emit exact, run-scoped evidence."""
 
 from __future__ import annotations
 
@@ -295,7 +295,7 @@ def validate_merged(
             failures.append(
                 f"merged generation {row.get('generationID', '?')} is not explicitly complete"
             )
-        if required_layers != ["app", "engine-service", "engine"]:
+        if required_layers != ["app", "engine"]:
             failures.append(
                 f"merged generation {row.get('generationID', '?')} has invalid requiredLayers={required_layers!r}"
             )
@@ -303,7 +303,7 @@ def validate_merged(
             failures.append(
                 f"merged generation {row.get('generationID', '?')} has missingLayers={missing_layers!r}"
             )
-        missing = [key for key in ("engine", "engineService", "app") if not isinstance(row.get(key), dict)]
+        missing = [key for key in ("engine", "app") if not isinstance(row.get(key), dict)]
         if missing:
             failures.append(
                 f"merged generation {row.get('generationID', '?')} missing complete layer payloads: "
@@ -311,7 +311,7 @@ def validate_merged(
             )
             continue
         gid = row.get("generationID")
-        for key in ("engine", "engineService", "app"):
+        for key in ("engine", "app"):
             nested_id = row[key].get("generationID")
             if nested_id != gid:
                 failures.append(
@@ -322,12 +322,11 @@ def validate_merged(
 
 def validate_process_ownership(
     engine_rows: list[dict],
-    service_rows: list[dict],
     app_rows: list[dict],
     merged_rows: list[dict],
     expected_ids: list[str],
 ) -> list[str]:
-    """Prove that app and XPC memory evidence came from the expected processes."""
+    """Prove that the app and engine rows came from the one in-process host."""
     failures: list[str] = []
 
     def indexed(rows: list[dict]) -> dict[str, dict]:
@@ -345,28 +344,20 @@ def validate_process_ownership(
         return value
 
     engine_by_id = indexed(engine_rows)
-    service_by_id = indexed(service_rows)
     app_by_id = indexed(app_rows)
     merged_by_id = indexed(merged_rows)
     for generation_id in expected_ids:
         engine_pid = pid(engine_by_id.get(generation_id), f"engine generation {generation_id}")
-        service_pid = pid(
-            service_by_id.get(generation_id), f"engine-service generation {generation_id}"
-        )
         app_pid = pid(app_by_id.get(generation_id), f"app generation {generation_id}")
-        if engine_pid is not None and service_pid is not None and engine_pid != service_pid:
+        # The engine runs inside the app process (since 2026-09-15): both rows
+        # must name the same PID, or the evidence came from two different hosts.
+        if engine_pid is not None and app_pid is not None and engine_pid != app_pid:
             failures.append(
-                f"generation {generation_id} engine PID {engine_pid} != engine-service PID {service_pid}"
-            )
-        if engine_pid is not None and app_pid is not None and engine_pid == app_pid:
-            failures.append(
-                f"generation {generation_id} app and engine unexpectedly share PID {engine_pid}"
+                f"generation {generation_id} app PID {app_pid} != engine PID {engine_pid}"
             )
 
         merged = merged_by_id.get(generation_id)
-        for key, expected_pid in (
-            ("engine", engine_pid), ("engineService", service_pid), ("app", app_pid)
-        ):
+        for key, expected_pid in (("engine", engine_pid), ("app", app_pid)):
             nested_pid = pid(
                 merged.get(key) if isinstance(merged, dict) else None,
                 f"merged generation {generation_id} {key}",
@@ -399,7 +390,7 @@ def memory_trim_metrics(engine: dict) -> tuple[int, int]:
     return len(trim_levels), max((TRIM_SEVERITY.get(level, 0) for level in trim_levels), default=0)
 
 
-def tracked_metrics(engine: dict, service: dict, app: dict) -> dict[str, float | int]:
+def tracked_metrics(engine: dict, app: dict) -> dict[str, float | int]:
     metrics: dict[str, float | int] = {}
 
     def add(name: str, value, scale: float = 1.0) -> None:
@@ -467,14 +458,6 @@ def tracked_metrics(engine: dict, service: dict, app: dict) -> dict[str, float |
         ("finalWAVFinish", "finalizationMS"),
     ):
         add(destination, backend_timings.get(source))
-
-    transport = service.get("transportMetrics") or {}
-    add("requestToFirstChunkMS", transport.get("requestToFirstChunkMS"))
-    transport_counters = transport.get("counters") or service.get("counters") or {}
-    add("chunksForwarded", transport_counters.get("chunksForwarded"))
-    add("transportChunkGaps", transport_counters.get("chunkGaps"))
-    add("transportDuplicateChunks", transport_counters.get("duplicateChunks"))
-    add("transportOutOfOrderChunks", transport_counters.get("outOfOrderChunks"))
 
     frontend = app.get("frontendMetrics") or {}
     for source, destination in (
@@ -611,7 +594,6 @@ def build_manifest(
     warm: int,
     cells: list[str],
     engine_rows: list[dict],
-    service_rows: list[dict],
     app_rows: list[dict],
     merged_rows: list[dict],
     *,
@@ -649,7 +631,7 @@ def build_manifest(
             capture_summary.append(capture["summary"])
         if qc.get("verdict") == "warn" or memory.warnings or capture["warnings"]:
             warning_count += 1
-        completeness = {"engine": True, "engineService": True, "app": True, "merged": True}
+        completeness = {"engine": True, "app": True, "merged": True}
         takes.append({
             "takeIndex": index,
             "generationID": row["generationID"],
@@ -680,7 +662,6 @@ def build_manifest(
     finished_at = recorded[-1] if recorded else now
     selected_telemetry = {
         "engine": engine_rows,
-        "engineService": service_rows,
         "app": app_rows,
         "merged": merged_rows,
         "sampleSidecars": memory_run["digestPayload"],
@@ -700,16 +681,11 @@ def build_manifest(
     )
     qc_algorithm = qc_algorithm_version(engine_rows)
     history_takes = []
-    service_by_id = {row.get("generationID"): row for row in service_rows}
     for take, row in zip(takes, engine_rows, strict=True):
         generation_id = take["generationID"]
         model_identity = row.get("modelRuntimeIdentity") or {}
         memory = memory_by_id[generation_id]
-        metrics = tracked_metrics(
-            row,
-            service_by_id.get(generation_id) or {},
-            app_by_id.get(generation_id) or {},
-        )
+        metrics = tracked_metrics(row, app_by_id.get(generation_id) or {})
         metrics.update(memory.metrics)
         qc = take["audioQC"]
         raw_qc = raw_audio_qc(row)
@@ -741,7 +717,7 @@ def build_manifest(
             ).get("playbackStartSource"),
             "status": "passedWithWarnings" if take_warnings else "passed",
             "layerCompleteness": "complete",
-            "layers": ["engine", "engine-service", "app", "merged"],
+            "layers": ["engine", "app", "merged"],
             "metrics": metrics,
             "output": {
                 "readableWAV": True,
@@ -831,7 +807,6 @@ def build_manifest(
         },
         "layers": {
             "engine": {"count": expected, "complete": True},
-            "engineService": {"count": expected, "complete": True},
             "app": {"count": expected, "complete": True},
             "merged": {"count": expected, "complete": True},
         },
@@ -865,7 +840,6 @@ def main() -> int:
     parser.add_argument("--lengths", default=",".join(DEFAULT_LENGTHS))
     parser.add_argument("--warm", type=int, default=DEFAULT_WARM)
     parser.add_argument("--run-id", default="", help="select only notes.benchRunID rows")
-    parser.add_argument("--max-chunk-gaps", type=int, default=0)
     parser.add_argument("--max-delayed-heartbeats-50", type=int, default=0)
     parser.add_argument("--since-recorded", default="")
     parser.add_argument("--label", default="")
@@ -920,7 +894,6 @@ def main() -> int:
     expected = len(expected_cell_order)
     paths = {
         "engine": args.diag_dir / "engine" / "generations.jsonl",
-        "engine-service": args.diag_dir / "engine-service" / "generations.jsonl",
         "app": args.diag_dir / "app" / "generations.jsonl",
         "merged": args.diag_dir / "generations-merged.jsonl",
     }
@@ -935,7 +908,6 @@ def main() -> int:
         loaded[layer] = rows
 
     engine_rows = loaded["engine"]
-    service_rows = loaded["engine-service"]
     app_rows = loaded["app"]
     engine_ids = [row.get("generationID") for row in engine_rows]
     valid_engine_ids = [value for value in engine_ids if isinstance(value, str) and value]
@@ -948,13 +920,10 @@ def main() -> int:
         failures.append("one or more engine rows has no generationID")
     if len(set(engine_ids)) != len(engine_ids):
         failures.append("engine generationIDs are not unique")
-    failures.extend(validate_layer("engine-service", service_rows, valid_engine_ids, expected))
     failures.extend(validate_layer("app", app_rows, valid_engine_ids, expected))
     failures.extend(validate_merged(merged_rows, valid_engine_ids, expected))
     failures.extend(
-        validate_process_ownership(
-            engine_rows, service_rows, app_rows, merged_rows, valid_engine_ids
-        )
+        validate_process_ownership(engine_rows, app_rows, merged_rows, valid_engine_ids)
     )
 
     actual_cells: list[str] = []
@@ -1029,27 +998,6 @@ def main() -> int:
                 f"does not match cell {cell!r}"
             )
 
-    for row in service_rows:
-        if row.get("schemaVersion", 0) >= 7:
-            transport = row.get("transportMetrics")
-            if not isinstance(transport, dict):
-                failures.append(f"generation {row.get('generationID', '?')} has no typed transport metrics")
-            else:
-                if transport.get("requestAccepted") is not True:
-                    failures.append(f"generation {row.get('generationID', '?')} was not accepted by XPC transport")
-                request_latency = transport.get("requestToFirstChunkMS")
-                if not _number(request_latency) or request_latency < 0:
-                    failures.append(f"generation {row.get('generationID', '?')} has no request-to-first-chunk transport latency")
-        gaps = (row.get("counters") or {}).get("chunkGaps")
-        transport_gaps = ((row.get("transportMetrics") or {}).get("counters") or {}).get("chunkGaps")
-        gaps = transport_gaps if transport_gaps is not None else gaps
-        if gaps is not None and not isinstance(gaps, int):
-            failures.append(f"generation {row.get('generationID', '?')} has invalid chunkGaps={gaps!r}")
-        elif isinstance(gaps, int) and gaps > args.max_chunk_gaps:
-            failures.append(
-                f"chunkGaps {gaps} > {args.max_chunk_gaps} (generation {row.get('generationID', '?')})"
-            )
-
     app_by_id = {row.get("generationID"): row for row in app_rows if row.get("generationID")}
     for row in app_rows:
         if row.get("schemaVersion", 0) < 7:
@@ -1101,8 +1049,8 @@ def main() -> int:
                 failures.append(f"take {index} ({expected_cell_order[index - 1]}): {reason}")
 
     print(
-        f"XPC bench gate: expected={expected} engine={len(engine_rows)} "
-        f"service={len(service_rows)} app={len(app_rows)} merged={len(merged_rows)}"
+        f"macOS UI bench gate: expected={expected} engine={len(engine_rows)} "
+        f"app={len(app_rows)} merged={len(merged_rows)}"
     )
     if failures:
         print("FAIL:")
@@ -1120,7 +1068,6 @@ def main() -> int:
             args.warm,
             expected_cell_order,
             engine_rows,
-            service_rows,
             app_rows,
             merged_rows,
             optimization=optimization,

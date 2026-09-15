@@ -320,7 +320,7 @@
       "class": "artifact",
       "owner": "macOS build and release identity checks",
       "cleanup": "preserve",
-      "retention": "Keep only symbols whose UUIDs match the current macOS app and XPC products",
+      "retention": "Keep only symbols whose UUIDs match the current macOS app product",
       "env": "QVOICE_SYMBOLS_MACOS"
     },
     {

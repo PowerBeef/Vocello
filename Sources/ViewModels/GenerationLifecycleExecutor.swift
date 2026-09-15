@@ -1,6 +1,5 @@
 import Foundation
 import QwenVoiceCore
-import QwenVoiceNative
 
 /// Shared single-take generation lifecycle (W2-C, 2026-08 UI review): the
 /// three mode coordinators previously triplicated this Task body — timeline

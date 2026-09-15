@@ -260,8 +260,8 @@ jobs:
 
   macos-tsan:
     # Blocking since 2026-09-14 (config/tsan-policy.json): the deterministic core
-    # and injectable XPC transport subset under ThreadSanitizer, routed with the
-    # Swift lane. The nightly keeps its cold run of the same lane.
+    # subset under ThreadSanitizer, routed with the Swift lane. The nightly keeps
+    # its cold run of the same lane.
     name: macOS ThreadSanitizer subset
     needs: changes
     if: needs.changes.outputs.swift == 'true'

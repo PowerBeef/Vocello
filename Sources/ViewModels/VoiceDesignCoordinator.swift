@@ -1,7 +1,6 @@
 import Foundation
 import Observation
 import QwenVoiceCore
-import QwenVoiceNative
 import SwiftUI
 
 struct VoiceDesignActionAlert: Identifiable {

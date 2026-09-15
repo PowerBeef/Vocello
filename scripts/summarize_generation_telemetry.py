@@ -425,7 +425,6 @@ def load_merged_runs(diag_dir, *, run_id="", generation_ids=None, strict=False):
     for row in rows:
         app = row.get("app") or {}
         engine = row.get("engine") or {}
-        engine_service = row.get("engineService") or {}
         app_frontend = app.get("frontendMetrics") or {}
         run = {
             "generationID": row.get("generationID"),
@@ -433,7 +432,6 @@ def load_merged_runs(diag_dir, *, run_id="", generation_ids=None, strict=False):
                 if app_frontend.get("submitToFirstChunkMS") is not None
                 else (app.get("timingsMS") or {}).get("submitToFirstChunkMS"),
             "engineFirstChunkMS": first_stage_mark_ms(engine, "firstChunk"),
-            "engineServiceFirstChunkMS": first_stage_mark_ms(engine_service, "firstChunk"),
         }
         if run["appTTFCMS"] is not None and run["engineFirstChunkMS"] is not None:
             run["frontendOverheadMS"] = run["appTTFCMS"] - run["engineFirstChunkMS"]
@@ -1478,7 +1476,7 @@ def print_merged_table(merged_runs):
         return
     header = (
         f"{'generationID':<16} {'appTTFCMS':>11} "
-        f"{'engineServiceFirstChunkMS':>26} {'engineFirstChunkMS':>20} "
+        f"{'engineFirstChunkMS':>20} "
         f"{'frontendOverheadMS':>18}"
     )
     print("\nCross-layer first-chunk latency (ms)\n")
@@ -1487,7 +1485,6 @@ def print_merged_table(merged_runs):
     for run in merged_runs:
         print(
             f"{run['generationID']:<16} {fmt(run['appTTFCMS'], 0):>11} "
-            f"{fmt(run['engineServiceFirstChunkMS'], 0):>26} "
             f"{fmt(run['engineFirstChunkMS'], 0):>20} "
             f"{fmt(run.get('frontendOverheadMS'), 0):>18}"
         )

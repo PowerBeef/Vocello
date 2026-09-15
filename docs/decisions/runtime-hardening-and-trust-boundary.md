@@ -10,31 +10,32 @@ sourceOfTruth:
 
 **Status:** Accepted
 **Owners:** Backend runtime, macOS, release/QA
-**Review trigger:** Entitlement, dynamic-library, model-loading, XPC trust, or runtime-override changes
+**Review trigger:** Entitlement, dynamic-library, model-loading, or runtime-override changes
 
 ## Decision
 
 Vocello's macOS engine remains outside the App Sandbox because the current MLX/Metal runtime and
 local model workflow require capabilities that are not compatible with the product's present
-sandbox profile. The app and XPC service use the hardened runtime, but the app entitlement set
+sandbox profile. The app uses the hardened runtime (since 2026-09-15 it hosts the engine itself; the
+former XPC service is gone), but the app entitlement set
 contains `com.apple.security.app-sandbox=false`,
 `com.apple.security.cs.disable-library-validation=true`, and
 `com.apple.security.cs.allow-unsigned-executable-memory=true`.
 
 Those exceptions are not treated as general extension points. Vocello does not load user-selected
 executables, plug-ins, frameworks, or arbitrary dynamic libraries. The exceptions are constrained
-to the signed application, its signed XPC service, pinned Swift packages, MLX-generated executable
+to the signed application, pinned Swift packages, MLX-generated executable
 memory, and catalog-verified model data.
 
 ## Assets and trust boundaries
 
 | Asset | Trusted producer | Required controls |
 | --- | --- | --- |
-| App and XPC executables | Verified release workflow | Hardened runtime, matching Team ID, nested signature verification, notarization, staple validation |
+| App executable | Verified release workflow | Hardened runtime, matching Team ID, nested signature verification, notarization, staple validation |
 | Swift/runtime dependencies | Repository manifests | Exact pins, lock agreement, action SHA pins, SBOM and dependency automation |
 | Model files | Product catalog | Immutable revision, safe relative path, exact size and SHA-256, verified staging, atomic install |
 | User audio, prompts, voices, history | Local user workflow | App-owned directories, no tracked content, privacy-safe bounded diagnostics, explicit export |
-| XPC requests | Signed app/service pair | Expected bundle IDs and Team ID, typed wire contract, one active generation owner |
+| Engine requests | In-process store | One active generation owner (`IOSGenerationOwnershipAuthority`), typed cancellation barrier |
 | Diagnostic overrides | Maintainer-run scripts | Internal-build capability plus `QWENVOICE_DEBUG`, classified registry, isolated storage, privacy-safe override provenance |
 
 Network content is data, never executable code. Redirects remain HTTPS and host-allowlisted. A
@@ -42,8 +43,8 @@ downloaded artifact cannot become installed until its catalog identity, path, si
 
 ## Compensating controls
 
-1. `scripts/verify_release_bundle.sh` fails signed releases when the app and XPC Team IDs differ
-   from each other, their signed metadata, or the expected release identity.
+1. `scripts/verify_release_bundle.sh` fails signed releases when the app's Team ID differs from
+   its signed metadata or the expected release identity, or when the bundle embeds an XPC service.
 2. The release workflow builds a draft, verifies signature/notarization/checksums/SBOM/evidence,
    then publishes last. Failure leaves no newly public release.
 3. Production-affecting environment overrides are inventoried in
@@ -55,13 +56,13 @@ downloaded artifact cannot become installed until its catalog identity, path, si
    tests and acceptance fixtures, not for selecting a production runtime or library.
 5. `config/concurrency-safety.json` inventories every owned `@unchecked Sendable` declaration and
    binds it to an owner, synchronization invariant, and deterministic evidence.
-6. The XPC service owns one generation at a time. Cancellation must reach a terminal barrier before
+6. The store owns one generation at a time. Cancellation must reach a terminal barrier before
    unload, and cancellation is a typed terminal state rather than a string-shaped failure.
 7. Diagnostics use allowlists and bounded retention; default persistence excludes prompts,
    transcripts, absolute paths, usernames, device identity, URLs, and secrets.
 8. `config/macos-entitlement-policy.json` is the exact per-role allowlist. The app receives the
-   five documented app capabilities; the engine XPC receives only the two MLX runtime exceptions;
-   nested frameworks receive none. `scripts/entitlement_contract.py` checks source routing and
+   five documented app capabilities (the two MLX runtime exceptions among them, since the engine
+   runs in the app); nested frameworks receive none. `scripts/entitlement_contract.py` checks source routing and
    rejects owned arbitrary-code loading APIs on every deterministic change, while packaged release
    verification compares the actual signed entitlements against the same allowlist.
 9. The entitlement policy binds its exception review to the exact resolved `mlx-swift` and

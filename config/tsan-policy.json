@@ -7,11 +7,10 @@
   "command": "scripts/macos_test.sh tsan",
   "derivedDataEntry": "xcode-macos-tsan-derived-data",
   "subset": [
-    "VocelloCoreTests",
-    "VocelloEngineIntegrationTests"
+    "VocelloCoreTests"
   ],
   "excluded": {
-    "Qwen3RuntimeTests": "MLX and Metal stay under their single-owner deterministic suite; the scheduled TSan lane targets the stable CPU core and injectable XPC transport subset."
+    "Qwen3RuntimeTests": "MLX and Metal stay under their single-owner deterministic suite; the TSan lane targets the stable CPU core subset (the injectable XPC transport bundle was retired with the XPC service on 2026-09-15)."
   },
   "skippedUnderSanitizer": {
     "VocelloCoreTests.CLIExecutionTests/testRealSignalsReachNativeSupervisorAndAwaitCleanup": "Spawns a helper xctest child; any child of the instrumented parent aborts in VerifyInterceptorsWorking on Xcode 26.6 (inherited, re-injected and runtime-propagated insertion all tried 2026-09-11). Skips under the sanitizer via NativeHelperProcess; runs in every non-sanitized test lane.",
@@ -56,5 +55,9 @@
     "decidedBy": "maintainer",
     "decision": "blocking-on-push-ci",
     "basis": "Three consecutive scheduled nightly passes (runs 34683488068, 34749309445, 34829408217) with zero race reports and only the two registered skips; the lane costs 5 to 11 minutes on a second macOS runner and is routed with the Swift lane inside CI required. The nightly keeps its cold run."
+  },
+  "transportBundleRetired": {
+    "date": "2026-09-15",
+    "reason": "The macOS engine runs in-process (plan macos-ios-convergence-2026-09, CONV-03); Tests/VocelloEngineIntegrationTests and its 19 transport tests no longer exist. The blocking decision stands: the lane runs the unchanged 654-test core subset, with no coverage of deterministic or MLX runtime tests weakened."
   }
 }

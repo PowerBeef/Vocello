@@ -26,7 +26,7 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 | Task | Authoritative procedure | Boundary |
 | --- | --- | --- |
 | Routine edit | [Development workflow](development-workflow.md) | `scripts/dev.sh check`, commit on `main`, push; CI is the gate; no UI/model/phone |
-| macOS UI / XPC acceptance | [macOS testing](macos-testing.md) | Existing `scripts/ui_test.sh macos` lanes only when requested |
+| macOS UI acceptance | [macOS testing](macos-testing.md) | Existing `scripts/ui_test.sh macos` lanes only when requested |
 | Generic iOS SDK compile | [Host prerequisite](ios-device-testing.md#host-toolchain-prerequisite) | No phone or Simulator; matching Xcode components required |
 | iPhone control / generation / candidate checks | [iOS testing](ios-device-testing.md) | Physical-device XCUITest; candidate proof remains distinct from diagnostics |
 | Device deadline / pause / resume / lock | [Pause and resume](ios-device-testing.md#pause-and-resume) | Frozen progress stays untracked; validate restoration and exact identities |

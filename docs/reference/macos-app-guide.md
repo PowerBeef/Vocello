@@ -17,7 +17,7 @@ XCUITest addresses it (identifier → action → expected). Use this to maintain
 benchmark tests and stable accessibility surface.
 
 > **Where this fits:** the canonical "macOS app + driving" reference. Running the tests
-> lives in [`macos-testing.md`](macos-testing.md); the engine/XPC internals live in
+> lives in [`macos-testing.md`](macos-testing.md); the engine internals live in
 > [`../ARCHITECTURE.md`](../ARCHITECTURE.md); the iOS counterpart is
 > [`ios-app-guide.md`](ios-app-guide.md).
 
@@ -26,8 +26,8 @@ benchmark tests and stable accessibility surface.
 ## 1. Overview
 
 A `NavigationSplitView` with a **sidebar** (6 items) + a detail pane. The engine runs
-**out-of-process in an XPC service** — the app talks to it over XPC; the service can crash
-or retire independently.
+**in-process** (since 2026-09-15) on the same `TTSEngineStore` the iOS app uses; an engine
+fault takes the app down with it, so crash deltas stay part of every lane's verdict.
 
 | Sidebar | Identifier | Shortcut |
 |---------|------------|----------|
@@ -142,7 +142,7 @@ iPhone. Save stays disabled until on-device transcription resolves; a delayed re
 cannot overwrite edited text. If recognition cannot provide text, the user must enter a transcript
 or choose **Use audio only** explicitly. Transcript-backed enrollment also requires a separately
 confirmed reference language. That language is persisted as reference metadata through the
-versioned XPC candidate command and never selects a later Clone output language. Clone Auto follows
+`enrollmentMetadata` overload and never selects a later Clone output language. Clone Auto follows
 the target script; an explicit output language always wins. Voice Design uses the same target-text
 language boundary.
 
@@ -233,7 +233,7 @@ The shell harness owns deterministic proof and evidence:
 
 | Lane | Purpose |
 |------|---------|
-| `scripts/macos_test.sh test` | Core, XPC transport, and runtime tests; no UI driving |
+| `scripts/macos_test.sh test` | Core and runtime tests; no UI driving |
 | `scripts/ui_test.sh macos smoke` | Seven ordered focused journeys (navigation/readiness, completed generation + History, mid-generation cancellation, virtual-mic recording, library surfaces, three-segment long-form project, two-line batch) with named screenshots and automatic on-failure desktop + element-tree evidence |
 | `scripts/ui_test.sh macos benchmark` | UI-driven generation matrix plus merged telemetry proof |
 | `scripts/ui_test.sh macos perf` | Nine scripted frame-health scenarios (`VocelloMacPerfUITests`) with the in-app 500 ms display-link probe, gated by `scripts/check_macos_ui_perf.py` against warn-only ceilings in `config/ui-perf-thresholds.json`; a canonical-hardware PASS publishes a `ui-perf` record under `benchmarks/runs/ui-perf/` (see [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md); the August 2026 refresh that introduced the lane is recorded historically in [`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md)) |
@@ -266,8 +266,8 @@ The shell harness owns deterministic proof and evidence:
   automating it. Label-only selection is not a fallback.
 - **NSOpenPanel** — system-picker interaction belongs to an explicit import scenario. Do not use
   coordinates, hidden mocks, or AppleScript as frontend proof.
-- **XPC service retirement** — the engine may be idle/retired; a generation auto-relaunches
-  it. The `sidebar_backendStatus_*` markers reflect the state.
+- **Idle unload** — the engine may have unloaded its model while idle; the first generation
+  reloads it. The `sidebar_backendStatus_*` markers reflect the state.
 - **First responder** — after navigating, the text editor may need one explicit action before
   typing; re-observe instead of assuming focus.
 

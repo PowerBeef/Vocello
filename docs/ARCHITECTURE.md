@@ -2,7 +2,7 @@
 status: active
 owner: backend-and-platform
 reviewed: 2026-09-12
-summary: System architecture — engine core, macOS XPC request lifecycle, iOS in-process lifecycle, model management, telemetry layers, and the engine invariants each surface must preserve.
+summary: System architecture — engine core, the in-process request lifecycle on macOS and iOS, model management, telemetry layers, and the engine invariants each surface must preserve.
 sourceOfTruth:
   - project.yml
   - config/runtime-refactor-contract.json
@@ -36,7 +36,7 @@ One engine core (`QwenVoiceCore` / `MLXTTSEngine`) is hosted three ways:
 
 | Host | Process model | Wired by | Used by |
 | --- | --- | --- | --- |
-| **macOS app** | Engine runs **out-of-process** in an XPC service (`QwenVoiceEngineService`) | `QwenVoiceNative` (XPC client + `TTSEngineStore`) | `Vocello.app` |
+| **macOS app** | Engine runs **in-process** (`MLXTTSEngine` via `NativeRuntimeFactory`, since 2026-09-15) | `MacEngineBootstrap` + the shared `Sources/iOS/TTSEngineStore.swift` | `Vocello.app` |
 | **iOS app** | Engine runs **in-process** (`MLXTTSEngine` via `NativeRuntimeFactory`) | `Sources/iOS/TTSEngineStore.swift` | `VocelloiOS` |
 | **CLI** | Engine runs **in-process** | `VocelloCLI` (`CLIRuntime`) | `vocello` binary |
 
@@ -56,8 +56,9 @@ release is **Vocello 2.4.0** and iOS 2.4.0 is the live **public TestFlight beta*
 ## 1. Module & target dependency graph
 
 The Xcode project is generated from [`project.yml`](../project.yml) (XcodeGen
-2.46.0). There are 14 targets split into **cross-platform frameworks**,
-**macOS-only frameworks + XPC service**, and **apps/CLI/tests**.
+2.46.0). There are 10 targets split into **cross-platform frameworks** and
+**apps/CLI/tests**; since 2026-09-15 no target is macOS-only except the app, the CLI
+and their test bundles.
 
 ```mermaid
 graph TD
@@ -70,9 +71,6 @@ graph TD
     VocelloiOS["VocelloiOS<br/>(iOS app)"]:::app
     VocelloCLI["VocelloCLI<br/>(vocello CLI)"]:::app
 
-    QwenVoiceNative["QwenVoiceNative<br/>(macOS XPC bridge)"]:::macfw
-    QwenVoiceEngineService["QwenVoiceEngineService<br/>(macOS XPC service)"]:::macfw
-    QwenVoiceEngineSupport["QwenVoiceEngineSupport<br/>(macOS runtime helpers)"]:::macfw
     QwenVoiceCore["QwenVoiceCore<br/>(engine core · iOS+macOS)"]:::fw
     QwenVoiceBackendCore["QwenVoiceBackendCore<br/>(provenance + policy vocabulary · iOS+macOS)"]:::fw
 
@@ -81,9 +79,6 @@ graph TD
     MLXSwift["MLXSwift<br/>(MLX, MLXRandom)"]:::spm
     SwiftHuggingFace["SwiftHuggingFace"]:::spm
 
-    QwenVoice --> QwenVoiceNative
-    QwenVoice --> QwenVoiceEngineService
-    QwenVoice --> QwenVoiceEngineSupport
     QwenVoice --> QwenVoiceCore
     QwenVoice --> GRDB
 
@@ -91,13 +86,7 @@ graph TD
     VocelloiOS --> GRDB
 
     VocelloCLI --> QwenVoiceCore
-    VocelloCLI --> QwenVoiceEngineSupport
 
-    QwenVoiceNative --> QwenVoiceCore
-    QwenVoiceNative --> QwenVoiceEngineSupport
-    QwenVoiceEngineService --> QwenVoiceCore
-    QwenVoiceEngineService --> QwenVoiceEngineSupport
-    QwenVoiceEngineSupport --> QwenVoiceCore
     QwenVoiceCore --> QwenVoiceBackendCore
 
     QwenVoiceCore --> MLXAudio
@@ -105,7 +94,7 @@ graph TD
     QwenVoiceCore --> SwiftHuggingFace
 ```
 
-(SPM products are also linked directly by the macOS frameworks/service/CLI where
+(SPM products are also linked directly by the apps and the CLI where
 needed — e.g. `QwenVoiceCore` pulls `MLXRandom` for deterministic seeding. Only
 the architectural edges are shown above; see `project.yml` for the exact link
 graph.)
@@ -114,17 +103,13 @@ graph.)
 
 | Target | Type | Platform | Module name | Bundle ID | Responsibility |
 | --- | --- | --- | --- | --- | --- |
-| `QwenVoice` | application | macOS | `QwenVoice` | `com.qwenvoice.app` | macOS SwiftUI app (`Vocello.app`). Links the full XPC stack. |
+| `QwenVoice` | application | macOS | `QwenVoice` | `com.qwenvoice.app` | macOS SwiftUI app (`Vocello.app`); hosts the engine in-process on the shared store (compiles the iOS store by path). |
 | `VocelloiOS` | application | iOS | `QVoiceiOS` | `com.patricedery.vocello` | iOS SwiftUI app; engine runs in-process. App Group `group.com.patricedery.vocello.shared`. |
 | `VocelloCLI` | tool | macOS | `VocelloCLI` | `com.qwenvoice.cli` | Headless `vocello` binary; engine in-process. |
 | `QwenVoiceCore` | framework.static | iOS + macOS | `QwenVoiceCore` | `com.qwenvoice.core` | **Engine core**: `TTSEngine` protocol, `MLXTTSEngine`, generation semantics, runtime, memory policy, telemetry. |
 | `QwenVoiceBackendCore` | framework.static | iOS + macOS | `QwenVoiceBackendCore` | `com.qwenvoice.backend-core` | Backend provenance, generation defaults and policy vocabulary, finish reason, and the minimal synthesis abstraction. MLX loading, synthesis, and codecs live in `QwenVoiceCore` and the owned Qwen3 runtime. |
-| `QwenVoiceEngineSupport` | framework.static | macOS | `QwenVoiceEngineSupport` | `com.qwenvoice.engine-support` | macOS runtime helpers + the **XPC wire protocol** (`EngineCommand`, envelopes, codec). |
-| `QwenVoiceNative` | framework.static | macOS | `QwenVoiceNative` | `com.qwenvoice.native` | macOS app-facing XPC client/coordinator/store bridging XPC to SwiftUI. |
-| `QwenVoiceEngineService` | xpc-service | macOS | `QwenVoiceEngineService` | `com.qwenvoice.app.engine-service` | Out-of-process engine host for crash isolation + memory containment. |
 | `VocelloCoreTests` | bundle.unit-test | macOS | `VocelloCoreTests` | `com.qwenvoice.core.tests` | Core semantics, typed telemetry compatibility, atomic/readable output contracts, and the host-runnable iOS policy assertions from `Tests/VocelloiOSLogicTests`, which this target also compiles. |
 | `VocelloiOSLogicTests` | bundle.unit-test | iOS | `VocelloiOSLogicTests` | `com.patricedery.vocello.logic-tests` | Duplicate standalone, app-host-free platform policy compile for catalog/ledger, memory, cancellation, storage gating, and privacy-safe diagnostics. Ordinary CI compiles this bundle for the physical-device SDK. Xcode 26 does not support executing a tool-hosted app-free bundle on a physical-device destination, so this target is compile-only; its shared assertions execute in `VocelloCoreTests`. |
-| `VocelloEngineIntegrationTests` | bundle.unit-test | macOS | `VocelloEngineIntegrationTests` | `com.qwenvoice.engine.integration-tests` | Injectable XPC client/transport lifecycle and correlation contracts; never launches frontend UI. |
 | `VocelloMacUITests` | bundle.ui-testing | macOS | `VocelloMacUITests` | `com.qwenvoice.app.uitests` | Explicit native-app smoke and benchmark XCUITest lanes. |
 | `VocelloiOSUITests` | bundle.ui-testing | iOS | `VocelloiOSUITests` | `com.patricedery.vocello.uitests` | Explicit paired-physical-iPhone smoke/benchmark lanes plus the isolated opt-in model-delivery lifecycle proof; never Simulator. |
 | `VocelloiOSCandidateUITests` | bundle.ui-testing | iOS | `VocelloiOSCandidateUITests` | `com.patricedery.vocello.candidateuitests` | Standalone black-box runner; no target-app dependency, no diagnostics, and no replacement of the preinstalled distribution app. |
@@ -133,7 +118,7 @@ graph.)
 
 | Layer | macOS | iOS | Development publishing policy |
 | --- | --- | --- | --- |
-| **Deterministic verification** | Core + XPC integration + `Qwen3RuntimeTests` + the host-runnable iOS policy assertions + app build | Project-input checks + app and standalone logic-test bundle physical-device SDK compile | Required by push CI on `main` (the gate, `CI required`); locally only `scripts/hooks/commit_lint.sh` blocks a commit and `scripts/dev.sh check` is advisory |
+| **Deterministic verification** | Core + `Qwen3RuntimeTests` + the host-runnable iOS policy assertions + app build | Project-input checks + app and standalone logic-test bundle physical-device SDK compile | Required by push CI on `main` (the gate, `CI required`); locally only `scripts/hooks/commit_lint.sh` blocks a commit and `scripts/dev.sh check` is advisory |
 | **Platform runtime gate** | `macos_test.sh gate` | `ios_device.sh gate` | Deterministic/device diagnostics; independent of XCUITest |
 | **UI regression** | `ui_test.sh macos smoke\|benchmark` XCUITest | `ui_test.sh ios smoke\|benchmark` XCUITest on a paired physical iPhone | Explicit frontend QA only; never required for publishing or packaging |
 | **Model-delivery lifecycle** | Isolated CLI install | `ui_test.sh ios model-download` on a paired physical iPhone | Opt-in diagnostic only; never part of smoke, benchmark, CI, or release |
@@ -168,13 +153,11 @@ and never executes that standalone bundle. A single shippable config,
 
 ### Key layering rule
 
-`QwenVoiceBackendCore` ← `QwenVoiceCore` ← {macOS frameworks, apps, CLI}. BackendCore is a narrow,
+`QwenVoiceBackendCore` ← `QwenVoiceCore` ← {apps, CLI}. BackendCore is a narrow,
 dependency-light contract/provenance layer; `QwenVoiceCore` and the owned Qwen3 runtime implement model loading,
-synthesis, streaming, and codecs. The
-**iOS app deliberately does not link** `QwenVoiceNative`, `QwenVoiceEngineService`,
-or `QwenVoiceEngineSupport` — those are macOS-only (the XPC stack). iOS reaches
-the engine in-process through `QwenVoiceCore` alone. This single dependency
-difference is what enforces the XPC-vs-in-process split.
+synthesis, streaming, and codecs. Every host reaches the engine in-process through
+`QwenVoiceCore` alone; the platform differences live in the bootstraps
+(`MacEngineBootstrap`, `IOSAppBootstrap`, `CLIRuntime`), never in a second engine module.
 
 ---
 
@@ -219,18 +202,15 @@ Shipped models (`Sources/Resources/qwenvoice_contract.json`): Qwen3-TTS 1.7B in
 
 All three hosts share one engine implementation — `MLXTTSEngine` (an
 `@MainActor … ObservableObject` conforming to the `TTSEngine` protocol) — built
-by `NativeRuntimeFactory.make(...)`. The hosts differ only in **where the engine
-lives** and **how the UI talks to it**.
+by `NativeRuntimeFactory.make(...)` and run **in-process**. Since 2026-09-15 (plan
+`macos-ios-convergence-2026-09`) the macOS app no longer differs from the iOS app
+here: the hosts differ only in **how the UI reaches the store**.
 
 ```mermaid
 flowchart LR
-    subgraph macOS["macOS app (Vocello.app)"]
+    subgraph macOS["macOS app (Vocello.app, in-process)"]
         MacUI["SwiftUI views / coordinators"]
-        MacStore["TTSEngineStore<br/>(QwenVoiceNative)"]
-        MacClient["XPCNativeEngineClient<br/>+ XPCNativeEngineCoordinator"]
-    end
-    subgraph XPC["XPC service (separate process)"]
-        Host["EngineServiceHost"]
+        MacStore["TTSEngineStore<br/>(Sources/iOS, compiled by path)"]
         Core1["MLXTTSEngine (QwenVoiceCore)"]
     end
     subgraph iOS["iOS app (in-process)"]
@@ -243,28 +223,25 @@ flowchart LR
         Core3["MLXTTSEngine (QwenVoiceCore)"]
     end
 
-    MacUI --> MacStore --> MacClient -->|"NSXPCConnection"| Host --> Core1
-    Host -.->|"events back over XPC"| MacClient
+    MacUI --> MacStore --> Core1
     IOSUI --> IOSStore --> Core2
     CLIRuntime --> Core3
 ```
 
-- **macOS** — the engine runs **out-of-process** in `QwenVoiceEngineService`
-  (`EngineServiceHost`). This isolates MLX crashes from the app and lets the
-  service be **retired under memory pressure** (`shutdownWhenIdle`) to return
-  memory that model unload can't (MLX heap fragmentation + Metal shader caches).
-  The app talks to it over `NSXPCConnection` through `QwenVoiceNative`.
+- **macOS** — `MacEngineBootstrap` builds the runtime from the bundled contract
+  (macOS-expanded registry, floor-tier prewarm policy) and wraps `MLXTTSEngine`
+  in the shared `TTSEngineStore` with `MacMemoryBudgetPolicy`. The retired XPC
+  service (`QwenVoiceEngineService`, 2026-07 to 2026-09-15) bought crash isolation
+  and process retirement; in-process hosting trades them for one architecture:
+  the engine's kernel-pressure responder, the store's footprint bands and the
+  resolver's idle unload now do the memory work.
 - **iOS** — the engine runs **in-process** (`MLXTTSEngine` built by
   `NativeRuntimeFactory`). The old ExtensionKit extension was removed because
   non-UI extensions are Jetsam-capped independently of the
-  `increased-memory-limit` entitlement. iOS holds the engine behind its own
-  `Sources/iOS/TTSEngineStore.swift`.
-- **CLI** — `vocello` links `QwenVoiceCore` (+ `QwenVoiceEngineSupport`) and
-  drives `MLXTTSEngine` in-process, reusing models the app already installed.
-
-`AppEngineSelection.current()` returns `.native` on every platform; the actual
-platform differences are enforced by the runtime factory and the XPC/in-process
-wiring, not by engine selection.
+  `increased-memory-limit` entitlement. iOS holds the engine behind
+  `Sources/iOS/TTSEngineStore.swift`, the same file the macOS target compiles.
+- **CLI** — `vocello` links `QwenVoiceCore` and drives `MLXTTSEngine`
+  in-process, reusing models the app already installed.
 
 ---
 
@@ -550,62 +527,35 @@ regeneration device-accepted 2026-08-01. See
 
 ## 5. Request lifecycle — macOS
 
-Since 2026-09-14 (plan `macos-ios-convergence-2026-09`, CONV-02) the macOS app
-hosts `MLXTTSEngine` in its own process: `MacEngineBootstrap` builds the runtime
-through `NativeRuntimeFactory` and wraps it in the shared iOS `TTSEngineStore`
+Since 2026-09-15 (plan `macos-ios-convergence-2026-09`, CONV-02/CONV-03) the macOS
+app hosts `MLXTTSEngine` in its own process on the shared `TTSEngineStore`
 (`Sources/iOS/TTSEngineStore.swift`, compiled into the macOS target by path).
-Coordinators call `store.generate`, chunks reach `AudioPlayerViewModel` through
-the store's `generationChunkReceived` notification, and telemetry merges two
-layers (app + engine). The sequence below documents the retired XPC path; CONV-03
-removes those targets and rewrites this section.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant V as SwiftUI View
     participant C as Coordinator<br/>(CustomVoice/VoiceDesign/<br/>VoiceCloning)
-    participant S as TTSEngineStore<br/>(QwenVoiceNative)
-    participant X as XPCNativeEngineClient<br/>+ XPCNativeEngineCoordinator
-    participant H as EngineServiceHost<br/>(XPC service)
-    participant E as MLXTTSEngine<br/>(QwenVoiceCore)
-    participant B as GenerationChunkBroker
+    participant S as TTSEngineStore<br/>(shared, ObservableObject)
+    participant E as MLXTTSEngine<br/>(QwenVoiceCore, same process)
+    participant P as AudioPlayerViewModel
 
     V->>C: generate(draft)
+    C->>C: MacStudioGenerationRequestFactory builds the request
     C->>S: generate(request)
-    S->>X: generate(request)
-    X->>X: encode EngineRequestEnvelope(.generate)
-    X->>H: perform(payload) via NSXPCConnection
-    H->>H: reserve admission before timing/task/forwarder side effects
-    H->>E: generate(request)
-    E-->>H: AsyncStream<GenerationEvent>
-    Note over H: drained on Task.detached(.utility)<br/>(off MainActor); lastPublishedEvent hops to MainActor
-    H-->>X: handleEvent(payload) — reverse XPC
-    X-->>B: publish(event) on MainActor
-    B-->>V: Combine publisher (live preview)
-    E-->>H: GenerationResult
-    H-->>X: EngineReplyEnvelope(.generationResult)
-    X-->>S: GenerationResult
+    S->>S: admission (ownership authority, memory band)
+    S->>E: generate(request)
+    E-->>S: AsyncStream<GenerationEvent> (generation-scoped forwarding task)
+    S-->>P: NotificationCenter .generationChunkReceived (live preview)
+    E-->>S: GenerationResult
     S-->>C: GenerationResult
     C->>C: GenerationPersistence.persist + autoplay
 ```
 
-**XPC wire protocol** (`Sources/QwenVoiceEngineSupport/EngineServiceIPC.swift`):
-a single envelope method —
-`QwenVoiceEngineServiceXPCProtocol.perform(_:withReply:)` — carrying an
-`EngineCommand`. The reverse event channel is
-`QwenVoiceEngineClientEventXPCProtocol.handleEvent(_:)`. Codec:
-`EngineServiceCodec` (= `QwenVoiceWireCodec`); envelopes are versioned
-(`QwenVoiceWireSchema`) with a legacy fallback path.
-
-`EngineCommand` cases (the full surface): `initialize`, `ping`, `loadModel`,
-`unloadModel`, `ensureModelLoadedIfNeeded`, `prewarmModelIfNeeded`,
-`prefetchInteractiveReadinessIfNeeded`, `ensureCloneReferencePrimed`,
-`cancelClonePreparationIfNeeded`, `generate`,
-`cancelActiveGeneration`, `listPreparedVoices`, `preparePreparedVoiceCandidate`,
-`preparePreparedVoiceCandidateV2`,
-`commitPreparedVoiceCandidate`, `discardPreparedVoiceCandidate`, `enrollPreparedVoice`,
-`deletePreparedVoice`, `clearGenerationActivity`, `clearVisibleError`,
-`shutdownWhenIdle`.
+There is no wire protocol, no reverse event channel and no service retirement.
+Chunks reach the player through the store's `generationChunkReceived` notification
+on both platforms; the root shell subscribes to the store's `snapshotChanges`
+bridge with `onReceive` instead of observing the whole object (W1-D/W2-A).
 
 Saved-voice mutation is serialized by `PreparedVoiceRepository`. Interactive enrollment first
 copies audio, transcript, warnings, and replacement intent into an opaque, private candidate; the
@@ -615,12 +565,6 @@ transaction directories so startup reconciliation can roll an interrupted pre-pu
 back, complete a post-publication commit, or finish a user-confirmed delete without reviving it.
 The legacy `enrollPreparedVoice` entry remains only as a prepare-plus-commit compatibility route
 for noninteractive CLI and diagnostics.
-
-**Service retirement**: under memory pressure the app calls `shutdownWhenIdle`;
-the service refuses while a generation is active, then exits. The client marks
-this `expectedRetirement` (no error UI, no auto-reconnect) and lazily relaunches
-on next use. Events are drained off `MainActor` so the synchronous XPC encode
-can't lag the producer; only `lastPublishedEvent` hops to `MainActor`.
 
 macOS generation flows through three coordinators in `Sources/ViewModels/`:
 `CustomVoiceCoordinator`, `VoiceDesignCoordinator`, `VoiceCloningCoordinator`
@@ -634,16 +578,17 @@ generating-flag, and player state in one place. `VoiceCloningCoordinator`
 additionally primes the clone reference via `ensureCloneReferencePrimed(...)`. Design and Clone
 request assembly is centralized in the pure `MacStudioGenerationRequestFactory`, which preserves
 the exact UI language, reference transcript/voice identity, prompt, seed, variation, and generation
-identity at the pre-XPC boundary. Clone Auto is then resolved by shared `GenerationSemantics` from
-the target text; reference-language metadata never selects output language.
+identity before the engine call. Clone Auto is then resolved by shared `GenerationSemantics` from
+the target text; reference-language metadata never selects output language. The Studio screens of
+plan `macos-ios-convergence-2026-09` replace these coordinators with the shared
+`StudioGenerationCoordinator` and `IOSSingleTakeGenerationExecutor`.
 
 ---
 
 ## 6. Request lifecycle — iOS
 
-iOS links only `QwenVoiceCore`, so the engine is in-process and the XPC stack is
-absent. The iOS app has its **own** `Sources/iOS/TTSEngineStore.swift` (a
-distinct type from the macOS one) that wraps the in-process `MLXTTSEngine`.
+iOS links only `QwenVoiceCore`; the engine is in-process behind
+`Sources/iOS/TTSEngineStore.swift`, the store the macOS app shares since 2026-09-15.
 
 ```mermaid
 sequenceDiagram
@@ -732,15 +677,14 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
 - Entry: `QwenVoiceApp.swift` → `ContentView.swift`. Layout is a
   `NavigationSplitView` with a `SidebarItem` enum: `customVoice`, `voiceDesign`,
   `voiceCloning`, `history`, `voices`, `settings`.
-- State: predominantly `@Observable`. Coordinators, `ModelManagerViewModel`,
-  and (since the 2026-08 UI review's W2-A migration) `TTSEngineStore` are
-  `@MainActor @Observable` — the store bridges snapshot/performance-activity
-  Combine publishers for the non-observation consumers; `AudioPlayerViewModel`
-  remains `ObservableObject`.
-- `Sources/Services/` — app-level services: `DatabaseService` (GRDB),
-  `BatchGenerationRunner`, `GenerationTelemetryMerger`,
-  `MacGenerationWarmupCoordinator`, `MacEngineServiceLifecycleCoordinator`
-  (idle XPC service retirement), `AudioService`, `WaveformService`.
+- State: coordinators and `ModelManagerViewModel` are `@MainActor @Observable`;
+  the shared `TTSEngineStore` and `AudioPlayerViewModel` are `ObservableObject`s
+  injected as environment objects, with the store's `snapshotChanges` and
+  `performanceActivityUpdates` bridges for the root shell and the gate model.
+- `Sources/Services/` — app-level services: `MacEngineBootstrap` (in-process
+  engine + `MacMemoryBudgetPolicy`), `DatabaseService` (GRDB),
+  `BatchGenerationRunner`, `GenerationTelemetryMerger` (app + engine rows),
+  `MacGenerationWarmupCoordinator`, `AudioService`, `WaveformService`.
 - `Sources/ViewModels/` — `ModelManagerViewModel` (model install/variant).
 - `Sources/QwenVoiceCore/` — `HuggingFaceDownloader` (SwiftHuggingFace + SHA-256).
 - `Sources/Models/` — `TTSModel`, `Generation` (GRDB record), `Voice`,
@@ -786,19 +730,20 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   (async GRDB writes), `LanguageSelectionPresentation`, `VoiceDesignBriefCatalog`,
   `AppGenerationTimeline` + `MainThreadStallWatchdog` (telemetry), and
   `Sources/SharedSupport/Database/GenerationMigrations.swift`.
-- **`Sources/iOSSupport/`** is the iOS-only counterpart to macOS
-  `Services/` + `QwenVoiceEngineSupport/`: runtime helpers + model wrappers
+- **`Sources/iOSSupport/`** is the iOS counterpart to macOS `Services/`: runtime helpers + model wrappers
   coordinating through the **App Group** container
   (`group.com.patricedery.vocello.shared`) and a `UserDefaults` suite, plus the pure ordering
   types the `@MainActor` iOS classes drive (`IOSGenerationOwnershipAuthority`,
   `IOSModelDownloadCancellationSequence`, `CriticalMemoryReliefExecutor`), which is what lets
   `Tests/VocelloiOSLogicTests` characterize them without an app host.
-- macOS uses `Sources/Services/` + the XPC stack; iOS uses `Sources/iOS/` +
-  `iOSSupport/` + the in-process engine. The divergence point is exactly the
-  XPC-vs-in-process choice from [§3](#3-runtime-architecture-three-engine-hosts).
+- macOS uses `Sources/Services/` plus the iOS engine-hosting files it compiles by
+  path (`TTSEngineStore`, the ownership authority, the release coordinator, the
+  diagnostics recorder, the notification names — listed in `project.yml`); iOS
+  uses `Sources/iOS/` + `iOSSupport/`. Plan `macos-ios-convergence-2026-09`
+  widens that shared set screen by screen.
 - Both frontends persist the reviewed transcript source and separately confirmed reference
   language as `PreparedVoiceEnrollmentMetadata`. The legacy prepared-candidate command remains
-  decode-compatible; new metadata-bearing macOS enrollment uses the versioned v2 command. That
+  decode-compatible; metadata-bearing enrollment uses the `enrollmentMetadata` overload. That
   reference language describes conditioning only and cannot override explicit or target-text Auto
   output-language resolution.
 
@@ -880,8 +825,8 @@ symlinks to the canonical macOS cache products, not copied binaries.
 
 Every supported build records an atomic `last-build.json` provenance stamp with its producer,
 scheme, configuration, destination, architecture, optimization, signing class, DerivedData, and
-package store. Local macOS app, XPC, CLI, and relevant framework products are arm64-only. Preserved
-dSYMs are accepted only when their Mach-O UUIDs match the current app/XPC or iOS product. Run
+package store. Local macOS app, CLI, and relevant framework products are arm64-only. Preserved
+dSYMs are accepted only when their Mach-O UUIDs match the current app or iOS product. Run
 `python3 scripts/build_output_policy.py status|validate`; use
 `scripts/clean_build_caches.sh --routine --dry-run` before bounded cleanup. The generated owner and
 lifetime table is maintained in [`reference/privacy-storage.md`](reference/privacy-storage.md).
@@ -991,12 +936,12 @@ values without retaining those values. Likewise,
 `config/concurrency-safety.json` is the authoritative inventory and justification for owned
 `@unchecked Sendable` and other unsafe concurrency declarations; unregistered exceptions fail
 `scripts/runtime_security_contract.py`. Registry schema v2 also requires a current review date and
-substantive removal condition for every exception and caps unreviewed growth at the registered 41
-`@unchecked Sendable` and 9 `nonisolated(unsafe)` declarations (`budget` in
+substantive removal condition for every exception and caps unreviewed growth at the registered 34
+`@unchecked Sendable` and 7 `nonisolated(unsafe)` declarations (`budget` in
 `config/concurrency-safety.json`). The CPU-focused
-ThreadSanitizer subset is owned by `config/tsan-policy.json`; it covers the deterministic core and
-injectable XPC transport while MLX/Metal runtime execution stays in its single-owner deterministic
-suite. Since 2026-09-14 it blocks push CI (`macos-tsan` inside `CI required`) after three
+ThreadSanitizer subset is owned by `config/tsan-policy.json`; it covers the deterministic core
+while MLX/Metal runtime execution stays in its single-owner deterministic suite (the injectable XPC
+transport bundle left with the XPC service on 2026-09-15). Since 2026-09-14 it blocks push CI (`macos-tsan` inside `CI required`) after three
 consecutive clean nightly runs and a recorded maintainer decision; the nightly keeps a cold run.
 
 Records are written by the `GenerationTelemetryJSONLSink` actor as JSONL under
@@ -1004,9 +949,8 @@ Records are written by the `GenerationTelemetryJSONLSink` actor as JSONL under
 
 - `app/generations.jsonl`
 - `engine/generations.jsonl`
-- `engine-service/generations.jsonl` (macOS)
 - `generations-merged.jsonl` (merged by `Sources/Services/GenerationTelemetryMerger.swift`)
-- `*/native-events.jsonl` (chunk gaps, warm-admission, XPC retirement — gated)
+- `*/native-events.jsonl` (chunk gaps, warm-admission — gated)
 - `<documents>/generation-failures.jsonl` (`GenerationFailureDiagnosticLogger` — gated,
   privacy-reduced schema v3 with schema-v2 decoding, capped at 200 entries and 256 KiB)
 
@@ -1033,7 +977,7 @@ memory/thread/headroom/Metal capture success and coverage, total-RAM/implied-pro
 start/end/delta/peak memory fields, aligned extrema snapshots, and explicit app/engine lifecycle
 boundaries. Publishable benchmark-evidence v2 binds exact verbose sidecars and rejects <95%
 coverage, capture failures, critical pressure, memory warnings/exits, `hardTrim`, and `fullUnload`.
-macOS UI/XPC aggregates pair app and engine samples by uptime; independent process peaks are never
+macOS UI aggregates pair app and engine samples by uptime; independent process peaks are never
 summed. Older telemetry remains decodable but cannot enter memory-qualified trends.
 No telemetry persists raw script, transcript, path, or voice description. The generation-failure
 log stores only an allowlisted error code/classification, lifecycle stage, known model identifier,
@@ -1046,7 +990,7 @@ oldest-first); raw `*.jsonl` is gitignored; committed summaries must be ≤256 K
 
 `GenerationStreamingTelemetryV9` is the complete target contract for the convergence program. It
 models plan/policy digests, separate model and product terminals, codec/materialized/written/preview
-frame counts, frame-bounded channel pressure, exact chunk ranges, XPC sequence evidence, and
+frame counts, frame-bounded channel pressure, exact chunk ranges, chunk sequence evidence, and
 first-render observation metadata. Complete v9 documents are now written, validated, and published
 as sidecars by `GenerationStreamingTelemetryV9Publication`
 (`*.streaming-telemetry-v9.json`) where the producer can prove every enumerated observation, and
@@ -1142,7 +1086,6 @@ Most-frequent imports across `Sources/**/*.swift`:
 | CoreMedia / Accelerate | Media timing/types, DSP. |
 | UniformTypeIdentifiers | File-type handling. |
 | OSLog / os | Logging + signposts. |
-| XPC (`NSXPCConnection`) | macOS engine-service IPC. |
 
 ---
 
@@ -1151,7 +1094,7 @@ Most-frequent imports across `Sources/**/*.swift`:
 - **No Python backend** — everything runs natively in Swift + MLX.
 - **No bundled weights** — models download on demand from Hugging Face.
 - **Single shippable config** — `Release` only; debug is runtime-gated (`DebugMode`), not compiled.
-- **macOS engine out-of-process via XPC** for crash isolation + retireable memory; **iOS engine in-process** (ExtensionKit removed over Jetsam caps).
+- **Engine in-process on every host** (macOS since 2026-09-15; the XPC service's crash isolation and retirement were traded for one architecture; iOS ExtensionKit removed over Jetsam caps).
 - **Local-first / privacy-first** — scripts, history, recordings, and generated audio stay on-device unless exported.
 
 ---
@@ -1162,7 +1105,7 @@ Most-frequent imports across `Sources/**/*.swift`:
 | --- | --- |
 | `TTSEngine` | `@MainActor ObservableObject` protocol — the engine abstraction (`Sources/QwenVoiceCore/TTSEngine.swift`). |
 | `MLXTTSEngine` | The single concrete `TTSEngine`, built on MLX. |
-| `TTSEngineStore` | Observable engine facade. macOS one wraps the XPC client (`QwenVoiceNative`); iOS one wraps the in-process engine (`Sources/iOS`). |
+| `TTSEngineStore` | Observable engine facade over the in-process engine (`Sources/iOS`, compiled into both apps). |
 | `NativeRuntimeFactory` | Builds the whole core (registry, asset store, audio prep, engine) from a contract + paths root. |
 | `NativeEngineRuntime` | Actor owning the transitional model-load/prewarm + conditioning bridge. |
 | `VocelloQwen3Engine` | Shipping Custom/Design/Clone generation mutation authority; owns the classified session and operation lease. |
@@ -1171,11 +1114,6 @@ Most-frequent imports across `Sources/**/*.swift`:
 | `ActiveGenerationCoordinator` | Owns one in-process generation and waits for a typed cancellation terminal barrier before releasing it. |
 | `GenerationEventDeliveryProbe` | Owns the bounded suspending frontend-event router and measures accepted, terminated, or unobserved sends. |
 | `RuntimeDebugGate` | Requires a repository-owned internal build capability plus `QWENVOICE_DEBUG` for behavior-changing overrides; records privacy-safe override provenance in generation telemetry. |
-| `EngineServiceHost` | `@MainActor` XPC service host (`QwenVoiceEngineService`) running the engine out-of-process. |
-| `XPCNativeEngineClient` | macOS XPC client conforming to `MacTTSEngine`; `XPCNativeEngineCoordinator` manages the connection. |
-| `EngineCommand` | The XPC command enum carried inside the single `perform(_:withReply:)` envelope. |
-| `GenerationChunkBroker` | Combine bridge delivering streaming events to SwiftUI (macOS). |
-| `EngineServiceTransportAccumulator` | Pure bounded XPC probe state: accepted chunks, gaps/duplicates/reordering, cancellation, and single terminal record. |
 | `ContractBackedModelRegistry` | Loads `qwenvoice_contract.json` and expands it per platform. |
 | `GenerationRequest` / `Payload` | The generation ask + its mode-specific payload (custom/design/clone). |
 | `CloneReference` | Reference audio + typed conditioning mode (`transcriptBacked` or genuine audio-only `xVectorOnly`) + optional prepared voice identity. |

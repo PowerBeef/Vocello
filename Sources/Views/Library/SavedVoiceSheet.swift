@@ -1,6 +1,5 @@
 import AppKit
 import QwenVoiceCore
-import QwenVoiceNative
 import SwiftUI
 import UniformTypeIdentifiers
 

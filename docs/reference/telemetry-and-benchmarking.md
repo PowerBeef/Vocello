@@ -11,8 +11,8 @@ sourceOfTruth:
 # Telemetry & benchmarking
 
 How Vocello measures itself. This is the single reference for the per‑generation
-telemetry that spans the **frontend (app UI)**, the **middle communication layer
-(macOS XPC service / iOS in‑process engine)**, and the **backend core (MLX / Qwen3‑TTS)** — what
+telemetry that spans the **frontend (app UI)** and the **backend core (MLX / Qwen3‑TTS)**, both
+in one process on macOS and iOS since 2026-09-15 — what
 is measured, where it lands, how to read it, and how it stays cheap enough to run on
 restricted hardware (8 GB Macs, iPhone) without distorting the numbers you optimize
 against.
@@ -25,7 +25,7 @@ If anything here disagrees with the code, the code wins — fix this file.
 > successful benchmark records, historical baselines, and generated indexes are permitted
 > (bounded by the `benchmarks/` cap). Raw telemetry, audio, screenshots, traces, and result
 > bundles remain untracked. XCUITest is the sole autonomous app UI driver; deterministic
-> history/WAV/XPC/backend probes validate its smoke and benchmark results. iOS UI tests
+> history/WAV/backend probes validate its smoke and benchmark results. iOS UI tests
 > and real-engine generation remain **on-device only** on a paired physical iPhone. GitHub CI
 > executes Foundation-level iOS policy assertions on the macOS host and remains compile-only for
 > iOS binaries.
@@ -51,8 +51,8 @@ If anything here disagrees with the code, the code wins — fix this file.
    `benchmark-evidence.json` with the exact ordered generation IDs and cells. Summaries and the
    tracked registry consume that manifest plus its run ID; unrelated historical rows are ignored.
 6. **Process ownership stays explicit.** Memory and resource deltas remain on the process that
-   measured them. macOS UI evidence requires app + engine-service + engine; iOS UI evidence
-   requires app + engine. A partial merge is marked incomplete and cannot publish history.
+   measured them. macOS and iOS UI evidence require app + engine (records before 2026-09-15 also
+   carried an engine-service layer). A partial merge is marked incomplete and cannot publish history.
 
 ---
 
@@ -67,9 +67,9 @@ resolved once per process:
 | App-to-engine `initialize` handshake | Relays the app's resolved environment mode to the macOS engine; `TelemetryGate.applyHandshakeMode(_:)` latches a non-off mode. There is no persisted Settings tap-toggle. |
 | `QWENVOICE_NATIVE_TELEMETRY_MODE=lightweight\|verbose` (aliases: `light`, `full`, `deep`) | Forces sampling/persistence on regardless of the gate. |
 
-The engine runs **out of process on macOS** (XPC service) and **in process on iOS**
-(the ExtensionKit extension was removed; see [`ARCHITECTURE.md`](../ARCHITECTURE.md) / commit `aed617c`). The
-separate process does not automatically inherit the app's resolved mode; the initialize handshake
+The engine runs **in process on macOS and iOS** (the macOS XPC service was retired on 2026-09-15 and the
+iOS ExtensionKit extension earlier; see [`ARCHITECTURE.md`](../ARCHITECTURE.md)). The engine does not
+automatically inherit the app's resolved mode; the initialize handshake
 carries it. Telemetry opt-in is distinct from production-affecting overrides, which additionally
 require the registered internal-diagnostics build capability and debug gate. Do not claim that
 all telemetry code is compiled out of distributed binaries.
@@ -131,7 +131,7 @@ values without retaining raw launch input. Never add an undocumented environment
 ## 3. Architecture
 
 ```
- App process (Vocello)                    Engine process (macOS XPC service / iOS in‑process engine)
+ App process (Vocello)                    Engine (same process on macOS and iOS)
  ┌───────────────────────────┐  IPC      ┌──────────────────────────────────────────┐
  │ Coordinators              │  ───────► │ NativeEngineRuntime.prepareGeneration      │
  │   mint generationID       │ generate  │   creates per‑generation recorder          │
@@ -141,7 +141,7 @@ values without retaining raw launch input. Never add an undocumented environment
  │ AppGenerationTimeline      │           │   reads MLX timings, per‑chunk substages   │
  │ GenerationTelemetryMerger  │           │ Qwen3TTS (owned) emits timings/counters │
  └───────────────────────────┘           └──────────────────────────────────────────┘
-        │  writes app row                          │  writes engine + engine-service rows
+        │  writes app row                          │  writes the engine row
         └──────────────► diagnostics/*/generations.jsonl ◄───────┘
                                   │ merge by generationID
                                   ▼
@@ -155,7 +155,7 @@ Core types (all in `Sources/QwenVoiceCore/` unless noted):
 | `TelemetryGate` | Master on/off, per process; handshake latch. |
 | `NativeTelemetryRecorder` | Per‑generation stage timeline (`mark(stage:)`). The generation telemetry session begins before model preparation and shares one clock across load, prewarm, synthesis, finalize, trim, cancellation, and failure. |
 | `NativeTelemetrySampler` | Background memory/timing sampler → `TelemetrySummary` + raw `[TelemetrySample]`. |
-| `GenerationTelemetryRecord` | One durable row per layer (`engine` / `engine-service` / `app`). |
+| `GenerationTelemetryRecord` | One durable row per layer (`engine` / `app`; `engine-service` only in records before 2026-09-15). |
 | `GenerationTelemetryJSONLSink` | Append‑only writer (gated); also the verbose raw‑sample sidecar. |
 | `GenerationTelemetryMerger` (`Sources/Services/`, macOS) | Joins per‑layer rows → `generations-merged.jsonl`. |
 | `AppGenerationTimeline` (`Sources/SharedSupport/Telemetry/`) | Frontend submit→firstChunk→playbackScheduled→completed plus bounded playback-health counters. |
@@ -170,7 +170,6 @@ folder when DebugMode is on, so real data is never polluted):
 | File | Layer | Contents |
 |---|---|---|
 | `engine/generations.jsonl` | backend | The decode breakdown, KPIs, per‑stage MLX memory, per‑chunk timeline, stage marks, memory summary. **The richest source for backend work.** |
-| `engine-service/generations.jsonl` | middle | XPC transport: request acceptance→first chunk, chunks forwarded, gaps, and forwarding span. |
 | `app/generations.jsonl` | frontend | Submit→first chunk→playback scheduled→completed, delayed-heartbeat coverage, and playback health. It does not claim acoustic audibility or inherit engine memory. |
 | `generations-merged.jsonl` | merged | Layers joined per `generationID`, with explicit `requiredLayers`, `missingLayers`, and `complete`. |
 | `engine/samples-*.jsonl` | backend (verbose only) | Raw per‑sample memory/timing series, one file per `generationID`. |
@@ -205,7 +204,7 @@ older rows stay readable but are marked memory-contract-incomplete and excluded 
 | `schemaVersion` | Int | 8 (v2 derived/memory/chunk; v3 model/warm state; v4 audioQC; v5 high-resolution clocks; v6 typed payloads; v7 sampler accuracy/resource deltas and playback-scheduled naming; v8 independently qualified memory captures, absolute uptime, aligned snapshots, and coverage). |
 | `clockSource` | String? | `mach_absolute_time` when nanosecond timestamps are present. |
 | `generationID` | String | Correlation key (UUID). |
-| `layer` | String | `engine` / `engine-service` / `app` / `merged`. (The retired iOS `engine-extension` layer no longer emits — iOS runs in-process.) |
+| `layer` | String | `engine` / `app` / `merged` (`engine-service` and the iOS `engine-extension` layers are retired and appear only in older records). |
 | `mode` | String? | `custom` / `design` / `clone`. |
 | `modelID` | String? | Resolved model variant id (e.g. `pro_custom_quality`). |
 | `warmState` | String? | `cold` / `warm` — the benchmark cell. |
@@ -435,7 +434,7 @@ Critical pressure, `application_memory_warning`, a memory exit, `hardTrim`, or `
 publication. Guarded pressure or `softTrim` is `passedWithWarnings`. iOS additionally fails at
 physical footprint ≥5.2 GB, minimum headroom <384 MB, or Metal working-set ratio ≥0.8; footprint
 ≥4.5 GB or headroom <768 MB is a warning. The iOS record retains start/end/min headroom and peak
-process-budget utilization. macOS UI/XPC totals pair app and engine samples by absolute uptime within
+process-budget utilization. macOS UI totals pair app and engine samples by absolute uptime within
 one sampler cadence (the larger of the two processes' target intervals: 500 ms on the 8 GB Mac and iPhone tiers, 250 ms on 16 GB, 100 ms above); they never add independent process maxima. Headless CLI/profile evidence reports
 only its owning engine process.
 
@@ -502,8 +501,8 @@ sampler + a sidecar write; for the tightest latency numbers use `lightweight` an
 The canonical benchmark procedure owns launch configuration, matrix execution, and diagnostics-path
 selection. For authoritative output, call `summarize_generation_telemetry.py` with both
 `--run-id` and `--evidence-manifest`; the manifest's ordered generation IDs prevent historical rows
-from leaking into the current summary. The summarizer can merge the macOS app, XPC, and engine
-layers by `generationID`; CLI rows have only the engine boundary. Read `finishReason` and
+from leaking into the current summary. The summarizer merges the app and engine layers by
+`generationID`; CLI rows have only the engine boundary. Read `finishReason` and
 `audioQC` before interpreting performance, keep cold and warm populations separate, and compare
 `derivedMetrics.realTimeFactor` (and the decode speedup `audioSecondsPerWallSecond`) with the dominant `timingsMS` substage. A cold Custom or
 Design row should include `upstreamModelLoad` in `stageMarks`; an immediately repeated row should be
@@ -562,7 +561,7 @@ high‑memory dev Mac they read `0`.
 
 `QWENVOICE_FORCE_MEMORY_CLASS` (accepts `floor_8gb_mac`/`mid_16gb_mac`/`high_memory_mac`/`iphone_pro`,
 or aliases `8gb`/`16gb`/`high`/`iphone`) is read in the app process and **propagated to the engine over the
-`initialize` IPC handshake** (env doesn't cross to the engine process — same path as `telemetryMode`).
+`initialize` handshake** (the same path as `telemetryMode`).
 When selected by the canonical diagnostic procedure, it makes the engine run the floor-tier code
 paths: the pressure monitor **starts**, caches are tight,
 single‑gen clears + post‑batch hard trims fire, and idle‑unload is aggressive. Every engine row stamps

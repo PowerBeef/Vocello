@@ -96,23 +96,6 @@
   ],
   "items": [
     {
-      "id": "CONV-03",
-      "plan": "macos-ios-convergence-2026-09",
-      "title": "Remove the XPC stack and rewrite its contracts, scripts and documents",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "Sources/QwenVoiceEngineService, Sources/QwenVoiceEngineSupport, Sources/QwenVoiceNative and Tests/VocelloEngineIntegrationTests are absent with their targets; the entitlement, concurrency-safety, runtime-refactor and TSan contracts pass with dated decisions; build, release, test and CI scripts carry no XPCServices path; scripts/dev.sh ci is green; CLAUDE.md, native.md, SECURITY.md and ARCHITECTURE.md describe in-process hosting.",
-      "sourceOfTruth": [
-        "config/macos-entitlement-policy.json",
-        "config/tsan-policy.json",
-        "config/concurrency-safety.json",
-        "config/runtime-refactor-contract.json",
-        "scripts/release.sh",
-        "scripts/macos_test.sh"
-      ],
-      "updated": "2026-09-15"
-    },
-    {
       "id": "CONV-04",
       "plan": "macos-ios-convergence-2026-09",
       "title": "In-process memory relief on 8 GB Macs",
@@ -130,17 +113,15 @@
       "id": "CONV-10",
       "plan": "macos-ios-convergence-2026-09",
       "title": "Shared theme tokens, glass surface, word timing and text-limit policy",
-      "status": "planned",
-      "blockedBy": [
-        "CONV-03"
-      ],
+      "status": "in-flight",
+      "blockedBy": [],
       "gate": "Sources/SharedSupport carries the tokens, the glass surface body, WordTimingPlanner and GenerationTextLimitPolicy with no UIKit or AppKit import; the iOS files forward to them; two new VocelloCoreTests pass; the generic iOS compile is green; config/ios-control-audit.json is unchanged.",
       "sourceOfTruth": [
         "Sources/SharedSupport",
         "Sources/iOS/Theme/Theme.swift",
         "Sources/iOS/Theme/ThemeModifiers.swift"
       ],
-      "updated": "2026-09-14"
+      "updated": "2026-09-15"
     },
     {
       "id": "CONV-11",
@@ -387,7 +368,7 @@
       "blockedBy": [
         "RF-09"
       ],
-      "gate": "Close F-05 with actual signed/notarized packaged-app startup/XPC evidence, verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.",
+      "gate": "Close F-05 with actual signed/notarized packaged-app startup evidence (in-process engine), verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.",
       "sourceOfTruth": [
         "scripts/release.sh",
         "scripts/macos_test.sh",
@@ -563,7 +544,6 @@
       "evidence": [
         "file:Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
         "file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift",
-        "file:Tests/VocelloEngineIntegrationTests/PreparedVoiceWireContractTests.swift",
         "file:Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift",
         "file:scripts/saved_voice_lifecycle_contract.py",
         "doc:docs/reference/privacy-storage.md",

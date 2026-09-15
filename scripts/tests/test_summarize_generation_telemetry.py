@@ -435,7 +435,6 @@ def test_load_merged_runs_frontend_overhead():
         run1 = next(r for r in runs if r["generationID"] == "gen-merged-001")
         assert run1["appTTFCMS"] == 450
         assert run1["engineFirstChunkMS"] == 380
-        assert run1["engineServiceFirstChunkMS"] == 390
         assert run1["frontendOverheadMS"] == 70
         run2 = next(r for r in runs if r["generationID"] == "gen-merged-002")
         assert run2["frontendOverheadMS"] == 100

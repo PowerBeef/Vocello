@@ -347,14 +347,14 @@ def architecture_chart(theme_name: str) -> str:
     parts.append(text(496, 50, "· the owned runtime", fill=theme["muted"], size=11))
 
     box(16, 84, 116, 44, ("SwiftUI app",), stroke=theme["grid"], title=True)
-    box(180, 84, 132, 44, ("Engine service", "separate process"), stroke=theme["grid"], title=True)
+    box(180, 84, 132, 44, ("Engine store", "same process"), stroke=theme["grid"], title=True)
     box(372, 62, 128, 52, ("Engine actor", "owns each session"), stroke=theme["grid"], title=True)
     box(532, 62, 156, 52, ("Qwen3-TTS talker", "+ code predictor"), stroke=theme["grid"], title=True)
     box(532, 128, 156, 48, ("Mimi decoder", "streams audio"), stroke=theme["grid"], title=True)
     box(372, 128, 128, 48, ("MLX · Metal", "unified memory"), stroke=theme["grid"], title=True)
 
     arrow(132, 106, 176, 106)
-    parts.append(text(154, 76, "XPC", fill=theme["muted"], size=11, anchor="middle"))
+    parts.append(text(154, 76, "in-process", fill=theme["muted"], size=11, anchor="middle"))
     arrow(312, 106, 368, 106)
     arrow(500, 88, 528, 88)
     arrow(610, 114, 610, 124)

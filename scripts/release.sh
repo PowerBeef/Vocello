@@ -355,15 +355,10 @@ echo "[5/7] Signing and verifying the final app bundle..."
 # the project's default ad-hoc identity ("-"), which notarization
 # rejects ("not signed with a valid Developer ID certificate") — the
 # 2.2.0 candidate failed exactly there on its embedded frameworks.
-# Frameworks first (no entitlements), then XPC services, then the app.
+# Frameworks first (no entitlements), then the app.
 while IFS= read -r -d '' framework_path; do
     run_codesign "$framework_path" --options runtime
 done < <(find "$APP_PATH/Contents/Frameworks" -maxdepth 1 -type d -name '*.framework' -print0 2>/dev/null)
-while IFS= read -r -d '' xpc_path; do
-    run_codesign "$xpc_path" \
-        --options runtime \
-        --entitlements "$PROJECT_DIR/Sources/QwenVoiceEmbeddedRuntime.entitlements"
-done < <(find "$APP_PATH/Contents/XPCServices" -maxdepth 1 -type d -name '*.xpc' -print0 2>/dev/null)
 run_codesign "$APP_PATH" \
     --options runtime \
     --entitlements "$PROJECT_DIR/Sources/QwenVoice.entitlements"

@@ -28,8 +28,14 @@
         "canonical"
       ],
       "requiredTakeCoverage": {
-        "modes": ["custom", "design", "clone"],
-        "variants": ["speed"]
+        "modes": [
+          "custom",
+          "design",
+          "clone"
+        ],
+        "variants": [
+          "speed"
+        ]
       }
     },
     "ios-ui-benchmark": {
@@ -41,8 +47,14 @@
         "canonical"
       ],
       "requiredTakeCoverage": {
-        "modes": ["custom", "design", "clone"],
-        "variants": ["speed"]
+        "modes": [
+          "custom",
+          "design",
+          "clone"
+        ],
+        "variants": [
+          "speed"
+        ]
       }
     },
     "macos-engine-benchmark": {
@@ -108,10 +120,19 @@
       "type": "benchmark-record",
       "kind": "engine-generation",
       "matrixScope": "focused",
-      "classifications": ["focused", "canonical"],
+      "classifications": [
+        "focused",
+        "canonical"
+      ],
       "requiredTakeCoverage": {
-        "modes": ["custom", "design", "clone"],
-        "variants": ["quality"]
+        "modes": [
+          "custom",
+          "design",
+          "clone"
+        ],
+        "variants": [
+          "quality"
+        ]
       }
     },
     "ios-quality-engine-benchmark": {
@@ -119,10 +140,19 @@
       "type": "benchmark-record",
       "kind": "engine-generation",
       "matrixScope": "focused",
-      "classifications": ["focused", "canonical"],
+      "classifications": [
+        "focused",
+        "canonical"
+      ],
       "requiredTakeCoverage": {
-        "modes": ["custom", "design", "clone"],
-        "variants": ["quality"]
+        "modes": [
+          "custom",
+          "design",
+          "clone"
+        ],
+        "variants": [
+          "quality"
+        ]
       }
     },
     "macos-language-benchmark": {
@@ -130,13 +160,25 @@
       "type": "benchmark-record",
       "kind": "language",
       "matrixScope": "focused",
-      "classifications": ["focused", "canonical"],
+      "classifications": [
+        "focused",
+        "canonical"
+      ],
       "requiredTakeCoverage": {
-        "variants": ["speed"],
+        "variants": [
+          "speed"
+        ],
         "cellPatterns": [
-          "custom-en-*", "custom-zh-*", "custom-de-*", "custom-fr-*",
-          "custom-ru-*", "custom-pt-*", "custom-es-*", "custom-it-*",
-          "custom-ja-*", "custom-ko-*"
+          "custom-en-*",
+          "custom-zh-*",
+          "custom-de-*",
+          "custom-fr-*",
+          "custom-ru-*",
+          "custom-pt-*",
+          "custom-es-*",
+          "custom-it-*",
+          "custom-ja-*",
+          "custom-ko-*"
         ]
       }
     },
@@ -145,13 +187,25 @@
       "type": "benchmark-record",
       "kind": "language",
       "matrixScope": "focused",
-      "classifications": ["focused", "canonical"],
+      "classifications": [
+        "focused",
+        "canonical"
+      ],
       "requiredTakeCoverage": {
-        "variants": ["speed"],
+        "variants": [
+          "speed"
+        ],
         "cellPatterns": [
-          "custom-en-*", "custom-zh-*", "custom-de-*", "custom-fr-*",
-          "custom-ru-*", "custom-pt-*", "custom-es-*", "custom-it-*",
-          "custom-ja-*", "custom-ko-*"
+          "custom-en-*",
+          "custom-zh-*",
+          "custom-de-*",
+          "custom-fr-*",
+          "custom-ru-*",
+          "custom-pt-*",
+          "custom-es-*",
+          "custom-it-*",
+          "custom-ja-*",
+          "custom-ko-*"
         ]
       }
     },
@@ -160,11 +214,20 @@
       "type": "benchmark-record",
       "kind": "engine-generation",
       "matrixScope": "focused",
-      "classifications": ["focused", "canonical"],
+      "classifications": [
+        "focused",
+        "canonical"
+      ],
       "requiredTakeCoverage": {
-        "variants": ["speed"],
-        "cellPatterns": ["*#delivery-*"],
-        "metricKeys": ["deliveryProsodyEffect"]
+        "variants": [
+          "speed"
+        ],
+        "cellPatterns": [
+          "*#delivery-*"
+        ],
+        "metricKeys": [
+          "deliveryProsodyEffect"
+        ]
       }
     },
     "ios-delivery-benchmark": {
@@ -172,11 +235,20 @@
       "type": "benchmark-record",
       "kind": "engine-generation",
       "matrixScope": "focused",
-      "classifications": ["focused", "canonical"],
+      "classifications": [
+        "focused",
+        "canonical"
+      ],
       "requiredTakeCoverage": {
-        "variants": ["speed"],
-        "cellPatterns": ["*#delivery-*"],
-        "metricKeys": ["deliveryProsodyEffect"]
+        "variants": [
+          "speed"
+        ],
+        "cellPatterns": [
+          "*#delivery-*"
+        ],
+        "metricKeys": [
+          "deliveryProsodyEffect"
+        ]
       }
     },
     "macos-model-download-lifecycle": {
@@ -205,46 +277,84 @@
   },
   "capabilities": {
     "speed-generation": {
-      "platformApplicability": {"macos": true, "ios": true},
+      "platformApplicability": {
+        "macos": true,
+        "ios": true
+      },
       "evidenceByPlatform": {
-        "macos": ["macos-ui-benchmark"],
-        "ios": ["ios-ui-benchmark"]
+        "macos": [
+          "macos-ui-benchmark"
+        ],
+        "ios": [
+          "ios-ui-benchmark"
+        ]
       },
       "unsupportedDimensions": []
     },
     "quality-generation": {
-      "platformApplicability": {"macos": true, "ios": false},
+      "platformApplicability": {
+        "macos": true,
+        "ios": false
+      },
       "evidenceByPlatform": {
-        "macos": ["macos-quality-engine-benchmark"],
+        "macos": [
+          "macos-quality-engine-benchmark"
+        ],
         "ios": []
       },
-      "unsupportedDimensions": ["multilingual-quality", "delivery-quality"]
+      "unsupportedDimensions": [
+        "multilingual-quality",
+        "delivery-quality"
+      ]
     },
     "studio-modes": {
       "evidenceByPlatform": {
-        "macos": ["macos-ui-benchmark"],
-        "ios": ["ios-ui-benchmark"]
+        "macos": [
+          "macos-ui-benchmark"
+        ],
+        "ios": [
+          "ios-ui-benchmark"
+        ]
       },
       "unsupportedDimensions": []
     },
     "multilingual-output": {
       "evidenceByPlatform": {
-        "macos": ["macos-language-benchmark"],
-        "ios": ["ios-language-benchmark"]
+        "macos": [
+          "macos-language-benchmark"
+        ],
+        "ios": [
+          "ios-language-benchmark"
+        ]
       },
-      "unsupportedDimensions": ["clone-mode", "quality-tier", "independent-generation-cohorts"]
+      "unsupportedDimensions": [
+        "clone-mode",
+        "quality-tier",
+        "independent-generation-cohorts"
+      ]
     },
     "delivery-evaluation": {
       "evidenceByPlatform": {
-        "macos": ["macos-delivery-benchmark"],
-        "ios": ["ios-delivery-benchmark"]
+        "macos": [
+          "macos-delivery-benchmark"
+        ],
+        "ios": [
+          "ios-delivery-benchmark"
+        ]
       },
-      "unsupportedDimensions": ["quality-tier", "independent-holdout-calibration"]
+      "unsupportedDimensions": [
+        "quality-tier",
+        "independent-holdout-calibration"
+      ]
     },
     "model-lifecycle": {
       "evidenceByPlatform": {
-        "macos": ["macos-model-download-lifecycle"],
-        "ios": ["ios-model-download-lifecycle"]
+        "macos": [
+          "macos-model-download-lifecycle"
+        ],
+        "ios": [
+          "ios-model-download-lifecycle"
+        ]
       },
       "unsupportedDimensions": []
     }
@@ -415,8 +525,6 @@
         "include": [
           "Sources/QwenVoiceBackendCore/**",
           "Sources/QwenVoiceCore/**",
-          "Sources/QwenVoiceEngineService/**",
-          "Sources/QwenVoiceEngineSupport/**",
           "Packages/VocelloQwen3Core/**"
         ],
         "exclude": [

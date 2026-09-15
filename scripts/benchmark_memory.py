@@ -5,8 +5,9 @@ Raw sampler sidecars are intentionally untracked.  This module validates the
 exact sidecars selected by a benchmark, derives a small allowlisted summary,
 and returns digests that bind the tracked record to those raw samples.
 
-iOS is a single-process engine/app runtime.  macOS has separate engine-service
-and app processes: its aggregate peaks are calculated only from samples whose
+iOS is a single-process engine/app runtime, and so is macOS since 2026-09-15.
+Older macOS records came from separate engine-service and app processes, so
+macOS aggregate peaks are calculated only from samples whose
 absolute uptime timestamps can be paired within one sampling cadence.  It is
 never valid to add independent process maxima.
 """

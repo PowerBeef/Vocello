@@ -81,15 +81,11 @@ prepare_build_inputs() {
 
 assert_mlx_metallibs() {
     local app_bundle="$1"
-    local relative_path
-    for relative_path in \
-        "Contents/Resources/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib" \
-        "Contents/XPCServices/QwenVoiceEngineService.xpc/Contents/Resources/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"; do
-        if [ ! -s "$app_bundle/$relative_path" ]; then
-            echo "error: required native MLX Metal library is missing or empty: $app_bundle/$relative_path" >&2
-            return 1
-        fi
-    done
+    local relative_path="Contents/Resources/mlx-swift_Cmlx.bundle/Contents/Resources/default.metallib"
+    if [ ! -s "$app_bundle/$relative_path" ]; then
+        echo "error: required native MLX Metal library is missing or empty: $app_bundle/$relative_path" >&2
+        return 1
+    fi
 }
 
 build_app() {
@@ -169,7 +165,6 @@ build_app() {
     assert_mlx_metallibs "$XCODEBUILD_APP"
     assert_macos_bundle_arm64_only "$XCODEBUILD_APP"
     assert_signing_identity "$XCODEBUILD_APP" "$signing_identity"
-    assert_signing_identity "$XCODEBUILD_APP/Contents/XPCServices/QwenVoiceEngineService.xpc" "$signing_identity"
     if [ "$CODEQL_BUILD_PHASE" = "prepare" ]; then
         echo "==> CodeQL native preparation completed (validated scratch product)"
         return 0
@@ -184,7 +179,6 @@ build_app() {
         exit 1
     fi
     assert_signing_identity "$APP_BUNDLE" "$signing_identity"
-    assert_signing_identity "$APP_BUNDLE/Contents/XPCServices/QwenVoiceEngineService.xpc" "$signing_identity"
     record_dev_signing_identity "$signing_identity"
     preserve_dsyms
     local signing_class="apple-development"
@@ -237,7 +231,7 @@ cmd_codeql() {
     build_app "scripts/build.sh codeql"
 }
 
-# Preserve this build's dSYMs (app + XPC service + any others) so
+# Preserve this build's dSYMs so
 # scripts/macos_test.sh crashes can symbolicate .ips reports. Keyed by build version.
 preserve_dsyms() {
     local dsym_dst="$QVOICE_SYMBOLS_MACOS"

@@ -8,9 +8,8 @@ import Foundation
 /// `TTSEngine` and by every throwing function on that protocol once the
 /// typed-throws sweep is complete. Conformers catch downstream typed
 /// errors (e.g. `AudioPreparationError`, `DocumentIOError`) and rethrow
-/// them as `.generationFailed(<localized description>)`. The macOS
-/// cross-process transport (`Sources/QwenVoiceNative/XPCNativeEngineClient.swift`)
-/// carries instances of this type across the `NSXPCConnection` boundary.
+/// them as `.generationFailed(<localized description>)`. Every host runs the
+/// engine in-process; the type stays `Codable` for telemetry and diagnostics.
 public enum TTSEngineError: LocalizedError, Equatable {
     case notInitialized
     case unknownModel(String)

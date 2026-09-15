@@ -21,20 +21,6 @@
                ReferencedContainer = "container:QwenVoice.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "NO"
-            buildForProfiling = "NO"
-            buildForArchiving = "NO"
-            buildForAnalyzing = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "ABFED323E033822F645DDE92"
-               BuildableName = "VocelloEngineIntegrationTests.xctest"
-               BlueprintName = "VocelloEngineIntegrationTests"
-               ReferencedContainer = "container:QwenVoice.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -61,17 +47,6 @@
                BlueprintIdentifier = "4F9690E3DF55653960832BA7"
                BuildableName = "VocelloCoreTests.xctest"
                BlueprintName = "VocelloCoreTests"
-               ReferencedContainer = "container:QwenVoice.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "ABFED323E033822F645DDE92"
-               BuildableName = "VocelloEngineIntegrationTests.xctest"
-               BlueprintName = "VocelloEngineIntegrationTests"
                ReferencedContainer = "container:QwenVoice.xcodeproj">
             </BuildableReference>
          </TestableReference>

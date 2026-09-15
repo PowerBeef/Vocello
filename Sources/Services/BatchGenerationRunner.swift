@@ -1,7 +1,6 @@
 import AVFoundation
 import Foundation
 import QwenVoiceCore
-import QwenVoiceNative
 
 enum BatchSegmentationMode: String, Codable, Equatable {
     case lineSeparated
@@ -213,7 +212,7 @@ struct BatchGenerationRequest {
 
     func makeHistoryRecord(
         for line: String,
-        result: QwenVoiceNative.GenerationResult,
+        result: GenerationResult,
         longFormRole: String? = nil
     ) -> Generation {
         let voiceName: String?
@@ -264,7 +263,7 @@ struct BatchGenerationRequest {
         guard segmentationMode == .longForm, let plan = longFormPlan else { return nil }
         var record = makeHistoryRecord(
             for: lines.joined(separator: " "),
-            result: QwenVoiceNative.GenerationResult(
+            result: GenerationResult(
                 audioPath: outputURL.path,
                 durationSeconds: Double(assembly.outputFrameCount) / Double(assembly.sampleRate),
                 streamSessionDirectory: nil,
@@ -299,7 +298,7 @@ struct BatchGenerationRequest {
         batchTotal rawBatchTotal: Int?,
         seedOverride: UInt64? = nil,
         generationID: UUID? = nil
-    ) -> QwenVoiceNative.GenerationRequest {
+    ) -> GenerationRequest {
         // Every item is an ordinary sequential streaming take; the engine's
         // support decision reserves batch markers for the retired native batch
         // route, and item order lives in the visible list (and, for long-form,
@@ -309,7 +308,7 @@ struct BatchGenerationRequest {
         _ = rawBatchTotal
         switch mode {
         case .custom:
-            return QwenVoiceNative.GenerationRequest(
+            return GenerationRequest(
                 modelID: model.id,
                 text: line,
                 outputPath: outputPath,
@@ -329,7 +328,7 @@ struct BatchGenerationRequest {
                 deliveryInstructionCellID: deliveryInstructionCellID
             )
         case .design:
-            return QwenVoiceNative.GenerationRequest(
+            return GenerationRequest(
                 modelID: model.id,
                 text: line,
                 outputPath: outputPath,
@@ -346,7 +345,7 @@ struct BatchGenerationRequest {
                 variation: GenerationVariationPreference.requestValue()
             )
         case .clone:
-            return QwenVoiceNative.GenerationRequest(
+            return GenerationRequest(
                 modelID: model.id,
                 text: line,
                 outputPath: outputPath,
@@ -1127,7 +1126,7 @@ final class BatchGenerationRunner {
         batchIndex: Int,
         batchTotal: Int,
         generationID: UUID
-    ) async throws -> QwenVoiceNative.GenerationResult {
+    ) async throws -> GenerationResult {
         try await engineStore.generate(
             request.makeGenerationRequest(
                 for: line,

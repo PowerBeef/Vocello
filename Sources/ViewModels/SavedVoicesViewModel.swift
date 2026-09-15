@@ -1,6 +1,6 @@
 import Foundation
 import Observation
-import QwenVoiceNative
+import QwenVoiceCore
 
 @MainActor
 @Observable

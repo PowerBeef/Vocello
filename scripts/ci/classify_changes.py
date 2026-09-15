@@ -45,11 +45,7 @@ MACOS_ONLY = (
     "Sources/Models/*",
     "Sources/Services/*",
     "Sources/VocelloCLI/*",
-    "Sources/QwenVoiceNative/*",
-    "Sources/QwenVoiceEngineService/*",
-    "Sources/QwenVoiceEngineSupport/*",
     "Tests/VocelloMacUITests/*",
-    "Tests/VocelloEngineIntegrationTests/*",
 )
 
 # Push CI's own inputs: when they change, every native lane reruns. Other

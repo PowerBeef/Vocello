@@ -25,9 +25,9 @@ class RuntimeSecurityContractTests(unittest.TestCase):
         self.assertEqual(
             MODULE.concurrency_metadata_errors(
                 contract,
-                observed_unchecked_count=41,
-                observed_unsafe_count=9,
-                today=date(2026, 9, 11),
+                observed_unchecked_count=34,
+                observed_unsafe_count=7,
+                today=date(2026, 9, 15),
             ),
             [],
         )
@@ -36,8 +36,8 @@ class RuntimeSecurityContractTests(unittest.TestCase):
         contract = MODULE.load_json(ROOT / "config/concurrency-safety.json")
         errors = MODULE.concurrency_metadata_errors(
             contract,
-            observed_unchecked_count=42,
-            observed_unsafe_count=10,
+            observed_unchecked_count=35,
+            observed_unsafe_count=8,
             today=date(2026, 8, 29),
         )
         self.assertTrue(any("unchecked Sendable declarations exceed" in error for error in errors))

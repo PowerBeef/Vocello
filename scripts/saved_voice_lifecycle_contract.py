@@ -38,7 +38,6 @@ def validate(root: Path) -> None:
     ios_reference_sheet = _read(root, "Sources/iOS/Sheets/IOSBottomSheets.swift")
     transcription_policy = _read(root, "Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift")
     engine = _read(root, "Sources/QwenVoiceCore/MLXTTSEngine.swift")
-    wire = _read(root, "Sources/QwenVoiceEngineSupport/EngineServiceIPC.swift")
     ios_ui_test = _read(root, "Tests/VocelloiOSUITests/VocelloiOSSavedVoiceLifecycleUITests.swift")
     ui_runner = _read(root, "scripts/ui_test.sh")
 
@@ -92,15 +91,6 @@ def validate(root: Path) -> None:
     ):
         if token not in engine:
             raise ContractError(f"engine deletion lifecycle is missing {token!r}")
-
-    for token in (
-        "case preparePreparedVoiceCandidate(",
-        "case commitPreparedVoiceCandidate(id:",
-        "case discardPreparedVoiceCandidate(id:",
-        "case preparedVoiceCandidate(PreparedVoiceCandidate)",
-    ):
-        if token not in wire:
-            raise ContractError(f"XPC lifecycle contract is missing {token!r}")
 
     for token in (
         '"voicesRowMenu_\\(voice.id)"',

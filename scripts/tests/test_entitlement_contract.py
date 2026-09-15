@@ -38,12 +38,7 @@ class EntitlementContractTests(unittest.TestCase):
             "com.apple.security.device.audio-input": True,
             "com.apple.security.files.user-selected.read-write": True,
         }
-        self.xpc_allowed = {
-            "com.apple.security.cs.allow-unsigned-executable-memory": True,
-            "com.apple.security.cs.disable-library-validation": True,
-        }
         self.write_plist("Sources/QwenVoice.entitlements", self.app_allowed)
-        self.write_plist("Sources/QwenVoiceEmbeddedRuntime.entitlements", self.xpc_allowed)
         (self.root / "Sources/App/App.swift").write_text("struct App {}\n")
         (self.root / "Sources/Engine/Engine.swift").write_text("struct Engine {}\n")
         (self.root / "Packages/VocelloQwen3Core/Sources/Runtime/Core.swift").write_text(
@@ -58,27 +53,17 @@ targets:
     settings:
       base:
         CODE_SIGN_ENTITLEMENTS: Sources/QwenVoice.entitlements
-  QwenVoiceEngineService:
-    type: xpc-service
-    platform: macOS
-    settings:
-      base:
-        CODE_SIGN_ENTITLEMENTS: Sources/QwenVoiceEmbeddedRuntime.entitlements
   Library:
     type: framework
     platform: macOS
 """
         )
         (self.root / "scripts/release.sh").write_text(
-            """while IFS= read -r -d '' xpc_path; do
-  run_codesign "$xpc_path" --entitlements "$PROJECT_DIR/Sources/QwenVoiceEmbeddedRuntime.entitlements"
-done < <(find "$APP_PATH/Contents/XPCServices" -name '*.xpc')
-run_codesign "$APP_PATH" --entitlements "$PROJECT_DIR/Sources/QwenVoice.entitlements"
+            """run_codesign "$APP_PATH" --entitlements "$PROJECT_DIR/Sources/QwenVoice.entitlements"
 """
         )
         (self.root / "scripts/verify_release_bundle.sh").write_text(
             """python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-app --bundle "$APP_PATH"
-python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-engine-xpc --bundle "$XPC_SERVICE_PATH"
 python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-framework --bundle "$framework_path"
 """
         )
@@ -99,12 +84,6 @@ python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-framewo
                     "projectTarget": "QwenVoice",
                     "source": "Sources/QwenVoice.entitlements",
                     "allowed": self.app_allowed,
-                },
-                {
-                    "id": "macos-engine-xpc",
-                    "projectTarget": "QwenVoiceEngineService",
-                    "source": "Sources/QwenVoiceEmbeddedRuntime.entitlements",
-                    "allowed": self.xpc_allowed,
                 },
                 {"id": "macos-framework", "projectTarget": None, "source": None, "allowed": {}},
             ],
@@ -146,25 +125,22 @@ python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-framewo
         self.write_plist("Sources/QwenVoice.entitlements", changed)
         self.assertTrue(any("differs from the exact" in error for error in module.validate(self.root)))
 
-    def test_xpc_cannot_inherit_the_broader_app_entitlements(self) -> None:
+    def test_a_second_entitled_target_is_rejected(self) -> None:
         path = self.root / "project.yml"
         path.write_text(
-            path.read_text().replace(
-                "CODE_SIGN_ENTITLEMENTS: Sources/QwenVoiceEmbeddedRuntime.entitlements",
-                "CODE_SIGN_ENTITLEMENTS: Sources/QwenVoice.entitlements",
-            )
+            path.read_text()
+            + "  Helper:\n    type: xpc-service\n    platform: macOS\n    settings:\n"
+            + "      base:\n        CODE_SIGN_ENTITLEMENTS: Sources/QwenVoice.entitlements\n"
         )
         self.assertTrue(any("routing differs" in error for error in module.validate(self.root)))
 
-    def test_release_xpc_signing_must_use_narrow_allowlist(self) -> None:
+    def test_release_signing_must_not_name_an_xpc_service(self) -> None:
         path = self.root / "scripts/release.sh"
         path.write_text(
-            path.read_text().replace(
-                "Sources/QwenVoiceEmbeddedRuntime.entitlements",
-                "Sources/QwenVoice.entitlements",
-            )
+            'run_codesign "$APP_PATH/Contents/XPCServices/Helper.xpc" --options runtime\n'
+            + path.read_text()
         )
-        self.assertTrue(any("XPC signing" in error for error in module.validate(self.root)))
+        self.assertTrue(any("XPC service" in error for error in module.validate(self.root)))
 
     def test_mlx_pin_change_requires_new_exception_review(self) -> None:
         path = self.root / module.LOCK_PATH

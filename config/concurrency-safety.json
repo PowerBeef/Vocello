@@ -3,8 +3,8 @@
   "owner": "backend-runtime",
   "policy": "Every unchecked Sendable or nonisolated(unsafe) declaration in owned production Swift requires a registry entry, explicit owner, synchronization invariant, review date, removal condition, deterministic evidence where applicable, and room within the no-unreviewed-growth budget.",
   "budget": {
-    "maximumUncheckedSendableDeclarations": 41,
-    "maximumNonisolatedUnsafeDeclarations": 9,
+    "maximumUncheckedSendableDeclarations": 34,
+    "maximumNonisolatedUnsafeDeclarations": 7,
     "reviewCadenceDays": 365
   },
   "sourceRoots": [
@@ -143,23 +143,6 @@
       ]
     },
     {
-      "id": "engine-service-host",
-      "source": "Sources/QwenVoiceEngineService/EngineServiceHost.swift",
-      "types": [
-        "EngineReplyHandlerBox",
-        "EngineServiceRequestTimingRegistry",
-        "RuntimeContext",
-        "EngineServiceHost"
-      ],
-      "owner": "EngineServiceHost (a final class, not an actor): MainActor-annotated methods and lock-protected request registries",
-      "invariant": "XPC callback boxes are single-resume. Every access to runtimeContext/activeSession happens in a @MainActor method or after an explicit hop to MainActor; this is enforced by convention on each method, not by the type, which is why the class stays @unchecked Sendable.",
-      "reviewedAt": "2026-09-11",
-      "removalCondition": "Remove unchecked types as XPC reply ownership and runtime context become expressible with checked Sendable values fully confined to the service actor.",
-      "tests": [
-        "Tests/VocelloEngineIntegrationTests/EngineServiceTransportAccumulatorTests.swift"
-      ]
-    },
-    {
       "id": "clone-conditioning",
       "source": "Sources/QwenVoiceCore/NativeCloneSupport.swift",
       "types": [
@@ -264,24 +247,6 @@
       "removalCondition": "Remove when product output and reusable PCM storage are fully confined to one checked isolation domain or use a standard Sendable buffer abstraction.",
       "tests": [
         "Tests/VocelloCoreTests/ActiveGenerationCoordinatorTests.swift"
-      ]
-    },
-    {
-      "id": "native-xpc-client",
-      "sources": [
-        "Sources/QwenVoiceNative/XPCNativeEngineClient.swift"
-      ],
-      "types": [
-        "PendingRequestBox",
-        "XPCServiceTransport",
-        "XPCNativeEngineClient"
-      ],
-      "owner": "XPCNativeEngineClient main actor and single-resume pending request boxes",
-      "invariant": "Mutable client state stays main-actor isolated; callback bridges are single-resume and lock-protected.",
-      "reviewedAt": "2026-08-26",
-      "removalCondition": "Remove as XPC callback APIs are wrapped by checked Sendable continuations and all client transport state remains expressibly MainActor-isolated.",
-      "tests": [
-        "Tests/VocelloEngineIntegrationTests/EngineServiceTransportAccumulatorTests.swift"
       ]
     },
     {

@@ -19,7 +19,6 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_BUNDLE="$ROOT_DIR/build/Vocello.app"
-XPC_BUNDLE="$APP_BUNDLE/Contents/XPCServices/QwenVoiceEngineService.xpc"
 BUNDLE_ID="com.qwenvoice.app"
 TCC_DB="$HOME/Library/Application Support/com.apple.TCC/TCC.db"
 
@@ -56,10 +55,6 @@ EOF
     fi
     echo "    designated requirement:"
     codesign -d -r- "$APP_BUNDLE" 2>/dev/null | grep "designated" | sed 's/^/      /' || true
-    if [ -d "$XPC_BUNDLE" ]; then
-        echo "    XPC service authority:"
-        codesign -dvv "$XPC_BUNDLE" 2>&1 | grep -m1 "^Authority=" | sed 's/^/      /' || true
-    fi
 }
 
 section_tcc() {

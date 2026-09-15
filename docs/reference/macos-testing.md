@@ -20,7 +20,7 @@ Clone/enrollment parity is part of ordinary deterministic verification. The core
 the shared transcription-review/evidence policy and the pure macOS Design/Clone request factory,
 including manual-edit precedence, stale-result rejection, explicit audio-only enrollment,
 reference-language metadata, target-text Auto routing, explicit-language precedence, and exact
-reference/prompt/seed/variation identity. These tests guard the pre-XPC boundary; native visual and
+reference/prompt/seed/variation identity. These tests guard the request boundary; native visual and
 interaction acceptance remains the explicitly requested XCUITest lane below.
 
 ## Ordinary development
@@ -56,8 +56,8 @@ file validated from `scripts/check_project_inputs.sh`, not in this lane.
 scripts/macos_test.sh gate                         # project inputs → foundation build → core-test → deterministic tests → crash delta
 QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate  # adds a bounded vocello bench step; a PASS publishes its benchmark history
 scripts/macos_test.sh release-readiness            # project inputs → exact-path app build → deterministic tests → crash delta
-scripts/macos_test.sh preflight [--strict-models]  # Xcode, app, dSYM, XPC and model-fixture status; --strict-models fails on a missing fixture
-scripts/macos_test.sh crashes [--test]             # collect and symbolicate .ips for the app and the XPC service
+scripts/macos_test.sh preflight [--strict-models]  # Xcode, app, dSYM and model-fixture status; --strict-models fails on a missing fixture
+scripts/macos_test.sh crashes [--test]             # collect and symbolicate .ips for the app
 scripts/macos_test.sh telemetry-overhead           # model-dependent on/off telemetry parity diagnostic
 ```
 
@@ -102,7 +102,8 @@ that earned the promotion (three consecutive scheduled nightly passes, runs 3468
 maintainer decision; `scripts/runtime_security_contract.py` refuses a blocking status without the
 recorded passes, zero open confirmed races and that decision. Both workflows preserve every failed
 run and perform no automatic retry. The first corrected physical-host run on 2026-08-26 passed all
-460 core and 18 XPC tests with no TSan warning or race summary.
+460 core and 18 transport tests with no TSan warning or race summary (the transport bundle left
+with the XPC service on 2026-09-15; the lane is core-only since).
 
 ## Explicit XCUITest lanes
 
@@ -192,8 +193,8 @@ source). Thresholds are set only after repeated baselines establish spread.
 | Benchmark | Ordered, configurable Custom/Design/Clone matrix with cold/warm classification and per-take deterministic proof; the default is exactly 29 takes |
 
 The runner targets the configured native Vocello test host. Before launch it resolves every matching
-Vocello and engine-service PID to its executable, fails fast if any process belongs to another app
-path, and signals only the exact app/service products under the runner's Release build directory.
+Vocello PID to its executable, fails fast if the process belongs to another app path, and signals
+only the exact app product under the runner's Release build directory.
 It uses stable accessibility identifiers and condition waits, preserves saved voices, visibly
 enables the persistent Clone consent preference for acceptance, restores temporary Auto-play
 changes, and records failures as XCTest activities and attachments. It never retries through a
@@ -225,8 +226,8 @@ run. Do not download models implicitly inside a normal UI lane.
 The benchmark validator joins UI completion with:
 
 - History/database correlation and a readable WAV;
-- audio QC and complete typed frontend/XPC/backend telemetry by `generationID`;
-- crash delta and XPC process lifecycle evidence;
+- audio QC and complete typed frontend/backend telemetry by `generationID` (app + engine rows);
+- crash delta evidence;
 - benchmark order, take count, cold/warm class, and timing.
 
 The validator atomically writes an untracked `benchmark-evidence.json` containing only the run's
@@ -238,8 +239,8 @@ screenshots, and `.xcresult` remain untracked; publication never stages, commits
 New publishable generation runs use telemetry schema v8 and evidence manifest v2. Their exact
 `samples-<generationID>.jsonl` files must begin/end with one start/stop sample, contain the required
 load/stream/finalization boundaries, match summary counts, have zero capture failures, and retain at
-least 95% periodic coverage. macOS UI/XPC totals are calculated only from app and engine samples
-paired by absolute uptime within one 500 ms cadence; independent process maxima are never added.
+least 95% periodic coverage. macOS UI totals come from the app and engine samples of the one
+hosting process, paired by absolute uptime within one 500 ms cadence.
 Critical pressure, app memory warning/exit, `hardTrim`, or `fullUnload` fails publication, and so
 does a marking peak-equality breach (CP-2: within every take, no post-marking footprint sample may
 exceed the pre-marking peak beyond tolerance — `config/marking-peak-equality.json`). Guarded
@@ -279,7 +280,7 @@ memory` owns the repeated retained-growth qualification.
 Both commands build the exact CLI, suspend one owned process, attach Instruments to that exact PID,
 resume it only after xctrace reports recording, and validate the exported trace table of contents.
 The memory lane enables verbose per-sample telemetry and remains PASS-only. Headless CLI profiles
-report the owning engine process; XPC UI benchmarks use the uptime-aligned app+engine aggregate.
+report the owning engine process; UI benchmarks use the uptime-aligned app+engine pairing.
 The tracer stage requires at least 5 GiB free for CPU profiles and 15 GiB for memory profiles before
 it launches the target. The prerequisite CLI build uses the shared 8 GiB development-build floor,
 so a complete CPU-profile command effectively requires 8 GiB; memory remains 15 GiB. After

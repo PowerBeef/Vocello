@@ -1,6 +1,5 @@
 import Foundation
 import QwenVoiceCore
-import QwenVoiceNative
 
 struct BatchGenerationSheetConfiguration: Identifiable, Equatable {
     let id = UUID()

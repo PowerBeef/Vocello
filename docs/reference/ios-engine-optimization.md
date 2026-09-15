@@ -57,7 +57,7 @@ so all iOS UI tests and generation validation run on a paired iPhone. The engine
 `TTSEngineStore` like macOS. (`Sources/iOS/IOSAppBootstrap.swift` engine-selection block.)
 
 It did **not** start here. The original design ran generation out-of-process in a `VocelloEngineExtension`
-ExtensionKit extension (mirroring the macOS XPC split). That can never work on iOS: a **non-UI
+ExtensionKit extension (mirroring the macOS XPC split of the time; macOS went in-process too on 2026-09-15). That can never work on iOS: a **non-UI
 ExtensionKit extension is Jetsam-capped at a tiny per-process budget that the
 `increased-memory-limit` entitlement does *not* raise** — only the *app* process gets the raised
 budget. On device the extension was jetsam-killed (`per-process-limit`) while loading the ~2.3 GB

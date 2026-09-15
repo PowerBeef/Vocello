@@ -140,24 +140,6 @@
       "remaining": []
     },
     {
-      "id": "XPC",
-      "title": "Request correlation, cleanup, chunk ordering, cancellation, interruption, retirement, and reconnection",
-      "source": "Sources/QwenVoiceNative/XPCNativeEngineClient.swift",
-      "tests": [
-        "VocelloEngineIntegrationTests/XPCNativeEngineClientTests/testRequestReplyCorrelationReturnsMatchingReply",
-        "VocelloEngineIntegrationTests/XPCNativeEngineClientTests/testMismatchedReplyDoesNotCompletePendingRequest",
-        "VocelloEngineIntegrationTests/XPCNativeEngineClientTests/testTimeoutCleansPendingRequestAndSendsGenerationCancellation",
-        "VocelloEngineIntegrationTests/XPCNativeEngineClientTests/testCancelledGenerationSendsCleanupAfterCancellation",
-        "VocelloEngineIntegrationTests/XPCNativeEngineClientTests/testInterruptionCreatesFreshConnectionAndReinitializes",
-        "VocelloEngineIntegrationTests/XPCNativeEngineClientTests/testExpectedRetirementDoesNotReconnectEagerly",
-        "VocelloEngineIntegrationTests/EngineServiceTransportAccumulatorTests/testDetectsMissingDuplicateAndOutOfOrderChunks",
-        "VocelloEngineIntegrationTests/EngineServiceTransportAccumulatorTests/testCancellationAndTerminalAgreementProducesOneTerminalRecord",
-        "VocelloEngineIntegrationTests/EngineServiceTransportAccumulatorTests/testGenerationSwitchPublishesSupersededTerminalBeforeNewChunks"
-      ],
-      "status": "implemented",
-      "remaining": []
-    },
-    {
       "id": "OUTPUT",
       "title": "Atomic readable frame-accurate final WAV publication",
       "source": "Sources/QwenVoiceCore/GenerationOutputAdapter.swift",

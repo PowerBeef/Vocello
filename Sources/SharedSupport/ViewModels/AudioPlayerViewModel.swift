@@ -1,20 +1,10 @@
-import Foundation
 import AVFoundation
 import Combine
+import Foundation
 
-#if canImport(QwenVoiceCore)
 import QwenVoiceCore
-#endif
 
-#if canImport(QwenVoiceNative)
-import QwenVoiceNative
-#endif
-
-#if canImport(QwenVoiceNative)
-typealias PlaybackGenerationResult = QwenVoiceNative.GenerationResult
-#elseif canImport(QwenVoiceCore)
 typealias PlaybackGenerationResult = QwenVoiceCore.GenerationResult
-#endif
 
 struct LivePreviewEstimate: Equatable, Sendable {
     let estimatedAudioDuration: TimeInterval

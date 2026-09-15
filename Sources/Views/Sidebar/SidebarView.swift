@@ -1,5 +1,5 @@
+import QwenVoiceCore
 import SwiftUI
-import QwenVoiceNative
 
 private struct NavigationSectionHeader: View {
     let title: String

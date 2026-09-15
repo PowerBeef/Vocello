@@ -1,6 +1,5 @@
 import Foundation
 import QwenVoiceCore
-import QwenVoiceNative
 
 /// An enrolled voice reference for voice cloning.
 struct Voice: Identifiable, Hashable {

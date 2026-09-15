@@ -1,23 +1,22 @@
 #!/usr/bin/env bash
 # macOS deterministic testing and telemetry driver.
 #
-# macOS is the native development host. The engine runs OUT-OF-PROCESS in
-# an XPC service (com.qwenvoice.app.engine-service) — a separate process that can crash
-# independently and be retired under memory pressure. Several lanes target the app AND the
-# service. Build/run/release stay in scripts/build.sh; this script adds the lanes.
+# macOS is the native development host. The engine runs IN-PROCESS in the app
+# (since 2026-09-15, plan macos-ios-convergence-2026-09), exactly like the iOS app
+# and the CLI. Build/run/release stay in scripts/build.sh; this script adds the lanes.
 #
 # usage:
-#   scripts/macos_test.sh preflight [--strict-models]  # Xcode + app + dSYMs + XPC + model status
+#   scripts/macos_test.sh preflight [--strict-models]  # Xcode + app + dSYMs + model status
 #   scripts/macos_test.sh core-test                 # VocelloCoreTests (core + host-runnable iOS policy, no models)
 #                                                    # opt-in: QWENVOICE_ENABLE_TSAN=1
-#   scripts/macos_test.sh tsan                      # scheduled core + injectable XPC transport TSan subset
+#   scripts/macos_test.sh tsan                      # core TSan subset (push CI blocking job + nightly cold run)
 #   scripts/macos_test.sh lang-bench [--subset quick|full] [--label RUN_ID]
 #                                                 # headless macOS language-hint matrix (vocello CLI)
-#   scripts/macos_test.sh test [--coverage]         # Core + XPC transport + Qwen3 runtime tests (no UI)
+#   scripts/macos_test.sh test [--coverage]         # Core + Qwen3 runtime tests (no UI)
 #                                                    # --coverage: llvm-cov line coverage (rebuilds instrumented; opt-in)
 #   scripts/macos_test.sh telemetry-overhead        # seeded PCM + RTF/TTFC (explicit, model-dependent)
-#   scripts/macos_test.sh crashes [--test]          # collect + xcsym-symbolicate .ips (app + XPC service)
-#   scripts/macos_test.sh debug                     # LLDB attach guidance (app + XPC service PID)
+#   scripts/macos_test.sh crashes [--test]          # collect + xcsym-symbolicate .ips (app)
+#   scripts/macos_test.sh debug                     # LLDB attach guidance (app PID)
 #   scripts/macos_test.sh logs                      # retained os_log → build/artifacts/macos/logs/<run>.log
 #   scripts/macos_test.sh profile [--kind cpu|memory] [--keep-trace] [spec]
 #                                                    # exact-PID xctrace vocello bench
@@ -45,7 +44,6 @@ APP_NAME="Vocello"
 BUNDLE_ID="com.qwenvoice.app"
 APP_BUNDLE="$QVOICE_BUILD_ROOT/$APP_NAME.app"
 APP_BINARY="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
-XPC_BUNDLE="$APP_BUNDLE/Contents/XPCServices/QwenVoiceEngineService.xpc"
 DSYM_DIR="$QVOICE_SYMBOLS_MACOS"
 
 string_sha256() {
@@ -293,9 +291,6 @@ PY
 assert_macos_tsan_bundle_architectures() {
   local app_bundle="$1" candidate architectures=""
   assert_macho_arm64_only "$app_bundle/Contents/MacOS/Vocello" "Vocello executable" || return 1
-  assert_macho_arm64_only \
-    "$app_bundle/Contents/XPCServices/QwenVoiceEngineService.xpc/Contents/MacOS/QwenVoiceEngineService" \
-    "QwenVoiceEngineService executable" || return 1
   while IFS= read -r -d '' candidate; do
     /usr/bin/file -b "$candidate" 2>/dev/null | grep -q 'Mach-O' || continue
     if [[ "${candidate##*/}" == "libclang_rt.tsan_osx_dynamic.dylib" ]]; then
@@ -309,12 +304,11 @@ assert_macos_tsan_bundle_architectures() {
     assert_macho_arm64_only "$candidate" "embedded Mach-O ${candidate#"$app_bundle"/}" || return 1
   done < <(find \
     "$app_bundle/Contents/MacOS" \
-    "$app_bundle/Contents/XPCServices" \
     "$app_bundle/Contents/Frameworks" \
     -type f -print0 2>/dev/null)
 }
 
-# crashes [--test]: collect macOS .ips crash reports (app + XPC service) from
+# crashes [--test]: collect macOS .ips crash reports (app) from
 # ~/Library/Logs/DiagnosticReports and symbolicate against the preserved build dSYMs.
 # `--test` SIGSEGVs a launched app to verify the capture→symbolicate lane end-to-end.
 cmd_crashes() {
@@ -338,10 +332,10 @@ cmd_crashes() {
   local dest
   dest="$QVOICE_ARTIFACTS_MACOS/crashes/crashes-$(date +%Y%m%d-%H%M%S)"
   mkdir -p "$dest"
-  note "collecting .ips from $dr (app: Vocello*, service: QwenVoiceEngineService* / *engine-service*)"
+  note "collecting .ips from $dr (app: Vocello*)"
   local n=0 f
   shopt -s nullglob
-  for f in "$dr"/Vocello-*.ips "$dr"/QwenVoiceEngineService-*.ips "$dr"/*engine-service*.ips; do
+  for f in "$dr"/Vocello-*.ips; do
     cp "$f" "$dest/" 2>/dev/null || true
     n=$((n+1))
   done
@@ -362,10 +356,9 @@ cmd_crashes() {
   done
 }
 
-# debug: launch the app and print LLDB attach commands for BOTH the app and the XPC
-# engine service (a separate process — the macOS-unique bit). Dev builds have hardened
-# runtime OFF, so LLDB attaches directly (no get-task-allow needed). The session is
-# interactive. The XPC service is lazy — spawn it with a generation first if absent.
+# debug: launch the app and print the LLDB attach command. The engine runs inside
+# the app process, so one attach covers UI and engine. Dev builds have hardened
+# runtime OFF, so LLDB attaches directly (no get-task-allow needed).
 cmd_debug() {
   ensure_app
   pkill -x "$APP_NAME" >/dev/null 2>&1 || true
@@ -374,19 +367,12 @@ cmd_debug() {
   for _ in {1..30}; do app_pid="$(pgrep -xn "$APP_NAME" || true)"; [[ -n "$app_pid" ]] && break; sleep 0.25; done
   [[ -n "$app_pid" ]] || die "$APP_NAME did not launch"
   note "debug: $APP_NAME running (pid $app_pid) — hardened runtime OFF, LLDB-attachable."
-  note "  lldb -p $app_pid        # app"
-  local svc_pid; svc_pid="$(pgrep -xn QwenVoiceEngineService || true)"
-  if [[ -n "$svc_pid" ]]; then
-    note "  lldb -p $svc_pid        # XPC engine service (pid $svc_pid)"
-  else
-    note "  XPC service not running yet — trigger a generation to spawn it, then:"
-    note "    lldb -p \$(pgrep -xn QwenVoiceEngineService)"
-  fi
+  note "  lldb -p $app_pid        # app + in-process engine"
   note "  (or XcodeBuildMCP debugging, or Xcode → Debug → Attach to Process by PID)"
   note "  retained os_log: scripts/macos_test.sh logs   (subsystem $BUNDLE_ID)"
 }
 
-# logs: retain the app + XPC service os_log (subsystem com.qwenvoice.app) to a file
+# logs: retain the app os_log (subsystem com.qwenvoice.app) to a file
 # under build/artifacts/macos/logs/<run>.log. Ctrl-C to stop.
 cmd_logs() {
   local out
@@ -398,16 +384,15 @@ cmd_logs() {
 }
 
 # profile [--kind cpu|memory] [spec]: Instruments/xctrace trace of a headless generation via the `vocello` CLI
-# (engine IN-PROCESS — the deterministic engine profile; the same engine code runs in the
-# XPC service). The engine emits OSSignpost intervals under subsystem com.qwenvoice.app,
+# (engine in-process, the same engine code the app runs). The engine emits OSSignpost
+# intervals under subsystem com.qwenvoice.app,
 # category 'performance'. The CPU lane records CPU Profiler + os_signpost. The memory
 # lane also records Allocations + VM Tracker in that same trace. QVOICE_MAC_PROFILE_DURATION
 # controls the capture window (seconds, default 90); QVOICE_MAC_MEMORY_PROFILE_DURATION
 # overrides the memory safety cap (default 180). QVOICE_MAC_PROFILE_GRACE_TIMEOUT bounds target/tracer
 # shutdown after the requested capture window (default 30 seconds for CPU, 60 for memory).
-# Produces build/artifacts/macos/profiles/<run-id>/<run-id>.trace. (To profile the XPC service
-# specifically — the production path — launch the app, 'xctrace record --attach
-# QwenVoiceEngineService', and generate via the UI; see macos-testing.md.)
+# Produces build/artifacts/macos/profiles/<run-id>/<run-id>.trace. (To profile the app
+# path, launch the app, 'xctrace record --attach Vocello', and generate via the UI.)
 cmd_profile() {
   local kind="cpu"
   local spec=""
@@ -652,7 +637,7 @@ cmd_profile() {
     note "validated summary → $profile_summary"
     note "raw trace removed after successful history publication (use --keep-trace to retain one)"
   fi
-  note "XPC service profile (production path): launch app, 'xctrace record --attach QwenVoiceEngineService', generate via UI."
+  note "App-path profile: launch the app, 'xctrace record --attach Vocello', generate via the UI."
 }
 
 # memory [--label ID]: retained-memory qualification, separate from Instruments.
@@ -728,8 +713,8 @@ cmd_memory() {
   note "memory qualification PASS · $artifacts"
 }
 
-# preflight: one-shot readiness — Xcode, the app bundle, the embedded XPC service,
-# the preserved dSYMs, and the Speed model. Fails fast with what's missing.
+# preflight: one-shot readiness — Xcode, the app bundle, the preserved dSYMs, and
+# the Speed model. Fails fast with what's missing.
 cmd_preflight() {
   local rc=0
   local strict_models=0
@@ -742,12 +727,8 @@ cmd_preflight() {
   note "macOS preflight"
   command -v xcodebuild >/dev/null 2>&1 && note "  xcodebuild: OK" || { warn "  xcodebuild: ✗ not found"; rc=1; }
   if [[ -d "$APP_BUNDLE" ]]; then note "  app: OK $APP_BUNDLE"; else warn "  app: ✗ not built (run: scripts/build.sh build)"; rc=1; fi
-  [[ -d "$XPC_BUNDLE" ]] && note "  xpc service: OK" || warn "  xpc service: ✗ not in bundle (rebuild)"
   if [[ -d "$DSYM_DIR" && -d "$APP_BUNDLE" ]] \
-      && validate_dsym_uuid "$APP_BINARY" "$DSYM_DIR/Vocello.app.dSYM" "Vocello" \
-      && validate_dsym_uuid \
-        "$XPC_BUNDLE/Contents/MacOS/QwenVoiceEngineService" \
-        "$DSYM_DIR/QwenVoiceEngineService.xpc.dSYM" "QwenVoiceEngineService"; then
+      && validate_dsym_uuid "$APP_BINARY" "$DSYM_DIR/Vocello.app.dSYM" "Vocello"; then
     note "  dsyms: OK $DSYM_DIR (UUID-matched)"
   else
     warn "  dsyms: ✗ missing or UUID-mismatched (run: scripts/build.sh build)"
@@ -840,9 +821,9 @@ cmd_core_test() {
 }
 
 # Thread Sanitizer characterization deliberately excludes execution of the
-# MLX/Metal runtime test bundle: the owned deterministic core and injectable XPC
-# transport are the stable CPU subset, while MLX has its own single-owner/runtime
-# tests. Xcode may still compile linked package targets while building the host.
+# MLX/Metal runtime test bundle: the owned deterministic core is the stable CPU
+# subset, while MLX has its own single-owner/runtime tests. Xcode may still
+# compile linked package targets while building the host.
 # Since 2026-09-14 the push workflow runs this lane as a required job (blocking,
 # config/tsan-policy.json) and the nightly keeps a cold run; both retain the logs.
 cmd_tsan() {
@@ -850,25 +831,22 @@ cmd_tsan() {
   local run_id
   run_id="tsan-$(date +%Y%m%d-%H%M%S)"
   local artifacts="$QVOICE_ARTIFACTS_MACOS/tests/$run_id"
-  local build_st=0 core_st=0 transport_st=0
+  local build_st=0 core_st=0
   mkdir -p "$artifacts"
-  note "tsan: deterministic core and injectable XPC transport subset"
+  note "tsan: deterministic core subset"
   set +e
   QWENVOICE_ENABLE_TSAN=1 build_mac_test_bundles "$artifacts/build.log" || build_st=$?
   if (( build_st == 0 )); then
     run_mac_test_bundle VocelloCoreTests "$artifacts/core.log" 1 || core_st=$?
     write_mac_test_summary "$artifacts/core.log"
-    run_mac_test_bundle VocelloEngineIntegrationTests "$artifacts/transport.log" 1 || transport_st=$?
-    write_mac_test_summary "$artifacts/transport.log"
   else
     core_st="$build_st"
-    transport_st="$build_st"
   fi
   set -e
-  printf 'build=%s\ncore=%s\ntransport=%s\n' \
-    "$build_st" "$core_st" "$transport_st" > "$artifacts/verdict.txt"
+  printf 'build=%s\ncore=%s\n' \
+    "$build_st" "$core_st" > "$artifacts/verdict.txt"
   cat "$artifacts/verdict.txt" >&2
-  if (( build_st == 0 && core_st == 0 && transport_st == 0 )); then
+  if (( build_st == 0 && core_st == 0 )); then
     note "tsan characterization PASS · artifacts → $artifacts"
     return 0
   fi
@@ -1047,8 +1025,8 @@ PY
   note "lang-bench PASS · $artifacts"
 }
 
-# test: deterministic Core, XPC transport, and owned Qwen3 runtime tests. No UI
-# process is launched and no frontend action is synthesized.
+# test: deterministic Core and owned Qwen3 runtime tests. No UI process is
+# launched and no frontend action is synthesized.
 cmd_test() {
   local coverage=0
   while [[ $# -gt 0 ]]; do
@@ -1061,7 +1039,7 @@ cmd_test() {
   run_id="mac-test-$(date +%Y%m%d-%H%M%S)"
   local artifacts="$QVOICE_ARTIFACTS_MACOS/tests/$run_id"
   mkdir -p "$artifacts"
-  local test_build_st=0 core_st=0 transport_st=0 runtime_st=0 coverage_st=0
+  local test_build_st=0 core_st=0 runtime_st=0 coverage_st=0
   local products="$QVOICE_XCODE_MACOS_DERIVED/Build/Products/Release"
 
   if (( coverage )); then
@@ -1078,17 +1056,11 @@ cmd_test() {
     LLVM_PROFILE_FILE="$artifacts/profraw/core-%p.profraw" \
       run_mac_test_bundle VocelloCoreTests "$artifacts/core.log" || core_st=$?
     write_mac_test_summary "$artifacts/core.log"
-
-    note "test: VocelloEngineIntegrationTests (injectable XPC transport)"
-    LLVM_PROFILE_FILE="$artifacts/profraw/transport-%p.profraw" \
-      run_mac_test_bundle VocelloEngineIntegrationTests "$artifacts/transport.log" || transport_st=$?
-    write_mac_test_summary "$artifacts/transport.log"
     if (( coverage )); then
       write_mac_coverage "$artifacts" "$products" || coverage_st=$?
     fi
   else
     core_st="$test_build_st"
-    transport_st="$test_build_st"
   fi
 
   note "test: Qwen3RuntimeTests (owned core runtime, seeded Metal fixture)"
@@ -1158,8 +1130,8 @@ cmd_test() {
   fi
 
   set -e
-  printf 'test_build=%s\ncore=%s\ntransport=%s\nruntime=%s\n' \
-    "$test_build_st" "$core_st" "$transport_st" "$runtime_st" \
+  printf 'test_build=%s\ncore=%s\nruntime=%s\n' \
+    "$test_build_st" "$core_st" "$runtime_st" \
     > "$artifacts/verdict.txt"
   if (( coverage )); then
     # Non-blocking in this pass: coverage is measured and retained, never a verdict input.
@@ -1170,7 +1142,7 @@ cmd_test() {
     fi
   fi
   cat "$artifacts/verdict.txt" >&2
-  if (( core_st == 0 && transport_st == 0 && runtime_st == 0 )); then
+  if (( core_st == 0 && runtime_st == 0 )); then
     note "test verdict: PASS · artifacts → $artifacts"
   else
     warn "test verdict: FAIL · artifacts → $artifacts"
@@ -1192,7 +1164,7 @@ cmd_telemetry_overhead() {
 }
 
 # gate: one-command macOS deterministic gate — inputs → build → Core,
-# transport, and runtime tests → crashes.
+# and runtime tests → crashes.
 # Optional bounded engine bench remains available with QWENVOICE_GATE_BENCH=1.
 
 GATE_BENCH_BASELINE="$ROOT_DIR/benchmarks/baselines/mac-gate-bench.json"
@@ -1278,7 +1250,7 @@ gate_crash_delta() {
   local gate_dir="$1" crash_marker="$2"
   cmd_crashes >>"$gate_dir/crashes.log" 2>&1 || return 1
   local diagnostic_root="$HOME/Library/Logs/DiagnosticReports" new_ips
-  new_ips="$(find "$diagnostic_root" \( -name 'Vocello-*.ips' -o -name 'QwenVoiceEngineService-*.ips' -o -name '*engine-service*.ips' \) -newer "$crash_marker" 2>/dev/null || true)"
+  new_ips="$(find "$diagnostic_root" -name 'Vocello-*.ips' -newer "$crash_marker" 2>/dev/null || true)"
   if [[ -n "$new_ips" ]]; then
     printf '%s\n' "$new_ips" >"$gate_dir/new-crashes.txt"
     return 1
@@ -1325,7 +1297,7 @@ cmd_gate() {
     echo "core-test: PASS" | tee -a "$verdict"
   else echo "core-test: FAIL" | tee -a "$verdict"; overall=1; fi
 
-  note "gate step 3/$total_steps: deterministic Core + XPC transport + Qwen3 runtime tests"
+  note "gate step 3/$total_steps: deterministic Core + Qwen3 runtime tests"
   if required_step_run "$step_ledger" deterministic-tests cmd_test \
       >>"$gate_dir/test.log" 2>&1; then
     echo "test: PASS" | tee -a "$verdict"

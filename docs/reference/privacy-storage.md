@@ -230,7 +230,7 @@ relevant System Settings panes. Full permission model: [`macos-permissions.md`](
 
 ## Diagnostics
 
-Diagnostics should be user-initiated. The app may write local logs or exportable diagnostic files for model download, generation, playback, XPC, and model-admission failures, but it should not report those details over the network automatically.
+Diagnostics should be user-initiated. The app may write local logs or exportable diagnostic files for model download, generation, playback, and model-admission failures, but it should not report those details over the network automatically.
 
 `scripts/privacy_scan.py` is the deterministic gate for the rules in this document. It runs inside
 `./scripts/check_project_inputs.sh` (the `contracts` lane of `scripts/dev.sh check`) and the CI
@@ -281,7 +281,7 @@ block byte-for-byte, so a manifest change cannot silently leave documentation st
 | `build/artifacts/diagnostics/` | Cross-platform logs, crash deltas, and local diagnostics | `artifact` | `governed` | Validator-owned; preserve unresolved failure and publication-repair evidence |
 | `build/artifacts/quality-promotion/` | Source-bound public-promotion manifests and managed quality receipts | `artifact` | `preserve` | Preserve the current candidate manifest until promotion or explicit candidate retirement |
 | `build/artifacts/app-store/` | Redacted App Store Connect, build-collision, and model-host readiness probes | `artifact` | `preserve` | Preserve the current candidate readiness summaries until closure or explicit candidate retirement |
-| `build/artifacts/symbols/macos/` | macOS build and release identity checks | `artifact` | `preserve` | Keep only symbols whose UUIDs match the current macOS app and XPC products |
+| `build/artifacts/symbols/macos/` | macOS build and release identity checks | `artifact` | `preserve` | Keep only symbols whose UUIDs match the current macOS app product |
 | `build/artifacts/symbols/ios/` | Physical-device iOS build and archive identity checks | `artifact` | `preserve` | Keep only symbols whose UUIDs match the current iOS app product |
 | `build/artifacts/foundation/` | Foundation compile-safety result bundles and logs | `artifact` | `routine` | Compile-safety result bundles and logs are disposable after the command verdict |
 | `build/dist/macos/` | macOS signing, notarization, and packaging lane | `distribution` | `dist` | Never remove during routine or aggressive cleanup; explicit distribution cleanup only |

@@ -3086,6 +3086,30 @@
         "file:project.yml"
       ],
       "notes": "Closed 2026-09-15. MacEngineBootstrap hosts MLXTTSEngine in-process on the iOS TTSEngineStore (compiled by path with the ownership authority, release coordinator, diagnostics recorder and notification names); AppEngineSelection, MacEngineServiceLifecycleCoordinator, the QwenVoiceNative store and GenerationChunkBroker are gone; the merger declares two required layers. Smoke lane macos-xcui-smoke-20260915-040350-f374335f: 7 of 7 journeys PASS on the in-process engine (generation, cancellation, recording, long-form, line batch). The 2-layer bench pipeline is proven in CONV-03 together with the script rewrite; unit lane mac-test-20260914-235716 PASS."
+    },
+    {
+      "id": "CONV-03",
+      "plan": "macos-ios-convergence-2026-09",
+      "title": "Remove the XPC stack and rewrite its contracts, scripts and documents",
+      "status": "done",
+      "gate": "Sources/QwenVoiceEngineService, Sources/QwenVoiceEngineSupport, Sources/QwenVoiceNative and Tests/VocelloEngineIntegrationTests are absent with their targets; the entitlement, concurrency-safety, runtime-refactor and TSan contracts pass with dated decisions; build, release, test and CI scripts carry no XPCServices path; scripts/dev.sh ci is green; CLAUDE.md, native.md, SECURITY.md and ARCHITECTURE.md describe in-process hosting.",
+      "sourceOfTruth": [
+        "config/macos-entitlement-policy.json",
+        "config/tsan-policy.json",
+        "config/concurrency-safety.json",
+        "config/runtime-refactor-contract.json",
+        "scripts/release.sh",
+        "scripts/macos_test.sh"
+      ],
+      "updated": "2026-09-15",
+      "evidence": [
+        "run:macos-xcui-smoke-20260915-054806-55c7c01b",
+        "run:macos-xcui-benchmark-20260915-060047-cf740c28",
+        "file:config/macos-entitlement-policy.json",
+        "file:config/tsan-policy.json",
+        "file:scripts/check_macos_ui_bench.py"
+      ],
+      "notes": "Closed 2026-09-15. Deleted Sources/QwenVoiceEngineService, Sources/QwenVoiceEngineSupport, Sources/QwenVoiceNative, the embedded-runtime entitlements and Tests/VocelloEngineIntegrationTests (19 transport tests) with their targets; imports point at QwenVoiceCore; SharedSupport seams key on os(macOS). Contracts rewritten with dated notes: entitlement policy (app + framework roles, release signing refuses XPC services), concurrency-safety (34/7 budgets), runtime-refactor (phase retired, invariant renamed, amendment20260915), TSan (VocelloCoreTests only), capability matrix, risk spine, build-output policy, classifier, localization target check, saved-voice lifecycle; scripts lose XPCServices paths and the transport bundle; check_macos_ui_bench.py validates two layers from one process. Docs: CLAUDE.md, native.md, SECURITY.md, ARCHITECTURE.md, macOS guides, telemetry, benchmarking, ADR, README and chart. Evidence: unit lane mac-test-20260915-014410 (659 core + 125 runtime), smoke macos-xcui-smoke-20260915-054806-55c7c01b, benchmark macos-xcui-benchmark-20260915-060047-cf740c28 (2-layer record)."
     }
   ]
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Focused fixtures for check_macos_xpc_bench.py ordering and output gates."""
+"""Focused fixtures for check_macos_ui_bench.py ordering and output gates."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ TEST_HELPERS = ROOT / "scripts" / "tests"
 if str(TEST_HELPERS) not in sys.path:
     sys.path.insert(0, str(TEST_HELPERS))
 from test_benchmark_memory import ENGINE_BOUNDARIES, row as memory_row, samples as memory_samples
-CHECK = ROOT / "scripts" / "check_macos_xpc_bench.py"
+CHECK = ROOT / "scripts" / "check_macos_ui_bench.py"
 RUN_ID = "mac-ui-order-fixture"
 
 
@@ -144,12 +144,6 @@ def upgrade_layers_to_v8(layers: dict[str, list[dict]], diagnostics: Path) -> No
         (diagnostics / "engine" / f"samples-{row['generationID']}.jsonl").write_text(
             "".join(json.dumps(item) + "\n" for item in sidecar), encoding="utf-8"
         )
-    for row in layers["engine-service"]:
-        row["schemaVersion"] = 8
-        row["transportMetrics"] = {
-            "requestAccepted": True, "requestToFirstChunkMS": 9,
-            "counters": {"chunkGaps": 0},
-        }
     for row in layers["app"]:
         sidecar = memory_samples(
             role="app", boundaries=["app_submit", "app_terminal"], ios=False,
@@ -173,7 +167,7 @@ def upgrade_layers_to_v8(layers: dict[str, list[dict]], diagnostics: Path) -> No
         )
 
 
-class CheckMacOSXPCBenchmarkTests(unittest.TestCase):
+class CheckMacOSUIBenchmarkTests(unittest.TestCase):
     expected_order = [
         "custom/medium/cold#0",
         "custom/short/warm#0",
@@ -211,37 +205,32 @@ class CheckMacOSXPCBenchmarkTests(unittest.TestCase):
             ]
             layers = {
                 "engine": engine_rows,
-                "engine-service": [dict(row) for row in correlated_rows],
                 "app": [dict(row) for row in correlated_rows],
                 "merged": [
                     {
                         "generationID": row["generationID"],
-                        "requiredLayers": ["app", "engine-service", "engine"],
+                        "requiredLayers": ["app", "engine"],
                         "missingLayers": [],
                         "complete": True,
                         "engine": {"generationID": row["generationID"]},
-                        "engineService": {"generationID": row["generationID"]},
                         "app": {"generationID": row["generationID"]},
                     }
                     for row in engine_rows
                 ],
             }
+            # One process hosts the app and the engine.
             for row in layers["engine"]:
                 row["processIdentifier"] = 42
-            for row in layers["engine-service"]:
-                row["processIdentifier"] = 42
             for row in layers["app"]:
-                row["processIdentifier"] = 43
+                row["processIdentifier"] = 42
             for row in layers["merged"]:
                 row["engine"]["processIdentifier"] = 42
-                row["engineService"]["processIdentifier"] = 42
-                row["app"]["processIdentifier"] = 43
+                row["app"]["processIdentifier"] = 42
             upgrade_layers_to_v8(layers, diagnostics)
             if mutate_layers is not None:
                 mutate_layers(layers)
             for layer, rows in (
                 ("engine", layers["engine"]),
-                ("engine-service", layers["engine-service"]),
                 ("app", layers["app"]),
             ):
                 directory = diagnostics / layer
@@ -404,23 +393,14 @@ class CheckMacOSXPCBenchmarkTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("missing complete layer payloads: app", result.stdout + result.stderr)
 
-    def test_process_ownership_rejects_same_app_and_engine_pid(self) -> None:
-        def share_pid(layers: dict[str, list[dict]]) -> None:
-            layers["app"][0]["processIdentifier"] = 42
-            layers["merged"][0]["app"]["processIdentifier"] = 42
+    def test_process_ownership_rejects_app_and_engine_pid_mismatch(self) -> None:
+        def split_pid(layers: dict[str, list[dict]]) -> None:
+            layers["app"][0]["processIdentifier"] = 43
+            layers["merged"][0]["app"]["processIdentifier"] = 43
 
-        result = self.run_checker(self.expected_order, mutate_layers=share_pid)
+        result = self.run_checker(self.expected_order, mutate_layers=split_pid)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("app and engine unexpectedly share PID", result.stdout + result.stderr)
-
-    def test_process_ownership_rejects_engine_service_pid_mismatch(self) -> None:
-        def mismatch(layers: dict[str, list[dict]]) -> None:
-            layers["engine-service"][0]["processIdentifier"] = 44
-            layers["merged"][0]["engineService"]["processIdentifier"] = 44
-
-        result = self.run_checker(self.expected_order, mutate_layers=mismatch)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("engine PID 42 != engine-service PID 44", result.stdout + result.stderr)
+        self.assertIn("app PID 43 != engine PID 42", result.stdout + result.stderr)
 
     def test_process_ownership_rejects_invalid_and_nested_mismatched_pid(self) -> None:
         for value in (None, True, 0, -1):
@@ -437,15 +417,15 @@ class CheckMacOSXPCBenchmarkTests(unittest.TestCase):
 
         result = self.run_checker(self.expected_order, mutate_layers=nested_mismatch)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("app PID 99 != layer PID 43", result.stdout + result.stderr)
+        self.assertIn("app PID 99 != layer PID 42", result.stdout + result.stderr)
 
     def test_duplicate_layer_generation_id_fails(self) -> None:
-        def duplicate_service_id(layers: dict[str, list[dict]]) -> None:
-            layers["engine-service"][1]["generationID"] = "fixture-1"
+        def duplicate_app_id(layers: dict[str, list[dict]]) -> None:
+            layers["app"][1]["generationID"] = "fixture-1"
 
-        result = self.run_checker(self.expected_order, mutate_layers=duplicate_service_id)
+        result = self.run_checker(self.expected_order, mutate_layers=duplicate_app_id)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("engine-service generationIDs are not unique", result.stdout + result.stderr)
+        self.assertIn("app generationIDs are not unique", result.stdout + result.stderr)
 
     def test_malformed_jsonl_fails(self) -> None:
         result = self.run_checker(self.expected_order, malformed_layer="engine")
@@ -464,18 +444,6 @@ class CheckMacOSXPCBenchmarkTests(unittest.TestCase):
         ):
             def mutate(layers, field=field):
                 layers["engine"][0]["summary"].pop(field)
-            with self.subTest(field=field):
-                result = self.run_checker(self.expected_order, mutate_layers=mutate)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn(message, result.stdout + result.stderr)
-
-    def test_schema_v8_transport_acceptance_and_latency_are_required(self) -> None:
-        for field, value, message in (
-            ("requestAccepted", False, "was not accepted by XPC transport"),
-            ("requestToFirstChunkMS", None, "has no request-to-first-chunk"),
-        ):
-            def mutate(layers, field=field, value=value):
-                layers["engine-service"][0]["transportMetrics"][field] = value
             with self.subTest(field=field):
                 result = self.run_checker(self.expected_order, mutate_layers=mutate)
                 self.assertNotEqual(result.returncode, 0)
@@ -506,7 +474,7 @@ if __name__ == "__main__":
     raise SystemExit(unittest.main())
 
 
-class PlaybackCaptureEvidenceTests(CheckMacOSXPCBenchmarkTests):
+class PlaybackCaptureEvidenceTests(CheckMacOSUIBenchmarkTests):
     """PC-01: the runner's per-take capture joins the take and yields warn-only evidence."""
 
     def _capture_fixture(self, root: Path, *, take_index: int, cell: str, duration: float, hole_ms: float = 0.0) -> tuple[Path, Path]:
@@ -562,7 +530,7 @@ class PlaybackCaptureEvidenceTests(CheckMacOSXPCBenchmarkTests):
 
     def test_the_bundle_path_follows_the_receipt(self) -> None:
         sys.path.insert(0, str(ROOT / "scripts"))
-        import check_macos_xpc_bench as checker
+        import check_macos_ui_bench as checker
         self.assertEqual(
             checker.app_bundle_from_receipt("build/cache/xcode/macos-optimized/Build/Products/Release/Vocello.app/Contents/MacOS/Vocello"),
             "build/cache/xcode/macos-optimized/Build/Products/Release/Vocello.app")

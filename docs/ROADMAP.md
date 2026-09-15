@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `macos-ios-convergence-2026-09` | active | backend-and-platform | 2/14 (14%) |
+| `macos-ios-convergence-2026-09` | active | backend-and-platform | 3/14 (21%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -33,9 +33,8 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `CONV-03` | in-flight | Remove the XPC stack and rewrite its contracts, scripts and documents | — |
 | `CONV-04` | in-flight | In-process memory relief on 8 GB Macs | — |
-| `CONV-10` | planned | Shared theme tokens, glass surface, word timing and text-limit policy | `CONV-03` |
+| `CONV-10` | in-flight | Shared theme tokens, glass surface, word timing and text-limit policy | — |
 | `CONV-11` | planned | New macOS shell in the iOS visual language hosting the legacy screens | `CONV-10` |
 | `CONV-12` | planned | History on the iOS screen with sort, Save As and Reveal | `CONV-11` |
 | `CONV-13` | planned | Saved Voices, the enrollment sheet and the record sheet on the iOS screens | `CONV-12` |
@@ -48,13 +47,10 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 ### Open items in detail
 
-- **`CONV-03`** (in-flight) — Remove the XPC stack and rewrite its contracts, scripts and documents.
-  gate: Sources/QwenVoiceEngineService, Sources/QwenVoiceEngineSupport, Sources/QwenVoiceNative and Tests/VocelloEngineIntegrationTests are absent with their targets; the entitlement, concurrency-safety, runtime-refactor and TSan contracts pass with dated decisions; build, release, test and CI scripts carry no XPCServices path; scripts/dev.sh ci is green; CLAUDE.md, native.md, SECURITY.md and ARCHITECTURE.md describe in-process hosting.
-
 - **`CONV-04`** (in-flight) — In-process memory relief on 8 GB Macs.
   gate: The macOS store runs a Mac memory budget policy; kernel pressure drives trim and full unload through the store's terminal barrier; idle unload follows NativeMemoryPolicyResolver; one consented scripts/macos_test.sh memory run shows no critical pressure, warning, hardTrim or fullUnload during a qualified take on the canonical 8 GB Mac.
 
-- **`CONV-10`** (planned) — Shared theme tokens, glass surface, word timing and text-limit policy.
+- **`CONV-10`** (in-flight) — Shared theme tokens, glass surface, word timing and text-limit policy.
   gate: Sources/SharedSupport carries the tokens, the glass surface body, WordTimingPlanner and GenerationTextLimitPolicy with no UIKit or AppKit import; the iOS files forward to them; two new VocelloCoreTests pass; the generic iOS compile is green; config/ios-control-audit.json is unchanged.
 
 - **`CONV-11`** (planned) — New macOS shell in the iOS visual language hosting the legacy screens.
@@ -397,7 +393,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   unparkWhen: RF-13 unparks (the paired iPhone is available for its remaining device gates) and lands; the freeze commit follows it.
 
 - **`RF-10`** (parked) — independently qualify macOS and downloadable CLI.
-  gate: Close F-05 with actual signed/notarized packaged-app startup/XPC evidence, verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.
+  gate: Close F-05 with actual signed/notarized packaged-app startup evidence (in-process engine), verify Built-in, French Design pinned seed, Clone/enrollment, History recovery, long-form/regeneration, and applicable canonical benchmark/promotion lanes. Qualify F-17's copied CLI independently. Product defects, distribution rights, artifact verification and applicable promotion evidence must be clear before publication; an explicit maintainer publication authorization is still required. iOS-only blockers do not prevent desktop/CLI qualification or separately authorized publication. Copied CLI qualification also verifies one real two-item batch with ordered legacy-success JSON and retained WAVs, signal-driven owned cleanup, complete partial-batch accounting, pre-existing-output preservation and app/CLI Saved Voice coexistence under F-18 through F-22; do not substitute host cleanup or source-only fixtures for artifact behavior.
   unparkWhen: The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.
 
 - **`RF-12`** (parked) — verify the distribution iOS candidate and finish submission preparation.

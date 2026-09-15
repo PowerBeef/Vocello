@@ -188,7 +188,7 @@ def _validate_manifest(root: Path) -> None:
     ios_body = _target_body(manifest, "VocelloiOS")
     if ios_body.count(catalog_entry) != 1 or "buildPhase: resources" not in ios_body:
         raise ContractError("VocelloiOS must bundle Localizable.xcstrings as a sources resource")
-    for target in ("VocelloCLI", "QwenVoiceEngineService"):
+    for target in ("VocelloCLI",):
         if catalog_entry in _target_body(manifest, target):
             raise ContractError(f"Localizable.xcstrings must not be attached to {target}")
 

@@ -10,20 +10,6 @@
         "Contents/Resources/ffmpeg"
       ],
       "engineCapabilities": {
-        "supportsBatchGeneration": false,
-        "supportsAudioPreparation": false,
-        "supportsInteractivePrefetch": false,
-        "supportsMemoryTrim": false,
-        "supportsPreparedVoiceManagement": true
-      }
-    },
-    "xpcService": {
-      "bundleIdentifier": "com.qwenvoice.app.engine-service",
-      "codeSigningRequirement": {
-        "debugAdHocRequirement": "identifier \"com.qwenvoice.app.engine-service\"",
-        "signedReleaseRequirementTemplate": "identifier \"com.qwenvoice.app.engine-service\" and certificate leaf[subject.OU] = \"${TEAM_ID}\""
-      },
-      "engineCapabilities": {
         "supportsBatchGeneration": true,
         "supportsAudioPreparation": false,
         "supportsInteractivePrefetch": true,

@@ -2,7 +2,7 @@
 
 The engine writes one `audioQC` report per generation (thresholds live once, in
 Swift, in `makeAudioQCReport`). Three Python consumers fold that report into a
-tracked benchmark take: `publish_benchmark_history.py`, `check_macos_xpc_bench.py`
+tracked benchmark take: `publish_benchmark_history.py`, `check_macos_ui_bench.py`
 and `check_ios_ui_benchmark.py`. This module holds the one copy of the
 finish-reason predicate, the QC failure predicate, the five-key metric rename,
 the quality-registry identity fold and the record schema-version rule.

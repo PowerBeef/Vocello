@@ -1,5 +1,5 @@
 import Combine
-import QwenVoiceNative
+import QwenVoiceCore
 
 /// Scopes the §K generation performance gate to its own tiny observable
 /// (2026-08 UI review, W1-D). The root shell previously read

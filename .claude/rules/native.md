@@ -15,7 +15,7 @@ paths:
 References, read only what the change needs: `docs/reference/mlx-guide.md`,
 `docs/reference/macos-app-guide.md`, `docs/reference/ios-app-guide.md`,
 `docs/reference/localization.md`, `docs/reference/delivery-harness.md`, `docs/ARCHITECTURE.md`.
-Verification: `scripts/dev.sh test` (macOS unit, XPC and owned-runtime tests), `scripts/dev.sh ios`
+Verification: `scripts/dev.sh test` (macOS unit and owned-runtime tests), `scripts/dev.sh ios`
 (generic device-SDK compile). The XCUITest bundles compile only in `scripts/ui_test.sh` or an explicit
 `xcodebuild build-for-testing`, so compile them after touching `Tests/*UITests`. Physical-device and macOS
 XCUITest lanes only when explicitly requested.
@@ -72,8 +72,7 @@ XCUITest lanes only when explicitly requested.
 - **The engine runs in-process on the shared store.** `MacEngineBootstrap` builds `MLXTTSEngine` through
   `NativeRuntimeFactory` (bundled contract → macOS-expanded registry, floor-tier prewarm policy) and wraps
   it in the iOS `TTSEngineStore` (compiled by path from `Sources/iOS`, behavior frozen). No XPC service,
-  no service retirement, no wire protocol: the XPC targets are retired by CONV-03 and must not be
-  reintroduced. Views inject the store as `@EnvironmentObject`; the root shell subscribes to
+  no service retirement, no wire protocol; a separate engine process must not be reintroduced. Views inject the store as `@EnvironmentObject`; the root shell subscribes to
   `snapshotChanges` with `onReceive` and never reads the store in `body` (W1-D/W2-A).
 - **Memory relief is in-process.** The engine's own kernel-pressure responder trims and unloads; the
   store's `MacMemoryBudgetPolicy` gates admission on footprint and Metal working set; idle unload follows
@@ -91,8 +90,8 @@ XCUITest lanes only when explicitly requested.
 - **Saved-voice review is shared and typed** (`ReferenceTranscriptionReviewState`); Save stays blocked
   while recognition is unresolved; user edits win; persisted metadata comes only from
   `VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(...)`.
-- **Entitlements.** App sandbox stays off for MLX; `config/macos-entitlement-policy.json` changes need a
-  security review (the XPC role and `QwenVoiceEmbeddedRuntime.entitlements` leave with CONV-03).
+- **Entitlements.** App sandbox stays off for MLX; the app is the only entitled Mach-O;
+  `config/macos-entitlement-policy.json` changes need a security review.
 - **Memory evidence pairs samples by uptime**; independent per-process maxima are not a system peak.
 
 ## iOS app (`Sources/iOS`, `Sources/iOSSupport`, `Tests/VocelloiOSLogicTests`)

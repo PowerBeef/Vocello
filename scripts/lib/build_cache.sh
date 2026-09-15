@@ -416,15 +416,11 @@ assert_macho_arm64_only() {
 assert_macos_bundle_arm64_only() {
     local app_bundle="$1" candidate
     assert_macho_arm64_only "$app_bundle/Contents/MacOS/Vocello" "Vocello executable" || return 1
-    assert_macho_arm64_only \
-        "$app_bundle/Contents/XPCServices/QwenVoiceEngineService.xpc/Contents/MacOS/QwenVoiceEngineService" \
-        "QwenVoiceEngineService executable" || return 1
     while IFS= read -r -d '' candidate; do
         /usr/bin/file -b "$candidate" 2>/dev/null | grep -q 'Mach-O' || continue
         assert_macho_arm64_only "$candidate" "embedded Mach-O ${candidate#"$app_bundle"/}" || return 1
     done < <(find \
         "$app_bundle/Contents/MacOS" \
-        "$app_bundle/Contents/XPCServices" \
         "$app_bundle/Contents/Frameworks" \
         -type f -print0 2>/dev/null)
 }
@@ -451,32 +447,25 @@ ensure_swiftpm_scratch_location() {
     mv "$temporary" "$marker"
 }
 
-# Preserve only the current app and XPC-service symbols. Test/CLI dSYMs are
-# reproducible and no longer consume the durable crash-symbolication budget.
+# Preserve only the current app symbols. Test/CLI dSYMs are reproducible and no
+# longer consume the durable crash-symbolication budget.
 preserve_macos_dsyms() {
     local products="$1" app_bundle="$2" destination="$3"
     local temporary="$destination.tmp.$$"
     local app_dsym="$products/Vocello.app.dSYM"
-    local xpc_dsym="$products/QwenVoiceEngineService.xpc.dSYM"
     local app_binary="$app_bundle/Contents/MacOS/Vocello"
-    local xpc_binary="$app_bundle/Contents/XPCServices/QwenVoiceEngineService.xpc/Contents/MacOS/QwenVoiceEngineService"
     validate_dsym_uuid "$app_binary" "$app_dsym" "Vocello" || return 1
-    validate_dsym_uuid "$xpc_binary" "$xpc_dsym" "QwenVoiceEngineService" || return 1
     rm -rf "$temporary"
     mkdir -p "$temporary"
     copy_tree_clone_first "$app_dsym" "$temporary/Vocello.app.dSYM" \
         || { rm -rf "$temporary"; return 1; }
-    copy_tree_clone_first "$xpc_dsym" "$temporary/QwenVoiceEngineService.xpc.dSYM" \
-        || { rm -rf "$temporary"; return 1; }
     validate_dsym_uuid "$app_binary" "$temporary/Vocello.app.dSYM" "preserved Vocello" \
-        || { rm -rf "$temporary"; return 1; }
-    validate_dsym_uuid "$xpc_binary" "$temporary/QwenVoiceEngineService.xpc.dSYM" "preserved QwenVoiceEngineService" \
         || { rm -rf "$temporary"; return 1; }
     /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$app_bundle/Contents/Info.plist" \
         > "$temporary/build-version.txt" 2>/dev/null || true
     rm -rf "$destination"
     mv "$temporary" "$destination"
-    echo "==> Preserved current app/XPC dSYMs → $destination"
+    echo "==> Preserved current app dSYMs → $destination"
 }
 
 # Preserve exactly the dSYM matching the current physical-device iOS product.

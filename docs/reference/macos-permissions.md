@@ -48,7 +48,7 @@ the recurring permission pain.
 - The resolved identity is fingerprinted inside the managed shared-package cache at
   `build/cache/xcode/source-packages/.qwenvoice-cache/dev-signing-identity`;
   changing it forces a fresh sign + restage, and `build.sh` asserts the app
-  *and* the embedded XPC service ended up signed as expected.
+  ended up signed as expected.
 - The dev-signed app and the shipped (Developer ID) app have different
   designated requirements, so the installed release prompts once on its own —
   expected.
@@ -80,15 +80,14 @@ the recurring permission pain.
 
 ## Permission map (which process touches what)
 
-| Permission | macOS app | XPC engine service | `vocello` CLI |
-|---|---|---|---|
-| Microphone (`NSMicrophoneUsageDescription`, `device.audio-input` entitlement) | record reference clips (`ReferenceClipRecorder`) | — | — |
-| Speech recognition (`NSSpeechRecognitionUsageDescription`) | on-device transcript auto-fill (`VoiceClipTranscriber`, `requiresOnDeviceRecognition` always) | — | — |
-| Files & Folders | `NSOpenPanel`/`NSSavePanel` (user intent ⇒ no extra prompt); writing to a **persisted** custom output dir under ~/Desktop/Documents/Downloads prompts once per folder category | — (receives paths as strings) | app-support folders only |
-| Everything else (contacts, photos, location, automation, screen) | not used | not used | not used |
+| Permission | macOS app | `vocello` CLI |
+|---|---|---|
+| Microphone (`NSMicrophoneUsageDescription`, `device.audio-input` entitlement) | record reference clips (`ReferenceClipRecorder`) | — |
+| Speech recognition (`NSSpeechRecognitionUsageDescription`) | on-device transcript auto-fill (`VoiceClipTranscriber`, `requiresOnDeviceRecognition` always) | — |
+| Files & Folders | `NSOpenPanel`/`NSSavePanel` (user intent ⇒ no extra prompt); writing to a **persisted** custom output dir under ~/Desktop/Documents/Downloads prompts once per folder category | app-support folders only |
+| Everything else (contacts, photos, location, automation, screen) | not used | not used |
 
-The app process is the TCC client for everything; the XPC service and CLI
-never trigger prompts.
+The app process is the TCC client for everything; the CLI never triggers prompts.
 
 ## OS gates beyond TCC
 

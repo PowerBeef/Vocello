@@ -1,5 +1,4 @@
 import QwenVoiceCore
-import QwenVoiceNative
 import SwiftUI
 
 struct BatchGenerationSheet: View {

@@ -143,11 +143,11 @@ This is the maintained engineering record of the whole package, refreshed with e
 
 Most local TTS tools shell out to a Python reference implementation behind a local server. Vocello generates through a first-party Swift runtime on MLX, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md): no Python, no local server, no bundled weights. The runtime is derived from [`mlx-audio-swift`](https://github.com/Blaizzy/mlx-audio-swift) v0.1.2 and narrowed to exactly what Vocello ships, the Qwen3-TTS runtime and the Mimi codec primitives it needs: about 36,000 of roughly 49,000 upstream lines were removed in that specialization, and every retained, modified and added file is tracked in a generated inventory (`Packages/VocelloQwen3Core/CURRENT_INVENTORY.json`) with its named semantic changes under an immutable lineage ledger (`Packages/VocelloQwen3Core/SEMANTIC_DELTAS.json`). A facade contract rejects any public declaration that leaks raw MLX types, and benchmark-backed capability claims automatically demote when their evidence source drifts from the recorded run.
 
-One engine serves three hosts. On the Mac the engine lives in a separate XPC service process that retires when idle, so engine memory pressure can never take the app window down, and retiring the process returns memory that a model unload alone cannot. On iPhone the same engine runs in-process. The `vocello` command-line tool links the engine directly and reuses the models the app installed.
+One engine serves three hosts. On the Mac the engine runs inside the app process, exactly as on the iPhone (since 2026-09-15; the earlier separate XPC service is gone), so one store, one lifecycle and one memory policy serve both apps: the engine's own pressure responder trims and unloads, and the per-tier policy unloads an idle model. The `vocello` command-line tool links the same engine framework and drives it in-process with no UI.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/charts/architecture-dark.svg">
-  <img alt="Architecture diagram: the SwiftUI app talks over XPC to a separate engine service process, which drives the owned VocelloQwen3Core runtime (an engine actor owning each session, the Qwen3-TTS talker and code predictor, and the Mimi decoder on MLX and Metal) while PCM audio streams back to the app chunk by chunk" src="docs/charts/architecture-light.svg">
+  <img alt="Architecture diagram: the SwiftUI app hosts the engine in its own process, which drives the owned VocelloQwen3Core runtime (an engine actor owning each session, the Qwen3-TTS talker and code predictor, the Mimi decoder) on MLX and Metal; PCM audio streams back chunk by chunk." src="docs/charts/architecture-light.svg">
 </picture>
 
 Every request moves through one synthesis pipeline from conditioning to a verified 24 kHz mono 16-bit WAV, owned end to end by an engine actor. The full request lifecycle and engine invariants are documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
@@ -182,7 +182,7 @@ That speed is the sum of an evergreen optimization ledger, not one trick. Sectio
 - Stream-chunk materialization is pipelined off the token hot path with identical event order, verified byte-identical across 12 of 12 fixed-seed takes (§M P2a-i).
 - Switching models reuses the byte-identical 682 MB speech tokenizer: its load cost drops from 503 ms to zero (§N 2.1).
 - The model packages carry 8-bit text embeddings, about 278 MB less resident memory and 292 MB less disk per Speed package, published across six public Hugging Face repositories at verified equal quality (§N 2.2).
-- The interface steps aside while the engine works: attribution put window compositing near 23% of the same warm take against about 3% for XPC transport, so translucent surfaces render as solid fills during generation (§K).
+- The interface steps aside while the engine works: attribution put window compositing near 23% of the same warm take against about 3% for the engine transport of the time, so translucent surfaces render as solid fills during generation (§K).
 
 The full methodology, hardware profiles, and every published record live in [`benchmarks/HISTORY.md`](benchmarks/HISTORY.md) and [`docs/reference/benchmarking-procedure.md`](docs/reference/benchmarking-procedure.md); the charts in this section regenerate deterministically from the named records via `scripts/generate_readme_charts.py`.
 

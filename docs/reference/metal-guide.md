@@ -236,7 +236,7 @@ CPU, GPU, and Neural Engine share the same DRAM pool. There is no discrete VRAM.
 
 - Model weights, KV caches, and MLX buffer cache all compete with the app, the OS, and audio pipelines.
 - On iOS, GPU allocations count directly against the Jetsam physical footprint ceiling.
-- On macOS, the XPC service isolates the engine's footprint from the app, but both still share system RAM.
+- On macOS the engine shares the app process (since 2026-09-15); its footprint and the UI's are one budget against system RAM.
 
 ### 5.2 Vocello's Metal memory telemetry
 

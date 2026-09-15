@@ -27,8 +27,6 @@ settings:
 targets:
   VocelloCLI:
     type: tool
-  QwenVoiceEngineService:
-    type: xpc-service
   VocelloiOS:
     type: application
     sources:

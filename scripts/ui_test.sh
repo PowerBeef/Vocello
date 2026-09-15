@@ -19,10 +19,6 @@ IOS_DERIVED="$QVOICE_XCODE_IOS_DERIVED"
 BUNDLE_ID_IOS="com.patricedery.vocello"
 MAC_TAKE_MANIFEST="/tmp/vocello-bench-current-take.json"
 MAC_APP_EXECUTABLE="$MAC_DERIVED/Build/Products/Release/Vocello.app/Contents/MacOS/Vocello"
-MAC_ENGINE_EXECUTABLES=(
-  "$MAC_DERIVED/Build/Products/Release/Vocello.app/Contents/XPCServices/QwenVoiceEngineService.xpc/Contents/MacOS/QwenVoiceEngineService"
-  "$MAC_DERIVED/Build/Products/Release/QwenVoiceEngineService.xpc/Contents/MacOS/QwenVoiceEngineService"
-)
 . "$ROOT_DIR/scripts/lib/test_models.sh"
 test_models_init "$ROOT_DIR"
 
@@ -573,7 +569,7 @@ arm_mac_crash_marker() {
 check_mac_crash_delta() {
   local root="$HOME/Library/Logs/DiagnosticReports" new
   [[ -f "$mac_crash_marker" ]] || { echo "crash marker was never armed" >"$out/new-crashes.txt"; return 1; }
-  new="$(find "$root" \( -name 'Vocello-*.ips' -o -name 'QwenVoiceEngineService-*.ips' -o -name '*engine-service*.ips' \) -newer "$mac_crash_marker" -print 2>/dev/null || true)"
+  new="$(find "$root" -name 'Vocello-*.ips' -newer "$mac_crash_marker" -print 2>/dev/null || true)"
   [[ -z "$new" ]] || { printf '%s\n' "$new" >"$out/new-crashes.txt"; return 1; }
   return 0
 }
@@ -664,7 +660,6 @@ terminate_owned_processes() {
 
 terminate_macos_app() {
   terminate_owned_processes Vocello "$MAC_APP_EXECUTABLE"
-  terminate_owned_processes QwenVoiceEngineService "${MAC_ENGINE_EXECUTABLES[@]}"
 }
 
 cleanup_macos_run() {
@@ -1044,7 +1039,7 @@ if segments >= 2 and durations and os.path.isfile(engine_log):
 # sidecars stay in the app support tree; they are bounded but large).
 kept = os.path.join(out_dir, "diagnostics")
 os.makedirs(kept, exist_ok=True)
-for layer in ("app", "engine", "engine-service"):
+for layer in ("app", "engine"):
     source = os.path.join(diag, layer, "generations.jsonl")
     if os.path.isfile(source):
         shutil.copy2(source, os.path.join(kept, f"{layer}-generations.jsonl"))
@@ -1121,7 +1116,7 @@ validate_macos_benchmark() {
   local evidence="$out/benchmark-evidence.json"
   local status=1
   for _ in {1..60}; do
-    if python3 "$ROOT_DIR/scripts/check_macos_xpc_bench.py" "$diagnostics" \
+    if python3 "$ROOT_DIR/scripts/check_macos_ui_bench.py" "$diagnostics" \
         --run-id "$run_id" --modes "$modes" --lengths "$lengths" --warm "$warm" \
         --label "${label:-$run_id}" --evidence-manifest "$evidence" \
         --build-provenance "$out/last-build.json" \
@@ -1427,7 +1422,7 @@ WAV
   required_step_run "$step_ledger" crash-delta check_mac_crash_delta \
     || die "new Vocello crash report detected (see $out/new-crashes.txt)"
   summarize_long_form_project_if_present "$out"
-  # The lane rebuilt the app/XPC products in the shared cache; re-preserve
+  # The lane rebuilt the app product in the shared cache; re-preserve
   # their dSYMs so the build-output symbol-identity check stays consistent
   # (mirrors preserve_ios_ui_dsym on the device lane).
   preserve_macos_dsyms "$MAC_DERIVED/Build/Products/Release" \

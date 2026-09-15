@@ -1,7 +1,6 @@
 import Combine
 import Foundation
 import QwenVoiceCore
-import QwenVoiceNative
 
 @MainActor
 final class MacGenerationWarmupCoordinator: ObservableObject {

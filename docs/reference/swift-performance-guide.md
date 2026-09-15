@@ -83,7 +83,7 @@ Vocello's concurrency design is intentionally coarse-grained:
 - **`@MainActor`** — SwiftUI views and view-models (`TTSEngineStore`, `AppModel`, `ContentView`).
 - **`actor NativeEngineRuntime`** — the engine's mutable runtime state and MLX call serialization.
 - **`actor NativePreparedCloneConditioningCache`** — mutable clone-conditioning cache with LRU eviction.
-- **Background `Task` / `Task.detached`** — telemetry sampler, XPC event forwarding, audio decoding consumer.
+- **Background `Task` / `Task.detached`** — telemetry sampler, chunk forwarding, audio decoding consumer.
 - **`@unchecked Sendable` + manual locking** — `MainThreadStallWatchdog` uses `NSLock` because it predates `Mutex` and is reviewed for correctness.
 
 This keeps data-race checking tractable and matches the natural boundaries of the app.
@@ -136,7 +136,7 @@ matching registry entry. Prefer `actor`, `Mutex` (Swift 6), immutable adapters, 
 ### 3.5 `Task` and `Task.detached`
 
 - Use `Task { ... }` from `@MainActor` contexts when the work must hop off the main thread and you want structured concurrency.
-- Use `Task.detached(priority: .utility) { ... }` for long-lived background work that must outlive the initiating scope, such as draining XPC event streams. The XPC host drains the per-generation stream `engine.events(for: generationID)` on a detached utility task so the synchronous XPC encode cannot lag the producer; only `lastPublishedEvent` hops to `@MainActor`.
+- Use `Task.detached(priority: .utility) { ... }` for long-lived background work that must outlive the initiating scope, such as the telemetry merge after a generation completes.
 - Avoid `Task.sleep` busy-waiting on the hot path. The telemetry sampler uses `try? await Task.sleep(nanoseconds:)` with a device-tiered cadence (500 ms on 8 GB Mac / iPhone).
 
 ---
@@ -268,7 +268,7 @@ Every strong reference copy is a retain; every last-use is a release. They are a
 1. **Borrow instead of copy.** Read-only access to a value should borrow it. Swift usually does this automatically for local variables; for class properties it may need a defensive copy.
 2. **Use `Span` / `InlineArray` where appropriate (Swift 6.2+).** `Span` gives non-escaping, zero-reference-count access to contiguous memory. `InlineArray` stores a fixed-size collection inline, eliminating COW uniqueness checks and heap allocation. Vocello targets iOS/macOS 26.0 with Xcode 26.0; if the deployment toolchain supports these types, they are the preferred replacement for unsafe buffer pointers in new binary/audio parsing code.
 3. **Move large values across boundaries with `consume`.** The `consume` operator explicitly transfers ownership, helping the compiler avoid a retain/release pair.
-4. **Avoid retain cycles.** The engine-service and XPC layers hold references to delegates and connections; use `[weak self]` in Combine sinks and XPC reply handlers.
+4. **Avoid retain cycles.** The store and the player hold long-lived Combine sinks and notification observers; use `[weak self]` in every sink and observer closure.
 
 ### 7.3 Observed vs. guaranteed object lifetimes
 

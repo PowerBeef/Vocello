@@ -90,7 +90,7 @@ response times are not promised for this maintainer-run project.
 ## Scope
 
 In scope: the Vocello macOS/iPhone applications, the `vocello` CLI, signed release artifacts,
-release automation, model-download integrity, local persistence, XPC boundaries, and the project
+release automation, model-download integrity, local persistence, and the project
 website. Upstream vulnerabilities in Qwen, MLX, Apple frameworks, GitHub Actions, npm packages, or
 Hugging Face should also be reported to their owners; report them here when Vocello needs a
 mitigation or ships an affected version.

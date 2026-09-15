@@ -46,7 +46,6 @@ APP_PATH="$(cd "$(dirname "$APP_PATH")" && pwd)/$(basename "$APP_PATH")"
 APP_INFO_PLIST="$APP_PATH/Contents/Info.plist"
 [ -f "$APP_INFO_PLIST" ] || fail "Missing app Info.plist: $APP_INFO_PLIST"
 EXPECTED_APP_BUNDLE_ID="$(matrix_read "macOS/app/bundleIdentifier")"
-EXPECTED_XPC_BUNDLE_ID="$(matrix_read "macOS/xpcService/bundleIdentifier")"
 REQUIRED_ABSENT_RESOURCE_PATHS=()
 while IFS= read -r required_absent_path; do
     REQUIRED_ABSENT_RESOURCE_PATHS+=("$required_absent_path")
@@ -59,15 +58,7 @@ APP_BUNDLE_ID="$(plist_read "$APP_INFO_PLIST" CFBundleIdentifier)"
 [ "$APP_BUNDLE_ID" = "$EXPECTED_APP_BUNDLE_ID" ] || fail "App bundle identifier mismatch: expected $EXPECTED_APP_BUNDLE_ID, got ${APP_BUNDLE_ID:-missing}"
 APP_TEAM_ID="$(plist_read "$APP_INFO_PLIST" "$TEAM_ID_INFO_KEY" || true)"
 
-XPC_SERVICE_PATH="$(find "$APP_PATH/Contents/XPCServices" -maxdepth 1 -name '*.xpc' -type d | head -n1 || true)"
-[ -n "$XPC_SERVICE_PATH" ] || fail "Bundled XPC service missing inside $APP_PATH/Contents/XPCServices"
-XPC_INFO_PLIST="$XPC_SERVICE_PATH/Contents/Info.plist"
-XPC_BUNDLE_ID="$(plist_read "$XPC_INFO_PLIST" CFBundleIdentifier)"
-[ "$XPC_BUNDLE_ID" = "$EXPECTED_XPC_BUNDLE_ID" ] || fail "Bundled XPC service bundle identifier mismatch: expected $EXPECTED_XPC_BUNDLE_ID, got ${XPC_BUNDLE_ID:-missing}"
-XPC_TEAM_ID="$(plist_read "$XPC_INFO_PLIST" "$TEAM_ID_INFO_KEY" || true)"
-XPC_EXECUTABLE_NAME="$(plist_read "$XPC_INFO_PLIST" CFBundleExecutable)"
-[ -n "$XPC_EXECUTABLE_NAME" ] || fail "Could not resolve XPC executable name from $XPC_INFO_PLIST"
-XPC_SERVICE_BINARY="$XPC_SERVICE_PATH/Contents/MacOS/$XPC_EXECUTABLE_NAME"
+[ -e "$APP_PATH/Contents/XPCServices" ] && fail "The app bundle must not embed an XPC service; the engine runs in-process"
 
 RESOURCES_DIR="$APP_PATH/Contents/Resources"
 TMP_UI_HOME=""
@@ -98,8 +89,6 @@ echo ""
 
 echo "[1/4] Checking native bundle contents..."
 [ -x "$APP_BINARY" ] || fail "App binary missing: $APP_BINARY"
-[ -d "$XPC_SERVICE_PATH" ] || fail "Bundled XPC service missing: $XPC_SERVICE_PATH"
-[ -x "$XPC_SERVICE_BINARY" ] || fail "Bundled XPC service binary missing: $XPC_SERVICE_BINARY"
 "$SCRIPT_DIR/check_backend_resource_contract.sh" --app-bundle "$APP_PATH" >/dev/null
 for required_absent_path in "${REQUIRED_ABSENT_RESOURCE_PATHS[@]}"; do
     if [ -e "$APP_PATH/$required_absent_path" ]; then
@@ -119,23 +108,15 @@ echo "[2/4] Verifying app code signature..."
 if [ "$EXPECT_SIGNED_RELEASE" = "1" ]; then
     codesign --verify --deep --strict "$APP_PATH" >/dev/null 2>&1 || fail "Signed release code signature verification failed"
     codesign_has_runtime_metadata "$APP_PATH" || fail "Signed release is missing hardened runtime metadata"
-    codesign --verify --strict "$XPC_SERVICE_PATH" >/dev/null 2>&1 || fail "Bundled XPC service code signature verification failed"
-    codesign_has_runtime_metadata "$XPC_SERVICE_PATH" || fail "Bundled XPC service is missing hardened runtime metadata"
     python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-app --bundle "$APP_PATH" \
         || fail "Signed release app entitlement allowlist verification failed"
-    python3 "$SCRIPT_DIR/entitlement_contract.py" verify-bundle --role macos-engine-xpc --bundle "$XPC_SERVICE_PATH" \
-        || fail "Signed release XPC entitlement allowlist verification failed"
     EXPECTED_TEAM_ID="${QWENVOICE_EXPECT_TEAM_ID:-${APPLE_TEAM_ID:-}}"
     [ -n "$APP_TEAM_ID" ] || fail "Signed release app Info.plist is missing $TEAM_ID_INFO_KEY"
-    [ -n "$XPC_TEAM_ID" ] || fail "Signed release XPC Info.plist is missing $TEAM_ID_INFO_KEY"
     if [ -n "$EXPECTED_TEAM_ID" ]; then
         [ "$APP_TEAM_ID" = "$EXPECTED_TEAM_ID" ] || fail "App Team ID mismatch: expected $EXPECTED_TEAM_ID, got $APP_TEAM_ID"
-        [ "$XPC_TEAM_ID" = "$EXPECTED_TEAM_ID" ] || fail "XPC Team ID mismatch: expected $EXPECTED_TEAM_ID, got $XPC_TEAM_ID"
     fi
     APP_SIGNATURE_TEAM_ID="$(codesign_team_identifier "$APP_PATH")"
-    XPC_SIGNATURE_TEAM_ID="$(codesign_team_identifier "$XPC_SERVICE_PATH")"
     [ "$APP_SIGNATURE_TEAM_ID" = "$APP_TEAM_ID" ] || fail "App signature Team ID mismatch: Info.plist=$APP_TEAM_ID signature=${APP_SIGNATURE_TEAM_ID:-missing}"
-    [ "$XPC_SIGNATURE_TEAM_ID" = "$XPC_TEAM_ID" ] || fail "XPC signature Team ID mismatch: Info.plist=$XPC_TEAM_ID signature=${XPC_SIGNATURE_TEAM_ID:-missing}"
     # Every nested framework must carry the release team identity too —
     # notarization rejects any ad-hoc Mach-O, and build-time signing
     # leaves frameworks ad-hoc until release re-signing covers them.

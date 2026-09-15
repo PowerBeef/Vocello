@@ -32,8 +32,12 @@ iOS behavior when the phone is back. Accepted costs: no crash isolation, and 8 G
 in-process trim and unload instead of service retirement. CONV-01 (96709242) laid the seams; CONV-02
 put the macOS app on the in-process engine behind the legacy screens: `MacEngineBootstrap`, the shared
 store compiled by path, two-layer telemetry, and all seven smoke journeys passing on the first run
-(macos-xcui-smoke-20260915-040350-f374335f). CONV-03 (XPC removal with its contracts) and CONV-04
-(memory relief) are next.
+(macos-xcui-smoke-20260915-040350-f374335f). CONV-03 removed the XPC service, its two frameworks,
+the transport test bundle and every contract, script and document that named them; the smoke lane
+passed again (macos-xcui-smoke-20260915-054806-55c7c01b) and the first two-layer benchmark record
+published (macos-xcui-benchmark-20260915-060047-cf740c28). CONV-04 (memory-lane validation of the
+in-process relief) waits for a consented `scripts/macos_test.sh memory` run; the screens (CONV-10
+onwards) are next.
 
 ### Harness stabilization first (September 13, night)
 

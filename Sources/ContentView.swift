@@ -1,7 +1,6 @@
-import SwiftUI
 import AppKit
 import QwenVoiceCore
-import QwenVoiceNative
+import SwiftUI
 
 struct SavedVoiceCloneHandoffPlan: Equatable {
     let handoff: PendingVoiceCloningHandoff

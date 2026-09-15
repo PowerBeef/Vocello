@@ -375,8 +375,7 @@ def crash_digests(scope: str, diagnostics: Path | None = None) -> list[str]:
         root = Path.home() / "Library" / "Logs" / "DiagnosticReports"
         candidates = [
             path for path in root.glob("*.ips")
-            if path.name.startswith(("Vocello-", "QwenVoiceEngineService-"))
-            or "engine-service" in path.name.lower()
+            if path.name.startswith("Vocello-")
         ] if root.is_dir() else []
     elif scope == "ios":
         if diagnostics is None or not diagnostics.is_dir():

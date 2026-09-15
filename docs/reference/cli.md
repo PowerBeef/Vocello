@@ -29,7 +29,7 @@ It serves two roles:
   controlled exactly via load/unload, no UI waits), aggregate run-scoped telemetry, and publish a
   privacy-safe PASS-only benchmark record when running inside this checkout.
 
-It links the engine frameworks directly (no XPC), **ships no model weights and no Python**, and runs
+It links the engine framework directly, like the apps, **ships no model weights and no Python**, and runs
 **in place** beside its MLX metallib bundle. It shares the same on-disk model store as the app
 (`~/Library/Application Support/QwenVoice/models` by default). Install weights via the app
 (Settings → Model downloads) or headlessly with `vocello models install <id>` — the same

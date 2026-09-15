@@ -1,18 +1,8 @@
 import Foundation
 
-#if canImport(QwenVoiceCore)
 import QwenVoiceCore
-#endif
 
-#if canImport(QwenVoiceNative)
-import QwenVoiceNative
-#endif
-
-#if canImport(QwenVoiceNative)
-typealias PersistenceGenerationResult = QwenVoiceNative.GenerationResult
-#elseif canImport(QwenVoiceCore)
 typealias PersistenceGenerationResult = QwenVoiceCore.GenerationResult
-#endif
 
 /// Shared generation persistence and autoplay logic used by all three generation views.
 @MainActor
@@ -125,7 +115,7 @@ enum GenerationPersistence {
             enqueue: { try GenerationHistoryRecovery.enqueue($0) },
             commit: { try await GenerationHistoryRecovery.coordinator.commit($0) },
             onSaved: { savedGeneration in
-                #if canImport(QwenVoiceNative)
+                #if os(macOS)
                 GenerationLibraryEvents.shared.announceGenerationAppended(savedGeneration)
                 #else
                 NotificationCenter.default.post(name: .generationSaved, object: nil)

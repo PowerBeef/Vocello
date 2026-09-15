@@ -882,7 +882,7 @@ def default_inputs(record: dict[str, Any]) -> dict[str, Any]:
     harness_paths = [
         REPO_ROOT / "scripts" / "ui_test.sh",
         REPO_ROOT / "scripts" / "repo_invariants.sh",
-        REPO_ROOT / "scripts" / "check_macos_xpc_bench.py",
+        REPO_ROOT / "scripts" / "check_macos_ui_bench.py",
         REPO_ROOT / "scripts" / "check_ios_ui_benchmark.py",
         REPO_ROOT / "scripts" / "summarize_generation_telemetry.py",
         REPO_ROOT / "scripts" / "benchmark_memory.py",
@@ -929,7 +929,6 @@ def default_inputs(record: dict[str, Any]) -> dict[str, Any]:
         REPO_ROOT / "Sources" / "QwenVoiceCore" / "NativeEngineRuntime.swift",
         REPO_ROOT / "Sources" / "SharedSupport" / "Telemetry" / "AppGenerationTimeline.swift",
         REPO_ROOT / "Sources" / "SharedSupport" / "Telemetry" / "MainThreadStallWatchdog.swift",
-        REPO_ROOT / "Sources" / "QwenVoiceEngineSupport" / "EngineServiceTransportAccumulator.swift",
         REPO_ROOT / "benchmarks" / "schema-v2.json",
         REPO_ROOT / "config" / "memory-qualification-policy.json",
     ]
@@ -1075,10 +1074,6 @@ def app_identity(platform: str, outer: dict[str, Any], artifact_dir: Path) -> di
             executable = bundle / (f"Contents/MacOS/{executable_name}" if platform == "macos" else executable_name)
             if executable.is_file():
                 executable_paths["Vocello"] = executable
-            if platform == "macos":
-                service = bundle / "Contents/XPCServices/QwenVoiceEngineService.xpc/Contents/MacOS/QwenVoiceEngineService"
-                if service.is_file():
-                    executable_paths["QwenVoiceEngineService"] = service
             app_version = str(plist.get("CFBundleShortVersionString", "unknown"))
             app_build = str(plist.get("CFBundleVersion", "unknown"))
         else:

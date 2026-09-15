@@ -25,7 +25,6 @@ class SavedVoiceLifecycleContractTests(unittest.TestCase):
             "Sources/QwenVoiceCore/SemanticTypes.swift",
             "Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
             "Sources/QwenVoiceCore/MLXTTSEngine.swift",
-            "Sources/QwenVoiceEngineSupport/EngineServiceIPC.swift",
             "Sources/iOS/Voices/IOSRecordVoiceSheet.swift",
             "Sources/iOS/IOSGenerationInputControls.swift",
             "Sources/iOS/IOSGenerationModeViews.swift",

@@ -1339,7 +1339,9 @@ public struct MergedGenerationTelemetry: Hashable, Codable, Sendable {
     public let engineService: GenerationTelemetryRecord?
     public let engine: GenerationTelemetryRecord?
     /// Explicit completeness prevents a timed-out partial merge from looking like
-    /// authoritative joined evidence. The macOS merger requires all three layers.
+    /// authoritative joined evidence. Both apps host the engine in-process, so a
+    /// merge requires the app and engine rows; `engineService` survives only to
+    /// decode records written before 2026-09-15.
     public let requiredLayers: [GenerationTelemetryRecord.Layer]
     public let missingLayers: [GenerationTelemetryRecord.Layer]
     public let complete: Bool
@@ -1350,7 +1352,7 @@ public struct MergedGenerationTelemetry: Hashable, Codable, Sendable {
         app: GenerationTelemetryRecord?,
         engineService: GenerationTelemetryRecord?,
         engine: GenerationTelemetryRecord?,
-        requiredLayers: [GenerationTelemetryRecord.Layer] = [.app, .engineService, .engine],
+        requiredLayers: [GenerationTelemetryRecord.Layer] = [.app, .engine],
         schemaVersion: Int = MergedGenerationTelemetry.currentSchemaVersion
     ) {
         self.schemaVersion = schemaVersion

@@ -131,8 +131,8 @@ def validate(root: Path = ROOT, policy_relative: Path = POLICY_PATH) -> list[str
         if policy.get("schemaVersion") != 1:
             errors.append("macOS entitlement policy has an unsupported schemaVersion")
         targets = policy.get("targets")
-        if not isinstance(targets, list) or len(targets) != 3:
-            raise EntitlementError("macOS entitlement policy must define app, XPC, and framework roles")
+        if not isinstance(targets, list) or len(targets) != 2:
+            raise EntitlementError("macOS entitlement policy must define the app and framework roles")
         by_id: dict[str, dict[str, Any]] = {}
         for row in targets:
             if not isinstance(row, dict) or not isinstance(row.get("id"), str) or not SAFE_ID.fullmatch(row["id"]):
@@ -140,13 +140,13 @@ def validate(root: Path = ROOT, policy_relative: Path = POLICY_PATH) -> list[str
             if row["id"] in by_id or not isinstance(row.get("allowed"), dict):
                 raise EntitlementError("macOS entitlement policy target is duplicate or lacks an allowlist")
             by_id[row["id"]] = row
-        if set(by_id) != {"macos-app", "macos-engine-xpc", "macos-framework"}:
+        if set(by_id) != {"macos-app", "macos-framework"}:
             errors.append("macOS entitlement policy target roles are incomplete")
 
         project = (root / "project.yml").read_text(encoding="utf-8")
         declared = _declared_entitlements(project)
         expected_declared: dict[str, str] = {}
-        for role in ("macos-app", "macos-engine-xpc"):
+        for role in ("macos-app",):
             row = by_id.get(role)
             if not row:
                 continue
@@ -169,20 +169,14 @@ def validate(root: Path = ROOT, policy_relative: Path = POLICY_PATH) -> list[str
             )
 
         release = (root / "scripts/release.sh").read_text(encoding="utf-8")
-        xpc_loop_match = re.search(
-            r"while IFS= read -r -d '' xpc_path; do(.*?)done < <\(find \"\$APP_PATH/Contents/XPCServices\"",
-            release,
-            re.DOTALL,
-        )
-        xpc_source = by_id.get("macos-engine-xpc", {}).get("source")
         app_source = by_id.get("macos-app", {}).get("source")
-        if not xpc_loop_match or f'--entitlements "$PROJECT_DIR/{xpc_source}"' not in xpc_loop_match.group(1):
-            errors.append("release XPC signing does not use the XPC entitlement allowlist")
+        if "Contents/XPCServices" in release:
+            errors.append("release signing still names an XPC service; the engine runs in-process")
         if f'--entitlements "$PROJECT_DIR/{app_source}"' not in release:
             errors.append("release app signing does not use the app entitlement allowlist")
 
         verifier = (root / "scripts/verify_release_bundle.sh").read_text(encoding="utf-8")
-        for role in ("macos-app", "macos-engine-xpc", "macos-framework"):
+        for role in ("macos-app", "macos-framework"):
             if f"verify-bundle --role {role}" not in verifier:
                 errors.append(f"packaged release verifier does not enforce {role} entitlements")
 

@@ -1334,14 +1334,6 @@ def _symbol_identity_violations(policy: LoadedPolicy) -> list[str]:
             macos_products / "Vocello.app.dSYM",
         ),
         (
-            "macOS QwenVoiceEngineService",
-            macos_products
-            / "Vocello.app/Contents/XPCServices/"
-            "QwenVoiceEngineService.xpc/Contents/MacOS/QwenVoiceEngineService",
-            macos_symbols / "QwenVoiceEngineService.xpc.dSYM",
-            macos_products / "QwenVoiceEngineService.xpc.dSYM",
-        ),
-        (
             "iOS Vocello",
             ios_products / "Vocello.app/Vocello",
             ios_symbols / "Vocello.app.dSYM",

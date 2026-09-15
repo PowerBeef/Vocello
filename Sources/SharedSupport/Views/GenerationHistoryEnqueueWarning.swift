@@ -27,7 +27,7 @@ struct GenerationHistoryEnqueueWarning: View {
                         Task {
                             let result = await GenerationHistoryRecovery.reconcile()
                             NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
-                            #if canImport(QwenVoiceNative)
+                            #if os(macOS)
                             for generation in result.committed {
                                 GenerationLibraryEvents.shared.announceGenerationAppended(generation)
                             }

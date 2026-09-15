@@ -47,14 +47,12 @@ schemes:
     build:
       targets:
         QwenVoice: all
-        VocelloEngineIntegrationTests: [test]
     run:
       config: Release
     test:
       config: Release
       targets:
         - VocelloCoreTests
-        - VocelloEngineIntegrationTests
     profile:
       config: Release
     analyze:
@@ -151,16 +149,10 @@ targets:
           - "QwenVoiceCore/**"
           - "QwenVoiceBackendCore"
           - "QwenVoiceBackendCore/**"
-          - "QwenVoiceEngineService"
-          - "QwenVoiceEngineService/**"
-          - "QwenVoiceEngineSupport"
-          - "QwenVoiceEngineSupport/**"
           - "iOS"
           - "iOS/**"
           - "iOSSupport"
           - "iOSSupport/**"
-          - "QwenVoiceNative"
-          - "QwenVoiceNative/**"
           - "VocelloCLI"
           - "VocelloCLI/**"
           - "Resources/ffmpeg"
@@ -218,9 +210,6 @@ targets:
     dependencies:
       - package: GRDB
       - target: QwenVoiceCore
-      - target: QwenVoiceEngineService
-      - target: QwenVoiceEngineSupport
-      - target: QwenVoiceNative
       - package: MLXAudio
         product: VocelloQwen3Core
       - package: MLXSwift
@@ -231,7 +220,7 @@ targets:
   # Headless Swift CLI over the in-process engine (QwenVoiceCore). User-facing
   # generation without the UI + the deterministic driver for benchmarks/perf
   # tests. No Python backend, no bundled
-  # weights — links the same engine frameworks as the app/XPC service.
+  # weights — links the same engine frameworks as the apps.
   VocelloCLI:
     type: tool
     platform: macOS
@@ -263,52 +252,6 @@ targets:
         # Ad-hoc signed, no hardened runtime: a plain CLI runs Metal/MLX fine
         # without the app's allow-unsigned-memory entitlement.
         CODE_SIGN_IDENTITY: "-"
-    dependencies:
-      - target: QwenVoiceCore
-      - target: QwenVoiceEngineSupport
-      - package: MLXAudio
-        product: VocelloQwen3Core
-      - package: MLXSwift
-        product: MLX
-      - package: SwiftHuggingFace
-        product: HuggingFace
-
-  QwenVoiceNative:
-    type: framework.static
-    platform: macOS
-    sources:
-      - path: Sources/QwenVoiceNative
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.qwenvoice.native
-        PRODUCT_NAME: QwenVoiceNative
-        PRODUCT_MODULE_NAME: QwenVoiceNative
-        SWIFT_VERSION: "6"
-        MACOSX_DEPLOYMENT_TARGET: "26.0"
-        GENERATE_INFOPLIST_FILE: YES
-    dependencies:
-      - target: QwenVoiceCore
-      - target: QwenVoiceEngineSupport
-      - package: MLXAudio
-        product: VocelloQwen3Core
-      - package: MLXSwift
-        product: MLX
-      - package: SwiftHuggingFace
-        product: HuggingFace
-
-  QwenVoiceEngineSupport:
-    type: framework.static
-    platform: macOS
-    sources:
-      - path: Sources/QwenVoiceEngineSupport
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.qwenvoice.engine-support
-        PRODUCT_NAME: QwenVoiceEngineSupport
-        PRODUCT_MODULE_NAME: QwenVoiceEngineSupport
-        SWIFT_VERSION: "6"
-        MACOSX_DEPLOYMENT_TARGET: "26.0"
-        GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: QwenVoiceCore
       - package: MLXAudio
@@ -360,38 +303,6 @@ targets:
         MACOSX_DEPLOYMENT_TARGET: "26.0"
         IPHONEOS_DEPLOYMENT_TARGET: "26.0"
         GENERATE_INFOPLIST_FILE: YES
-  QwenVoiceEngineService:
-    type: xpc-service
-    platform: macOS
-    sources:
-      - path: Sources/QwenVoiceEngineService
-      - path: Sources/Resources/qwenvoice_contract.json
-        buildPhase: resources
-      - path: Sources/Resources/qwenvoice_production_model_catalog.json
-        buildPhase: resources
-      - path: Sources/PrivacyInfo.xcprivacy
-        buildPhase: resources
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.qwenvoice.app.engine-service
-        PRODUCT_NAME: QwenVoiceEngineService
-        PRODUCT_MODULE_NAME: QwenVoiceEngineService
-        SWIFT_VERSION: "6"
-        MACOSX_DEPLOYMENT_TARGET: "26.0"
-        INFOPLIST_FILE: Sources/QwenVoiceEngineService/Info.plist
-        INFOPLIST_KEY_QwenVoiceTeamIdentifier: $(QWENVOICE_DEVELOPMENT_TEAM)
-        CODE_SIGN_ENTITLEMENTS: Sources/QwenVoiceEmbeddedRuntime.entitlements
-        GENERATE_INFOPLIST_FILE: NO
-    dependencies:
-      - target: QwenVoiceCore
-      - target: QwenVoiceEngineSupport
-      - package: MLXAudio
-        product: VocelloQwen3Core
-      - package: MLXSwift
-        product: MLX
-      - package: SwiftHuggingFace
-        product: HuggingFace
-
   VocelloiOS:
     type: application
     platform: iOS
@@ -537,7 +448,6 @@ targets:
       - path: Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift
     dependencies:
       - target: QwenVoiceCore
-      - target: QwenVoiceNative
       - package: GRDB
     settings:
       base:
@@ -601,29 +511,6 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: NO
 
-  # Deterministic macOS XPC transport tests. Frontend journeys live in the
-  # separate VocelloMacUITests target and never run as part of this bundle.
-  VocelloEngineIntegrationTests:
-    type: bundle.unit-test
-    platform: macOS
-    sources:
-      - path: Tests/VocelloEngineIntegrationTests
-    dependencies:
-      - target: QwenVoiceCore
-      - target: QwenVoiceEngineSupport
-      - target: QwenVoiceNative
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.qwenvoice.engine.integration-tests
-        PRODUCT_NAME: VocelloEngineIntegrationTests
-        PRODUCT_MODULE_NAME: VocelloEngineIntegrationTests
-        SWIFT_VERSION: "6"
-        MACOSX_DEPLOYMENT_TARGET: "26.0"
-        CODE_SIGN_IDENTITY: "-"
-        GENERATE_INFOPLIST_FILE: YES
-
-  # Explicit macOS UI automation. This target is deliberately isolated from the
-  # ordinary QwenVoice test action so commits and CI do not drive the UI.
   VocelloMacUITests:
     type: bundle.ui-testing
     platform: macOS

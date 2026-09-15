@@ -134,7 +134,7 @@ enum BenchCommand {
         let expectedTakeCount: Int
     }
 
-    /// Fixed corpus — shared with macOS XPC UI bench via `BenchMatrixSpec`.
+    /// Fixed corpus — shared with the macOS UI bench via `BenchMatrixSpec`.
     static var corpus: [(len: String, text: String)] { BenchMatrixSpec.corpus }
     static var defaultDesignBrief: String { BenchMatrixSpec.defaultDesignBrief }
     static var defaultCloneVoice: String { BenchMatrixSpec.defaultCloneVoice }
@@ -620,7 +620,7 @@ enum BenchCommand {
         // Optional engine first-chunk-latency probe. Runs after the main matrix but
         // before final evidence publication. The immutable results manifest selects
         // only the matrix generations, so these probe rows cannot perturb its summary.
-        // This is engine-side TTFC — not the app's through-XPC
+        // This is engine-side TTFC — not the app's end-to-end
         // submit-to-playback-scheduled latency.
         if ttfc {
             note("ttfc probe (warm streaming, after summary)…")
@@ -1510,7 +1510,7 @@ enum BenchCommand {
     private static func reportTTFC(_ rows: [TTFCRow], diagnostics: URL) {
         guard !rows.isEmpty else { return }
         FileHandle.standardError.write(Data(
-            "\nEngine first-chunk latency (TTFC, ms) — warm streaming probe (engine-side, not app/XPC playback-scheduled latency)\n".utf8))
+            "\nEngine first-chunk latency (TTFC, ms) — warm streaming probe (engine-side, not the app's playback-scheduled latency)\n".utf8))
         for r in rows {
             let ms = r.firstChunkMS.map { String(format: "%.0f", $0) } ?? "-"
             FileHandle.standardError.write(Data("  \(r.mode)/\(r.variant)\t\(ms)\n".utf8))
@@ -1576,8 +1576,8 @@ enum BenchCommand {
         outside a Vocello checkout; local WAVs and bench-results.json are retained.
 
         Measures engine truth — RTF / decode / memory / audioQC. It does NOT capture
-        the app's end-to-end through-XPC submit-to-first-chunk or
-        playback-scheduled latency, or the merged 3-layer row
+        the app's end-to-end submit-to-first-chunk or
+        playback-scheduled latency, or the merged app+engine row
         (use the app for those); --ttfc adds an engine-side first-chunk probe.
         Prerequisites: the requested models installed; saved clone voice
         '\(defaultCloneVoice)' when clone is in --modes.

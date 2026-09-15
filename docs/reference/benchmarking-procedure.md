@@ -2,7 +2,7 @@
 status: active
 owner: release-qa
 reviewed: 2026-09-12
-summary: Operator runbook for performance and quality benchmarks — when to bench, the macOS CLI/app-XPC and iOS device paths, expected artifacts, and how to read results.
+summary: Operator runbook for performance and quality benchmarks — when to bench, the macOS CLI/app and iOS device paths, expected artifacts, and how to read results.
 sourceOfTruth:
   - scripts/macos_test.sh
   - scripts/ios_device.sh
@@ -11,7 +11,7 @@ sourceOfTruth:
 # Benchmarking procedure — operator runbook
 
 Step-by-step guide for running Vocello performance and quality benchmarks on **macOS**
-(CLI and app/XPC) and **iOS** (physical-device UI and headless diagnostics). This document covers **when** to bench,
+(CLI and app) and **iOS** (physical-device UI and headless diagnostics). This document covers **when** to bench,
 **how** to drive each platform path, **what** artifacts to expect, and **how** to read results.
 
 For telemetry schema, record fields, and MLX timing semantics, see
@@ -30,7 +30,7 @@ Run a benchmark when you change anything that can affect **decode throughput**, 
 peaks**, **first-chunk latency**, or **audio quality**:
 
 - MLX / owned Qwen3-TTS core runtime or Mimi codec
-- Memory policy, streaming interval, idle-unload, XPC lifecycle
+- Memory policy, streaming interval, idle-unload, in-process relief
 - Model load path, prewarm, clone conditioning
 - Before explicitly promoting engine-adjacent work or cutting a macOS/iOS release
 
@@ -56,7 +56,7 @@ summarizer's `xRT` column.
 ### Design constraints
 
 1. **Primary backend driver is headless** — `vocello bench` drives the matrix in-process with exact
-   cold/warm control. **`scripts/ui_test.sh macos benchmark`** is the supplementary XPC integration net (§4.10).
+   cold/warm control. **`scripts/ui_test.sh macos benchmark`** is the supplementary UI integration net (§4.10).
 2. **Telemetry is runtime-gated** — identical code in Release; off unless `QWENVOICE_DEBUG=1`,
    `QWENVOICE_NATIVE_TELEMETRY_MODE`, or the app-to-engine handshake enables it.
 3. **No CI execution gate** — model-dependent benchmarks are local and explicitly requested. CI validates the compact registry and reproducible index but does not run models, devices, XCUITest, or Instruments.
@@ -77,12 +77,11 @@ summarizer's `xRT` column.
 Three hosts write telemetry; only some layers exist per path:
 
 ```text
-                    CLI (vocello bench)     macOS app + XPC        iOS app (in-process)
-                    ───────────────────     ───────────────        ────────────────────
+                    CLI (vocello bench)     macOS app (in-process) iOS app (in-process)
+                    ───────────────────     ─────────────────────  ────────────────────
 Engine row          yes                     yes                    yes
-Engine-service row  no                      yes (XPC transport)    no
 App row             no                      yes (UI timings)       yes (UI timings)
-Required join        engine                  app + service + engine app + engine
+Required join        engine                  app + engine           app + engine
 TTFC column         — (no app process)      yes (submit→chunk)     yes
 UI heartbeat        —                       yes                    yes
 ```
@@ -90,16 +89,16 @@ UI heartbeat        —                       yes                    yes
 | Path | Driver | Engine topology | Best for |
 |------|--------|-----------------|----------|
 | **CLI** | `./build/vocello bench` | In-process `MLXTTSEngine` | Deterministic RTF/decode/memory matrix; release QA step 3 |
-| **macOS UI** | App + `QwenVoiceEngineService` XPC | Out-of-process engine | Submit-to-first-chunk, playback scheduling, delayed-heartbeat, and XPC transport evidence; UI smoke tests |
-| **macOS XPC UI benchmark** | `scripts/ui_test.sh macos benchmark` | Out-of-process engine | Full UI matrix through real app + XPC; merged 3-layer telemetry |
+| **macOS UI** | App (in-process engine) | In-process engine | Submit-to-first-chunk, playback scheduling and delayed-heartbeat evidence; UI smoke tests |
+| **macOS UI benchmark** | `scripts/ui_test.sh macos benchmark` | In-process engine | Full UI matrix through the real app; merged app + engine telemetry |
 | **macOS profile** | `scripts/macos_test.sh profile --kind cpu|memory` | In-process via CLI inside exact-PID trace | CPU/signpost or allocation/VM validation |
 | **iOS device** | `scripts/ios_device.sh bench` | In-process | iPhone tier, Jetsam, on-device RTF (headless diagnostics, single take) |
 | **iOS UI benchmark** | `scripts/ui_test.sh ios benchmark` | In-process | Full UI matrix through XCUITest on the paired physical iPhone; telemetry gated per take |
 | **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Nine scripted SwiftUI scenarios with the in-app frame probe; warn-only ceilings; canonical-hardware runs publish `ui-perf` registry records; lane contract in [`macos-testing.md`](macos-testing.md) (history: [`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md)) |
 | **iOS UI frame health** | `scripts/ui_test.sh ios perf` | No engine claims (UI-only) | Nine scripted scenarios on the paired physical iPhone with the pinned-60 Hz in-app probe; `check_ios_ui_perf.py` structural + canonical-hardware gate with warn-only ceilings from [`config/ui-perf-thresholds-ios.json`](../../config/ui-perf-thresholds-ios.json); canonical-iPhone runs publish platform-`ios` `ui-perf` registry records; lane contract in [`ios-device-testing.md`](ios-device-testing.md) (history: IUI-6, [`ios-ui-refresh-2026-08.md`](ios-ui-refresh-2026-08.md)) |
 
-**Important:** CLI bench numbers are **not** identical to macOS XPC UI numbers. Compare like with
-like (CLI vs CLI, UI vs UI). Use CLI for backend optimization; use UI/XPC for integration regressions.
+**Important:** CLI bench numbers are **not** identical to macOS UI numbers. Compare like with
+like (CLI vs CLI, UI vs UI). Use CLI for backend optimization; use the UI lane for integration regressions.
 
 ### Canonical hardware profiles
 
@@ -433,8 +432,8 @@ early. The separate `scripts/macos_test.sh memory` lane owns repeated retained g
 
 Produces `build/artifacts/macos/profiles/<run-id>/<run-id>.trace` containing CPU Profiler samples and
 `os_signpost` rows in one capture; the memory kind adds Allocations and VM Tracker. **In-process
-only** — not the production XPC
-path. The lane is PASS-only: a tracer failure, benchmark failure, invalid trace, or failed publication
+only** — the CLI process rather than
+the app. The lane is PASS-only: a tracer failure, benchmark failure, invalid trace, or failed publication
 returns nonzero without creating history. It retains only the newest raw failure per platform and
 profile kind; older failures are compacted to small diagnostic summaries.
 Explicitly pinned failures are never compacted. An unpinned compacted failure retains the required
@@ -448,8 +447,8 @@ scripts/clean_build_caches.sh --compact-profile-failure <run-id>
 ```
 
 The profiler launches or attaches to the exact target PID, requires a successful tracer exit, and
-validates the trace through `xctrace export --toc`; there is no blind startup sleep. For XPC, attach
-to the exact `QwenVoiceEngineService` PID while generating via UI. Traces remain untracked. On
+validates the trace through `xctrace export --toc`; there is no blind startup sleep. For the app path,
+attach to the exact `Vocello` PID while generating via UI. Traces remain untracked. On
 success the registry retains the digest, settings, extracted summary, original ephemeral path, and
 retention policy, then the runner removes the raw trace. Pass `--keep-trace` to retain it
 explicitly. The same complete retention validation applies to schema-v2 records and quality-bearing
@@ -471,23 +470,23 @@ It runs Custom and Design as one cold plus three `retained#0...2` takes and Clon
 engine warm-state attribution. The same `retained-memory-v1` within-mode 5%-of-RAM policy applies;
 an accepted run publishes `memory-qualification` and carries no trace.
 
-### 4.9 UI-driven generation (macOS XPC)
+### 4.9 UI-driven generation (macOS app)
 
 Real generation through the macOS frontend is driven only by XCUITest. Deterministic completion
-comes from matching History/WAV state and typed XPC/backend probes:
+comes from matching History/WAV state and typed backend probes:
 
 ```sh
 scripts/macos_test.sh models ensure
 scripts/ui_test.sh macos smoke
 ```
 
-This validates semantic frontend behavior plus the matching History/WAV/XPC/backend state. It is
+This validates semantic frontend behavior plus the matching History/WAV/backend state. It is
 not the primary RTF matrix driver.
 
-### 4.10 macOS XPC UI benchmark (supplementary integration net)
+### 4.10 macOS UI benchmark (supplementary integration net)
 
 **Primary backend regression remains `vocello bench` (§4.1).** The supplementary UI matrix is
-driven by XCUITest through the real app + XPC service. Shared fixtures own the take definitions;
+driven by XCUITest through the real app (in-process engine). Shared fixtures own the take definitions;
 deterministic tooling owns timestamps, typed telemetry validation, and aggregation.
 
 Telemetry rows stamp `notes.benchRunID`, `benchTakeIndex`, `benchCell`, and `benchWarmState` when
@@ -498,7 +497,7 @@ run-ID-only validator call is useful for diagnosis, but it is not a publishable 
 
 ```sh
 # Diagnostic only: inspect the default matrix rows already present for one run ID.
-python3 scripts/check_macos_xpc_bench.py ~/Library/Application\ Support/QwenVoice-Debug/diagnostics \
+python3 scripts/check_macos_ui_bench.py ~/Library/Application\ Support/QwenVoice-Debug/diagnostics \
   --run-id macos-xcui-benchmark-YYYYMMDD-HHMMSS
 ```
 
@@ -583,7 +582,7 @@ Cold takes: app relaunch + `QWENVOICE_DEBUG=1` + `QWENVOICE_SUPPRESS_WARMUP=1` +
 ### Fixed corpus
 
 Defined in `BenchMatrixSpec` (`Sources/QwenVoiceCore/BenchMatrixSpec.swift`; shared with
-`BenchCommand` and XPC UI bench) — do not change without updating baselines:
+`BenchCommand` and the UI bench) — do not change without updating baselines:
 
 | Bucket | Chars (approx) | Text role |
 |--------|----------------|-----------|
@@ -670,7 +669,7 @@ New publishable generation benchmarks require telemetry schema v8 and benchmark-
 v2. For every selected generation, the exact `engine/samples-*.jsonl` sidecar for that `generationID` must
 begin with one `start`, end with one `stop`, retain monotonic elapsed and absolute-uptime clocks,
 and contain the required preparation/model-load/session/first-output/final-WAV/terminal boundaries.
-iOS additionally requires finite headroom samples. macOS UI/XPC runs require a matching app sidecar;
+iOS additionally requires finite headroom samples. macOS UI runs require a matching app sidecar;
 their total resident/footprint/compressed/GPU values use samples paired by absolute uptime within one
 500 ms cadence. Headless macOS CLI/profile runs remain owning-engine-process evidence. Never add
 independent process maxima.
@@ -808,7 +807,7 @@ regression signal:
 |------|-------|----------|-----------------------------------|
 | `build.sh cli-optimized` CLI bench | hash-bound `-O` | in-process | Shipping-optimization backend result; compare only with the same optimization identity |
 | local release / `-O` CLI | optimized | in-process | legacy `decodeSpeedupX` ≈ 1.7 (records before 2026-09-12) |
-| macOS `ui_test.sh macos benchmark` | Release app | app + XPC service | legacy `decodeSpeedupX` ≈ 1.7 (records before 2026-09-12) |
+| macOS `ui_test.sh macos benchmark` | Release app | app (in-process engine; app + XPC service before 2026-09-15) | legacy `decodeSpeedupX` ≈ 1.7 (records before 2026-09-12) |
 | iOS `ios_device.sh bench` | `-Onone` device | in-process on iPhone | legacy `decodeSpeedupX` ≈ 1.6–1.9 (records before 2026-09-12) |
 | iOS `ui_test.sh ios benchmark` | `-O` Release app | in-process, real Studio UI | optimized frontend/device result; do not compare with the `-Onone` headless lane |
 
@@ -873,7 +872,6 @@ an automated gate and does not authorize overriding a deterministic failure or w
 | Path | Contents |
 |------|----------|
 | `~/Library/Application Support/QwenVoice-Debug/diagnostics/engine/generations.jsonl` | Richest backend rows |
-| `…/engine-service/generations.jsonl` | XPC transport (macOS app path) |
 | `…/app/generations.jsonl` | UI timings |
 | `…/generations-merged.jsonl` | Joined layers (macOS) |
 | `…/engine/samples-<UUID>.jsonl` | Verbose per-sample series |

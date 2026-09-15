@@ -1297,6 +1297,12 @@ trend percentages carry their direction in words.
 | 2026-07-23 | [`macos-xcui-benchmark-20260723-081659-e4a216aa`](runs/ui-generation/macos-xcui-benchmark-20260723-081659-e4a216aa.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | ~0.57 | `f7ee0d006e3a` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-081659-e4a216aa |
 | 2026-07-23 | [`macos-xcui-benchmark-20260723-083313-d02005ae`](runs/ui-generation/macos-xcui-benchmark-20260723-083313-d02005ae.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.57 | `b6f11211da85` | `3bd86418d3bc` | vs macos-xcui-benchmark-20260723-054315-9b6f267b: RTF +34.3% (faster), RAM -2.1% | macos-xcui-benchmark-20260723-083313-d02005ae |
 
+## ui-generation / macos / mac-mini-m2-8gb / config `3cf35519d4d3`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-15 | [`macos-xcui-benchmark-20260915-060047-cf740c28`](runs/ui-generation/macos-xcui-benchmark-20260915-060047-cf740c28.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 2 | 0.75 | `06f6484815b7` dirty | `excluded` | baseline | conv03-2layer |
+
 ## ui-generation / macos / mac-mini-m2-8gb / config `4a5bd9c374be`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

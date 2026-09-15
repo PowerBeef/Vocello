@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 import Observation
-import QwenVoiceNative
+import QwenVoiceCore
 import SwiftUI
 import UniformTypeIdentifiers
 

@@ -617,12 +617,13 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
             engine: nil
         )
         XCTAssertFalse(merged.complete)
-        XCTAssertEqual(merged.missingLayers, [.engineService, .engine])
+        // Both hosts run the engine in-process: app + engine is the complete set.
+        XCTAssertEqual(merged.missingLayers, [.engine])
         let roundTrip = try JSONDecoder().decode(
             MergedGenerationTelemetry.self,
             from: JSONEncoder().encode(merged)
         )
-        XCTAssertEqual(roundTrip.missingLayers, [.engineService, .engine])
+        XCTAssertEqual(roundTrip.missingLayers, [.engine])
     }
 
     func testEgregiousTerminalSilenceFailsBeforePublication() {

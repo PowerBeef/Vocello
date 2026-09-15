@@ -94,7 +94,7 @@
   },
   "phaseStatus": {
     "characterizationContract": "closed-clean-control-sessions-bound",
-    "xpcReserveBeforeSideEffects": "implemented",
+    "xpcReserveBeforeSideEffects": "retired-2026-09-15-engine-runs-in-process-on-macos",
     "synchronizedPressureSnapshot": "implemented",
     "continuousCriticalReliefAdmission": "implemented-current-product-gate",
     "immutablePlans": "implemented-independent-shadow-comparison-only",
@@ -150,7 +150,7 @@
     "Qwen3TalkerSamplingOverride"
   ],
   "invariants": [
-    "macos-xpc-and-ios-in-process-topology-remain-authoritative",
+    "in-process-engine-topology-on-macos-ios-and-cli-remains-authoritative",
     "one-active-product-generation",
     "fixed-mlx-dependency-pins-during-convergence",
     "no-mlx-array-crosses-public-runtime-isolation",
@@ -186,5 +186,15 @@
     ],
     "experimentReverts": "Three diagnostic engine-loop changes (generation task priority pin, per-token publishProgress coalescing, dedicated userInteractive actor executor) were reverted after two intermittent Fast-QC hard failures appeared with them in-tree; 12/12 takes passed QC after the revert. Any future re-introduction requires its own fixed-seed QC soak.",
     "phase7Result": "Implemented 2026-07-23: generationPerformanceGate environment value renders glass surfaces with the solid-fill fallback while a generation is active. One-cell custom/long warm RTF 1.833 (pre-gate 1.37; no-glass ceiling 1.842); full matrix custom 1.67-1.84, design 1.79-1.94, clone 1.43-1.86. Root cause chain: XCUITest screen recording (fixed via preferredScreenCaptureFormat) then Liquid Glass compositor work (gated); XPC topology measured ~3%."
+  },
+  "amendment20260915": {
+    "authority": "maintainer decision 2026-09-14, plan macos-ios-convergence-2026-09 (CONV-02, CONV-03)",
+    "diagnosis": "The macOS XPC engine service was the only host topology that differed from the iOS app and the CLI. It bought crash isolation and process retirement on 8 GB Macs at the price of a second store, a wire protocol, a transport test bundle and a three-layer telemetry join.",
+    "changes": [
+      "The macOS app hosts MLXTTSEngine in-process through NativeRuntimeFactory and the shared iOS TTSEngineStore; the reviewCheckpoint above stays a dated 2026-07-20 record (its xpcIntegrationTests count is history).",
+      "Sources/QwenVoiceNative, Sources/QwenVoiceEngineSupport, Sources/QwenVoiceEngineService and Tests/VocelloEngineIntegrationTests are removed; the TSan subset is VocelloCoreTests only.",
+      "Merged macOS telemetry requires the app and engine layers; 3-layer records stay decodable and never share a comparison key with 2-layer records.",
+      "Memory relief on 8 GB Macs is the engine's kernel-pressure responder, the store's MacMemoryBudgetPolicy bands and the resolver's idle unload (CONV-04 validates them with the memory lane)."
+    ]
   }
 }

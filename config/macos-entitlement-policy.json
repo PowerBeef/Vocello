@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "policy": "Every shipped macOS code target has an exact entitlement allowlist. Any added, removed, or changed entitlement fails deterministic and packaged-release verification until this policy and its security review are updated together.",
+  "policy": "Every shipped macOS code target has an exact entitlement allowlist. Any added, removed, or changed entitlement fails deterministic and packaged-release verification until this policy and its security review are updated together. Since 2026-09-15 the app hosts the engine in-process; the XPC service role was retired with it.",
   "targets": [
     {
       "id": "macos-app",
@@ -12,15 +12,6 @@
         "com.apple.security.cs.disable-library-validation": true,
         "com.apple.security.device.audio-input": true,
         "com.apple.security.files.user-selected.read-write": true
-      }
-    },
-    {
-      "id": "macos-engine-xpc",
-      "projectTarget": "QwenVoiceEngineService",
-      "source": "Sources/QwenVoiceEmbeddedRuntime.entitlements",
-      "allowed": {
-        "com.apple.security.cs.allow-unsigned-executable-memory": true,
-        "com.apple.security.cs.disable-library-validation": true
       }
     },
     {
@@ -50,7 +41,7 @@
       "com.apple.security.cs.allow-unsigned-executable-memory",
       "com.apple.security.cs.disable-library-validation"
     ],
-    "conclusion": "Retain for the current MLX Metal runtime; the app loads no user-selected executable code and the XPC target receives no unrelated app capability.",
+    "conclusion": "Retain for the current MLX Metal runtime; the app loads no user-selected executable code and, since the in-process engine (2026-09-15), it is the only Mach-O that needs the two exceptions.",
     "removalCondition": "Re-test and remove either exception when an MLX upgrade or Apple runtime change can load and execute the pinned Metal/runtime graph without it."
   }
 }

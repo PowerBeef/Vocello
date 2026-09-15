@@ -78,7 +78,8 @@ XCUITest lanes only when explicitly requested.
   store's `MacMemoryBudgetPolicy` gates admission on footprint and Metal working set; idle unload follows
   `NativeMemoryPolicyResolver`; `MacWarmupAdmissionPolicy` defers proactive warms. No hard
   `Memory.memoryLimit` on macOS.
-- **Liquid Glass is gated.** Every glass surface renders through `GatedGlass` (`AppTheme.swift`): the
+- **Liquid Glass is gated.** Every glass surface renders through `GatedGlass` (`Views/Theme/MacGlass.swift`;
+  `macGatedGlass` / `macSubtleGlassSurface` wrap the shared `VocelloGlassSurface` body): the
   `generationPerformanceGate` value, Reduce Transparency and the solid fallback live in one place.
 - **Accessibility.** Reduce Motion and Reduce Transparency route through `appAnimation` /
   `AppLaunchConfiguration.performAnimated`; no color-only signal; `accessibilityIdentifier`s such as

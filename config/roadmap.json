@@ -121,7 +121,8 @@
         "Sources/Views/Sidebar/SidebarView.swift",
         "Sources/QwenVoiceApp.swift"
       ],
-      "updated": "2026-09-15"
+      "updated": "2026-09-15",
+      "notes": "Shell landed 2026-09-15: SidebarView rewritten in the iOS visual language over the shared tokens (MacTheme, MacGlass with GatedGlass + macGatedGlass/macSubtleGlassSurface over VocelloGlassSurface, MacMotion), MacInlinePlayerCard and MacStatusStrip in the footer, MacWindowToolbar and MacStartupDiagnosticsView out of ContentView, MacAppModel for selection and toolbar state, SidebarItem in Sources/Models, dark-only on both scenes; SidebarPlayerView, SidebarStatusView, StartupDiagnosticsView, SidebarStatus and SidebarStatusPresentation deleted; seven vocello.mac.shell/startup keys with French. Identifiers unchanged. Remaining gate: scripts/ui_test.sh macos localization, smoke and perf (idle-baseline, sidebar-navigation, window-resize) PASS run ids, consent-bound."
     },
     {
       "id": "CONV-12",

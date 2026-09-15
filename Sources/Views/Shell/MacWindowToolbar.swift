@@ -1,0 +1,127 @@
+import AppKit
+import SwiftUI
+
+/// Window-toolbar controls of the current destination: History sort, clear
+/// and search, and the Saved Voices enroll button. Desktop-only chrome the
+/// iOS screens keep inline; the identifiers are the lane contract.
+struct MacWindowToolbar: ToolbarContent {
+    let selectedItem: SidebarItem?
+    @Binding var historySortOrder: HistorySortOrder
+    @Binding var historySearchText: String
+    @Binding var historyClearRequest: HistoryClearRequest?
+    @Binding var voicesEnrollRequestID: UUID?
+
+    var body: some ToolbarContent {
+        // One ToolbarItem (HStack): separate items pick up enough inter-item
+        // padding that the search field overflows at the minimum window width
+        // (regressing the smoke test's `history_searchField` assertion).
+        if selectedItem == .history {
+            ToolbarItem {
+                HStack(spacing: 10) {
+                    Menu {
+                        Picker(MacInterfaceText.historySortPicker, selection: $historySortOrder) {
+                            ForEach(HistorySortOrder.allCases) { order in
+                                Text(order.label).tag(order)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down.circle")
+                    }
+                    .accessibilityLabel(MacInterfaceText.historySortAccessibility)
+                    .accessibilityIdentifier("history_sortPicker")
+
+                    Menu {
+                        Button(MacInterfaceText.historyClearKeepFiles) {
+                            historyClearRequest = HistoryClearRequest(scope: .keepFiles)
+                        }
+                        .accessibilityIdentifier("history_clearKeepFiles")
+                        Button(MacInterfaceText.historyClearDeleteFiles, role: .destructive) {
+                            historyClearRequest = HistoryClearRequest(scope: .deleteFiles)
+                        }
+                        .accessibilityIdentifier("history_clearDeleteFiles")
+                    } label: {
+                        Image(systemName: "trash.circle")
+                    }
+                    .accessibilityLabel(MacInterfaceText.historyClearAccessibility)
+                    .accessibilityIdentifier("history_clearMenu")
+
+                    MacToolbarSearchField(
+                        text: $historySearchText,
+                        placeholder: MacInterfaceText.sidebarSearchHistory,
+                        accessibilityIdentifier: "history_searchField"
+                    )
+                    // Fixed width on purpose: flexible or generous frames push
+                    // the trailing toolbar group into the overflow chevron at
+                    // compact window widths (smoke-verified 2026-08-06). 170
+                    // is just enough to unclip the placeholder.
+                    .frame(width: 170)
+                }
+            }
+        }
+
+        if selectedItem == .voices {
+            ToolbarItem {
+                Button(MacInterfaceText.voicesAddVoiceSampleAction) {
+                    voicesEnrollRequestID = UUID()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(MacTheme.accent)
+                .accessibilityIdentifier("voices_enrollButton")
+            }
+        }
+    }
+}
+
+private struct MacToolbarSearchField: NSViewRepresentable {
+    @Binding var text: String
+    let placeholder: String
+    let accessibilityIdentifier: String
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+
+    func makeNSView(context: Context) -> NSSearchField {
+        let field = NSSearchField(frame: .zero)
+        field.target = context.coordinator
+        field.action = #selector(Coordinator.didActivateSearch(_:))
+        field.delegate = context.coordinator
+        field.sendsSearchStringImmediately = true
+        field.sendsWholeSearchString = false
+        configure(field)
+        return field
+    }
+
+    func updateNSView(_ nsView: NSSearchField, context: Context) {
+        context.coordinator.text = $text
+        if nsView.stringValue != text {
+            nsView.stringValue = text
+        }
+        configure(nsView)
+    }
+
+    private func configure(_ field: NSSearchField) {
+        field.placeholderString = placeholder
+        field.identifier = NSUserInterfaceItemIdentifier(accessibilityIdentifier)
+        field.setAccessibilityIdentifier(accessibilityIdentifier)
+        field.setAccessibilityLabel(placeholder)
+    }
+
+    @MainActor final class Coordinator: NSObject, NSSearchFieldDelegate {
+        var text: Binding<String>
+
+        init(text: Binding<String>) {
+            self.text = text
+        }
+
+        @objc
+        func didActivateSearch(_ sender: NSSearchField) {
+            text.wrappedValue = sender.stringValue
+        }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSSearchField else { return }
+            text.wrappedValue = field.stringValue
+        }
+    }
+}

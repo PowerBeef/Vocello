@@ -39,9 +39,14 @@ published (macos-xcui-benchmark-20260915-060047-cf740c28). CONV-04 (memory-lane 
 in-process relief) waits for a consented `scripts/macos_test.sh memory` run. The screens started
 with CONV-10 (b7b62075): `Sources/SharedSupport` now holds the theme tokens, the glass surface body,
 the word-timing planner and the script-limit policy, the iOS files forward to them unchanged in
-behavior, and the macOS long-form router reads the shared limit. CONV-11, the new shell (sidebar,
-inline player card, status strip, window toolbar in the iOS visual language, dark-only, hosting the
-legacy screens), is in flight.
+behavior, and the macOS long-form router reads the shared limit. CONV-11 put the new shell in
+place: `SidebarView` rewritten in the iOS visual language (lockup, Studio and Library sections,
+tinted glyph tiles, tint-glass selection pill, install hint on dimmed modes), `MacInlinePlayerCard`
+and `MacStatusStrip` in the footer, `MacWindowToolbar` and `MacStartupDiagnosticsView` out of
+`ContentView`, `MacAppModel` for the shell state, `MacTheme` / `MacGlass` / `MacMotion` over the
+shared tokens, dark-only on both scenes; every `sidebar_*` and `sidebarPlayer_*` identifier
+unchanged and the legacy screens still hosted underneath. The localization, smoke and perf lanes
+that close CONV-11 run on the maintainer's consent.
 
 ### Harness stabilization first (September 13, night)
 

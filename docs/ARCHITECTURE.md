@@ -675,8 +675,12 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
 ### macOS app (`Sources/`, module `QwenVoice`)
 
 - Entry: `QwenVoiceApp.swift` → `ContentView.swift`. Layout is a
-  `NavigationSplitView` with a `SidebarItem` enum: `customVoice`, `voiceDesign`,
-  `voiceCloning`, `history`, `voices`, `settings`.
+  `NavigationSplitView` with a `SidebarItem` enum (`Sources/Models/SidebarItem.swift`):
+  `customVoice`, `voiceDesign`, `voiceCloning`, `history`, `voices`, `settings`. Shell state
+  (selection, toolbar state, pending Settings highlight) lives in `MacAppModel`; the sidebar,
+  inline player card, status strip, window toolbar and startup diagnostics live under
+  `Sources/Views/{Sidebar,Shell}` and read the shared `VocelloTheme` tokens through `MacTheme`
+  (`Sources/Views/Theme`). Dark-only, like iOS.
 - State: coordinators and `ModelManagerViewModel` are `@MainActor @Observable`;
   the shared `TTSEngineStore` and `AudioPlayerViewModel` are `ObservableObject`s
   injected as environment objects, with the store's `snapshotChanges` and

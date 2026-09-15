@@ -1,0 +1,21 @@
+import CoreGraphics
+
+/// Window and shell geometry in one place: the desktop counterpart of the
+/// iOS safe-area and dock constants.
+enum MacShellMetrics {
+    static let windowMinSize = CGSize(width: 720, height: 560)
+    static let windowDefaultSize = CGSize(width: 880, height: 640)
+    static let diagnosticsMinSize = CGSize(width: 520, height: 420)
+
+    static let sidebarMinWidth: CGFloat = 220
+    static let sidebarIdealWidth: CGFloat = 250
+    static let sidebarMaxWidth: CGFloat = 300
+    /// Below this window width the composer chip rows wrap (B6 onwards).
+    static let compactBreakpoint: CGFloat = 860
+
+    static let sidebarInset: CGFloat = 12
+    static let sidebarRowMinHeight: CGFloat = 40
+    static let sidebarRowRadius: CGFloat = 12
+    static let sidebarGlyphTile: CGFloat = 28
+    static let sidebarGlyphTileRadius: CGFloat = 8
+}

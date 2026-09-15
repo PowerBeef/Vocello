@@ -7,134 +7,16 @@ struct SavedVoiceCloneHandoffPlan: Equatable {
     let cloneModelID: String?
 }
 
-enum SidebarItem: String, CaseIterable, Identifiable {
-    // rawValue is the visible sidebar label only (never persisted); the
-    // accessibilityID derives from the case name and stays sidebar_customVoice.
-    case customVoice = "Built-in Voice"
-    case voiceDesign = "Voice Design"
-    case voiceCloning = "Voice Cloning"
-    case history = "History"
-    case voices = "Saved Voices"
-    /// Renamed from `.models` (May 2026 redesign): the Models tab
-    /// merged with the Cmd+, Preferences window into one unified
-    /// Settings surface that hosts model downloads, playback,
-    /// storage, and about. The enum case stays internal for code
-    /// clarity; the rawValue drives the sidebar label.
-    case settings = "Settings"
-
-    var id: String { rawValue }
-
-    /// Catalog-owned sidebar label; the rawValue stays the stored identity.
-    var title: String {
-        switch self {
-        case .customVoice: MacInterfaceText.menuBuiltInVoice
-        case .voiceDesign: MacInterfaceText.menuVoiceDesign
-        case .voiceCloning: MacInterfaceText.menuVoiceCloning
-        case .history: MacInterfaceText.menuHistory
-        case .voices: MacInterfaceText.menuSavedVoices
-        case .settings: MacInterfaceText.settingsTitle
-        }
-    }
-
-    var accessibilityID: String { "sidebar_\(String(describing: self))" }
-
-    var screenAccessibilityID: String {
-        switch self {
-        case .customVoice:
-            return "screen_customVoice"
-        case .voiceDesign:
-            return "screen_voiceDesign"
-        case .voiceCloning:
-            return "screen_voiceCloning"
-        case .history:
-            return "screen_history"
-        case .voices:
-            return "screen_voices"
-        case .settings:
-            return "screen_settings"
-        }
-    }
-
-    var generationMode: GenerationMode? {
-        switch self {
-        case .customVoice:
-            return .custom
-        case .voiceDesign:
-            return .design
-        case .voiceCloning:
-            return .clone
-        case .history, .voices, .settings:
-            return nil
-        }
-    }
-
-    var requiredModel: TTSModel? {
-        generationMode.flatMap(TTSModel.model(for:))
-    }
-
-    var iconName: String {
-        switch self {
-        // Generation modes use the canonical per-mode glyphs so the sidebar
-        // and Settings model rows stay matched.
-        case .customVoice: return AppTheme.modeGlyph(for: .custom)
-        case .voiceDesign: return AppTheme.modeGlyph(for: .design)
-        case .voiceCloning: return AppTheme.modeGlyph(for: .clone)
-        case .history: return "clock.arrow.circlepath"
-        case .voices: return "person.2.wave.2"
-        case .settings: return "gearshape"
-        }
-    }
-
-    enum Section: String, CaseIterable {
-        case generate = "Generate"
-        case library = "Library"
-        case settings = "Settings"
-
-        var accessibilityID: String {
-            "sidebarSection_\(String(describing: self))"
-        }
-
-        /// Catalog-owned section header; the rawValue stays the internal identity.
-        var title: String {
-            switch self {
-            case .generate: MacInterfaceText.sidebarSectionGenerate
-            case .library: MacInterfaceText.sidebarSectionLibrary
-            case .settings: MacInterfaceText.settingsTitle
-            }
-        }
-
-        var items: [SidebarItem] {
-            switch self {
-            case .generate:
-                return [.customVoice, .voiceDesign, .voiceCloning]
-            case .library:
-                return [.history, .voices]
-            case .settings:
-                return [.settings]
-            }
-        }
-    }
-
-    static var generationItems: [SidebarItem] {
-        [.customVoice, .voiceDesign, .voiceCloning]
-    }
-
-    @MainActor
-    func isAvailable(using modelManager: ModelManagerViewModel) -> Bool {
-        guard let generationMode else { return true }
-        return modelManager.hasInstalledVariant(for: generationMode)
-    }
-
-    @MainActor static func defaultInitialSelection() -> SidebarItem {
-        return .customVoice
-    }
-}
-
+/// The macOS window: the sidebar (`SidebarView`) beside the selected screen,
+/// the destination-specific window toolbar, and the shell state in
+/// `MacAppModel`. Screens are hosted one per sidebar item; the legacy screens
+/// remain until each is replaced by its iOS-derived successor (CONV-12 to
+/// CONV-17).
 @MainActor
 struct ContentView: View {
     @Environment(ModelManagerViewModel.self) private var modelManager
     /// Plain reference, deliberately NOT `@EnvironmentObject` (W1-D): the
-    /// root shell must not subscribe to the whole engine store — every use
+    /// root shell must not subscribe to the whole engine store; every use
     /// below is imperative, and the only body-relevant signal is the gate,
     /// which `gateModel` republishes flip-scoped. Descendant screens keep
     /// their own environment-object injection.
@@ -143,26 +25,7 @@ struct ContentView: View {
     @Environment(SavedVoicesViewModel.self) private var savedVoicesViewModel
     @EnvironmentObject private var appCommandRouter: AppCommandRouter
 
-    static let lastSidebarItemKey = "QwenVoice.LastSelectedSidebarItem"
-    static let lastVoiceCloningSavedVoiceIDKey = "QwenVoice.LastVoiceCloningSavedVoiceID"
-
-    @AppStorage(ContentView.lastSidebarItemKey, store: AppDefaults.store)
-    private var persistedSidebarItem: SidebarItem = .customVoice
-
-    @AppStorage(ContentView.lastVoiceCloningSavedVoiceIDKey, store: AppDefaults.store)
-    private var persistedVoiceCloningSavedVoiceID: String = ""
-
-    @State private var selectedItem: SidebarItem?
-    /// When the user clicks a disabled generation tab, the
-    /// sidebar redirects to Settings and asks the Models page to
-    /// flash that mode's row. Keyed by `GenerationMode` (not
-    /// model id) because the row is mode-keyed and the missing
-    /// variant might not be the currently active one.
-    @State private var pendingHighlightedMode: GenerationMode?
-    @State private var historySearchText = ""
-    @State private var historySortOrder: HistorySortOrder = .newest
-    @State private var historyClearRequest: HistoryClearRequest?
-    @State private var voicesEnrollRequestID: UUID?
+    @State private var appModel: MacAppModel
     @State private var customVoiceDraft = CustomVoiceDraft()
     @State private var voiceDesignDraft = VoiceDesignDraft()
     @State private var voiceCloningDraft = VoiceCloningDraft()
@@ -180,7 +43,7 @@ struct ContentView: View {
 
     private var sidebarSelectionBinding: Binding<SidebarItem?> {
         Binding(
-            get: { selectedItem },
+            get: { appModel.selectedItem },
             set: { newValue in
                 guard let newValue else { return }
                 selectSidebarItemIfEnabled(newValue)
@@ -193,19 +56,12 @@ struct ContentView: View {
         _gateModel = StateObject(
             wrappedValue: GenerationPerformanceGateModel(store: ttsEngineStore)
         )
-        // Read through AppDefaults because @AppStorage is not materialized in init yet.
-        let storedSidebar = AppDefaults.store
-            .string(forKey: ContentView.lastSidebarItemKey)
-            .flatMap(SidebarItem.init(rawValue:))
-        let initialSelection = storedSidebar ?? SidebarItem.defaultInitialSelection()
+        let appModel = MacAppModel()
         var initialDraft = VoiceCloningDraft()
-        let storedVoiceID = AppDefaults.store
-            .string(forKey: ContentView.lastVoiceCloningSavedVoiceIDKey)
-        if let storedVoiceID, !storedVoiceID.isEmpty {
+        if let storedVoiceID = appModel.restoredVoiceCloningSavedVoiceID {
             initialDraft.selectedSavedVoiceID = storedVoiceID
         }
-
-        _selectedItem = State(initialValue: initialSelection)
+        _appModel = State(initialValue: appModel)
         _voiceCloningDraft = State(initialValue: initialDraft)
     }
 
@@ -241,39 +97,44 @@ struct ContentView: View {
     }
 
     var body: some View {
+        @Bindable var appModel = appModel
         NavigationSplitView {
             SidebarView(
                 selection: sidebarSelectionBinding,
                 disabledItems: disabledSidebarItems
             )
-                .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 300)
+            .navigationSplitViewColumnWidth(
+                min: MacShellMetrics.sidebarMinWidth,
+                ideal: MacShellMetrics.sidebarIdealWidth,
+                max: MacShellMetrics.sidebarMaxWidth
+            )
         } detail: {
             detailContent
         }
         .toolbar {
-            MainWindowToolbar(
-                selectedItem: selectedItem,
-                historySortOrder: $historySortOrder,
-                historySearchText: $historySearchText,
-                historyClearRequest: $historyClearRequest,
-                voicesEnrollRequestID: $voicesEnrollRequestID
+            MacWindowToolbar(
+                selectedItem: appModel.selectedItem,
+                historySortOrder: $appModel.historySortOrder,
+                historySearchText: $appModel.historySearchText,
+                historyClearRequest: $appModel.historyClearRequest,
+                voicesEnrollRequestID: $appModel.voicesEnrollRequestID
             )
         }
         .navigationSplitViewStyle(.balanced)
+        .environment(appModel)
         // Generation performance gate (OPTIMIZATION.md §K): while the engine
         // generates, glass surfaces fall back to the solid-fill design so the
         // material's continuous compositor work stops competing with MLX for
         // the GPU (measured 1.37 with glass vs 1.84 solid on the 8 GB tier).
         // Read through the flip-scoped gate model (W1-D), never the store.
         .environment(\.generationPerformanceGate, gateModel.isActive)
-        .onAppear(perform: handleAppear)
         .task { await handleInitialLoad() }
-        .onChange(of: selectedItem) { _, newValue in handleSelectionChange(newValue) }
+        .onChange(of: appModel.selectedItem) { _, newValue in handleSelectionChange(newValue) }
         .onChange(of: customVoiceDraft) { _, _ in handleGenerationDraftChange() }
         .onChange(of: voiceDesignDraft) { _, _ in handleGenerationDraftChange() }
         .onChange(of: voiceCloningDraft) { _, _ in handleGenerationDraftChange() }
         .onChange(of: voiceCloningDraft.selectedSavedVoiceID) { _, newValue in
-            handleVoiceCloningSavedVoiceIDChange(newValue)
+            appModel.persistVoiceCloningSavedVoiceID(newValue)
         }
         .onChange(of: modelManager.statuses) { _, _ in handleStatusesChange() }
         .onChange(of: modelManager.activeVariantRevision) { _, _ in handleActiveVariantChange() }
@@ -291,7 +152,7 @@ struct ContentView: View {
     @ViewBuilder
     private var detailContent: some View {
         Group {
-            if let selectedItem {
+            if let selectedItem = appModel.selectedItem {
                 screenView(for: selectedItem)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
@@ -304,6 +165,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private func screenView(for item: SidebarItem) -> some View {
+        @Bindable var appModel = appModel
         switch item {
         case .customVoice:
             CustomVoiceScreenHost(draft: $customVoiceDraft)
@@ -317,9 +179,9 @@ struct ContentView: View {
         case .history:
             HistoryView(
                 ttsEngineStore: ttsEngineStore,
-                searchText: $historySearchText,
-                sortOrder: $historySortOrder,
-                clearRequest: $historyClearRequest,
+                searchText: $appModel.historySearchText,
+                sortOrder: $appModel.historySortOrder,
+                clearRequest: $appModel.historyClearRequest,
                 onPinSeed: { generation in
                     guard let seedValue = generation.samplingSeed else { return }
                     // Pin into the take's own mode and surface that mode so
@@ -341,7 +203,7 @@ struct ContentView: View {
             )
         case .voices:
             VoicesView(
-                enrollRequestID: voicesEnrollRequestID,
+                enrollRequestID: appModel.voicesEnrollRequestID,
                 canUseInVoiceCloning: canUseSavedVoicesInVoiceCloning,
                 onUseInVoiceCloning: { voice in
                     let cloneModel = modelManager.generationActiveVariant(for: .clone)
@@ -356,16 +218,13 @@ struct ContentView: View {
             )
         case .settings:
             SettingsView(
-                highlightedMode: $pendingHighlightedMode,
+                highlightedMode: $appModel.pendingHighlightedMode,
                 showsNavigationTitle: false
             )
         }
     }
 
     // MARK: - Inline closure methods
-
-    private func handleAppear() {
-    }
 
     private func startSavedVoiceCloningHandoff(_ plan: SavedVoiceCloneHandoffPlan) {
         pendingVoiceCloningHandoff = plan.handoff
@@ -409,27 +268,23 @@ struct ContentView: View {
         await modelManager.refresh()
         didCompleteInitialAvailabilityRefresh = true
         reconcileSelectionWithAvailability()
-        scheduleGenerationWarmupIfNeeded(for: selectedItem, allowClonePrime: false)
+        scheduleGenerationWarmupIfNeeded(for: appModel.selectedItem, allowClonePrime: false)
     }
 
     private func handleSelectionChange(_ newValue: SidebarItem?) {
-        // Persist the selection so the next cold launch restores the last sidebar item.
-        if let newValue {
-            persistedSidebarItem = newValue
-        }
         scheduleGenerationWarmupIfNeeded(for: newValue)
     }
 
     private func handleStatusesChange() {
         guard didCompleteInitialAvailabilityRefresh else { return }
         reconcileSelectionWithAvailability()
-        scheduleGenerationWarmupIfNeeded(for: selectedItem)
+        scheduleGenerationWarmupIfNeeded(for: appModel.selectedItem)
     }
 
     private func handleActiveVariantChange() {
         guard didCompleteInitialAvailabilityRefresh else { return }
         reconcileSelectionWithAvailability()
-        scheduleGenerationWarmupIfNeeded(for: selectedItem)
+        scheduleGenerationWarmupIfNeeded(for: appModel.selectedItem)
     }
 
     private func handleEngineSnapshotChange(_ newSnapshot: TTSEngineSnapshot) {
@@ -438,15 +293,7 @@ struct ContentView: View {
 
     private func handleGenerationDraftChange() {
         guard didCompleteInitialAvailabilityRefresh else { return }
-        scheduleGenerationWarmupIfNeeded(for: selectedItem)
-    }
-
-    private func handleVoiceCloningSavedVoiceIDChange(_ newValue: String?) {
-        // Persist the last picked Voice Cloning saved voice so the dropdown
-        // restores it on next launch. The existing `syncSavedVoiceSelectionState`
-        // hydration path will reload `wavPath` + transcript from disk, or clear
-        // the draft if the voice was deleted between launches.
-        persistedVoiceCloningSavedVoiceID = newValue ?? ""
+        scheduleGenerationWarmupIfNeeded(for: appModel.selectedItem)
     }
 
     // MARK: - Helper methods
@@ -454,22 +301,22 @@ struct ContentView: View {
     private func selectSidebarItemIfEnabled(_ item: SidebarItem, bypassDisabledCheck: Bool = false) {
         guard bypassDisabledCheck || !disabledSidebarItems.contains(item) else { return }
         AppPerformanceSignposts.emit("Sidebar Selection")
-        if selectedItem == item {
+        if appModel.selectedItem == item {
             return
         }
-        selectedItem = item
+        appModel.selectedItem = item
     }
 
     private func reconcileSelectionWithAvailability() {
-        guard let selectedItem, disabledSidebarItems.contains(selectedItem) else {
+        guard let selectedItem = appModel.selectedItem, disabledSidebarItems.contains(selectedItem) else {
             return
         }
 
         if let mode = selectedItem.generationMode {
-            pendingHighlightedMode = mode
+            appModel.pendingHighlightedMode = mode
         }
 
-        self.selectedItem = .settings
+        appModel.selectedItem = .settings
     }
 
     private func scheduleGenerationWarmupIfNeeded(
@@ -605,134 +452,5 @@ private struct VoiceCloningScreenHost: View {
             modelManager: modelManager,
             savedVoicesViewModel: savedVoicesViewModel
         )
-    }
-}
-
-// MARK: - MainWindowToolbar
-
-private struct MainWindowToolbar: ToolbarContent {
-    let selectedItem: SidebarItem?
-    @Binding var historySortOrder: HistorySortOrder
-    @Binding var historySearchText: String
-    @Binding var historyClearRequest: HistoryClearRequest?
-    @Binding var voicesEnrollRequestID: UUID?
-
-    var body: some ToolbarContent {
-        // One ToolbarItem (HStack) — separate items pick up enough inter-item
-        // padding that the search field overflows at the default 720pt window
-        // (regressing the smoke test's `history_searchField` assertion). The
-        // combined group fits like the pre-clear-menu layout did, with the
-        // search slimmed to make room for the trash menu.
-        if selectedItem == .history {
-            ToolbarItem {
-                HStack(spacing: 10) {
-                    Menu {
-                        Picker(MacInterfaceText.historySortPicker, selection: $historySortOrder) {
-                            ForEach(HistorySortOrder.allCases) { order in
-                                Text(order.label).tag(order)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "arrow.up.arrow.down.circle")
-                    }
-                    .accessibilityLabel(MacInterfaceText.historySortAccessibility)
-                    .accessibilityIdentifier("history_sortPicker")
-
-                    Menu {
-                        Button(MacInterfaceText.historyClearKeepFiles) {
-                            historyClearRequest = HistoryClearRequest(scope: .keepFiles)
-                        }
-                        .accessibilityIdentifier("history_clearKeepFiles")
-                        Button(MacInterfaceText.historyClearDeleteFiles, role: .destructive) {
-                            historyClearRequest = HistoryClearRequest(scope: .deleteFiles)
-                        }
-                        .accessibilityIdentifier("history_clearDeleteFiles")
-                    } label: {
-                        Image(systemName: "trash.circle")
-                    }
-                    .accessibilityLabel(MacInterfaceText.historyClearAccessibility)
-                    .accessibilityIdentifier("history_clearMenu")
-
-                    ToolbarSearchField(
-                        text: $historySearchText,
-                        placeholder: MacInterfaceText.sidebarSearchHistory,
-                        accessibilityIdentifier: "history_searchField"
-                    )
-                    // Fixed width on purpose: flexible or generous frames
-                    // push the trailing toolbar group into the overflow
-                    // chevron at compact window widths (smoke-verified
-                    // 2026-08-06, twice). 170 is just enough to unclip the
-                    // "Search history" placeholder the old 150 cut off.
-                    .frame(width: 170)
-                }
-            }
-        }
-
-        if selectedItem == .voices {
-            ToolbarItem {
-                Button(MacInterfaceText.voicesAddVoiceSampleAction) {
-                    voicesEnrollRequestID = UUID()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(AppTheme.accent)
-                .accessibilityIdentifier("voices_enrollButton")
-            }
-        }
-    }
-}
-
-// MARK: - ToolbarSearchField
-
-private struct ToolbarSearchField: NSViewRepresentable {
-    @Binding var text: String
-    let placeholder: String
-    let accessibilityIdentifier: String
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text)
-    }
-
-    func makeNSView(context: Context) -> NSSearchField {
-        let field = NSSearchField(frame: .zero)
-        field.target = context.coordinator
-        field.action = #selector(Coordinator.didActivateSearch(_:))
-        field.delegate = context.coordinator
-        field.sendsSearchStringImmediately = true
-        field.sendsWholeSearchString = false
-        configure(field)
-        return field
-    }
-
-    func updateNSView(_ nsView: NSSearchField, context: Context) {
-        context.coordinator.text = $text
-        if nsView.stringValue != text {
-            nsView.stringValue = text
-        }
-        configure(nsView)
-    }
-
-    private func configure(_ field: NSSearchField) {
-        field.placeholderString = placeholder
-        field.identifier = NSUserInterfaceItemIdentifier(accessibilityIdentifier)
-        field.setAccessibilityIdentifier(accessibilityIdentifier)
-        field.setAccessibilityLabel(placeholder)
-    }
-
-    @MainActor final class Coordinator: NSObject, NSSearchFieldDelegate {
-        var text: Binding<String>
-
-        init(text: Binding<String>) {
-            self.text = text
-        }
-
-        @objc
-        func didActivateSearch(_ sender: NSSearchField) {
-            text.wrappedValue = sender.stringValue
-        }
-
-        func controlTextDidChange(_ notification: Notification) {
-            guard let field = notification.object as? NSSearchField else { return }
-            text.wrappedValue = field.stringValue
-        }
     }
 }

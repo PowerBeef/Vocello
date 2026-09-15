@@ -2,23 +2,6 @@ import AppKit
 import QwenVoiceCore
 import SwiftUI
 
-/// Generation performance gate (benchmarks/OPTIMIZATION.md §K): Liquid Glass's
-/// continuous compositor work costs ~23% engine RTF on the 8 GB tier while a
-/// window showing glass is visible (measured 1.37 with glass vs 1.84 with the
-/// solid-fill fallback during generation). While a generation is active the
-/// glass surfaces fall back to the same solid-fill design Reduce Transparency
-/// uses; glass returns when the engine goes idle.
-private struct GenerationPerformanceGateKey: EnvironmentKey {
-    static let defaultValue = false
-}
-
-extension EnvironmentValues {
-    var generationPerformanceGate: Bool {
-        get { self[GenerationPerformanceGateKey.self] }
-        set { self[GenerationPerformanceGateKey.self] = newValue }
-    }
-}
-
 enum AppTheme {
     enum UIProfile: String {
         case liquid
@@ -29,7 +12,7 @@ enum AppTheme {
     // but there is deliberately NO behavioral fork today (2026-07-02 review).
     static let uiProfile: UIProfile = .liquid
 
-    static let vocelloGold = Color(red: 0.93, green: 0.80, blue: 0.54)
+    static let vocelloGold = VocelloTheme.Brand.gold
     static let accent = vocelloGold
     static let inlinePreviewProgressTint = vocelloGold
     static let statusProgressTint = vocelloGold
@@ -37,12 +20,10 @@ enum AppTheme {
     // Solid sheet-well fill (recording/save sheets). Kept beside
     // smokedGlassTint so near-duplicate greys stay one decision.
     static let sheetWellFill = Color(white: 0.16)
-    // Vocello mode palette (mirrors Sources/iOS/Theme/Theme.swift `Theme.Brand`).
-    // The app is dark-only (appearance pinned in QwenVoiceApplicationDelegate),
-    // matching the iOS brand values exactly.
+    // Vocello mode palette: the shared `VocelloTheme.Brand` tokens (CONV-10).
     static let customVoice = vocelloGold                                 // warm golden — Vocello primary
-    static let voiceDesign = Color(red: 0.75, green: 0.67, blue: 0.86)   // lavender purple
-    static let voiceCloning = Color(red: 0.86, green: 0.66, blue: 0.53)  // warm terracotta
+    static let voiceDesign = VocelloTheme.Brand.modeDesign
+    static let voiceCloning = VocelloTheme.Brand.modeClone
     // Library + Settings continue to resolve to the primary accent (golden) so
     // non-generation surfaces read as one coherent app chrome.
     static let history = accent
@@ -126,17 +107,6 @@ enum AppTheme {
         }
     }
 
-    static func sidebarColor(for item: SidebarItem) -> Color {
-        switch item {
-        case .customVoice: return customVoice
-        case .voiceDesign: return voiceDesign
-        case .voiceCloning: return voiceCloning
-        case .history: return history
-        case .voices: return voices
-        case .settings: return preferences
-        }
-    }
-
     static func modeColor(for mode: String) -> Color {
         switch mode {
         case GenerationMode.custom.rawValue: return customVoice
@@ -158,11 +128,7 @@ enum AppTheme {
     /// keep Settings rows, sidebar items, and any future mode chips on the
     /// same glyphs (`c196f11` analog from iOS).
     static func modeGlyph(for mode: GenerationMode) -> String {
-        switch mode {
-        case .custom: return "person.wave.2"
-        case .design: return "text.bubble"
-        case .clone: return "waveform.badge.plus"
-        }
+        MacTheme.modeGlyph(for: mode)
     }
 
     static func accentWash(_ color: Color) -> Color {
@@ -217,33 +183,6 @@ enum AppTheme {
         static let gentle = Animation.timingCurve(0.22, 1.0, 0.36, 1.0, duration: 0.32)
         /// Tap-press response.
         static let press = Animation.easeOut(duration: 0.09)
-    }
-}
-
-/// The one place the Liquid Glass render decision lives (W1-G): glass
-/// renders only on liquid builds with Reduce Transparency off and the §K
-/// generation performance gate inactive — otherwise the caller's solid-fill
-/// fallback. Hand-rolled copies of this condition drifted (the eight direct
-/// glass sites shipped without the Reduce Transparency check until
-/// 2026-08-05); routing every glass surface through this container makes
-/// the invariant structural instead of remembered.
-struct GatedGlass<Glass: View, Fallback: View>: View {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.generationPerformanceGate) private var performanceGate
-
-    @ViewBuilder let glass: () -> Glass
-    @ViewBuilder let fallback: () -> Fallback
-
-    var body: some View {
-        #if QW_UI_LIQUID
-        if !reduceTransparency, !performanceGate {
-            glass()
-        } else {
-            fallback()
-        }
-        #else
-        fallback()
-        #endif
     }
 }
 
@@ -309,42 +248,6 @@ private struct NativeSurfaceStyle: ViewModifier {
 extension View {
     func inlinePanel(padding: CGFloat = 14, radius: CGFloat = 16) -> some View {
         modifier(NativeSurfaceStyle(padding: padding, radius: radius, fill: AppTheme.inlineFill))
-    }
-
-    func appAnimation<Value: Equatable>(_ animation: Animation?, value: Value) -> some View {
-        self.animation(AppLaunchConfiguration.current.animation(animation), value: value)
-    }
-
-    /// Visible keyboard-focus indicator in the active mode's accent color
-    /// (2026-08 UI review, W1-C). The system blue ring stays suppressed —
-    /// it painted a stray selection halo on first appearance under Full
-    /// Keyboard Access — but suppression alone left twelve controls with
-    /// no focus indication at all (WCAG 2.4.7). This modifier keeps the
-    /// suppression and draws a 2 pt accent ring only while the control
-    /// actually has focus.
-    func vocelloFocusRing(_ color: Color, radius: CGFloat = 8) -> some View {
-        modifier(VocelloFocusRing(color: color, radius: radius))
-    }
-}
-
-private struct VocelloFocusRing: ViewModifier {
-    let color: Color
-    let radius: CGFloat
-    @FocusState private var isFocused: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .focused($isFocused)
-            .focusEffectDisabled()
-            .overlay {
-                if isFocused {
-                    RoundedRectangle(cornerRadius: radius + 2, style: .continuous)
-                        .strokeBorder(color.opacity(0.85), lineWidth: 2)
-                        .padding(-3)
-                        .allowsHitTesting(false)
-                }
-            }
-            .appAnimation(AppTheme.Motion.state, value: isFocused)
     }
 }
 

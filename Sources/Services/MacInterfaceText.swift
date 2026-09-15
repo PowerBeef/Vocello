@@ -1290,6 +1290,30 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.settings.voiceCloning", defaultValue: "Voice cloning",
                comment: "macOS interface: Settings section header. Presentation only.")
     }
+    static var shellEngineStopped: String {
+        localization.string(localized: "vocello.mac.shell.engineStopped", defaultValue: "Engine stopped",
+               comment: "macOS interface: status strip title when the engine stopped with an error. Presentation only.")
+    }
+    static var shellEngineUnavailable: String {
+        localization.string(localized: "vocello.mac.shell.engineUnavailable", defaultValue: "Engine unavailable",
+               comment: "macOS interface: status strip title when the engine reported it is unavailable. Presentation only.")
+    }
+    static var shellInProgress: String {
+        localization.string(localized: "vocello.mac.shell.inProgress", defaultValue: "In progress",
+               comment: "macOS interface: VoiceOver value of a live activity without a known fraction. Presentation only.")
+    }
+    static var shellModelMissingHint: String {
+        localization.string(localized: "vocello.mac.shell.modelMissingHint", defaultValue: "Install in Settings",
+               comment: "macOS interface: caption under a dimmed sidebar mode whose model is not installed yet. Presentation only.")
+    }
+    static var shellRestartToContinue: String {
+        localization.string(localized: "vocello.mac.shell.restartToContinue", defaultValue: "Restart the app to continue",
+               comment: "macOS interface: status strip message when the engine stopped without a detail. Presentation only.")
+    }
+    static var shellSectionStudio: String {
+        localization.string(localized: "vocello.mac.shell.sectionStudio", defaultValue: "Studio",
+               comment: "macOS interface: sidebar section header above the three generation modes. Presentation only.")
+    }
     static var sidebarSearchHistory: String {
         localization.string(localized: "vocello.mac.sidebar.searchHistory", defaultValue: "Search history",
                comment: "macOS interface: toolbar search field placeholder shown on the History screen. Presentation only.")
@@ -1325,6 +1349,10 @@ enum MacInterfaceText {
     static var startupManifestPath: String {
         localization.string(localized: "vocello.mac.startup.manifestPath", defaultValue: "Manifest path",
                comment: "macOS interface: startup diagnostics row title. Presentation only.")
+    }
+    static var startupNotFound: String {
+        localization.string(localized: "vocello.mac.startup.notFound", defaultValue: "Not found",
+               comment: "macOS interface: startup diagnostics value when a path could not be resolved. Presentation only.")
     }
     static var startupResourcesPath: String {
         localization.string(localized: "vocello.mac.startup.resourcesPath", defaultValue: "Resources path",

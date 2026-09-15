@@ -1,271 +1,14 @@
 import QwenVoiceCore
 import SwiftUI
 
-private struct NavigationSectionHeader: View {
-    let title: String
-    let accessibilityID: String
-
-    var body: some View {
-        Text(title)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .textCase(nil)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(title)
-            .accessibilityIdentifier(accessibilityID)
-    }
-}
-
-/// Compact Vocello brand lockup pinned to the top of the sidebar via
-/// `safeAreaInset(edge: .top)`. Stays out of the List's scroll region so
-/// the brand anchor remains visible as the user scrolls through sections.
-///
-/// Three-tier typography:
-///   • V glyph (22pt image)            — the colored brand anchor.
-///   • "AI·TTS" preamble (caption,
-///      medium, secondary)             — quiet category qualifier; SF Pro
-///                                        default for a slightly technical
-///                                        feel that contrasts the wordmark's
-///                                        rounded warmth.
-///   • "Vocello" wordmark (18pt SF
-///      Rounded semibold, primary)     — the spoken-aloud name.
-///
-/// Intentionally NOT a stylized display face: PRODUCT.md asks the brand
-/// to defer to the output, so the lockup sits in the same visual tier
-/// as the section headers instead of competing with them.
-private struct SidebarBrandHeader: View {
-    // Scale with the nav rows: under Larger Text the sidebar rows grew via
-    // ScaledMetric while the brand stayed fixed, shrinking the lockup
-    // relative to its own navigation.
-    @ScaledMetric(relativeTo: .title2) private var brandMarkHeight: CGFloat = 22
-    @ScaledMetric(relativeTo: .title2) private var brandWordmarkSize: CGFloat = 18
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image("VocelloHeaderMark")
-                .resizable()
-                .scaledToFit()
-                .frame(height: brandMarkHeight)
-                .alignmentGuide(.firstTextBaseline) { dimension in
-                    dimension[.bottom] - 2
-                }
-
-            Text(MacInterfaceText.brandName)
-                .font(.system(size: brandWordmarkSize, weight: .semibold, design: .rounded))
-                .foregroundStyle(.primary)
-
-            Text(MacInterfaceText.brandTagline)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
-        // Audit Batch 7b: symmetric top/bottom padding so the brand
-        // lockup sits centered in its slot. Previous (.top 14, .bottom 8)
-        // looked off-balance at small window heights.
-        .padding(.top, 14)
-        .padding(.bottom, 14)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(MacInterfaceText.brandAccessibility)
-    }
-}
-
-private struct SidebarRow: View {
-    let item: SidebarItem
-    @Binding var selection: SidebarItem?
-    let isDisabled: Bool
-    @State private var isHovered = false
-
-    // W1-E: the sidebar's 17/14 pt fonts and 22 pt icon slot were fixed
-    // and ignored the system text-size setting.
-    @ScaledMetric(relativeTo: .body) private var iconSize: CGFloat = 17
-    @ScaledMetric(relativeTo: .body) private var labelSize: CGFloat = 14
-    @ScaledMetric(relativeTo: .body) private var iconSlotWidth: CGFloat = 22
-
-    private var isSelected: Bool {
-        selection == item
-    }
-
-    private var rowBackground: some View {
-        GatedGlass {
-            if isSelected {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(AppTheme.sidebarSelectionFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder(
-                                // Per-mode selection edge — golden for
-                                // Built-in Voice / Library, lavender for
-                                // Voice Design, terracotta for Voice
-                                // Cloning. Matches the non-liquid
-                                // fallback in `borderColor`.
-                                AppTheme.sidebarColor(for: item).opacity(0.55),
-                                lineWidth: AppTheme.surfaceStrokeWidth
-                            )
-                    )
-                    .glassEffect(.regular.tint(AppTheme.smokedGlassTint).interactive(), in: .rect(cornerRadius: 8))
-                    .glass3DDepth(radius: 8, intensity: 0.5)
-            } else if isHovered {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(AppTheme.sidebarHoverFill)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder(
-                                AppTheme.sidebarHoverStroke,
-                                lineWidth: AppTheme.surfaceStrokeWidth
-                            )
-                    )
-                    .glassEffect(.regular.tint(AppTheme.smokedGlassTint).interactive(), in: .rect(cornerRadius: 8))
-                    .glass3DDepth(radius: 8, intensity: 0.25)
-            } else {
-                Color.clear
-            }
-        } fallback: {
-            legacyRowBackground
-        }
-    }
-
-    private var legacyRowBackground: some View {
-        RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(backgroundColor)
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(borderColor, lineWidth: isSelected || isHovered ? 1 : 0)
-            }
-    }
-
-    private var backgroundColor: Color {
-        if isDisabled {
-            return isSelected ? Color.secondary.opacity(0.06) : .clear
-        }
-
-        if isSelected {
-            return AppTheme.sidebarSelectionFill
-        }
-
-        if isHovered {
-            return AppTheme.sidebarHoverFill
-        }
-
-        return .clear
-    }
-
-    private var borderColor: Color {
-        if isDisabled {
-            return isSelected ? Color.secondary.opacity(0.16) : .clear
-        }
-
-        if isSelected {
-            // Per-mode edge accent — the stroke picks up the item's
-            // Vocello palette color so selecting Voice Design shows a
-            // lavender edge, Voice Cloning terracotta, etc. Library
-            // and Settings rows still resolve to accent (golden) via
-            // AppTheme.sidebarColor(for:).
-            return AppTheme.sidebarColor(for: item).opacity(0.32)
-        }
-
-        if isHovered {
-            return AppTheme.sidebarHoverStroke
-        }
-
-        return .clear
-    }
-
-    private var iconColor: Color {
-        if isDisabled {
-            return Color.secondary.opacity(isSelected ? 0.8 : 0.65)
-        }
-
-        return isSelected ? AppTheme.sidebarColor(for: item) : Color.primary
-    }
-
-    private var textColor: Color {
-        if isDisabled {
-            return Color.secondary.opacity(isSelected ? 0.88 : 0.72)
-        }
-
-        return Color.primary
-    }
-
-    private var selectionIndicatorColor: Color {
-        if !isSelected {
-            return .clear
-        }
-
-        return isDisabled ? Color.secondary.opacity(0.6) : AppTheme.sidebarColor(for: item)
-    }
-
-    private var accessibilityStateValue: String {
-        var states: [String] = []
-
-        if isSelected {
-            states.append("selected")
-        } else {
-            states.append("not selected")
-        }
-
-        if isDisabled {
-            states.append("disabled")
-        }
-
-        return states.joined(separator: ", ")
-    }
-
-    var body: some View {
-        // Wrap the row content in a Button so VoiceOver announces the row
-        // as a button (not just static text), keyboard activation (Space /
-        // Return) works, and AppKit's focus ring lands correctly. The
-        // visual modifiers (background, animation, hover) stay on the
-        // button's label so the look is unchanged. `.disabled(isDisabled)`
-        // gates both activation and accessibility traits via Button's
-        // built-in handling, which is stronger than the prior gesture
-        // gate.
-        Button {
-            selection = item
-        } label: {
-            HStack(spacing: 8) {
-                Capsule()
-                    .fill(selectionIndicatorColor)
-                    .frame(width: 3, height: 16)
-
-                Image(systemName: item.iconName)
-                    .font(.system(size: iconSize, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(iconColor)
-                    .frame(width: iconSlotWidth, alignment: .center)
-
-                Text(item.title)
-                    .font(.system(size: labelSize, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(textColor)
-                    .lineLimit(1)
-
-                Spacer(minLength: 0)
-            }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: 34)
-                .background(rowBackground)
-                .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
-            .buttonStyle(.plain)
-            .onHover { hovering in
-                isHovered = isDisabled ? false : hovering
-            }
-            .onChange(of: isDisabled) { _, disabled in
-                if disabled {
-                    isHovered = false
-                }
-            }
-            .appAnimation(AppTheme.Motion.state, value: isHovered)
-            .appAnimation(AppTheme.Motion.state, value: isSelected)
-            .disabled(isDisabled)
-            .accessibilityLabel(item.title)
-            .accessibilityValue(accessibilityStateValue)
-            .accessibilityIdentifier(item.accessibilityID)
-    }
-}
-
+/// The macOS sidebar in the iOS visual language (plan
+/// `macos-ios-convergence-2026-09`, CONV-11): the brand lockup on top, the
+/// Studio and Library sections plus Settings as rows with mode-tinted glyph
+/// tiles, the selected row a quiet tint-glass pill (the iOS `TabDock`
+/// selection recipe), disabled modes dimmed with the install hint, and the
+/// inline player card and engine status strip pinned in the footer. Every
+/// `sidebar_*`, `sidebarSection_*` and `sidebarPlayer_*` identifier is the
+/// lane contract and stays.
 struct SidebarView: View {
     @Binding var selection: SidebarItem?
     let disabledItems: Set<SidebarItem>
@@ -289,11 +32,11 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
-        .background(AppTheme.railBackground)
+        .background(MacTheme.canvasGradient.ignoresSafeArea())
         .safeAreaInset(edge: .top, spacing: 0) {
-            SidebarBrandHeader()
+            MacSidebarBrandHeader()
         }
-        .safeAreaInset(edge: .bottom) {
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             SidebarFooterRegion()
         }
     }
@@ -303,20 +46,23 @@ struct SidebarView: View {
         ForEach(SidebarItem.Section.allCases, id: \.self) { section in
             Section {
                 ForEach(section.items) { item in
-                    SidebarRow(
+                    MacSidebarRow(
                         item: item,
                         selection: $selection,
                         isDisabled: disabledItems.contains(item)
                     )
-                        .tag(item as SidebarItem?)
-                        .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
-                        .listRowBackground(Color.clear)
+                    .tag(item as SidebarItem?)
+                    .listRowInsets(
+                        EdgeInsets(top: 2, leading: MacShellMetrics.sidebarInset, bottom: 2, trailing: MacShellMetrics.sidebarInset)
+                    )
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
                 }
             } header: {
-                // The Settings section holds exactly the Settings row —
-                // a header would restate the row directly beneath it.
+                // The Settings section holds exactly the Settings row; a
+                // header would restate the row directly beneath it.
                 if section != .settings {
-                    NavigationSectionHeader(
+                    MacSidebarSectionHeader(
                         title: section.title,
                         accessibilityID: section.accessibilityID
                     )
@@ -326,55 +72,211 @@ struct SidebarView: View {
     }
 }
 
+// MARK: - Brand header
+
+private struct MacSidebarBrandHeader: View {
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            MacProductTitleLockup(title: MacInterfaceText.brandName)
+
+            Text(MacInterfaceText.brandTagline)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(MacTheme.Text.tertiary)
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, MacShellMetrics.sidebarInset + 4)
+        .padding(.vertical, 14)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(MacInterfaceText.brandAccessibility)
+    }
+}
+
+// MARK: - Section header
+
+private struct MacSidebarSectionHeader: View {
+    let title: String
+    let accessibilityID: String
+
+    var body: some View {
+        Text(title.uppercased())
+            .font(.system(size: 11, weight: .semibold))
+            .tracking(0.88)
+            .foregroundStyle(MacTheme.Text.secondary)
+            .lineLimit(1)
+            .textCase(nil)
+            .padding(.leading, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(title)
+            .accessibilityIdentifier(accessibilityID)
+    }
+}
+
+// MARK: - Row
+
+private struct MacSidebarRow: View {
+    let item: SidebarItem
+    @Binding var selection: SidebarItem?
+    let isDisabled: Bool
+    @State private var isHovered = false
+
+    @ScaledMetric(relativeTo: .body) private var labelSize: CGFloat = 13
+    @ScaledMetric(relativeTo: .body) private var glyphSize: CGFloat = 13
+    @ScaledMetric(relativeTo: .body) private var tileSize: CGFloat = MacShellMetrics.sidebarGlyphTile
+
+    private var isSelected: Bool { selection == item }
+    private var tint: Color { MacTheme.tint(for: item) }
+
+    private var accessibilityStateValue: String {
+        var states = [isSelected ? "selected" : "not selected"]
+        if isDisabled {
+            states.append("disabled")
+        }
+        return states.joined(separator: ", ")
+    }
+
+    var body: some View {
+        // A Button so VoiceOver announces the row as a button, keyboard
+        // activation works and `.disabled` gates activation and traits.
+        Button {
+            selection = item
+        } label: {
+            HStack(spacing: 10) {
+                glyphTile
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.title)
+                        .font(.system(size: labelSize, weight: isSelected ? .semibold : .medium))
+                        .foregroundStyle(MacTheme.Text.primary)
+                        .lineLimit(1)
+
+                    if isDisabled {
+                        Text(MacInterfaceText.shellModelMissingHint)
+                            .font(.caption2)
+                            .foregroundStyle(MacTheme.Text.tertiary)
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: MacShellMetrics.sidebarRowMinHeight)
+            .background(rowBackground)
+            .contentShape(RoundedRectangle(cornerRadius: MacShellMetrics.sidebarRowRadius, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .opacity(isDisabled ? 0.62 : 1)
+        .onHover { hovering in
+            isHovered = isDisabled ? false : hovering
+        }
+        .onChange(of: isDisabled) { _, disabled in
+            if disabled {
+                isHovered = false
+            }
+        }
+        .appAnimation(MacTheme.Motion.stateChange, value: isHovered)
+        .appAnimation(MacTheme.Motion.stateChange, value: isSelected)
+        .disabled(isDisabled)
+        .accessibilityLabel(item.title)
+        .accessibilityValue(accessibilityStateValue)
+        .accessibilityIdentifier(item.accessibilityID)
+    }
+
+    private var glyphTile: some View {
+        let shape = RoundedRectangle(cornerRadius: MacShellMetrics.sidebarGlyphTileRadius, style: .continuous)
+        return Image(systemName: item.iconName)
+            .font(.system(size: glyphSize, weight: .semibold))
+            .foregroundStyle(isSelected ? tint : MacTheme.Text.secondary)
+            .frame(width: tileSize, height: tileSize)
+            .background { shape.fill(isSelected ? tint.opacity(0.16) : Color.white.opacity(0.05)) }
+            .overlay { shape.stroke(isSelected ? tint.opacity(0.32) : Color.white.opacity(0.06), lineWidth: 0.5) }
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var rowBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: MacShellMetrics.sidebarRowRadius, style: .continuous)
+        if isSelected {
+            MacSidebarSelectionPill(tint: tint, shape: shape)
+        } else if isHovered {
+            shape.fill(Color.white.opacity(0.04))
+        } else {
+            Color.clear
+        }
+    }
+}
+
+/// The iOS `TabDockSelectionBackground` recipe: a 12% tint over a faint white
+/// film, a 38% tint hairline, an inset top highlight, through the glass gate.
+private struct MacSidebarSelectionPill: View {
+    let tint: Color
+    let shape: RoundedRectangle
+
+    var body: some View {
+        shape
+            .fill(Color.white.opacity(0.02))
+            .overlay { shape.fill(tint.opacity(0.12)) }
+            .overlay { shape.stroke(tint.opacity(0.38), lineWidth: 0.5) }
+            .overlay {
+                shape
+                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                    .mask(
+                        LinearGradient(colors: [.white, .clear], startPoint: .top, endPoint: .center)
+                    )
+            }
+            .macGatedGlass(tint: MacTheme.glassTint(tint, intensity: 0.9), in: shape, interactive: true)
+    }
+}
+
+// MARK: - Footer
+
 private struct SidebarFooterRegion: View {
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
 
-    private var resolvedSidebarStatus: SidebarStatus {
-        SidebarStatusPresentation.resolve(
+    private var status: MacShellStatus {
+        MacShellStatusPresentation.resolve(
             snapshot: ttsEngineStore.snapshot,
             prefersInlinePresentation: audioPlayer.isLiveStream
         )
     }
 
-    private var footerPresentation: SidebarFooterPresentation {
-        SidebarFooterPresentation.resolve(
-            sidebarStatus: resolvedSidebarStatus,
+    private var footerPresentation: MacShellFooterPresentation {
+        MacShellFooterPresentation.resolve(
+            status: status,
             isLiveStream: audioPlayer.isLiveStream
         )
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Rectangle()
-                .fill(AppTheme.railStroke.opacity(0.9))
-                .frame(height: 1)
-
-            VStack(alignment: .leading, spacing: 10) {
-                if audioPlayer.hasAudio {
-                    SidebarPlayerView(inlinePlayerActivity: footerPresentation.inlinePlayerActivity)
-
-                    if footerPresentation.showsStandaloneStatus {
-                        Rectangle()
-                            .fill(AppTheme.railStroke.opacity(0.65))
-                            .frame(height: 1)
-                    }
-                }
-
-                if footerPresentation.showsStandaloneStatus {
-                    SidebarStatusView(
-                        sidebarStatus: resolvedSidebarStatus,
-                        clearError: {
-                            ttsEngineStore.clearVisibleError()
-                        }
-                    )
-                }
+        VStack(alignment: .leading, spacing: 10) {
+            if audioPlayer.hasAudio {
+                MacInlinePlayerCard(inlinePlayerActivity: footerPresentation.inlinePlayerActivity)
             }
-            .padding(.horizontal, LayoutConstants.shellPadding)
-            .padding(.top, LayoutConstants.generationSectionSpacing)
-            .padding(.bottom, LayoutConstants.shellPadding)
-            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if footerPresentation.showsStandaloneStatus {
+                MacStatusStrip(
+                    status: status,
+                    clearError: { ttsEngineStore.clearVisibleError() }
+                )
+            }
         }
-        .background(AppTheme.railBackground)
+        .padding(.horizontal, MacShellMetrics.sidebarInset)
+        .padding(.top, 8)
+        .padding(.bottom, MacShellMetrics.sidebarInset)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [MacTheme.Surface.canvasBottom.opacity(0), MacTheme.Surface.canvasBottom.opacity(0.9)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
     }
 }

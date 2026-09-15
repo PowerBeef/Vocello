@@ -29,6 +29,13 @@ A `NavigationSplitView` with a **sidebar** (6 items) + a detail pane. The engine
 **in-process** (since 2026-09-15) on the same `TTSEngineStore` the iOS app uses; an engine
 fault takes the app down with it, so crash deltas stay part of every lane's verdict.
 
+The shell (since 2026-09-15, CONV-11) is the iOS design on the desktop: the brand lockup on
+top of the sidebar, **Studio** and **Library** sections plus Settings as rows with mode-tinted
+glyph tiles (`sidebarSection_generate`, `sidebarSection_library`), the selected row a tint-glass
+pill, a mode whose model is missing dimmed with an "Install in Settings" caption, and the inline
+player card and engine status strip pinned in the sidebar footer. Dark-only. Window minimum
+720×560, default 880×640 (`MacShellMetrics`).
+
 | Sidebar | Identifier | Shortcut |
 |---------|------------|----------|
 | Built-in Voice | `sidebar_customVoice` | Cmd+1 |
@@ -164,9 +171,9 @@ language boundary.
 
 | Element | Identifier |
 |---|---|
-| Player bar | `sidebarPlayer_bar` / `sidebarPlayer_playPause` / `sidebarPlayer_waveform` / `sidebarPlayer_time` / `sidebarPlayer_dismiss` |
-| Live badge | `sidebarPlayer_liveBadge` / `sidebarPlayer_liveProgress` |
-| Engine status | `sidebar_backendStatus_idle` / `_standby` / `_starting` / `_active` / `_error` / `_crashed` |
+| Player card | `sidebarPlayer_bar` / `sidebarPlayer_playPause` (value `play` / `pause`) / `sidebarPlayer_waveform` / `sidebarPlayer_time` / `sidebarPlayer_dismiss` / `sidebarPlayer_error` |
+| Live badge | `sidebarPlayer_liveBadge` / `sidebarPlayer_liveStatus` / `sidebarPlayer_liveProgress` |
+| Engine status strip | `sidebar_generationStatus` > `sidebar_backendStatus` > `sidebar_backendStatus_idle` / `_standby` / `_starting` / `_active` / `_error` (+ `_dismiss`) / `_crashed` |
 
 ### Batch generation
 

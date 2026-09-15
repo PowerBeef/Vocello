@@ -38,7 +38,10 @@ struct QwenVoiceApp: App {
         WindowGroup(id: "mainWindow") {
             mainWindowContent
         }
-        .defaultSize(width: 880, height: 640)
+        .defaultSize(
+            width: MacShellMetrics.windowDefaultSize.width,
+            height: MacShellMetrics.windowDefaultSize.height
+        )
         Settings {
             // The Cmd+, scene hosts the same SettingsView the
             // sidebar shows, so muscle memory keeps working. Deep
@@ -48,6 +51,7 @@ struct QwenVoiceApp: App {
             // window).
             SettingsView(highlightedMode: .constant(nil))
                 .environment(modelManager)
+                .preferredColorScheme(.dark)
         }
         .commands {
             CommandGroup(replacing: .newItem) { }
@@ -122,11 +126,14 @@ struct QwenVoiceApp: App {
     private var mainWindowContent: some View {
         Group {
             if let launchDiagnostics = appStartupCoordinator.launchDiagnostics ?? engineBootstrapDiagnostics {
-                StartupDiagnosticsView(
+                MacStartupDiagnosticsView(
                     snapshot: launchDiagnostics,
                     onRetry: retryLaunchPreflight
                 )
-                .frame(minWidth: 520, minHeight: 420)
+                .frame(
+                    minWidth: MacShellMetrics.diagnosticsMinSize.width,
+                    minHeight: MacShellMetrics.diagnosticsMinSize.height
+                )
             } else if let ttsEngineStore {
                 ContentView(ttsEngineStore: ttsEngineStore)
                     .safeAreaInset(edge: .top, spacing: 0) { GenerationHistoryEnqueueWarning() }
@@ -137,9 +144,15 @@ struct QwenVoiceApp: App {
                     .environment(savedVoicesViewModel)
                     .environmentObject(appCommandRouter)
                     .environmentObject(generationLibraryEvents)
-                    .frame(minWidth: 720, minHeight: 560)
+                    .frame(
+                        minWidth: MacShellMetrics.windowMinSize.width,
+                        minHeight: MacShellMetrics.windowMinSize.height
+                    )
             }
         }
+        // Dark-only, like iOS (maintainer decision 2026-09-14); the delegate
+        // pins the AppKit appearance, this pins the SwiftUI environment.
+        .preferredColorScheme(.dark)
         .onAppear {
             appStartupCoordinator.setupAppSupport()
             reconcilePendingHistory()

@@ -16002,6 +16002,132 @@
           }
         }
       }
+    },
+    "vocello.mac.shell.sectionStudio": {
+      "comment": "macOS interface: sidebar section header above the three generation modes. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Studio"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Studio"
+          }
+        }
+      }
+    },
+    "vocello.mac.shell.modelMissingHint": {
+      "comment": "macOS interface: caption under a dimmed sidebar mode whose model is not installed yet. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install in Settings"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À installer dans Réglages"
+          }
+        }
+      }
+    },
+    "vocello.mac.shell.engineUnavailable": {
+      "comment": "macOS interface: status strip title when the engine reported it is unavailable. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine unavailable"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moteur indisponible"
+          }
+        }
+      }
+    },
+    "vocello.mac.shell.engineStopped": {
+      "comment": "macOS interface: status strip title when the engine stopped with an error. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine stopped"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moteur arrêté"
+          }
+        }
+      }
+    },
+    "vocello.mac.shell.restartToContinue": {
+      "comment": "macOS interface: status strip message when the engine stopped without a detail. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restart the app to continue"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relancez l’app pour continuer"
+          }
+        }
+      }
+    },
+    "vocello.mac.shell.inProgress": {
+      "comment": "macOS interface: VoiceOver value of a live activity without a known fraction. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In progress"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En cours"
+          }
+        }
+      }
+    },
+    "vocello.mac.startup.notFound": {
+      "comment": "macOS interface: startup diagnostics value when a path could not be resolved. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not found"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Introuvable"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

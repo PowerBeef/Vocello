@@ -1065,19 +1065,29 @@ cmd_test() {
 
   note "test: Qwen3RuntimeTests (owned core runtime, seeded Metal fixture)"
   local runtime_package="$ROOT_DIR/Packages/VocelloQwen3Core"
+  # SwiftPM in Xcode 27 (Swift 6.4) defaults to the Swift Build engine, whose
+  # bin path is a different layout and which does not assemble the XCTest
+  # bundle for --build-tests, so the lane keeps the classic engine while the
+  # toolchain still offers the switch (2026-09-15). Toolchains without the
+  # option (the pinned CI Xcode) are classic already; bash 3.2 needs the
+  # guarded expansion for an empty array under set -u.
+  local -a swiftpm_engine=()
+  if swift build --help 2>/dev/null | grep -q -- '--build-system'; then
+    swiftpm_engine=(--build-system native)
+  fi
   local mlx_bundle="$QVOICE_XCODE_MACOS_DERIVED/Build/Products/Release/mlx-swift_Cmlx.bundle"
   if ensure_swiftpm_scratch_location "$runtime_package" "$QVOICE_SWIFTPM_RUNTIME_CACHE" \
       && swift build --package-path "$runtime_package" \
       --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration debug \
-      --force-resolved-versions \
+      --force-resolved-versions ${swiftpm_engine[@]+"${swiftpm_engine[@]}"} \
       --build-tests \
       ${coverage:+--enable-code-coverage} \
       > "$artifacts/runtime-build.log" 2>&1; then
     local runtime_bin runtime_resources
     runtime_bin="$(swift build --package-path "$runtime_package" \
       --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration debug \
-      --force-resolved-versions \
-      --show-bin-path)"
+      --force-resolved-versions ${swiftpm_engine[@]+"${swiftpm_engine[@]}"} \
+      --show-bin-path 2>/dev/null)"
     runtime_resources="$runtime_bin/MLXAudioPackageTests.xctest/Contents/Resources"
     if [[ -d "$mlx_bundle" ]]; then
       mkdir -p "$runtime_resources"
@@ -1092,7 +1102,7 @@ cmd_test() {
         # on GitHub's macOS 26 runner. No test is skipped or moved off Metal.
         MLX_ENABLE_TF32=0 swift test --package-path "$runtime_package" \
           --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration debug \
-          --force-resolved-versions \
+          --force-resolved-versions ${swiftpm_engine[@]+"${swiftpm_engine[@]}"} \
           --skip-build \
           ${coverage:+--enable-code-coverage} \
           --filter Qwen3RuntimeTests \
@@ -1102,6 +1112,7 @@ cmd_test() {
           local codecov_path
           codecov_path="$(swift test --package-path "$runtime_package" \
             --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration debug \
+            ${swiftpm_engine[@]+"${swiftpm_engine[@]}"} \
             --force-resolved-versions --show-codecov-path 2>/dev/null || true)"
           if [[ -n "$codecov_path" && -f "$codecov_path" ]]; then
             cp "$codecov_path" "$artifacts/coverage-runtime.json"

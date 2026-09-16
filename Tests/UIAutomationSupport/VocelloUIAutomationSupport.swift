@@ -435,23 +435,57 @@ public enum VocelloUIScroll {
     #if os(macOS)
     /// Wheel-scrolls a container (e.g. the Settings form whose clone-consent
     /// toggle is deliberately last) until the element is hittable.
+    ///
+    /// The budget is the container, not a step count. A fixed count encodes a
+    /// guess about how tall a screen is, and that guess expired: once UIF-05
+    /// put Settings on the type scale, the pseudo-localized page grew past the
+    /// old 8 x 120 pt budget and the localization lane failed to reach a
+    /// consent toggle that a user scrolls to without trouble. So this scrolls
+    /// while the element is still travelling and stops when the container has
+    /// nothing left to give. `maxAttempts` is only a runaway guard.
     @discardableResult
     public static func intoView(
         _ element: XCUIElement,
         in container: XCUIElement,
-        maxAttempts: Int = 8,
+        maxAttempts: Int = 60,
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> Bool {
-        for _ in 0 ..< maxAttempts {
+        var lastTop = CGFloat.greatestFiniteMagnitude
+        var stalledScrolls = 0
+        var scrolls = 0
+        var reachedEnd = false
+        while scrolls < maxAttempts {
             if element.exists && element.isHittable { return true }
             container.scroll(byDeltaX: 0, deltaY: -120)
+            scrolls += 1
+            guard element.exists else { continue }
+            let top = element.frame.minY
+            // A point of tolerance: the window server rounds to backing pixels.
+            if top < lastTop - 1 {
+                stalledScrolls = 0
+            } else {
+                stalledScrolls += 1
+            }
+            lastTop = top
+            // Two scrolls that moved nothing mean the container is at its end
+            // and the element is genuinely unreachable, not merely far away.
+            if stalledScrolls >= 2 {
+                reachedEnd = true
+                break
+            }
         }
         let revealed = element.exists && element.isHittable
         if !revealed {
             VocelloUIFailureEvidence.capture(reason: "reveal \(element.identifier)")
-            XCTFail("Could not scroll \(element.identifier) into view after \(maxAttempts) attempts",
-                    file: file, line: line)
+            let why = reachedEnd
+                ? "the container stopped scrolling with it still out of reach"
+                : "the \(maxAttempts)-scroll runaway guard fired first"
+            XCTFail(
+                "Could not scroll \(element.identifier) into view after \(scrolls) scrolls: \(why)",
+                file: file,
+                line: line
+            )
         }
         return revealed
     }

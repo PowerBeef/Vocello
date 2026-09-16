@@ -71,12 +71,24 @@ if errors:
     raise SystemExit("\n".join(errors))
 PY
 
-# UI tests synchronise on conditions and stable identifiers. The two perf scenario
+# UI tests synchronise on conditions, never on the clock. The two perf scenario
 # files are the recorded exemption: their paced sleeps are the measured workload.
-out="$(rg -n '\b(?:sleep|usleep)\s*\(|Thread\.sleep|coordinate\s*\(' \
+out="$(rg -n '\b(?:sleep|usleep)\s*\(|Thread\.sleep' \
   Tests/UIAutomationSupport Tests/VocelloMacUITests Tests/VocelloiOSUITests 2>/dev/null \
   | rg -v '^Tests/Vocello(Mac|iOS)UITests/Vocello(Mac|iOS)PerfUITests\.swift:' || true)"
-[[ -z "$out" ]] || fail "UI tests must use condition waits and exact elements, not delays or coordinates:\n$out"
+[[ -z "$out" ]] || fail "UI tests must use condition waits, not delays:\n$out"
+
+# UI tests act on exact elements, never on raw coordinates. Beyond the perf
+# files, VocelloUIWindowFrame.swift is exempt for one reason that cannot be
+# engineered away: macOS XCUITest exposes no window-resize API, so sizing a
+# window to a known width means dragging its edge, and an edge is a point on a
+# window rather than an element. It uses no delays; the sleep rule above still
+# binds it.
+out="$(rg -n 'coordinate\s*\(' \
+  Tests/UIAutomationSupport Tests/VocelloMacUITests Tests/VocelloiOSUITests 2>/dev/null \
+  | rg -v '^Tests/Vocello(Mac|iOS)UITests/Vocello(Mac|iOS)PerfUITests\.swift:' \
+  | rg -v '^Tests/VocelloMacUITests/VocelloUIWindowFrame\.swift:' || true)"
+[[ -z "$out" ]] || fail "UI tests must act on exact elements, not coordinates:\n$out"
 out="$(rg -n 'matching\s*\(\s*NSPredicate\s*\(\s*format:\s*"label|buttons\s*\[\s*"(?:Generate|Custom|Design|Clone|Dismiss)' \
   Tests/UIAutomationSupport Tests/VocelloMacUITests Tests/VocelloiOSUITests 2>/dev/null || true)"
 [[ -z "$out" ]] || fail "UI tests must use stable accessibility identifiers, not visible-label fallbacks:\n$out"

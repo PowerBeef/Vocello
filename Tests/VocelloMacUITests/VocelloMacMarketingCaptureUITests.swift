@@ -191,15 +191,18 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
     /// It exists because the app had only ever been photographed at whatever
     /// width the scene restored to, which is why every narrow-window defect of
     /// the UI-fidelity plan was found by eye and none by a test.
-    func test04_LayoutSurveyCapture() throws {
+    func test04_LayoutSurveyCapture() {
         beginSession()
         defer { endSession() }
-        try skipUnlessWindowCanBePinned()
+        reportWindowSizingMechanism()
 
+        // Widest first: an edge drag can only grow the window into space to
+        // its right, so growing once and shrinking twice never fights the
+        // screen edge.
         for width in [
-            VocelloUIWindowFrame.Width.minimum,
-            VocelloUIWindowFrame.Width.standard,
             VocelloUIWindowFrame.Width.wide,
+            VocelloUIWindowFrame.Width.standard,
+            VocelloUIWindowFrame.Width.minimum,
         ] {
             captureEveryDestination(at: width, suffix: "")
         }
@@ -210,28 +213,25 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
     /// The narrow window under pseudo-localization: the worst case macOS can be
     /// driven to, since it has no Dynamic Type and doubled strings are the only
     /// text-growth axis the platform offers.
-    func test05_LayoutSurveyPseudoLocalizedCapture() throws {
+    func test05_LayoutSurveyPseudoLocalizedCapture() {
         beginSession(additionalArguments: [
             "-NSDoubleLocalizedStrings", "YES",
             "-NSShowNonLocalizedStrings", "YES",
         ])
         defer { endSession() }
-        try skipUnlessWindowCanBePinned()
+        reportWindowSizingMechanism()
 
         captureEveryDestination(at: VocelloUIWindowFrame.Width.minimum, suffix: "-pseudo")
     }
 
-    /// A survey that cannot pin the window would photograph an unknown width
-    /// and label it 720, which is worse than no survey. Skipping says so; the
-    /// diagnosis says which of the three failure modes it was.
-    private func skipUnlessWindowCanBePinned() throws {
-        let diagnosis = VocelloUIWindowFrame.diagnosis()
-        print("WINDOW_FRAME diagnosis: \(diagnosis)")
-        try XCTSkipUnless(
-            VocelloUIWindowFrame.isAvailable(),
-            "the window cannot be pinned (\(diagnosis)); grant VocelloMacUITests-Runner.app "
-                + "Accessibility, see docs/reference/macos-permissions.md"
-        )
+    /// Records how the window will be sized before anything is photographed.
+    /// Accessibility is exact but needs a grant the runner does not always
+    /// hold; the edge drag needs nothing and lands within a few points. Either
+    /// is fine, because every capture is named after the width it reached --
+    /// what would not be fine is not knowing which one ran.
+    private func reportWindowSizingMechanism() {
+        VocelloUIWindowFrame.requestTrustIfPermitted()
+        print("WINDOW_FRAME diagnosis: \(VocelloUIWindowFrame.diagnosis())")
     }
 
     private func captureEveryDestination(at width: CGFloat, suffix: String) {

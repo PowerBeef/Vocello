@@ -34,9 +34,11 @@ enum VocelloUIWindowFrame {
         /// breakpoint, which is why the default window has never shown a
         /// compact defect.
         static let standard: CGFloat = 880
-        /// A wide desktop, where the content caps (Studio 640, library 960)
-        /// are the only thing still bounding the column.
-        static let wide: CGFloat = 1280
+        /// As wide as this display allows. The development Mac's logical screen
+        /// is 1280x720 pt, so "wide" here is roughly 1220 -- the app lives in
+        /// the 720-1280 band, straddling its own 860 pt compact breakpoint, and
+        /// a capture names the width it actually reached.
+        static let wide: CGFloat = 4000
     }
 
     enum Height {
@@ -50,6 +52,25 @@ enum VocelloUIWindowFrame {
     /// True when the accessibility API can reach the app's window. False means
     /// the runner has no accessibility grant, or the app has no window yet.
     static func isAvailable() -> Bool { mainWindow() != nil }
+
+    /// Asks macOS to register this runner in the Accessibility list, which is
+    /// the reliable way in: the system records the calling process's exact code
+    /// identity, where hand-adding the bundle records whatever identity the
+    /// picker resolved and silently does nothing if the two differ.
+    ///
+    /// It shows a dialog, so it is opt-in through `QVOICE_AX_PROMPT=1` and
+    /// never fires in an unattended run. The prompt is a no-op once trusted.
+    /// Answering it does not grant anything by itself -- macOS adds the row and
+    /// the toggle still has to be switched on by hand.
+    @discardableResult
+    static func requestTrustIfPermitted() -> Bool {
+        guard ProcessInfo.processInfo.environment["QVOICE_AX_PROMPT"] == "1" else { return false }
+        // The literal key, not `kAXTrustedCheckOptionPrompt`: the imported
+        // constant is a global `var` and Swift 6 refuses it as shared mutable
+        // state. The string is the constant's documented value.
+        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
+    }
 
     /// Why `isAvailable` said what it said. The three failure modes are not
     /// interchangeable -- an untrusted runner is a machine setup problem, a
@@ -100,9 +121,24 @@ enum VocelloUIWindowFrame {
         return settledFrame(of: app)
     }
 
-    /// Pins the window, or fails the test. Use this wherever an unknown width
-    /// would make the evidence meaningless — a capture that claims to be 720,
-    /// or a layout assertion whose whole point is the narrow window.
+    /// How a frame was reached, because the two mechanisms differ in precision
+    /// and a reader of the evidence deserves to know which one ran.
+    enum Mechanism: String {
+        /// Exact, and needs the runner to hold the Accessibility grant.
+        case accessibility
+        /// Approximate, needs no permission, and is the only native
+        /// alternative: `VocelloMacPerfUITests.test08WindowResize` proves it
+        /// works and documents that an individual drag misses
+        /// nondeterministically.
+        case edgeDrag
+    }
+
+    /// Sizes the window as close to `width` as the machine allows and returns
+    /// the frame it actually reached, never the one requested. Accessibility
+    /// first because it is exact; the edge drag when the runner is untrusted,
+    /// because an approximate width honestly labelled beats no evidence.
+    ///
+    /// Fails only when neither mechanism moved the window at all.
     @discardableResult
     static func require(
         _ app: XCUIApplication,
@@ -111,23 +147,90 @@ enum VocelloUIWindowFrame {
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> CGRect {
-        guard let frame = set(app, width: width, height: height) else {
-            VocelloUIFailureEvidence.capture(reason: "window frame could not be pinned")
+        if let frame = set(app, width: width, height: height) {
+            XCTAssertEqual(
+                frame.width, width, accuracy: 1,
+                "Window settled at \(Int(frame.width)) pt, not the \(Int(width)) pt requested.",
+                file: file, line: line
+            )
+            print("WINDOW_FRAME mechanism=\(Mechanism.accessibility.rawValue) "
+                + "requested=\(Int(width)) settled=\(Int(frame.width))x\(Int(frame.height))")
+            return frame
+        }
+
+        let frame = drag(app, towardWidth: width)
+        print("WINDOW_FRAME mechanism=\(Mechanism.edgeDrag.rawValue) "
+            + "requested=\(Int(width)) settled=\(Int(frame.width))x\(Int(frame.height))")
+        guard frame.width > 0 else {
+            VocelloUIFailureEvidence.capture(reason: "window frame could not be sized")
             XCTFail(
-                "Could not pin the window to \(Int(width)) pt: the accessibility API cannot reach it. "
-                    + "Grant the test runner Accessibility in System Settings > Privacy & Security.",
+                "Neither the accessibility API nor an edge drag could size the window.",
                 file: file,
                 line: line
             )
             return .zero
         }
-        // One point of tolerance: the window server rounds to backing pixels.
-        XCTAssertEqual(
-            frame.width, width, accuracy: 1,
-            "Window settled at \(Int(frame.width)) pt, not the \(Int(width)) pt this evidence claims.",
-            file: file, line: line
-        )
         return frame
+    }
+
+    /// Drags the window's right edge toward a width, measuring after every
+    /// attempt and stopping when it arrives or when dragging stops helping.
+    ///
+    /// The recipe is `VocelloMacPerfUITests.test08WindowResize`'s, including
+    /// the two details that scenario needed a rewrite to find: the press goes
+    /// on the right edge's midpoint, because the bottom-right corner sits
+    /// inside the window's rounded corner on macOS 27 and lands on the desktop;
+    /// and the cursor is parked between attempts, because a press where the
+    /// previous drag released chains into a double-click that never resizes.
+    ///
+    /// A width beyond the display clamps at the screen edge rather than
+    /// failing, which is how `Width.wide` asks for "as wide as this screen
+    /// allows" without hard-coding one machine's resolution.
+    static func drag(
+        _ app: XCUIApplication,
+        towardWidth target: CGFloat,
+        maxAttempts: Int = 12,
+        tolerance: CGFloat = 6
+    ) -> CGRect {
+        let window = app.windows.firstMatch
+        guard window.exists else { return .zero }
+
+        var stalledDrags = 0
+        for _ in 0 ..< maxAttempts {
+            let before = window.frame
+            let delta = target - before.width
+            if abs(delta) <= tolerance { return before }
+
+            let edge = window
+                .coordinate(withNormalizedOffset: CGVector(dx: 1.0, dy: 0.5))
+                .withOffset(CGVector(dx: -1, dy: 0))
+            edge.click(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: delta, dy: 0)))
+
+            // Wait on the window, not on the clock: the resize either lands or
+            // the drag missed, and a condition wait says which as soon as it is
+            // true instead of always paying for the slowest case. A miss costs
+            // the full timeout, which is why the runaway guard is small.
+            _ = VocelloUIWait.condition("window width to change", timeout: 2) {
+                abs(window.frame.width - before.width) >= 1
+            }
+            // A press where the previous drag released chains into a
+            // double-click, which never starts a resize. Parking needs no wait
+            // of its own: posting the event is synchronous, and the next
+            // iteration's frame query costs more latency than the cursor move.
+            VocelloUICursor.park()
+
+            // Only a width change counts; a drag that merely moved the window
+            // must not read as progress.
+            if abs(window.frame.width - before.width) < 1 {
+                stalledDrags += 1
+                // Two misses in a row while growing means the screen edge, not
+                // a flaky press: that width is the widest this display has.
+                if stalledDrags >= 2 { break }
+            } else {
+                stalledDrags = 0
+            }
+        }
+        return window.frame
     }
 
     // MARK: - Accessibility handles

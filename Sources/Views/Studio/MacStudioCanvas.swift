@@ -37,10 +37,13 @@ enum MacStudioGenState: Equatable {
 }
 
 enum MacStudioMetrics {
-    /// The Studio column. The phone's canvas is 390 pt; at 640 the three
-    /// chips and the Generate button keep the phone's proportions and the
-    /// 22 pt script keeps a comfortable line length.
-    static let contentMaxWidth: CGFloat = 640
+    /// The Studio column. The phone's canvas is 390 pt. 640 kept the phone's
+    /// proportions but capped the chip row at 600, which is why the setup chips
+    /// split onto two rows however wide the window was -- the window was never
+    /// the constraint, this was. 780 holds all five chips on one row (739 pt of
+    /// chips plus the gutters) and still leaves the 22 pt script a measure of
+    /// roughly 71 characters, inside the comfortable range.
+    static let contentMaxWidth: CGFloat = 780
     /// The iOS canvas gutter, which is the app's screen gutter token. The
     /// composer uses it, the chip row and the dock use it, so the script, the
     /// chips and the Generate button share one left edge — the spine the

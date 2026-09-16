@@ -85,13 +85,16 @@ XCUITest lanes only when explicitly requested.
   `AppLaunchConfiguration.performAnimated`; no color-only signal; `accessibilityIdentifier`s such as
   `voicesRow_*`, `textInput_*`, `studioChip_*` survive refactors; test-only code lives in the UI test
   target.
-- **The Studio canvas is the phone's, arranged for a desktop.** `MacStudioCanvas`: a composer sized
-  to its text (six-line floor, 55 % ceiling, then it scrolls), meta line, one row of equal-width
-  chips, the dock with Generate and the square Batch button, space at the bottom. One
-  `VocelloModeBackdrop` wash behind the whole window from `ContentView`, transparent title bar. No
-  title row (the sidebar names the mode); the Speed/Quality switch is window-toolbar chrome. Numbers
-  that must not drift: column 640 pt, chip pill 46 pt, CTA and Batch 56 pt, dock floor 64 pt,
-  composer 22 pt at −0.22 tracking with a 176 pt floor, 20 pt gutters.
+- **The Studio canvas is the phone's, arranged for a desktop.** `MacStudioCanvas`: the composer takes
+  every point the rest does not (six-line floor, then it scrolls), meta line flush below it, one row
+  of setup chips, then the dock with Generate and the square Batch button. No trailing spacer — the
+  script is the flexible element, as `IOSStudioCanvas` states for the phone, and no card or border
+  around it. One `VocelloModeBackdrop` wash behind the whole window from `ContentView`, transparent
+  title bar. No title row (the sidebar names the mode); the Speed/Quality switch is window-toolbar
+  chrome. Numbers that must not drift: column 780 pt, chip pill 46 pt, CTA and Batch 56 pt, dock
+  floor 64 pt, composer 22 pt at −0.22 tracking with a 176 pt floor, 20 pt gutters, window minimum
+  880×560 and default 1040×680. A completed take is a result row (identity plus Generate again, Save
+  As, Reveal, Dismiss); playback lives in the sidebar player, never in both.
 - **Studio generation runs on the shared pipeline.** `StudioGenerationCoordinator` (owned by `MacAppModel`)
   holds the attempt-scoped terminal state, `IOSSingleTakeGenerationExecutor` runs the take through
   `MacStudioSingleTakeGenerationHooks` (timeline, playback handoff, History, telemetry merge) and

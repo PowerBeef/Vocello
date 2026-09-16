@@ -23,21 +23,18 @@ import XCTest
 @MainActor
 enum VocelloUIWindowFrame {
     /// The widths the app is designed against. A UI test target cannot import
-    /// the app module, so these restate `MacShellMetrics.windowMinSize`,
-    /// `.windowDefaultSize` and `.compactBreakpoint`; `MacShellMetrics` owns
-    /// them and this comment is the link.
+    /// the app module, so these restate `MacShellMetrics.windowMinSize` and
+    /// `.windowDefaultSize`; `MacShellMetrics` owns them and this comment is
+    /// the link.
     enum Width {
-        /// `MacShellMetrics.windowMinSize.width` — below the 860 pt compact
-        /// breakpoint, so the composer chip rows wrap here.
-        static let minimum: CGFloat = 720
-        /// `MacShellMetrics.windowDefaultSize.width` — just above the compact
-        /// breakpoint, which is why the default window has never shown a
-        /// compact defect.
-        static let standard: CGFloat = 880
+        /// `MacShellMetrics.windowMinSize.width` — the narrowest the app goes.
+        static let minimum: CGFloat = 880
+        /// `MacShellMetrics.windowDefaultSize.width` — where it opens, and the
+        /// width at which all five Studio setup chips sit on one row.
+        static let standard: CGFloat = 1040
         /// As wide as this display allows. The development Mac's logical screen
-        /// is 1280x720 pt, so "wide" here is roughly 1220 -- the app lives in
-        /// the 720-1280 band, straddling its own 860 pt compact breakpoint, and
-        /// a capture names the width it actually reached.
+        /// is 1280x720 pt, so "wide" here is roughly 1220; a capture is named
+        /// for the width it actually reached rather than the one requested.
         static let wide: CGFloat = 4000
     }
 
@@ -45,7 +42,7 @@ enum VocelloUIWindowFrame {
         /// `MacShellMetrics.windowMinSize.height`.
         static let minimum: CGFloat = 560
         /// `MacShellMetrics.windowDefaultSize.height`.
-        static let standard: CGFloat = 640
+        static let standard: CGFloat = 680
         static let tall: CGFloat = 800
     }
 

@@ -3,8 +3,14 @@ import CoreGraphics
 /// Window and shell geometry in one place: the desktop counterpart of the
 /// iOS safe-area and dock constants.
 enum MacShellMetrics {
-    static let windowMinSize = CGSize(width: 720, height: 560)
-    static let windowDefaultSize = CGSize(width: 880, height: 640)
+    /// Wide enough that the Studio column reaches its cap and the setup chips
+    /// stay on one row for the common four-chip case. The old 720 forced the
+    /// chip row to wrap and truncated the reference chip -- the one chip
+    /// carrying a name the user chose -- at the width the app opened smallest.
+    static let windowMinSize = CGSize(width: 880, height: 560)
+    /// Opens with room for all five chips on one row, which is the case an
+    /// emotion-bank voice produces; it shrinks to the minimum from here.
+    static let windowDefaultSize = CGSize(width: 1040, height: 680)
     static let diagnosticsMinSize = CGSize(width: 520, height: 420)
     static let settingsWindowMinSize = CGSize(width: 600, height: 520)
     static let settingsWindowDefaultSize = CGSize(width: 680, height: 720)
@@ -12,8 +18,6 @@ enum MacShellMetrics {
     static let sidebarMinWidth: CGFloat = 220
     static let sidebarIdealWidth: CGFloat = 250
     static let sidebarMaxWidth: CGFloat = 300
-    /// Below this window width the composer chip rows wrap (B6 onwards).
-    static let compactBreakpoint: CGFloat = 860
     /// Content column of the History and Saved Voices lists; wider than the
     /// Studio column (`MacStudioMetrics.contentMaxWidth`) so rows keep their
     /// legacy width and do not tear apart on wide displays.

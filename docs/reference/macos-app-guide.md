@@ -68,17 +68,19 @@ Tests assert these visible production surfaces directly.
 ### Studio composition
 
 The three Studio screens are one canvas (`MacStudioCanvas`) arranged for a desktop: the composer
-on top, sized to its text between a six-line floor and 55 % of the canvas (it scrolls past that),
-then the meta line (mode, readiness, Clear, counter), one row of equal-width setup chips, and the
-dock; whatever space is left falls to the bottom. The dock holds the full-width Generate button with
+on top, taking every point the rest of the column does not (a six-line floor, scrolling past its
+height), then the meta line (mode, readiness, Clear, counter) flush below it, one row of setup
+chips, and the dock. Nothing trails the dock: the script is the flexible element, so a taller
+window grows the writing surface rather than the space under the button. The dock holds the full-width Generate button with
 the square Batch button (`textInput_batchButton`) at its right end, the generating bar, the error bar
 that retries when clicked, or the player card, and never falls below 64 pt. The column caps at
-640 pt. One mode-tinted wash (`VocelloModeBackdrop`, shared with iOS) is painted behind the whole
+780 pt. One mode-tinted wash (`VocelloModeBackdrop`, shared with iOS) is painted behind the whole
 window by `ContentView`, tinted by the selected destination, and the title bar is transparent over
 it with no visible title. There is no title row — the sidebar names the mode, as the phone's capsule
 does — so the desktop's Speed/Quality switch (`<prefix>_speedVariantButton`,
 `<prefix>_qualityVariantButton`, `<prefix>_heavyBadge`) lives in the window toolbar. Below roughly
-560 pt of canvas the chip row wraps instead of squeezing.
+the window's 880 pt minimum the four ordinary setup chips stay on one row; a fifth (an
+emotion-bank delivery) or a sixth (a pinned seed) wraps below about 1040 pt rather than squeezing.
 
 ### Built-in Voice (`sidebar_customVoice` → `screen_customVoice`)
 

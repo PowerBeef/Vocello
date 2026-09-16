@@ -145,40 +145,40 @@ struct MacModelPackageLine: View {
         let shape = RoundedRectangle(cornerRadius: MacTheme.Radius.input, style: .continuous)
 
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    // "Speed · 4-bit": the tier plus only the per-row fact.
-                    // The tier label is the row's identity and wins the width;
-                    // on a narrow window the badge truncates before the label
-                    // collapses to one letter.
-                    Text(compactVariantLabel)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(MacTheme.Text.primary)
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
-                        .layoutPriority(2)
-                    packageBadge
-                        .lineLimit(1)
-                        .accessibilityIdentifier("settings_packageBadge_\(model.id)")
-                }
-                .layoutPriority(1)
+            // Two lines, like the phone's model row: the package names itself
+            // on the first, its state and controls follow on the second. One
+            // line could not hold four labels plus a button at a narrow window
+            // — under pseudo-localization the badge collapsed to 8 pt — and
+            // squeezing any of them truncated a label the lanes read.
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                // "Speed · 4-bit": the tier plus only the per-row fact.
+                Text(compactVariantLabel)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(MacTheme.Text.primary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                packageBadge
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .accessibilityIdentifier("settings_packageBadge_\(model.id)")
 
                 Spacer(minLength: 6)
+            }
 
+            HStack(alignment: .center, spacing: 8) {
                 HStack(spacing: 5) {
                     statusGlyph(presentation.kind)
                     Text(presentation.label)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(statusColor(presentation.kind))
                         .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                         .accessibilityIdentifier("settings_packageStatus_\(model.id)")
                 }
-                // minWidth keeps the status column aligned while letting
-                // longer labels grow instead of truncating.
-                .frame(minWidth: 94, alignment: .leading)
+
+                Spacer(minLength: 8)
 
                 MacModelPackageAction(model: model, status: status, onDelete: onDelete)
-                    .frame(minWidth: 92, alignment: .trailing)
             }
 
             // Dynamic detail only (repair reasons, download specifics).

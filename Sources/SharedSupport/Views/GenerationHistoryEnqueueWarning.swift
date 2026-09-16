@@ -12,15 +12,15 @@ struct GenerationHistoryEnqueueWarning: View {
 
     var body: some View {
         if !state.records.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: VocelloTheme.Spacing.sm) {
                 Label(VocelloPresentationText.historyUnqueuedTitle, systemImage: "exclamationmark.triangle")
                     .font(.headline)
                 Text(VocelloPresentationText.historyUnqueuedDetail)
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
                 let layout = dynamicTypeSize.isAccessibilitySize
-                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-                    : AnyLayout(HStackLayout(spacing: 12))
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: VocelloTheme.Spacing.sm))
+                    : AnyLayout(HStackLayout(spacing: VocelloTheme.Spacing.md))
                 layout {
                     Button(VocelloPresentationText.retryHistorySave) {
                         isRetrying = true
@@ -63,7 +63,7 @@ struct GenerationHistoryEnqueueWarning: View {
                 }
                 .buttonStyle(.bordered)
             }
-            .padding(12)
+            .padding(VocelloTheme.Spacing.md)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.regularMaterial)
             .accessibilityElement(children: .contain)

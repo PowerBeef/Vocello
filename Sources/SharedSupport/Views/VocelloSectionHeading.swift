@@ -56,8 +56,8 @@ struct VocelloSectionHeading: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, VocelloTheme.Spacing.xl)
         .padding(.top, topPadding)
-        .padding(.bottom, 6)
+        .padding(.bottom, VocelloTheme.Spacing.tight)
     }
 }

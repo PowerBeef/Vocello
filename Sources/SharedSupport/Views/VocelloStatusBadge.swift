@@ -66,7 +66,7 @@ struct VocelloStatusBadge: View {
     }
 
     var body: some View {
-        let shape = Capsule(style: .continuous)
+        let shape = VocelloShape.pill()
 
         Text(text)
             .font(.caption.weight(.semibold))

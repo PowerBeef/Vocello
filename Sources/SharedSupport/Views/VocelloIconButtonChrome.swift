@@ -22,7 +22,7 @@ struct VocelloIconButtonChrome: View {
             }
             .overlay {
                 Circle()
-                    .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
+                    .stroke(Color.white.opacity(0.10), lineWidth: VocelloTheme.Stroke.hairline)
             }
     }
 }

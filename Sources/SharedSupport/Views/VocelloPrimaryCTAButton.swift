@@ -148,14 +148,14 @@ struct VocelloPrimaryCTAButton: View {
     @ViewBuilder
     private var label: some View {
         if traits.hitTestsCapsule {
-            chrome.contentShape(Capsule(style: .continuous))
+            chrome.contentShape(VocelloShape.pill())
         } else {
             chrome
         }
     }
 
     private var chrome: some View {
-        HStack(alignment: .center, spacing: 8) {
+        HStack(alignment: .center, spacing: VocelloTheme.Spacing.sm) {
             if let symbol {
                 Image(systemName: symbol)
                     .font(.system(size: size.symbolPointSize, weight: .semibold))
@@ -182,16 +182,16 @@ struct VocelloPrimaryCTAButton: View {
             }
         }
         .background {
-            Capsule(style: .continuous)
+            VocelloShape.pill()
                 .fill(backgroundFill)
         }
         .overlay {
-            Capsule(style: .continuous)
+            VocelloShape.pill()
                 .stroke(strokeColor, lineWidth: size.strokeLineWidth)
         }
         .overlay {
             if size == .dock {
-                Capsule(style: .continuous)
+                VocelloShape.pill()
                     .inset(by: 0.65)
                     .stroke(Color.white.opacity(0.06), lineWidth: 0.55)
             }
@@ -199,7 +199,7 @@ struct VocelloPrimaryCTAButton: View {
         .overlay(alignment: .top) {
             if size == .dock {
                 // Lit top edge — sheen masked to the upper half.
-                Capsule(style: .continuous)
+                VocelloShape.pill()
                     .stroke(Color.white.opacity(0.22), lineWidth: 0.6)
                     .mask(
                         LinearGradient(
@@ -212,8 +212,18 @@ struct VocelloPrimaryCTAButton: View {
         }
         // Mode-colored hero glow (stronger than the pills' 0.28 @ r8) +
         // a faint ambient shadow for grounding. Glow drops under RT.
-        .shadow(color: glowColor, radius: 16, x: 0, y: 4)
-        .shadow(color: size == .dock ? Color.black.opacity(0.22) : .clear, radius: 10, x: 0, y: 6)
+        .shadow(
+            color: glowColor,
+            radius: VocelloTheme.Elevation.ctaGlowRadius,
+            x: 0,
+            y: VocelloTheme.Elevation.ctaGlowY
+        )
+        .shadow(
+            color: size == .dock ? VocelloTheme.Elevation.ctaDropColor : .clear,
+            radius: VocelloTheme.Elevation.ctaDropRadius,
+            x: 0,
+            y: VocelloTheme.Elevation.ctaDropY
+        )
     }
 
     private var strokeColor: Color {
@@ -224,6 +234,6 @@ struct VocelloPrimaryCTAButton: View {
     /// Reduce Transparency, like every other tinted bloom in the app.
     private var glowColor: Color {
         guard size == .dock, !reduceTransparency, isEnabled || traits.glowsWhenDisabled else { return .clear }
-        return tint.opacity(0.35)
+        return VocelloTheme.Elevation.ctaGlowColor(tint)
     }
 }

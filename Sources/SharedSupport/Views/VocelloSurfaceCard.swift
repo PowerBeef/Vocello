@@ -20,10 +20,10 @@ struct VocelloSurfaceCard<Content: View>: View {
         VStack(alignment: .leading, spacing: contentSpacing) {
             content
         }
-        .padding(12)
+        .padding(VocelloTheme.Spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { shape.fill(Color.white.opacity(0.04)) }
-        .overlay { shape.stroke(Color.white.opacity(0.08), lineWidth: 0.5) }
+        .overlay { shape.stroke(Color.white.opacity(0.08), lineWidth: VocelloTheme.Stroke.hairline) }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 

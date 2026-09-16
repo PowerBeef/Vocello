@@ -43,7 +43,7 @@ struct VocelloSetupChipPill<Label: View>: View {
     }
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: VocelloTheme.Spacing.tight) {
             Image(systemName: symbol)
                 .font(.system(size: 18, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
@@ -64,18 +64,22 @@ struct VocelloSetupChipPill<Label: View>: View {
         .frame(minWidth: minWidth, maxWidth: .infinity)
         .frame(height: height)
         .background {
-            Capsule(style: .continuous).fill(fillStyle)
+            VocelloShape.pill().fill(fillStyle)
         }
         .overlay {
-            Capsule(style: .continuous)
+            VocelloShape.pill()
                 .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
         }
         .overlay {
-            Capsule(style: .continuous)
+            VocelloShape.pill()
                 .inset(by: 0.65)
                 .stroke(Color.white.opacity(0.04), lineWidth: 0.55)
         }
-        .shadow(color: reduceTransparency ? .clear : tint.opacity(0.28), radius: 8, y: 1)
+        .shadow(
+            color: reduceTransparency ? .clear : VocelloTheme.Elevation.glowColor(tint),
+            radius: VocelloTheme.Elevation.glowRadius,
+            y: VocelloTheme.Elevation.glowY
+        )
     }
 
     private var fillStyle: AnyShapeStyle {

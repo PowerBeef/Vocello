@@ -40,7 +40,7 @@ struct VocelloEmptyStateCard: View {
 
     private var card: some View {
         VocelloSurfaceCard(tint: tint) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: VocelloTheme.Spacing.snug) {
                 symbol
                 Text(title)
                     .font(.headline.weight(.semibold))

@@ -167,6 +167,12 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
                 // Lock voice, delivery and language while a take is in flight
                 // (the request already captured them); re-enabled on complete.
+                // `setupChips` must be a flat list of chips. A nested layout
+                // here breaks quietly: a Layout measures its subviews at
+                // unspecified width, so an inner flow reports the rows it would
+                // take unconstrained and the outer one reserves that height,
+                // while the inner one wraps to more rows at the real width and
+                // draws over whatever follows.
                 MacChipFlow(spacing: MacTheme.Spacing.sm) {
                     setupChips
                 }

@@ -300,42 +300,44 @@ struct MacVoiceCloningScreen: View {
 
     // MARK: - Chips (two rows: the reference and its sources, then the take)
 
+    /// A flat list, like the other two Studio screens. It used to be a VStack
+    /// of two nested `MacChipFlow`s, which broke: the canvas already lays these
+    /// out in a `MacChipFlow`, and a flow measures its subviews at unspecified
+    /// width. The outer flow therefore sized this one child for the two rows it
+    /// reports unconstrained, while at 720 pt under doubled text it needed
+    /// three — so the language chip drew outside the height reserved for it,
+    /// on top of the permission caption and the reference clip card.
+    @ViewBuilder
     private var setupChips: some View {
-        VStack(alignment: .leading, spacing: MacTheme.Spacing.sm) {
-            MacChipFlow(spacing: MacTheme.Spacing.sm, rowSpacing: MacTheme.Spacing.sm) {
-                MacStudioChipContainer(accessibilityIdentifier: "voiceCloning_voiceSetup") { referenceChip }
-                MacStudioActionChip(
-                    eyebrow: MacInterfaceText.cloningReferenceSection,
-                    value: draft.referenceAudioPath == nil ? MacInterfaceText.cloningImport : MacInterfaceText.cloningReplace,
-                    leadingSymbol: "waveform.badge.plus",
-                    tint: tint,
-                    accessibilityIdentifier: "voiceCloning_importButton",
-                    action: browseForAudio
-                )
-                MacStudioActionChip(
-                    eyebrow: MacInterfaceText.cloningReferenceSection,
-                    value: MacInterfaceText.recordRecord,
-                    leadingSymbol: "mic.fill",
-                    tint: tint,
-                    accessibilityIdentifier: "voiceCloning_recordReferenceButton",
-                    action: { isRecordSheetPresented = true }
-                )
-                if let persona = selectedBankPersona {
-                    bankDeliveryChip(persona)
-                }
-            }
-            MacChipFlow(spacing: MacTheme.Spacing.sm, rowSpacing: MacTheme.Spacing.sm) {
-                MacStudioChipContainer(accessibilityIdentifier: "voiceCloning_languageSetup") {
-                    MacStudioLanguageChip(
-                        selectedLanguage: $draft.selectedLanguage,
-                        detectedLanguage: detectedPromptLanguage,
-                        tint: tint,
-                        accessibilityIdentifier: "voiceCloning_languagePicker"
-                    )
-                }
-                MacSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: tint)
-            }
+        MacStudioChipContainer(accessibilityIdentifier: "voiceCloning_voiceSetup") { referenceChip }
+        MacStudioActionChip(
+            eyebrow: MacInterfaceText.cloningReferenceSection,
+            value: draft.referenceAudioPath == nil ? MacInterfaceText.cloningImport : MacInterfaceText.cloningReplace,
+            leadingSymbol: "waveform.badge.plus",
+            tint: tint,
+            accessibilityIdentifier: "voiceCloning_importButton",
+            action: browseForAudio
+        )
+        MacStudioActionChip(
+            eyebrow: MacInterfaceText.cloningReferenceSection,
+            value: MacInterfaceText.recordRecord,
+            leadingSymbol: "mic.fill",
+            tint: tint,
+            accessibilityIdentifier: "voiceCloning_recordReferenceButton",
+            action: { isRecordSheetPresented = true }
+        )
+        if let persona = selectedBankPersona {
+            bankDeliveryChip(persona)
         }
+        MacStudioChipContainer(accessibilityIdentifier: "voiceCloning_languageSetup") {
+            MacStudioLanguageChip(
+                selectedLanguage: $draft.selectedLanguage,
+                detectedLanguage: detectedPromptLanguage,
+                tint: tint,
+                accessibilityIdentifier: "voiceCloning_languagePicker"
+            )
+        }
+        MacSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: tint)
     }
 
     private struct SourceEntry: Identifiable {

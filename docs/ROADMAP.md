@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `macos-ui-fidelity-2026-09` | active | backend-and-platform | 1/4 (25%) |
+| `macos-ui-fidelity-2026-09` | active | backend-and-platform | 2/5 (40%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -33,20 +33,20 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `UIF-02` | in-flight | One copy of each shared view primitive | — |
 | `UIF-03` | planned | History and Saved Voices on the iOS row and chip metrics | — |
 | `UIF-04` | planned | Settings and shell polish | — |
+| `UIF-05` | in-flight | One scale: type, control sizes, radii, strokes, spacing | — |
 
 ### Open items in detail
-
-- **`UIF-02`** (in-flight) — One copy of each shared view primitive.
-  gate: The shared bodies of the stable-hash, waveform thumbnail, mode dot, voice avatar, icon-button chrome, surface and empty-state cards, status badge, section heading, product lockup, primary CTA, setup-chip pill and subtle-glass chrome live under Sources/SharedSupport/Views with IOS<Name> forwards; the macOS twins are deleted and the call sites point at the shared types; VocelloShape replaces the hand-written rounded rectangles whose radius token matches; the diff changes no rendered constant or accessibility identifier on either platform; a control moved into SharedSupport keeps its ios-control-audit policy; the generic iOS device-SDK compile and the macOS unit lane are green. The filter chip row and the settings row family are deliberately NOT moved here: both are UIKit-bound in behaviour and UIF-03/UIF-04 rewrite exactly the numbers that would have to be parameterised, so they move with the commit that changes them.
 
 - **`UIF-03`** (planned) — History and Saved Voices on the iOS row and chip metrics.
   gate: Filter chips are equal width at 32 pt with 13 pt labels; History rows use the 15 pt title with -0.15 tracking, 10 pt padding and one ellipsis menu carrying every action identifier; both screens show the inline search field; Saved Voices gains the All/Built-in/Saved filters, the built-in speakers section and the dashed save-a-new-voice card, and drops the extra glass layer; sort and enroll stay in the toolbar; localization, smoke and perf pass.
 
 - **`UIF-04`** (planned) — Settings and shell polish.
   gate: Settings icons are 20 pt symbols in the 28 pt slot, action buttons 44 pt tall, the section border the clipped hairline, gutters 16/12/16, and the nested package cards flattened to the iOS model-row shape so no label truncates; the inline player card adopts the iOS card geometry; the sidebar selection pill matches the phone's; MacWaveformBars gains the third band and the playhead; the marketing captures are retaken and sent; localization, smoke and perf pass.
+
+- **`UIF-05`** (in-flight) — One scale: type, control sizes, radii, strokes, spacing.
+  gate: VocelloTypography (role vocabulary + VocelloTextStyle spec) and the macOS table in MacTypeScale exist, with six sizes covering thirteen roles and no role appearing twice; MacControl carries the six control heights with the glyph size and shape that belong to each; VocelloTheme gains Radius.row, Stroke, Elevation, Opacity and the two intra-control spacing steps; Sources/Views carries no hand-written font size, control height, corner radius, stroke width or shadow that a token covers; one screen gutter across every destination; the layout assertions (assertSingleLine 24 pt, assertSavedVoicesLayoutIntact) and the localization lane pass at the narrow window; captures reviewed by the maintainer.
 
 ## Autonomous validation audit remediation
 

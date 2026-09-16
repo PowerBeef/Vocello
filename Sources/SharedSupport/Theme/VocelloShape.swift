@@ -2,6 +2,10 @@ import SwiftUI
 
 /// Shape factories over the shared radii (iOS `ThemeShape` forwards here).
 enum VocelloShape {
+    static func row() -> RoundedRectangle {
+        RoundedRectangle(cornerRadius: VocelloTheme.Radius.row, style: .continuous)
+    }
+
     static func card() -> RoundedRectangle {
         RoundedRectangle(cornerRadius: VocelloTheme.Radius.card, style: .continuous)
     }

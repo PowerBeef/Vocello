@@ -105,13 +105,72 @@ enum VocelloTheme {
     enum Radius {
         static let chip: CGFloat = 8
         static let input: CGFloat = 10
+        /// Rows and row-sized tiles: the list language, distinct from a
+        /// card's 16. Already the de facto value at eight macOS sites before
+        /// it had a name.
+        static let row: CGFloat = 12
         static let card: CGFloat = 16
         static let stage: CGFloat = 22
         static let sheetGrabber: CGFloat = 3
     }
 
+    /// Border widths. Three steps, because a surface either whispers its
+    /// edge, states it, or is focused. Before these existed the app drew
+    /// hairlines at 0.5, 0.55, 0.7, 0.75 and 0.8, so a chip could carry a
+    /// heavier outline than the card containing it.
+    enum Stroke {
+        static let hairline: CGFloat = 0.5
+        static let standard: CGFloat = 1
+        static let focus: CGFloat = 2
+    }
+
+    /// The four shadows the apps actually use, named so a surface picks a tier
+    /// instead of inventing a recipe.
+    enum Elevation {
+        /// A card lifted off the canvas.
+        static let cardColor = Color.black.opacity(0.22)
+        static let cardRadius: CGFloat = 5
+        static let cardY: CGFloat = 2
+
+        /// A tinted control's bloom (chips, the Batch square).
+        static func glowColor(_ tint: Color) -> Color { tint.opacity(0.28) }
+        static let glowRadius: CGFloat = 8
+        static let glowY: CGFloat = 1
+
+        /// The primary call to action: a tint bloom over a dark drop.
+        static func ctaGlowColor(_ tint: Color) -> Color { tint.opacity(0.35) }
+        static let ctaGlowRadius: CGFloat = 16
+        static let ctaGlowY: CGFloat = 4
+        static let ctaDropColor = Color.black.opacity(0.22)
+        static let ctaDropRadius: CGFloat = 10
+        static let ctaDropY: CGFloat = 6
+
+        /// Chrome floating over content: the dock, a popover.
+        static let floatingColor = Color.black.opacity(0.40)
+        static let floatingRadius: CGFloat = 18
+        static let floatingY: CGFloat = 14
+    }
+
+    /// Dimming, which the app previously expressed with six values (0.42, 0.45,
+    /// 0.5, 0.55, 0.62, 0.7) for three ideas.
+    enum Opacity {
+        /// A control that cannot be used.
+        static let disabled: Double = 0.45
+        /// A value standing in for one the user has not chosen yet.
+        static let placeholder: Double = 0.55
+        /// Live content held back while something else has the focus.
+        static let dimmed: Double = 0.5
+    }
+
     enum Spacing {
         static let xs: CGFloat = 4
+        /// Glyph to label inside a control. Off the 4 pt layout grid on
+        /// purpose: controls have their own rhythm, and 6 was already the
+        /// app's most common intra-control gap.
+        static let tight: CGFloat = 6
+        /// A row's internal gaps. Likewise off-grid and likewise already
+        /// dominant, at 33 uses before it had a name.
+        static let snug: CGFloat = 10
         static let sm: CGFloat = 8
         static let md: CGFloat = 12
         static let lg: CGFloat = 16

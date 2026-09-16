@@ -32,6 +32,17 @@ controls attached to the detail column. Lanes on 2be20f0c: localization 012725-a
 013020-f98f17b1 7/7, perf 014036-508e2487 nine scenarios clean, custom benchmark 014846-5892b77c.
 Two CI-only compile errors this evening came from the same source, Xcode 26.6 on CI against Xcode 27
 here; both were isolation annotations, both fixed forward, and CI is read after every push. Next:
+UIF-05 follows, and runs before the remaining screen work: the maintainer judged the composition right
+but the elements and text proportions incoherent, and three inventories measured why. The macOS app
+renders 38 text styles for 13 roles, with 10 pt alone carrying thirteen of them because `.caption`,
+`.caption2` and `.footnote` all resolve to 10 pt on macOS; a row title is rendered at 10, 11, 12, 13 and
+14 pt on different screens; fourteen interactive control heights live between 22 and 56, six of them used
+once; one warning triangle appears at seven sizes; and half the layout numbers sit off the project's own
+4 pt grid while the shared `Spacing` tokens are used seven times against roughly two hundred literals. The
+scale is six type steps for thirteen roles, six control heights each carrying the glyph size and shape
+that belong to it, and new stroke, elevation and opacity tokens, all in the shared theme so the two apps
+cannot drift apart on type the way they just did on primitives.
+
 UIF-02 collapsed the duplicated view primitives into `Sources/SharedSupport/Views` as a pure move:
 thirteen types, 923 lines of duplication removed, every platform difference now a parameter carrying
 the value that side already had. A verification fleet audited each pair adversarially and refuted

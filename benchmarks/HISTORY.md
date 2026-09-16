@@ -1582,6 +1582,7 @@ trend percentages carry their direction in words.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-16 | [`macos-xcui-perf-20260916-001505-cc72b89a`](runs/ui-perf/macos-xcui-perf-20260916-001505-cc72b89a.json) | canonical | canonical | passed | not-applicable | 9 | — | `c54b8dff3fea` | `b4dfc3e8a507` | baseline | macos-xcui-perf-20260916-001505-cc72b89a |
 | 2026-09-16 | [`macos-xcui-perf-20260916-014036-508e2487`](runs/ui-perf/macos-xcui-perf-20260916-014036-508e2487.json) | canonical | canonical | passed | not-applicable | 9 | — | `2be20f0cec2d` | `b4dfc3e8a507` | vs macos-xcui-perf-20260916-001505-cc72b89a: compatible | macos-xcui-perf-20260916-014036-508e2487 |
+| 2026-09-16 | [`macos-xcui-perf-20260916-030032-8960acc3`](runs/ui-perf/macos-xcui-perf-20260916-030032-8960acc3.json) | canonical | canonical | passed | not-applicable | 9 | — | `742753b9b892` | `b4dfc3e8a507` | vs macos-xcui-perf-20260916-014036-508e2487: compatible | macos-xcui-perf-20260916-030032-8960acc3 |
 
 ## ui-perf / macos / mac-mini-m2-8gb / config `b9aa3720228c`
 

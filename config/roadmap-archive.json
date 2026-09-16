@@ -3399,6 +3399,29 @@
         "file:Sources/Views/Studio/MacStudioCanvas.swift",
         "file:Sources/Views/Theme/MacTheme.swift"
       ]
+    },
+    {
+      "id": "UIF-02",
+      "title": "One copy of each shared view primitive",
+      "status": "done",
+      "gate": "The shared bodies of the stable-hash, waveform thumbnail, mode dot, voice avatar, icon-button chrome, surface and empty-state cards, status badge, section heading, product lockup, primary CTA, setup-chip pill and subtle-glass chrome live under Sources/SharedSupport/Views with IOS<Name> forwards; the macOS twins are deleted and the call sites point at the shared types; VocelloShape replaces the hand-written rounded rectangles whose radius token matches; the diff changes no rendered constant or accessibility identifier on either platform; a control moved into SharedSupport keeps its ios-control-audit policy; the generic iOS device-SDK compile and the macOS unit lane are green. The filter chip row and the settings row family are deliberately NOT moved here: both are UIKit-bound in behaviour and UIF-03/UIF-04 rewrite exactly the numbers that would have to be parameterised, so they move with the commit that changes them.",
+      "sourceOfTruth": [
+        "Sources/SharedSupport/Views/VocelloPrimaryCTAButton.swift",
+        "Sources/SharedSupport/Views/VocelloSetupChipPill.swift",
+        "Sources/SharedSupport/Theme/VocelloShape.swift",
+        "Sources/Views/Primitives/MacListPrimitives.swift"
+      ],
+      "notes": "Closed 2026-09-16 with 742753b9. Thirteen primitives moved to Sources/SharedSupport/Views with IOS<Name> forwards (typealias where the API matched, same-init wrapper where the body needed an environment key, a scaled metric or the iOS animation helper); the Mac twins are deleted; 923 lines of duplication removed for 254 added. Every platform difference became a parameter carrying that side's current value, so nothing rendered changed. A 42-agent verification fleet audited each pair with three adversarial lenses and refuted all 8 claimed regressions; its completeness critic caught the phone's .tracking(0) riding onto the macOS wordmark (which never set tracking, and .tracking(0) overrides the face's own table) and the primary CTA's Button leaving the ios-control-audit scan when it moved into SharedSupport — the scanner now reads Sources/SharedSupport/Views and the CTA has its own coverage row. Filter chip row and settings rows deferred to UIF-03/UIF-04, recorded in the gate. Lanes: localization 024705-99dd3586, smoke 025009-6b8d3693 7/7, perf 030032-8960acc3 nine scenarios clean.",
+      "plan": "macos-ui-fidelity-2026-09",
+      "updated": "2026-09-15",
+      "evidence": [
+        "commit:742753b9",
+        "run:macos-xcui-localization-20260916-024705-99dd3586",
+        "run:macos-xcui-smoke-20260916-025009-6b8d3693",
+        "run:macos-xcui-perf-20260916-030032-8960acc3",
+        "file:Sources/SharedSupport/Views/VocelloPrimaryCTAButton.swift",
+        "file:scripts/ios_control_audit.py"
+      ]
     }
   ]
 }

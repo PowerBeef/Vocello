@@ -1,12 +1,20 @@
 import SwiftUI
 
-/// The Studio dock hero player (the iOS `IOSStudioPlayerCard`): one card for
-/// the live streaming preview and the completed take, so the live → complete
-/// transition morphs in place. The shared `AudioPlayerViewModel` owns the
-/// audio on the desktop (the sidebar footer card mirrors the same player), so
-/// this card reads and drives it directly. While live, its trailing control
-/// is the lanes' `textInput_cancelButton`; complete, it offers Save As,
-/// Reveal in Finder and Dismiss.
+/// The Studio dock card (the iOS `IOSStudioPlayerCard`): one card for the live
+/// streaming preview and the completed take, so the live → complete transition
+/// morphs in place.
+///
+/// The two phases are deliberately not the same shape. **Live** is a player:
+/// waveform, clock, scrubber, play/pause, and the lanes' `textInput_cancelButton`
+/// — it is the surface being watched while a take streams. **Complete** is a
+/// result row: the take's identity and what you can do with it (Generate again,
+/// Save As, Reveal in Finder, Dismiss), and no transport at all. Playback of a
+/// finished take belongs to the sidebar footer card, which is on screen from
+/// every destination; showing a second one here gave one sound two play buttons
+/// and two clocks, which the maintainer asked to remove on 2026-09-16.
+///
+/// The shared `AudioPlayerViewModel` owns the audio either way, so both this
+/// card and the sidebar's read and drive the same player.
 struct MacStudioPlayerCard: View {
     enum Phase: Equatable {
         case live(IOSStudioLivePreviewItem)
@@ -60,7 +68,15 @@ struct MacStudioPlayerCard: View {
         let shape = VocelloShape.stage()
 
         VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
-            MacStudioWaveformRow(tint: tint)
+            // Transport belongs to the sidebar player, which is always on
+            // screen; a finished take showing its own waveform, clock and
+            // scrubber gave one sound two play buttons and two clocks
+            // (maintainer decision 2026-09-16). The live preview keeps its
+            // own, because it is the surface being watched while a take
+            // streams and it carries Cancel.
+            if phase.isLive {
+                MacStudioWaveformRow(tint: tint)
+            }
             controlsRow
 
             if let notice = phase.completedItem?.cadenceNotice {
@@ -112,33 +128,40 @@ struct MacStudioPlayerCard: View {
         }
     }
 
+    /// Only the live preview has one; see the note in `body`.
+    private var playPauseButton: some View {
+        Button {
+            AppLaunchConfiguration.performAnimated(MacTheme.Motion.stateChange) {
+                audioPlayer.togglePlayPause()
+            }
+        } label: {
+            Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
+                .font(.system(size: MacControl.field.glyph, weight: .semibold))
+                .foregroundStyle(MacTheme.Text.onAccent)
+                .macControlSquare(.field)
+                .background {
+                    Circle().fill(
+                        LinearGradient(
+                            colors: [tint, tint.mix(with: .black, by: 0.20, in: .perceptual)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                }
+                .overlay { Circle().stroke(Color.white.opacity(0.18), lineWidth: VocelloTheme.Stroke.hairline) }
+        }
+        .buttonStyle(.plain)
+        .disabled(!audioPlayer.hasAudio)
+        .accessibilityLabel(MacInterfaceText.menuPlayPause)
+        .accessibilityValue(audioPlayer.isPlaying ? "pause" : "play")
+        .accessibilityIdentifier("studio_livePreview_playPause")
+    }
+
     private var controlsRow: some View {
         HStack(spacing: MacTheme.Spacing.snug) {
-            Button {
-                AppLaunchConfiguration.performAnimated(MacTheme.Motion.stateChange) {
-                    audioPlayer.togglePlayPause()
-                }
-            } label: {
-                Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: MacControl.field.glyph, weight: .semibold))
-                    .foregroundStyle(MacTheme.Text.onAccent)
-                    .macControlSquare(.field)
-                    .background {
-                        Circle().fill(
-                            LinearGradient(
-                                colors: [tint, tint.mix(with: .black, by: 0.20, in: .perceptual)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                    }
-                    .overlay { Circle().stroke(Color.white.opacity(0.18), lineWidth: VocelloTheme.Stroke.hairline) }
+            if phase.isLive {
+                playPauseButton
             }
-            .buttonStyle(.plain)
-            .disabled(!audioPlayer.hasAudio)
-            .accessibilityLabel(MacInterfaceText.menuPlayPause)
-            .accessibilityValue(audioPlayer.isPlaying ? "pause" : "play")
-            .accessibilityIdentifier(phase.isLive ? "studio_livePreview_playPause" : "studio_inlinePlayer_playPause")
 
             VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {
                 Text(phase.voiceName)

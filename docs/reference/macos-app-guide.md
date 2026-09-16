@@ -91,7 +91,7 @@ does — so the desktop's Speed/Quality switch (`<prefix>_speedVariantButton`,
 | Readiness | `customVoice_readiness` (value "Ready" or "Waiting"), one caption after the mode label in the meta line, where the phone puts it |
 | Generate CTA | `textInput_generateButton`; error bar `textInput_generationError` retries |
 | Generating | `textInput_generatingBar` with `textInput_cancelButton`; once audio streams, the player card `studio_livePreview_card` carries the same cancel |
-| Completed take | `studio_inlinePlayer_generation_<id>` with play/pause, `studio_inlinePlayer_retry`, `studio_inlinePlayer_saveAs`, `studio_inlinePlayer_reveal`, `studio_inlinePlayer_dismiss` (confirmed by `studio_inlinePlayer_dismissConfirm`); the sidebar footer card mirrors the same shared player |
+| Completed take | `studio_inlinePlayer_generation_<id>`: a result row, not a player — the take's identity plus `studio_inlinePlayer_retry`, `studio_inlinePlayer_saveAs`, `studio_inlinePlayer_reveal` and `studio_inlinePlayer_dismiss` (confirmed by `studio_inlinePlayer_dismissConfirm`). It carries no waveform, clock, scrubber or play/pause: playback of a finished take belongs to the sidebar footer card, which is reachable from every destination (maintainer decision 2026-09-16) |
 | Batch | `textInput_batchButton` chip (opens the batch sheet) |
 | Pinned seed chip | `textInput_seedPinChip` while a seed is pinned (DP-15); its confirmation's `textInput_seedUnpin` clears it back to fresh-seed-per-take. Shared across all three modes |
 

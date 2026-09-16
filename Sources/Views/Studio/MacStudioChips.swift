@@ -292,12 +292,28 @@ struct MacChipFlow: Layout {
         var index = 0
         var y = bounds.minY
 
-        // Equal shares, like `.frame(maxWidth: .infinity)` inside the phone's
-        // HStack. One share for every row, so a trailing row that holds fewer
-        // chips lines up under the row above instead of stretching its last
-        // chip across the whole width.
+        // What a chip needs first, then the leftover split evenly. Equal shares
+        // alone gave a four-letter language default the same width as the
+        // user's own saved-voice name, so "Warm Narrator (Angry)" truncated to
+        // "Warm Nar..." at every window size while "Auto" sat in a pill it did
+        // not need. The row still fills its width and still lines up with the
+        // row above, because the leftover is shared equally.
+        //
+        // One share for every row, not for the chips actually on it, so a
+        // trailing row holding fewer chips lines up under the row above instead
+        // of stretching its last chip across the whole width.
         let fullRowAvailable = bounds.width - spacing * CGFloat(perRow - 1)
-        let share = (fullRowAvailable / CGFloat(perRow)).rounded(.down)
+        let equalShare = (fullRowAvailable / CGFloat(perRow)).rounded(.down)
+        let ideals = subviews.map { $0.sizeThatFits(.unspecified).width }
+        let widestRowIdeal = stride(from: 0, to: subviews.count, by: perRow)
+            .map { start in ideals[start ..< min(start + perRow, ideals.count)].reduce(0, +) }
+            .max() ?? 0
+        // Only when every chip's natural width fits; otherwise equal shares are
+        // already the fair answer and `chipsPerRow` has guaranteed the floor.
+        let honorsIdealWidths = widestRowIdeal <= fullRowAvailable
+        let surplus = honorsIdealWidths
+            ? ((fullRowAvailable - widestRowIdeal) / CGFloat(perRow)).rounded(.down)
+            : 0
 
         while index < subviews.count {
             let count = min(perRow, subviews.count - index)
@@ -307,7 +323,10 @@ struct MacChipFlow: Layout {
             for offset in 0..<count {
                 // The last chip of a full row absorbs the rounding remainder so
                 // the row ends exactly on the container's trailing edge.
-                let width = (isFullRow && offset == count - 1) ? bounds.maxX - x : share
+                let natural = honorsIdealWidths
+                    ? max(ideals[index + offset] + surplus, minimumChipWidth)
+                    : equalShare
+                let width = (isFullRow && offset == count - 1) ? bounds.maxX - x : natural
                 subviews[index + offset].place(
                     at: CGPoint(x: x, y: y),
                     anchor: .topLeading,

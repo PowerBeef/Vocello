@@ -50,13 +50,12 @@ enum MacStudioMetrics {
     /// silhouette does not jump between the idle CTA and the generating bar:
     /// the primary control plus one step of air under it.
     static let dockMinHeight: CGFloat = MacControl.primary.height + MacTheme.Spacing.sm
-    /// Six lines of the 22 pt face plus the editor's vertical insets. The
-    /// desktop composer is a bounded area that grows with its text instead of
-    /// the phone's flexible pad, because a Mac window has no thumb zone to
-    /// justify pinning the controls to the bottom of a void.
+    /// Six lines of the 22 pt face plus the editor's vertical insets: the
+    /// floor below which the script never shrinks, even in the shortest
+    /// window. Above it the script takes every point the chips and the dock do
+    /// not, because it is the one region this product exists to host and it
+    /// was the one region that could not grow.
     static let composerMinHeight: CGFloat = 176
-    /// Share of the canvas the composer may take before it scrolls internally.
-    static let composerMaxFraction: CGFloat = 0.55
 }
 
 /// Readiness of the current mode, rendered as one caption beside the mode
@@ -112,7 +111,6 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
 
     @State private var isScriptFocused = false
     /// Height of the laid-out script, reported by the editor bridge.
-    @State private var scriptContentHeight: CGFloat = 0
 
     init(
         mode: GenerationMode,
@@ -157,20 +155,14 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     }
 
     var body: some View {
-        // Pinned to the viewport: every child receives a finite proposal and
-        // the canvas's own minimum size is zero, so the window never grows to
-        // fit the composer; the composer scrolls instead.
-        GeometryReader { proxy in
-            canvasColumn(canvasHeight: proxy.size.height)
-                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(shortcutBridge)
+        canvasColumn
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(shortcutBridge)
     }
 
-    private func canvasColumn(canvasHeight: CGFloat) -> some View {
+    private var canvasColumn: some View {
         VStack(alignment: .leading, spacing: 0) {
-            composerPad(editorHeight: editorHeight(canvasHeight: canvasHeight))
+            composerPad
 
             VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
                 // Lock voice, delivery and language while a take is in flight
@@ -198,37 +190,32 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
                 .padding(.bottom, MacTheme.Spacing.lg)
                 .accessibilityElement(children: .contain)
 
-            // Desktop eyes expect a form to end and space to follow; the
-            // phone's void sat between the script and the controls.
-            Spacer(minLength: 0)
         }
         .frame(maxWidth: MacStudioMetrics.contentMaxWidth)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .appAnimation(MacTheme.Motion.stateChange, value: genState)
     }
 
-    /// The editor grows with its text between the six-line floor and a share
-    /// of the canvas; past the ceiling it scrolls inside its own scroll view.
-    private func editorHeight(canvasHeight: CGFloat) -> CGFloat {
-        let ceiling = max(MacStudioMetrics.composerMinHeight, (canvasHeight * MacStudioMetrics.composerMaxFraction).rounded(.down))
-        return min(max(scriptContentHeight, MacStudioMetrics.composerMinHeight), ceiling)
-    }
-
     // MARK: - Composer pad
 
-    private func composerPad(editorHeight: CGFloat) -> some View {
+    /// No card, no border, and the emptiness under a short script is the
+    /// point: `IOSStudioCanvas.composerPad` says "No card background, no
+    /// border. The composer fills available vertical space", and this is that
+    /// composer adapted to a window. A design review asked for a container
+    /// here, on the grounds that the primary input has none while Voice
+    /// Design's secondary brief field does. Declined: the reference world
+    /// deliberately has none, and the brief outranks the reviewer.
+    private var composerPad: some View {
         VStack(alignment: .leading, spacing: 0) {
             MacScriptTextEditor(
                 text: $script,
                 placeholder: placeholder,
                 font: .systemFont(ofSize: MacType.style(.script).size, weight: .medium),
                 isFocused: $isScriptFocused,
-                tracking: MacType.style(.script).tracking,
-                contentHeight: $scriptContentHeight
+                tracking: MacType.style(.script).tracking
             )
             .frame(maxWidth: .infinity)
-            .frame(height: editorHeight)
-            .appAnimation(MacTheme.Motion.stateChange, value: editorHeight)
+            .frame(minHeight: MacStudioMetrics.composerMinHeight, maxHeight: .infinity)
 
             // The meta line sits right under the script, above the chips:
             // mode, readiness, Clear, count.

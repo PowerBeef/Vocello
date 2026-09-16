@@ -354,6 +354,21 @@ public enum VocelloUIWait {
         return true
     }
 
+    /// Waits like `condition`, but treats a timeout as an answer rather than a
+    /// failure. Use it only where not happening is a legitimate outcome the
+    /// caller acts on -- an edge drag that missed, a frame that has finished
+    /// settling -- never as a way to soften an assertion that should fail.
+    public static func settles(
+        _ description: String,
+        timeout: TimeInterval,
+        evaluate: @escaping () -> Bool
+    ) -> Bool {
+        let anchor = NSObject()
+        let predicate = NSPredicate { _, _ in evaluate() }
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: anchor)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
     /// Waits for `evaluate` like `condition`, but also gives up early when the
     /// visible `progress` signature has not changed for `stallBudget` seconds.
     /// Long generations legitimately take many minutes; a run whose UI stops

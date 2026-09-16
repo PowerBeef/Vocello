@@ -207,10 +207,11 @@ enum VocelloUIWindowFrame {
             edge.click(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: delta, dy: 0)))
 
             // Wait on the window, not on the clock: the resize either lands or
-            // the drag missed, and a condition wait says which as soon as it is
-            // true instead of always paying for the slowest case. A miss costs
-            // the full timeout, which is why the runaway guard is small.
-            _ = VocelloUIWait.condition("window width to change", timeout: 2) {
+            // the drag missed, and this says which as soon as it is true instead
+            // of always paying for the slowest case. A miss is expected -- the
+            // drag is nondeterministic -- so this uses the non-failing wait and
+            // lets the loop below decide what a miss means.
+            _ = VocelloUIWait.settles("window width to change", timeout: 2) {
                 abs(window.frame.width - before.width) >= 1
             }
             // A press where the previous drag released chains into a

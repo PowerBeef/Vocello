@@ -17,6 +17,24 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### The Mac screens read like the iOS app, on a desktop (September 15, evening)
+
+The close-out captures showed that adopting the iOS screens had not adopted the iOS design: the
+skeleton matched, nearly every surface had been re-implemented at different numbers. Plan
+`macos-ui-fidelity-2026-09` (UIF-01 to UIF-04) is primary; its decisions live in the "UI fidelity
+follow-up" section of `docs/reference/macos-ios-convergence-2026-09.md`. UIF-01 is closed: the Studio
+canvas went to the phone's composition (5140a475), the localization lane caught a Settings row the
+close-out had squeezed (c54b8dff), and the maintainer's review of the literal copy led to the
+desktop pass (03c12444, 2be20f0c): a composer sized to its text with the controls under it and space
+at the bottom, Batch as a square beside Generate, the column at 640 pt, one mode wash across sidebar
+and canvas painted per split-view column, and a transparent title bar with the per-destination
+controls attached to the detail column. Lanes on 2be20f0c: localization 012725-a705d1fe, smoke
+013020-f98f17b1 7/7, perf 014036-508e2487 nine scenarios clean, custom benchmark 014846-5892b77c.
+Two CI-only compile errors this evening came from the same source, Xcode 26.6 on CI against Xcode 27
+here; both were isolation annotations, both fixed forward, and CI is read after every push. Next:
+UIF-02 collapses the duplicated view primitives into `Sources/SharedSupport/Views` as a pure move,
+then UIF-03 History and Saved Voices, UIF-04 Settings and the shell, and the captures are retaken.
+
 ### macOS converges on the iOS architecture (September 14)
 
 The maintainer decided that the iOS app's design and architecture are the project's gold

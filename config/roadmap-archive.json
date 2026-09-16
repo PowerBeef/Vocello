@@ -3372,6 +3372,33 @@
         "file:docs/reference/macos-release-qa.md"
       ],
       "notes": "Closed 2026-09-15 with 55c8cd9b. config/ui-perf-thresholds.json re-baselined (baseline-v3) from three perf sessions on the converged tree: 220611-0bb33592, 221935-636488c2, 222752-64610737 (all nine scenarios passed, no warnings); ceilings = 2x hitch median / 1.5x gap median, never below 1.25x the observed maximum, floors 5 ms/s and 40 ms, warn-only kept. Marketing captures retaken through VocelloMacMarketingCaptureUITests (explicit run, QVOICE_MARKETING_CAPTURE=1, English pinned, debug History staged empty and restored) with a new Voice Design + Settings capture; six README and website images replaced. macos-release-qa.md gained the attended walk of the converged screens; the convergence doc records the outcome; CONV-20 and CONV-21 re-homed to release-first, which is primary again; the plan is archived complete."
+    },
+    {
+      "id": "UIF-01",
+      "title": "Studio canvas: the phone's chip row, dock and mode wash",
+      "status": "done",
+      "gate": "The three Studio screens carry no title row and MacGenerationVariantSelector is in MacWindowToolbar; the chips share the row at equal widths on one line at 46 pt; the Generate CTA is full width at 56 pt; the canvas paints VocelloModeBackdrop at the mode tint; the readiness note is one caption in the meta line keeping <prefix>_readiness with its Ready/Waiting value; the counter reads N / 900 from the shared limit policy; localization, smoke, perf and the short custom benchmark pass.",
+      "sourceOfTruth": [
+        "Sources/Views/Studio/MacStudioCanvas.swift",
+        "Sources/Views/Studio/MacStudioSetupChip.swift",
+        "Sources/SharedSupport/Views/VocelloModeBackdrop.swift",
+        "Sources/Views/Shell/MacWindowToolbar.swift"
+      ],
+      "notes": "Closed 2026-09-15 with 5140a475 (phone composition: 46 pt one-line equal-width chips, 56 pt full-width Generate, mode wash, no title row, the phone's meta line and 900-character counter), c54b8dff (Settings package row on two lines; the localization lane caught the badge at 8 pt), 03c12444 (desktop pass: top-down flow with a TextKit 2 content-sized composer at a 176 pt floor and 55 % ceiling, Batch as a 56 pt square beside Generate with a ⌘↩ hint, column 640 pt, one whisper wash painted per split-view column as slices of a window-sized surface, transparent title bar with no title, toolbar controls attached to the detail column behind a flexible spacer) and 2be20f0c (the height measurement isolated to the main actor; Xcode 26.6 on CI refused what Xcode 27 accepted). Lanes on 2be20f0c: localization 012725-a705d1fe, smoke 013020-f98f17b1 7/7, perf 014036-508e2487 (nine scenarios, no warnings; composer-typing hitch 30 ms/s vs 37 ceiling, up from 18 with the per-keystroke measurement), custom benchmark 014846-5892b77c. Maintainer reviewed the Built-in Voice capture.",
+      "plan": "macos-ui-fidelity-2026-09",
+      "updated": "2026-09-15",
+      "evidence": [
+        "commit:5140a475",
+        "commit:c54b8dff",
+        "commit:03c12444",
+        "commit:2be20f0c",
+        "run:macos-xcui-localization-20260916-012725-a705d1fe",
+        "run:macos-xcui-smoke-20260916-013020-f98f17b1",
+        "run:macos-xcui-perf-20260916-014036-508e2487",
+        "run:macos-xcui-benchmark-20260916-014846-5892b77c",
+        "file:Sources/Views/Studio/MacStudioCanvas.swift",
+        "file:Sources/Views/Theme/MacTheme.swift"
+      ]
     }
   ]
 }

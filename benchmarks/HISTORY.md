@@ -1338,6 +1338,7 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-16 | [`macos-xcui-benchmark-20260916-002319-0abd5326`](runs/ui-generation/macos-xcui-benchmark-20260916-002319-0abd5326.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | 0.77 | `c54b8dff3fea` | `4bafacb97dfa` | baseline | macos-xcui-benchmark-20260916-002319-0abd5326 |
+| 2026-09-16 | [`macos-xcui-benchmark-20260916-014846-5892b77c`](runs/ui-generation/macos-xcui-benchmark-20260916-014846-5892b77c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | 0.81 | `2be20f0cec2d` | `4bafacb97dfa` | vs macos-xcui-benchmark-20260916-002319-0abd5326: RTF +6.4% (slower), RAM -2.1% | macos-xcui-benchmark-20260916-014846-5892b77c |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `54c3c1bb6bba`
 
@@ -1580,6 +1581,7 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-16 | [`macos-xcui-perf-20260916-001505-cc72b89a`](runs/ui-perf/macos-xcui-perf-20260916-001505-cc72b89a.json) | canonical | canonical | passed | not-applicable | 9 | — | `c54b8dff3fea` | `b4dfc3e8a507` | baseline | macos-xcui-perf-20260916-001505-cc72b89a |
+| 2026-09-16 | [`macos-xcui-perf-20260916-014036-508e2487`](runs/ui-perf/macos-xcui-perf-20260916-014036-508e2487.json) | canonical | canonical | passed | not-applicable | 9 | — | `2be20f0cec2d` | `b4dfc3e8a507` | vs macos-xcui-perf-20260916-001505-cc72b89a: compatible | macos-xcui-perf-20260916-014036-508e2487 |
 
 ## ui-perf / macos / mac-mini-m2-8gb / config `b9aa3720228c`
 

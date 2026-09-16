@@ -96,25 +96,9 @@
   ],
   "items": [
     {
-      "id": "UIF-01",
-      "title": "Studio canvas: the phone's chip row, dock and mode wash",
-      "status": "in-flight",
-      "gate": "The three Studio screens carry no title row and MacGenerationVariantSelector is in MacWindowToolbar; the chips share the row at equal widths on one line at 46 pt; the Generate CTA is full width at 56 pt; the canvas paints VocelloModeBackdrop at the mode tint; the readiness note is one caption in the meta line keeping <prefix>_readiness with its Ready/Waiting value; the counter reads N / 900 from the shared limit policy; localization, smoke, perf and the short custom benchmark pass.",
-      "sourceOfTruth": [
-        "Sources/Views/Studio/MacStudioCanvas.swift",
-        "Sources/Views/Studio/MacStudioSetupChip.swift",
-        "Sources/SharedSupport/Views/VocelloModeBackdrop.swift",
-        "Sources/Views/Shell/MacWindowToolbar.swift"
-      ],
-      "notes": "Opened 2026-09-15 after the CONV-18 marketing captures showed the drift. 5140a475 put the canvas on the phone's composition (46 pt one-line equal-width chips, 56 pt full-width Generate, mode wash, no title row, the phone's meta line and 900-character counter); c54b8dff fixed the Settings package row the localization lane caught. The maintainer judged the literal copy wrong for a desktop: floating text over a void, a stain across the top, four rows of controls, a 780 pt slab. Desktop pass decisions (2026-09-15 evening): top-down flow with a content-sized composer (176 pt floor, 55 % ceiling), Batch as a 56 pt square beside Generate, one whisper wash behind the whole window with a transparent title bar, column 640 pt.",
-      "plan": "macos-ui-fidelity-2026-09",
-      "blockedBy": [],
-      "updated": "2026-09-15"
-    },
-    {
       "id": "UIF-02",
       "title": "One copy of each shared view primitive",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "The iOS bodies of the stable-hash, waveform thumbnail, mode dot, voice avatar, surface and empty cards, status badge, section heading, filter chip row, icon button, primary CTA, subtle glass surface, product lockup and settings row family live under Sources/SharedSupport/Views with IOS<Name> forwards; the macOS twins are deleted and the call sites point at the shared types; VocelloShape replaces the hand-written rounded rectangles; the diff changes no constant; the generic iOS device-SDK compile and the macOS unit lane are green.",
       "sourceOfTruth": [
         "Sources/SharedSupport/Views/VocelloGlassSurface.swift",

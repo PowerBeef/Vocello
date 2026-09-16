@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `macos-ui-fidelity-2026-09` | active | backend-and-platform | 0/4 (0%) |
+| `macos-ui-fidelity-2026-09` | active | backend-and-platform | 1/4 (25%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -33,17 +33,13 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `UIF-01` | in-flight | Studio canvas: the phone's chip row, dock and mode wash | — |
-| `UIF-02` | planned | One copy of each shared view primitive | — |
+| `UIF-02` | in-flight | One copy of each shared view primitive | — |
 | `UIF-03` | planned | History and Saved Voices on the iOS row and chip metrics | — |
 | `UIF-04` | planned | Settings and shell polish | — |
 
 ### Open items in detail
 
-- **`UIF-01`** (in-flight) — Studio canvas: the phone's chip row, dock and mode wash.
-  gate: The three Studio screens carry no title row and MacGenerationVariantSelector is in MacWindowToolbar; the chips share the row at equal widths on one line at 46 pt; the Generate CTA is full width at 56 pt; the canvas paints VocelloModeBackdrop at the mode tint; the readiness note is one caption in the meta line keeping <prefix>_readiness with its Ready/Waiting value; the counter reads N / 900 from the shared limit policy; localization, smoke, perf and the short custom benchmark pass.
-
-- **`UIF-02`** (planned) — One copy of each shared view primitive.
+- **`UIF-02`** (in-flight) — One copy of each shared view primitive.
   gate: The iOS bodies of the stable-hash, waveform thumbnail, mode dot, voice avatar, surface and empty cards, status badge, section heading, filter chip row, icon button, primary CTA, subtle glass surface, product lockup and settings row family live under Sources/SharedSupport/Views with IOS<Name> forwards; the macOS twins are deleted and the call sites point at the shared types; VocelloShape replaces the hand-written rounded rectangles; the diff changes no constant; the generic iOS device-SDK compile and the macOS unit lane are green.
 
 - **`UIF-03`** (planned) — History and Saved Voices on the iOS row and chip metrics.

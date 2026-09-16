@@ -106,7 +106,7 @@
         "Sources/SharedSupport/Views/VocelloModeBackdrop.swift",
         "Sources/Views/Shell/MacWindowToolbar.swift"
       ],
-      "notes": "Opened 2026-09-15 after the CONV-18 marketing captures showed the drift. Measured against Sources/iOS: chips 46 pt one line vs 44 pt two-line hugging, CTA 56 pt full width vs 34 pt hugging, composer 22 pt/-0.22 tracking with 20 pt gutters vs 20 pt with 24, meta line 'Built-in voice · Clear · 4 / 900' vs a verbose label and 'N characters', dock floor 64 pt, and IOSModeBackdrop's radial mode wash which macOS never had.",
+      "notes": "Opened 2026-09-15 after the CONV-18 marketing captures showed the drift. 5140a475 put the canvas on the phone's composition (46 pt one-line equal-width chips, 56 pt full-width Generate, mode wash, no title row, the phone's meta line and 900-character counter); c54b8dff fixed the Settings package row the localization lane caught. The maintainer judged the literal copy wrong for a desktop: floating text over a void, a stain across the top, four rows of controls, a 780 pt slab. Desktop pass decisions (2026-09-15 evening): top-down flow with a content-sized composer (176 pt floor, 55 % ceiling), Batch as a 56 pt square beside Generate, one whisper wash behind the whole window with a transparent title bar, column 640 pt.",
       "plan": "macos-ui-fidelity-2026-09",
       "blockedBy": [],
       "updated": "2026-09-15"

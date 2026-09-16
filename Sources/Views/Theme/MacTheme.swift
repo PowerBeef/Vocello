@@ -94,20 +94,51 @@ enum MacTheme {
     }
 }
 
-/// The Studio screens' backdrop: the shared mode wash, with macOS resolving
-/// Reduce Transparency from its own environment key. The library screens keep
-/// `MacTheme.canvasGradient`, which is what the phone shows outside Studio.
+/// The window's backdrop: the shared mode wash, tinted by the selected
+/// destination. The split view's sidebar column draws its own material over
+/// any window background, so each column paints the wash itself as its slice
+/// of one window-sized surface: the phone's recipe untouched at the window's
+/// size, shifted by the column's origin and clipped to the column, so the two
+/// slices compose into one. Reduce Transparency is macOS's own environment key.
 struct MacModeBackdrop: View {
+    enum Column {
+        case sidebar
+        case detail
+    }
+
     let tint: Color
-    var intensity: VocelloModeBackdrop.Intensity = .warm
+    var intensity: VocelloModeBackdrop.Intensity = .whisper
+    var column: Column? = nil
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.vocelloWindowSize) private var windowSize
 
     var body: some View {
-        VocelloModeBackdrop(
-            tint: tint,
-            intensity: intensity,
-            reduceTransparency: reduceTransparency
-        )
+        GeometryReader { proxy in
+            if let column, let windowSize, windowSize.width > proxy.size.width {
+                let originX: CGFloat = column == .sidebar ? 0 : windowSize.width - proxy.size.width
+                let surfaceHeight = max(windowSize.height, proxy.size.height)
+                VocelloModeBackdrop(tint: tint, intensity: intensity, reduceTransparency: reduceTransparency)
+                    .frame(width: windowSize.width, height: surfaceHeight)
+                    .offset(x: -originX)
+                    .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+                    .clipped()
+            } else {
+                VocelloModeBackdrop(tint: tint, intensity: intensity, reduceTransparency: reduceTransparency)
+            }
+        }
+    }
+}
+
+/// Size of the main window's content, published by `ContentView` so the
+/// split view's columns can draw one continuous backdrop.
+private struct VocelloWindowSizeKey: EnvironmentKey {
+    static let defaultValue: CGSize? = nil
+}
+
+extension EnvironmentValues {
+    var vocelloWindowSize: CGSize? {
+        get { self[VocelloWindowSizeKey.self] }
+        set { self[VocelloWindowSizeKey.self] = newValue }
     }
 }

@@ -16525,24 +16525,6 @@
         }
       }
     },
-    "vocello.mac.studio.chipBatch": {
-      "comment": "macOS interface: eyebrow of the Studio chip that opens the line-batch sheet; the value below it reads Batch. Presentation only.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lines"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Lignes"
-          }
-        }
-      }
-    },
     "vocello.mac.studio.chipSeed": {
       "comment": "macOS interface: eyebrow of the pinned-seed Studio chip. Presentation only.",
       "extractionState": "manual",

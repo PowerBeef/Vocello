@@ -221,17 +221,18 @@ struct MacVoiceCloningScreen: View {
                 genState: studioGenState,
                 errorMessage: coordinator.errorMessage,
                 canGenerate: canGenerate,
+                canRunBatch: canRunBatch,
                 modelInstalled: isModelAvailable,
                 setupChips: { setupChips },
                 footer: { chipFooter },
                 onGenerate: generate,
+                onBatch: { presentedSheet = .batch(.clone(draft: draft, voice: selectedVoice?.name)) },
                 onCancel: cancelGeneration,
                 onInstallModel: openSettingsForModel,
                 onPlayerDismiss: { coordinator.dismissInlinePlayer() }
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(MacModeBackdrop(tint: tint).ignoresSafeArea())
         .overlay {
             if session.isDragOver {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -333,9 +334,6 @@ struct MacVoiceCloningScreen: View {
                     )
                 }
                 MacSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: tint)
-                MacStudioBatchChip(tint: tint, isEnabled: canRunBatch) {
-                    presentedSheet = .batch(.clone(draft: draft, voice: selectedVoice?.name))
-                }
             }
         }
     }

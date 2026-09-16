@@ -11,17 +11,22 @@ struct MacWindowToolbar: ToolbarContent {
     let selectedItem: SidebarItem?
 
     var body: some ToolbarContent {
+        // The toolbar is attached to the detail column and no title fills the
+        // bar any more, so a flexible spacer keeps the controls at the trailing
+        // edge of the column's section.
+        ToolbarSpacer(.flexible, placement: .primaryAction)
+
         // One ToolbarItem (HStack): separate items pick up enough inter-item
         // padding that the search field overflows at the minimum window width
         // (regressing the smoke test's `history_searchField` assertion).
         if selectedItem == .history {
-            ToolbarItem {
+            ToolbarItem(placement: .primaryAction) {
                 MacHistoryToolbarControls()
             }
         }
 
         if selectedItem == .voices {
-            ToolbarItem {
+            ToolbarItem(placement: .primaryAction) {
                 MacVoicesToolbarControls()
             }
         }
@@ -30,7 +35,7 @@ struct MacWindowToolbar: ToolbarContent {
         // as the phone's capsule does — so the desktop's Speed/Quality switch
         // lives in the window chrome with the other per-destination controls.
         if let mode = selectedItem?.generationMode, let prefix = selectedItem?.accessibilityPrefix {
-            ToolbarItem {
+            ToolbarItem(placement: .primaryAction) {
                 MacStudioToolbarControls(mode: mode, accessibilityPrefix: prefix)
             }
         }

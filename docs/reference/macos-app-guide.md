@@ -67,14 +67,18 @@ Tests assert these visible production surfaces directly.
 
 ### Studio composition
 
-The three Studio screens are one canvas (`MacStudioCanvas`) over a mode-tinted backdrop
-(`VocelloModeBackdrop`, shared with iOS): the composer fills the height, then the meta line (mode,
-readiness, Clear, counter), then one row of equal-width setup chips, then the dock. The dock holds
-the full-width Generate button, the generating bar, the error bar that retries when clicked, or the
-player card, and never falls below 64 pt so its silhouette does not jump between states. There is no
-title row — the sidebar names the mode, as the phone's capsule does — so the desktop's Speed/Quality
-switch (`<prefix>_speedVariantButton`, `<prefix>_qualityVariantButton`, `<prefix>_heavyBadge`) lives
-in the window toolbar. Below roughly 700 pt of canvas the chip row wraps instead of squeezing.
+The three Studio screens are one canvas (`MacStudioCanvas`) arranged for a desktop: the composer
+on top, sized to its text between a six-line floor and 55 % of the canvas (it scrolls past that),
+then the meta line (mode, readiness, Clear, counter), one row of equal-width setup chips, and the
+dock; whatever space is left falls to the bottom. The dock holds the full-width Generate button with
+the square Batch button (`textInput_batchButton`) at its right end, the generating bar, the error bar
+that retries when clicked, or the player card, and never falls below 64 pt. The column caps at
+640 pt. One mode-tinted wash (`VocelloModeBackdrop`, shared with iOS) is painted behind the whole
+window by `ContentView`, tinted by the selected destination, and the title bar is transparent over
+it with no visible title. There is no title row — the sidebar names the mode, as the phone's capsule
+does — so the desktop's Speed/Quality switch (`<prefix>_speedVariantButton`,
+`<prefix>_qualityVariantButton`, `<prefix>_heavyBadge`) lives in the window toolbar. Below roughly
+560 pt of canvas the chip row wraps instead of squeezing.
 
 ### Built-in Voice (`sidebar_customVoice` → `screen_customVoice`)
 

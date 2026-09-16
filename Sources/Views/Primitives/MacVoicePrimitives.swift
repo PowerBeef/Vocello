@@ -64,6 +64,9 @@ struct MacPrimaryCTAButton: View {
     let tint: Color
     let isEnabled: Bool
     let size: Size
+    /// A desktop nicety the phone cannot offer: the key equivalent, drawn at
+    /// the trailing edge of a `.dock` button ("⌘↩" on Generate).
+    let shortcutHint: String?
     let action: () -> Void
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -74,6 +77,7 @@ struct MacPrimaryCTAButton: View {
         tint: Color,
         isEnabled: Bool = true,
         size: Size = .compact,
+        shortcutHint: String? = nil,
         action: @escaping () -> Void
     ) {
         self.title = title
@@ -81,6 +85,7 @@ struct MacPrimaryCTAButton: View {
         self.tint = tint
         self.isEnabled = isEnabled
         self.size = size
+        self.shortcutHint = shortcutHint
         self.action = action
     }
 
@@ -118,6 +123,15 @@ struct MacPrimaryCTAButton: View {
             .padding(.horizontal, size.horizontalPadding)
             .frame(maxWidth: size.spansWidth ? .infinity : nil)
             .frame(height: size.height)
+            .overlay(alignment: .trailing) {
+                if size == .dock, let shortcutHint {
+                    Text(verbatim: shortcutHint)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(MacTheme.Text.secondary.opacity(isEnabled ? 0.8 : 0.5))
+                        .padding(.trailing, 18)
+                        .accessibilityHidden(true)
+                }
+            }
             .background { Capsule(style: .continuous).fill(backgroundFill) }
             .overlay { Capsule(style: .continuous).stroke(strokeColor, lineWidth: size == .dock ? 0.8 : 0.75) }
             .overlay { if size == .dock { innerStroke } }

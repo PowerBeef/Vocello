@@ -1557,10 +1557,6 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.status.starting", defaultValue: "Starting engine…",
                comment: "macOS interface: sidebar engine status. Presentation only.")
     }
-    static var studioChipBatch: String {
-        localization.string(localized: "vocello.mac.studio.chipBatch", defaultValue: "Lines",
-               comment: "macOS interface: eyebrow of the Studio chip that opens the line-batch sheet; the value below it reads Batch. Presentation only.")
-    }
     static var studioChipSeed: String {
         localization.string(localized: "vocello.mac.studio.chipSeed", defaultValue: "Seed",
                comment: "macOS interface: eyebrow of the pinned-seed Studio chip. Presentation only.")

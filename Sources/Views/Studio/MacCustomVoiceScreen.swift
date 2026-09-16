@@ -138,17 +138,18 @@ struct MacCustomVoiceScreen: View {
                 genState: studioGenState,
                 errorMessage: coordinator.errorMessage,
                 canGenerate: canGenerate,
+                canRunBatch: canRunBatch,
                 modelInstalled: isModelAvailable,
                 setupChips: { setupChips },
                 footer: { chipFooter },
                 onGenerate: generate,
+                onBatch: { presentedSheet = .batch(.custom(draft: draft, model: activeModel)) },
                 onCancel: cancelGeneration,
                 onInstallModel: openSettingsForModel,
                 onPlayerDismiss: { coordinator.dismissInlinePlayer() }
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(MacModeBackdrop(tint: tint).ignoresSafeArea())
         .accessibilityIdentifier("screen_customVoice")
         .onAppear {
             reconcileGenerationVariantSelection()
@@ -200,9 +201,6 @@ struct MacCustomVoiceScreen: View {
             )
         }
         MacSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: tint)
-        MacStudioBatchChip(tint: tint, isEnabled: canRunBatch) {
-            presentedSheet = .batch(.custom(draft: draft, model: activeModel))
-        }
     }
 
     private var recommendedSpeakers: [String] {

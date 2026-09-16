@@ -32,7 +32,13 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
-        .background(MacTheme.canvasGradient.ignoresSafeArea())
+        // The column's own material would sit over any window background,
+        // so the sidebar paints its slice of the window-wide mode wash.
+        .background {
+            MacModeBackdrop(tint: MacTheme.tint(for: selection ?? .customVoice), column: .sidebar)
+                .ignoresSafeArea()
+                .appAnimation(MacTheme.Motion.modeCrossfade, value: selection)
+        }
         .safeAreaInset(edge: .top, spacing: 0) {
             MacSidebarBrandHeader()
         }

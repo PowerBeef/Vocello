@@ -93,3 +93,11 @@ Maintainer decisions for that plan:
 4. Kept desktop-only against the phone: the sidebar instead of the tab dock, the persistent footer
    player, Voice Cloning's inline transcript field and consent stack, the inline Voice Design brief
    editor, and Settings' flat single scroll.
+
+The first Studio commit copied the phone's composition literally, and on a desktop it read as a
+void under floating text with a stain across the top. The same evening's decisions, all taken as
+recommended: **top-down flow** (the composer is a bounded area that grows with its text, the
+controls follow it, space falls to the bottom); **Batch is a square button beside Generate**, not a
+setup chip; **one wash behind the whole window** at the phone's whisper intensity, tinted by the
+selected destination, with the **title bar transparent over it**; and the **Studio column capped
+at 640 pt** so three chips and the Generate button keep the phone's proportions.

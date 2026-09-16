@@ -85,10 +85,13 @@ XCUITest lanes only when explicitly requested.
   `AppLaunchConfiguration.performAnimated`; no color-only signal; `accessibilityIdentifier`s such as
   `voicesRow_*`, `textInput_*`, `studioChip_*` survive refactors; test-only code lives in the UI test
   target.
-- **The Studio canvas is the phone's.** `MacStudioCanvas` over `VocelloModeBackdrop`: composer, meta
-  line, one row of equal-width chips, dock. No title row (the sidebar names the mode); the
-  Speed/Quality switch is window-toolbar chrome. Numbers that must not drift: chip pill 46 pt, CTA
-  56 pt full width, dock floor 64 pt, composer 22 pt at −0.22 tracking, 20 pt gutters.
+- **The Studio canvas is the phone's, arranged for a desktop.** `MacStudioCanvas`: a composer sized
+  to its text (six-line floor, 55 % ceiling, then it scrolls), meta line, one row of equal-width
+  chips, the dock with Generate and the square Batch button, space at the bottom. One
+  `VocelloModeBackdrop` wash behind the whole window from `ContentView`, transparent title bar. No
+  title row (the sidebar names the mode); the Speed/Quality switch is window-toolbar chrome. Numbers
+  that must not drift: column 640 pt, chip pill 46 pt, CTA and Batch 56 pt, dock floor 64 pt,
+  composer 22 pt at −0.22 tracking with a 176 pt floor, 20 pt gutters.
 - **Studio generation runs on the shared pipeline.** `StudioGenerationCoordinator` (owned by `MacAppModel`)
   holds the attempt-scoped terminal state, `IOSSingleTakeGenerationExecutor` runs the take through
   `MacStudioSingleTakeGenerationHooks` (timeline, playback handoff, History, telemetry merge) and

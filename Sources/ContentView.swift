@@ -30,6 +30,8 @@ struct ContentView: View {
     @State private var voiceDesignDraft = VoiceDesignDraft()
     @State private var voiceCloningDraft = VoiceCloningDraft()
     @State private var pendingVoiceCloningHandoff: PendingVoiceCloningHandoff?
+    /// Content size of the window, for the split-view columns' shared backdrop.
+    @State private var windowSize: CGSize?
     @State private var didCompleteInitialAvailabilityRefresh = false
     @StateObject private var generationWarmupCoordinator = MacGenerationWarmupCoordinator()
 
@@ -109,11 +111,21 @@ struct ContentView: View {
             )
         } detail: {
             detailContent
-        }
-        .toolbar {
-            MacWindowToolbar(selectedItem: appModel.selectedItem)
+                .toolbar {
+                    MacWindowToolbar(selectedItem: appModel.selectedItem)
+                }
         }
         .navigationSplitViewStyle(.balanced)
+        // One mode-tinted wash behind sidebar and canvas together, at the
+        // phone's whisper intensity, tinted by the destination the way the
+        // phone tints each tab: each column paints its slice from the window
+        // size measured here. The toolbar is part of that surface: no band,
+        // no title (the sidebar carries the lockup; the window title still
+        // names the window for Mission Control and the Dock).
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { windowSize = $0 }
+        .environment(\.vocelloWindowSize, windowSize)
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        .toolbar(removing: .title)
         .environment(appModel)
         // Generation performance gate (OPTIMIZATION.md §K): while the engine
         // generates, glass surfaces fall back to the solid-fill design so the
@@ -153,7 +165,11 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(MacTheme.Surface.canvas)
+        .background {
+            MacModeBackdrop(tint: MacTheme.tint(for: appModel.selectedItem ?? .customVoice), column: .detail)
+                .ignoresSafeArea()
+                .appAnimation(MacTheme.Motion.modeCrossfade, value: appModel.selectedItem)
+        }
     }
 
     @ViewBuilder

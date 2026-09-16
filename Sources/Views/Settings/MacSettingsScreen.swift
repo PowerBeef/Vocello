@@ -61,7 +61,6 @@ struct MacSettingsScreen: View {
                 .padding(.horizontal, MacTheme.Spacing.xxl)
                 .padding(.vertical, MacTheme.Spacing.xl)
             }
-            .background(MacTheme.canvasGradient.ignoresSafeArea())
             .settingsNavigationTitle(showsNavigationTitle)
             .accessibilityIdentifier("screen_settings")
             .task {

@@ -150,17 +150,18 @@ struct MacVoiceDesignScreen: View {
                 genState: studioGenState,
                 errorMessage: coordinator.errorMessage,
                 canGenerate: canGenerate,
+                canRunBatch: canRunBatch,
                 modelInstalled: isModelAvailable,
                 setupChips: { setupChips },
                 footer: { chipFooter },
                 onGenerate: generate,
+                onBatch: { presentedSheet = .batch(.design(draft: draft)) },
                 onCancel: cancelGeneration,
                 onInstallModel: openSettingsForModel,
                 onPlayerDismiss: { coordinator.dismissInlinePlayer() }
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(MacModeBackdrop(tint: tint).ignoresSafeArea())
         .accessibilityIdentifier("screen_voiceDesign")
         .onAppear {
             reconcileGenerationVariantSelection()
@@ -226,9 +227,6 @@ struct MacVoiceDesignScreen: View {
             )
         }
         MacSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: tint)
-        MacStudioBatchChip(tint: tint, isEnabled: canRunBatch) {
-            presentedSheet = .batch(.design(draft: draft))
-        }
     }
 
     @ViewBuilder

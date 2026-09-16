@@ -255,25 +255,6 @@ struct MacStudioChipContainer<Chip: View>: View {
     }
 }
 
-/// The desktop's Batch entry as a chip (`textInput_batchButton`).
-struct MacStudioBatchChip: View {
-    let tint: Color
-    let isEnabled: Bool
-    let action: () -> Void
-
-    var body: some View {
-        MacStudioActionChip(
-            eyebrow: MacInterfaceText.studioChipBatch,
-            value: MacInterfaceText.textInputBatch,
-            leadingSymbol: "list.bullet.rectangle",
-            tint: tint,
-            isEnabled: isEnabled,
-            accessibilityIdentifier: "textInput_batchButton",
-            action: action
-        )
-    }
-}
-
 /// The phone's chip row: every chip takes an equal share of the width, so the
 /// row spans exactly the Generate button beneath it and no chip hugs its
 /// label. Where the phone can rely on a plain `HStack` — three chips always

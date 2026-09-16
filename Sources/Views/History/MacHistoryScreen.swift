@@ -290,7 +290,6 @@ struct MacHistoryScreen: View {
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(MacTheme.canvasGradient.ignoresSafeArea())
         .accessibilityIdentifier("screen_history")
         .onAppear(perform: handleAppear)
         .onReceive(generationLibraryEvents.generationAppended) { generation in handleGenerationAppended(generation) }

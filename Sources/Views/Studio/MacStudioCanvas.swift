@@ -37,7 +37,10 @@ enum MacStudioGenState: Equatable {
 }
 
 enum MacStudioMetrics {
-    static let contentMaxWidth: CGFloat = 780
+    /// The Studio column. The phone's canvas is 390 pt; at 640 the three
+    /// chips and the Generate button keep the phone's proportions and the
+    /// 22 pt script keeps a comfortable line length.
+    static let contentMaxWidth: CGFloat = 640
     /// The iOS canvas gutter. The composer uses it, the chip row and the dock
     /// use it, so the script, the chips and the Generate button share one
     /// left edge — the spine the whole screen hangs from.
@@ -45,6 +48,15 @@ enum MacStudioMetrics {
     /// Floor for the dock box (the iOS `compactDockAreaHeight`), so the
     /// silhouette does not jump between the idle CTA and the generating bar.
     static let dockMinHeight: CGFloat = 64
+    /// Six lines of the 22 pt face plus the editor's vertical insets. The
+    /// desktop composer is a bounded area that grows with its text instead of
+    /// the phone's flexible pad, because a Mac window has no thumb zone to
+    /// justify pinning the controls to the bottom of a void.
+    static let composerMinHeight: CGFloat = 176
+    /// Share of the canvas the composer may take before it scrolls internally.
+    static let composerMaxFraction: CGFloat = 0.55
+    /// The dock's square Batch button: the CTA's height, the stage radius.
+    static let batchButtonSize: CGFloat = 56
 }
 
 /// Readiness of the current mode, rendered as one caption beside the mode
@@ -65,13 +77,14 @@ struct MacStudioReadinessState: Equatable {
     }
 }
 
-/// The unified Studio surface (the iOS `IOSStudioCanvas`): the composer pad
-/// on top (flexible height), the setup-chip row, then the dock area that
-/// carries the Generate CTA, the generating bar, the error bar or the player
-/// card depending on `genState`. Per-mode screens provide the chips and own
-/// the generation logic through the closures; the canvas is stateless from a
-/// generation point of view. Every `textInput_*` identifier is the lane
-/// contract.
+/// The unified Studio surface (the iOS `IOSStudioCanvas`, arranged for a
+/// desktop): the composer on top, sized to its text between a six-line floor
+/// and a ceiling; the meta line; the setup-chip row; the dock with the
+/// Generate CTA and the Batch button, the generating bar, the error bar or the
+/// player card depending on `genState`; then whatever space is left. Per-mode
+/// screens provide the chips and own the generation logic through the
+/// closures; the canvas is stateless from a generation point of view. Every
+/// `textInput_*` identifier is the lane contract.
 struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     let mode: GenerationMode
     /// Identifier prefix of the mode's container ids (`customVoice_script`).
@@ -84,6 +97,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     let genState: MacStudioGenState
     let errorMessage: String?
     let canGenerate: Bool
+    let canRunBatch: Bool
     let modelInstalled: Bool
     let setupChips: SetupChips
     /// Rows under the chip row (custom tone field, hints, warnings). Empty on
@@ -91,11 +105,14 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     /// the phone's composition.
     let footer: Footer
     let onGenerate: () -> Void
+    let onBatch: () -> Void
     let onCancel: () -> Void
     let onInstallModel: () -> Void
     let onPlayerDismiss: () -> Void
 
     @State private var isScriptFocused = false
+    /// Height of the laid-out script, reported by the editor bridge.
+    @State private var scriptContentHeight: CGFloat = 0
 
     init(
         mode: GenerationMode,
@@ -108,10 +125,12 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         genState: MacStudioGenState,
         errorMessage: String? = nil,
         canGenerate: Bool,
+        canRunBatch: Bool,
         modelInstalled: Bool,
         @ViewBuilder setupChips: () -> SetupChips,
         @ViewBuilder footer: () -> Footer,
         onGenerate: @escaping () -> Void,
+        onBatch: @escaping () -> Void,
         onCancel: @escaping () -> Void,
         onInstallModel: @escaping () -> Void,
         onPlayerDismiss: @escaping () -> Void
@@ -126,32 +145,32 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         self.genState = genState
         self.errorMessage = errorMessage
         self.canGenerate = canGenerate
+        self.canRunBatch = canRunBatch
         self.modelInstalled = modelInstalled
         self.setupChips = setupChips()
         self.footer = footer()
         self.onGenerate = onGenerate
+        self.onBatch = onBatch
         self.onCancel = onCancel
         self.onInstallModel = onInstallModel
         self.onPlayerDismiss = onPlayerDismiss
     }
 
     var body: some View {
-        // Pinned to the viewport (as the legacy page scaffold did): every
-        // child then receives a finite proposal, and the canvas's own minimum
-        // size is zero, so the window never grows to fit the composer.
+        // Pinned to the viewport: every child receives a finite proposal and
+        // the canvas's own minimum size is zero, so the window never grows to
+        // fit the composer; the composer scrolls instead.
         GeometryReader { proxy in
-            canvasColumn
+            canvasColumn(canvasHeight: proxy.size.height)
                 .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(shortcutBridge)
     }
 
-    private var canvasColumn: some View {
+    private func canvasColumn(canvasHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            composerPad
-                .frame(maxHeight: .infinity)
-                .layoutPriority(1)
+            composerPad(editorHeight: editorHeight(canvasHeight: canvasHeight))
 
             VStack(alignment: .leading, spacing: 10) {
                 // Lock voice, delivery and language while a take is in flight
@@ -172,35 +191,47 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             // that is not inside a container, which would erase the chip,
             // readiness and dock identifiers the lanes read.
             .accessibilityElement(children: .contain)
-            .layoutPriority(2)
 
             dockArea
-                .frame(minHeight: MacStudioMetrics.dockMinHeight, alignment: .bottom)
+                .frame(minHeight: MacStudioMetrics.dockMinHeight, alignment: .top)
                 .padding(.horizontal, MacStudioMetrics.horizontalInset)
                 .padding(.bottom, 16)
                 .accessibilityElement(children: .contain)
-                .layoutPriority(3)
+
+            // Desktop eyes expect a form to end and space to follow; the
+            // phone's void sat between the script and the controls.
+            Spacer(minLength: 0)
         }
         .frame(maxWidth: MacStudioMetrics.contentMaxWidth)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .appAnimation(MacTheme.Motion.stateChange, value: genState)
     }
 
+    /// The editor grows with its text between the six-line floor and a share
+    /// of the canvas; past the ceiling it scrolls inside its own scroll view.
+    private func editorHeight(canvasHeight: CGFloat) -> CGFloat {
+        let ceiling = max(MacStudioMetrics.composerMinHeight, (canvasHeight * MacStudioMetrics.composerMaxFraction).rounded(.down))
+        return min(max(scriptContentHeight, MacStudioMetrics.composerMinHeight), ceiling)
+    }
+
     // MARK: - Composer pad
 
-    private var composerPad: some View {
+    private func composerPad(editorHeight: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             MacScriptTextEditor(
                 text: $script,
                 placeholder: placeholder,
                 font: .systemFont(ofSize: 22, weight: .medium),
                 isFocused: $isScriptFocused,
-                tracking: -0.22
+                tracking: -0.22,
+                contentHeight: $scriptContentHeight
             )
-            .frame(maxWidth: .infinity, minHeight: 72, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity)
+            .frame(height: editorHeight)
+            .appAnimation(MacTheme.Motion.stateChange, value: editorHeight)
 
-            // The meta line floats at the bottom of the composer region, right
-            // above the chips: mode, readiness, Clear, count.
+            // The meta line sits right under the script, above the chips:
+            // mode, readiness, Clear, count.
             HStack(alignment: .center, spacing: 12) {
                 HStack(spacing: 5) {
                     Text(modeMetaLabel)
@@ -236,7 +267,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         }
         .padding(.horizontal, MacStudioMetrics.horizontalInset)
         .padding(.top, 12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("\(accessibilityPrefix)_script")
     }
@@ -316,12 +347,22 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
                 if let errorMessage {
                     errorBar(errorMessage)
                 }
-                if modelInstalled {
-                    generateCTA
-                } else {
-                    installCTA
-                }
+                actionRow
             }
+        }
+    }
+
+    /// Generate takes the width; Batch, the desktop's own action, is a square
+    /// of the same height at its right end rather than a setup chip (it does
+    /// not describe the take, and as a chip it wrapped the row).
+    private var actionRow: some View {
+        HStack(spacing: 8) {
+            if modelInstalled {
+                generateCTA
+            } else {
+                installCTA
+            }
+            MacStudioBatchButton(tint: tint, isEnabled: canRunBatch && modelInstalled, action: onBatch)
         }
     }
 
@@ -387,6 +428,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             tint: tint,
             isEnabled: canGenerate,
             size: .dock,
+            shortcutHint: "⌘↩",
             action: onGenerate
         )
         .accessibilityIdentifier("textInput_generateButton")
@@ -444,5 +486,51 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             .opacity(0.001)
             .disabled(!canGenerate || genState.isGenerationActive)
             .accessibilityHidden(true)
+    }
+}
+
+/// The desktop's Batch entry as the square at the right end of the Generate
+/// row: the CTA's height, the chip's chrome, `textInput_batchButton`.
+struct MacStudioBatchButton: View {
+    let tint: Color
+    let isEnabled: Bool
+    let action: () -> Void
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: MacTheme.Radius.stage, style: .continuous)
+        Button(action: action) {
+            Image(systemName: "list.bullet.rectangle")
+                .font(.system(size: 18, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(MacTheme.Text.primary)
+                .frame(width: MacStudioMetrics.batchButtonSize, height: MacStudioMetrics.batchButtonSize)
+                .background { shape.fill(fillStyle) }
+                .overlay { shape.stroke(Color.white.opacity(0.12), lineWidth: 0.8) }
+                .overlay { shape.inset(by: 0.65).stroke(Color.white.opacity(0.04), lineWidth: 0.55) }
+                .shadow(color: reduceTransparency ? .clear : tint.opacity(0.28), radius: 8, y: 1)
+                .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.45)
+        .vocelloFocusRing(tint, radius: MacTheme.Radius.stage)
+        .help(MacInterfaceText.textInputBatch)
+        .accessibilityLabel(MacInterfaceText.textInputBatch)
+        .accessibilityIdentifier("textInput_batchButton")
+    }
+
+    private var fillStyle: AnyShapeStyle {
+        if reduceTransparency {
+            return AnyShapeStyle(tint.opacity(0.22))
+        }
+        return AnyShapeStyle(
+            LinearGradient(
+                colors: [tint.opacity(0.30), tint.opacity(0.14)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
     }
 }

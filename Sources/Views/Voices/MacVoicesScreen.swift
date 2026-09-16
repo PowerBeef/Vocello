@@ -57,7 +57,6 @@ struct MacVoicesScreen: View {
     var body: some View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(MacTheme.canvasGradient.ignoresSafeArea())
             .accessibilityIdentifier("screen_voices")
             .task(id: loadTaskID) {
                 guard ttsEngineStore.isReady else { return }

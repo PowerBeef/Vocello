@@ -594,12 +594,23 @@ struct MacVoiceCloningScreen: View {
         }
     }
 
+    /// Wraps rather than truncates. This is the string that has to match the
+    /// reference clip, and on one line it cut mid-word even at the widest
+    /// window this display can show -- so the one field whose whole purpose is
+    /// to be checked was the one field you could not read. Three lines, then it
+    /// scrolls; the label holds the first baseline so it does not float beside
+    /// a growing box.
     private var transcriptField: some View {
-        HStack(alignment: .center, spacing: MacTheme.Spacing.snug) {
+        HStack(alignment: .firstTextBaseline, spacing: MacTheme.Spacing.snug) {
             Text(MacInterfaceText.cloningTranscriptAccessibility)
                 .macType(.caption)
                 .foregroundStyle(MacTheme.Text.secondary)
-            TextField(MacInterfaceText.cloningTranscriptPlaceholder, text: $draft.referenceTranscript)
+            TextField(
+                MacInterfaceText.cloningTranscriptPlaceholder,
+                text: $draft.referenceTranscript,
+                axis: .vertical
+            )
+                .lineLimit(1 ... 3)
                 .textFieldStyle(.plain)
                 .macType(.body)
                 .foregroundStyle(MacTheme.Text.primary)

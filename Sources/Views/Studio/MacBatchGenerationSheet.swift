@@ -219,6 +219,10 @@ struct MacBatchGenerationSheet: View {
             Text(MacInterfaceText.batchLongForm).tag(MacBatchSegmentationMode.longForm)
         }
         .pickerStyle(.segmented)
+        // Every other control on this sheet is mode-tinted; an untinted
+        // segmented picker renders in the system accent, which was the only
+        // blue in the app and the loudest thing on the sheet.
+        .tint(tint)
         .disabled(isProcessing)
         .accessibilityIdentifier("batch_segmentationMode")
 

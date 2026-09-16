@@ -110,10 +110,14 @@ private struct MacVoicesToolbarControls: View {
     @Environment(MacAppModel.self) private var appModel
 
     var body: some View {
+        // Bordered, not prominent. A filled toolbar button was the loudest
+        // object on Saved Voices by a wide margin -- louder than the saved
+        // voices themselves, which design principle 2 makes the hero of that
+        // screen. Tinted so it stays the obvious action without shouting.
         Button(MacInterfaceText.voicesAddVoiceSampleAction) {
             appModel.voicesEnrollRequestID = UUID()
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.bordered)
         .tint(MacTheme.accent)
         .accessibilityIdentifier("voices_enrollButton")
     }

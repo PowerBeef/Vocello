@@ -144,7 +144,10 @@ struct MacScriptTextEditor: NSViewRepresentable {
 
         /// TextKit 2 first (`layoutManager` on a TextKit 2 view would drop it
         /// to the compatibility path and lose Writing Tools), TextKit 1 as
-        /// the fallback. An empty document reports one line.
+        /// the fallback. An empty document reports one line. Main-actor
+        /// explicitly: the coordinator class is not isolated and Xcode 26.6
+        /// refuses the text view's properties from it (Xcode 27 accepted it).
+        @MainActor
         func reportContentHeight(of textView: NSTextView) {
             guard let binding = parent.contentHeight else { return }
             let used: CGFloat

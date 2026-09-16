@@ -56,19 +56,6 @@ enum MacControl: Equatable, CaseIterable {
         case .badge: 9
         }
     }
-
-    /// The corner radius of a rectangular control of this size; `nil` means the
-    /// control is a capsule (or, when it is square, a circle).
-    var cornerRadius: CGFloat? {
-        switch self {
-        case .primary: VocelloTheme.Radius.stage
-        case .pill: nil
-        case .row: VocelloTheme.Radius.row
-        case .field: VocelloTheme.Radius.input
-        case .icon: nil
-        case .badge: nil
-        }
-    }
 }
 
 extension View {

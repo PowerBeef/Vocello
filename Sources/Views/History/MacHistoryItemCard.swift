@@ -8,6 +8,11 @@ import SwiftUI
 /// the `_play_`, `_saveVoice_`, `_saveAs_` and `_delete_` shapes the row
 /// counter excludes.
 struct MacHistoryItemCard: View {
+    /// Where the row's text column starts: the play tile plus the card's own
+    /// horizontal padding on either side of it. The hairline under the row and
+    /// the long-form segments toggle beneath it both align to this.
+    static let contentLeadingInset: CGFloat = MacControl.row.height + VocelloTheme.Spacing.md * 2
+
     let generation: Generation
     let rowID: String
     let textPreview: String
@@ -53,22 +58,22 @@ struct MacHistoryItemCard: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: VocelloTheme.Spacing.md) {
             playTile
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: VocelloTheme.Spacing.xs) {
                 Text(textPreview)
-                    .font(.system(size: 14, weight: .medium))
+                    .macType(.rowTitle)
                     .foregroundStyle(MacTheme.Text.primary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
-                HStack(spacing: 6) {
+                HStack(spacing: VocelloTheme.Spacing.tight) {
                     VocelloModeDot(tint: modeTint)
                     // The mode stays a textual cue beside the dot, never
                     // color-only, even when the voice name is present.
                     Text(verbatim: metadataParts.joined(separator: " · "))
-                        .font(.system(size: 12))
+                        .macType(.rowMeta)
                         .foregroundStyle(MacTheme.Text.secondary)
                         .lineLimit(1)
                 }
@@ -79,20 +84,20 @@ struct MacHistoryItemCard: View {
 
             actions
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
+        .padding(.vertical, VocelloTheme.Spacing.snug)
+        .padding(.horizontal, VocelloTheme.Spacing.md)
         .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            VocelloShape.row()
                 .fill(Color.white.opacity(isHovered ? 0.035 : 0))
         }
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(MacTheme.Surface.hairline)
-                .frame(height: 0.5)
-                .padding(.leading, 72)
-                .padding(.trailing, 12)
+                .frame(height: VocelloTheme.Stroke.hairline)
+                .padding(.leading, Self.contentLeadingInset)
+                .padding(.trailing, VocelloTheme.Spacing.md)
         }
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(VocelloShape.row())
         .onHover { hovering in
             isHovered = hovering
         }
@@ -104,29 +109,31 @@ struct MacHistoryItemCard: View {
     private var playTile: some View {
         Button(action: onPlay) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                VocelloShape.row()
                     .fill(modeTint.opacity(0.14))
                     .background {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        VocelloShape.row()
                             .fill(Color.white.opacity(0.02))
                     }
                 if audioFileExists {
                     VocelloStaticWaveformThumbnail(seed: waveformSeed, barCount: 14, tint: modeTint)
-                        .frame(width: 34, height: 22)
+                        // Content, not a control: it keeps the optical inset
+                        // it had when the tile was 48 pt.
+                        .frame(width: 28, height: 18)
                         .opacity(isHovered ? 0.35 : 1)
                     if isHovered {
                         Image(systemName: "play.fill")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: MacControl.row.glyph, weight: .semibold))
                             .foregroundStyle(modeTint)
                     }
                 } else {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: MacControl.row.glyph, weight: .semibold))
                         .foregroundStyle(MacTheme.Status.guarded)
                 }
             }
-            .frame(width: 48, height: 48)
-            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .macControlSquare(.row)
+            .contentShape(VocelloShape.row())
         }
         .buttonStyle(.plain)
         .disabled(!audioFileExists)
@@ -136,7 +143,7 @@ struct MacHistoryItemCard: View {
     }
 
     private var actions: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: VocelloTheme.Spacing.tight) {
             if let onSaveToSavedVoices {
                 MacIconButton(
                     symbol: "person.crop.circle.badge.plus",

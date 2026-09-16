@@ -20,15 +20,14 @@ struct MacVoiceBriefEditor: View {
     var body: some View {
         let shape = VocelloShape.input()
 
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.sm) {
             HStack(alignment: .firstTextBaseline) {
                 Text(MacInterfaceText.designVoiceBriefLabel)
-                    .font(.system(size: 11, weight: .semibold))
-                    .tracking(0.88)
+                    .macType(.eyebrow)
                     .textCase(.uppercase)
                     .foregroundStyle(MacTheme.Text.secondary)
 
-                Spacer(minLength: 8)
+                Spacer(minLength: MacTheme.Spacing.sm)
 
                 startingPointsMenu
             }
@@ -36,16 +35,21 @@ struct MacVoiceBriefEditor: View {
             MacScriptTextEditor(
                 text: $text,
                 placeholder: VoiceDesignBriefCatalog.placeholder,
-                font: .systemFont(ofSize: 14, weight: .medium),
+                font: .systemFont(ofSize: MacType.style(.body).size, weight: .medium),
                 isFocused: $isEditorFocused,
                 accessibilityIdentifier: "voiceDesign_voiceDescriptionField",
                 idealHeight: 60
             )
             .frame(minHeight: 52, maxHeight: 72)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.horizontal, MacTheme.Spacing.sm)
+            .padding(.vertical, MacTheme.Spacing.tight)
             .background { shape.fill(MacTheme.Surface.field) }
-            .overlay { shape.stroke(isEditorFocused ? tint.opacity(0.40) : MacTheme.Surface.fieldStroke, lineWidth: 0.5) }
+            .overlay {
+                shape.stroke(
+                    isEditorFocused ? tint.opacity(0.40) : MacTheme.Surface.fieldStroke,
+                    lineWidth: VocelloTheme.Stroke.hairline
+                )
+            }
             .onChange(of: text) { _, newValue in
                 // UX bound only: no model cap exists for the open-weights
                 // VoiceDesign model (see VoiceDesignBriefCatalog).
@@ -57,14 +61,14 @@ struct MacVoiceBriefEditor: View {
 
             HStack(alignment: .firstTextBaseline) {
                 Text(MacInterfaceText.briefHelper)
-                    .font(.caption)
+                    .macType(.caption)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .lineLimit(1)
 
-                Spacer(minLength: 8)
+                Spacer(minLength: MacTheme.Spacing.sm)
 
                 Text(verbatim: "\(text.count)/\(VoiceDesignBriefCatalog.descriptionLimit)")
-                    .font(.caption.monospacedDigit())
+                    .macType(.counter)
                     .foregroundStyle(isAtLimit ? tint : MacTheme.Text.secondary)
                     .accessibilityIdentifier("voiceDesign_briefCharCount")
             }
@@ -84,22 +88,22 @@ struct MacVoiceBriefEditor: View {
                 .accessibilityIdentifier("voiceDesign_briefStarter_\(index)")
             }
         } label: {
-            HStack(spacing: 5) {
+            HStack(spacing: MacTheme.Spacing.tight) {
                 Image(systemName: "sparkles")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: MacControl.badge.glyph, weight: .semibold))
                 Text(MacInterfaceText.briefStartingPoints)
-                    .font(.caption.weight(.semibold))
+                    .macType(.badge)
                     .lineLimit(1)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .semibold))
                     .foregroundStyle(tint.opacity(0.7))
             }
             .foregroundStyle(MacTheme.Text.primary)
-            .padding(.horizontal, 10)
-            .frame(height: 24)
-            .background { Capsule(style: .continuous).fill(tint.opacity(0.14)) }
-            .overlay { Capsule(style: .continuous).stroke(tint.opacity(0.30), lineWidth: 0.5) }
-            .contentShape(Capsule(style: .continuous))
+            .padding(.horizontal, MacTheme.Spacing.snug)
+            .macControlHeight(.badge)
+            .background { VocelloShape.pill().fill(tint.opacity(0.14)) }
+            .overlay { VocelloShape.pill().stroke(tint.opacity(0.30), lineWidth: VocelloTheme.Stroke.hairline) }
+            .contentShape(VocelloShape.pill())
             .accessibilityElement(children: .ignore)
         }
         .menuStyle(.button)

@@ -64,7 +64,7 @@ private struct MacHistoryToolbarControls: View {
 
     var body: some View {
         @Bindable var appModel = appModel
-        HStack(spacing: 10) {
+        HStack(spacing: MacTheme.Spacing.snug) {
             Menu {
                 Picker(MacInterfaceText.historySortPicker, selection: $appModel.historySortOrder) {
                     ForEach(HistorySortOrder.allCases) { order in

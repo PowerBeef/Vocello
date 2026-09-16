@@ -143,14 +143,14 @@ struct MacBatchGenerationSheet: View {
     // MARK: - Body
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.lg) {
             if let outcome = presentedOutcome {
                 completionView(outcome)
             } else {
                 editorView
             }
         }
-        .padding(24)
+        .padding(MacTheme.Spacing.xxl)
         .frame(minWidth: 520, minHeight: 440)
         .background(MacTheme.canvasGradient.ignoresSafeArea())
         .onAppear {
@@ -207,11 +207,11 @@ struct MacBatchGenerationSheet: View {
     @ViewBuilder
     private var editorView: some View {
         Text(MacInterfaceText.batchTitle)
-            .font(.title.weight(.bold))
+            .macType(.sheetTitle)
             .foregroundStyle(MacTheme.Text.primary)
 
         Text(MacInterfaceText.batchInstructions)
-            .font(.callout)
+            .macType(.body)
             .foregroundStyle(MacTheme.Text.secondary)
 
         Picker(MacInterfaceText.batchSegmentation, selection: $segmentationMode) {
@@ -238,7 +238,7 @@ struct MacBatchGenerationSheet: View {
             isFocused: $isEditorFocused,
             accessibilityIdentifier: "batch_textEditor"
         )
-        .padding(8)
+        .padding(MacTheme.Spacing.sm)
         .frame(minHeight: 220)
         .background {
             VocelloShape.input()
@@ -252,15 +252,15 @@ struct MacBatchGenerationSheet: View {
         .disabled(isProcessing)
 
         if isProcessing {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: MacTheme.Spacing.sm) {
                 ProgressView(value: progressFraction, total: 1.0)
                     .tint(MacTheme.accent)
                 Text(progressStatusMessage)
-                    .font(.callout)
+                    .macType(.rowMeta)
                     .foregroundStyle(MacTheme.Text.secondary)
                 if totalCount > 0 {
                     Text(MacInterfaceText.batchClipsCompleted(String(completedCount), String(totalCount)))
-                        .font(.caption)
+                        .macType(.caption)
                         .foregroundStyle(MacTheme.Text.secondary)
                 }
             }
@@ -273,7 +273,7 @@ struct MacBatchGenerationSheet: View {
         if let errorLine {
             Text(errorLine)
                 .foregroundStyle(MacTheme.Status.critical)
-                .font(.callout)
+                .macType(.rowMeta)
         }
 
         HStack {
@@ -308,17 +308,17 @@ struct MacBatchGenerationSheet: View {
     private func completionView(_ outcome: MacBatchOutcomePresentation) -> some View {
         Spacer()
 
-        VStack(spacing: 16) {
+        VStack(spacing: MacTheme.Spacing.lg) {
             Image(systemName: outcome.iconName)
                 .font(.system(size: completionIconSize))
                 .foregroundStyle(outcome.iconColor)
 
             Text(outcome.title)
-                .font(.title2.weight(.bold))
+                .macType(.sheetTitle)
                 .foregroundStyle(MacTheme.Text.primary)
 
             Text(outcome.message)
-                .font(.callout)
+                .macType(.body)
                 .foregroundStyle(MacTheme.Text.secondary)
                 .multilineTextAlignment(.center)
         }
@@ -330,7 +330,7 @@ struct MacBatchGenerationSheet: View {
         if outcome.kind != .failed, let errorLine {
             Text(errorLine)
                 .foregroundStyle(MacTheme.Status.critical)
-                .font(.callout)
+                .macType(.rowMeta)
         }
 
         Spacer()
@@ -402,9 +402,9 @@ struct MacBatchGenerationSheet: View {
         if !rows.isEmpty {
             GroupBox(title) {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
                         ForEach(rows) { row in
-                            HStack(spacing: 8) {
+                            HStack(spacing: MacTheme.Spacing.sm) {
                                 MacBatchItemRow(row: row)
                                 if canRegenerateSegments, row.isSaved {
                                     Spacer(minLength: 4)
@@ -412,14 +412,14 @@ struct MacBatchGenerationSheet: View {
                                         regenerateSegment(row.index)
                                     }
                                     .buttonStyle(.borderless)
-                                    .font(.caption)
+                                    .macType(.caption)
                                     .accessibilityIdentifier("batch_regenerateSegment_\(row.index)")
                                 }
                             }
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, MacTheme.Spacing.xs)
                 }
                 .frame(minHeight: 120, maxHeight: 220)
             }
@@ -681,37 +681,37 @@ private struct MacBatchItemRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.tight) {
+            HStack(alignment: .firstTextBaseline, spacing: MacTheme.Spacing.snug) {
                 Label(row.statusLabel, systemImage: statusIcon)
-                    .font(.caption.weight(.semibold))
+                    .macType(.captionEmphasis)
                     .foregroundStyle(statusColor)
 
                 Text(MacInterfaceText.batchLine(String(row.index + 1)))
-                    .font(.caption)
+                    .macType(.caption)
                     .foregroundStyle(MacTheme.Text.secondary)
 
                 Spacer()
             }
 
             Text(row.line)
-                .font(.callout)
+                .macType(.rowTitle)
                 .foregroundStyle(MacTheme.Text.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if let failureMessage = row.failureMessage {
                 Text(failureMessage)
-                    .font(.caption)
+                    .macType(.caption)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else if let audioPath = row.audioPath {
                 Text(URL(fileURLWithPath: audioPath).lastPathComponent)
-                    .font(.caption)
+                    .macType(.caption)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(12)
+        .padding(MacTheme.Spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             VocelloShape.card()
@@ -719,7 +719,7 @@ private struct MacBatchItemRow: View {
         )
         .overlay(
             VocelloShape.card()
-                .stroke(statusColor.opacity(0.18), lineWidth: 1)
+                .stroke(statusColor.opacity(0.18), lineWidth: VocelloTheme.Stroke.standard)
         )
     }
 }

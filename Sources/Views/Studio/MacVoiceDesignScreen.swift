@@ -203,7 +203,7 @@ struct MacVoiceDesignScreen: View {
     private var briefSection: some View {
         MacVoiceBriefEditor(text: $draft.voiceDescription, tint: tint)
             .padding(.horizontal, MacStudioMetrics.horizontalInset)
-            .padding(.top, 10)
+            .padding(.top, MacTheme.Spacing.snug)
             .frame(maxWidth: MacStudioMetrics.contentMaxWidth)
             .frame(maxWidth: .infinity)
             .accessibilityElement(children: .contain)
@@ -240,7 +240,7 @@ struct MacVoiceDesignScreen: View {
         if let candidate = currentSavedVoiceCandidate {
             if candidate.isSaved {
                 Label(MacInterfaceText.designSavedToSavedVoices, systemImage: "checkmark.circle.fill")
-                    .font(.caption.weight(.semibold))
+                    .macType(.captionEmphasis)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .lineLimit(1)
                     .accessibilityIdentifier("voiceDesign_saveVoiceCompleted")

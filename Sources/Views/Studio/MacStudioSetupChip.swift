@@ -9,10 +9,11 @@ import SwiftUI
 /// lanes' `delivery_tonePicker` and the other picker identifiers stay on the
 /// trigger and its rows stay real menu items.
 enum MacStudioChipMetrics {
-    /// The iOS pill height (`IOSSetupChipPill`). The chips share the row
-    /// equally and span exactly the Generate button's width, so a chip never
-    /// hugs its label and the row never wraps at a usual window size.
-    static let pillHeight: CGFloat = 46
+    /// The iOS pill height (`IOSSetupChipPill`), which is the app's `pill`
+    /// control step. The chips share the row equally and span exactly the
+    /// Generate button's width, so a chip never hugs its label and the row
+    /// never wraps at a usual window size.
+    static let pillHeight: CGFloat = MacControl.pill.height
     /// The floor below which `MacChipFlow` wraps the row. Sized so the value
     /// still reads after the glyph, the chevron and the padding take their
     /// share: below this a four-chip row on a 720 pt window truncated
@@ -78,7 +79,7 @@ struct MacStudioActionChip: View {
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
-        .opacity(isEnabled ? 1 : 0.45)
+        .opacity(isEnabled ? 1 : VocelloTheme.Opacity.disabled)
         .vocelloFocusRing(tint, radius: MacStudioChipMetrics.pillHeight / 2)
         .accessibilityLabel(spokenLabel)
         .accessibilityIdentifier(accessibilityIdentifier)
@@ -109,19 +110,19 @@ struct MacStudioSetupChipPill: View {
             symbol: symbol,
             tint: tint,
             height: MacStudioChipMetrics.pillHeight,
-            horizontalPadding: 12,
+            horizontalPadding: MacControl.pill.horizontalPadding,
             minWidth: MacStudioChipMetrics.minWidth,
             showsChevron: showsChevron,
             reduceTransparency: reduceTransparency
         ) {
             Text(value)
-                .font(.subheadline.weight(.semibold))
+                .macType(.chipLabel)
                 .foregroundStyle(isPlaceholder ? MacTheme.Text.secondary : MacTheme.Text.primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
-        .opacity(isPlaceholder ? 0.55 : 1)
-        .contentShape(Capsule(style: .continuous))
+        .opacity(isPlaceholder ? VocelloTheme.Opacity.placeholder : 1)
+        .contentShape(VocelloShape.pill())
         // One accessibility element per chip: the menu's identifier and value
         // land on a single control the size of the pill, not on each glyph.
         .accessibilityElement(children: .ignore)

@@ -31,7 +31,7 @@ private struct VocelloFocusRing: ViewModifier {
             .overlay {
                 if isFocused {
                     RoundedRectangle(cornerRadius: radius + 2, style: .continuous)
-                        .strokeBorder(color.opacity(0.85), lineWidth: 2)
+                        .strokeBorder(color.opacity(0.85), lineWidth: VocelloTheme.Stroke.focus)
                         .padding(-3)
                         .allowsHitTesting(false)
                 }

@@ -14,12 +14,12 @@ struct MacStartupDiagnosticsView: View {
                 VocelloProductTitleLockup(title: MacInterfaceText.brandName)
 
                 Text(snapshot.issue.summary)
-                    .font(.title3.weight(.semibold))
+                    .macType(.screenTitle)
                     .foregroundStyle(MacTheme.Text.primary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(MacInterfaceText.startupCannotContinue)
-                    .font(.body)
+                    .macType(.body)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -31,7 +31,7 @@ struct MacStartupDiagnosticsView: View {
 
                 Rectangle()
                     .fill(MacTheme.Surface.hairline)
-                    .frame(height: 1)
+                    .frame(height: VocelloTheme.Stroke.standard)
                     .padding(.vertical, 2)
 
                 diagnosticsRow(MacInterfaceText.startupUnderlyingError, snapshot.underlyingError)
@@ -53,18 +53,18 @@ struct MacStartupDiagnosticsView: View {
         }
         .frame(maxWidth: 640, alignment: .topLeading)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(MacTheme.Spacing.xxl)
+        .padding(MacTheme.Spacing.xl)
         .background(MacTheme.canvasGradient.ignoresSafeArea())
         .accessibilityIdentifier("startupDiagnostics_view")
     }
 
     private func diagnosticsRow(_ label: String, _ value: String?) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {
             Text(label)
-                .font(.subheadline.weight(.semibold))
+                .macType(.rowTitle)
                 .foregroundStyle(MacTheme.Text.primary)
             Text(value ?? MacInterfaceText.startupNotFound)
-                .font(.callout)
+                .macType(.rowMeta)
                 .foregroundStyle(MacTheme.Text.secondary)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)

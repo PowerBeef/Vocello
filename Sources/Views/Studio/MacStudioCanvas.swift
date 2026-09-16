@@ -41,13 +41,15 @@ enum MacStudioMetrics {
     /// chips and the Generate button keep the phone's proportions and the
     /// 22 pt script keeps a comfortable line length.
     static let contentMaxWidth: CGFloat = 640
-    /// The iOS canvas gutter. The composer uses it, the chip row and the dock
-    /// use it, so the script, the chips and the Generate button share one
-    /// left edge — the spine the whole screen hangs from.
-    static let horizontalInset: CGFloat = 20
+    /// The iOS canvas gutter, which is the app's screen gutter token. The
+    /// composer uses it, the chip row and the dock use it, so the script, the
+    /// chips and the Generate button share one left edge — the spine the
+    /// whole screen hangs from.
+    static let horizontalInset: CGFloat = MacTheme.Spacing.xl
     /// Floor for the dock box (the iOS `compactDockAreaHeight`), so the
-    /// silhouette does not jump between the idle CTA and the generating bar.
-    static let dockMinHeight: CGFloat = 64
+    /// silhouette does not jump between the idle CTA and the generating bar:
+    /// the primary control plus one step of air under it.
+    static let dockMinHeight: CGFloat = MacControl.primary.height + MacTheme.Spacing.sm
     /// Six lines of the 22 pt face plus the editor's vertical insets. The
     /// desktop composer is a bounded area that grows with its text instead of
     /// the phone's flexible pad, because a Mac window has no thumb zone to
@@ -55,8 +57,6 @@ enum MacStudioMetrics {
     static let composerMinHeight: CGFloat = 176
     /// Share of the canvas the composer may take before it scrolls internally.
     static let composerMaxFraction: CGFloat = 0.55
-    /// The dock's square Batch button: the CTA's height, the stage radius.
-    static let batchButtonSize: CGFloat = 56
 }
 
 /// Readiness of the current mode, rendered as one caption beside the mode
@@ -172,20 +172,20 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         VStack(alignment: .leading, spacing: 0) {
             composerPad(editorHeight: editorHeight(canvasHeight: canvasHeight))
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
                 // Lock voice, delivery and language while a take is in flight
                 // (the request already captured them); re-enabled on complete.
-                MacChipFlow(spacing: 8) {
+                MacChipFlow(spacing: MacTheme.Spacing.sm) {
                     setupChips
                 }
                 .disabled(genState.isGenerationActive)
-                .opacity(genState.isGenerationActive ? 0.5 : 1)
+                .opacity(genState.isGenerationActive ? VocelloTheme.Opacity.dimmed : 1)
                 .appAnimation(MacTheme.Motion.stateChange, value: genState.isGenerationActive)
 
                 footer
             }
             .padding(.horizontal, MacStudioMetrics.horizontalInset)
-            .padding(.bottom, 10)
+            .padding(.bottom, MacTheme.Spacing.snug)
             // Accessibility containers: the screen root carries `screen_<mode>`
             // and SwiftUI hands that identifier to every descendant element
             // that is not inside a container, which would erase the chip,
@@ -195,7 +195,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             dockArea
                 .frame(minHeight: MacStudioMetrics.dockMinHeight, alignment: .top)
                 .padding(.horizontal, MacStudioMetrics.horizontalInset)
-                .padding(.bottom, 16)
+                .padding(.bottom, MacTheme.Spacing.lg)
                 .accessibilityElement(children: .contain)
 
             // Desktop eyes expect a form to end and space to follow; the
@@ -221,9 +221,9 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             MacScriptTextEditor(
                 text: $script,
                 placeholder: placeholder,
-                font: .systemFont(ofSize: 22, weight: .medium),
+                font: .systemFont(ofSize: MacType.style(.script).size, weight: .medium),
                 isFocused: $isScriptFocused,
-                tracking: -0.22,
+                tracking: MacType.style(.script).tracking,
                 contentHeight: $scriptContentHeight
             )
             .frame(maxWidth: .infinity)
@@ -232,11 +232,10 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
 
             // The meta line sits right under the script, above the chips:
             // mode, readiness, Clear, count.
-            HStack(alignment: .center, spacing: 12) {
-                HStack(spacing: 5) {
+            HStack(alignment: .center, spacing: MacTheme.Spacing.md) {
+                HStack(spacing: MacTheme.Spacing.tight) {
                     Text(modeMetaLabel)
-                        .font(.caption.weight(.medium))
-                        .tracking(0.24)
+                        .macType(.captionEmphasis)
                         .foregroundStyle(MacTheme.Text.secondary)
                         .lineLimit(1)
                         .accessibilityIdentifier("textInput_modeMetaLabel")
@@ -245,14 +244,14 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
                 }
                 .layoutPriority(1)
 
-                Spacer(minLength: 8)
+                Spacer(minLength: MacTheme.Spacing.sm)
 
                 if !script.isEmpty {
                     Button(MacInterfaceText.studioClearScript) {
                         script = ""
                     }
                     .buttonStyle(.plain)
-                    .font(.caption.weight(.semibold))
+                    .macType(.buttonLabel)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .lineLimit(1)
                     .fixedSize()
@@ -262,11 +261,11 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
                 characterCount
                     .fixedSize()
             }
-            .padding(.top, 4)
-            .padding(.bottom, 10)
+            .padding(.top, MacTheme.Spacing.xs)
+            .padding(.bottom, MacTheme.Spacing.snug)
         }
         .padding(.horizontal, MacStudioMetrics.horizontalInset)
-        .padding(.top, 12)
+        .padding(.top, MacTheme.Spacing.md)
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("\(accessibilityPrefix)_script")
@@ -276,22 +275,21 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     /// uses for Voice Cloning. The glyph appears only when the mode is not
     /// ready, so state is never carried by color alone.
     private var readinessCaption: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: MacTheme.Spacing.xs) {
             Text(verbatim: "·")
-                .font(.caption.weight(.medium))
+                .macType(.captionEmphasis)
                 .foregroundStyle(MacTheme.Text.tertiary)
                 .accessibilityHidden(true)
 
             if !readiness.isReady {
                 Image(systemName: "clock")
-                    .font(.system(size: 10, weight: .semibold))
+                    .macType(.captionEmphasis)
                     .foregroundStyle(MacTheme.Text.tertiary)
                     .accessibilityHidden(true)
             }
 
             Text(readiness.title)
-                .font(.caption.weight(.medium))
-                .tracking(0.24)
+                .macType(.captionEmphasis)
                 .foregroundStyle(readiness.isReady ? MacTheme.Text.secondary : MacTheme.Text.tertiary)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -310,7 +308,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         let state = GenerationTextLimitPolicy.state(for: script, mode: mode)
         let spoken = MacInterfaceText.textInputCharacterCount(String(state.count))
         return Text(verbatim: "\(state.count) / \(state.displayLimit)")
-            .font(.caption.weight(.medium).monospacedDigit())
+            .macType(.counter)
             .foregroundStyle(state.isOverLimit ? MacTheme.Status.guarded : MacTheme.Text.secondary)
             .accessibilityLabel(spoken)
             .accessibilityValue(spoken)
@@ -326,7 +324,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     /// `textInput_generateButton` after every completion.
     @ViewBuilder
     private var dockArea: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
             if let phase = genState.playerPhase {
                 MacStudioPlayerCard(
                     phase: phase,
@@ -356,7 +354,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     /// of the same height at its right end rather than a setup chip (it does
     /// not describe the take, and as a chip it wrapped the row).
     private var actionRow: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: MacTheme.Spacing.sm) {
             if modelInstalled {
                 generateCTA
             } else {
@@ -381,39 +379,39 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     /// when clicked, rather than a block of text above a separate button.
     private func errorBar(_ message: String) -> some View {
         Button(action: onGenerate) {
-            HStack(spacing: 12) {
+            HStack(spacing: MacTheme.Spacing.md) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: MacControl.field.glyph, weight: .semibold))
                     .foregroundStyle(MacTheme.Status.guarded)
-                    .frame(width: 34, height: 34)
+                    .macControlSquare(.field)
                     .background { Circle().fill(MacTheme.Status.guarded.opacity(0.14)) }
                     .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {
                     Text(MacInterfaceText.studioGenerationFailed)
-                        .font(.footnote.weight(.semibold))
+                        .macType(.rowTitle)
                         .foregroundStyle(MacTheme.Text.primary)
                         .lineLimit(1)
                     Text(message)
-                        .font(.caption2)
+                        .macType(.rowMeta)
                         .foregroundStyle(MacTheme.Text.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
 
-                Spacer(minLength: 8)
+                Spacer(minLength: MacTheme.Spacing.sm)
 
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: MacControl.field.glyph, weight: .semibold))
                     .foregroundStyle(MacTheme.Text.secondary)
                     .accessibilityHidden(true)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, MacTheme.Spacing.lg)
             .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background { Capsule(style: .continuous).fill(Color.white.opacity(0.04)) }
-            .overlay { Capsule(style: .continuous).stroke(MacTheme.Status.guarded.opacity(0.30), lineWidth: 0.7) }
-            .contentShape(Capsule(style: .continuous))
+            .macControlHeight(.primary)
+            .background { VocelloShape.pill().fill(Color.white.opacity(0.04)) }
+            .overlay { VocelloShape.pill().stroke(MacTheme.Status.guarded.opacity(0.30), lineWidth: VocelloTheme.Stroke.hairline) }
+            .contentShape(VocelloShape.pill())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(MacInterfaceText.studioGenerationFailed)
@@ -435,26 +433,26 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     }
 
     private var generatingBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: MacTheme.Spacing.snug) {
             VocelloStaticWaveformThumbnail(seed: 42, barCount: 28, tint: tint)
                 .frame(height: 32)
                 .accessibilityHidden(true)
 
-            VStack(alignment: .trailing, spacing: 2) {
+            VStack(alignment: .trailing, spacing: MacTheme.Spacing.xs) {
                 Text(MacInterfaceText.statusGenerating)
-                    .font(.footnote.weight(.semibold))
+                    .macType(.rowTitle)
                     .foregroundStyle(MacTheme.Text.primary)
                 Text(generatingSubline)
-                    .font(.caption2)
+                    .macType(.rowMeta)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .lineLimit(1)
             }
 
             Button(action: onCancel) {
                 Image(systemName: "stop.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: MacControl.row.glyph, weight: .semibold))
                     .foregroundStyle(MacTheme.Text.primary)
-                    .frame(width: 44, height: 44)
+                    .macControlSquare(.row)
                     .background { Circle().fill(MacTheme.Surface.glassSurfaceMuted.opacity(0.7)) }
                     .contentShape(Circle())
             }
@@ -462,11 +460,11 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             .accessibilityLabel(MacInterfaceText.studioStopGenerating)
             .accessibilityIdentifier("textInput_cancelButton")
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, MacTheme.Spacing.lg)
         .frame(maxWidth: .infinity)
-        .frame(height: 56)
-        .background { Capsule(style: .continuous).fill(Color.white.opacity(0.04)) }
-        .overlay { Capsule(style: .continuous).stroke(Color.white.opacity(0.10), lineWidth: 0.5) }
+        .macControlHeight(.primary)
+        .background { VocelloShape.pill().fill(Color.white.opacity(0.04)) }
+        .overlay { VocelloShape.pill().stroke(Color.white.opacity(0.10), lineWidth: VocelloTheme.Stroke.hairline) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("textInput_generatingBar")
     }
@@ -502,19 +500,23 @@ struct MacStudioBatchButton: View {
         let shape = VocelloShape.stage()
         Button(action: action) {
             Image(systemName: "list.bullet.rectangle")
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: MacControl.primary.glyph, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(MacTheme.Text.primary)
-                .frame(width: MacStudioMetrics.batchButtonSize, height: MacStudioMetrics.batchButtonSize)
+                .macControlSquare(.primary)
                 .background { shape.fill(fillStyle) }
-                .overlay { shape.stroke(Color.white.opacity(0.12), lineWidth: 0.8) }
-                .overlay { shape.inset(by: 0.65).stroke(Color.white.opacity(0.04), lineWidth: 0.55) }
-                .shadow(color: reduceTransparency ? .clear : tint.opacity(0.28), radius: 8, y: 1)
+                .overlay { shape.stroke(Color.white.opacity(0.12), lineWidth: VocelloTheme.Stroke.hairline) }
+                .overlay { shape.inset(by: 0.65).stroke(Color.white.opacity(0.04), lineWidth: VocelloTheme.Stroke.hairline) }
+                .shadow(
+                    color: reduceTransparency ? .clear : VocelloTheme.Elevation.glowColor(tint),
+                    radius: VocelloTheme.Elevation.glowRadius,
+                    y: VocelloTheme.Elevation.glowY
+                )
                 .contentShape(shape)
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
-        .opacity(isEnabled ? 1 : 0.45)
+        .opacity(isEnabled ? 1 : VocelloTheme.Opacity.disabled)
         .vocelloFocusRing(tint, radius: MacTheme.Radius.stage)
         .help(MacInterfaceText.textInputBatch)
         .accessibilityLabel(MacInterfaceText.textInputBatch)

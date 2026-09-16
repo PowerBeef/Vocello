@@ -21,13 +21,12 @@ struct MacSettingsSection<Content: View>: View {
             if let title {
                 Text(title)
                     .textCase(.uppercase)
-                    .font(.system(size: 11, weight: .semibold))
-                    .tracking(0.88)
+                    .macType(.eyebrow)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .lineLimit(1)
                     .accessibilityAddTraits(.isHeader)
-                    .padding(.horizontal, 4)
-                    .padding(.bottom, 6)
+                    .padding(.horizontal, MacTheme.Spacing.xs)
+                    .padding(.bottom, MacTheme.Spacing.tight)
             }
 
             VStack(alignment: .leading, spacing: 0) {
@@ -36,7 +35,7 @@ struct MacSettingsSection<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(accent?.opacity(0.07) ?? Color.white.opacity(0.04))
             .clipShape(shape)
-            .overlay { shape.strokeBorder(accent?.opacity(0.25) ?? MacTheme.Surface.panelStroke, lineWidth: 0.5) }
+            .overlay { shape.strokeBorder(accent?.opacity(0.25) ?? MacTheme.Surface.panelStroke, lineWidth: VocelloTheme.Stroke.hairline) }
         }
     }
 }
@@ -45,8 +44,9 @@ struct MacSettingsDivider: View {
     var body: some View {
         Rectangle()
             .fill(MacTheme.Surface.hairline)
-            .frame(height: 0.5)
-            .padding(.leading, 50)
+            .frame(height: VocelloTheme.Stroke.hairline)
+            // Starts where the title does: row inset, glyph slot, glyph gap.
+            .padding(.leading, MacTheme.Spacing.md + MacControl.icon.height + MacTheme.Spacing.snug)
     }
 }
 
@@ -56,9 +56,9 @@ struct MacSettingsIcon: View {
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: 15, weight: .medium))
+            .font(.system(size: MacControl.field.glyph, weight: .medium))
             .foregroundStyle(tint)
-            .frame(width: 28, height: 28)
+            .macControlSquare(.icon)
             .accessibilityHidden(true)
     }
 }
@@ -86,13 +86,13 @@ struct MacSettingsRow<Detail: View, Trailing: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .center, spacing: MacTheme.Spacing.md) {
+            HStack(alignment: .top, spacing: MacTheme.Spacing.snug) {
                 MacSettingsIcon(symbol: symbol, tint: tint)
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {
                     Text(title)
-                        .font(.subheadline.weight(.semibold))
+                        .macType(.rowTitle)
                         .foregroundStyle(MacTheme.Text.primary)
                         .fixedSize(horizontal: false, vertical: true)
                     detail
@@ -101,13 +101,13 @@ struct MacSettingsRow<Detail: View, Trailing: View>: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 8) {
+            HStack(spacing: MacTheme.Spacing.sm) {
                 trailing
             }
             .fixedSize(horizontal: true, vertical: false)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, MacTheme.Spacing.md)
+        .padding(.vertical, MacTheme.Spacing.snug)
         .frame(minHeight: 52)
     }
 }
@@ -124,7 +124,7 @@ struct MacSettingsDetailText: View {
 
     var body: some View {
         Text(text)
-            .font(.footnote)
+            .macType(.rowMeta)
             .foregroundStyle(color)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -194,15 +194,20 @@ private struct MacSettingsActionButtonBody: View {
 
     var body: some View {
         configuration.label
-            .font(.caption.weight(.semibold))
+            .macType(.buttonLabel)
             .lineLimit(1)
             .foregroundStyle(foregroundColor)
-            .padding(.horizontal, 10)
-            .frame(width: width, height: 26)
+            // `.icon` rather than `.field`: a settings list's action buttons
+            // are secondary, and a Mac list is denser than a phone's. Ten
+            // points on every package line also pushes the clone-consent
+            // toggle — the last row on the screen — past the scroll budget the
+            // smoke lane reveals it with.
+            .padding(.horizontal, MacControl.icon.horizontalPadding)
+            .frame(width: width, height: MacControl.icon.height)
             .frame(minWidth: 64)
-            .background { Capsule(style: .continuous).fill(backgroundColor) }
-            .overlay { Capsule(style: .continuous).stroke(strokeColor, lineWidth: 0.5) }
-            .contentShape(Capsule(style: .continuous))
+            .background { VocelloShape.pill().fill(backgroundColor) }
+            .overlay { VocelloShape.pill().stroke(strokeColor, lineWidth: VocelloTheme.Stroke.hairline) }
+            .contentShape(VocelloShape.pill())
             .brightness(isHovering ? 0.08 : 0)
             .opacity(configuration.isPressed ? 0.82 : 1)
             .onHover { hovering in
@@ -251,9 +256,9 @@ struct MacSettingsProgressBar: View {
         GeometryReader { proxy in
             let clamped = min(max(fraction, 0), 1)
             ZStack(alignment: .leading) {
-                Capsule(style: .continuous)
+                VocelloShape.pill()
                     .fill(MacTheme.Surface.inline)
-                Capsule(style: .continuous)
+                VocelloShape.pill()
                     .fill(tint)
                     .frame(width: max(clamped > 0 ? 6 : 0, proxy.size.width * clamped))
             }

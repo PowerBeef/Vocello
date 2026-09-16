@@ -76,35 +76,35 @@ struct MacStatusStrip: View {
         let shape = VocelloShape.card()
         let percent = descriptor.fraction.map { Int(($0 * 100).rounded()) }
 
-        return HStack(alignment: .top, spacing: 8) {
+        return HStack(alignment: .top, spacing: MacTheme.Spacing.sm) {
             Image(systemName: descriptor.symbol)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: MacControl.badge.glyph, weight: .semibold))
                 .foregroundStyle(descriptor.tint)
-                .frame(width: 22, height: 22)
+                .macControlSquare(.badge)
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {
                 Text(descriptor.title)
-                    .font(.subheadline.weight(.semibold))
+                    .macType(.rowTitle)
                     .foregroundStyle(MacTheme.Text.primary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let message = descriptor.message, !message.isEmpty {
                     Text(message)
-                        .font(.caption)
+                        .macType(.caption)
                         .foregroundStyle(MacTheme.Text.secondary)
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 if let fraction = descriptor.fraction, let percent {
-                    HStack(spacing: 8) {
+                    HStack(spacing: MacTheme.Spacing.sm) {
                         ProgressView(value: fraction, total: 1.0)
                             .tint(descriptor.tint)
                             .scaleEffect(y: 0.6, anchor: .center)
                         Text(verbatim: "\(percent)%")
-                            .font(.caption2.monospacedDigit().weight(.medium))
+                            .macType(.counter)
                             .foregroundStyle(MacTheme.Text.tertiary)
                     }
                     .padding(.top, 2)
@@ -115,7 +115,7 @@ struct MacStatusStrip: View {
             if descriptor.dismissible {
                 Button(action: clearError) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.callout)
+                        .font(.system(size: MacControl.icon.glyph, weight: .semibold))
                         .foregroundStyle(MacTheme.Text.tertiary)
                 }
                 .buttonStyle(.plain)
@@ -123,8 +123,8 @@ struct MacStatusStrip: View {
                 .accessibilityIdentifier("sidebar_backendStatus_dismiss")
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.horizontal, MacTheme.Spacing.md)
+        .padding(.vertical, MacTheme.Spacing.sm)
         .macSubtleGlassSurface(
             in: shape,
             tint: descriptor.tint,

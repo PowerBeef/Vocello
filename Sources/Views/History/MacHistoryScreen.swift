@@ -258,7 +258,7 @@ struct MacHistoryScreen: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: VocelloTheme.Spacing.md) {
                 if recoverySnapshot.needsAttention {
                     MacHistoryRecoveryBanner(
                         message: recoveryMessage,
@@ -274,16 +274,16 @@ struct MacHistoryScreen: View {
                     options: HistoryModeFilter.allCases,
                     selection: $modeFilter,
                     label: \.title,
-                    leading: { filter in AnyView(VocelloModeDot(tint: filter.dotColor, diameter: 7)) },
+                    leading: { filter in AnyView(VocelloModeDot(tint: filter.dotColor)) },
                     accessibilityIdentifier: \.accessibilityID
                 )
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel(MacInterfaceText.historyFilterAccessibility)
                 .accessibilityIdentifier("history_modeFilter")
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
-            .padding(.bottom, 4)
+            .padding(.horizontal, VocelloTheme.Spacing.xl)
+            .padding(.top, VocelloTheme.Spacing.lg)
+            .padding(.bottom, VocelloTheme.Spacing.xs)
             .frame(maxWidth: MacShellMetrics.libraryContentMaxWidth)
             .frame(maxWidth: .infinity)
 
@@ -394,13 +394,24 @@ struct MacHistoryScreen: View {
                     Section {
                         ForEach(section.entries) { entry in
                             rowView(for: entry)
-                                .listRowInsets(EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8))
+                                .listRowInsets(EdgeInsets(
+                                    top: 0,
+                                    leading: VocelloTheme.Spacing.sm,
+                                    bottom: 0,
+                                    trailing: VocelloTheme.Spacing.sm
+                                ))
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)
                         }
                     } header: {
                         if let bucket = section.bucket {
-                            VocelloSectionHeading(bucket.title, titleFontSize: 11, topPadding: 18, titleLineLimit: 1, expandsWidth: true)
+                            VocelloSectionHeading(
+                                bucket.title,
+                                titleFontSize: MacType.style(.eyebrow).size,
+                                topPadding: VocelloTheme.Spacing.xl,
+                                titleLineLimit: 1,
+                                expandsWidth: true
+                            )
                         }
                     }
                 }
@@ -460,7 +471,7 @@ struct MacHistoryScreen: View {
                 segmentsToggle(projectID: toggle.projectID, segmentCount: toggle.segmentCount)
             }
         }
-        .padding(.leading, entry.isSegment ? 24 : 0)
+        .padding(.leading, entry.isSegment ? VocelloTheme.Spacing.xxl : 0)
     }
 
     private func segmentsToggle(projectID: String, segmentCount: Int) -> some View {
@@ -474,7 +485,7 @@ struct MacHistoryScreen: View {
                 }
             }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: VocelloTheme.Spacing.tight) {
                 Image(systemName: "rectangle.stack")
                 Text(
                     segmentCount == 1
@@ -483,13 +494,13 @@ struct MacHistoryScreen: View {
                 )
                 Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
             }
-            .font(.footnote.weight(.medium))
+            .macType(.captionEmphasis)
             .foregroundStyle(MacTheme.Text.secondary)
-            .padding(.vertical, 6)
+            .padding(.vertical, VocelloTheme.Spacing.tight)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.leading, 72)
+        .padding(.leading, MacHistoryItemCard.contentLeadingInset)
         .accessibilityValue(isExpanded ? MacInterfaceText.historySegmentsExpanded : MacInterfaceText.historySegmentsCollapsed)
         .accessibilityIdentifier("history_longFormSegmentsToggle_\(String(projectID.prefix(8)))")
     }
@@ -622,10 +633,10 @@ private extension MacHistoryScreen {
         identifier: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: VocelloTheme.Spacing.md) {
             content()
         }
-        .padding(24)
+        .padding(VocelloTheme.Spacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(identifier)

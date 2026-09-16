@@ -58,7 +58,7 @@ struct MacSettingsScreen: View {
                 }
                 .frame(maxWidth: contentMaxWidth)
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal, MacTheme.Spacing.xxl)
+                .padding(.horizontal, MacTheme.Spacing.xl)
                 .padding(.vertical, MacTheme.Spacing.xl)
             }
             .settingsNavigationTitle(showsNavigationTitle)
@@ -169,7 +169,7 @@ struct MacSettingsScreen: View {
                 .labelsHidden()
                 .tint(MacTheme.accent)
                 .frame(maxWidth: 360)
-                .padding(.top, 4)
+                .padding(.top, MacTheme.Spacing.xs)
                 .accessibilityIdentifier("settings_generationVariation")
                 .accessibilityLabel(MacInterfaceText.settingsVariation)
             } trailing: {
@@ -193,16 +193,16 @@ struct MacSettingsScreen: View {
     private var storageSection: some View {
         MacSettingsSection(title: MacInterfaceText.settingsStorage) {
             MacSettingsRow(symbol: "folder", title: MacInterfaceText.settingsOutputDirectory) {
-                HStack(spacing: 6) {
+                HStack(spacing: MacTheme.Spacing.tight) {
                     if outputDirectoryIssue != nil {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption)
+                            .macType(.rowMeta)
                             .foregroundStyle(MacTheme.Status.guarded)
                             .help(outputDirectoryIssue ?? "")
                             .accessibilityIdentifier("preferences_outputDirectoryWarning")
                     }
                     Text(outputDirectorySummary)
-                        .font(.footnote)
+                        .macType(.rowMeta)
                         .foregroundStyle(MacTheme.Text.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -229,7 +229,7 @@ struct MacSettingsScreen: View {
             // About Vocello) covers full version detail in the standard spot.
             MacSettingsRow(symbol: "internaldrive", title: MacInterfaceText.settingsApplicationData) {
                 Text(appVersion)
-                    .font(.footnote.monospacedDigit())
+                    .macType(.counter)
                     .foregroundStyle(MacTheme.Text.secondary)
             } trailing: {
                 Button(MacInterfaceText.revealInFinder) {

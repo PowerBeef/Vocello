@@ -23,9 +23,8 @@ enum MacShellMetrics {
     /// card fill its column.
     static let emptyStateCardMaxWidth: CGFloat = 480
 
-    static let sidebarInset: CGFloat = 12
-    static let sidebarRowMinHeight: CGFloat = 40
-    static let sidebarRowRadius: CGFloat = 12
-    static let sidebarGlyphTile: CGFloat = 28
-    static let sidebarGlyphTileRadius: CGFloat = 8
+    static let sidebarInset: CGFloat = VocelloTheme.Spacing.md
+    /// The sidebar row is the shared row step; its glyph tile the icon step.
+    static let sidebarRowMinHeight: CGFloat = MacControl.row.height
+    static let sidebarGlyphTile: CGFloat = MacControl.icon.height
 }

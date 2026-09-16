@@ -11,9 +11,9 @@ struct MacInlinePlayerCard: View {
     var tint: Color = MacTheme.accent
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        let shape = VocelloShape.stage()
 
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
             MacInlineWaveformRow(tint: tint)
             controlsRow
 
@@ -23,20 +23,25 @@ struct MacInlinePlayerCard: View {
 
             if let playbackError = audioPlayer.playbackError {
                 Text(playbackError)
-                    .font(.caption2)
+                    .macType(.caption)
                     .foregroundStyle(MacTheme.Status.guarded)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("sidebarPlayer_error")
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 12)
-        .padding(.bottom, 12)
+        .padding(.horizontal, MacTheme.Spacing.lg)
+        .padding(.top, MacTheme.Spacing.md)
+        .padding(.bottom, MacTheme.Spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background { shape.fill(Color(red: 13 / 255, green: 14 / 255, blue: 18 / 255).opacity(0.85)) }
-        .overlay { shape.stroke(Color.white.opacity(0.10), lineWidth: 0.5) }
-        .shadow(color: Color.black.opacity(0.22), radius: 5, x: 0, y: 2)
+        .overlay { shape.stroke(Color.white.opacity(0.10), lineWidth: VocelloTheme.Stroke.hairline) }
+        .shadow(
+            color: VocelloTheme.Elevation.cardColor,
+            radius: VocelloTheme.Elevation.cardRadius,
+            x: 0,
+            y: VocelloTheme.Elevation.cardY
+        )
         .transition(
             AppLaunchConfiguration.current.animationsEnabled
                 ? .move(edge: .bottom).combined(with: .opacity)
@@ -47,16 +52,16 @@ struct MacInlinePlayerCard: View {
     }
 
     private var controlsRow: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: MacTheme.Spacing.sm) {
             Button {
                 AppLaunchConfiguration.performAnimated(MacTheme.Motion.stateChange) {
                     audioPlayer.togglePlayPause()
                 }
             } label: {
                 Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: MacControl.field.glyph, weight: .semibold))
                     .foregroundStyle(MacTheme.Text.onAccent)
-                    .frame(width: 36, height: 36)
+                    .macControlSquare(.field)
                     .background {
                         Circle().fill(
                             LinearGradient(
@@ -66,26 +71,26 @@ struct MacInlinePlayerCard: View {
                             )
                         )
                     }
-                    .overlay { Circle().stroke(Color.white.opacity(0.18), lineWidth: 0.5) }
+                    .overlay { Circle().stroke(Color.white.opacity(0.18), lineWidth: VocelloTheme.Stroke.hairline) }
             }
             .buttonStyle(.plain)
             .accessibilityLabel(MacInterfaceText.menuPlayPause)
             .accessibilityValue(audioPlayer.isPlaying ? "pause" : "play")
             .accessibilityIdentifier("sidebarPlayer_playPause")
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {
                 Text(audioPlayer.currentTitle)
-                    .font(.system(size: 13, weight: .semibold))
+                    .macType(.rowTitle)
                     .foregroundStyle(MacTheme.Text.primary)
                     .lineLimit(1)
 
                 if audioPlayer.isLiveStream {
-                    HStack(spacing: 5) {
+                    HStack(spacing: MacTheme.Spacing.tight) {
                         Circle()
                             .fill(tint)
                             .frame(width: 6, height: 6)
                         Text(MacInterfaceText.playerLive)
-                            .font(.system(size: 11, weight: .medium))
+                            .macType(.badge)
                             .foregroundStyle(MacTheme.Text.secondary)
                             .lineLimit(1)
                     }
@@ -103,11 +108,11 @@ struct MacInlinePlayerCard: View {
                 }
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: MacControl.icon.glyph, weight: .semibold))
                     .foregroundStyle(MacTheme.Text.primary)
-                    .frame(width: 30, height: 30)
+                    .macControlSquare(.icon)
                     .background { Circle().fill(Color.white.opacity(0.06)) }
-                    .overlay { Circle().stroke(Color.white.opacity(0.10), lineWidth: 0.5) }
+                    .overlay { Circle().stroke(Color.white.opacity(0.10), lineWidth: VocelloTheme.Stroke.hairline) }
             }
             .buttonStyle(.plain)
             .accessibilityLabel(MacInterfaceText.playerClose)
@@ -124,16 +129,20 @@ private struct MacInlineWaveformRow: View {
     @EnvironmentObject private var playbackProgress: AudioPlayerViewModel.PlaybackProgress
     let tint: Color
 
+    /// Matches the Studio player card's time column, so the two cards line up
+    /// when both are on screen.
+    private static let timeColumnWidth: CGFloat = 34
+
     private var percentValue: String {
         "\(Int((playbackProgress.progress * 100).rounded())) %"
     }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: MacTheme.Spacing.sm) {
             Text(playbackProgress.formattedCurrentTime)
-                .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                .macType(.counter)
                 .foregroundStyle(MacTheme.Text.secondary)
-                .frame(width: 32, alignment: .leading)
+                .frame(width: Self.timeColumnWidth, alignment: .leading)
                 .accessibilityIdentifier("sidebarPlayer_time")
                 .accessibilityValue(
                     "\(playbackProgress.formattedCurrentTime) / \(audioPlayer.durationDisplayText)"
@@ -151,7 +160,7 @@ private struct MacInlineWaveformRow: View {
                     audioPlayer.seek(to: max(0, min(1, location.x / geo.size.width)))
                 }
             }
-            .frame(height: 26)
+            .macControlHeight(.icon)
             .opacity(audioPlayer.canSeek ? 1.0 : 0.8)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(MacInterfaceText.playerPosition)
@@ -169,9 +178,9 @@ private struct MacInlineWaveformRow: View {
             }
 
             Text(audioPlayer.durationDisplayText)
-                .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                .macType(.counter)
                 .foregroundStyle(MacTheme.Text.secondary)
-                .frame(width: 32, alignment: .trailing)
+                .frame(width: Self.timeColumnWidth, alignment: .trailing)
                 .lineLimit(1)
         }
     }
@@ -190,15 +199,15 @@ private struct MacInlineLiveStatusRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {
+            HStack(spacing: MacTheme.Spacing.tight) {
                 Image(systemName: "waveform")
-                    .font(.caption2.weight(.semibold))
+                    .macType(.captionEmphasis)
                     .foregroundStyle(tint)
                     .accessibilityHidden(true)
 
                 Text(activity.label)
-                    .font(.caption.weight(.medium))
+                    .macType(.captionEmphasis)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .lineLimit(1)
 
@@ -206,7 +215,7 @@ private struct MacInlineLiveStatusRow: View {
 
                 if let percentLabel {
                     Text(verbatim: percentLabel)
-                        .font(.caption2.monospacedDigit().weight(.medium))
+                        .macType(.counter)
                         .foregroundStyle(MacTheme.Text.tertiary)
                 }
             }

@@ -256,13 +256,13 @@ struct MacSavedVoiceSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: VocelloTheme.Spacing.xl) {
+            VStack(alignment: .leading, spacing: VocelloTheme.Spacing.xs) {
                 Text(configuration.title)
-                    .font(.title2.weight(.bold))
+                    .macType(.sheetTitle)
                     .foregroundStyle(MacTheme.Text.primary)
                 Text(configuration.subtitle)
-                    .font(.callout)
+                    .macType(.rowMeta)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -277,7 +277,7 @@ struct MacSavedVoiceSheet: View {
             }
 
             fieldSection(label: MacInterfaceText.savedVoiceAudioSection) {
-                HStack(spacing: 8) {
+                HStack(spacing: VocelloTheme.Spacing.sm) {
                     TextField(MacInterfaceText.savedVoiceAudioPlaceholder, text: $audioPath)
                         .textFieldStyle(.plain)
                         .focused($isAudioPathFocused)
@@ -302,12 +302,12 @@ struct MacSavedVoiceSheet: View {
 
             fieldSection(label: MacInterfaceText.savedVoiceTranscriptSection, caption: MacInterfaceText.savedVoiceTranscriptHelp) {
                 if let issue = speechIssueMessage {
-                    HStack(spacing: 6) {
+                    HStack(spacing: VocelloTheme.Spacing.tight) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption)
+                            .macType(.badge)
                             .foregroundStyle(MacTheme.Status.guarded)
                         Text(issue)
-                            .font(.caption)
+                            .macType(.caption)
                             .foregroundStyle(MacTheme.Text.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("voicesEnroll_speechUnavailable")
@@ -320,12 +320,12 @@ struct MacSavedVoiceSheet: View {
                 }
 
                 TextEditor(text: transcriptBinding)
-                    .font(.body)
+                    .macType(.body)
                     .scrollContentBackground(.hidden)
                     .focused($isTranscriptFocused)
                     .frame(minHeight: 96)
-                    .padding(6)
-                    .modifier(MacFieldChrome(tint: tint, isFocused: isTranscriptFocused, radius: 14))
+                    .padding(VocelloTheme.Spacing.tight)
+                    .modifier(MacFieldChrome(tint: tint, isFocused: isTranscriptFocused))
                     .accessibilityIdentifier("voicesEnroll_transcriptField")
 
                 transcriptionStatus
@@ -335,13 +335,13 @@ struct MacSavedVoiceSheet: View {
                         confirmAudioOnly()
                     } label: {
                         Label(VocelloPresentationText.useAudioOnly, systemImage: "waveform")
-                            .font(.footnote.weight(.semibold))
+                            .macType(.buttonLabel)
                             .foregroundStyle(tint)
-                            .padding(.horizontal, 12)
-                            .frame(minHeight: 30)
-                            .background { Capsule(style: .continuous).fill(tint.opacity(0.12)) }
-                            .overlay { Capsule(style: .continuous).stroke(tint.opacity(0.35), lineWidth: 0.75) }
-                            .contentShape(Capsule(style: .continuous))
+                            .padding(.horizontal, VocelloTheme.Spacing.md)
+                            .frame(minHeight: MacControl.icon.height)
+                            .background { VocelloShape.pill().fill(tint.opacity(0.12)) }
+                            .overlay { VocelloShape.pill().stroke(tint.opacity(0.35), lineWidth: VocelloTheme.Stroke.hairline) }
+                            .contentShape(VocelloShape.pill())
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint(VocelloPresentationText.useAudioOnlyHint)
@@ -370,7 +370,7 @@ struct MacSavedVoiceSheet: View {
 
             if let activeMessage = validationMessage ?? errorMessage {
                 Text(activeMessage)
-                    .font(.callout.weight(.medium))
+                    .macType(.captionEmphasis)
                     .foregroundStyle(MacTheme.Status.critical)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("voicesEnroll_errorMessage")
@@ -398,7 +398,7 @@ struct MacSavedVoiceSheet: View {
                 .accessibilityIdentifier("voicesEnroll_confirmButton")
             }
         }
-        .padding(20)
+        .padding(VocelloTheme.Spacing.xl)
         // Min instead of fixed: a fixed width squeezed content at large
         // accessibility text sizes.
         .frame(minWidth: 520, maxWidth: 600)
@@ -486,14 +486,14 @@ struct MacSavedVoiceSheet: View {
         captionTint: Color? = nil,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: VocelloTheme.Spacing.sm) {
+            VStack(alignment: .leading, spacing: VocelloTheme.Spacing.xs) {
                 Text(label)
-                    .font(.footnote.weight(.semibold))
+                    .macType(.rowTitle)
                     .foregroundStyle(MacTheme.Text.secondary)
                 if let caption {
                     Text(caption)
-                        .font(.caption)
+                        .macType(.caption)
                         .foregroundStyle(captionTint ?? MacTheme.Text.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -505,19 +505,19 @@ struct MacSavedVoiceSheet: View {
     @ViewBuilder
     private var transcriptionStatus: some View {
         let status = transcriptionReview.status
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: VocelloTheme.Spacing.sm) {
             if status.showsProgress {
                 ProgressView()
                     .controlSize(.mini)
                     .accessibilityHidden(true)
             } else {
                 Image(systemName: status.symbolName)
-                    .font(.footnote.weight(.semibold))
+                    .macType(.badge)
                     .foregroundStyle(tint)
                     .accessibilityHidden(true)
             }
             Text(status.message)
-                .font(.caption)
+                .macType(.caption)
                 .foregroundStyle(MacTheme.Text.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -764,13 +764,13 @@ struct MacSavedVoiceSheet: View {
 struct MacFieldChrome: ViewModifier {
     let tint: Color
     let isFocused: Bool
-    var radius: CGFloat = 12
+    var radius: CGFloat = VocelloTheme.Radius.input
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         content
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.horizontal, VocelloTheme.Spacing.snug)
+            .padding(.vertical, VocelloTheme.Spacing.sm)
             .macSubtleGlassSurface(
                 in: shape,
                 tint: isFocused ? tint : MacTheme.Brand.silver,
@@ -780,7 +780,10 @@ struct MacFieldChrome: ViewModifier {
             )
             .overlay {
                 shape
-                    .stroke(isFocused ? tint.opacity(0.35) : Color.white.opacity(0.06), lineWidth: isFocused ? 1 : 0.5)
+                    .stroke(
+                        isFocused ? tint.opacity(0.35) : Color.white.opacity(0.06),
+                        lineWidth: isFocused ? VocelloTheme.Stroke.standard : VocelloTheme.Stroke.hairline
+                    )
                     .allowsHitTesting(false)
             }
             .appAnimation(MacTheme.Motion.highlight, value: isFocused)

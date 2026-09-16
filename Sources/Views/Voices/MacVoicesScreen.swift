@@ -161,12 +161,23 @@ struct MacVoicesScreen: View {
                                 onReplaceReference: { requestReplaceReference(voice) }
                             )
                             .id(voice.id)
-                            .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
+                            .listRowInsets(EdgeInsets(
+                                top: 3,
+                                leading: VocelloTheme.Spacing.lg,
+                                bottom: 3,
+                                trailing: VocelloTheme.Spacing.lg
+                            ))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
                         }
                     } header: {
-                        VocelloSectionHeading(MacInterfaceText.voicesYourVoices, titleFontSize: 11, topPadding: 18, titleLineLimit: 1, expandsWidth: true)
+                        VocelloSectionHeading(
+                            MacInterfaceText.voicesYourVoices,
+                            titleFontSize: MacType.style(.eyebrow).size,
+                            topPadding: VocelloTheme.Spacing.xl,
+                            titleLineLimit: 1,
+                            expandsWidth: true
+                        )
                     }
                 }
                 .listStyle(.plain)
@@ -207,10 +218,10 @@ private extension MacVoicesScreen {
         identifier: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: VocelloTheme.Spacing.md) {
             content()
         }
-        .padding(24)
+        .padding(VocelloTheme.Spacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(identifier)
@@ -357,10 +368,18 @@ private struct MacVoiceRow: View {
     @State private var actionsWidth: CGFloat = 0
     @State private var isHovered = false
 
+    /// A portrait, not a control: it keeps its own diameter while the row's
+    /// controls snap to the six steps.
+    private static let avatarDiameter: CGFloat = 44
+
     /// Name plus status badge at body/caption sizes.
     private static let minimumMetadataWidth: CGFloat = 220
     /// Avatar, its gap, the layout gap, card padding and List insets.
-    private static let rowChrome: CGFloat = 44 + 12 + 14 + 24 + 32
+    private static let rowChrome: CGFloat = avatarDiameter
+        + VocelloTheme.Spacing.md
+        + VocelloTheme.Spacing.lg
+        + VocelloTheme.Spacing.md * 2
+        + VocelloTheme.Spacing.lg * 2
 
     private var usesWideLayout: Bool {
         guard availableWidth > 0, actionsWidth > 0 else { return true }
@@ -378,12 +397,17 @@ private struct MacVoiceRow: View {
     var body: some View {
         let shape = VocelloShape.card()
         let layout = usesWideLayout
-            ? AnyLayout(HStackLayout(alignment: .center, spacing: 14))
-            : AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            ? AnyLayout(HStackLayout(alignment: .center, spacing: VocelloTheme.Spacing.lg))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: VocelloTheme.Spacing.md))
 
         layout {
-            HStack(alignment: .center, spacing: 12) {
-                VocelloVoiceAvatar(seed: voice.id, initials: voice.name, diameter: 44, isDecorative: true)
+            HStack(alignment: .center, spacing: VocelloTheme.Spacing.md) {
+                VocelloVoiceAvatar(
+                    seed: voice.id,
+                    initials: voice.name,
+                    diameter: Self.avatarDiameter,
+                    isDecorative: true
+                )
 
                 MacVoiceRowMetadata(
                     voiceName: voice.name,
@@ -410,8 +434,8 @@ private struct MacVoiceRow: View {
                 actionsWidth = width
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, VocelloTheme.Spacing.md)
+        .padding(.vertical, VocelloTheme.Spacing.snug)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             shape.fill(Color.white.opacity(isHovered ? 0.06 : 0.04))
@@ -419,7 +443,7 @@ private struct MacVoiceRow: View {
         .overlay {
             shape.stroke(
                 isHighlighted ? MacTheme.voicesTint.opacity(0.55) : Color.white.opacity(0.08),
-                lineWidth: isHighlighted ? 1 : 0.5
+                lineWidth: isHighlighted ? VocelloTheme.Stroke.standard : VocelloTheme.Stroke.hairline
             )
         }
         .macGatedGlass(
@@ -446,18 +470,24 @@ private struct MacVoiceRowMetadata: View {
     @State private var showsWarningDetails = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: VocelloTheme.Spacing.tight) {
+            HStack(alignment: .firstTextBaseline, spacing: VocelloTheme.Spacing.sm) {
                 // Display-only humanization: sanitized voice names carry
                 // underscores (stable IDs, CLI and test identifiers keep the
                 // raw form).
                 Text(voiceName.replacingOccurrences(of: "_", with: " "))
-                    .font(.subheadline.weight(.semibold))
+                    .macType(.rowTitle)
                     .foregroundStyle(MacTheme.Text.primary)
                     .lineLimit(1)
                     .accessibilityIdentifier("voicesRow_\(voiceID)")
 
-                VocelloStatusBadge(text: transcriptStatus, tone: .muted, horizontalPadding: 9, verticalPadding: 4, lineLimit: 1)
+                VocelloStatusBadge(
+                    text: transcriptStatus,
+                    tone: .muted,
+                    horizontalPadding: MacControl.badge.horizontalPadding,
+                    verticalPadding: VocelloTheme.Spacing.xs,
+                    lineLimit: 1
+                )
                     .fixedSize(horizontal: true, vertical: false)
                     .accessibilityIdentifier("voicesRow_\(voiceID)_transcriptStatus")
             }
@@ -466,7 +496,7 @@ private struct MacVoiceRowMetadata: View {
                 warningChip
             } else {
                 Text(caption)
-                    .font(.caption)
+                    .macType(.caption)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .lineLimit(1)
             }
@@ -483,23 +513,23 @@ private struct MacVoiceRowMetadata: View {
         return Button {
             showsWarningDetails = true
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: VocelloTheme.Spacing.tight) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.caption)
+                    .font(.system(size: MacControl.badge.glyph, weight: .semibold))
                 Text(label)
-                    .font(.caption.weight(.medium))
+                    .macType(.badge)
                     .lineLimit(1)
                 Image(systemName: "chevron.right")
-                    .font(.caption2.weight(.semibold))
+                    .font(.system(size: MacControl.badge.glyph, weight: .semibold))
                     .opacity(0.7)
             }
             .fixedSize(horizontal: true, vertical: false)
             .foregroundStyle(MacTheme.Status.guarded)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(Capsule(style: .continuous).fill(MacTheme.Status.guarded.opacity(0.12)))
-            .overlay(Capsule(style: .continuous).stroke(MacTheme.Status.guarded.opacity(0.30), lineWidth: 0.75))
-            .contentShape(Capsule(style: .continuous))
+            .padding(.horizontal, VocelloTheme.Spacing.snug)
+            .padding(.vertical, VocelloTheme.Spacing.xs)
+            .background(VocelloShape.pill().fill(MacTheme.Status.guarded.opacity(0.12)))
+            .overlay(VocelloShape.pill().stroke(MacTheme.Status.guarded.opacity(0.30), lineWidth: VocelloTheme.Stroke.hairline))
+            .contentShape(VocelloShape.pill())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(MacInterfaceText.voicesQualityWarningAccessibility)
@@ -511,13 +541,13 @@ private struct MacVoiceRowMetadata: View {
     }
 
     private var warningDetailsPopover: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: VocelloTheme.Spacing.md) {
             Label(MacInterfaceText.voicesReferenceOutsideRange, systemImage: "exclamationmark.triangle.fill")
-                .font(.headline)
+                .macType(.screenTitle)
                 .foregroundStyle(MacTheme.Status.guarded)
 
             Text(PreparedVoiceQualityWarning.summary(for: qualityWarnings))
-                .font(.body)
+                .macType(.body)
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack {
@@ -530,7 +560,7 @@ private struct MacVoiceRowMetadata: View {
                 .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("voicesRow_\(voiceID)_replaceReference")
 
-                Spacer(minLength: 8)
+                Spacer(minLength: VocelloTheme.Spacing.sm)
 
                 Button(MacInterfaceText.close) {
                     showsWarningDetails = false
@@ -538,7 +568,7 @@ private struct MacVoiceRowMetadata: View {
                 .keyboardShortcut(.cancelAction)
             }
         }
-        .padding(16)
+        .padding(VocelloTheme.Spacing.lg)
         .frame(width: 360)
     }
 }
@@ -551,30 +581,28 @@ private struct MacVoiceRowActions: View {
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: VocelloTheme.Spacing.sm) {
             MacIconButton(
                 symbol: "play.fill",
                 label: MacInterfaceText.voicesPreview,
                 accessibilityIdentifier: "voicesRow_play_\(voiceID)",
-                size: 32,
-                symbolSize: 13,
                 action: onPlay
             )
 
             Button(action: onUseInVoiceCloning) {
-                HStack(spacing: 6) {
+                HStack(spacing: VocelloTheme.Spacing.tight) {
                     Image(systemName: MacTheme.modeGlyph(for: .clone))
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: MacControl.icon.glyph, weight: .semibold))
                     Text(MacInterfaceText.voicesOpenInCloning)
-                        .font(.system(size: 12, weight: .semibold))
+                        .macType(.buttonLabel)
                         .lineLimit(1)
                 }
                 .foregroundStyle(MacTheme.Brand.modeClone)
-                .padding(.horizontal, 12)
-                .frame(height: 32)
-                .background { Capsule(style: .continuous).fill(MacTheme.Brand.modeClone.opacity(0.14)) }
-                .overlay { Capsule(style: .continuous).stroke(MacTheme.Brand.modeClone.opacity(0.32), lineWidth: 0.75) }
-                .contentShape(Capsule(style: .continuous))
+                .padding(.horizontal, VocelloTheme.Spacing.md)
+                .macControlHeight(.icon)
+                .background { VocelloShape.pill().fill(MacTheme.Brand.modeClone.opacity(0.14)) }
+                .overlay { VocelloShape.pill().stroke(MacTheme.Brand.modeClone.opacity(0.32), lineWidth: VocelloTheme.Stroke.hairline) }
+                .contentShape(VocelloShape.pill())
             }
             .buttonStyle(.plain)
             .fixedSize(horizontal: true, vertical: false)
@@ -585,8 +613,6 @@ private struct MacVoiceRowActions: View {
                 symbol: "trash",
                 label: MacInterfaceText.voicesDeleteAction,
                 accessibilityIdentifier: "voicesRow_delete_\(voiceID)",
-                size: 32,
-                symbolSize: 13,
                 action: onDelete
             )
         }

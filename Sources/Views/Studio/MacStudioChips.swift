@@ -145,21 +145,21 @@ struct MacStudioDeliveryFooter: View {
 
     var body: some View {
         if selection.isCustom {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: MacTheme.Spacing.tight) {
                 TextField(MacInterfaceText.emotionCustomTonePlaceholder, text: $selection.customText)
                     .textFieldStyle(.plain)
-                    .font(.callout)
+                    .macType(.body)
                     .foregroundStyle(MacTheme.Text.primary)
-                    .vocelloFocusRing(tint, radius: 10)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .vocelloFocusRing(tint, radius: MacTheme.Radius.input)
+                    .padding(.horizontal, MacTheme.Spacing.md)
+                    .padding(.vertical, MacTheme.Spacing.sm)
                     .background {
                         VocelloShape.input()
                             .fill(MacTheme.Surface.field)
                     }
                     .overlay {
                         VocelloShape.input()
-                            .stroke(MacTheme.Surface.fieldStroke, lineWidth: 0.5)
+                            .stroke(MacTheme.Surface.fieldStroke, lineWidth: VocelloTheme.Stroke.hairline)
                     }
                     .accessibilityLabel(MacInterfaceText.emotionCustomTone)
                     .accessibilityIdentifier("\(accessibilityPrefix)_toneField")
@@ -174,14 +174,14 @@ struct MacStudioDeliveryFooter: View {
 
                 if DeliveryInstructionAdvisor.hasDurationDirective(selection.customText) {
                     Label(DeliveryInstructionAdvisor.advisoryMessage, systemImage: "exclamationmark.triangle")
-                        .font(.caption2)
+                        .macType(.caption)
                         .foregroundStyle(MacTheme.Status.guarded)
                         .accessibilityIdentifier("\(accessibilityPrefix)_durationAdvisory")
                 }
             }
         } else if selection.selectedPreset(for: emotion)?.isDirectionalHint == true {
             Label(EmotionPreset.directionalHintAdvisory, systemImage: "wand.and.sparkles")
-                .font(.caption2)
+                .macType(.caption)
                 .foregroundStyle(MacTheme.Text.secondary)
                 .accessibilityIdentifier("\(accessibilityPrefix)_hintAdvisory")
         }
@@ -263,8 +263,8 @@ struct MacStudioChipContainer<Chip: View>: View {
 /// column past the viewport (an `HStack` of pills never compresses, and the
 /// pinned canvas would clip both edges of the composer and the chips).
 struct MacChipFlow: Layout {
-    var spacing: CGFloat = 8
-    var rowSpacing: CGFloat = 8
+    var spacing: CGFloat = MacTheme.Spacing.sm
+    var rowSpacing: CGFloat = MacTheme.Spacing.sm
     /// Narrowest a chip may become before the row breaks.
     var minimumChipWidth: CGFloat = MacStudioChipMetrics.minWidth
 

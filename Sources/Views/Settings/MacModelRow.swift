@@ -16,15 +16,15 @@ struct MacModelSetupSummaryRow: View {
         let setupProgress = viewModel.recommendedSetupProgress
         let isComplete = summary.installedRecommendedCount == summary.totalRecommendedCount
 
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 12) {
-                HStack(alignment: .top, spacing: 10) {
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.sm) {
+            HStack(alignment: .center, spacing: MacTheme.Spacing.md) {
+                HStack(alignment: .top, spacing: MacTheme.Spacing.snug) {
                     MacSettingsIcon(
                         symbol: isComplete ? "checkmark.circle.fill" : "arrow.down.circle",
                         tint: isComplete ? MacTheme.Status.healthy : MacTheme.settingsTint
                     )
                     Text(summary.text)
-                        .font(.subheadline.weight(.semibold))
+                        .macType(.rowTitle)
                         .foregroundStyle(MacTheme.Text.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("settings_modelDownloadsSummary")
@@ -47,7 +47,7 @@ struct MacModelSetupSummaryRow: View {
             }
 
             if let setupProgress {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {
                     MacSettingsProgressBar(
                         fraction: setupProgress.fraction,
                         tint: MacTheme.accent,
@@ -56,16 +56,16 @@ struct MacModelSetupSummaryRow: View {
                         accessibilityIdentifier: "settings_recommendedSetupProgressBar"
                     )
                     Text(setupProgressText(setupProgress))
-                        .font(.footnote)
+                        .macType(.rowMeta)
                         .foregroundStyle(MacTheme.Text.secondary)
                         .lineLimit(1)
                         .accessibilityIdentifier("settings_recommendedSetupProgress")
                 }
-                .padding(.leading, 38)
+                .padding(.leading, MacControl.icon.height + MacTheme.Spacing.snug)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, MacTheme.Spacing.md)
+        .padding(.vertical, MacTheme.Spacing.snug)
     }
 
     private func setupProgressText(_ progress: ModelManagerViewModel.RecommendedSetupProgress) -> String {
@@ -90,33 +90,33 @@ struct MacModelModeRow: View {
     var body: some View {
         let variants = viewModel.variants(for: mode)
 
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 10) {
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.sm) {
+            HStack(alignment: .top, spacing: MacTheme.Spacing.snug) {
                 MacSettingsIcon(symbol: MacTheme.modeGlyph(for: mode), tint: MacTheme.Brand.modeColor(mode))
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {
                     Text(MacInterfaceText.modeName(mode))
-                        .font(.subheadline.weight(.semibold))
+                        .macType(.rowTitle)
                         .foregroundStyle(MacTheme.Text.primary)
                         .lineLimit(1)
                     // Mode-constant facts live here once (purpose, size)
                     // instead of repeating on every package line below.
                     Text(modeSubtitle(variants))
-                        .font(.footnote)
+                        .macType(.rowMeta)
                         .foregroundStyle(MacTheme.Text.secondary)
                         .lineLimit(1)
                 }
             }
 
-            VStack(spacing: 6) {
+            VStack(spacing: MacTheme.Spacing.tight) {
                 ForEach(variants) { model in
                     MacModelPackageLine(model: model, onDelete: { onDelete(model) })
                 }
             }
-            .padding(.leading, 38)
+            .padding(.leading, MacControl.icon.height + MacTheme.Spacing.snug)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, MacTheme.Spacing.md)
+        .padding(.vertical, MacTheme.Spacing.snug)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(isFlashed ? MacTheme.accent.opacity(0.10) : Color.clear)
         .appAnimation(MacTheme.Motion.stateChange, value: isFlashed)
@@ -144,16 +144,16 @@ struct MacModelPackageLine: View {
         let status = viewModel.statuses[model.id] ?? .checking
         let shape = VocelloShape.input()
 
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.tight) {
             // Two lines, like the phone's model row: the package names itself
             // on the first, its state and controls follow on the second. One
             // line could not hold four labels plus a button at a narrow window
             // — under pseudo-localization the badge collapsed to 8 pt — and
             // squeezing any of them truncated a label the lanes read.
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: MacTheme.Spacing.tight) {
                 // "Speed · 4-bit": the tier plus only the per-row fact.
                 Text(compactVariantLabel)
-                    .font(.caption.weight(.semibold))
+                    .macType(.rowTitle)
                     .foregroundStyle(MacTheme.Text.primary)
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
@@ -162,21 +162,21 @@ struct MacModelPackageLine: View {
                     .fixedSize(horizontal: true, vertical: false)
                     .accessibilityIdentifier("settings_packageBadge_\(model.id)")
 
-                Spacer(minLength: 6)
+                Spacer(minLength: MacTheme.Spacing.tight)
             }
 
-            HStack(alignment: .center, spacing: 8) {
-                HStack(spacing: 5) {
+            HStack(alignment: .center, spacing: MacTheme.Spacing.sm) {
+                HStack(spacing: MacTheme.Spacing.tight) {
                     statusGlyph(presentation.kind)
                     Text(presentation.label)
-                        .font(.caption2.weight(.semibold))
+                        .macType(.badge)
                         .foregroundStyle(statusColor(presentation.kind))
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
                         .accessibilityIdentifier("settings_packageStatus_\(model.id)")
                 }
 
-                Spacer(minLength: 8)
+                Spacer(minLength: MacTheme.Spacing.sm)
 
                 MacModelPackageAction(model: model, status: status, onDelete: onDelete)
             }
@@ -184,7 +184,7 @@ struct MacModelPackageLine: View {
             // Dynamic detail only (repair reasons, download specifics).
             if let detail = presentation.detail {
                 Text(detail)
-                    .font(.caption2)
+                    .macType(.caption)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -203,10 +203,10 @@ struct MacModelPackageLine: View {
                 )
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, MacTheme.Spacing.snug)
+        .padding(.vertical, MacTheme.Spacing.sm)
         .background { shape.fill(Color.white.opacity(0.03)) }
-        .overlay { shape.stroke(MacTheme.Surface.hairline, lineWidth: 0.5) }
+        .overlay { shape.stroke(MacTheme.Surface.hairline, lineWidth: VocelloTheme.Stroke.hairline) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("settings_package_\(model.id)")
     }
@@ -215,7 +215,7 @@ struct MacModelPackageLine: View {
     private var packageBadge: some View {
         if viewModel.isHardwareRisky(model) {
             Text(MacInterfaceText.settingsHeavy)
-                .font(.caption2.weight(.semibold))
+                .macType(.badge)
                 .foregroundStyle(MacTheme.Status.guarded)
                 .help(MacInterfaceText.settingsHeavyOnThisMac)
                 .accessibilityLabel(MacInterfaceText.settingsHeavyOnThisMac)
@@ -223,7 +223,7 @@ struct MacModelPackageLine: View {
             // Quiet, not green: static guidance; install state is the row's
             // one semantic color.
             Text(MacInterfaceText.settingsRecommended)
-                .font(.caption2.weight(.semibold))
+                .macType(.badge)
                 .foregroundStyle(MacTheme.Text.secondary)
         }
     }
@@ -245,19 +245,19 @@ struct MacModelPackageLine: View {
         case .ready:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(MacTheme.Status.healthy)
-                .imageScale(.small)
+                .macType(.badge)
         case .notInstalled:
             Image(systemName: "arrow.down.circle")
                 .foregroundStyle(MacTheme.Text.secondary)
-                .imageScale(.small)
+                .macType(.badge)
         case .needsRepair:
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(MacTheme.Status.guarded)
-                .imageScale(.small)
+                .macType(.badge)
         case .updateAvailable:
             Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
                 .foregroundStyle(MacTheme.accent)
-                .imageScale(.small)
+                .macType(.badge)
         }
     }
 
@@ -316,7 +316,7 @@ private struct MacModelPackageAction: View {
             .accessibilityIdentifier("settings_repair_\(model.id)")
 
         case .updateAvailable:
-            HStack(spacing: 6) {
+            HStack(spacing: MacTheme.Spacing.tight) {
                 Button(MacInterfaceText.settingsUpdate) {
                     Task { await viewModel.download(model) }
                 }

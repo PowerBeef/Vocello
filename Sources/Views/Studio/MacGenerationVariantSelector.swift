@@ -27,10 +27,10 @@ struct MacGenerationVariantSelector: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 8) {
+        HStack(alignment: .center, spacing: MacTheme.Spacing.sm) {
             if showsLabel {
                 Text(MacInterfaceText.workflowModel)
-                    .font(.caption.weight(.semibold))
+                    .macType(.captionEmphasis)
                     .foregroundStyle(MacTheme.Text.secondary)
             }
             variantControl
@@ -47,11 +47,11 @@ struct MacGenerationVariantSelector: View {
         if let selectedModel,
            modelManager.isHardwareRisky(selectedModel),
            case .ready = modelManager.packagePresentation(for: selectedModel).kind {
-            HStack(spacing: 4) {
+            HStack(spacing: MacTheme.Spacing.xs) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.caption2)
+                    .macType(.badge)
                 Text(MacInterfaceText.settingsHeavy)
-                    .font(.caption2.weight(.semibold))
+                    .macType(.badge)
                     .lineLimit(1)
             }
             .foregroundStyle(MacTheme.Status.guarded)
@@ -68,17 +68,21 @@ struct MacGenerationVariantSelector: View {
                 variantSegment(for: kind)
             }
         }
-        .vocelloFocusRing(tint, radius: 8)
-        .padding(3)
+        .vocelloFocusRing(tint, radius: MacTheme.Radius.chip)
+        .padding(segmentInset)
         .background {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
+            VocelloShape.chip()
                 .fill(Color.white.opacity(0.04))
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
+            VocelloShape.chip()
+                .stroke(Color.white.opacity(0.10), lineWidth: VocelloTheme.Stroke.hairline)
         }
     }
+
+    /// How far the segments sit inside the track. The segment's corner radius
+    /// is the track's less this, which is what keeps the two concentric.
+    private let segmentInset: CGFloat = 3
 
     private func variantSegment(for kind: TTSModelVariantKind) -> some View {
         let isSelected = selectedModel?.variantKind == kind
@@ -89,14 +93,18 @@ struct MacGenerationVariantSelector: View {
             modelManager.use(model)
         } label: {
             Text(kind.displayName)
-                .font(.caption.weight(.semibold))
+                .macType(.buttonLabel)
                 .lineLimit(1)
-                .padding(.horizontal, 10)
-                .frame(minWidth: 62, minHeight: 24)
+                .padding(.horizontal, MacTheme.Spacing.snug)
+                .frame(minWidth: 62, minHeight: MacControl.badge.height)
                 .foregroundStyle(isSelected ? MacTheme.Text.primary : MacTheme.Text.secondary)
                 .background {
                     if isSelected {
-                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        // Concentric with the track: the segment sits inside the
+                        // control's 3 pt inset, so its corner is the track's
+                        // radius less that inset. Equal radii read as two
+                        // curves fighting each other.
+                        VocelloShape.chip(inset: segmentInset)
                             .fill(
                                 LinearGradient(
                                     colors: [tint.opacity(0.28), tint.opacity(0.14)],
@@ -105,16 +113,16 @@ struct MacGenerationVariantSelector: View {
                                 )
                             )
                             .overlay {
-                                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                    .strokeBorder(tint.opacity(0.32), lineWidth: 1)
+                                VocelloShape.chip(inset: segmentInset)
+                                    .strokeBorder(tint.opacity(0.32), lineWidth: VocelloTheme.Stroke.standard)
                             }
                     }
                 }
-                .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .contentShape(VocelloShape.chip(inset: segmentInset))
         }
         .buttonStyle(.plain)
         .disabled(!(isSelectable && !isDisabled))
-        .opacity(isSelectable ? 1 : 0.42)
+        .opacity(isSelectable ? 1 : VocelloTheme.Opacity.disabled)
         .accessibilityLabel(String("\(kind.displayName), \(variantAccessibilityStatus(for: kind))"))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("\(accessibilityPrefix)_\(kind.rawValue)VariantButton")

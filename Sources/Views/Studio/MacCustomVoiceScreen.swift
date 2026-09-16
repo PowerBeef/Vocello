@@ -260,13 +260,13 @@ struct MacCustomVoiceScreen: View {
             )
         } else {
             Label(MacInterfaceText.customDeliveryUnsupported, systemImage: "slider.horizontal.3")
-                .font(.caption2)
+                .macType(.caption)
                 .foregroundStyle(MacTheme.Text.secondary)
                 .accessibilityIdentifier("customVoice_deliveryUnsupported")
         }
         if let languageHintMessage {
             Label(languageHintMessage, systemImage: "globe")
-                .font(.caption2)
+                .macType(.caption)
                 .foregroundStyle(MacTheme.Text.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("customVoice_languageHint")

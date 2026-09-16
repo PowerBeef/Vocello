@@ -92,18 +92,16 @@ struct MacRecordVoiceSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: VocelloTheme.Spacing.xl) {
             HStack(alignment: .firstTextBaseline) {
                 Text(MacInterfaceText.recordTitle)
-                    .font(.title2.weight(.bold))
+                    .macType(.sheetTitle)
                     .foregroundStyle(MacTheme.Text.primary)
                 Spacer()
                 MacIconButton(
                     symbol: "xmark",
                     label: MacInterfaceText.cancel,
-                    accessibilityIdentifier: "recordClip_cancel",
-                    size: 30,
-                    symbolSize: 12
+                    accessibilityIdentifier: "recordClip_cancel"
                 ) {
                     recorder.stopWithoutSaving()
                     dismiss()
@@ -111,10 +109,9 @@ struct MacRecordVoiceSheet: View {
                 .keyboardShortcut(.cancelAction)
             }
 
-            VStack(spacing: 18) {
+            VStack(spacing: VocelloTheme.Spacing.xl) {
                 Text(phaseLabel.uppercased())
-                    .font(.system(size: 12, weight: .semibold))
-                    .tracking(1.4)
+                    .macType(.eyebrow)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .lineLimit(1)
 
@@ -136,7 +133,7 @@ struct MacRecordVoiceSheet: View {
                 .accessibilityIdentifier("recordClip_levelMeter")
 
                 Text(statusLabel)
-                    .font(.callout.weight(.medium))
+                    .macType(.captionEmphasis)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -149,10 +146,10 @@ struct MacRecordVoiceSheet: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .padding(.vertical, VocelloTheme.Spacing.sm)
             .appAnimation(MacTheme.Motion.stateChange, value: recorder.isRecording)
 
-            HStack(spacing: 10) {
+            HStack(spacing: VocelloTheme.Spacing.snug) {
                 Spacer()
 
                 switch stage {
@@ -196,7 +193,7 @@ struct MacRecordVoiceSheet: View {
                 }
             }
         }
-        .padding(20)
+        .padding(VocelloTheme.Spacing.xl)
         // Min instead of fixed: at large accessibility text sizes a fixed
         // width squeezed the coaching copy instead of growing.
         .frame(minWidth: 480, maxWidth: 560)
@@ -239,17 +236,17 @@ struct MacRecordVoiceSheet: View {
     // MARK: - Review
 
     private var reviewRow: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: VocelloTheme.Spacing.md) {
             Button {
                 reviewPlayer.toggle()
             } label: {
                 ZStack {
                     Circle().fill(tint.opacity(0.2))
                     Image(systemName: reviewPlayer.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: MacControl.field.glyph, weight: .semibold))
                         .foregroundStyle(tint)
                 }
-                .frame(width: 36, height: 36)
+                .macControlSquare(.field)
                 .contentShape(Circle())
             }
             .buttonStyle(.plain)
@@ -258,9 +255,9 @@ struct MacRecordVoiceSheet: View {
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule(style: .continuous)
+                    VocelloShape.pill()
                         .fill(Color.white.opacity(0.10))
-                    Capsule(style: .continuous)
+                    VocelloShape.pill()
                         .fill(tint.opacity(0.75))
                         .frame(width: max(4, geo.size.width * reviewPlayer.progress))
                 }
@@ -268,10 +265,10 @@ struct MacRecordVoiceSheet: View {
             .frame(height: 6)
 
             Text(durationString)
-                .font(.caption.monospacedDigit())
+                .macType(.counter)
                 .foregroundStyle(MacTheme.Text.secondary)
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, VocelloTheme.Spacing.xxl)
     }
 
     private var durationString: String {

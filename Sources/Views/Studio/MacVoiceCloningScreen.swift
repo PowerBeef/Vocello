@@ -235,9 +235,9 @@ struct MacVoiceCloningScreen: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .overlay {
             if session.isDragOver {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(tint.opacity(0.5), lineWidth: 2)
-                    .padding(8)
+                VocelloShape.card()
+                    .stroke(tint.opacity(0.5), lineWidth: VocelloTheme.Stroke.focus)
+                    .padding(MacTheme.Spacing.sm)
                     .allowsHitTesting(false)
             }
         }
@@ -301,8 +301,8 @@ struct MacVoiceCloningScreen: View {
     // MARK: - Chips (two rows: the reference and its sources, then the take)
 
     private var setupChips: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            MacChipFlow(spacing: 8, rowSpacing: 8) {
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.sm) {
+            MacChipFlow(spacing: MacTheme.Spacing.sm, rowSpacing: MacTheme.Spacing.sm) {
                 MacStudioChipContainer(accessibilityIdentifier: "voiceCloning_voiceSetup") { referenceChip }
                 MacStudioActionChip(
                     eyebrow: MacInterfaceText.cloningReferenceSection,
@@ -324,7 +324,7 @@ struct MacVoiceCloningScreen: View {
                     bankDeliveryChip(persona)
                 }
             }
-            MacChipFlow(spacing: 8, rowSpacing: 8) {
+            MacChipFlow(spacing: MacTheme.Spacing.sm, rowSpacing: MacTheme.Spacing.sm) {
                 MacStudioChipContainer(accessibilityIdentifier: "voiceCloning_languageSetup") {
                     MacStudioLanguageChip(
                         selectedLanguage: $draft.selectedLanguage,
@@ -441,7 +441,7 @@ struct MacVoiceCloningScreen: View {
     @ViewBuilder
     private var chipFooter: some View {
         Label(MacInterfaceText.cloningPermittedClipsOnly, systemImage: "hand.raised")
-            .font(.caption2)
+            .macType(.caption)
             .foregroundStyle(MacTheme.Text.secondary)
             .accessibilityIdentifier("voiceCloning_consentNotice")
 
@@ -472,7 +472,7 @@ struct MacVoiceCloningScreen: View {
             transcriptField
             if let unavailableMessage = session.transcriptionUnavailableMessage {
                 Label(unavailableMessage, systemImage: "waveform.badge.mic")
-                    .font(.caption2)
+                    .macType(.caption)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("voiceCloning_transcriptionUnavailable")
@@ -482,7 +482,7 @@ struct MacVoiceCloningScreen: View {
         if !cloneConsentAcknowledged, !isGenerationActive {
             // Inline one-time consent: the Settings toggle stays the persistent
             // record; this writes the same stored key at the moment of first use.
-            HStack(alignment: .center, spacing: 10) {
+            HStack(alignment: .center, spacing: MacTheme.Spacing.snug) {
                 Button {
                     cloneConsentAcknowledged = true
                 } label: {
@@ -491,7 +491,7 @@ struct MacVoiceCloningScreen: View {
                 .buttonStyle(MacSettingsActionButtonStyle(tint: tint, prominence: .primary))
                 .accessibilityIdentifier("voiceCloning_inlineConsent")
                 Text(MacInterfaceText.cloningConsentOneTime)
-                    .font(.caption2)
+                    .macType(.caption)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .lineLimit(2)
             }
@@ -502,14 +502,14 @@ struct MacVoiceCloningScreen: View {
     @ViewBuilder
     private var referenceStatus: some View {
         if let path = draft.referenceAudioPath {
-            HStack(spacing: 8) {
+            HStack(spacing: MacTheme.Spacing.sm) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.body.weight(.semibold))
+                    .macType(.rowTitle)
                     .foregroundStyle(tint)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {
                     Text(URL(fileURLWithPath: path).lastPathComponent)
-                        .font(.system(size: 12, weight: .semibold))
+                        .macType(.rowTitle)
                         .foregroundStyle(MacTheme.Text.primary)
                         .lineLimit(1)
 
@@ -518,7 +518,7 @@ struct MacVoiceCloningScreen: View {
                         warningChip(token: token, shortLabel: shortLabel)
                     } else {
                         Text(referenceDetail)
-                            .font(.system(size: 10, weight: .medium))
+                            .macType(.rowMeta)
                             .foregroundStyle(MacTheme.Text.secondary)
                     }
                 }
@@ -532,21 +532,21 @@ struct MacVoiceCloningScreen: View {
                 }
                 .buttonStyle(MacSettingsActionButtonStyle(tint: tint))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, MacTheme.Spacing.snug)
+            .padding(.vertical, MacTheme.Spacing.sm)
             .background {
                 VocelloShape.input()
                     .fill(Color.white.opacity(0.04))
             }
             .overlay {
                 VocelloShape.input()
-                    .stroke(MacTheme.Surface.hairline, lineWidth: 0.5)
+                    .stroke(MacTheme.Surface.hairline, lineWidth: VocelloTheme.Stroke.hairline)
             }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("voiceCloning_activeReference")
         } else {
             Label(MacInterfaceText.cloningNoReference, systemImage: "waveform.badge.exclamationmark")
-                .font(.caption)
+                .macType(.caption)
                 .foregroundStyle(MacTheme.Text.secondary)
         }
     }
@@ -562,11 +562,11 @@ struct MacVoiceCloningScreen: View {
         Button {
             showsWarningDetails = true
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: MacTheme.Spacing.xs) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 9))
+                    .macType(.badge)
                 Text(shortLabel)
-                    .font(.system(size: 10, weight: .medium))
+                    .macType(.badge)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 7, weight: .semibold))
                     .opacity(0.7)
@@ -579,38 +579,38 @@ struct MacVoiceCloningScreen: View {
             selectedVoice?.qualityWarnings.first.flatMap(PreparedVoiceQualityWarning.headline(for:)) ?? shortLabel
         )
         .popover(isPresented: $showsWarningDetails, arrowEdge: .top) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
                 Label(MacInterfaceText.voicesReferenceOutsideRange, systemImage: "exclamationmark.triangle.fill")
-                    .font(.headline)
+                    .macType(.screenTitle)
                     .foregroundStyle(MacTheme.Status.guarded)
                 Text(PreparedVoiceQualityWarning.summary(for: selectedVoice?.qualityWarnings ?? [token]))
-                    .font(.callout)
+                    .macType(.body)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(16)
+            .padding(MacTheme.Spacing.lg)
             .frame(maxWidth: 340)
         }
     }
 
     private var transcriptField: some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: MacTheme.Spacing.snug) {
             Text(MacInterfaceText.cloningTranscriptAccessibility)
-                .font(.caption.weight(.semibold))
+                .macType(.caption)
                 .foregroundStyle(MacTheme.Text.secondary)
             TextField(MacInterfaceText.cloningTranscriptPlaceholder, text: $draft.referenceTranscript)
                 .textFieldStyle(.plain)
-                .font(.callout)
+                .macType(.body)
                 .foregroundStyle(MacTheme.Text.primary)
-                .vocelloFocusRing(tint, radius: 10)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
+                .vocelloFocusRing(tint, radius: MacTheme.Radius.input)
+                .padding(.horizontal, MacTheme.Spacing.md)
+                .padding(.vertical, MacTheme.Spacing.sm)
                 .background {
                     VocelloShape.input()
                         .fill(MacTheme.Surface.field)
                 }
                 .overlay {
                     VocelloShape.input()
-                        .stroke(MacTheme.Surface.fieldStroke, lineWidth: 0.5)
+                        .stroke(MacTheme.Surface.fieldStroke, lineWidth: VocelloTheme.Stroke.hairline)
                 }
                 .accessibilityLabel(MacInterfaceText.cloningTranscriptAccessibility)
                 .accessibilityIdentifier("voiceCloning_transcriptInput")
@@ -627,13 +627,13 @@ struct MacVoiceCloningScreen: View {
         actionAccessibilityIdentifier: String? = nil,
         action: (() -> Void)? = nil
     ) -> some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: MacTheme.Spacing.snug) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(MacTheme.Status.guarded)
-                .font(.subheadline.weight(.semibold))
-            VStack(alignment: .leading, spacing: 6) {
+                .macType(.captionEmphasis)
+            VStack(alignment: .leading, spacing: MacTheme.Spacing.tight) {
                 Text(message)
-                    .font(.caption)
+                    .macType(.caption)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if let actionLabel, let action {
@@ -644,7 +644,7 @@ struct MacVoiceCloningScreen: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(10)
+        .padding(MacTheme.Spacing.snug)
         .background {
             VocelloShape.input()
                 .fill(MacTheme.Status.guarded.opacity(0.10))

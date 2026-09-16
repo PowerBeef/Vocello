@@ -82,18 +82,18 @@ struct SidebarView: View {
 
 private struct MacSidebarBrandHeader: View {
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: MacTheme.Spacing.sm) {
             VocelloProductTitleLockup(title: MacInterfaceText.brandName)
 
             Text(MacInterfaceText.brandTagline)
-                .font(.caption.weight(.medium))
+                .macType(.captionEmphasis)
                 .foregroundStyle(MacTheme.Text.tertiary)
                 .lineLimit(1)
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, MacShellMetrics.sidebarInset + 4)
-        .padding(.vertical, 14)
+        .padding(.horizontal, MacShellMetrics.sidebarInset + MacTheme.Spacing.xs)
+        .padding(.vertical, MacTheme.Spacing.lg)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(MacInterfaceText.brandAccessibility)
     }
@@ -107,12 +107,11 @@ private struct MacSidebarSectionHeader: View {
 
     var body: some View {
         Text(title.uppercased())
-            .font(.system(size: 11, weight: .semibold))
-            .tracking(0.88)
+            .macType(.eyebrow)
             .foregroundStyle(MacTheme.Text.secondary)
             .lineLimit(1)
             .textCase(nil)
-            .padding(.leading, 4)
+            .padding(.leading, MacTheme.Spacing.xs)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(title)
@@ -128,8 +127,7 @@ private struct MacSidebarRow: View {
     let isDisabled: Bool
     @State private var isHovered = false
 
-    @ScaledMetric(relativeTo: .body) private var labelSize: CGFloat = 13
-    @ScaledMetric(relativeTo: .body) private var glyphSize: CGFloat = 13
+    @ScaledMetric(relativeTo: .body) private var glyphSize: CGFloat = MacControl.icon.glyph
     @ScaledMetric(relativeTo: .body) private var tileSize: CGFloat = MacShellMetrics.sidebarGlyphTile
 
     private var isSelected: Bool { selection == item }
@@ -149,18 +147,20 @@ private struct MacSidebarRow: View {
         Button {
             selection = item
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: MacTheme.Spacing.snug) {
                 glyphTile
 
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {
                     Text(item.title)
-                        .font(.system(size: labelSize, weight: isSelected ? .semibold : .medium))
+                        // The role sets the size; selection still sets the weight,
+                // which is how a selected destination reads as selected.
+                .font(.system(size: MacType.style(.rowTitle).size, weight: isSelected ? .semibold : .medium))
                         .foregroundStyle(MacTheme.Text.primary)
                         .lineLimit(1)
 
                     if isDisabled {
                         Text(MacInterfaceText.shellModelMissingHint)
-                            .font(.caption2)
+                            .macType(.caption)
                             .foregroundStyle(MacTheme.Text.tertiary)
                             .lineLimit(1)
                     }
@@ -168,15 +168,15 @@ private struct MacSidebarRow: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.horizontal, MacTheme.Spacing.sm)
+            .padding(.vertical, MacTheme.Spacing.tight)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(minHeight: MacShellMetrics.sidebarRowMinHeight)
             .background(rowBackground)
-            .contentShape(RoundedRectangle(cornerRadius: MacShellMetrics.sidebarRowRadius, style: .continuous))
+            .contentShape(VocelloShape.row())
         }
         .buttonStyle(.plain)
-        .opacity(isDisabled ? 0.62 : 1)
+        .opacity(isDisabled ? VocelloTheme.Opacity.disabled : 1)
         .onHover { hovering in
             isHovered = isDisabled ? false : hovering
         }
@@ -194,19 +194,24 @@ private struct MacSidebarRow: View {
     }
 
     private var glyphTile: some View {
-        let shape = RoundedRectangle(cornerRadius: MacShellMetrics.sidebarGlyphTileRadius, style: .continuous)
+        let shape = VocelloShape.chip()
         return Image(systemName: item.iconName)
             .font(.system(size: glyphSize, weight: .semibold))
             .foregroundStyle(isSelected ? tint : MacTheme.Text.secondary)
             .frame(width: tileSize, height: tileSize)
             .background { shape.fill(isSelected ? tint.opacity(0.16) : Color.white.opacity(0.05)) }
-            .overlay { shape.stroke(isSelected ? tint.opacity(0.32) : Color.white.opacity(0.06), lineWidth: 0.5) }
+            .overlay {
+                shape.stroke(
+                    isSelected ? tint.opacity(0.32) : Color.white.opacity(0.06),
+                    lineWidth: VocelloTheme.Stroke.hairline
+                )
+            }
             .accessibilityHidden(true)
     }
 
     @ViewBuilder
     private var rowBackground: some View {
-        let shape = RoundedRectangle(cornerRadius: MacShellMetrics.sidebarRowRadius, style: .continuous)
+        let shape = VocelloShape.row()
         if isSelected {
             MacSidebarSelectionPill(tint: tint, shape: shape)
         } else if isHovered {
@@ -227,10 +232,10 @@ private struct MacSidebarSelectionPill: View {
         shape
             .fill(Color.white.opacity(0.02))
             .overlay { shape.fill(tint.opacity(0.12)) }
-            .overlay { shape.stroke(tint.opacity(0.38), lineWidth: 0.5) }
+            .overlay { shape.stroke(tint.opacity(0.38), lineWidth: VocelloTheme.Stroke.hairline) }
             .overlay {
                 shape
-                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                    .stroke(Color.white.opacity(0.08), lineWidth: VocelloTheme.Stroke.hairline)
                     .mask(
                         LinearGradient(colors: [.white, .clear], startPoint: .top, endPoint: .center)
                     )
@@ -260,7 +265,7 @@ private struct SidebarFooterRegion: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
             if audioPlayer.hasAudio {
                 MacInlinePlayerCard(inlinePlayerActivity: footerPresentation.inlinePlayerActivity)
             }
@@ -273,7 +278,7 @@ private struct SidebarFooterRegion: View {
             }
         }
         .padding(.horizontal, MacShellMetrics.sidebarInset)
-        .padding(.top, 8)
+        .padding(.top, MacTheme.Spacing.sm)
         .padding(.bottom, MacShellMetrics.sidebarInset)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(

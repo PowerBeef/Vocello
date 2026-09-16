@@ -11,15 +11,15 @@ struct MacHistoryRecoveryBanner: View {
     let onExport: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: VocelloTheme.Spacing.snug) {
             Label(MacInterfaceText.historyFinishedAudioWaiting, systemImage: "arrow.clockwise.icloud")
-                .font(.subheadline.weight(.semibold))
+                .macType(.screenTitle)
                 .foregroundStyle(MacTheme.Text.primary)
             Text(message)
-                .font(.caption)
+                .macType(.caption)
                 .foregroundStyle(MacTheme.Text.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 10) {
+            HStack(spacing: VocelloTheme.Spacing.snug) {
                 Button(MacInterfaceText.retry, action: onRetry)
                     .accessibilityIdentifier("historyRecovery_retry")
                 Button(MacInterfaceText.historyRevealAudio, action: onReveal)
@@ -33,15 +33,15 @@ struct MacHistoryRecoveryBanner: View {
             .controlSize(.small)
             .tint(MacTheme.historyTint)
         }
-        .padding(14)
+        .padding(VocelloTheme.Spacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             MacTheme.Surface.panel,
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            in: VocelloShape.card()
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(MacTheme.Status.guarded.opacity(0.30), lineWidth: 0.5)
+            VocelloShape.card()
+                .stroke(MacTheme.Status.guarded.opacity(0.30), lineWidth: VocelloTheme.Stroke.hairline)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("historyRecovery_banner")

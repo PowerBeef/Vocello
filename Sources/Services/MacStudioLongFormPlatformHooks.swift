@@ -20,7 +20,7 @@ final class MacStudioLongFormPlatformHooks: IOSLongFormPlatformHooks {
     }
 
     func waveformSeed(for text: String) -> Int {
-        MacStableVisualHash.int(text)
+        VocelloStableVisualHash.int(text)
     }
 
     func segmentTitle(index: Int, total: Int) -> String {

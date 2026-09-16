@@ -47,24 +47,9 @@ struct IOSModeBackdrop: View {
 
 // MARK: - Waveform bars
 
-enum IOSStableVisualHash {
-    static func int(_ value: String) -> Int {
-        Int(truncatingIfNeeded: fnv1a64(value))
-    }
-
-    static func normalized(_ value: String) -> Double {
-        Double(fnv1a64(value) % 10_000) / 10_000.0
-    }
-
-    private static func fnv1a64(_ value: String) -> UInt64 {
-        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
-        for byte in value.utf8 {
-            hash ^= UInt64(byte)
-            hash &*= 0x0000_0100_0000_01B3
-        }
-        return hash
-    }
-}
+/// The shared FNV-1a visual seed hash
+/// (`Sources/SharedSupport/Views/VocelloStableVisualHash.swift`, UIF-02).
+typealias IOSStableVisualHash = VocelloStableVisualHash
 
 /// Static or playback-driven waveform bars. Deterministic heights from a
 /// seed so repeated renders match. Used by mini-waveform thumbnails
@@ -302,132 +287,26 @@ struct IOSWaveformBars: View {
     }
 }
 
-/// Fixed-size history-row waveform thumbnail. Uses `Canvas` instead of
-/// `GeometryReader` so list rows avoid per-layout measurement work.
-struct IOSStaticWaveformThumbnail: View {
-    let seed: Int
-    let barCount: Int
-    let tint: Color
+/// Fixed-size history-row waveform thumbnail; the body lives in the shared
+/// `VocelloStaticWaveformThumbnail` (UIF-02).
+typealias IOSStaticWaveformThumbnail = VocelloStaticWaveformThumbnail
 
-    private let barWidth: CGFloat = 2
-    private let spacing: CGFloat = 1.5
-    private let cornerRadius: CGFloat = 1
-
-    var body: some View {
-        Canvas { context, size in
-            for index in 0..<barCount {
-                let amplitude = miniAmplitude(at: index)
-                let height = max(2, size.height * CGFloat(amplitude))
-                let x = CGFloat(index) * (barWidth + spacing)
-                let y = (size.height - height) / 2
-                let rect = CGRect(x: x, y: y, width: barWidth, height: height)
-                let path = Path(roundedRect: rect, cornerRadius: cornerRadius, style: .continuous)
-                context.fill(
-                    path,
-                    with: .color(tint.opacity(0.4 + amplitude * 0.5))
-                )
-            }
-        }
-    }
-
-    private func miniAmplitude(at index: Int) -> Double {
-        let i = Double(index)
-        let raw = sin((Double(seed) * 13 + i * 7.31) * 1.3) * 0.4 + 0.5
-        let base = abs(raw) + Double(index % 5) * 0.08
-        return max(0.16, min(0.95, base))
-    }
-}
-
-struct IOSPlayerIconButtonChrome: View {
-    let symbol: String
-    var isActive: Bool = false
-    var size: CGFloat = 40
-    var symbolSize: CGFloat = 16
-
-    var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: symbolSize, weight: .semibold))
-            .foregroundStyle(Theme.Text.primary)
-            .frame(width: size, height: size)
-            .background {
-                Circle()
-                    .fill(Color.white.opacity(isActive ? 0.16 : 0.06))
-            }
-            .overlay {
-                Circle()
-                    .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
-            }
-    }
-}
+/// Circular icon chrome for the player and row controls; the body lives in
+/// the shared `VocelloIconButtonChrome` (UIF-02) with the phone's 40 / 16 pt
+/// defaults.
+typealias IOSPlayerIconButtonChrome = VocelloIconButtonChrome
 
 // MARK: - Voice avatar
 
-/// Circular gradient avatar for built-in or saved voices. Hue derived from
-/// the voice id so the same voice renders the same gradient everywhere.
-///
-/// Per `design_references/Vocello iOS/chrome.jsx` VoiceAvatar.
-struct IOSVoiceAvatar: View {
-    let seed: String
-    let initials: String
-    let diameter: CGFloat
-
-    init(seed: String, initials: String, diameter: CGFloat = 44) {
-        self.seed = seed
-        let parts = initials.split(separator: " ")
-        if parts.count >= 2 {
-            self.initials = parts.prefix(2).map { String($0.prefix(1)) }.joined().uppercased()
-        } else {
-            self.initials = String(initials.prefix(1)).uppercased()
-        }
-        self.diameter = diameter
-    }
-
-    var body: some View {
-        let hue = hueForSeed(seed)
-        let topColor = Color(hue: hue, saturation: 0.45, brightness: 0.78)
-        let bottomColor = Color(hue: hue, saturation: 0.55, brightness: 0.52)
-
-        return ZStack {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [topColor, bottomColor],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-            Circle()
-                .stroke(Color.white.opacity(0.10), lineWidth: 0.75)
-            Text(initials)
-                .font(.system(size: diameter * 0.36, weight: .semibold, design: .rounded))
-                .foregroundStyle(Theme.Text.primary)
-        }
-        .frame(width: diameter, height: diameter)
-    }
-
-    private func hueForSeed(_ seed: String) -> Double {
-        IOSStableVisualHash.normalized(seed)
-    }
-}
+/// Circular gradient avatar for built-in or saved voices; the body lives in
+/// the shared `VocelloVoiceAvatar` (UIF-02).
+typealias IOSVoiceAvatar = VocelloVoiceAvatar
 
 // MARK: - Mode dot
 
-/// 6×6 colored dot used in History row meta + filter chips.
-struct IOSModeDot: View {
-    let tint: Color
-    let diameter: CGFloat
-
-    init(tint: Color, diameter: CGFloat = 6) {
-        self.tint = tint
-        self.diameter = diameter
-    }
-
-    var body: some View {
-        Circle()
-            .fill(tint)
-            .frame(width: diameter, height: diameter)
-    }
-}
+/// 6×6 colored dot used in History row meta + filter chips; the body lives in
+/// the shared `VocelloModeDot` (UIF-02).
+typealias IOSModeDot = VocelloModeDot
 
 // MARK: - Bottom sheet
 
@@ -1024,10 +903,10 @@ struct IOSStudioSetupChip: View {
     }
 }
 
-/// Premium "lit tinted" pill used by the Studio setup chips: a soft tint
-/// gradient fill, the app's standard glass strokes, a faint tint glow, an SF
-/// Symbol + a two-letter abbreviation in the tint. Honors Reduce Transparency
-/// (flat fill, no glow).
+/// Premium "lit tinted" pill used by the Studio setup chips: the shared
+/// `VocelloSetupChipPill` chrome (UIF-02) with the phone's label — an SF
+/// Symbol + a two-letter abbreviation, or a "+" for an unset slot. Honors
+/// Reduce Transparency through the iOS environment key.
 struct IOSSetupChipPill: View {
     let symbol: String
     let abbreviation: String
@@ -1038,11 +917,12 @@ struct IOSSetupChipPill: View {
     @Environment(\.iosReduceTransparencyEnabled) private var reduceTransparency
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: symbol)
-                .font(.system(size: 18, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(Theme.Text.primary)
+        VocelloSetupChipPill(
+            symbol: symbol,
+            tint: tint,
+            height: height,
+            reduceTransparency: reduceTransparency
+        ) {
             if isPlaceholder {
                 // Unset slot: a "+" add affordance instead of a value abbreviation.
                 Image(systemName: "plus")
@@ -1058,43 +938,7 @@ struct IOSSetupChipPill: View {
                     .foregroundStyle(Theme.Text.primary)
                     .lineLimit(1)
             }
-            // Trailing chevron — signals every pill is a tappable selector (opens a picker),
-            // so the value pills don't read as static badges. Subtle + subordinate to the value.
-            // Points UP: these pills sit in the bottom screen area and their pickers are bottom
-            // sheets that slide UP, so the chevron points toward where the menu appears.
-            Image(systemName: "chevron.up")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(tint.opacity(0.5))
-                .accessibilityHidden(true)
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: height)
-        .background {
-            Capsule(style: .continuous).fill(fillStyle)
-        }
-        .overlay {
-            Capsule(style: .continuous)
-                .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
-        }
-        .overlay {
-            Capsule(style: .continuous)
-                .inset(by: 0.65)
-                .stroke(Color.white.opacity(0.04), lineWidth: 0.55)
-        }
-        .shadow(color: reduceTransparency ? .clear : tint.opacity(0.28), radius: 8, y: 1)
-    }
-
-    private var fillStyle: AnyShapeStyle {
-        if reduceTransparency {
-            return AnyShapeStyle(tint.opacity(0.22))
-        }
-        return AnyShapeStyle(
-            LinearGradient(
-                colors: [tint.opacity(0.30), tint.opacity(0.14)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
     }
 }
 
@@ -1233,13 +1077,10 @@ struct IOSSearchField: View {
 // MARK: - Primary CTA
 
 /// Primary CTA "glass hero" button (Studio Generate/Install, Onboarding,
-/// Recording overlay, sheet Install). Built from the same lit-tint material as
-/// the selector pills (`IOSSetupChipPill`) — a translucent tint gradient,
-/// hairline white strokes, a mode-tinted glow — but dialed up to be the
-/// brightest, largest member of the family so it reads as the primary action
-/// while staying cohesive with the surrounding glass UI. Tints to whatever
-/// color the caller passes (Studio = per-mode gold/lavender/terracotta).
-/// Respects Reduce Transparency with an opaque deep-tint fill (no glow).
+/// Recording overlay, sheet Install): the shared `VocelloPrimaryCTAButton`
+/// (UIF-02) at the phone's `.dock` size with `Traits.phone`, Reduce
+/// Transparency from the iOS environment key and the phone's Reduce
+/// Motion-aware state animation.
 struct IOSPrimaryCTAButton: View {
     let title: String
     let symbol: String?
@@ -1248,35 +1089,6 @@ struct IOSPrimaryCTAButton: View {
     let action: () -> Void
 
     @Environment(\.iosReduceTransparencyEnabled) private var reduceTransparency
-
-    // Warm off-white label, legible on the translucent tinted fill (matches the
-    // app text-primary). Under Reduce Transparency the fill is a deep opaque
-    // tint, so the same off-white stays legible.
-    private var foregroundInk: Color {
-        isEnabled ? Theme.Text.primary : Theme.Text.secondary
-    }
-
-    private var backgroundFill: AnyShapeStyle {
-        if reduceTransparency {
-            // Opaque deep-tint fill so the off-white label keeps contrast.
-            return AnyShapeStyle(
-                tint.mix(with: .black, by: isEnabled ? 0.42 : 0.70, in: .perceptual)
-            )
-        }
-
-        // Same recipe as the selector pills (tint gradient over the dark
-        // canvas), brighter (0.46→0.24 vs the pills' 0.30→0.14) so the CTA is
-        // the standout tinted surface while staying the same translucent glass.
-        return AnyShapeStyle(
-            LinearGradient(
-                colors: isEnabled
-                    ? [tint.opacity(0.46), tint.opacity(0.24)]
-                    : [tint.opacity(0.14), tint.opacity(0.08)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-    }
 
     init(
         title: String,
@@ -1293,59 +1105,16 @@ struct IOSPrimaryCTAButton: View {
     }
 
     var body: some View {
-        Button(action: {
-            if isEnabled { action() }
-        }) {
-            HStack(alignment: .center, spacing: 8) {
-                if let symbol {
-                    Image(systemName: symbol)
-                        .font(.system(size: 18, weight: .semibold))
-                        .symbolRenderingMode(.hierarchical)
-                        // White glyph, matching the label so icon + text read as one unit.
-                        .foregroundStyle(foregroundInk)
-                }
-                Text(title)
-                    .font(.headline)
-                    .tracking(-0.17)
-                    .foregroundStyle(foregroundInk)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .background {
-                Capsule(style: .continuous)
-                    .fill(backgroundFill)
-            }
-            .overlay {
-                Capsule(style: .continuous)
-                    .stroke(Color.white.opacity(0.16), lineWidth: 0.8)
-            }
-            .overlay {
-                Capsule(style: .continuous)
-                    .inset(by: 0.65)
-                    .stroke(Color.white.opacity(0.06), lineWidth: 0.55)
-            }
-            .overlay(alignment: .top) {
-                // Lit top edge — sheen masked to the upper half.
-                Capsule(style: .continuous)
-                    .stroke(Color.white.opacity(0.22), lineWidth: 0.6)
-                    .mask(
-                        LinearGradient(
-                            colors: [.white, .clear],
-                            startPoint: .top,
-                            endPoint: .center
-                        )
-                    )
-            }
-            // Mode-colored hero glow (stronger than the pills' 0.28 @ r8) +
-            // a faint ambient shadow for grounding. Glow drops under RT.
-            .shadow(color: reduceTransparency ? .clear : tint.opacity(0.35), radius: 16, x: 0, y: 4)
-            .shadow(color: .black.opacity(0.22), radius: 10, x: 0, y: 6)
-        }
-        .buttonStyle(.plain)
-        // Keep disabled copy readable and expose the state semantically. Dimming the
-        // complete control made the label fail contrast while still presenting an
-        // apparently enabled Button to assistive technologies.
-        .disabled(!isEnabled)
+        VocelloPrimaryCTAButton(
+            title: title,
+            symbol: symbol,
+            tint: tint,
+            isEnabled: isEnabled,
+            size: .dock,
+            traits: .phone,
+            reduceTransparency: reduceTransparency,
+            action: action
+        )
         .iosAppAnimation(Theme.Motion.stateChange, value: isEnabled)
     }
 }

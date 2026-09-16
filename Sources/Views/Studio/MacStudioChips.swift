@@ -154,11 +154,11 @@ struct MacStudioDeliveryFooter: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background {
-                        RoundedRectangle(cornerRadius: MacTheme.Radius.input, style: .continuous)
+                        VocelloShape.input()
                             .fill(MacTheme.Surface.field)
                     }
                     .overlay {
-                        RoundedRectangle(cornerRadius: MacTheme.Radius.input, style: .continuous)
+                        VocelloShape.input()
                             .stroke(MacTheme.Surface.fieldStroke, lineWidth: 0.5)
                     }
                     .accessibilityLabel(MacInterfaceText.emotionCustomTone)

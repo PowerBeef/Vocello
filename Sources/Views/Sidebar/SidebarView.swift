@@ -83,7 +83,7 @@ struct SidebarView: View {
 private struct MacSidebarBrandHeader: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            MacProductTitleLockup(title: MacInterfaceText.brandName)
+            VocelloProductTitleLockup(title: MacInterfaceText.brandName)
 
             Text(MacInterfaceText.brandTagline)
                 .font(.caption.weight(.medium))

@@ -310,7 +310,7 @@ struct MacCustomVoiceScreen: View {
         let voiceName = speakerDisplayName
         let modeLabel = MacInterfaceText.modeName(.custom)
         // Same seed for the live and final card so the decorative waveform keeps its shape.
-        let waveformSeed = MacStableVisualHash.int(text)
+        let waveformSeed = VocelloStableVisualHash.int(text)
         guard let attempt = coordinator.start(live: IOSStudioLivePreviewItem(
             voiceName: voiceName,
             modeLabel: modeLabel,

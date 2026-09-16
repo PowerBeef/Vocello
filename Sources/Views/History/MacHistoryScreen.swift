@@ -36,7 +36,7 @@ private struct MacHistoryListItem: Identifiable, Sendable {
         self.formattedDate = generation.createdAt.formatted(date: .abbreviated, time: .shortened)
         self.searchKey = "\(generation.text)\n\(generation.voice ?? "")".lowercased()
         self.waveformSeed = generation.id.map { Int(truncatingIfNeeded: $0) }
-            ?? MacStableVisualHash.int(generation.audioPath)
+            ?? VocelloStableVisualHash.int(generation.audioPath)
         self.saveVoiceSource = Self.makeSaveVoiceSource(for: generation)
     }
 
@@ -274,7 +274,7 @@ struct MacHistoryScreen: View {
                     options: HistoryModeFilter.allCases,
                     selection: $modeFilter,
                     label: \.title,
-                    leading: { filter in AnyView(MacModeDot(tint: filter.dotColor, diameter: 7)) },
+                    leading: { filter in AnyView(VocelloModeDot(tint: filter.dotColor, diameter: 7)) },
                     accessibilityIdentifier: \.accessibilityID
                 )
                 .accessibilityElement(children: .contain)
@@ -357,11 +357,13 @@ struct MacHistoryScreen: View {
     private var content: some View {
         if let loadError, items.isEmpty, !isLoading {
             historyStateContainer(identifier: "history_errorState") {
-                MacEmptyStateCard(
+                VocelloEmptyStateCard(
                     title: MacInterfaceText.historyLoadFailedTitle,
                     message: "\(MacInterfaceText.historyLoadFailedDetail)\n\(loadError)",
                     symbolName: "exclamationmark.triangle",
-                    tint: MacTheme.Status.guarded
+                    tint: MacTheme.Status.guarded,
+                    maxWidth: MacShellMetrics.emptyStateCardMaxWidth,
+                    symbolIsDecorative: true
                 )
                 Button(MacInterfaceText.retry) {
                     reloadHistory(reopenFailedStore: true)
@@ -377,11 +379,13 @@ struct MacHistoryScreen: View {
             }
         } else if filteredItems.isEmpty {
             historyStateContainer(identifier: "history_emptyState") {
-                MacEmptyStateCard(
+                VocelloEmptyStateCard(
                     title: items.isEmpty ? MacInterfaceText.historyNoTakesTitle : MacInterfaceText.historyNoMatchesTitle,
                     message: items.isEmpty ? MacInterfaceText.historyNoTakesDetail : MacInterfaceText.historyNoMatchesDetail,
                     symbolName: items.isEmpty ? "clock.arrow.circlepath" : "line.3.horizontal.decrease.circle",
-                    tint: MacTheme.historyTint
+                    tint: MacTheme.historyTint,
+                    maxWidth: MacShellMetrics.emptyStateCardMaxWidth,
+                    symbolIsDecorative: true
                 )
             }
         } else {
@@ -396,7 +400,7 @@ struct MacHistoryScreen: View {
                         }
                     } header: {
                         if let bucket = section.bucket {
-                            MacSectionHeading(bucket.title)
+                            VocelloSectionHeading(bucket.title, titleFontSize: 11, topPadding: 18, titleLineLimit: 1, expandsWidth: true)
                         }
                     }
                 }

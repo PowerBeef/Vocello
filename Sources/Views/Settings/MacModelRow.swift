@@ -142,7 +142,7 @@ struct MacModelPackageLine: View {
     var body: some View {
         let presentation = viewModel.packagePresentation(for: model)
         let status = viewModel.statuses[model.id] ?? .checking
-        let shape = RoundedRectangle(cornerRadius: MacTheme.Radius.input, style: .continuous)
+        let shape = VocelloShape.input()
 
         VStack(alignment: .leading, spacing: 6) {
             // Two lines, like the phone's model row: the package names itself

@@ -16,7 +16,7 @@ struct MacSettingsSection<Content: View>: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: MacTheme.Radius.card, style: .continuous)
+        let shape = VocelloShape.card()
         VStack(alignment: .leading, spacing: 0) {
             if let title {
                 Text(title)

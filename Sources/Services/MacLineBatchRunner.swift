@@ -178,7 +178,7 @@ final class MacLineBatchRunner {
 
             items[index].status = .running
             publish(active: index, message: MacInterfaceText.batchGeneratingItem(String(index + 1), String(total)))
-            let waveformSeed = MacStableVisualHash.int(line)
+            let waveformSeed = VocelloStableVisualHash.int(line)
             studioCoordinator.updateLiveItem(IOSStudioLivePreviewItem(
                 voiceName: request.displayVoiceName,
                 modeLabel: request.modeLabel,

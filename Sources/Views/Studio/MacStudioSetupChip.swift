@@ -87,6 +87,13 @@ struct MacStudioActionChip: View {
     private var spokenLabel: String { "\(eyebrow): \(value)" }
 }
 
+/// The shared setup-chip chrome (`VocelloSetupChipPill`, UIF-02) with the
+/// desktop's label: one line, the value written out in full ("Aiden") where
+/// the phone shows a two-letter code, inset 12 pt and floored at
+/// `MacStudioChipMetrics.minWidth`. The eyebrow the desktop used to stack
+/// above the value survives as the spoken label, because a Mac window has
+/// room for the value written out in full and a two-line pill reads as a
+/// different control.
 struct MacStudioSetupChipPill: View {
     let symbol: String
     let eyebrow: String
@@ -98,58 +105,26 @@ struct MacStudioSetupChipPill: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
-        // One line, like the phone: glyph, value, chevron. The eyebrow the
-        // desktop used to stack above the value survives as the spoken label,
-        // because a Mac window has room for the value written out in full and
-        // a two-line pill reads as a different control.
-        HStack(spacing: 6) {
-            Image(systemName: symbol)
-                .font(.system(size: 18, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(MacTheme.Text.primary)
-
+        VocelloSetupChipPill(
+            symbol: symbol,
+            tint: tint,
+            height: MacStudioChipMetrics.pillHeight,
+            horizontalPadding: 12,
+            minWidth: MacStudioChipMetrics.minWidth,
+            showsChevron: showsChevron,
+            reduceTransparency: reduceTransparency
+        ) {
             Text(value)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(isPlaceholder ? MacTheme.Text.secondary : MacTheme.Text.primary)
                 .lineLimit(1)
                 .truncationMode(.tail)
-
-            if showsChevron {
-                Image(systemName: "chevron.up")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(tint.opacity(0.5))
-                    .accessibilityHidden(true)
-            }
         }
-        .padding(.horizontal, 12)
-        .frame(minWidth: MacStudioChipMetrics.minWidth, maxWidth: .infinity)
-        .frame(height: MacStudioChipMetrics.pillHeight)
-        .background { Capsule(style: .continuous).fill(fillStyle) }
-        .overlay { Capsule(style: .continuous).stroke(Color.white.opacity(0.12), lineWidth: 0.8) }
-        .overlay {
-            Capsule(style: .continuous)
-                .inset(by: 0.65)
-                .stroke(Color.white.opacity(0.04), lineWidth: 0.55)
-        }
-        .shadow(color: reduceTransparency ? .clear : tint.opacity(0.28), radius: 8, y: 1)
         .opacity(isPlaceholder ? 0.55 : 1)
         .contentShape(Capsule(style: .continuous))
         // One accessibility element per chip: the menu's identifier and value
         // land on a single control the size of the pill, not on each glyph.
         .accessibilityElement(children: .ignore)
-    }
-
-    private var fillStyle: AnyShapeStyle {
-        if reduceTransparency {
-            return AnyShapeStyle(tint.opacity(0.22))
-        }
-        return AnyShapeStyle(
-            LinearGradient(
-                colors: [tint.opacity(0.30), tint.opacity(0.14)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
     }
 }
 

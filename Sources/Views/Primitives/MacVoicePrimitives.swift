@@ -1,71 +1,16 @@
 import SwiftUI
 
-/// Circular gradient avatar for saved voices (the iOS `IOSVoiceAvatar`): the
-/// hue derives from the voice id so the same voice renders the same gradient
-/// everywhere.
-struct MacVoiceAvatar: View {
-    let seed: String
-    let initials: String
-    let diameter: CGFloat
-
-    init(seed: String, initials: String, diameter: CGFloat = 44) {
-        self.seed = seed
-        let parts = initials.split(separator: " ")
-        if parts.count >= 2 {
-            self.initials = parts.prefix(2).map { String($0.prefix(1)) }.joined().uppercased()
-        } else {
-            self.initials = String(initials.prefix(1)).uppercased()
-        }
-        self.diameter = diameter
-    }
-
-    var body: some View {
-        let hue = MacStableVisualHash.normalized(seed)
-        let topColor = Color(hue: hue, saturation: 0.45, brightness: 0.78)
-        let bottomColor = Color(hue: hue, saturation: 0.55, brightness: 0.52)
-
-        return ZStack {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [topColor, bottomColor],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-            Circle()
-                .stroke(Color.white.opacity(0.10), lineWidth: 0.75)
-            Text(initials)
-                .font(.system(size: diameter * 0.36, weight: .semibold, design: .rounded))
-                .foregroundStyle(MacTheme.Text.primary)
-        }
-        .frame(width: diameter, height: diameter)
-        .accessibilityHidden(true)
-    }
-}
-
-/// The iOS primary call to action (`IOSPrimaryCTAButton`): a tinted capsule
-/// with an optional leading symbol, solid under Reduce Transparency.
+/// The shared primary call to action (`VocelloPrimaryCTAButton`, UIF-02) on
+/// the desktop: `Traits.desktop`, the `.compact` sheet size and the trailing
+/// key-equivalent hint, with Reduce Transparency from the macOS environment.
 struct MacPrimaryCTAButton: View {
-    /// `.dock` is the Studio's Generate button: the phone's full-width 56 pt
-    /// capsule with its sheen and glow, which is what anchors the canvas.
-    /// `.compact` is the sheet button that hugs its label.
-    enum Size {
-        case dock
-        case compact
-
-        var height: CGFloat { self == .dock ? 56 : 34 }
-        var horizontalPadding: CGFloat { self == .dock ? 20 : 18 }
-        var spansWidth: Bool { self == .dock }
-    }
+    typealias Size = VocelloPrimaryCTAButton.Size
 
     let title: String
     let symbol: String?
     let tint: Color
     let isEnabled: Bool
     let size: Size
-    /// A desktop nicety the phone cannot offer: the key equivalent, drawn at
-    /// the trailing edge of a `.dock` button ("⌘↩" on Generate).
     let shortcutHint: String?
     let action: () -> Void
 
@@ -89,88 +34,18 @@ struct MacPrimaryCTAButton: View {
         self.action = action
     }
 
-    private var backgroundFill: AnyShapeStyle {
-        if reduceTransparency {
-            return AnyShapeStyle(tint.mix(with: .black, by: isEnabled ? 0.42 : 0.70, in: .perceptual))
-        }
-        return AnyShapeStyle(
-            LinearGradient(
-                colors: isEnabled
-                    ? [tint.opacity(0.46), tint.opacity(0.24)]
-                    : [tint.opacity(0.14), tint.opacity(0.08)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-    }
-
     var body: some View {
-        Button {
-            if isEnabled { action() }
-        } label: {
-            HStack(alignment: .center, spacing: 8) {
-                if let symbol {
-                    Image(systemName: symbol)
-                        .font(.system(size: size == .dock ? 18 : 14, weight: .semibold))
-                        .symbolRenderingMode(.hierarchical)
-                }
-                Text(title)
-                    .font(size == .dock ? .headline : .system(size: 13, weight: .semibold))
-                    .tracking(size == .dock ? -0.17 : 0)
-                    .lineLimit(1)
-            }
-            .foregroundStyle(isEnabled ? MacTheme.Text.primary : MacTheme.Text.secondary)
-            .padding(.horizontal, size.horizontalPadding)
-            .frame(maxWidth: size.spansWidth ? .infinity : nil)
-            .frame(height: size.height)
-            .overlay(alignment: .trailing) {
-                if size == .dock, let shortcutHint {
-                    Text(verbatim: shortcutHint)
-                        .font(.caption2.monospaced())
-                        .foregroundStyle(MacTheme.Text.secondary.opacity(isEnabled ? 0.8 : 0.5))
-                        .padding(.trailing, 18)
-                        .accessibilityHidden(true)
-                }
-            }
-            .background { Capsule(style: .continuous).fill(backgroundFill) }
-            .overlay { Capsule(style: .continuous).stroke(strokeColor, lineWidth: size == .dock ? 0.8 : 0.75) }
-            .overlay { if size == .dock { innerStroke } }
-            .overlay { if size == .dock { topSheen } }
-            .shadow(color: glowColor, radius: 16, y: 4)
-            .shadow(color: size == .dock ? Color.black.opacity(0.22) : .clear, radius: 10, y: 6)
-            .contentShape(Capsule(style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .disabled(!isEnabled)
-    }
-
-    private var strokeColor: Color {
-        size == .dock ? Color.white.opacity(0.16) : tint.opacity(isEnabled ? 0.45 : 0.18)
-    }
-
-    /// The dock button's glow is what lifts it off the canvas; it goes with
-    /// Reduce Transparency, like every other tinted bloom in the app.
-    private var glowColor: Color {
-        guard size == .dock, isEnabled, !reduceTransparency else { return .clear }
-        return tint.opacity(0.35)
-    }
-
-    private var innerStroke: some View {
-        Capsule(style: .continuous)
-            .inset(by: 0.65)
-            .stroke(Color.white.opacity(0.06), lineWidth: 0.55)
-    }
-
-    private var topSheen: some View {
-        Capsule(style: .continuous)
-            .stroke(Color.white.opacity(0.22), lineWidth: 0.6)
-            .mask {
-                LinearGradient(
-                    colors: [.white, .clear],
-                    startPoint: .top,
-                    endPoint: .center
-                )
-            }
+        VocelloPrimaryCTAButton(
+            title: title,
+            symbol: symbol,
+            tint: tint,
+            isEnabled: isEnabled,
+            size: size,
+            shortcutHint: shortcutHint,
+            traits: .desktop,
+            reduceTransparency: reduceTransparency,
+            action: action
+        )
     }
 }
 
@@ -218,11 +93,5 @@ struct MacLiveLevelMeter: View {
         guard isActive else { return 0.3 }
         let t = Double(index) / Double(max(1, barCount - 1))
         return 0.4 + 0.6 * t
-    }
-}
-
-extension MacStableVisualHash {
-    static func normalized(_ value: String) -> Double {
-        Double(UInt64(bitPattern: Int64(int(value))) % 10_000) / 10_000.0
     }
 }

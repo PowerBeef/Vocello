@@ -18,7 +18,7 @@ struct MacVoiceBriefEditor: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: MacTheme.Radius.input, style: .continuous)
+        let shape = VocelloShape.input()
 
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {

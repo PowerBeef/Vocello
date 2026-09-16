@@ -18,6 +18,10 @@ enum MacShellMetrics {
     /// Studio column (`MacStudioMetrics.contentMaxWidth`) so rows keep their
     /// legacy width and do not tear apart on wide displays.
     static let libraryContentMaxWidth: CGFloat = 960
+    /// Width cap of the empty, error and loading state cards on the History
+    /// and Saved Voices screens (`VocelloEmptyStateCard`); the phone lets the
+    /// card fill its column.
+    static let emptyStateCardMaxWidth: CGFloat = 480
 
     static let sidebarInset: CGFloat = 12
     static let sidebarRowMinHeight: CGFloat = 40

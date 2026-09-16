@@ -159,9 +159,11 @@ def catalogs() -> dict[str, list[str]]:
 def interactive_sources(root: pathlib.Path = ROOT) -> dict[str, list[int]]:
     result: dict[str, list[int]] = {}
     paths = list((root / "Sources/iOS").rglob("*.swift"))
-    shared_warning = root / "Sources/SharedSupport/Views/GenerationHistoryEnqueueWarning.swift"
-    if shared_warning.exists():
-        paths.append(shared_warning)
+    # Shared views carry production controls too (the primary CTA since
+    # UIF-02): scan the directory rather than naming files one at a time, so a
+    # control moved into SharedSupport keeps its audit policy instead of
+    # silently leaving the contract's scope.
+    paths.extend(sorted((root / "Sources/SharedSupport/Views").glob("*.swift")))
     for path in sorted(paths):
         lines = path.read_text(encoding="utf-8").splitlines()
         hits = [index for index, line in enumerate(lines, start=1) if INTERACTIVE_RE.search(line)]
@@ -220,11 +222,10 @@ def validate_contract(contract: dict[str, Any], root: pathlib.Path = ROOT) -> di
             )
 
     source_text = "\n".join(
-        path.read_text(encoding="utf-8") for path in sorted((root / "Sources/iOS").rglob("*.swift"))
+        path.read_text(encoding="utf-8")
+        for path in sorted((root / "Sources/iOS").rglob("*.swift"))
+        + sorted((root / "Sources/SharedSupport/Views").glob("*.swift"))
     )
-    shared_warning = root / "Sources/SharedSupport/Views/GenerationHistoryEnqueueWarning.swift"
-    if shared_warning.exists():
-        source_text += "\n" + shared_warning.read_text(encoding="utf-8")
     family_ids: set[str] = set()
     for family in contract.get("controlFamilies", []):
         family_id = family.get("id")

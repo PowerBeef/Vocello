@@ -80,33 +80,19 @@ struct IOSSubtleGlassSurfaceModifier<S: InsettableShape>: ViewModifier {
     let strokeOpacity: Double
     let interactive: Bool
 
-    @ViewBuilder
     func body(content: Content) -> some View {
-        let base = content
-            .background {
-                shape
-                    .fill(fill)
-            }
-            .overlay {
-                shape
-                    .stroke(Color.white.opacity(strokeOpacity), lineWidth: 0.8)
-                    .allowsHitTesting(false)
-            }
-            .overlay {
-                shape
-                    .inset(by: 0.65)
-                    .stroke(Theme.Surface.glassInnerStroke, lineWidth: 0.55)
-                    .allowsHitTesting(false)
-            }
-
+        // The solid chrome is the shared recipe
+        // (`Sources/SharedSupport/Views/VocelloSubtleGlassChrome.swift`, UIF-02).
         // The gate decision lives in the shared IOSGatedGlassModifier
-        // (IUI-5 D10a); `fill` above already paints the solid base, so the
-        // gated branch needs no extra backing here.
-        base.iosGatedGlass(
-            tint: Theme.glassTint(tint, intensity: 0.9),
-            in: shape,
-            interactive: interactive
-        )
+        // (IUI-5 D10a); `fill` already paints the solid base, so the gated
+        // branch needs no extra backing here.
+        content
+            .vocelloSubtleGlassChrome(in: shape, fill: fill, strokeOpacity: strokeOpacity)
+            .iosGatedGlass(
+                tint: VocelloSubtleGlass.glassTint(tint),
+                in: shape,
+                interactive: interactive
+            )
     }
 }
 
@@ -137,92 +123,35 @@ struct IOSScreenBackdrop: View {
     }
 }
 
+/// The shared flat status badge (`VocelloStatusBadge`, UIF-02) with the
+/// phone's Dynamic Type-scaled padding.
 struct IOSStatusBadge: View {
     @ScaledMetric(relativeTo: .caption) private var horizontalPadding = 10
     @ScaledMetric(relativeTo: .caption) private var verticalPadding = 5
 
-    enum Tone {
-        case accent(Color)
-        case success
-        case warning
-        case muted
-
-        var fill: Color {
-            switch self {
-            case .accent(let color):
-                return color.opacity(0.16)
-            case .success:
-                return Color.green.opacity(0.16)
-            case .warning:
-                return Color.orange.opacity(0.16)
-            case .muted:
-                return Color.secondary.opacity(0.12)
-            }
-        }
-
-        var foreground: Color {
-            switch self {
-            case .accent(let color):
-                return color
-            case .success:
-                return .green
-            case .warning:
-                return .orange
-            case .muted:
-                return .secondary
-            }
-        }
-    }
+    typealias Tone = VocelloStatusBadge.Tone
 
     let text: String
     let tone: Tone
 
     var body: some View {
-        let shape = Capsule(style: .continuous)
-
-        // Flat fill + stroke. Chips on iOS now mirror the macOS chip audit
-        // (May 2026): no glass on badges, so they contrast with the glassy
-        // cards behind them and don't collapse the hierarchy.
-        Text(text)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(tone.foreground)
-            .padding(.horizontal, horizontalPadding)
-            .padding(.vertical, verticalPadding)
-            .background {
-                shape.fill(tone.fill)
-            }
-            .overlay {
-                shape.stroke(tone.foreground.opacity(0.30), lineWidth: 0.75)
-            }
+        VocelloStatusBadge(
+            text: text,
+            tone: tone,
+            horizontalPadding: horizontalPadding,
+            verticalPadding: verticalPadding
+        )
     }
 }
 
-struct IOSSurfaceCard<Content: View>: View {
-    let tint: Color?
-    let content: Content
+/// The shared quiet surface card (`VocelloSurfaceCard`, UIF-02).
+typealias IOSSurfaceCard<Content: View> = VocelloSurfaceCard<Content>
 
-    init(tint: Color? = nil, @ViewBuilder content: () -> Content) {
-        self.tint = tint
-        self.content = content()
-    }
-
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-
-        VStack(alignment: .leading, spacing: contentSpacing) {
-            content
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background { shape.fill(Color.white.opacity(0.04)) }
-        .overlay { shape.stroke(Color.white.opacity(0.08), lineWidth: 0.5) }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var contentSpacing: CGFloat { 8 }
-}
-
+/// The shared section heading (`VocelloSectionHeading`, UIF-02) with the
+/// phone's Dynamic Type-scaled 11 pt title and 20 pt top padding.
 struct IOSSectionHeading: View {
+    @ScaledMetric(relativeTo: .caption2) private var titleFontSize: CGFloat = 11
+
     let title: String
     let subtitle: String?
 
@@ -232,21 +161,12 @@ struct IOSSectionHeading: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title.uppercased())
-                .iosScaledFont(size: 11, weight: .semibold, relativeTo: .caption2)
-                .tracking(0.88)
-                .foregroundStyle(Theme.Text.secondary)
-            if let subtitle, !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(Theme.Text.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-        .padding(.bottom, 6)
+        VocelloSectionHeading(
+            title,
+            subtitle: subtitle,
+            titleFontSize: titleFontSize,
+            topPadding: 20
+        )
     }
 }
 
@@ -535,34 +455,14 @@ struct IOSStudioUtilityHeader: View {
     }
 }
 
+/// The shared brand lockup (`VocelloProductTitleLockup`, UIF-02) with the
+/// phone header's half-point vertical padding and its `.tracking(0)` on the
+/// wordmark, both of which the desktop never had.
 struct IOSProductTitleLockup: View {
-    @ScaledMetric(relativeTo: .title3) private var markWidth = 28
-    @ScaledMetric(relativeTo: .title3) private var markHeight = 24
-    @ScaledMetric(relativeTo: .title3) private var lockupSpacing = 5
-
     let title: String
 
     var body: some View {
-        HStack(alignment: .center, spacing: lockupSpacing) {
-            Image(Theme.Branding.headerMarkAssetName)
-                .renderingMode(.original)
-                .resizable()
-                .interpolation(.high)
-                .antialiased(true)
-                .scaledToFit()
-                .frame(width: markWidth, height: markHeight)
-                .accessibilityHidden(true)
-
-            Text(title)
-                .font(.system(.title3, design: .rounded, weight: .semibold))
-                .foregroundStyle(Theme.Text.primary)
-                .lineLimit(1)
-                .tracking(0)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title)
-        .fixedSize(horizontal: true, vertical: false)
-        .padding(.vertical, 0.5)
+        VocelloProductTitleLockup(title: title, verticalPadding: 0.5, tracking: 0)
     }
 }
 
@@ -767,41 +667,8 @@ struct IOSStickyActionBar<Content: View>: View {
     }
 }
 
-struct IOSEmptyStateCard: View {
-    let title: String
-    let message: String
-    let symbolName: String
-    let tint: Color
-
-    init(
-        title: String,
-        message: String,
-        symbolName: String,
-        tint: Color
-    ) {
-        self.title = title
-        self.message = message
-        self.symbolName = symbolName
-        self.tint = tint
-    }
-
-    var body: some View {
-        IOSSurfaceCard(tint: tint) {
-            VStack(alignment: .leading, spacing: 10) {
-                Image(systemName: symbolName)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(tint)
-                Text(title)
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(Theme.Text.primary)
-                Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(Theme.Text.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-}
+/// The shared empty-state card (`VocelloEmptyStateCard`, UIF-02).
+typealias IOSEmptyStateCard = VocelloEmptyStateCard
 
 struct IOSHeaderMetricRow: View {
     let label: String

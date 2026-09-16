@@ -99,13 +99,14 @@
       "id": "UIF-02",
       "title": "One copy of each shared view primitive",
       "status": "in-flight",
-      "gate": "The iOS bodies of the stable-hash, waveform thumbnail, mode dot, voice avatar, surface and empty cards, status badge, section heading, filter chip row, icon button, primary CTA, subtle glass surface, product lockup and settings row family live under Sources/SharedSupport/Views with IOS<Name> forwards; the macOS twins are deleted and the call sites point at the shared types; VocelloShape replaces the hand-written rounded rectangles; the diff changes no constant; the generic iOS device-SDK compile and the macOS unit lane are green.",
+      "gate": "The shared bodies of the stable-hash, waveform thumbnail, mode dot, voice avatar, icon-button chrome, surface and empty-state cards, status badge, section heading, product lockup, primary CTA, setup-chip pill and subtle-glass chrome live under Sources/SharedSupport/Views with IOS<Name> forwards; the macOS twins are deleted and the call sites point at the shared types; VocelloShape replaces the hand-written rounded rectangles whose radius token matches; the diff changes no rendered constant or accessibility identifier on either platform; a control moved into SharedSupport keeps its ios-control-audit policy; the generic iOS device-SDK compile and the macOS unit lane are green. The filter chip row and the settings row family are deliberately NOT moved here: both are UIKit-bound in behaviour and UIF-03/UIF-04 rewrite exactly the numbers that would have to be parameterised, so they move with the commit that changes them.",
       "sourceOfTruth": [
-        "Sources/SharedSupport/Views/VocelloGlassSurface.swift",
+        "Sources/SharedSupport/Views/VocelloPrimaryCTAButton.swift",
+        "Sources/SharedSupport/Views/VocelloSetupChipPill.swift",
         "Sources/SharedSupport/Theme/VocelloShape.swift",
         "Sources/Views/Primitives/MacListPrimitives.swift"
       ],
-      "notes": "Opened 2026-09-15. Every type named is SwiftUI-only on the iOS side; the genuinely UIKit-bound pieces (haptics, the scroll-view bridges, the UIColor twins, the bottom-sheet family) stay per platform. Sizes that differ between the platforms become parameters, so no call site changes behavior. iOS edits are pure moves with forwards left behind and are re-verified on the phone under CONV-20.",
+      "notes": "Opened 2026-09-15. Thirteen primitives moved; iOS keeps every type name and init (typealias where the API is identical, same-init wrapper where the body needs an environment key, a scaled metric or the iOS animation helper). Differences became parameters carrying each platform's current value: the empty card's 480 pt Mac cap (now MacShellMetrics.emptyStateCardMaxWidth, same number), the badge's 9/4 against the phone's scaled 10/5, the heading's 18 pt top inset against 20, the icon button's 28/12 against 40/16, the CTA's desktop traits, and the wordmark's tracking (the phone sets 0, the desktop never set any; .tracking(0) overrides the face's own table so it is applied only when given). A 42-agent verification fleet audited each pair and refuted all 8 claimed regressions; its completeness critic caught the wordmark tracking and that the CTA's Button had left the ios-control-audit scan, so the scanner now reads Sources/SharedSupport/Views and the CTA has its own coverage row. Filter chip row and settings rows deferred to UIF-03/UIF-04 with the gate.",
       "plan": "macos-ui-fidelity-2026-09",
       "blockedBy": [],
       "updated": "2026-09-15"

@@ -325,7 +325,7 @@ struct MacVoiceDesignScreen: View {
         let emotion = draft.emotion
         let voiceName = briefDisplayName
         let modeLabel = MacInterfaceText.modeName(.design)
-        let waveformSeed = MacStableVisualHash.int(text)
+        let waveformSeed = VocelloStableVisualHash.int(text)
         guard let attempt = coordinator.start(live: IOSStudioLivePreviewItem(
             voiceName: voiceName,
             modeLabel: modeLabel,

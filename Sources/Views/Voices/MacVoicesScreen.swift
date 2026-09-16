@@ -101,20 +101,24 @@ struct MacVoicesScreen: View {
     private var content: some View {
         if !ttsEngineStore.isReady {
             voicesStateContainer(identifier: "voices_emptyState") {
-                MacEmptyStateCard(
+                VocelloEmptyStateCard(
                     title: MacInterfaceText.voicesEngineStarting,
                     message: MacInterfaceText.voicesWaitingForEngine,
                     symbolName: "arrow.triangle.2.circlepath.circle",
-                    tint: MacTheme.voicesTint
+                    tint: MacTheme.voicesTint,
+                    maxWidth: MacShellMetrics.emptyStateCardMaxWidth,
+                    symbolIsDecorative: true
                 )
             }
         } else if let loadError, voices.isEmpty, !isLoading {
             voicesStateContainer(identifier: "voices_errorState") {
-                MacEmptyStateCard(
+                VocelloEmptyStateCard(
                     title: MacInterfaceText.voicesLoadFailedTitle,
                     message: loadError,
                     symbolName: "exclamationmark.triangle",
-                    tint: MacTheme.Status.guarded
+                    tint: MacTheme.Status.guarded,
+                    maxWidth: MacShellMetrics.emptyStateCardMaxWidth,
+                    symbolIsDecorative: true
                 )
                 Button(MacInterfaceText.tryAgain) {
                     retryLoadVoices()
@@ -130,11 +134,13 @@ struct MacVoicesScreen: View {
             }
         } else if voices.isEmpty {
             voicesStateContainer(identifier: "voices_emptyState") {
-                MacEmptyStateCard(
+                VocelloEmptyStateCard(
                     title: MacInterfaceText.voicesNoVoicesTitle,
                     message: MacInterfaceText.voicesEmpty,
                     symbolName: "person.2.fill",
-                    tint: MacTheme.voicesTint
+                    tint: MacTheme.voicesTint,
+                    maxWidth: MacShellMetrics.emptyStateCardMaxWidth,
+                    symbolIsDecorative: true
                 )
             }
         } else {
@@ -160,7 +166,7 @@ struct MacVoicesScreen: View {
                             .listRowBackground(Color.clear)
                         }
                     } header: {
-                        MacSectionHeading(MacInterfaceText.voicesYourVoices)
+                        VocelloSectionHeading(MacInterfaceText.voicesYourVoices, titleFontSize: 11, topPadding: 18, titleLineLimit: 1, expandsWidth: true)
                     }
                 }
                 .listStyle(.plain)
@@ -370,14 +376,14 @@ private struct MacVoiceRow: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: MacTheme.Radius.card, style: .continuous)
+        let shape = VocelloShape.card()
         let layout = usesWideLayout
             ? AnyLayout(HStackLayout(alignment: .center, spacing: 14))
             : AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
 
         layout {
             HStack(alignment: .center, spacing: 12) {
-                MacVoiceAvatar(seed: voice.id, initials: voice.name, diameter: 44)
+                VocelloVoiceAvatar(seed: voice.id, initials: voice.name, diameter: 44, isDecorative: true)
 
                 MacVoiceRowMetadata(
                     voiceName: voice.name,
@@ -451,7 +457,7 @@ private struct MacVoiceRowMetadata: View {
                     .lineLimit(1)
                     .accessibilityIdentifier("voicesRow_\(voiceID)")
 
-                MacStatusBadge(text: transcriptStatus, tone: .muted)
+                VocelloStatusBadge(text: transcriptStatus, tone: .muted, horizontalPadding: 9, verticalPadding: 4, lineLimit: 1)
                     .fixedSize(horizontal: true, vertical: false)
                     .accessibilityIdentifier("voicesRow_\(voiceID)_transcriptStatus")
             }

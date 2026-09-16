@@ -64,7 +64,7 @@ struct MacHistoryItemCard: View {
                     .multilineTextAlignment(.leading)
 
                 HStack(spacing: 6) {
-                    MacModeDot(tint: modeTint)
+                    VocelloModeDot(tint: modeTint)
                     // The mode stays a textual cue beside the dot, never
                     // color-only, even when the voice name is present.
                     Text(verbatim: metadataParts.joined(separator: " · "))
@@ -111,7 +111,7 @@ struct MacHistoryItemCard: View {
                             .fill(Color.white.opacity(0.02))
                     }
                 if audioFileExists {
-                    MacStaticWaveformThumbnail(seed: waveformSeed, barCount: 14, tint: modeTint)
+                    VocelloStaticWaveformThumbnail(seed: waveformSeed, barCount: 14, tint: modeTint)
                         .frame(width: 34, height: 22)
                         .opacity(isHovered ? 0.35 : 1)
                     if isHovered {

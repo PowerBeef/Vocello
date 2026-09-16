@@ -78,8 +78,9 @@ private struct MacGatedGlassModifier<S: Shape>: ViewModifier {
     }
 }
 
-/// The iOS subtle glass surface (`iosSubtleGlassSurface`) on macOS: a solid
-/// base fill, an outer and an inset hairline, then the gated glass.
+/// The subtle glass surface on macOS: the shared solid chrome
+/// (`VocelloSubtleGlassChrome`: base fill, outer and inset hairlines), then
+/// the macOS gated glass.
 private struct MacSubtleGlassSurfaceModifier<S: InsettableShape>: ViewModifier {
     let shape: S
     let tint: Color?
@@ -89,20 +90,9 @@ private struct MacSubtleGlassSurfaceModifier<S: InsettableShape>: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .background { shape.fill(fill) }
-            .overlay {
-                shape
-                    .stroke(Color.white.opacity(strokeOpacity), lineWidth: 0.8)
-                    .allowsHitTesting(false)
-            }
-            .overlay {
-                shape
-                    .inset(by: 0.65)
-                    .stroke(MacTheme.Surface.glassInnerStroke, lineWidth: 0.55)
-                    .allowsHitTesting(false)
-            }
+            .vocelloSubtleGlassChrome(in: shape, fill: fill, strokeOpacity: strokeOpacity)
             .macGatedGlass(
-                tint: MacTheme.glassTint(tint, intensity: 0.9),
+                tint: VocelloSubtleGlass.glassTint(tint),
                 in: shape,
                 interactive: interactive
             )

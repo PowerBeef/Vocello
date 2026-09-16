@@ -436,7 +436,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
 
     private var generatingBar: some View {
         HStack(spacing: 10) {
-            MacStaticWaveformThumbnail(seed: 42, barCount: 28, tint: tint)
+            VocelloStaticWaveformThumbnail(seed: 42, barCount: 28, tint: tint)
                 .frame(height: 32)
                 .accessibilityHidden(true)
 
@@ -499,7 +499,7 @@ struct MacStudioBatchButton: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: MacTheme.Radius.stage, style: .continuous)
+        let shape = VocelloShape.stage()
         Button(action: action) {
             Image(systemName: "list.bullet.rectangle")
                 .font(.system(size: 18, weight: .semibold))

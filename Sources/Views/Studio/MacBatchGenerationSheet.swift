@@ -241,11 +241,11 @@ struct MacBatchGenerationSheet: View {
         .padding(8)
         .frame(minHeight: 220)
         .background {
-            RoundedRectangle(cornerRadius: MacTheme.Radius.input, style: .continuous)
+            VocelloShape.input()
                 .fill(MacTheme.Surface.field)
         }
         .overlay {
-            RoundedRectangle(cornerRadius: MacTheme.Radius.input, style: .continuous)
+            VocelloShape.input()
                 .stroke(isEditorFocused ? tint.opacity(0.6) : MacTheme.Surface.fieldStroke, lineWidth: isEditorFocused ? 1 : 0.5)
         }
         .appAnimation(MacTheme.Motion.stateChange, value: isEditorFocused)
@@ -714,11 +714,11 @@ private struct MacBatchItemRow: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: MacTheme.Radius.card, style: .continuous)
+            VocelloShape.card()
                 .fill(MacTheme.Surface.card)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: MacTheme.Radius.card, style: .continuous)
+            VocelloShape.card()
                 .stroke(statusColor.opacity(0.18), lineWidth: 1)
         )
     }

@@ -535,11 +535,11 @@ struct MacVoiceCloningScreen: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .background {
-                RoundedRectangle(cornerRadius: MacTheme.Radius.input, style: .continuous)
+                VocelloShape.input()
                     .fill(Color.white.opacity(0.04))
             }
             .overlay {
-                RoundedRectangle(cornerRadius: MacTheme.Radius.input, style: .continuous)
+                VocelloShape.input()
                     .stroke(MacTheme.Surface.hairline, lineWidth: 0.5)
             }
             .accessibilityElement(children: .contain)
@@ -605,11 +605,11 @@ struct MacVoiceCloningScreen: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
                 .background {
-                    RoundedRectangle(cornerRadius: MacTheme.Radius.input, style: .continuous)
+                    VocelloShape.input()
                         .fill(MacTheme.Surface.field)
                 }
                 .overlay {
-                    RoundedRectangle(cornerRadius: MacTheme.Radius.input, style: .continuous)
+                    VocelloShape.input()
                         .stroke(MacTheme.Surface.fieldStroke, lineWidth: 0.5)
                 }
                 .accessibilityLabel(MacInterfaceText.cloningTranscriptAccessibility)
@@ -646,7 +646,7 @@ struct MacVoiceCloningScreen: View {
         }
         .padding(10)
         .background {
-            RoundedRectangle(cornerRadius: MacTheme.Radius.input, style: .continuous)
+            VocelloShape.input()
                 .fill(MacTheme.Status.guarded.opacity(0.10))
         }
         .accessibilityElement(children: .contain)
@@ -890,7 +890,7 @@ struct MacVoiceCloningScreen: View {
         let text = currentDraft.text
         let voiceName = selectedVoice?.name ?? URL(fileURLWithPath: refPath).deletingPathExtension().lastPathComponent
         let modeLabel = MacInterfaceText.modeName(.clone)
-        let waveformSeed = MacStableVisualHash.int(text)
+        let waveformSeed = VocelloStableVisualHash.int(text)
         let primingKey = clonePrimingRequestKey
         guard let attempt = coordinator.start(live: IOSStudioLivePreviewItem(
             voiceName: voiceName,

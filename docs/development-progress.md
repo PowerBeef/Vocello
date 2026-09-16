@@ -32,8 +32,16 @@ controls attached to the detail column. Lanes on 2be20f0c: localization 012725-a
 013020-f98f17b1 7/7, perf 014036-508e2487 nine scenarios clean, custom benchmark 014846-5892b77c.
 Two CI-only compile errors this evening came from the same source, Xcode 26.6 on CI against Xcode 27
 here; both were isolation annotations, both fixed forward, and CI is read after every push. Next:
-UIF-02 collapses the duplicated view primitives into `Sources/SharedSupport/Views` as a pure move,
-then UIF-03 History and Saved Voices, UIF-04 Settings and the shell, and the captures are retaken.
+UIF-02 collapsed the duplicated view primitives into `Sources/SharedSupport/Views` as a pure move:
+thirteen types, 923 lines of duplication removed, every platform difference now a parameter carrying
+the value that side already had. A verification fleet audited each pair adversarially and refuted
+every claimed regression; its completeness critic caught the two things a pair-by-pair audit cannot
+see — the phone's `.tracking(0)` riding along onto the macOS wordmark, which never had it, and the
+primary CTA's `Button` leaving the iOS control audit's scan when it moved into SharedSupport, which
+would have made that contract weaker while reporting green. The scanner now reads the shared views
+and the CTA has its own coverage row. The filter chip row and the settings rows stay put until
+UIF-03 and UIF-04, which rewrite exactly the numbers that would otherwise be parameterised. Then
+History and Saved Voices, Settings and the shell, and the captures are retaken.
 
 ### macOS converges on the iOS architecture (September 14)
 

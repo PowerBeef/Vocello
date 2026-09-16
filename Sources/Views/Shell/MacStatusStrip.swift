@@ -73,7 +73,7 @@ struct MacStatusStrip: View {
     }
 
     private func strip(_ descriptor: Descriptor) -> some View {
-        let shape = RoundedRectangle(cornerRadius: MacTheme.Radius.card, style: .continuous)
+        let shape = VocelloShape.card()
         let percent = descriptor.fraction.map { Int(($0 * 100).rounded()) }
 
         return HStack(alignment: .top, spacing: 8) {

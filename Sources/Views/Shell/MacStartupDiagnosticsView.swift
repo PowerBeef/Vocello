@@ -11,7 +11,7 @@ struct MacStartupDiagnosticsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: MacTheme.Spacing.xl) {
             VStack(alignment: .leading, spacing: MacTheme.Spacing.sm) {
-                MacProductTitleLockup(title: MacInterfaceText.brandName)
+                VocelloProductTitleLockup(title: MacInterfaceText.brandName)
 
                 Text(snapshot.issue.summary)
                     .font(.title3.weight(.semibold))
@@ -24,7 +24,7 @@ struct MacStartupDiagnosticsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            MacSurfaceCard {
+            VocelloSurfaceCard {
                 diagnosticsRow(MacInterfaceText.startupManifestPath, snapshot.manifestPath)
                 diagnosticsRow(MacInterfaceText.startupBundlePath, snapshot.bundlePath)
                 diagnosticsRow(MacInterfaceText.startupResourcesPath, snapshot.resourcesPath)

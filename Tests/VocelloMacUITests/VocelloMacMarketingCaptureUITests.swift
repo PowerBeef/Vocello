@@ -1,6 +1,10 @@
+import CoreGraphics
 import XCTest
 
-/// Marketing screenshot captures for the website and README.
+/// Screenshot captures: the marketing assets for the website and README
+/// (`test01`-`test03`), and the layout survey the design review reads
+/// (`test04`-`test05`), which photographs every destination at each width the
+/// app is designed against.
 ///
 /// Not part of any acceptance lane and never run by `scripts/ui_test.sh`:
 /// invoke explicitly with
@@ -176,5 +180,93 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
         settingsShot.name = "marketing-model-downloads"
         settingsShot.lifetime = .keepAlways
         add(settingsShot)
+    }
+
+    // MARK: - Layout survey (design review evidence)
+
+    /// Every destination at the three widths the app is designed against.
+    ///
+    /// This is a geometry survey, not a product journey: it generates no take,
+    /// so it runs in a couple of minutes and can be repeated after any commit.
+    /// It exists because the app had only ever been photographed at whatever
+    /// width the scene restored to, which is why every narrow-window defect of
+    /// the UI-fidelity plan was found by eye and none by a test.
+    func test04_LayoutSurveyCapture() throws {
+        beginSession()
+        defer { endSession() }
+        try skipUnlessWindowCanBePinned()
+
+        for width in [
+            VocelloUIWindowFrame.Width.minimum,
+            VocelloUIWindowFrame.Width.standard,
+            VocelloUIWindowFrame.Width.wide,
+        ] {
+            captureEveryDestination(at: width, suffix: "")
+        }
+
+        captureSheets(at: VocelloUIWindowFrame.Width.standard)
+    }
+
+    /// The narrow window under pseudo-localization: the worst case macOS can be
+    /// driven to, since it has no Dynamic Type and doubled strings are the only
+    /// text-growth axis the platform offers.
+    func test05_LayoutSurveyPseudoLocalizedCapture() throws {
+        beginSession(additionalArguments: [
+            "-NSDoubleLocalizedStrings", "YES",
+            "-NSShowNonLocalizedStrings", "YES",
+        ])
+        defer { endSession() }
+        try skipUnlessWindowCanBePinned()
+
+        captureEveryDestination(at: VocelloUIWindowFrame.Width.minimum, suffix: "-pseudo")
+    }
+
+    /// A survey that cannot pin the window would photograph an unknown width
+    /// and label it 720, which is worse than no survey. Skipping says so; the
+    /// diagnosis says which of the three failure modes it was.
+    private func skipUnlessWindowCanBePinned() throws {
+        let diagnosis = VocelloUIWindowFrame.diagnosis()
+        print("WINDOW_FRAME diagnosis: \(diagnosis)")
+        try XCTSkipUnless(
+            VocelloUIWindowFrame.isAvailable(),
+            "the window cannot be pinned (\(diagnosis)); grant VocelloMacUITests-Runner.app "
+                + "Accessibility, see docs/reference/macos-permissions.md"
+        )
+    }
+
+    private func captureEveryDestination(at width: CGFloat, suffix: String) {
+        let frame = VocelloUIWindowFrame.require(app, width: width)
+        let window = app.windows.firstMatch
+        for screen in VocelloMacScreen.allCases {
+            navigate(to: screen)
+            // Named for the width the window actually settled at, never the one
+            // requested: a capture that misreports its own width is evidence
+            // for the wrong question.
+            VocelloUIScreenshot.attach(
+                window,
+                named: "layout-\(screen.rawValue)-\(Int(frame.width))\(suffix)"
+            )
+        }
+    }
+
+    /// The two sheets that open without a system permission prompt. The record
+    /// clip sheet is deliberately absent: it asks for the microphone, and the
+    /// interruption sentinel never answers a TCC dialog.
+    private func captureSheets(at width: CGFloat) {
+        let frame = VocelloUIWindowFrame.require(app, width: width)
+        let window = app.windows.firstMatch
+
+        navigate(to: .customVoice)
+        replaceScript(with: "One line per take, and the batch runs them in order.")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("textInput_batchButton"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("batch_cancelButton"), timeout: 20))
+        VocelloUIScreenshot.attach(window, named: "layout-sheet-batch-\(Int(frame.width))")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("batch_cancelButton"), timeout: 20))
+
+        navigate(to: .voices)
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("voices_enrollButton"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("voicesEnroll_nameField"), timeout: 20))
+        VocelloUIScreenshot.attach(window, named: "layout-sheet-enroll-\(Int(frame.width))")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("voicesEnroll_cancelButton"), timeout: 20))
     }
 }

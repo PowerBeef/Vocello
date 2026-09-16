@@ -149,6 +149,28 @@ Configure its signing and test destination through the project and repository te
 screenshots need no separate screen-capture plugin route. These concerns are distinct from the
 application's microphone and speech permissions above.
 
+### Accessibility, for pinning the window to a width (UIF-06)
+
+macOS XCUITest has no window-resize API, so the layout survey
+(`VocelloMacMarketingCaptureUITests.test04`/`test05`) pins the window through the accessibility API
+instead — `VocelloUIWindowFrame` writes `kAXPositionAttribute` and `kAXSizeAttribute` on the app's
+main window. That needs the **runner**, not the app, to hold the Accessibility grant, and macOS
+never prompts for it from a test process: without it every accessibility call returns
+`kAXErrorAPIDisabled` (-25211) and the survey skips rather than photographing an unknown width and
+labelling it 720.
+
+Grant it once, the same way the System Audio Recording grant is handled above:
+
+1. Build the runner and let the lane re-sign it, or re-sign it directly with the Apple Development
+   identity — the grant binds to the designated requirement, so a stable identity survives rebuilds
+   while an ad-hoc signature does not.
+2. System Settings → Privacy & Security → Accessibility → **+**, then add
+   `build/cache/xcode/macos/Build/Products/Release/VocelloMacUITests-Runner.app` and enable it.
+
+`VocelloUIWindowFrame.diagnosis()` reports which of the three failure modes applies (untrusted
+runner, no running process, or an accessibility error on a process that was found), and every
+survey run prints it as `WINDOW_FRAME diagnosis:`.
+
 ## Virtual microphone (registered debug knob)
 
 `QWENVOICE_FAKE_MIC_WAV` is a registered input-substitution knob

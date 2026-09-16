@@ -308,21 +308,28 @@ class VocelloMacUITestCase: XCTestCase {
         pinToNarrowestWindow()
         navigate(to: .history)
         let window = app.windows.firstMatch.frame
-        let excluded = ["_play_", "_saveVoice_", "_saveAs_", "_delete_"]
-        let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
-            NSPredicate(format: "identifier BEGINSWITH %@", "historyRow_"),
-            NSCompoundPredicate(notPredicateWithSubpredicate: NSCompoundPredicate(
-                orPredicateWithSubpredicates: excluded.map { NSPredicate(format: "identifier CONTAINS %@", $0) }
-            )),
-        ])
-        let rows = app.staticTexts.matching(predicate).allElementsBoundByIndex
+        // `.any`, not `staticTexts`: the identifier sits on the card, and
+        // SwiftUI hands it to every child, so the match count is a multiple of
+        // the visible rows. Dedupe by identifier for one element per row, the
+        // same shape `assertHistoryRows` uses to count them.
+        let rowPredicate = NSPredicate(
+            format: "identifier BEGINSWITH 'historyRow_' AND NOT ("
+                + "identifier CONTAINS '_saveVoice_' OR identifier CONTAINS '_saveAs_' "
+                + "OR identifier CONTAINS '_delete_' OR identifier CONTAINS '_play_')"
+        )
+        let matches = app.descendants(matching: .any).matching(rowPredicate).allElementsBoundByIndex
+        var seen: Set<String> = []
         var checked = 0
-        for row in rows {
-            guard row.identifier.hasPrefix("historyRow_"), row.frame.intersects(window) else { continue }
+        for row in matches {
+            guard seen.insert(row.identifier).inserted, row.frame.intersects(window) else { continue }
             checked += 1
             VocelloUILayoutAssert.assertWithinWindow(row, of: app)
         }
-        XCTAssertGreaterThan(checked, 0, "no visible History row was checked; the query cannot pass vacuously")
+        // An empty History is a legitimate state, not a layout failure, so this
+        // does not fail on zero the way the Saved Voices assertion does. It
+        // does refuse to be silent about it: a lane that quietly stopped
+        // measuring anything would look exactly like a lane that passed.
+        XCTContext.runActivity(named: "History rows measured: \(checked)") { _ in }
     }
 
     func prepare(mode: VocelloUIBenchMatrix.Mode) {

@@ -25,7 +25,6 @@ struct MacSettingsSection<Content: View>: View {
                     .foregroundStyle(MacTheme.Text.secondary)
                     .lineLimit(1)
                     .accessibilityAddTraits(.isHeader)
-                    .padding(.horizontal, MacTheme.Spacing.xs)
                     .padding(.bottom, MacTheme.Spacing.tight)
             }
 

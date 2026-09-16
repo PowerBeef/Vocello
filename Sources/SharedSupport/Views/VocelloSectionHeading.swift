@@ -10,6 +10,11 @@ import SwiftUI
 /// fixed 11. The remaining desktop differences are parameters with the
 /// phone's values as defaults: the Mac pads 18 above (the phone 20), caps the
 /// title at one line and stretches the heading across its list section.
+///
+/// The gutter is a parameter for the same reason. It used to be a hardcoded
+/// 20, which meant a heading sat wherever 20 happened to land rather than over
+/// the rows it heads: on macOS History that was 12 pt right of its own rows.
+/// A caller that insets its rows differently passes the same inset here.
 struct VocelloSectionHeading: View {
     let title: String
     let subtitle: String?
@@ -17,6 +22,7 @@ struct VocelloSectionHeading: View {
     let topPadding: CGFloat
     let titleLineLimit: Int?
     let expandsWidth: Bool
+    let horizontalInset: CGFloat
 
     init(
         _ title: String,
@@ -24,7 +30,8 @@ struct VocelloSectionHeading: View {
         titleFontSize: CGFloat,
         topPadding: CGFloat,
         titleLineLimit: Int? = nil,
-        expandsWidth: Bool = false
+        expandsWidth: Bool = false,
+        horizontalInset: CGFloat = VocelloTheme.Spacing.xl
     ) {
         self.title = title
         self.subtitle = subtitle
@@ -32,6 +39,7 @@ struct VocelloSectionHeading: View {
         self.topPadding = topPadding
         self.titleLineLimit = titleLineLimit
         self.expandsWidth = expandsWidth
+        self.horizontalInset = horizontalInset
     }
 
     var body: some View {
@@ -56,7 +64,7 @@ struct VocelloSectionHeading: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.horizontal, VocelloTheme.Spacing.xl)
+        .padding(.horizontal, horizontalInset)
         .padding(.top, topPadding)
         .padding(.bottom, VocelloTheme.Spacing.tight)
     }

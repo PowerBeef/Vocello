@@ -279,6 +279,7 @@ struct MacHistoryScreen: View {
                 )
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel(MacInterfaceText.historyFilterAccessibility)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("history_modeFilter")
             }
             .padding(.horizontal, VocelloTheme.Spacing.xl)
@@ -396,9 +397,9 @@ struct MacHistoryScreen: View {
                             rowView(for: entry)
                                 .listRowInsets(EdgeInsets(
                                     top: 0,
-                                    leading: VocelloTheme.Spacing.sm,
+                                    leading: VocelloTheme.Spacing.xl,
                                     bottom: 0,
-                                    trailing: VocelloTheme.Spacing.sm
+                                    trailing: VocelloTheme.Spacing.xl
                                 ))
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)

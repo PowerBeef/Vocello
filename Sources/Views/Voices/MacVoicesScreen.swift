@@ -162,10 +162,10 @@ struct MacVoicesScreen: View {
                             )
                             .id(voice.id)
                             .listRowInsets(EdgeInsets(
-                                top: 3,
-                                leading: VocelloTheme.Spacing.lg,
-                                bottom: 3,
-                                trailing: VocelloTheme.Spacing.lg
+                                top: VocelloTheme.Spacing.xs,
+                                leading: VocelloTheme.Spacing.xl,
+                                bottom: VocelloTheme.Spacing.xs,
+                                trailing: VocelloTheme.Spacing.xl
                             ))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)

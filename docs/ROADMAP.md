@@ -12,7 +12,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `macos-ui-fidelity-2026-09` | active | backend-and-platform | 2/5 (40%) |
+| `macos-ui-fidelity-2026-09` | active | backend-and-platform | 2/6 (33%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -33,9 +33,10 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `UIF-03` | planned | History and Saved Voices on the iOS row and chip metrics | — |
-| `UIF-04` | planned | Settings and shell polish | — |
+| `UIF-03` | planned | History and Saved Voices on the iOS row and chip metrics | `UIF-06` |
+| `UIF-04` | planned | Settings and shell polish | `UIF-06` |
 | `UIF-05` | in-flight | One scale: type, control sizes, radii, strokes, spacing | — |
+| `UIF-06` | in-flight | See the window at every width, then find the layout and proportions | — |
 
 ### Open items in detail
 
@@ -47,6 +48,9 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 - **`UIF-05`** (in-flight) — One scale: type, control sizes, radii, strokes, spacing.
   gate: VocelloTypography (role vocabulary + VocelloTextStyle spec) and the macOS table in MacTypeScale exist, with six sizes covering thirteen roles and no role appearing twice; MacControl carries the six control heights with the glyph size and shape that belong to each; VocelloTheme gains Radius.row, Stroke, Elevation, Opacity and the two intra-control spacing steps; Sources/Views carries no hand-written font size, control height, corner radius, stroke width or shadow that a token covers; one screen gutter across every destination; the layout assertions (assertSingleLine 24 pt, assertSavedVoicesLayoutIntact) and the localization lane pass at the narrow window; captures reviewed by the maintainer.
+
+- **`UIF-06`** (in-flight) — See the window at every width, then find the layout and proportions.
+  gate: A test-target window-frame helper pins the macOS window to an exact width through the accessibility API, and both the existing layout assertions and the survey captures run at the 720 pt minimum; every macOS surface is captured at 720, 880 and 1280 plus one pseudo-localized narrow pass; a written layout-and-proportions thesis, synthesized from two isolated assessments, is delivered and approved before any screen is rewritten; SharedSupport/Views carries no raw font size, stroke width, shadow or hand-written Capsule() that a token covers; one content left edge across all six destinations, with section headings sitting over their own rows; History gains its first geometry assertion.
 
 ## Autonomous validation audit remediation
 

@@ -108,7 +108,23 @@
         "Sources/Views/Theme/MacControlMetrics.swift",
         "Sources/SharedSupport/Theme/VocelloThemeTokens.swift"
       ],
-      "notes": "Opened 2026-09-16 on the maintainer's verdict that the composition is right but the elements and text proportions are not cohesive. Three inventories measured it: 38 text styles for 13 roles with 10 pt carrying thirteen of them (.caption/.caption2/.footnote all resolve to 10 on macOS); row titles at 10, 11, 12, 13 and 14; 14 interactive heights between 22 and 56, six used once; 10 radii against a 4-value token set; one warning triangle at seven sizes; half the layout numbers off the project's own grid; Spacing used 7 times against ~200 literals and VocelloShape.chip()/pill() never. Decisions: the full six-step ladder (22/17/15/13/12/11), glyph size follows its container with heights 56/46/40/36/28/24, tokens in the shared theme with a macOS table, and stroke plus elevation tokens added. Runs BEFORE UIF-03 and UIF-04 so those screens are built on the scale.",
+      "notes": "Opened 2026-09-16 on the maintainer's verdict that the composition is right but the elements and text proportions are not cohesive. Inventories measured 38 text styles for 13 roles (10 pt carrying thirteen of them), row titles at 10/11/12/13/14, 14 interactive heights, 10 radii, and half the layout numbers off the project's own grid. Decisions: the six-step ladder 22/17/15/13/12/11, glyph size follows its container with heights 56/46/40/36/28/24, tokens in the shared theme with a macOS table, stroke and elevation added. Landed: 614d7205 (tokens, 7 tests), 3874b70d (sweep, 31 files), a93186f3 (intoView scrolls to the container's end -- the sweep made Settings taller than the old 8x120 pt budget and the localization lane could no longer reach the consent toggle). Evidence on a93186f3: localization, smoke and perf all PASS; CI green. Three gate clauses are still open and are NOT being quietly dropped: Sources/Views is 88% on the scale while SharedSupport/Views is untouched; the content left edge is still 20/20/20/20/28/32; and no assertion runs at the narrow window. UIF-06 closes them.",
+      "updated": "2026-09-16"
+    },
+    {
+      "id": "UIF-06",
+      "plan": "macos-ui-fidelity-2026-09",
+      "title": "See the window at every width, then find the layout and proportions",
+      "status": "in-flight",
+      "blockedBy": [],
+      "gate": "A test-target window-frame helper pins the macOS window to an exact width through the accessibility API, and both the existing layout assertions and the survey captures run at the 720 pt minimum; every macOS surface is captured at 720, 880 and 1280 plus one pseudo-localized narrow pass; a written layout-and-proportions thesis, synthesized from two isolated assessments, is delivered and approved before any screen is rewritten; SharedSupport/Views carries no raw font size, stroke width, shadow or hand-written Capsule() that a token covers; one content left edge across all six destinations, with section headings sitting over their own rows; History gains its first geometry assertion.",
+      "sourceOfTruth": [
+        "Tests/VocelloMacUITests/VocelloMacMarketingCaptureUITests.swift",
+        "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift",
+        "Sources/SharedSupport/Views/VocelloSectionHeading.swift",
+        "Sources/SharedSupport/Views/VocelloPrimaryCTAButton.swift"
+      ],
+      "notes": "Opened 2026-09-16 to run the Impeccable Operate-mode method over the macOS app: two isolated assessments (design review against rendered captures; a source drift scan), then one written thesis before any edit. Refinement, not redesign -- iOS stays the reference world. Two facts forced the shape: nothing in the repo sets a macOS window size, because XCUITest has no resize API, so every lane and every capture has run at whatever the scene restored to and every narrow-window defect so far was found by eye; and only Saved Voices rows and the Settings package rows carry any geometry assertion at all. Measured drift at a93186f3: SharedSupport/Views is 0 of 16 font sites on the scale, holds 11 of 12 raw stroke widths (0.55/0.6/0.75/0.8) and 3 of 3 raw shadows that are numerically identical to their tokens; VocelloSectionHeading hardcodes a 20 pt gutter, so its eyebrow hangs 12 pt right of its own History rows. Banked defect F1: the Settings Variation picker is capped at maxWidth 360, which cannot shrink a segmented control below its intrinsic width, so it overflows and clips.",
       "updated": "2026-09-16"
     },
     {
@@ -123,7 +139,9 @@
       ],
       "notes": "Opened 2026-09-15. The desktop keeps hover affordances, the context menu's Reveal in Finder, the 960 pt content cap and the toolbar's sort and enroll controls; everything else matches the phone. Lands after UIF-05 and adopts its type, control, radius and stroke tokens rather than today's numbers.",
       "plan": "macos-ui-fidelity-2026-09",
-      "blockedBy": [],
+      "blockedBy": [
+        "UIF-06"
+      ],
       "updated": "2026-09-16"
     },
     {
@@ -138,7 +156,9 @@
       ],
       "notes": "Opened 2026-09-15. The Mac keeps its flat single-scroll Settings rather than the phone's hub and drill-down, and keeps the 680 pt cap; the sidebar and the persistent footer player stay, both convergence-plan decisions. Lands after UIF-05 and adopts its type, control, radius and stroke tokens rather than today's numbers.",
       "plan": "macos-ui-fidelity-2026-09",
-      "blockedBy": [],
+      "blockedBy": [
+        "UIF-06"
+      ],
       "updated": "2026-09-16"
     },
     {

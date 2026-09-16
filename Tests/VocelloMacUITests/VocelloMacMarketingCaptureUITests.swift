@@ -269,4 +269,36 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
         VocelloUIScreenshot.attach(window, named: "layout-sheet-enroll-\(Int(frame.width))")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("voicesEnroll_cancelButton"), timeout: 20))
     }
+
+    /// The state the brief calls the point of the product, and the one the
+    /// layout survey could not reach: a finished take.
+    ///
+    /// Every other capture is a pre-generation empty state, so the two player
+    /// cards -- the one in the Studio dock and the one in the sidebar footer --
+    /// had no evidence at all, and neither did the space below the Generate
+    /// button that a completed take is presumably meant to fill. This generates
+    /// one real take through the genuine controls and photographs the result at
+    /// the narrow and default widths.
+    func test06_PostGenerationCapture() {
+        beginSession()
+        defer { endSession() }
+        reportWindowSizingMechanism()
+
+        prepare(mode: .custom)
+        replaceScript(with: "Welcome to Vocello. Every word you hear was generated "
+            + "right here on your Mac, private by design.")
+        generateAndWaitForCompletion(mode: .custom, timeout: 360)
+
+        for width in [
+            VocelloUIWindowFrame.Width.standard,
+            VocelloUIWindowFrame.Width.minimum,
+        ] {
+            let frame = VocelloUIWindowFrame.require(app, width: width)
+            let window = app.windows.firstMatch
+            VocelloUIScreenshot.attach(window, named: "layout-customVoice-take-\(Int(frame.width))")
+            navigate(to: .history)
+            VocelloUIScreenshot.attach(window, named: "layout-history-take-\(Int(frame.width))")
+            navigate(to: .customVoice)
+        }
+    }
 }

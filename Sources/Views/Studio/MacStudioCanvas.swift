@@ -41,8 +41,12 @@ enum MacStudioMetrics {
     /// proportions but capped the chip row at 600, which is why the setup chips
     /// split onto two rows however wide the window was -- the window was never
     /// the constraint, this was. 780 holds all five chips on one row (739 pt of
-    /// chips plus the gutters) and still leaves the 22 pt script a measure of
-    /// roughly 71 characters, inside the comfortable range.
+    /// chips plus the gutters).
+    ///
+    /// It used to carry a second job -- giving the 22 pt script a measure of
+    /// roughly 71 characters -- which it no longer does. The face came down to
+    /// 17 and the measure moved to `composerMaxWidth`, so this number now
+    /// answers to the chip row alone.
     static let contentMaxWidth: CGFloat = 780
     /// The iOS canvas gutter, which is the app's screen gutter token. The
     /// composer uses it, the chip row and the dock use it, so the script, the
@@ -53,12 +57,24 @@ enum MacStudioMetrics {
     /// silhouette does not jump between the idle CTA and the generating bar:
     /// the primary control plus one step of air under it.
     static let dockMinHeight: CGFloat = MacControl.primary.height + MacTheme.Spacing.sm
-    /// Six lines of the 22 pt face plus the editor's vertical insets: the
+    /// Six lines of the 17 pt face plus the editor's vertical insets: the
     /// floor below which the script never shrinks, even in the shortest
     /// window. Above it the script takes every point the chips and the dock do
     /// not, because it is the one region this product exists to host and it
     /// was the one region that could not grow.
-    static let composerMinHeight: CGFloat = 176
+    ///
+    /// It is a hand-derived literal and has to be: `MacScriptTextEditor`
+    /// reports whatever height it is proposed and never measures its own text,
+    /// so nothing here follows the face automatically. Six lines at ~20.6 pt
+    /// each is 124, plus the editor's 8 pt insets above and below.
+    static let composerMinHeight: CGFloat = 140
+    /// Measure of the script, which is not the width of the column. At 780 pt
+    /// the old 22 pt face ran about 71 characters to the line, comfortably
+    /// inside the range where prose stays readable; the same column at 17 pt
+    /// runs about 92, which is past it. The chips and the Generate button keep
+    /// the full column -- they are sized by their own content, not by reading
+    /// -- and the composer shares their left edge and stops earlier.
+    static let composerMaxWidth: CGFloat = 600
 }
 
 /// Readiness of the current mode, rendered as one caption beside the mode
@@ -160,19 +176,22 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         // The reader is here for its floor, not for its proxy. A GeometryReader
         // reports a flexible minimum of its own rather than the sum of its
         // children's, which is what stops the column's stacked floors --
-        // composer 176, chip rows 46 each, dock 64, plus every footer a mode
+        // composer 140, chip rows 40 each, dock 56, plus every footer a mode
         // can show -- from propagating up through ContentView's
         // `.frame(minHeight:)` and becoming the window's enforced minimum.
         //
-        // Removing it was measured afterwards and was wrong: at the declared
-        // 560 pt floor, Voice Design's column needs about 633 pt and Voice
-        // Cloning about 603 once a take has finished, so the window would
-        // either refuse to shrink to its own documented minimum or clip the
-        // dock, since nothing in this chain scrolls. The flexible composer and
-        // the absent trailing spacer -- the useful half of that change -- are
-        // unaffected: inside the reader the column still receives a finite
-        // proposal and the editor still takes whatever the chips and dock do
-        // not.
+        // Removing it was measured afterwards and was wrong: against the
+        // declared 560 pt floor, Voice Design's column was measured needing
+        // about 633 pt and Voice Cloning about 603 once a take had finished, so
+        // the window would either refuse to shrink to its own documented
+        // minimum or clip the dock, since nothing in this chain scrolls. Those
+        // two figures were taken before the scale came down and each of the
+        // three floors above shrank; the column now needs roughly fifty points
+        // less, which narrows the gap without being measured again. The
+        // flexible composer and the absent trailing spacer -- the useful half
+        // of that change -- are unaffected: inside the reader the column still
+        // receives a finite proposal and the editor still takes whatever the
+        // chips and dock do not.
         GeometryReader { proxy in
             canvasColumn
                 .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
@@ -278,9 +297,15 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             .padding(.top, MacTheme.Spacing.xs)
             .padding(.bottom, MacTheme.Spacing.snug)
         }
+        // The cap covers the meta line as well as the editor, so the counter
+        // and Clear finish where the text does instead of floating a hundred
+        // and eighty points past its right edge. Leading alignment is what
+        // keeps the spine: the script, the chips and Generate still begin on
+        // one vertical line, they just end on different ones.
+        .frame(maxWidth: MacStudioMetrics.composerMaxWidth, alignment: .leading)
         .padding(.horizontal, MacStudioMetrics.horizontalInset)
         .padding(.top, MacTheme.Spacing.md)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("\(accessibilityPrefix)_script")
     }

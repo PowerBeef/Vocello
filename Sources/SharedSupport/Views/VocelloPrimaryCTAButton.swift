@@ -16,16 +16,23 @@ import SwiftUI
 /// reads it from its own environment key (`iosReduceTransparencyEnabled`,
 /// `accessibilityReduceTransparency`), as `VocelloModeBackdrop` does.
 struct VocelloPrimaryCTAButton: View {
-    /// `.dock` is the Studio's Generate button: the full-width 56 pt capsule
-    /// with its sheen and glow, which is what anchors the canvas. `.compact`
-    /// is the desktop sheet button that hugs its label.
+    /// `.dock` is the Studio's Generate button: the full-width capsule with its
+    /// sheen and glow, which is what anchors the canvas. `.compact` is the
+    /// desktop sheet button that hugs its label.
+    ///
+    /// The dock capsule's height and symbol are **not** here. They are the one
+    /// pair of numbers the two apps no longer agree on, so they live in
+    /// `Traits` beside the other per-platform chrome: the phone's 56 pt is
+    /// right next to a 56 pt tab bar, and the desktop's is not, next to a 40 pt
+    /// sidebar row. `.compact` is desktop-only and keeps its numbers here.
     enum Size {
         case dock
         case compact
 
-        var height: CGFloat { self == .dock ? 56 : 34 }
+        static let compactHeight: CGFloat = 34
+        static let compactSymbolPointSize: CGFloat = 14
+
         var spansWidth: Bool { self == .dock }
-        var symbolPointSize: CGFloat { self == .dock ? 18 : 14 }
         var titleFont: Font { self == .dock ? .headline : .system(size: 13, weight: .semibold) }
         var titleTracking: CGFloat { self == .dock ? -0.17 : 0 }
         var strokeLineWidth: CGFloat { self == .dock ? 0.8 : 0.75 }
@@ -47,13 +54,22 @@ struct VocelloPrimaryCTAButton: View {
         var glowsWhenDisabled: Bool
         /// The desktop hit-tests the capsule; the phone hit-tests the frame.
         var hitTestsCapsule: Bool
+        /// Height of the dock capsule and the point size of the symbol inside
+        /// it. The phone's 56/18 is the original and is the reference; the
+        /// desktop sits one step lower because its own control ladder does
+        /// (`MacControl.primary`), and a button 16 pt taller than the sidebar
+        /// row beside it read as belonging to another application.
+        var dockHeight: CGFloat
+        var dockSymbolPointSize: CGFloat
 
         static let phone = Traits(
             dockHorizontalPadding: 0,
             compactHorizontalPadding: 0,
             titleLineLimit: nil,
             glowsWhenDisabled: true,
-            hitTestsCapsule: false
+            hitTestsCapsule: false,
+            dockHeight: 56,
+            dockSymbolPointSize: 18
         )
 
         static let desktop = Traits(
@@ -61,11 +77,21 @@ struct VocelloPrimaryCTAButton: View {
             compactHorizontalPadding: 18,
             titleLineLimit: 1,
             glowsWhenDisabled: false,
-            hitTestsCapsule: true
+            hitTestsCapsule: true,
+            dockHeight: 48,
+            dockSymbolPointSize: 16
         )
 
         func horizontalPadding(for size: Size) -> CGFloat {
             size == .dock ? dockHorizontalPadding : compactHorizontalPadding
+        }
+
+        func height(for size: Size) -> CGFloat {
+            size == .dock ? dockHeight : Size.compactHeight
+        }
+
+        func symbolPointSize(for size: Size) -> CGFloat {
+            size == .dock ? dockSymbolPointSize : Size.compactSymbolPointSize
         }
     }
 
@@ -158,7 +184,7 @@ struct VocelloPrimaryCTAButton: View {
         HStack(alignment: .center, spacing: VocelloTheme.Spacing.sm) {
             if let symbol {
                 Image(systemName: symbol)
-                    .font(.system(size: size.symbolPointSize, weight: .semibold))
+                    .font(.system(size: traits.symbolPointSize(for: size), weight: .semibold))
                     .symbolRenderingMode(.hierarchical)
                     // White glyph, matching the label so icon + text read as one unit.
                     .foregroundStyle(foregroundInk)
@@ -171,7 +197,7 @@ struct VocelloPrimaryCTAButton: View {
         }
         .padding(.horizontal, traits.horizontalPadding(for: size))
         .frame(maxWidth: size.spansWidth ? .infinity : nil)
-        .frame(height: size.height)
+        .frame(height: traits.height(for: size))
         .overlay(alignment: .trailing) {
             if size == .dock, let shortcutHint {
                 Text(verbatim: shortcutHint)

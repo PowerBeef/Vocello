@@ -1,16 +1,22 @@
 import SwiftUI
 
-/// The macOS half of the shared type vocabulary: six sizes, thirteen roles,
-/// each role appearing exactly once.
+/// The macOS half of the shared type vocabulary: five sizes, thirteen roles.
 ///
 /// | pt | role |
 /// |----|------|
-/// | 22 | script |
-/// | 17 | sheetTitle |
+/// | 17 | script, sheetTitle |
 /// | 15 | screenTitle |
 /// | 13 | rowTitle, body, buttonLabel, chipLabel |
 /// | 12 | rowMeta |
 /// | 11 | caption, captionEmphasis, badge, counter, eyebrow |
+///
+/// The script used to have a 22 pt step to itself, inherited from the largest
+/// size the app happened to use before this table existed rather than chosen.
+/// Beside a 13 pt sidebar it read as a different application, so it joins
+/// `sheetTitle` at 17: four points above body, still the largest thing on the
+/// screen, no longer shouting. Roles sharing a size is how this table already
+/// works -- thirteen roles have never needed thirteen sizes -- and what
+/// separates two roles at one size is weight, tracking and their anchor.
 ///
 /// Sizes are stated in points rather than taken from SwiftUI's semantic styles
 /// because the semantic names lie on macOS: `.caption`, `.caption2` and
@@ -21,8 +27,10 @@ enum MacType {
     static func style(_ role: VocelloTypeRole) -> VocelloTextStyle {
         switch role {
         case .script:
-            // The hero. Negative tracking keeps a 22 pt line from feeling airy.
-            VocelloTextStyle(size: 22, weight: .medium, tracking: -0.22, relativeTo: .title)
+            // The hero, and the only role whose size is set by how the text
+            // reads rather than by what it labels. The tracking is the phone's
+            // -0.01em carried across: -0.22 at 22 pt, -0.17 here.
+            VocelloTextStyle(size: 17, weight: .medium, tracking: -0.17, relativeTo: .title)
         case .sheetTitle:
             VocelloTextStyle(size: 17, weight: .semibold, relativeTo: .title2)
         case .screenTitle:

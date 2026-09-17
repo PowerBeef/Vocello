@@ -3,13 +3,22 @@ import CoreGraphics
 /// Window and shell geometry in one place: the desktop counterpart of the
 /// iOS safe-area and dock constants.
 enum MacShellMetrics {
-    /// Wide enough that the Studio column reaches its cap and the setup chips
-    /// stay on one row for the common four-chip case. The old 720 forced the
-    /// chip row to wrap and truncated the reference chip -- the one chip
-    /// carrying a name the user chose -- at the width the app opened smallest.
-    static let windowMinSize = CGSize(width: 880, height: 560)
+    /// Wide enough that the setup chips stay on one row for the common
+    /// four-chip case, which is the only thing this number has ever encoded:
+    /// sidebar, two gutters, and four chips at their floor. The old 720 forced
+    /// the row to wrap and truncated the reference chip -- the one chip
+    /// carrying a name the user chose.
+    ///
+    /// 880 was that arithmetic when a chip reserved 132 pt and the row stretched
+    /// to fill whatever it was given. Chips are sized to their content now and
+    /// floored at 116, so four of them plus their gaps come to 488 rather than
+    /// 552 and the same rule lands 100 pt lower.
+    static let windowMinSize = CGSize(width: 780, height: 560)
     /// Opens with room for all five chips on one row, which is the case an
-    /// emotion-bank voice produces; it shrinks to the minimum from here.
+    /// emotion-bank voice produces, and with a working amount of canvas above
+    /// them; it shrinks to the minimum from here. Wider than the chip row
+    /// strictly needs, which is the point -- the minimum is the constraint, the
+    /// default is a judgement about a comfortable size to start at.
     static let windowDefaultSize = CGSize(width: 1040, height: 680)
     static let diagnosticsMinSize = CGSize(width: 520, height: 420)
     static let settingsWindowMinSize = CGSize(width: 600, height: 520)
@@ -41,7 +50,12 @@ enum MacShellMetrics {
     static let emptyStateCardMaxWidth: CGFloat = 480
 
     static let sidebarInset: CGFloat = VocelloTheme.Spacing.md
-    /// The sidebar row is the shared row step; its glyph tile the icon step.
+    /// The sidebar row is the shared row step — the same step a Studio chip
+    /// sits on, so the two halves of the window are one control size.
     static let sidebarRowMinHeight: CGFloat = MacControl.row.height
-    static let sidebarGlyphTile: CGFloat = MacControl.icon.height
+    /// Width of the glyph column. It is a column, not a tile: the glyphs are
+    /// bare and this only aligns them, because SF Symbols have different
+    /// intrinsic widths and a ragged icon edge down a sidebar is worse than
+    /// any of them being a point off centre.
+    static let sidebarGlyphColumn: CGFloat = MacControl.icon.height
 }

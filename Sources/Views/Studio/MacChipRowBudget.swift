@@ -10,7 +10,16 @@ enum MacChipRowMetrics {
     /// chevron and the padding take their share. `VocelloSetupChipPill` enforces
     /// it with `.frame(minWidth:)`, which is why the layout must respect it: a
     /// chip handed less does not shrink, it overflows.
-    static let minimumChipWidth: CGFloat = 132
+    ///
+    /// It is also the only thing `MacShellMetrics.windowMinSize.width` encodes:
+    /// a sidebar, two gutters and four of these. 132 was the floor when the
+    /// leading glyph was 18 pt; the glyph follows its control at 14 now, so the
+    /// same argument lands at 116 and the window can be 100 pt narrower.
+    ///
+    /// Only the floor. Above it a chip takes whatever share of the row it is
+    /// given, which is what keeps the chip row and the Generate button the same
+    /// width at every window size.
+    static let minimumChipWidth: CGFloat = 116
 
     /// How many chips share one row at this width. Every row uses the same
     /// count so a trailing row lines up under the row above.

@@ -9,15 +9,18 @@ import SwiftUI
 /// lanes' `delivery_tonePicker` and the other picker identifiers stay on the
 /// trigger and its rows stay real menu items.
 enum MacStudioChipMetrics {
-    /// The iOS pill height (`IOSSetupChipPill`), which is the app's `pill`
-    /// control step. The chips share the row equally and span exactly the
-    /// Generate button's width, so a chip never hugs its label and the row
-    /// never wraps at a usual window size.
+    /// The app's `pill` control step, which is also the sidebar row's step: a
+    /// chip and a destination row are the same size, so the two halves of the
+    /// window read at one density.
     static let pillHeight: CGFloat = MacControl.pill.height
     /// The floor below which `MacChipFlow` wraps the row. Sized so the value
     /// still reads after the glyph, the chevron and the padding take their
     /// share: below this a four-chip row on a 720 pt window truncated
     /// "Aiden" to "Aid…".
+    ///
+    /// Every chip in the row is one width -- the widest chip's content, floored
+    /// here and capped at `maximumChipWidth`. They no longer stretch to fill the
+    /// column, so the row is as wide as the chips are and the rest is margin.
     static let minWidth: CGFloat = MacChipRowMetrics.minimumChipWidth
 }
 
@@ -112,6 +115,7 @@ struct MacStudioSetupChipPill: View {
             height: MacStudioChipMetrics.pillHeight,
             horizontalPadding: MacControl.pill.horizontalPadding,
             minWidth: MacStudioChipMetrics.minWidth,
+            glyphPointSize: MacControl.pill.glyph,
             showsChevron: showsChevron,
             reduceTransparency: reduceTransparency
         ) {

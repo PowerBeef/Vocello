@@ -1,17 +1,17 @@
 import SwiftUI
 import XCTest
 
-/// The scale is a claim about relationships — six sizes, thirteen roles, no
-/// role rendered twice — and that claim is otherwise enforced only by reading
-/// the table. These tests hold the shape of it, so a role added later has to
-/// land on a step rather than inventing one.
+/// The scale is a claim about relationships — five sizes, thirteen roles, no
+/// two roles rendered identically — and that claim is otherwise enforced only
+/// by reading the table. These tests hold the shape of it, so a role added
+/// later has to land on a step rather than inventing one.
 @MainActor
 final class MacTypeScaleTests: XCTestCase {
-    func testTheLadderHasSixSteps() {
+    func testTheLadderHasFiveSteps() {
         let sizes = Set(VocelloTypeRole.allCases.map { MacType.style($0).size })
         XCTAssertEqual(
-            sizes.sorted(), [11, 12, 13, 15, 17, 22],
-            "The macOS ladder is six steps; a new size means a new rung, which is how the app reached 38 styles for 13 roles."
+            sizes.sorted(), [11, 12, 13, 15, 17],
+            "The macOS ladder is five steps; a new size means a new rung, which is how the app reached 38 styles for 13 roles."
         )
     }
 
@@ -71,9 +71,15 @@ final class MacTypeScaleTests: XCTestCase {
         )
     }
 
-    func testControlLadderHasSixStepsAndGlyphsFollowTheirControl() {
+    /// Six cases, five distinct heights: `.pill` and `.row` deliberately share
+    /// 40 pt, so a Studio chip and a sidebar row are the same size and the two
+    /// halves of the window read at one density. They stay separate cases
+    /// because they carry different glyphs and shapes, which is the same
+    /// reason four type roles share 13 pt.
+    func testControlLadderIsOrderedAndGlyphsFollowTheirControl() {
         let heights = MacControl.allCases.map(\.height)
-        XCTAssertEqual(heights.sorted(), [24, 28, 36, 40, 46, 56])
+        XCTAssertEqual(heights.sorted(), [24, 28, 36, 40, 40, 48])
+        XCTAssertEqual(MacControl.pill.height, MacControl.row.height)
         for control in MacControl.allCases {
             let ratio = control.glyph / control.height
             XCTAssertTrue(

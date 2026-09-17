@@ -34,7 +34,7 @@ top of the sidebar, **Studio** and **Library** sections plus Settings as rows wi
 glyph tiles (`sidebarSection_generate`, `sidebarSection_library`), the selected row a tint-glass
 pill, a mode whose model is missing dimmed with an "Install in Settings" caption, and the inline
 player card and engine status strip pinned in the sidebar footer. Dark-only. Window minimum
-720×560, default 880×640 (`MacShellMetrics`).
+780×560, default 1040×680 (`MacShellMetrics`).
 
 | Sidebar | Identifier | Shortcut |
 |---------|------------|----------|
@@ -68,19 +68,21 @@ Tests assert these visible production surfaces directly.
 ### Studio composition
 
 The three Studio screens are one canvas (`MacStudioCanvas`) arranged for a desktop: the composer
-on top, taking every point the rest of the column does not (a six-line floor, scrolling past its
+on top, taking every point the rest of the column does not (a six-line floor at the 17 pt face, and a measure capped at 600 pt so the line length does not run with the column, scrolling past its
 height), then the meta line (mode, readiness, Clear, counter) flush below it, one row of setup
 chips, and the dock. Nothing trails the dock: the script is the flexible element, so a taller
 window grows the writing surface rather than the space under the button. The dock holds the full-width Generate button with
 the square Batch button (`textInput_batchButton`) at its right end, the generating bar, the error bar
-that retries when clicked, or the player card, and never falls below 64 pt. The column caps at
+that retries when clicked, or the player card, and never falls below 56 pt. The column caps at
 780 pt. One mode-tinted wash (`VocelloModeBackdrop`, shared with iOS) is painted behind the whole
 window by `ContentView`, tinted by the selected destination, and the title bar is transparent over
 it with no visible title. There is no title row — the sidebar names the mode, as the phone's capsule
 does — so the desktop's Speed/Quality switch (`<prefix>_speedVariantButton`,
-`<prefix>_qualityVariantButton`, `<prefix>_heavyBadge`) lives in the window toolbar. Below roughly
-the window's 880 pt minimum the four ordinary setup chips stay on one row; a fifth (an
-emotion-bank delivery) or a sixth (a pinned seed) wraps below about 1040 pt rather than squeezing.
+`<prefix>_qualityVariantButton`, `<prefix>_heavyBadge`) lives in the window toolbar. Setup chips share the row and span
+exactly the Generate button's width; a 116 pt floor is the only bound, and below it the row wraps.
+Four ordinary chips stay on one row at the window's 780 pt minimum, which is the arithmetic that
+minimum encodes; a fifth (an emotion-bank delivery) or a sixth (a pinned seed) wraps rather than
+squeezing.
 
 ### Built-in Voice (`sidebar_customVoice` → `screen_customVoice`)
 

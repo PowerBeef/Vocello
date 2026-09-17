@@ -18,6 +18,12 @@ struct VocelloSetupChipPill<Label: View>: View {
     let height: CGFloat
     let horizontalPadding: CGFloat
     let minWidth: CGFloat?
+    /// Point size of the leading symbol. It travels with the pill's height
+    /// rather than being fixed, because a glyph that stays put while its
+    /// container shrinks stops reading as part of the control and starts
+    /// reading as something dropped into it. 18 is the phone's, and the phone
+    /// keeps it by taking the default.
+    let glyphPointSize: CGFloat
     let showsChevron: Bool
     let reduceTransparency: Bool
     let label: Label
@@ -28,6 +34,7 @@ struct VocelloSetupChipPill<Label: View>: View {
         height: CGFloat,
         horizontalPadding: CGFloat = 0,
         minWidth: CGFloat? = nil,
+        glyphPointSize: CGFloat = 18,
         showsChevron: Bool = true,
         reduceTransparency: Bool,
         @ViewBuilder label: () -> Label
@@ -37,6 +44,7 @@ struct VocelloSetupChipPill<Label: View>: View {
         self.height = height
         self.horizontalPadding = horizontalPadding
         self.minWidth = minWidth
+        self.glyphPointSize = glyphPointSize
         self.showsChevron = showsChevron
         self.reduceTransparency = reduceTransparency
         self.label = label()
@@ -45,7 +53,7 @@ struct VocelloSetupChipPill<Label: View>: View {
     var body: some View {
         HStack(spacing: VocelloTheme.Spacing.tight) {
             Image(systemName: symbol)
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: glyphPointSize, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(VocelloTheme.Text.primary)
             label

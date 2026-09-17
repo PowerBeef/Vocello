@@ -27,11 +27,11 @@ final class MacChipFlowTests: XCTestCase {
     func testARowNeverReceivesMoreWidthThanItHas() {
         let rowWidth: CGFloat = 740
         let cases: [[CGFloat]] = [
-            [166, 134, 135, 137, 135],          // the five real Studio chips
-            [166, 0, 135, 137, 135],            // an empty chip: the seed pin with no seed
+            [150, 118, 119, 121, 119],          // the five real Studio chips, at the 14 pt glyph
+            [150, 0, 119, 121, 119],            // an empty chip: the seed pin with no seed
             [10, 10, 10, 10, 10],               // every chip below the floor
             [400, 10, 10],                      // one long saved-voice name
-            [132, 132, 132, 132, 132],          // everything exactly on the floor
+            [116, 116, 116, 116, 116],          // everything exactly on the floor
         ]
 
         for ideals in cases {
@@ -55,8 +55,8 @@ final class MacChipFlowTests: XCTestCase {
     /// carries `.frame(minWidth:)`, so a chip handed less simply renders wider
     /// than it was told and draws outside the row.
     func testNoChipIsEverPlacedBelowTheMinimum() {
-        let budget = budget([0, 10, 131, 400], perRow: 4, rowWidth: 740)
-        for ideal in [CGFloat(0), 10, 131, 400] {
+        let budget = budget([0, 10, 115, 400], perRow: 4, rowWidth: 740)
+        for ideal in [CGFloat(0), 10, 115, 400] {
             XCTAssertGreaterThanOrEqual(budget.width(forIdeal: max(ideal, minimum)), minimum)
         }
     }
@@ -64,9 +64,9 @@ final class MacChipFlowTests: XCTestCase {
     /// The reason the natural-width branch exists: a long label keeps its
     /// width instead of being averaged away by short neighbours.
     func testALongLabelKeepsItsWidthWhenTheRowCanAffordIt() {
-        let budget = budget([300, 132, 132], perRow: 3, rowWidth: 740)
+        let budget = budget([300, 116, 116], perRow: 3, rowWidth: 740)
         XCTAssertTrue(budget.honorsIdealWidths)
-        XCTAssertGreaterThan(budget.width(forIdeal: 300), budget.width(forIdeal: 132))
+        XCTAssertGreaterThan(budget.width(forIdeal: 300), budget.width(forIdeal: 116))
     }
 
     /// And the reason it has a fallback: when the naturals cannot fit, equal

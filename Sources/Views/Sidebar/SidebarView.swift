@@ -32,18 +32,25 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
-        // The column's own material would sit over any window background,
-        // so the sidebar paints its slice of the window-wide mode wash.
-        .background {
-            MacModeBackdrop(tint: MacTheme.tint(for: selection ?? .customVoice), column: .sidebar)
-                .ignoresSafeArea()
-                .appAnimation(MacTheme.Motion.modeCrossfade, value: selection)
-        }
         .safeAreaInset(edge: .top, spacing: 0) {
             MacSidebarBrandHeader()
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             SidebarFooterRegion()
+        }
+        // The column's own material would sit over any window background, so
+        // the sidebar paints its slice of the window-wide mode wash.
+        //
+        // After the insets, not before them. Attached to the List it was
+        // painted behind the List alone, and the brand header and the footer
+        // are safe-area insets that sit outside it — so the slice began below
+        // the lockup while the detail column's began at the window's top edge.
+        // Two halves of one gradient, one of them starting sixty points lower:
+        // the seam that made the panels look like different surfaces.
+        .background {
+            MacModeBackdrop(tint: MacTheme.tint(for: selection ?? .customVoice), column: .sidebar)
+                .ignoresSafeArea()
+                .appAnimation(MacTheme.Motion.modeCrossfade, value: selection)
         }
     }
 
@@ -127,8 +134,11 @@ private struct MacSidebarRow: View {
     let isDisabled: Bool
     @State private var isHovered = false
 
-    @ScaledMetric(relativeTo: .body) private var glyphSize: CGFloat = MacControl.icon.glyph
-    @ScaledMetric(relativeTo: .body) private var tileSize: CGFloat = MacShellMetrics.sidebarGlyphTile
+    /// The chip's glyph size, not the icon step's. A sidebar row and a Studio
+    /// chip are the same 40 pt control with the same 13 pt label, so their
+    /// glyphs are the same too.
+    @ScaledMetric(relativeTo: .body) private var glyphSize: CGFloat = MacControl.pill.glyph
+    @ScaledMetric(relativeTo: .body) private var glyphColumnWidth: CGFloat = MacShellMetrics.sidebarGlyphColumn
 
     private var isSelected: Bool { selection == item }
     private var tint: Color { MacTheme.tint(for: item) }
@@ -140,13 +150,24 @@ private struct MacSidebarRow: View {
             selection = item
         } label: {
             HStack(spacing: MacTheme.Spacing.snug) {
-                glyphTile
+                glyphColumn
 
                 VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {
                     Text(item.title)
-                        // The role sets the size; selection still sets the weight,
-                // which is how a selected destination reads as selected.
-                .font(.system(size: MacType.style(.rowTitle).size, weight: isSelected ? .semibold : .medium))
+                        // The same step and weight as a Studio chip's label,
+                        // which is the point: these rows and those chips are
+                        // the two halves of the window and they are now the
+                        // same control drawn at the same size. 15 pt was tried
+                        // and was too much -- the panel stopped reading as
+                        // navigation and started competing with the canvas.
+                        //
+                        // It used to set its own font so selection could carry
+                        // a weight change. Selection already changes the row's
+                        // pill and the glyph's colour; weight was a third
+                        // signal doing the least work, and paying for it meant
+                        // every unselected row sat a step lighter than
+                        // everything else on screen.
+                        .macType(.rowTitle)
                         .foregroundStyle(MacTheme.Text.primary)
                         .lineLimit(1)
 
@@ -189,19 +210,24 @@ private struct MacSidebarRow: View {
         .accessibilityIdentifier(item.accessibilityID)
     }
 
-    private var glyphTile: some View {
-        let shape = VocelloShape.chip()
-        return Image(systemName: item.iconName)
+    /// The glyph, at the size and strength a Studio chip's glyph has, in a
+    /// fixed column so the icons line up down the panel.
+    ///
+    /// It used to sit in a filled, stroked tile. That tile was the one thing in
+    /// the sidebar with no counterpart anywhere in the Studio -- a container
+    /// inside a row, which on a selected row meant a tinted tile inside a
+    /// tinted pill, two rounded shapes at two radii saying the same thing. The
+    /// frame stays because it is what aligns icons of different intrinsic
+    /// widths; only the chrome goes.
+    private var glyphColumn: some View {
+        Image(systemName: item.iconName)
             .font(.system(size: glyphSize, weight: .semibold))
-            .foregroundStyle(isSelected ? tint : MacTheme.Text.secondary)
-            .frame(width: tileSize, height: tileSize)
-            .background { shape.fill(isSelected ? tint.opacity(0.16) : Color.white.opacity(0.05)) }
-            .overlay {
-                shape.stroke(
-                    isSelected ? tint.opacity(0.32) : Color.white.opacity(0.06),
-                    lineWidth: VocelloTheme.Stroke.hairline
-                )
-            }
+            // Full strength when unselected, not secondary: dimmed as well as
+            // small left the icons reading as decoration beside a chip whose
+            // own glyph is at full strength. The tint still marks the selected
+            // one, as it does on the chip.
+            .foregroundStyle(isSelected ? tint : MacTheme.Text.primary)
+            .frame(width: glyphColumnWidth, height: glyphColumnWidth)
             .accessibilityHidden(true)
     }
 

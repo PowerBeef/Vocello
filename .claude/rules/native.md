@@ -16,8 +16,9 @@ References, read only what the change needs: `docs/reference/mlx-guide.md`,
 `docs/reference/macos-app-guide.md`, `docs/reference/ios-app-guide.md`,
 `docs/reference/localization.md`, `docs/reference/delivery-harness.md`, `docs/ARCHITECTURE.md`.
 Verification: `scripts/dev.sh test` (macOS unit and owned-runtime tests), `scripts/dev.sh ios`
-(generic device-SDK compile). The XCUITest bundles compile only in `scripts/ui_test.sh` or an explicit
-`xcodebuild build-for-testing`, so compile them after touching `Tests/*UITests`. Physical-device and macOS
+(generic device-SDK compile). `dev.sh check` compiles the XCUITest bundles for you
+(`scripts/build_ui_test_bundles.sh`, build only) whenever the dirty tree touches `Tests/*UITests`,
+`Tests/UIAutomationSupport` or `project.yml`; nothing in CI compiles them. Physical-device and macOS
 XCUITest lanes only when explicitly requested.
 
 ## Engine and runtime (owned package `Packages/VocelloQwen3Core`, `Sources/QwenVoiceCore`)
@@ -91,9 +92,13 @@ XCUITest lanes only when explicitly requested.
   script is the flexible element, as `IOSStudioCanvas` states for the phone, and no card or border
   around it. One `VocelloModeBackdrop` wash behind the whole window from `ContentView`, transparent
   title bar. No title row (the sidebar names the mode); the Speed/Quality switch is window-toolbar
-  chrome. Numbers that must not drift: column 780 pt, chip pill 46 pt, CTA and Batch 56 pt, dock
-  floor 64 pt, composer 22 pt at −0.22 tracking with a 176 pt floor, 20 pt gutters, window minimum
-  880×560 and default 1040×680. A completed take is a result row (identity plus Generate again, Save
+  chrome. Numbers that must not drift: column 780 pt, chip pill 40 pt tall with a 116 pt width floor,
+  CTA and Batch 48 pt, dock floor 56 pt, composer 17 pt at −0.17 tracking with a 140 pt floor capped
+  to a 600 pt measure, 20 pt gutters, window minimum 780×560 and default 1040×680. The chips share
+  the row and span exactly the Generate button's width, as on the phone; the floor is the only
+  bound, and it is what the window minimum encodes (a sidebar, two gutters and four chips). The chip
+  and the sidebar row are the same 40 pt step on purpose; the desktop CTA's height and symbol live
+  in `VocelloPrimaryCTAButton.Traits.desktop`, because the phone keeps 56/18. A completed take is a result row (identity plus Generate again, Save
   As, Reveal, Dismiss); playback lives in the sidebar player, never in both.
 - **Studio generation runs on the shared pipeline.** `StudioGenerationCoordinator` (owned by `MacAppModel`)
   holds the attempt-scoped terminal state, `IOSSingleTakeGenerationExecutor` runs the take through

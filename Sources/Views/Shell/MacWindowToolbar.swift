@@ -38,6 +38,16 @@ struct MacWindowToolbar: ToolbarContent {
             ToolbarItem(placement: .primaryAction) {
                 MacStudioToolbarControls(mode: mode, accessibilityPrefix: prefix)
             }
+            // The one toolbar item that brings its own container. macOS gives a
+            // toolbar item a glass background of its own, which is right for
+            // the History and Saved Voices items -- those are bare glyph
+            // buttons and the glass is what makes them look like controls --
+            // and wrong for a segmented switch that already has a track. Nested,
+            // the two read as a chip dropped into a well: three rounded shapes
+            // at three radii, the innermost inset from a container whose own
+            // radius we do not know. The app's title bar is transparent by
+            // decision; this keeps the control on it rather than on a slab.
+            .sharedBackgroundVisibility(.hidden)
         }
     }
 }

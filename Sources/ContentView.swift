@@ -107,6 +107,22 @@ struct ContentView: View {
                 selection: sidebarSelectionBinding,
                 disabledItems: disabledSidebarItems
             )
+            // One hairline where the columns meet. The wash runs across both
+            // of them without a seam, which is the point of painting it once --
+            // and it left the two panels floating in the same field with
+            // nothing saying where navigation ends and the canvas begins. The
+            // same token and width the History and Settings rows use for their
+            // own separators, so the app has one idea of what a dividing line
+            // looks like. It ignores the safe area so it runs the full height
+            // of the window, under a title bar that is deliberately
+            // transparent.
+            .overlay(alignment: .trailing) {
+                Rectangle()
+                    .fill(MacTheme.Surface.hairline)
+                    .frame(width: VocelloTheme.Stroke.hairline)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
             .navigationSplitViewColumnWidth(
                 min: MacShellMetrics.sidebarMinWidth,
                 ideal: MacShellMetrics.sidebarIdealWidth,

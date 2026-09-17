@@ -28,7 +28,7 @@ enum VocelloUIWindowFrame {
     /// the link.
     enum Width {
         /// `MacShellMetrics.windowMinSize.width` — the narrowest the app goes.
-        static let minimum: CGFloat = 880
+        static let minimum: CGFloat = 780
         /// `MacShellMetrics.windowDefaultSize.width` — where it opens, and the
         /// width at which all five Studio setup chips sit on one row.
         static let standard: CGFloat = 1040

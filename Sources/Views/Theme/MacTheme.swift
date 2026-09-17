@@ -100,6 +100,18 @@ enum MacTheme {
 /// of one window-sized surface: the phone's recipe untouched at the window's
 /// size, shifted by the column's origin and clipped to the column, so the two
 /// slices compose into one. Reduce Transparency is macOS's own environment key.
+///
+/// `compositingGroup` is what makes the two slices look alike, and it is not
+/// an optimisation. The wash is a canvas fill with a radial tint blended over
+/// it in `.plusLighter`, and a `ZStack` is not a compositing group -- so that
+/// blend resolved not against the canvas inside the stack but against whatever
+/// backed the stack in the window. Behind the detail column that is an opaque
+/// surface, and the tint added light as intended; behind the sidebar it is the
+/// split view's own vibrancy material, against which plus-lighter contributes
+/// nothing. The sidebar was not drawing a dimmer wash, or one in the wrong
+/// place. It was drawing the canvas and then adding zero to it. Grouping makes
+/// the fill and the tint composite with each other first, so both columns
+/// produce the same pixels before either meets its own backing.
 struct MacModeBackdrop: View {
     enum Column {
         case sidebar
@@ -119,12 +131,14 @@ struct MacModeBackdrop: View {
                 let originX: CGFloat = column == .sidebar ? 0 : windowSize.width - proxy.size.width
                 let surfaceHeight = max(windowSize.height, proxy.size.height)
                 VocelloModeBackdrop(tint: tint, intensity: intensity, reduceTransparency: reduceTransparency)
+                    .compositingGroup()
                     .frame(width: windowSize.width, height: surfaceHeight)
                     .offset(x: -originX)
                     .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
                     .clipped()
             } else {
                 VocelloModeBackdrop(tint: tint, intensity: intensity, reduceTransparency: reduceTransparency)
+                    .compositingGroup()
             }
         }
     }

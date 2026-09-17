@@ -108,13 +108,23 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
             navigate(to: screen)
         }
         assertVisibleSpeedModelReadiness()
+        ensureCloneConsentEnabled()
+        assertSavedCloneVoice()
+
+        // One pin for the whole walk, and it comes after the steps that scroll
+        // and click: interaction happens at the size the scene restored to,
+        // measurement at the size the app declares as its smallest. Doubled
+        // strings at the minimum window is the combination that produces the
+        // defects -- a chip row overflowing, a meta row stacking "Clear" into
+        // single letters -- and until now nothing ran there.
+        pinToNarrowestWindow()
+
         // Under the doubled strings every row, chip and badge must still be a
         // single legible line with its controls inside the window (the 2026-09-13
         // collapse in Saved Voices was visible only in the screenshot).
         assertSettingsPackageRowsLayoutIntact()
-        ensureCloneConsentEnabled()
-        assertSavedCloneVoice()
         assertSavedVoicesLayoutIntact()
+        assertStudioDockFitsAtMinimumWindow()
         VocelloUIScreenshot.attach(app, named: "mac-smoke-readiness-pseudolocalized")
     }
 
@@ -150,8 +160,21 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         }
         VocelloUIScreenshot.attach(app, named: "mac-smoke-custom-complete")
 
+        // The tallest the Studio column ever gets: a finished take turns the
+        // dock's CTA into a player card, and that is the state in which the
+        // column was measured needing ~603-633 pt against a 560 pt minimum.
+        // Generation is over by here, so the pin perturbs no timing.
+        pinToNarrowestWindow()
+        VocelloUILayoutAssert.assertFullyWithinWindow(
+            button("textInput_generateButton"), of: app
+        )
+
         // The completed take must be visible in History exactly once.
         assertHistoryRows(matching: nonce, expected: 1)
+        // And it must be laid out. The nonce is what makes this measurable at
+        // all: filtered to one known row, the geometry is bounded and the pass
+        // cannot be vacuous, which is not true of History at rest.
+        assertHistoryRowsLayoutIntact(filteredTo: nonce)
         VocelloUIScreenshot.attach(app, named: "mac-smoke-history-completed")
     }
 

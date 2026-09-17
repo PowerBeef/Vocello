@@ -281,6 +281,157 @@ class VocelloMacUITestCase: XCTestCase {
         }
     }
 
+    /// Layout assertions belong at the size where layout fails. They used to run
+    /// at whatever size the scene restored to, which is why every narrow-window
+    /// defect of the UI-fidelity plan was found by eye and none by a test.
+    ///
+    /// Call this once per journey, not once per assertion: on an untrusted
+    /// runner each call is two edge drags worth roughly a minute, and three
+    /// separately-pinned assertions buy nothing a single pin does not.
+    ///
+    /// Returns the frame actually reached, which on a machine that cannot size
+    /// the window is not the one asked for. Every assertion below it is true at
+    /// whatever size it got; the activity records which size that was, so a
+    /// reader can tell a run that measured the minimum from one that did not.
+    @discardableResult
+    func pinToNarrowestWindow() -> CGRect {
+        let frame = VocelloUIWindowFrame.require(
+            app,
+            width: VocelloUIWindowFrame.Width.minimum,
+            height: VocelloUIWindowFrame.Height.minimum
+        )
+        let reached = abs(frame.width - VocelloUIWindowFrame.Width.minimum) <= 6
+            && abs(frame.height - VocelloUIWindowFrame.Height.minimum) <= 6
+        let verdict = reached
+            ? "reached"
+            : "NOT reached (\(VocelloUIWindowFrame.shrinkDiagnosis(app, from: frame)))"
+        XCTContext.runActivity(
+            named: "Window pinned to \(Int(frame.width))x\(Int(frame.height)) pt; "
+                + "declared minimum is \(Int(VocelloUIWindowFrame.Width.minimum))x"
+                + "\(Int(VocelloUIWindowFrame.Height.minimum)) — \(verdict)"
+        ) { _ in }
+        return frame
+    }
+
+    /// Nothing in the Studio column scrolls. The composer flexes and everything
+    /// under it — the chip rows, the mode footer, the dock — is fixed, so when
+    /// the column needs more height than the window has, the dock is what falls
+    /// off the bottom, and a control off the bottom of a column that does not
+    /// scroll is not below the fold, it is gone.
+    ///
+    /// An audit found exactly that: at the 560 pt height the app declares as its
+    /// minimum, Voice Design's column needs about 633 pt and Voice Cloning about
+    /// 603 once a take has finished. Nothing caught it because no assertion had
+    /// ever measured the dock, and none had ever run at the minimum.
+    func assertStudioDockFitsAtMinimumWindow() {
+        for screen in [VocelloMacScreen.customVoice, .voiceDesign, .voiceCloning] {
+            navigate(to: screen)
+            VocelloUILayoutAssert.assertFullyWithinWindow(
+                button("textInput_generateButton"), of: app
+            )
+        }
+    }
+
+    /// History's first geometry assertion. It had none of any kind — and
+    /// `assertHistoryRows` counts rows, it does not measure them — so the
+    /// densest surface in the app, the one whose metadata line carries four
+    /// facts on one line, was the only library screen nothing watched.
+    ///
+    /// The row title is allowed two lines; the metadata beneath it is not,
+    /// because that is where the duration lives and a wrapped date pushes it
+    /// out of view.
+    ///
+    /// It measures a **filtered** History, and the filter is not a convenience:
+    /// History renders every generation the machine has ever produced, and each
+    /// `MacHistoryItemCard` carries `.accessibilityElement(children: .contain)`,
+    /// so the card's identifier reaches every child and the accessibility tree
+    /// is a large multiple of a row count that only ever grows. The first
+    /// version of this walked that tree with `descendants(matching: .any)` and
+    /// hung a lane for eighty-two minutes; the second used a typed query and
+    /// still timed out resolving it, because the tree, not the predicate, is
+    /// what is unbounded. `assertHistoryRows` has always filtered first, and
+    /// this is the same discipline: narrow the list, then measure it.
+    ///
+    /// (That History loads and renders an unbounded row set is a product
+    /// finding, not a test one. It is recorded against the History persistence
+    /// work rather than worked around further here.)
+    func assertHistoryRowsLayoutIntact(filteredTo text: String) {
+        navigate(to: .history)
+        let search = element("history_searchField", type: .searchField)
+        XCTAssertTrue(VocelloUITextEntry.replace(in: search, with: text, timeout: 20))
+        XCTAssertTrue(
+            VocelloUIWait.value(search, contains: text, timeout: 10),
+            "typed history filter text must land in the search field"
+        )
+
+        let playButtons = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "historyRow_play_")
+        )
+        // Rows load asynchronously after `screen_history` exists, so an
+        // immediate query measures an empty list. A non-failing wait, because
+        // a filter that matches nothing is a legitimate state, not a layout
+        // failure.
+        _ = VocelloUIWait.settles("History rows to load", timeout: 20) {
+            playButtons.firstMatch.exists
+        }
+
+        let window = app.windows.firstMatch.frame
+        // Only the rows on screen. History scrolls, so a row below the fold is
+        // a legitimate state and its geometry is not meaningful to measure.
+        let visibleRowIDs = playButtons.allElementsBoundByIndex
+            .filter { $0.frame.intersects(window) }
+            .map(\.identifier)
+            .filter { $0.hasPrefix("historyRow_play_") }
+            .map { String($0.dropFirst("historyRow_play_".count)) }
+
+        var checked = 0
+        var unmeasured: [String] = []
+        for rowID in visibleRowIDs {
+            let texts = app.staticTexts
+                .matching(NSPredicate(format: "identifier == %@", "historyRow_\(rowID)"))
+                .allElementsBoundByIndex
+                .filter { $0.frame.intersects(window) }
+            guard let metadata = texts.max(by: { $0.frame.minY < $1.frame.minY }) else {
+                unmeasured.append(rowID)
+                continue
+            }
+            checked += 1
+
+            // The metadata line is `lineLimit(1)` at 12 pt: it must truncate
+            // under a doubled string, never wrap.
+            VocelloUILayoutAssert.assertSingleLine(metadata, maxHeight: 24, minWidth: 40)
+            // The title above it is `lineLimit(2)` at 13 pt.
+            for title in texts where title.frame.minY < metadata.frame.minY {
+                VocelloUILayoutAssert.assertSingleLine(title, maxHeight: 44, minWidth: 40)
+            }
+            for text in texts {
+                VocelloUILayoutAssert.assertWithinWindow(text, of: app)
+            }
+            for action in ["historyRow_play_\(rowID)", "historyRow_saveAs_\(rowID)"] {
+                let control = button(action)
+                if control.exists {
+                    VocelloUILayoutAssert.assertWithinWindow(control, of: app)
+                }
+            }
+        }
+
+        // An empty History is legitimate and must not fail. A visible row whose
+        // text this could not find is not: that is the vacuous pass this guards
+        // against, the failure mode that looks exactly like success. The
+        // identifier those texts are matched on is inherited from the card
+        // rather than declared on them, so it is precisely the kind of contract
+        // that can lapse without anyone editing this file.
+        XCTAssertTrue(
+            unmeasured.isEmpty,
+            "\(unmeasured.count) of \(visibleRowIDs.count) visible History row(s) exposed no "
+            + "measurable text: \(unmeasured). The row identifier no longer reaches the labels "
+            + "this assertion reads, so it is watching nothing."
+        )
+        XCTContext.runActivity(
+            named: "History rows measured: \(checked) of \(visibleRowIDs.count) visible"
+        ) { _ in }
+    }
+
     func prepare(mode: VocelloUIBenchMatrix.Mode) {
         switch mode {
         case .custom:

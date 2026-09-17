@@ -145,19 +145,33 @@ enum VocelloUIWindowFrame {
         line: UInt = #line
     ) -> CGRect {
         if let frame = set(app, width: width, height: height) {
-            XCTAssertEqual(
-                frame.width, width, accuracy: 1,
-                "Window settled at \(Int(frame.width)) pt, not the \(Int(width)) pt requested.",
+            // Never wider than requested, rather than exactly the width
+            // requested. Both callers are served by the weaker statement and
+            // the stronger one is false for one of them: `Width.wide` asks for
+            // 4000 pt precisely because no display has it, so an equality here
+            // would fail the moment this runner is granted Accessibility --
+            // an assertion that has never run and cannot hold. Shrinking to a
+            // minimum still cannot pass by doing nothing, because a window that
+            // stayed wide is wider than the width asked for.
+            XCTAssertLessThanOrEqual(
+                frame.width, width + 1,
+                "Window settled at \(Int(frame.width)) pt, wider than the \(Int(width)) pt requested.",
                 file: file, line: line
             )
             print("WINDOW_FRAME mechanism=\(Mechanism.accessibility.rawValue) "
-                + "requested=\(Int(width)) settled=\(Int(frame.width))x\(Int(frame.height))")
+                + "requested=\(Int(width))x\(Int(height)) "
+                + "settled=\(Int(frame.width))x\(Int(frame.height))")
             return frame
         }
 
-        let frame = drag(app, towardWidth: width)
+        // Both edges, because a window pinned only in width is not pinned to
+        // the minimum, and a height assertion run at whatever height the scene
+        // restored to would pass while measuring nothing.
+        _ = drag(app, edge: .right, toward: width)
+        let frame = drag(app, edge: .bottom, toward: height)
         print("WINDOW_FRAME mechanism=\(Mechanism.edgeDrag.rawValue) "
-            + "requested=\(Int(width)) settled=\(Int(frame.width))x\(Int(frame.height))")
+            + "requested=\(Int(width))x\(Int(height)) "
+            + "settled=\(Int(frame.width))x\(Int(frame.height))")
         guard frame.width > 0 else {
             VocelloUIFailureEvidence.capture(reason: "window frame could not be sized")
             XCTFail(
@@ -170,22 +184,62 @@ enum VocelloUIWindowFrame {
         return frame
     }
 
-    /// Drags the window's right edge toward a width, measuring after every
-    /// attempt and stopping when it arrives or when dragging stops helping.
+    /// Which edge a drag grabs. The two are the same gesture on different
+    /// sides, and a window pinned to a minimum needs both: the column defects
+    /// this exists to catch are as much about height as about width.
+    enum Edge {
+        case right
+        case bottom
+
+        /// Normalized grab point: the edge's midpoint, never a corner.
+        var anchor: CGVector {
+            switch self {
+            case .right: CGVector(dx: 1.0, dy: 0.5)
+            case .bottom: CGVector(dx: 0.5, dy: 1.0)
+            }
+        }
+
+        /// One point inside the window, so the press lands on the resize
+        /// affordance rather than just past it on the desktop.
+        var inset: CGVector {
+            switch self {
+            case .right: CGVector(dx: -1, dy: 0)
+            case .bottom: CGVector(dx: 0, dy: -1)
+            }
+        }
+
+        func extent(of frame: CGRect) -> CGFloat {
+            switch self {
+            case .right: frame.width
+            case .bottom: frame.height
+            }
+        }
+
+        func displacement(_ delta: CGFloat) -> CGVector {
+            switch self {
+            case .right: CGVector(dx: delta, dy: 0)
+            case .bottom: CGVector(dx: 0, dy: delta)
+            }
+        }
+    }
+
+    /// Drags one window edge toward a size, measuring after every attempt and
+    /// stopping when it arrives or when dragging stops helping.
     ///
     /// The recipe is `VocelloMacPerfUITests.test08WindowResize`'s, including
     /// the two details that scenario needed a rewrite to find: the press goes
-    /// on the right edge's midpoint, because the bottom-right corner sits
-    /// inside the window's rounded corner on macOS 27 and lands on the desktop;
-    /// and the cursor is parked between attempts, because a press where the
-    /// previous drag released chains into a double-click that never resizes.
+    /// on the edge's midpoint, because a corner sits inside the window's
+    /// rounded corner on macOS 27 and lands on the desktop; and the cursor is
+    /// parked between attempts, because a press where the previous drag
+    /// released chains into a double-click that never resizes.
     ///
-    /// A width beyond the display clamps at the screen edge rather than
+    /// A size beyond the display clamps at the screen edge rather than
     /// failing, which is how `Width.wide` asks for "as wide as this screen
     /// allows" without hard-coding one machine's resolution.
     static func drag(
         _ app: XCUIApplication,
-        towardWidth target: CGFloat,
+        edge: Edge,
+        toward target: CGFloat,
         maxAttempts: Int = 12,
         tolerance: CGFloat = 6
     ) -> CGRect {
@@ -195,21 +249,21 @@ enum VocelloUIWindowFrame {
         var stalledDrags = 0
         for _ in 0 ..< maxAttempts {
             let before = window.frame
-            let delta = target - before.width
+            let delta = target - edge.extent(of: before)
             if abs(delta) <= tolerance { return before }
 
-            let edge = window
-                .coordinate(withNormalizedOffset: CGVector(dx: 1.0, dy: 0.5))
-                .withOffset(CGVector(dx: -1, dy: 0))
-            edge.click(forDuration: 0.3, thenDragTo: edge.withOffset(CGVector(dx: delta, dy: 0)))
+            let grab = window
+                .coordinate(withNormalizedOffset: edge.anchor)
+                .withOffset(edge.inset)
+            grab.click(forDuration: 0.3, thenDragTo: grab.withOffset(edge.displacement(delta)))
 
             // Wait on the window, not on the clock: the resize either lands or
             // the drag missed, and this says which as soon as it is true instead
             // of always paying for the slowest case. A miss is expected -- the
             // drag is nondeterministic -- so this uses the non-failing wait and
             // lets the loop below decide what a miss means.
-            _ = VocelloUIWait.settles("window width to change", timeout: 2) {
-                abs(window.frame.width - before.width) >= 1
+            _ = VocelloUIWait.settles("window size to change", timeout: 2) {
+                abs(edge.extent(of: window.frame) - edge.extent(of: before)) >= 1
             }
             // A press where the previous drag released chains into a
             // double-click, which never starts a resize. Parking needs no wait
@@ -217,18 +271,58 @@ enum VocelloUIWindowFrame {
             // iteration's frame query costs more latency than the cursor move.
             VocelloUICursor.park()
 
-            // Only a width change counts; a drag that merely moved the window
-            // must not read as progress.
-            if abs(window.frame.width - before.width) < 1 {
+            // Only a change on this edge's axis counts; a drag that merely
+            // moved the window must not read as progress.
+            if abs(edge.extent(of: window.frame) - edge.extent(of: before)) < 1 {
                 stalledDrags += 1
                 // Two misses in a row while growing means the screen edge, not
-                // a flaky press: that width is the widest this display has.
+                // a flaky press: that size is the largest this display has.
                 if stalledDrags >= 2 { break }
             } else {
                 stalledDrags = 0
             }
         }
         return window.frame
+    }
+
+    /// Why a window would not shrink to the size asked for. A drag that misses
+    /// the resize affordance and a window that has hit a real minimum look
+    /// identical from the outside -- both leave the frame unchanged -- and the
+    /// difference decides whether the fault is in this helper or in the app.
+    ///
+    /// So it asks the edge to move the other way. If the window grows, the
+    /// gesture works and the size it refused is the app's true floor, which is
+    /// a product fact worth reporting: `MacShellMetrics.windowMinSize` declares
+    /// one minimum and SwiftUI enforces whatever the content subtree actually
+    /// demands, which can be larger and is never written down. If it does not
+    /// grow either, the gesture is what failed.
+    ///
+    /// It puts the window back before returning, so a diagnosis never changes
+    /// the size the assertions after it run at.
+    static func shrinkDiagnosis(_ app: XCUIApplication, from frame: CGRect) -> String {
+        // Check the cheap explanation first. A window as tall as the screen
+        // allows has its bottom edge against the Dock, and a press meant for
+        // the resize affordance lands on the Dock instead -- so the edge cannot
+        // be grabbed however correct the gesture is. On the development Mac,
+        // whose logical screen is 1280x720, a window is about 690 pt tall the
+        // moment it is not deliberately made shorter, which is most of the time.
+        if let screen = NSScreen.screens.first {
+            let usableBottom = screen.frame.height - screen.visibleFrame.minY
+            if frame.maxY >= usableBottom - 4 {
+                return "the window's bottom edge is at the edge of the usable screen "
+                    + "(\(Int(frame.maxY)) of \(Int(usableBottom)) pt), so the resize affordance "
+                    + "is under the Dock and cannot be pressed; the window must be moved up first"
+            }
+        }
+
+        let grown = drag(app, edge: .bottom, toward: frame.height + 60, maxAttempts: 2)
+        guard grown.height > frame.height + 1 else {
+            return "the bottom edge did not move in either direction; the drag missed the resize affordance"
+        }
+        let restored = drag(app, edge: .bottom, toward: frame.height, maxAttempts: 3)
+        return "the bottom edge moves, so \(Int(frame.height)) pt is the height this content "
+            + "actually enforces, not the \(Int(Height.minimum)) pt declared "
+            + "(restored to \(Int(restored.height)))"
     }
 
     // MARK: - Accessibility handles

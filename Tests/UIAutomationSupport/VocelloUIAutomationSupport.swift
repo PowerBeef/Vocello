@@ -708,6 +708,33 @@ public enum VocelloUILayoutAssert {
             return
         }
     }
+
+    /// Containment on both axes. Use it only for a control with nothing
+    /// scrollable above it, because below the fold is a legitimate place for a
+    /// list row and an unreachable one for a dock.
+    public static func assertFullyWithinWindow(
+        _ element: XCUIElement,
+        of app: XCUIApplication,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard element.exists else {
+            VocelloUIFailureEvidence.capture(reason: "layout subject missing: \(element)")
+            XCTFail("Layout subject does not exist: \(element)", file: file, line: line)
+            return
+        }
+        let window = app.windows.firstMatch.frame
+        let frame = element.frame
+        guard VocelloUILayoutBounds.fullyWithin(frame, window: window) else {
+            VocelloUIFailureEvidence.capture(reason: "control clipped by the window \(element.identifier)")
+            XCTFail(
+                "\(element.identifier) does not fit the window: frame \(frame), window \(window). "
+                + "Nothing scrolls above it, so the part outside cannot be reached.",
+                file: file, line: line
+            )
+            return
+        }
+    }
 }
 
 /// Screenshots are retained in the xcresult; no out-of-band coordinate metadata is used.

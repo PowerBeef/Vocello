@@ -47,6 +47,19 @@ enum VocelloUILayoutBounds {
         guard VocelloUIRevealRequirement.valid(frame), VocelloUIRevealRequirement.valid(window) else { return false }
         return frame.minX >= window.minX - tolerance && frame.maxX <= window.maxX + tolerance
     }
+
+    /// Containment on both axes, for a control that has no scroll view under it
+    /// and therefore no legitimate reason to be below the fold. The Studio dock
+    /// is the case this exists for: its column does not scroll, so a dock whose
+    /// bottom edge is past the window's is not off-screen, it is unreachable.
+    ///
+    /// This is the shape of the defect an audit found and no test could: at the
+    /// window minimum the app declares, a Studio column with a finished take
+    /// needs more height than the minimum allows, and the dock is what pays.
+    static func fullyWithin(_ frame: CGRect, window: CGRect, tolerance: CGFloat = 1) -> Bool {
+        guard horizontallyWithin(frame, window: window, tolerance: tolerance) else { return false }
+        return frame.minY >= window.minY - tolerance && frame.maxY <= window.maxY + tolerance
+    }
 }
 
 /// Test-only bounded search. Geometry comes from the current accessibility snapshot,

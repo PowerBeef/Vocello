@@ -213,4 +213,34 @@ final class UIInteractionPolicyTests: XCTestCase {
         XCTAssertFalse(VocelloUILayoutBounds.horizontallyWithin(
             CGRect(x: 200, y: 60, width: 100, height: 24), window: .infinite))
     }
+
+    /// Two-axis containment differs from horizontal containment in exactly one
+    /// case, and that case is the whole point: a control below the fold. In a
+    /// list it is fine and `horizontallyWithin` says so; under a column that
+    /// does not scroll it is unreachable and this must say so.
+    func testFullContainmentRefusesTheControlBelowTheFoldThatHorizontalAccepts() {
+        let window = CGRect(x: 100, y: 50, width: 880, height: 560)
+        let belowTheFold = CGRect(x: 140, y: 600, width: 200, height: 56)
+        XCTAssertTrue(VocelloUILayoutBounds.horizontallyWithin(belowTheFold, window: window))
+        XCTAssertFalse(VocelloUILayoutBounds.fullyWithin(belowTheFold, window: window),
+            "a dock pushed past the window's bottom edge is unreachable, not scrolled away")
+
+        // The measured shape of the defect: a column needing 633 pt of height
+        // inside a window whose declared minimum is 560 leaves the dock 73 pt
+        // past the bottom edge.
+        let clippedDock = CGRect(x: 140, y: 50 + 633 - 56, width: 200, height: 56)
+        XCTAssertFalse(VocelloUILayoutBounds.fullyWithin(clippedDock, window: window))
+
+        XCTAssertTrue(VocelloUILayoutBounds.fullyWithin(
+            CGRect(x: 140, y: 500, width: 200, height: 56), window: window))
+        // Sub-point rendering slop stays inside the tolerance on both axes.
+        XCTAssertTrue(VocelloUILayoutBounds.fullyWithin(
+            CGRect(x: 99.5, y: 49.5, width: 880.8, height: 560.8), window: window))
+        // A control above the top edge is out of bounds too, not just below.
+        XCTAssertFalse(VocelloUILayoutBounds.fullyWithin(
+            CGRect(x: 140, y: 20, width: 200, height: 56), window: window))
+        XCTAssertFalse(VocelloUILayoutBounds.fullyWithin(.null, window: window))
+        XCTAssertFalse(VocelloUILayoutBounds.fullyWithin(
+            CGRect(x: 140, y: 100, width: 200, height: 56), window: .null))
+    }
 }

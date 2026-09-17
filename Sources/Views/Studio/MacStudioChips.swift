@@ -304,7 +304,15 @@ struct MacChipFlow: Layout {
         // of stretching its last chip across the whole width.
         let fullRowAvailable = bounds.width - spacing * CGFloat(perRow - 1)
         let equalShare = (fullRowAvailable / CGFloat(perRow)).rounded(.down)
-        let ideals = subviews.map { $0.sizeThatFits(.unspecified).width }
+        // Floored before they are budgeted, not after. A chip physically cannot
+        // render narrower than `minimumChipWidth` — `VocelloSetupChipPill`
+        // carries `.frame(minWidth:)` — so a floor applied after the shares are
+        // computed is width nobody accounted for. It came out of the trailing
+        // chip, whose remainder is `bounds.maxX - x`, and that chip then drew
+        // at its own minimum anyway: past the row's right edge, with nothing in
+        // the chain clipping it. Flooring here keeps
+        // `sum(ideal + surplus) <= fullRowAvailable` true by construction.
+        let ideals = subviews.map { max($0.sizeThatFits(.unspecified).width, minimumChipWidth) }
         let widestRowIdeal = stride(from: 0, to: subviews.count, by: perRow)
             .map { start in ideals[start ..< min(start + perRow, ideals.count)].reduce(0, +) }
             .max() ?? 0
@@ -323,9 +331,9 @@ struct MacChipFlow: Layout {
             for offset in 0..<count {
                 // The last chip of a full row absorbs the rounding remainder so
                 // the row ends exactly on the container's trailing edge.
-                let natural = honorsIdealWidths
-                    ? max(ideals[index + offset] + surplus, minimumChipWidth)
-                    : equalShare
+                // No clamp here: `ideals` is already floored, and `surplus` is
+                // never negative, so this cannot fall below the minimum.
+                let natural = honorsIdealWidths ? ideals[index + offset] + surplus : equalShare
                 let width = (isFullRow && offset == count - 1) ? bounds.maxX - x : natural
                 subviews[index + offset].place(
                     at: CGPoint(x: x, y: y),

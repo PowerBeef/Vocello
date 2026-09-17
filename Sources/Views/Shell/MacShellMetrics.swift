@@ -18,6 +18,14 @@ enum MacShellMetrics {
     static let sidebarMinWidth: CGFloat = 220
     static let sidebarIdealWidth: CGFloat = 250
     static let sidebarMaxWidth: CGFloat = 300
+    /// Horizontal inset of a row in the History and Saved Voices lists, and the
+    /// app's content gutter. It is named here because two things must agree on
+    /// it: the `listRowInsets` that position the row, and any row that budgets
+    /// its own chrome against the width it is given. They drifted once — the
+    /// insets moved to `xl` while `MacVoiceRow` went on subtracting `lg` — and
+    /// a row then believed it had 8 pt more than it did.
+    static let libraryRowHorizontalInset: CGFloat = VocelloTheme.Spacing.xl
+
     /// Content column of the History and Saved Voices lists; wider than the
     /// Studio column (`MacStudioMetrics.contentMaxWidth`) so rows keep their
     /// legacy width and do not tear apart on wide displays.

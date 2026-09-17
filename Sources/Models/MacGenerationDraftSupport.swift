@@ -26,9 +26,20 @@ extension VoiceCloningDraft {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// The reference transcript as conditioning: nil when blank.
+    /// The reference transcript as conditioning: nil when blank, and always a
+    /// single line.
+    ///
+    /// The field it comes from is a multi-line `TextField` (it has to be — the
+    /// transcript is what a user checks against the reference clip, and on one
+    /// line it truncated mid-word even at the widest window). That means Return
+    /// inserts a newline instead of committing, so interior line breaks reach
+    /// this property. A transcript of spoken audio has no line structure to
+    /// preserve, and a stray newline is a token the model never heard, so every
+    /// run of whitespace collapses to one space before it becomes conditioning.
     var trimmedReferenceTranscript: String? {
-        let trimmed = referenceTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+        let collapsed = referenceTranscript
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        return collapsed.isEmpty ? nil : collapsed
     }
 }

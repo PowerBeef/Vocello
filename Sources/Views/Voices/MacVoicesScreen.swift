@@ -163,9 +163,9 @@ struct MacVoicesScreen: View {
                             .id(voice.id)
                             .listRowInsets(EdgeInsets(
                                 top: VocelloTheme.Spacing.xs,
-                                leading: VocelloTheme.Spacing.xl,
+                                leading: MacShellMetrics.libraryRowHorizontalInset,
                                 bottom: VocelloTheme.Spacing.xs,
-                                trailing: VocelloTheme.Spacing.xl
+                                trailing: MacShellMetrics.libraryRowHorizontalInset
                             ))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
@@ -374,12 +374,14 @@ private struct MacVoiceRow: View {
 
     /// Name plus status badge at body/caption sizes.
     private static let minimumMetadataWidth: CGFloat = 220
-    /// Avatar, its gap, the layout gap, card padding and List insets.
+    /// Avatar, its gap, the layout gap, card padding and List insets. The last
+    /// term reads the list's own inset rather than restating it, because the
+    /// two drifted apart the last time the insets moved.
     private static let rowChrome: CGFloat = avatarDiameter
         + VocelloTheme.Spacing.md
         + VocelloTheme.Spacing.lg
         + VocelloTheme.Spacing.md * 2
-        + VocelloTheme.Spacing.lg * 2
+        + MacShellMetrics.libraryRowHorizontalInset * 2
 
     private var usesWideLayout: Bool {
         guard availableWidth > 0, actionsWidth > 0 else { return true }

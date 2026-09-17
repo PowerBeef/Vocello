@@ -397,9 +397,9 @@ struct MacHistoryScreen: View {
                             rowView(for: entry)
                                 .listRowInsets(EdgeInsets(
                                     top: 0,
-                                    leading: VocelloTheme.Spacing.xl,
+                                    leading: MacShellMetrics.libraryRowHorizontalInset,
                                     bottom: 0,
-                                    trailing: VocelloTheme.Spacing.xl
+                                    trailing: MacShellMetrics.libraryRowHorizontalInset
                                 ))
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)

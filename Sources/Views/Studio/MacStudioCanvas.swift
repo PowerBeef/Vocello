@@ -113,7 +113,6 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     let onPlayerDismiss: () -> Void
 
     @State private var isScriptFocused = false
-    /// Height of the laid-out script, reported by the editor bridge.
 
     init(
         mode: GenerationMode,

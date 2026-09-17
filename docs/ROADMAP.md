@@ -12,7 +12,8 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `macos-ui-fidelity-2026-09` | active | backend-and-platform | 2/6 (33%) |
+| `macos-ui-fidelity-2026-09` | active | backend-and-platform | 2/7 (29%) |
+| `audit-remediation-2026-09` | active | backend-and-platform | 0/12 (0%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
@@ -37,6 +38,7 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 | `UIF-04` | planned | Settings and shell polish | `UIF-06` |
 | `UIF-05` | in-flight | One scale: type, control sizes, radii, strokes, spacing | — |
 | `UIF-06` | in-flight | See the window at every width, then find the layout and proportions | — |
+| `UIF-07` | planned | The window minimum the app declares is the one it enforces | `UIF-06` |
 
 ### Open items in detail
 
@@ -51,6 +53,76 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 - **`UIF-06`** (in-flight) — See the window at every width, then find the layout and proportions.
   gate: A test-target window-frame helper sizes the macOS window to a known width, and every capture is named for the width it reached rather than the one requested; every macOS surface is captured at the scene minimum, the default and the widest the display allows, plus one pseudo-localized narrow pass; a written layout-and-proportions thesis, synthesized from two isolated assessments, is delivered and approved before any screen is rewritten; SharedSupport/Views carries no raw stroke width, shadow or hand-written Capsule() that a token covers; one content left edge across all six destinations, with section headings over their own rows; the Studio chip row's arithmetic is unit-tested for the invariant that a row never hands out more width than it has; and every defect the specialist audit attributes to this plan's own commits is fixed with evidence.
+
+- **`UIF-07`** (planned) — The window minimum the app declares is the one it enforces.
+  gate: Every Studio mode's column fits the declared minimum window with a finished take on screen, or the column scrolls; the declared minimum is the enforced one; the geometry assertion runs at that size and says so in its activity.
+
+## Specialist-audit remediation
+
+`audit-remediation-2026-09` · **active** · backend-and-platform · adopted 2026-09-17
+
+Close the conditions the 2026-09-17 specialist audit surfaced. None were caused by the macOS UI-fidelity range that prompted the audit; they are pre-existing and were ranked by severity rather than by how close they sat to the changed code. The defects that range did introduce were fixed inside it and are not tracked here.
+
+Narrative authority: [`docs/reference/ui-rework-audit-2026-09-17.md`](reference/ui-rework-audit-2026-09-17.md)
+
+| Item | Status | Title | Blocked by |
+| --- | --- | --- | --- |
+| `AUD-01` | parked | iOS launch and deep-link dead ends | — |
+| `AUD-02` | parked | One owner for the iOS audio session | — |
+| `AUD-03` | planned | Studio screens stop owning generation Tasks | — |
+| `AUD-04` | parked | Clone readiness reflects the context it actually has | — |
+| `AUD-05` | planned | History persistence, and what History shows | — |
+| `AUD-06` | parked | iOS modals hide their background from VoiceOver | — |
+| `AUD-07` | parked | Finish the transaction that cannot be verified | — |
+| `AUD-08` | planned | Make the logging half of the privacy invariant a gate | — |
+| `AUD-09` | planned | Smoke test01 owns the fixture it depends on | — |
+| `AUD-10` | planned | The engine is kept hot by intent, not by browsing | — |
+| `AUD-11` | planned | Repetition-penalty dedup uses the set it already has | — |
+| `AUD-12` | parked | Migrate off the deprecated audio-session interruption keys | — |
+
+### Open items in detail
+
+- **`AUD-01`** (parked) — iOS launch and deep-link dead ends.
+  gate: A dependency-bootstrap failure offers retry and restart rather than a terminal screen; opening a file during first run never presents the import cover over the onboarding cover; both proven on the phone by iOS smoke.
+  unparkWhen: the paired iPhone is available and unlocked for a consented lane (CONV-20)
+
+- **`AUD-02`** (parked) — One owner for the iOS audio session.
+  gate: Playback after a recording is audible on the phone; the shared player sets its category before playing; both AVAudioPlayer owners observe interruption and route change; iOS smoke covers record-then-play in one journey.
+  unparkWhen: the paired iPhone is available and unlocked for a consented lane (CONV-20)
+
+- **`AUD-03`** (planned) — Studio screens stop owning generation Tasks.
+  gate: No Studio screen starts a generation Task; the actor-owned lifecycle owns cancellation and prewarm; macOS smoke and the cancellation journey pass unchanged.
+
+- **`AUD-04`** (parked) — Clone readiness reflects the context it actually has.
+  gate: canGenerate accounts for cloneContextStatus; a failure to prime the clone reference is surfaced rather than swallowed; a degraded take is impossible or announced.
+  unparkWhen: the paired iPhone is available and unlocked for a consented lane (CONV-20)
+
+- **`AUD-05`** (planned) — History persistence, and what History shows.
+  gate: No filesystem work runs inside the database queue; the iOS delete failure is surfaced rather than swallowed; History displays a bounded page with a way to reach the rest.
+
+- **`AUD-06`** (parked) — iOS modals hide their background from VoiceOver.
+  gate: With a panel presented, VoiceOver focus cannot reach a control behind it.
+  unparkWhen: the paired iPhone is available and unlocked for a consented lane (CONV-20)
+
+- **`AUD-07`** (parked) — Finish the transaction that cannot be verified.
+  gate: An .unverified transaction is finished rather than left pending; Restore clears it; the purchase lane passes on the phone.
+  unparkWhen: the paired iPhone is available and unlocked for a consented lane (CONV-20)
+
+- **`AUD-08`** (planned) — Make the logging half of the privacy invariant a gate.
+  gate: A check refuses a log statement that interpolates a transcript, prompt, path or credential, or the invariant is narrowed to what can actually be enforced and says so.
+
+- **`AUD-09`** (planned) — Smoke test01 owns the fixture it depends on.
+  gate: test01 either creates the clone voice it asserts, or stops claiming to leave no persisted state; the macOS smoke lane passes from a clean store.
+
+- **`AUD-10`** (planned) — The engine is kept hot by intent, not by browsing.
+  gate: On the high-memory Mac tier a warm prefetch is followed by an idle unload or a pressure response; navigating between tabs alone does not pin the engine in memory.
+
+- **`AUD-11`** (planned) — Repetition-penalty dedup uses the set it already has.
+  gate: The per-step token dedup is a set membership test; runtime parity is proven by the seeded runtime tests and the gate bench shows no regression.
+
+- **`AUD-12`** (parked) — Migrate off the deprecated audio-session interruption keys.
+  gate: Interruption handling uses AVAudioSessionDidBecomeInactiveNotification and AVAudioSessionResumptionRecommendationNotification behind an availability gate, with the current path kept for the deployment target; proven on the phone.
+  unparkWhen: the paired iPhone is available and unlocked for a consented lane (CONV-20)
 
 ## Autonomous validation audit remediation
 

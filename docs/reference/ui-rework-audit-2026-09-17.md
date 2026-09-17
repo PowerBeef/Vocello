@@ -56,7 +56,10 @@ boundary holds by grep.
 
 ## Pre-existing conditions this audit surfaced
 
-Not caused by this range and deliberately not fixed in it. Ranked by severity.
+Not caused by this range. Eight were closed in the remediation pass that
+followed on 2026-09-17 (marked **closed**); the rest are tracked as
+`audit-remediation-2026-09` in `config/roadmap.json`, which is where their
+current status lives. Ranked by the severity they were given here.
 
 | Severity | Finding | Where |
 |---|---|---|
@@ -65,24 +68,46 @@ Not caused by this range and deliberately not fixed in it. Ranked by severity.
 | CRITICAL | All three Studio screens **start their own generation Task**, which `.claude/rules/native.md` forbids in as many words | `MacCustomVoiceScreen.swift:337` + 2 |
 | CRITICAL | `onOpenURL` presents an import cover without checking the onboarding cover, so opening a file during first run races two `fullScreenCover`s and can drop the hand-off | `RootView.swift:117,138,325` |
 | HIGH | Clone's `canGenerate` ignores `cloneContextStatus` and `ensureCloneReferencePrimed` failures are swallowed by `try?`, so a take can silently degrade to audio-only cloning | `IOSGenerationModeViews.swift:1404,1900` |
-| HIGH | Six findings in History persistence: unindexed idempotency key, filesystem work inside the database queue, **synchronous delete on the main thread**, and a **silently swallowed delete failure** on iOS | `DatabaseService.swift`, `HistoryScreen.swift:596` |
+| HIGH | Six findings in History persistence: unindexed idempotency key, filesystem work inside the database queue, **synchronous delete on the main thread**, and a **silently swallowed delete failure** on iOS — *index and main-thread delete **closed**; the rest is AUD-05* |
 | HIGH | Two independent `AVAudioPlayer` owners install no interruption or route-change observer | `IOSPlayerSheet.swift:769`, `IOSStudioInlinePlayerCard.swift:657` |
-| HIGH | Deprecated `AVAudioSession.InterruptionType` decoding in three files, under warnings-as-errors — the next SDK bump breaks all three at once | `ReferenceClipRecorder.swift:203` + 2 |
+| HIGH → MEDIUM | Deprecated `AVAudioSession.InterruptionType` decoding in three files. The reported consequence does not occur: compiling the exact expression at deployment target 26.0 and 27.0 emits no warning, so nothing breaks under warnings-as-errors today — *AUD-12* |
 | HIGH | iOS modal overlays do not hide the background from VoiceOver, so focus can reach controls behind a presented panel | `RootView.swift:250-315` |
-| HIGH | Four close/back buttons at 40×40 against the app's own 44×44 standard | `IOSDesignSystemPrimitives.swift:650` + 3 |
-| HIGH | `.background(.regularMaterial)` bypasses `GatedGlass` entirely — no Reduce Transparency check, no performance gate. The one glass leak in an otherwise fully gated architecture | `GenerationHistoryEnqueueWarning.swift:68` |
-| HIGH | macOS `deleteVoice` never clears the pending clone handoff or the selected saved-voice ID, unlike iOS, so deleting a voice mid-handoff stages Clone against a dead `wavPath`; the handoff itself applies with no existence check on either platform | `MacVoicesScreen.swift:303`, `MacVoiceCloningScreen.swift:727` |
-| MEDIUM | `UIPerfFrameProbe` / `IOSUIPerfFrameProbe` never remove their observers and never nil their `static active` | `UIPerfFrameProbe.swift:82` |
+| HIGH | Four close/back buttons at 40×40 against the app's own 44×44 standard — ***closed***, and the standard is now `Theme.HitTarget.minimum` |
+| HIGH | `.background(.regularMaterial)` bypasses `GatedGlass` entirely — no Reduce Transparency check, no performance gate — ***closed*** |
+| HIGH | macOS `deleteVoice` never clears the pending clone handoff, and the handoff applies with no existence check — ***closed*** on macOS, both halves |
+| MEDIUM | `UIPerfFrameProbe` / `IOSUIPerfFrameProbe` never remove their observers and never nil their `static active` — ***closed*** on both platforms |
 | MEDIUM | An `.unverified` StoreKit transaction is never finished, so it redelivers every launch and Restore cannot clear it | `IOSStoreKitClient.swift:56` |
-| MEDIUM | Hardcoded English `"play"` / `"selected"` accessibility values on a French-shipping app | `MacStudioPlayerCard.swift:155`, `SidebarView.swift:136` |
+| MEDIUM | Hardcoded English `"play"` / `"selected"` accessibility values on a French-shipping app — ***closed***: selection is the `.isSelected` trait, play/pause a localized action label |
 | MEDIUM | `privacy_scan.py` cannot see runtime log interpolation, so the logging half of the privacy invariant is discipline, not a gate | `scripts/privacy_scan.py:23` |
 | MEDIUM | `test01` depends on a clone-voice fixture nothing in the suite creates, contradicting its own "leaves no persisted state" header | `VocelloMacSmokeUITests.swift:97` |
 | MEDIUM | On `highMemoryMac` there is no idle-unload and no pressure monitor, so the warm prefetch fires from tab navigation alone and nothing ever unloads it — the engine is kept hot by browsing rather than by intent | `NativeMemoryPolicyResolver.swift:62`, `MLXTTSEngine.swift:812` |
 | MEDIUM | Repetition-penalty token dedup does an O(n) scan plus a full rebuild per decode step, while a `Set` for the identical membership check already exists in the same function | `Qwen3TTS.swift:4710` |
 
+Also closed in the same pass: the `VocelloSectionHeading` uppercase transform (it baked the change into
+the string the accessibility layer reads), and a `chunkCancellable` that was declared and cancelled and
+never once assigned.
+
 Fixed in passing because it was one line and provably wrong: `settingsWindowDefaultSize` asked for 720 pt
 of content on a 720 pt screen, which no non-zero chrome allows, so the system had been silently clamping
 it.
+
+## Found while remediating, not by the audit
+
+Three things only turned up because the remediation wrote tests that had to run.
+
+| Finding | How it surfaced |
+|---|---|
+| **History's accessibility tree is unbounded.** It renders every generation the machine has ever produced, and each card's `children: .contain` multiplies that across descendants. A *typed*, bounded XCUITest query over it times out. | The re-landed History assertion could not resolve its own query until the list was filtered first. Tracked as AUD-05, where it is the concrete argument for bounding the fetch. |
+| **The declared window minimum is not the enforced one.** `MacShellMetrics` says 560 pt tall; SwiftUI enforces whatever the content subtree demands, which is written down nowhere. | Tracked as UIF-07, with the audit's own 603–633 pt measurement as its input. |
+| **The geometry assertion's height half does not bind on this machine.** The logical screen is 1280×720, so a window at any natural size has its bottom edge under the Dock and the resize affordance cannot be pressed. | The pin reports this on every run rather than implying it measured the minimum. Width does bind: 880 is reached. |
+
+And two beliefs of mine about SwiftUI that were wrong, both caught by the
+assertion's vacuous-pass guard rather than by review:
+`.accessibilityElement(children: .contain)` does **not** hand the container's
+identifier to a child that has none, and a child under `children: .ignore` is
+not exposed as the element type its content suggests. The guard has now earned
+its keep twice; it is the reason those are sentences here rather than two
+silently green lane runs.
 
 ## Coverage of this audit
 

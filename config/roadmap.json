@@ -92,6 +92,15 @@
       "adopted": "2026-08-30",
       "goal": "Causally localize the reported saved-reference pitch/fidelity variance, typed enrollment-transcription failure, and French Voice Design regression with source-bound private diagnostics; separate target language from reference metadata; and apply only tokenizer, reference-quality, or prompt remediation proven by fixed-seed evidence without weakening QC or exposing personal audio and transcript data.",
       "authority": "docs/reference/delivery-harness.md"
+    },
+    {
+      "id": "audit-remediation-2026-09",
+      "title": "Specialist-audit remediation",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "adopted": "2026-09-17",
+      "goal": "Close the conditions the 2026-09-17 specialist audit surfaced. None were caused by the macOS UI-fidelity range that prompted the audit; they are pre-existing and were ranked by severity rather than by how close they sat to the changed code. The defects that range did introduce were fixed inside it and are not tracked here.",
+      "authority": "docs/reference/ui-rework-audit-2026-09-17.md"
     }
   ],
   "items": [
@@ -1196,6 +1205,186 @@
       "updated": "2026-09-13",
       "notes": "macOS clauses done on September 13: (1) gate bench PASS after three harness fixes (6ab8c461 clock divisor, b1824091 warm-only verdict, b88d6d03 footprint dispersion), baseline re-saved from mac-gate-bench-20260912-225643-0fd52c77, first standard-RTF gate record mac-gate-bench-20260912-234613-c8f8a8c6; (2) canonical UI records macos-xcui-benchmark-20260913-170946-488a9ed0 and 181112-6cb80773, the latter paired with CLI matrix macos-engine-20260913-180702-42b26142 (engine rtf equal within 0.04; the UI adds 60 to 120 ms to the first chunk); (3) macos-xcui-perf-20260913-174907-79e014f2 after ee97e92c; (4) charts and website repinned (ae676061, 4ea74266); (5) mac-lang-bench-20260913-000655-546b90cf after acba7581 and 5ca95a73. Open: the iOS halves of (2) and (3); run ios-xcui-benchmark-20260913-184908-a94cbc47 aborted before its build because CoreDevice reported the paired iPhone unavailable. The replay cache-policy flake is fixed in 5619004c.",
       "unparkWhen": "The paired iPhone is available for one ios benchmark and one ios perf run (the macOS clauses are done)."
+    },
+    {
+      "id": "AUD-01",
+      "title": "iOS launch and deep-link dead ends",
+      "status": "parked",
+      "gate": "A dependency-bootstrap failure offers retry and restart rather than a terminal screen; opening a file during first run never presents the import cover over the onboarding cover; both proven on the phone by iOS smoke.",
+      "sourceOfTruth": [
+        "Sources/iOS/QVoiceiOSApp.swift",
+        "Sources/iOS/App/RootView.swift"
+      ],
+      "notes": "Audit CRITICAL, two findings with one shape: a state the user cannot leave. The bootstrap failure screen has no retry and no restart, so a persistent cause reproduces every launch with no way forward. Separately, onOpenURL presents the import cover without checking whether the onboarding cover is up, and two fullScreenCovers racing can drop the hand-off entirely. Both are behavioural and neither is verifiable without the device.",
+      "plan": "audit-remediation-2026-09",
+      "updated": "2026-09-17",
+      "unparkWhen": "the paired iPhone is available and unlocked for a consented lane (CONV-20)"
+    },
+    {
+      "id": "AUD-02",
+      "title": "One owner for the iOS audio session",
+      "status": "parked",
+      "gate": "Playback after a recording is audible on the phone; the shared player sets its category before playing; both AVAudioPlayer owners observe interruption and route change; iOS smoke covers record-then-play in one journey.",
+      "sourceOfTruth": [
+        "Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift",
+        "Sources/SharedSupport/ViewModels/ReferenceClipRecorder.swift",
+        "Sources/SharedSupport/ViewModels/ClipReviewPlayer.swift",
+        "Sources/iOS/Sheets/IOSPlayerSheet.swift",
+        "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
+      ],
+      "notes": "Audit CRITICAL. The recorder leaves the session on .record and deactivated, and the shared player never sets a category, so playback after a recording can be silent. ClipReviewPlayer already carries the fix for this exact contamination, which is the evidence that the problem is understood and unevenly applied. Two other AVAudioPlayer owners install no interruption or route-change observer at all, so a call or an unplugged headset leaves them in a state nothing corrects. One owner, one policy.",
+      "plan": "audit-remediation-2026-09",
+      "updated": "2026-09-17",
+      "unparkWhen": "the paired iPhone is available and unlocked for a consented lane (CONV-20)"
+    },
+    {
+      "id": "AUD-03",
+      "title": "Studio screens stop owning generation Tasks",
+      "status": "planned",
+      "gate": "No Studio screen starts a generation Task; the actor-owned lifecycle owns cancellation and prewarm; macOS smoke and the cancellation journey pass unchanged.",
+      "sourceOfTruth": [
+        "Sources/Views/Studio/MacCustomVoiceScreen.swift",
+        "Sources/Views/Studio/MacVoiceCloningScreen.swift",
+        ".claude/rules/native.md"
+      ],
+      "notes": "Audit CRITICAL, and the only one of the four that is a stated rule rather than a judgement: .claude/rules/native.md forbids a view starting generation work, and all three macOS Studio screens do it. Testable on macOS without a phone. It is a refactor with its own shape and deserves its own plan step rather than being folded into a remediation pass.",
+      "plan": "audit-remediation-2026-09",
+      "updated": "2026-09-17"
+    },
+    {
+      "id": "AUD-04",
+      "title": "Clone readiness reflects the context it actually has",
+      "status": "parked",
+      "gate": "canGenerate accounts for cloneContextStatus; a failure to prime the clone reference is surfaced rather than swallowed; a degraded take is impossible or announced.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSGenerationModeViews.swift"
+      ],
+      "notes": "Audit HIGH. canGenerate ignores cloneContextStatus and ensureCloneReferencePrimed's failures are discarded by try?, so a take can silently fall back to audio-only cloning -- the user asked for one thing and got another with no signal. Behavioural on iOS.",
+      "plan": "audit-remediation-2026-09",
+      "updated": "2026-09-17",
+      "unparkWhen": "the paired iPhone is available and unlocked for a consented lane (CONV-20)"
+    },
+    {
+      "id": "AUD-05",
+      "title": "History persistence, and what History shows",
+      "status": "planned",
+      "gate": "No filesystem work runs inside the database queue; the iOS delete failure is surfaced rather than swallowed; History displays a bounded page with a way to reach the rest.",
+      "sourceOfTruth": [
+        "Sources/iOSSupport/Services/DatabaseService.swift",
+        "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift",
+        "Sources/iOS/History/HistoryScreen.swift"
+      ],
+      "notes": "Audit HIGH, partly closed 2026-09-17: the audioPath idempotency key is indexed and the macOS delete runs off the main thread. What remains is filesystem work inside the write transaction, a delete failure iOS discards, and the unbounded fetch. The last of those is not only a performance question -- History renders every generation the machine has ever produced, and its accessibility tree grew large enough to time out a typed XCUITest query, which is how it was found. Bounding what the screen shows is a product decision about the user's own archive and needs an answer before code: a page plus a way to reach the rest, not a silent cap.",
+      "plan": "audit-remediation-2026-09",
+      "updated": "2026-09-17"
+    },
+    {
+      "id": "AUD-06",
+      "title": "iOS modals hide their background from VoiceOver",
+      "status": "parked",
+      "gate": "With a panel presented, VoiceOver focus cannot reach a control behind it.",
+      "sourceOfTruth": [
+        "Sources/iOS/App/RootView.swift"
+      ],
+      "notes": "Audit HIGH. The overlays do not mark the content behind them as hidden, so focus walks into controls the user cannot see and did not mean to reach. Verifiable only with VoiceOver on the device.",
+      "plan": "audit-remediation-2026-09",
+      "updated": "2026-09-17",
+      "unparkWhen": "the paired iPhone is available and unlocked for a consented lane (CONV-20)"
+    },
+    {
+      "id": "AUD-07",
+      "title": "Finish the transaction that cannot be verified",
+      "status": "parked",
+      "gate": "An .unverified transaction is finished rather than left pending; Restore clears it; the purchase lane passes on the phone.",
+      "sourceOfTruth": [
+        "Sources/iOS/Commerce/IOSStoreKitClient.swift"
+      ],
+      "notes": "Audit MEDIUM. An unverified StoreKit transaction is never finished, so it is redelivered on every launch and Restore cannot clear it -- a permanent snag in the one flow that takes the user's money.",
+      "plan": "audit-remediation-2026-09",
+      "updated": "2026-09-17",
+      "unparkWhen": "the paired iPhone is available and unlocked for a consented lane (CONV-20)"
+    },
+    {
+      "id": "AUD-08",
+      "title": "Make the logging half of the privacy invariant a gate",
+      "status": "planned",
+      "gate": "A check refuses a log statement that interpolates a transcript, prompt, path or credential, or the invariant is narrowed to what can actually be enforced and says so.",
+      "sourceOfTruth": [
+        "scripts/privacy_scan.py",
+        "docs/reference/privacy-storage.md"
+      ],
+      "notes": "Audit MEDIUM, and the most structural of them. privacy_scan.py reads source for known shapes and cannot see what a runtime log interpolates, so half of a hard invariant -- never log PII, paths, prompts or transcripts -- rests on discipline while the documentation presents it as enforced. Either the gate grows to cover it or the claim shrinks to match. A hard invariant that is partly aspirational is worse than a smaller one that is true.",
+      "plan": "audit-remediation-2026-09",
+      "updated": "2026-09-17"
+    },
+    {
+      "id": "AUD-09",
+      "title": "Smoke test01 owns the fixture it depends on",
+      "status": "planned",
+      "gate": "test01 either creates the clone voice it asserts, or stops claiming to leave no persisted state; the macOS smoke lane passes from a clean store.",
+      "sourceOfTruth": [
+        "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift"
+      ],
+      "notes": "Audit MEDIUM. test01 asserts a benchmark clone voice is present and nothing in the suite creates it, while its own header says the journey leaves no persisted state. Both cannot be true, and today the lane passes because the machine happens to carry the fixture -- which means it would fail on any machine that does not.",
+      "plan": "audit-remediation-2026-09",
+      "updated": "2026-09-17"
+    },
+    {
+      "id": "AUD-10",
+      "title": "The engine is kept hot by intent, not by browsing",
+      "status": "planned",
+      "gate": "On the high-memory Mac tier a warm prefetch is followed by an idle unload or a pressure response; navigating between tabs alone does not pin the engine in memory.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift"
+      ],
+      "notes": "Audit MEDIUM. The highMemoryMac policy has neither an idle unload nor a pressure monitor, and the warm prefetch fires from tab navigation, so opening a tab loads the engine and nothing ever puts it down. Memory is held because the user browsed, not because they asked to generate.",
+      "plan": "audit-remediation-2026-09",
+      "updated": "2026-09-17"
+    },
+    {
+      "id": "AUD-11",
+      "title": "Repetition-penalty dedup uses the set it already has",
+      "status": "planned",
+      "gate": "The per-step token dedup is a set membership test; runtime parity is proven by the seeded runtime tests and the gate bench shows no regression.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
+      ],
+      "notes": "Audit MEDIUM. The dedup does an O(n) scan plus a full rebuild every decode step while a Set for the identical membership check already exists in the same function. Inside the owned VocelloQwen3Core package, so it moves under qwen3-core-maintenance.md with a semantic-delta entry, not as a casual edit.",
+      "plan": "audit-remediation-2026-09",
+      "updated": "2026-09-17"
+    },
+    {
+      "id": "AUD-12",
+      "title": "Migrate off the deprecated audio-session interruption keys",
+      "status": "parked",
+      "gate": "Interruption handling uses AVAudioSessionDidBecomeInactiveNotification and AVAudioSessionResumptionRecommendationNotification behind an availability gate, with the current path kept for the deployment target; proven on the phone.",
+      "sourceOfTruth": [
+        "Sources/SharedSupport/ViewModels/ReferenceClipRecorder.swift",
+        "Sources/SharedSupport/ViewModels/AudioPlayerViewModel.swift",
+        "Sources/SharedSupport/ViewModels/ClipReviewPlayer.swift"
+      ],
+      "notes": "Audit HIGH, downgraded on inspection. AVAudioSessionInterruptionTypeKey is deprecated in the 27 SDK, but the reported consequence -- breaking a warnings-as-errors build -- does not happen: compiling the exact expression at deployment target 26.0 and at 27.0 emits no warning (verified 2026-09-17). So it is API debt with a known trigger, not a live failure. The replacement is a different notification model rather than a rename, which makes it a behavioural change to audio interruption handling and not safe to do blind.",
+      "plan": "audit-remediation-2026-09",
+      "updated": "2026-09-17",
+      "unparkWhen": "the paired iPhone is available and unlocked for a consented lane (CONV-20)"
+    },
+    {
+      "id": "UIF-07",
+      "title": "The window minimum the app declares is the one it enforces",
+      "status": "planned",
+      "gate": "Every Studio mode's column fits the declared minimum window with a finished take on screen, or the column scrolls; the declared minimum is the enforced one; the geometry assertion runs at that size and says so in its activity.",
+      "sourceOfTruth": [
+        "Sources/Views/Shell/MacShellMetrics.swift",
+        "Sources/Views/Studio/MacStudioCanvas.swift",
+        "Tests/VocelloMacUITests/VocelloUIWindowFrame.swift"
+      ],
+      "notes": "MacShellMetrics declares 880x560 and SwiftUI enforces whatever the content subtree demands, which is never written down. The audit measured Voice Design needing ~633 pt and Voice Cloning ~603 with a finished take, against that 560. The GeometryReader restored in e1755734 stops the column's floors becoming the window's floor, which prevents the window refusing to shrink -- and leaves clipping as the other outcome, since nothing in that column scrolls. Two honest answers: raise the declared minimum to what the content needs, or let the column scroll. Both are product decisions. Separately, the geometry assertion's height half does not bind on this machine: the logical screen is 1280x720, so the window's bottom edge sits under the Dock and the resize affordance cannot be pressed. The pin reports that on every run rather than implying it measured the minimum.",
+      "plan": "macos-ui-fidelity-2026-09",
+      "blockedBy": [
+        "UIF-06"
+      ],
+      "updated": "2026-09-17"
     }
   ]
 }

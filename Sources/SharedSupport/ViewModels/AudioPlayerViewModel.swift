@@ -243,7 +243,6 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     private var completedLiveSessionOrder: [String] = []
     private let livePreviewConfiguration: LivePreviewConfiguration
     private var chunkObserver: NSObjectProtocol?
-    private var chunkCancellable: AnyCancellable?
     private var timer: Timer?
     #if os(iOS)
     private var interruptionObserver: NSObjectProtocol?
@@ -323,7 +322,6 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
             if let chunkObserver {
                 NotificationCenter.default.removeObserver(chunkObserver)
             }
-            chunkCancellable?.cancel()
             teardownLivePlayback(clearSession: true)
             stopFilePlayback(clearPlayer: true)
         }

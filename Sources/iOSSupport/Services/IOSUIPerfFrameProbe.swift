@@ -228,8 +228,19 @@ final class IOSUIPerfFrameProbe: NSObject {
         append(summary)
         writerQueue.sync { }
         try? writer?.close()
+        writer = nil
         displayLink?.invalidate()
         displayLink = nil
+        // The probe stops observing when it stops measuring, and releasing the
+        // singleton is what ends its life -- but not from inside a notification
+        // callback, which is running on this object. Mirrors the macOS probe.
+        NotificationCenter.default.removeObserver(self)
+        Task { @MainActor in Self.active = nil }
+    }
+
+    deinit {
+        // Backstop for any path that deallocates without finishing.
+        NotificationCenter.default.removeObserver(self)
     }
 
     private func append(_ row: [String: Any]) {

@@ -652,6 +652,11 @@ struct IOSBottomEdgeSheet<Content: View>: View {
                             Circle()
                                 .fill(Color.white.opacity(0.06))
                         }
+                        // The circle is 40; what it catches is 44. A drawn size
+                        // and a touch target are separate decisions and this
+                        // control had only made the first one.
+                        .frame(width: Theme.HitTarget.minimum, height: Theme.HitTarget.minimum)
+                        .contentShape(Circle())
                         .overlay {
                             Circle()
                                 .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
@@ -787,6 +792,11 @@ struct IOSBottomSheet<Content: View>: View {
                             Circle()
                                 .fill(Color.white.opacity(0.06))
                         }
+                        // The circle is 40; what it catches is 44. A drawn size
+                        // and a touch target are separate decisions and this
+                        // control had only made the first one.
+                        .frame(width: Theme.HitTarget.minimum, height: Theme.HitTarget.minimum)
+                        .contentShape(Circle())
                         .overlay {
                             Circle()
                                 .stroke(Color.white.opacity(0.10), lineWidth: 0.5)

@@ -133,14 +133,6 @@ private struct MacSidebarRow: View {
     private var isSelected: Bool { selection == item }
     private var tint: Color { MacTheme.tint(for: item) }
 
-    private var accessibilityStateValue: String {
-        var states = [isSelected ? "selected" : "not selected"]
-        if isDisabled {
-            states.append("disabled")
-        }
-        return states.joined(separator: ", ")
-    }
-
     var body: some View {
         // A Button so VoiceOver announces the row as a button, keyboard
         // activation works and `.disabled` gates activation and traits.
@@ -189,7 +181,11 @@ private struct MacSidebarRow: View {
         .appAnimation(MacTheme.Motion.stateChange, value: isSelected)
         .disabled(isDisabled)
         .accessibilityLabel(item.title)
-        .accessibilityValue(accessibilityStateValue)
+        // The trait, not a string. VoiceOver synthesises "selected" in the
+        // user's own language from this; the words it replaces were English
+        // on an app that ships in French, and "disabled" was a second copy of
+        // what `.disabled` already tells the accessibility layer.
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         .accessibilityIdentifier(item.accessibilityID)
     }
 

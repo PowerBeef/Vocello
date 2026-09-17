@@ -133,7 +133,9 @@ final class UIPerfFrameProbe: NSObject {
     private var attachedWindow: NSWindow?
 
     private func attach(to window: NSWindow) {
-        guard attachedWindow !== window else { return }
+        // A finished probe has closed its writer and ended its watchdog, so a
+        // display link installed after that would tick into a dead session.
+        guard !finished, attachedWindow !== window else { return }
         displayLink?.invalidate()
         previousTimestamp = nil
         refreshIntervalMS = 0
@@ -237,8 +239,23 @@ final class UIPerfFrameProbe: NSObject {
         append(summary)
         writerQueue.sync { }
         try? writer?.close()
+        writer = nil
         displayLink?.invalidate()
         displayLink = nil
+        attachedWindow = nil
+        // The probe stops observing when it stops measuring. Leaving the three
+        // observers registered kept a finished probe reachable and let
+        // didBecomeKey resurrect it: a new key window would install a display
+        // link on a session whose writer was already closed.
+        NotificationCenter.default.removeObserver(self)
+        // And releasing the singleton is what ends its life -- but not from
+        // inside a notification callback, which is running on this object.
+        Task { @MainActor in Self.active = nil }
+    }
+
+    deinit {
+        // Backstop for any path that deallocates without finishing.
+        NotificationCenter.default.removeObserver(self)
     }
 
     private func append(_ row: [String: Any]) {

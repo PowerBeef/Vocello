@@ -161,8 +161,7 @@ struct MacStudioPlayerCard: View {
         }
         .buttonStyle(.plain)
         .disabled(!audioPlayer.hasAudio)
-        .accessibilityLabel(MacInterfaceText.menuPlayPause)
-        .accessibilityValue(audioPlayer.isPlaying ? "pause" : "play")
+        .accessibilityLabel(audioPlayer.isPlaying ? MacInterfaceText.playerPause : MacInterfaceText.playerPlay)
         .accessibilityIdentifier(
             // Named for the phase, not for why it is on screen: a
             // completed take showing transport because the sidebar is

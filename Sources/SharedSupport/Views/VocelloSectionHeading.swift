@@ -52,7 +52,15 @@ struct VocelloSectionHeading: View {
 
     private var heading: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(title.uppercased())
+            // `.textCase`, not `uppercased()`: the first is a display
+            // transform the framework applies while drawing, the second bakes
+            // the transform into the string every other layer then sees --
+            // including the accessibility label, where an all-caps short
+            // heading can be read out letter by letter. It also hands the
+            // case mapping to SwiftUI rather than to a `String` method whose
+            // locale is not the interface language the user chose.
+            Text(title)
+                .textCase(.uppercase)
                 .font(.system(size: titleFontSize, weight: .semibold))
                 .tracking(0.88)
                 .foregroundStyle(VocelloTheme.Text.secondary)

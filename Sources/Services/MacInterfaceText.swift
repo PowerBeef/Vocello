@@ -1033,6 +1033,19 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.player.close", defaultValue: "Close player",
                comment: "macOS interface: VoiceOver label of the sidebar player close button. Presentation only.")
     }
+    /// The action the control performs, not the state it is in: VoiceOver reads
+    /// a button's label as what pressing it will do. Naming the current state
+    /// instead ("pause" while playing) tells a blind user the opposite of what
+    /// happens. These replace a pair of hardcoded English words that shipped as
+    /// `accessibilityValue` on a French-localized app.
+    static var playerPause: String {
+        localization.string(localized: "vocello.mac.player.pause", defaultValue: "Pause",
+               comment: "macOS interface: VoiceOver label of the player's play/pause button while audio is playing. Presentation only.")
+    }
+    static var playerPlay: String {
+        localization.string(localized: "vocello.mac.player.play", defaultValue: "Play",
+               comment: "macOS interface: VoiceOver label of the player's play/pause button while audio is paused or stopped. Presentation only.")
+    }
     static var playerLive: String {
         localization.string(localized: "vocello.mac.player.live", defaultValue: "Live",
                comment: "macOS interface: sidebar player badge while streaming audio plays. Presentation only.")

@@ -11233,6 +11233,42 @@
         }
       }
     },
+    "vocello.mac.player.pause": {
+      "comment": "macOS interface: VoiceOver label of the player's play/pause button while audio is playing. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause"
+          }
+        }
+      }
+    },
+    "vocello.mac.player.play": {
+      "comment": "macOS interface: VoiceOver label of the player's play/pause button while audio is paused or stopped. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lecture"
+          }
+        }
+      }
+    },
     "vocello.mac.player.live": {
       "comment": "macOS interface: sidebar player badge while streaming audio plays. Presentation only.",
       "extractionState": "manual",

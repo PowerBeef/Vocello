@@ -74,8 +74,7 @@ struct MacInlinePlayerCard: View {
                     .overlay { Circle().stroke(Color.white.opacity(0.18), lineWidth: VocelloTheme.Stroke.hairline) }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(MacInterfaceText.menuPlayPause)
-            .accessibilityValue(audioPlayer.isPlaying ? "pause" : "play")
+            .accessibilityLabel(audioPlayer.isPlaying ? MacInterfaceText.playerPause : MacInterfaceText.playerPlay)
             .accessibilityIdentifier("sidebarPlayer_playPause")
 
             VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {

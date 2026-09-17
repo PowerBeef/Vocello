@@ -200,6 +200,17 @@ enum Theme {
         static let sheetGrabber: CGFloat = 3
     }
 
+    // MARK: - Hit targets
+
+    enum HitTarget {
+        /// Apple's minimum comfortable touch target, and the size the app's
+        /// own controls already use in 42 other places. It is named here
+        /// because four close and back buttons did not: they were sized to
+        /// their 40 pt circle, and a control's drawn size and its touchable
+        /// size are not the same decision.
+        static let minimum: CGFloat = 44
+    }
+
     // MARK: - Spacing (4-pt grid)
 
     enum Spacing {

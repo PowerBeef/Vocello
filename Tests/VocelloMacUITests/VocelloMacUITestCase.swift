@@ -114,9 +114,11 @@ class VocelloMacUITestCase: XCTestCase {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: sidebar, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element(screen.screenID), timeout: 20))
         XCTAssertTrue(
+            // The trait, which the app now sets instead of spelling the word
+            // out in an accessibility value a French user would hear in
+            // English. XCUITest reads the same attribute VoiceOver does.
             VocelloUIWait.condition("sidebar destination to become selected", timeout: 10) {
-                guard let value = sidebar.value as? String else { return false }
-                return value == "selected" || value.hasPrefix("selected, ")
+                sidebar.isSelected
             }
         )
     }
@@ -635,13 +637,15 @@ class VocelloMacUITestCase: XCTestCase {
         XCTAssertFalse(backendCrash.exists, "Generation must not expose a backend crash")
     }
 
-    /// Waits until the sidebar player reports it stopped playing (its play/pause
-    /// control exposes "pause" while playing and "play" once done). Returns
-    /// whether the stop was observed within the timeout.
+    /// Waits until the sidebar player reports it stopped playing. The control
+    /// is labelled with the action it will perform, so "Play" means playback
+    /// is not running. The label is read rather than a value because the state
+    /// words the app used to publish were hardcoded English; every lane pins
+    /// `-AppleLanguages (en)`, so the label here is deterministic.
     func waitForPlaybackToFinish(timeout: TimeInterval) -> Bool {
         let control = button("sidebarPlayer_playPause")
         return VocelloUIWait.condition("playback to finish", timeout: timeout) {
-            !control.exists || (control.value as? String) == "play"
+            !control.exists || control.label == "Play"
         }
     }
 

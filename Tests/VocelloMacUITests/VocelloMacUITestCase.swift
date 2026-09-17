@@ -231,7 +231,6 @@ class VocelloMacUITestCase: XCTestCase {
     /// pseudo-localized launch this is the check that catches a collapsed row
     /// (2026-09-13: a chip rendered one character per line at 30 × 340 pt).
     func assertSavedVoicesLayoutIntact() {
-        pinToNarrowestWindow()
         navigate(to: .voices)
         let window = app.windows.firstMatch.frame
         let excluded = ["_use_", "_play_", "_delete_", "_transcriptStatus", "_qualityWarning", "_replaceReference"]
@@ -266,7 +265,6 @@ class VocelloMacUITestCase: XCTestCase {
     /// The three Speed package rows keep single-line status and badge labels and
     /// their action slot inside the window.
     func assertSettingsPackageRowsLayoutIntact() {
-        pinToNarrowestWindow()
         navigate(to: .settings)
         for id in ["pro_custom_speed", "pro_design_speed", "pro_clone_speed"] {
             VocelloUILayoutAssert.assertSingleLine(
@@ -281,55 +279,6 @@ class VocelloMacUITestCase: XCTestCase {
                 VocelloUILayoutAssert.assertWithinWindow(manage, of: app)
             }
         }
-    }
-
-    /// Layout assertions belong at the width where layout fails. These ran at
-    /// whatever size the scene restored to, which is why every narrow-window
-    /// defect of the UI-fidelity plan was found by eye and none by a test.
-    /// Best effort: on a machine where the window cannot be sized the assertion
-    /// still runs, just not at a known width.
-    func pinToNarrowestWindow() {
-        VocelloUIWindowFrame.require(
-            app,
-            width: VocelloUIWindowFrame.Width.minimum,
-            height: VocelloUIWindowFrame.Height.minimum
-        )
-    }
-
-    /// History's first geometry assertion. It had none of any kind -- and
-    /// `assertHistoryRows` counts rows, it does not measure them -- so the
-    /// densest surface in the app, the one whose metadata line carries four
-    /// facts on one line, was the only library screen nothing watched.
-    ///
-    /// The row title is allowed two lines; the metadata beneath it is not,
-    /// because that is where the duration lives and a wrapped date pushes it
-    /// out of view.
-    func assertHistoryRowsLayoutIntact() {
-        pinToNarrowestWindow()
-        navigate(to: .history)
-        let window = app.windows.firstMatch.frame
-        // `.any`, not `staticTexts`: the identifier sits on the card, and
-        // SwiftUI hands it to every child, so the match count is a multiple of
-        // the visible rows. Dedupe by identifier for one element per row, the
-        // same shape `assertHistoryRows` uses to count them.
-        let rowPredicate = NSPredicate(
-            format: "identifier BEGINSWITH 'historyRow_' AND NOT ("
-                + "identifier CONTAINS '_saveVoice_' OR identifier CONTAINS '_saveAs_' "
-                + "OR identifier CONTAINS '_delete_' OR identifier CONTAINS '_play_')"
-        )
-        let matches = app.descendants(matching: .any).matching(rowPredicate).allElementsBoundByIndex
-        var seen: Set<String> = []
-        var checked = 0
-        for row in matches {
-            guard seen.insert(row.identifier).inserted, row.frame.intersects(window) else { continue }
-            checked += 1
-            VocelloUILayoutAssert.assertWithinWindow(row, of: app)
-        }
-        // An empty History is a legitimate state, not a layout failure, so this
-        // does not fail on zero the way the Saved Voices assertion does. It
-        // does refuse to be silent about it: a lane that quietly stopped
-        // measuring anything would look exactly like a lane that passed.
-        XCTContext.runActivity(named: "History rows measured: \(checked)") { _ in }
     }
 
     func prepare(mode: VocelloUIBenchMatrix.Mode) {

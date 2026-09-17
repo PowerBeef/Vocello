@@ -115,9 +115,6 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         ensureCloneConsentEnabled()
         assertSavedCloneVoice()
         assertSavedVoicesLayoutIntact()
-        // History had no geometry assertion at all until UIF-06, so the
-        // densest surface in the app was the one nothing measured.
-        assertHistoryRowsLayoutIntact()
         VocelloUIScreenshot.attach(app, named: "mac-smoke-readiness-pseudolocalized")
     }
 

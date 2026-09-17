@@ -726,6 +726,18 @@ struct MacVoiceCloningScreen: View {
 
     private func consumePendingSavedVoiceHandoffIfNeeded() {
         guard let handoff = pendingSavedVoiceHandoff else { return }
+        // A handoff is a path plus a promise that the file is there, and the
+        // promise is made before this screen is ever shown: the user picks a
+        // saved voice on another screen and this consumes it on appear. In
+        // between, the voice can be deleted, the file can be moved, or the
+        // volume holding it can go away. Applying it unchecked stages Clone
+        // against a reference that is not there, and the failure surfaces
+        // later as an unexplained generation error.
+        guard FileManager.default.fileExists(atPath: handoff.wavPath) else {
+            session.dropError = MacInterfaceText.cloningSavedVoiceUnavailable
+            pendingSavedVoiceHandoff = nil
+            return
+        }
         draft.applySavedVoiceSelection(id: handoff.savedVoiceID, wavPath: handoff.wavPath, transcript: handoff.transcript)
         session.transcriptLoadError = handoff.transcriptLoadError
         session.hydratedSavedVoiceID = handoff.savedVoiceID

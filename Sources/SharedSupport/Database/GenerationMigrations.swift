@@ -88,6 +88,21 @@ enum GenerationMigrations {
             }
         }
 
+        migrator.registerMigration("v7_index_generations_audioPath") { db in
+            // `audioPath` is the idempotency key: every save first asks whether
+            // a row with this path already exists, which is what makes a
+            // retried write safe. Without an index that question was a full
+            // table scan, and it runs on the path a generation completes on --
+            // the one place a stall is most visible -- against a table that
+            // only ever grows. Not unique: two rows may legitimately share a
+            // path after a long-form join supersedes an earlier take.
+            try db.create(
+                index: "idx_generations_audioPath",
+                on: "generations",
+                columns: ["audioPath"]
+            )
+        }
+
         return migrator
     }
 }

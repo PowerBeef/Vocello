@@ -23,6 +23,11 @@ struct MacVoicesScreen: View {
     let enrollRequestID: UUID?
     let canUseInVoiceCloning: Bool
     let onUseInVoiceCloning: (Voice) -> Void
+    /// Reported after a voice is actually gone, so the shell can drop anything
+    /// still pointing at it. The phone has always done this
+    /// (`IOSVoicesView`); the desktop did not, which left a staged Clone
+    /// handoff aimed at a `wavPath` that no longer exists.
+    let onVoiceDeleted: (String) -> Void
 
     @State private var savedVoiceSheetConfiguration: SavedVoiceSheetConfiguration?
     @State private var actionAlert: MacVoicesAlertState?
@@ -309,6 +314,7 @@ private extension MacVoicesScreen {
                 try await ttsEngineStore.deletePreparedVoice(id: voice.id)
                 await MainActor.run {
                     savedVoicesViewModel.removeVoiceFromVisibleState(id: voice.id)
+                    onVoiceDeleted(voice.id)
                 }
             } catch {
                 await MainActor.run {

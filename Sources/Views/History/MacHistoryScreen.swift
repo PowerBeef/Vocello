@@ -323,7 +323,7 @@ struct MacHistoryScreen: View {
             }
             Button(MacInterfaceText.delete, role: .destructive) {
                 if let item = itemToDelete {
-                    confirmDelete(item)
+                    Task { await confirmDelete(item) }
                 }
                 itemToDelete = nil
             }
@@ -759,8 +759,8 @@ private extension MacHistoryScreen {
         }
     }
 
-    func confirmDelete(_ item: MacHistoryListItem) {
-        switch deleteItem(item) {
+    func confirmDelete(_ item: MacHistoryListItem) async {
+        switch await deleteItem(item) {
         case .deleted:
             break
         case .databaseFailure(let message):
@@ -776,11 +776,18 @@ private extension MacHistoryScreen {
         }
     }
 
-    func deleteItem(_ item: MacHistoryListItem) -> HistoryDeletionEngine.SingleOutcome {
-        let outcome = HistoryDeletionEngine.databaseBacked.deleteSingle(
-            recordID: item.generation.id,
-            audioPath: item.generation.audioPath
-        )
+    /// Off the main actor, because the work behind this is a synchronous SQLite
+    /// write followed by a file removal, and both were running on the thread
+    /// drawing the list. The engine stays pure and synchronous -- its rules are
+    /// tested in `QwenVoiceCore` and are worth keeping that way -- so the hop
+    /// happens here, at the one place that knows it is on the main actor.
+    func deleteItem(_ item: MacHistoryListItem) async -> HistoryDeletionEngine.SingleOutcome {
+        let engine = HistoryDeletionEngine.databaseBacked
+        let recordID = item.generation.id
+        let audioPath = item.generation.audioPath
+        let outcome = await Task.detached(priority: .userInitiated) {
+            engine.deleteSingle(recordID: recordID, audioPath: audioPath)
+        }.value
 
         if case .databaseFailure = outcome {
             databaseUnavailable = true

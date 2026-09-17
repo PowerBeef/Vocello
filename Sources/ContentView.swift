@@ -223,6 +223,15 @@ struct ContentView: View {
                         }
                     )
                     startSavedVoiceCloningHandoff(plan)
+                },
+                onVoiceDeleted: { voiceID in
+                    // The staged handoff carries the voice's `wavPath`, and
+                    // deleting the voice removes that file. Left in place it
+                    // would stage Voice Cloning against a reference that is no
+                    // longer there. `IOSVoicesView` has always cleared it.
+                    if pendingVoiceCloningHandoff?.savedVoiceID == voiceID {
+                        pendingVoiceCloningHandoff = nil
+                    }
                 }
             )
         case .settings:

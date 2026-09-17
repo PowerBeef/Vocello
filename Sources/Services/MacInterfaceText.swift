@@ -416,6 +416,10 @@ enum MacInterfaceText {
             defaultValue: "Couldn't load the saved transcript for “%@”. You can still clone from the audio file alone.",
             comment: "macOS interface: warning when a saved voice's transcript file cannot be read; %@ is the voice name. Presentation only."), name)
     }
+    static var cloningSavedVoiceUnavailable: String {
+        localization.string(localized: "vocello.mac.cloning.savedVoiceUnavailable", defaultValue: "That saved voice’s reference audio is no longer available. Choose another reference.",
+               comment: "macOS interface: shown when a staged saved-voice reference file no longer exists by the time Voice Cloning opens. Presentation only.")
+    }
     static var cloningTranscriptPlaceholder: String {
         localization.string(localized: "vocello.mac.cloning.transcriptPlaceholder", defaultValue: "What does the reference audio say? (optional)",
                comment: "macOS interface: placeholder of the reference transcript field. Presentation only.")

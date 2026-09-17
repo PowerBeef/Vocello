@@ -16885,6 +16885,24 @@
         }
       }
     },
+    "vocello.mac.cloning.savedVoiceUnavailable": {
+      "comment": "macOS interface: shown when a staged saved-voice reference file no longer exists by the time Voice Cloning opens. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That saved voice’s reference audio is no longer available. Choose another reference."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’audio de référence de cette voix enregistrée n’est plus disponible. Choisissez une autre référence."
+          }
+        }
+      }
+    },
     "vocello.mac.cloning.transcriptPlaceholder": {
       "comment": "macOS interface: placeholder of the reference transcript field. Presentation only.",
       "extractionState": "manual",

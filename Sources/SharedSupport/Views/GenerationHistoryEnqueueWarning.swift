@@ -65,12 +65,46 @@ struct GenerationHistoryEnqueueWarning: View {
             }
             .padding(VocelloTheme.Spacing.md)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial)
+            .modifier(GatedBannerSurface())
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("historyUnqueued_banner")
             #if os(iOS)
             .iosExportPresentation(exportGate)
             #endif
+        }
+    }
+}
+
+/// The banner's translucency, decided by the same two conditions every other
+/// translucent surface in the app routes through. It was the one that did not:
+/// a bare `.background(.regularMaterial)` in an architecture where the glass
+/// decision is deliberately structural rather than remembered.
+///
+/// Reduce Transparency is the accessibility half. The generation performance
+/// gate is the half a material cannot know about on its own: continuous
+/// compositor work costs ~23% engine RTF on the 8 GB tier while a translucent
+/// surface is visible (benchmarks/OPTIMIZATION.md §K), and this banner is
+/// pinned to the top of the window, so when it is showing it is showing during
+/// generation too.
+///
+/// The ungated branch keeps `.regularMaterial` rather than adopting glass: the
+/// fix here is the gate, not a redesign of a warning the user did not ask to
+/// see.
+private struct GatedBannerSurface: ViewModifier {
+    #if os(iOS)
+    @Environment(\.iosReduceTransparencyEnabled) private var reduceTransparency
+    @Environment(\.iosGenerationPerformanceGate) private var performanceGate
+    #else
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.generationPerformanceGate) private var performanceGate
+    #endif
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if reduceTransparency || performanceGate {
+            content.background(VocelloTheme.Surface.banner)
+        } else {
+            content.background(.regularMaterial)
         }
     }
 }

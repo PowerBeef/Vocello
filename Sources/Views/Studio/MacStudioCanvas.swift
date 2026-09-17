@@ -157,9 +157,28 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     }
 
     var body: some View {
-        canvasColumn
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .background(shortcutBridge)
+        // The reader is here for its floor, not for its proxy. A GeometryReader
+        // reports a flexible minimum of its own rather than the sum of its
+        // children's, which is what stops the column's stacked floors --
+        // composer 176, chip rows 46 each, dock 64, plus every footer a mode
+        // can show -- from propagating up through ContentView's
+        // `.frame(minHeight:)` and becoming the window's enforced minimum.
+        //
+        // Removing it was measured afterwards and was wrong: at the declared
+        // 560 pt floor, Voice Design's column needs about 633 pt and Voice
+        // Cloning about 603 once a take has finished, so the window would
+        // either refuse to shrink to its own documented minimum or clip the
+        // dock, since nothing in this chain scrolls. The flexible composer and
+        // the absent trailing spacer -- the useful half of that change -- are
+        // unaffected: inside the reader the column still receives a finite
+        // proposal and the editor still takes whatever the chips and dock do
+        // not.
+        GeometryReader { proxy in
+            canvasColumn
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(shortcutBridge)
     }
 
     private var canvasColumn: some View {

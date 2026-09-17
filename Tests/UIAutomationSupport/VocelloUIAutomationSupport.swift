@@ -468,13 +468,28 @@ public enum VocelloUIScroll {
     ) -> Bool {
         var lastTop = CGFloat.greatestFiniteMagnitude
         var stalledScrolls = 0
+        var missingScrolls = 0
         var scrolls = 0
         var reachedEnd = false
         while scrolls < maxAttempts {
             if element.exists && element.isHittable { return true }
             container.scroll(byDeltaX: 0, deltaY: -120)
             scrolls += 1
-            guard element.exists else { continue }
+
+            // An element that never appears needs its own budget. It used to
+            // `continue` straight past the stall bookkeeping below, which froze
+            // `stalledScrolls` at zero — so the one case this loop exists to
+            // fail fast on, a target that is not there at all, was the one case
+            // that always paid the full runaway budget before failing.
+            guard element.exists else {
+                missingScrolls += 1
+                if missingScrolls >= 8 {
+                    reachedEnd = true
+                    break
+                }
+                continue
+            }
+            missingScrolls = 0
             let top = element.frame.minY
             // A point of tolerance: the window server rounds to backing pixels.
             if top < lastTop - 1 {
@@ -493,9 +508,14 @@ public enum VocelloUIScroll {
         let revealed = element.exists && element.isHittable
         if !revealed {
             VocelloUIFailureEvidence.capture(reason: "reveal \(element.identifier)")
-            let why = reachedEnd
-                ? "the container stopped scrolling with it still out of reach"
-                : "the \(maxAttempts)-scroll runaway guard fired first"
+            let why: String
+            if missingScrolls >= 8 {
+                why = "it never appeared in \(scrolls) scrolls — check the identifier and the container"
+            } else if reachedEnd {
+                why = "the container stopped scrolling with it still out of reach"
+            } else {
+                why = "the \(maxAttempts)-scroll runaway guard fired first"
+            }
             XCTFail(
                 "Could not scroll \(element.identifier) into view after \(scrolls) scrolls: \(why)",
                 file: file,

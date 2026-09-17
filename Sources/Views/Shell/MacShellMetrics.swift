@@ -13,7 +13,12 @@ enum MacShellMetrics {
     static let windowDefaultSize = CGSize(width: 1040, height: 680)
     static let diagnosticsMinSize = CGSize(width: 520, height: 420)
     static let settingsWindowMinSize = CGSize(width: 600, height: 520)
-    static let settingsWindowDefaultSize = CGSize(width: 680, height: 720)
+    /// 680 tall, not 720. A window's default size is its *content* size, and
+    /// macOS adds a title bar above it while the menu bar takes from the screen
+    /// below — so asking for 720 pt of content on a 720 pt screen cannot be
+    /// satisfied for any non-zero chrome, and the system silently clamps it.
+    /// The size was therefore never the size anyone saw.
+    static let settingsWindowDefaultSize = CGSize(width: 680, height: 680)
 
     static let sidebarMinWidth: CGFloat = 220
     static let sidebarIdealWidth: CGFloat = 250

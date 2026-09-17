@@ -438,6 +438,10 @@ targets:
       - path: Sources/SharedSupport/Theme/VocelloTypography.swift
       - path: Sources/Views/Theme/MacTypeScale.swift
       - path: Sources/Views/Theme/MacControlMetrics.swift
+      # The chip row's arithmetic, so MacChipFlowTests can hold the invariant
+      # that a row never hands out more width than it has. Pure CoreGraphics,
+      # no view dependency.
+      - path: Sources/Views/Studio/MacChipRowBudget.swift
       - path: Sources/iOSSupport/Services/IOSAppLanguage.swift
       - path: Sources/iOS/Commerce/IOSCommercePresentationText.swift
       - path: Sources/iOSSupport/Services/IOSSettingsModelNavigation.swift

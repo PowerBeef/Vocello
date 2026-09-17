@@ -18,7 +18,7 @@ enum MacStudioChipMetrics {
     /// still reads after the glyph, the chevron and the padding take their
     /// share: below this a four-chip row on a 720 pt window truncated
     /// "Aiden" to "Aid…".
-    static let minWidth: CGFloat = 132
+    static let minWidth: CGFloat = MacChipRowMetrics.minimumChipWidth
 }
 
 struct MacStudioSetupChip<MenuContent: View>: View {

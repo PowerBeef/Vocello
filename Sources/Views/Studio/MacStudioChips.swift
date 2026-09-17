@@ -278,7 +278,9 @@ struct MacChipFlow: Layout {
                 + spacing * CGFloat(subviews.count - 1)
             return CGSize(width: ideal, height: rowHeight)
         }
-        let rows = rowCount(for: subviews.count, width: width)
+        let rows = MacChipRowMetrics.rowCount(
+            count: subviews.count, width: width, spacing: spacing, minimumChipWidth: minimumChipWidth
+        )
         return CGSize(
             width: width,
             height: rowHeight * CGFloat(rows) + rowSpacing * CGFloat(max(rows - 1, 0))
@@ -288,40 +290,23 @@ struct MacChipFlow: Layout {
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         guard !subviews.isEmpty else { return }
         let rowHeight = subviews.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
-        let perRow = chipsPerRow(for: subviews.count, width: bounds.width)
+        let perRow = MacChipRowMetrics.chipsPerRow(
+            count: subviews.count,
+            width: bounds.width,
+            spacing: spacing,
+            minimumChipWidth: minimumChipWidth
+        )
         var index = 0
         var y = bounds.minY
 
-        // What a chip needs first, then the leftover split evenly. Equal shares
-        // alone gave a four-letter language default the same width as the
-        // user's own saved-voice name, so "Warm Narrator (Angry)" truncated to
-        // "Warm Nar..." at every window size while "Auto" sat in a pill it did
-        // not need. The row still fills its width and still lines up with the
-        // row above, because the leftover is shared equally.
-        //
-        // One share for every row, not for the chips actually on it, so a
-        // trailing row holding fewer chips lines up under the row above instead
-        // of stretching its last chip across the whole width.
-        let fullRowAvailable = bounds.width - spacing * CGFloat(perRow - 1)
-        let equalShare = (fullRowAvailable / CGFloat(perRow)).rounded(.down)
-        // Floored before they are budgeted, not after. A chip physically cannot
-        // render narrower than `minimumChipWidth` — `VocelloSetupChipPill`
-        // carries `.frame(minWidth:)` — so a floor applied after the shares are
-        // computed is width nobody accounted for. It came out of the trailing
-        // chip, whose remainder is `bounds.maxX - x`, and that chip then drew
-        // at its own minimum anyway: past the row's right edge, with nothing in
-        // the chain clipping it. Flooring here keeps
-        // `sum(ideal + surplus) <= fullRowAvailable` true by construction.
-        let ideals = subviews.map { max($0.sizeThatFits(.unspecified).width, minimumChipWidth) }
-        let widestRowIdeal = stride(from: 0, to: subviews.count, by: perRow)
-            .map { start in ideals[start ..< min(start + perRow, ideals.count)].reduce(0, +) }
-            .max() ?? 0
-        // Only when every chip's natural width fits; otherwise equal shares are
-        // already the fair answer and `chipsPerRow` has guaranteed the floor.
-        let honorsIdealWidths = widestRowIdeal <= fullRowAvailable
-        let surplus = honorsIdealWidths
-            ? ((fullRowAvailable - widestRowIdeal) / CGFloat(perRow)).rounded(.down)
-            : 0
+        let ideals = subviews.map { $0.sizeThatFits(.unspecified).width }
+        let budget = MacChipRowMetrics.RowBudget(
+            ideals: ideals,
+            perRow: perRow,
+            rowWidth: bounds.width,
+            spacing: spacing,
+            minimumChipWidth: minimumChipWidth
+        )
 
         while index < subviews.count {
             let count = min(perRow, subviews.count - index)
@@ -331,9 +316,7 @@ struct MacChipFlow: Layout {
             for offset in 0..<count {
                 // The last chip of a full row absorbs the rounding remainder so
                 // the row ends exactly on the container's trailing edge.
-                // No clamp here: `ideals` is already floored, and `surplus` is
-                // never negative, so this cannot fall below the minimum.
-                let natural = honorsIdealWidths ? ideals[index + offset] + surplus : equalShare
+                let natural = budget.width(forIdeal: ideals[index + offset])
                 let width = (isFullRow && offset == count - 1) ? bounds.maxX - x : natural
                 subviews[index + offset].place(
                     at: CGPoint(x: x, y: y),
@@ -346,16 +329,5 @@ struct MacChipFlow: Layout {
             index += count
             y += rowHeight + rowSpacing
         }
-    }
-
-    private func chipsPerRow(for count: Int, width: CGFloat) -> Int {
-        guard count > 0, width.isFinite, width > 0 else { return max(count, 1) }
-        let fitting = Int(((width + spacing) / (minimumChipWidth + spacing)).rounded(.down))
-        return max(1, min(count, fitting))
-    }
-
-    private func rowCount(for count: Int, width: CGFloat) -> Int {
-        let perRow = chipsPerRow(for: count, width: width)
-        return Int((Double(count) / Double(perRow)).rounded(.up))
     }
 }

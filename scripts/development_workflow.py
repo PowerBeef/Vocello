@@ -159,6 +159,32 @@ def swift_test_commands(paths: list[str], *, everything: bool = False) -> list[l
     return []
 
 
+# The XCUITest bundles compile nowhere else. Push CI is forbidden from naming
+# them (repo_invariants.sh check #2, so CI can never execute XCUITest), and the
+# app-target builds do not include them — so until 2026-09-17 a syntax error in
+# the code that drives every acceptance lane reached a human only when someone
+# ran a lane by hand.
+UI_BUNDLE_SOURCES = (
+    "Tests/UIAutomationSupport/",
+    "Tests/VocelloMacUITests/",
+    "Tests/VocelloiOSUITests/",
+    "Tests/VocelloiOSCandidateUITests/",
+)
+
+
+def ui_bundle_mode(paths: list[str]) -> str | None:
+    """Which UI-test bundles the dirty tree can break, or None."""
+    touched = [p for p in paths if p.startswith(UI_BUNDLE_SOURCES) or p == "project.yml"]
+    if not touched:
+        return None
+    # The shared helper module and the project file reach both targets.
+    if any(p.startswith(("Tests/UIAutomationSupport/",)) or p == "project.yml" for p in touched):
+        return "all"
+    if any(p.startswith("Tests/VocelloMacUITests/") for p in touched):
+        return "macos"
+    return "ios"
+
+
 def check_plan(paths: list[str]) -> dict:
     lanes = lanes_for(paths)
     commands: list[list[str]] = []
@@ -172,6 +198,9 @@ def check_plan(paths: list[str]) -> dict:
         commands.append(["./scripts/build_foundation_targets.sh", "ios", "--incremental"])
     if lanes["website"]:
         commands.append(["npm", "--prefix", "website", "run", "check"])
+    bundles = ui_bundle_mode(paths)
+    if bundles:
+        commands.append(["./scripts/build_ui_test_bundles.sh", bundles])
     return {"changedPaths": paths, "lanes": lanes, "commands": commands}
 
 

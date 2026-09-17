@@ -284,6 +284,7 @@ block byte-for-byte, so a manifest change cannot silently leave documentation st
 | `build/artifacts/symbols/macos/` | macOS build and release identity checks | `artifact` | `preserve` | Keep only symbols whose UUIDs match the current macOS app product |
 | `build/artifacts/symbols/ios/` | Physical-device iOS build and archive identity checks | `artifact` | `preserve` | Keep only symbols whose UUIDs match the current iOS app product |
 | `build/artifacts/foundation/` | Foundation compile-safety result bundles and logs | `artifact` | `routine` | Compile-safety result bundles and logs are disposable after the command verdict |
+| `build/artifacts/ui-bundles/` | XCUITest bundle compile logs (scripts/build_ui_test_bundles.sh) | `artifact` | `routine` | Compile logs are disposable once the command has reported its verdict |
 | `build/dist/macos/` | macOS signing, notarization, and packaging lane | `distribution` | `dist` | Never remove during routine or aggressive cleanup; explicit distribution cleanup only |
 | `build/dist/ios/` | iOS archive and TestFlight export lane | `distribution` | `dist` | Never remove during routine or aggressive cleanup; explicit distribution cleanup only |
 <!-- END GENERATED BUILD OUTPUT POLICY TABLE -->

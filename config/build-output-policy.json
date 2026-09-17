@@ -342,6 +342,15 @@
       "env": "QVOICE_ARTIFACTS_FOUNDATION"
     },
     {
+      "id": "artifacts-ui-bundles",
+      "path": "build/artifacts/ui-bundles",
+      "class": "artifact",
+      "owner": "XCUITest bundle compile logs (scripts/build_ui_test_bundles.sh)",
+      "cleanup": "routine",
+      "retention": "Compile logs are disposable once the command has reported its verdict",
+      "env": "QVOICE_ARTIFACTS_UI_BUNDLES"
+    },
+    {
       "id": "dist-macos",
       "path": "build/dist/macos",
       "class": "distribution",

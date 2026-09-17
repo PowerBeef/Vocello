@@ -55,6 +55,36 @@ class CheckPlanTests(unittest.TestCase):
         self.assertEqual(joined[0], "./scripts/regenerate_project.sh --fast")
         self.assertIn("npm --prefix website run check", joined)
 
+    def test_ui_test_sources_compile_their_bundles(self) -> None:
+        """The bundles compile nowhere else. CI is forbidden from naming them."""
+        for changed, expected in [
+            ("Tests/VocelloMacUITests/VocelloMacUITestCase.swift", "macos"),
+            ("Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift", "ios"),
+            ("Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift", "all"),
+        ]:
+            with self.subTest(changed=changed):
+                joined = commands(MODULE.check_plan([changed]))
+                self.assertIn(f"./scripts/build_ui_test_bundles.sh {expected}", joined)
+
+    def test_ordinary_source_change_does_not_compile_ui_bundles(self) -> None:
+        joined = commands(MODULE.check_plan(["Sources/ContentView.swift"]))
+        self.assertFalse(any("build_ui_test_bundles" in c for c in joined))
+
+    def test_compiling_a_ui_bundle_is_never_running_one(self) -> None:
+        """`build-for-testing` builds and stops; nothing here may execute a lane.
+
+        Asserted against the code, not the comments: the header explains at
+        length what this script deliberately does not do, and naming a thing in
+        prose is not invoking it.
+        """
+        script = (ROOT / "scripts/build_ui_test_bundles.sh").read_text(encoding="utf-8")
+        code = "\n".join(
+            line for line in script.splitlines() if not line.lstrip().startswith("#")
+        )
+        self.assertIn("build-for-testing", code)
+        for forbidden in ("test-without-building", "ui_test.sh", "Simulator", "xcodebuild test"):
+            self.assertNotIn(forbidden, code, f"{forbidden!r} must not be invoked here")
+
     def test_check_never_schedules_ui_device_or_release_lanes(self) -> None:
         plan = MODULE.check_plan(["Sources/iOS/A.swift", "scripts/ui_test.sh", "scripts/release.sh", "website/x.ts"])
         for command in commands(plan):

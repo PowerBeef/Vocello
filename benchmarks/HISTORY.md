@@ -1574,6 +1574,12 @@ trend percentages carry their direction in words.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-16 | [`macos-xcui-perf-20260916-060302-b684908c`](runs/ui-perf/macos-xcui-perf-20260916-060302-b684908c.json) | canonical | canonical | passed | not-applicable | 9 | — | `a93186f34e63` | `588ddf1584cb` | baseline | macos-xcui-perf-20260916-060302-b684908c |
 
+## ui-perf / macos / mac-mini-m2-8gb / config `5b5908b3f42b`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-17 | [`macos-xcui-perf-20260917-020446-da222c6f`](runs/ui-perf/macos-xcui-perf-20260917-020446-da222c6f.json) | canonical | exploratory | passed | not-applicable | 9 | — | `e1755734b902` dirty | `excluded` | baseline | macos-xcui-perf-20260917-020446-da222c6f |
+
 ## ui-perf / macos / mac-mini-m2-8gb / config `98cc9677aeef`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

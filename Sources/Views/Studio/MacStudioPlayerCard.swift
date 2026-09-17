@@ -55,6 +55,11 @@ struct MacStudioPlayerCard: View {
     }
 
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
+    /// The completed take is a result row because the sidebar footer carries
+    /// the transport. macOS lets the user collapse that column, which took the
+    /// transport with it and left a finished take with no way to play it except
+    /// through History — so the card takes it back when the sidebar is gone.
+    @Environment(\.vocelloSidebarIsVisible) private var sidebarIsVisible
 
     let phase: Phase
     let tint: Color
@@ -74,8 +79,8 @@ struct MacStudioPlayerCard: View {
             // (maintainer decision 2026-09-16). The live preview keeps its
             // own, because it is the surface being watched while a take
             // streams and it carries Cancel.
-            if phase.isLive {
-                MacStudioWaveformRow(tint: tint)
+            if showsTransport {
+                MacStudioWaveformRow(tint: tint, isLive: phase.isLive)
             }
             controlsRow
 
@@ -128,7 +133,11 @@ struct MacStudioPlayerCard: View {
         }
     }
 
-    /// Only the live preview has one; see the note in `body`.
+    /// The live preview always shows transport; a completed take shows it only
+    /// when the sidebar player is not on screen to carry it.
+    private var showsTransport: Bool { phase.isLive || !sidebarIsVisible }
+
+    /// See the note beside `sidebarIsVisible`.
     private var playPauseButton: some View {
         Button {
             AppLaunchConfiguration.performAnimated(MacTheme.Motion.stateChange) {
@@ -154,12 +163,17 @@ struct MacStudioPlayerCard: View {
         .disabled(!audioPlayer.hasAudio)
         .accessibilityLabel(MacInterfaceText.menuPlayPause)
         .accessibilityValue(audioPlayer.isPlaying ? "pause" : "play")
-        .accessibilityIdentifier("studio_livePreview_playPause")
+        .accessibilityIdentifier(
+            // Named for the phase, not for why it is on screen: a
+            // completed take showing transport because the sidebar is
+            // collapsed is still the inline player.
+            phase.isLive ? "studio_livePreview_playPause" : "studio_inlinePlayer_playPause"
+        )
     }
 
     private var controlsRow: some View {
         HStack(spacing: MacTheme.Spacing.snug) {
-            if phase.isLive {
+            if showsTransport {
                 playPauseButton
             }
 
@@ -270,6 +284,10 @@ private struct MacStudioWaveformRow: View {
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @EnvironmentObject private var playbackProgress: AudioPlayerViewModel.PlaybackProgress
     let tint: Color
+    /// Names the scrubber for the card it is in. The row appears in the live
+    /// preview, and in a completed take only when a collapsed sidebar has left
+    /// it carrying the transport.
+    let isLive: Bool
 
     private var percentValue: String {
         "\(Int((playbackProgress.progress * 100).rounded())) %"
@@ -300,7 +318,7 @@ private struct MacStudioWaveformRow: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(MacInterfaceText.playerPosition)
             .accessibilityValue(percentValue)
-            .accessibilityIdentifier("studio_inlinePlayer_scrubber")
+            .accessibilityIdentifier(isLive ? "studio_livePreview_scrubber" : "studio_inlinePlayer_scrubber")
             .accessibilityAdjustableAction { direction in
                 guard audioPlayer.canSeek else { return }
                 let step = 0.05

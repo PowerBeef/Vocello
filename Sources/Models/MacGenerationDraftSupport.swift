@@ -37,9 +37,6 @@ extension VoiceCloningDraft {
     /// preserve, and a stray newline is a token the model never heard, so every
     /// run of whitespace collapses to one space before it becomes conditioning.
     var trimmedReferenceTranscript: String? {
-        let collapsed = referenceTranscript
-            .split(whereSeparator: \.isWhitespace)
-            .joined(separator: " ")
-        return collapsed.isEmpty ? nil : collapsed
+        TranscriptNormalization.conditioningLine(referenceTranscript)
     }
 }

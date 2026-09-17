@@ -136,9 +136,25 @@ private struct VocelloWindowSizeKey: EnvironmentKey {
     static let defaultValue: CGSize? = nil
 }
 
+/// Whether the sidebar column is on screen, published by `ContentView`.
+///
+/// It matters because the sidebar footer holds the only playback transport for
+/// a finished take (maintainer decision 2026-09-16). macOS gives the user a
+/// toolbar control and a menu command to collapse that column, and nothing
+/// stopped it taking the transport with it — so a completed take could be left
+/// with no way to play it except through History.
+private struct VocelloSidebarVisibleKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
 extension EnvironmentValues {
     var vocelloWindowSize: CGSize? {
         get { self[VocelloWindowSizeKey.self] }
         set { self[VocelloWindowSizeKey.self] = newValue }
+    }
+
+    var vocelloSidebarIsVisible: Bool {
+        get { self[VocelloSidebarVisibleKey.self] }
+        set { self[VocelloSidebarVisibleKey.self] = newValue }
     }
 }

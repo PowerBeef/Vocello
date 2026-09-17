@@ -442,6 +442,9 @@ targets:
       # that a row never hands out more width than it has. Pure CoreGraphics,
       # no view dependency.
       - path: Sources/Views/Studio/MacChipRowBudget.swift
+      # The transcript's conditioning normalisation, so the whitespace collapse
+      # that changed what reaches the model is covered. Pure Foundation.
+      - path: Sources/Models/TranscriptNormalization.swift
       - path: Sources/iOSSupport/Services/IOSAppLanguage.swift
       - path: Sources/iOS/Commerce/IOSCommercePresentationText.swift
       - path: Sources/iOSSupport/Services/IOSSettingsModelNavigation.swift

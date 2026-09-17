@@ -37,56 +37,56 @@ enum MacChipRowMetrics {
         return Int((Double(count) / Double(perRow)).rounded(.up))
     }
 
-/// How a row's width is divided among its chips.
-///
-/// Lifted out of `placeSubviews` because that is where the arithmetic that
-/// has broken twice lives, and `Subviews` cannot be constructed in a unit
-/// test. Everything here is pure, so `MacChipFlowTests` can hold the
-/// invariant that matters: the widths handed out for a row never exceed the
-/// width the row has.
-struct RowBudget: Equatable {
-    /// True when every chip's natural width fits, so each keeps it and only
-    /// the leftover is shared. False falls back to equal shares, which
-    /// `chipsPerRow` has already guaranteed clear the minimum.
-    let honorsIdealWidths: Bool
-    let surplus: CGFloat
-    let equalShare: CGFloat
-    /// Ideal widths floored at the minimum, in the order given.
-    let flooredIdeals: [CGFloat]
+    /// How a row's width is divided among its chips.
+    ///
+    /// Lifted out of `placeSubviews` because that is where the arithmetic that
+    /// has broken twice lives, and `Subviews` cannot be constructed in a unit
+    /// test. Everything here is pure, so `MacChipFlowTests` can hold the
+    /// invariant that matters: the widths handed out for a row never exceed the
+    /// width the row has.
+    struct RowBudget: Equatable {
+        /// True when every chip's natural width fits, so each keeps it and only
+        /// the leftover is shared. False falls back to equal shares, which
+        /// `chipsPerRow` has already guaranteed clear the minimum.
+        let honorsIdealWidths: Bool
+        let surplus: CGFloat
+        let equalShare: CGFloat
+        /// Ideal widths floored at the minimum, in the order given.
+        let flooredIdeals: [CGFloat]
 
-    init(
-        ideals: [CGFloat],
-        perRow: Int,
-        rowWidth: CGFloat,
-        spacing: CGFloat,
-        minimumChipWidth: CGFloat
-    ) {
-        let perRow = max(perRow, 1)
-        let available = rowWidth - spacing * CGFloat(perRow - 1)
-        // Floored before they are budgeted, not after. A chip physically
-        // cannot render narrower than `minimumChipWidth` --
-        // `VocelloSetupChipPill` carries `.frame(minWidth:)` -- so a floor
-        // applied after the shares were computed was width nobody had
-        // accounted for. It came out of the trailing chip, whose share is
-        // whatever remains to the row's edge, and that chip then drew at
-        // its own minimum anyway: past the edge, unclipped.
-        let floored = ideals.map { max($0, minimumChipWidth) }
-        let widestRow = stride(from: 0, to: floored.count, by: perRow)
-            .map { start in floored[start ..< min(start + perRow, floored.count)].reduce(0, +) }
-            .max() ?? 0
+        init(
+            ideals: [CGFloat],
+            perRow: Int,
+            rowWidth: CGFloat,
+            spacing: CGFloat,
+            minimumChipWidth: CGFloat
+        ) {
+            let perRow = max(perRow, 1)
+            let available = rowWidth - spacing * CGFloat(perRow - 1)
+            // Floored before they are budgeted, not after. A chip physically
+            // cannot render narrower than `minimumChipWidth` --
+            // `VocelloSetupChipPill` carries `.frame(minWidth:)` -- so a floor
+            // applied after the shares were computed was width nobody had
+            // accounted for. It came out of the trailing chip, whose share is
+            // whatever remains to the row's edge, and that chip then drew at
+            // its own minimum anyway: past the edge, unclipped.
+            let floored = ideals.map { max($0, minimumChipWidth) }
+            let widestRow = stride(from: 0, to: floored.count, by: perRow)
+                .map { start in floored[start ..< min(start + perRow, floored.count)].reduce(0, +) }
+                .max() ?? 0
 
-        flooredIdeals = floored
-        equalShare = (available / CGFloat(perRow)).rounded(.down)
-        honorsIdealWidths = widestRow <= available
-        surplus = honorsIdealWidths
-            ? ((available - widestRow) / CGFloat(perRow)).rounded(.down)
-            : 0
+            flooredIdeals = floored
+            equalShare = (available / CGFloat(perRow)).rounded(.down)
+            honorsIdealWidths = widestRow <= available
+            surplus = honorsIdealWidths
+                ? ((available - widestRow) / CGFloat(perRow)).rounded(.down)
+                : 0
+        }
+
+        /// What a chip of this ideal width receives. Never below the minimum:
+        /// `flooredIdeals` already cleared it and `surplus` is never negative.
+        func width(forIdeal ideal: CGFloat) -> CGFloat {
+            honorsIdealWidths ? ideal + surplus : equalShare
+        }
     }
-
-    /// What a chip of this ideal width receives. Never below the minimum:
-    /// `flooredIdeals` already cleared it and `surplus` is never negative.
-    func width(forIdeal ideal: CGFloat) -> CGFloat {
-        honorsIdealWidths ? ideal + surplus : equalShare
-    }
-}
 }

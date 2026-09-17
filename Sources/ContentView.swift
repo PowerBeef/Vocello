@@ -26,6 +26,9 @@ struct ContentView: View {
     @EnvironmentObject private var appCommandRouter: AppCommandRouter
 
     @State private var appModel: MacAppModel
+    /// Bound so the shell knows when the sidebar column is collapsed; the
+    /// sidebar footer is the only playback transport for a finished take.
+    @State private var sidebarColumnVisibility: NavigationSplitViewVisibility = .all
     @State private var customVoiceDraft = CustomVoiceDraft()
     @State private var voiceDesignDraft = VoiceDesignDraft()
     @State private var voiceCloningDraft = VoiceCloningDraft()
@@ -99,7 +102,7 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $sidebarColumnVisibility) {
             SidebarView(
                 selection: sidebarSelectionBinding,
                 disabledItems: disabledSidebarItems
@@ -124,6 +127,7 @@ struct ContentView: View {
         // names the window for Mission Control and the Dock).
         .onGeometryChange(for: CGSize.self) { $0.size } action: { windowSize = $0 }
         .environment(\.vocelloWindowSize, windowSize)
+        .environment(\.vocelloSidebarIsVisible, sidebarColumnVisibility != .detailOnly)
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .toolbar(removing: .title)
         .environment(appModel)

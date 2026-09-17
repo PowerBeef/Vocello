@@ -357,6 +357,12 @@ class VocelloMacUITestCase: XCTestCase {
     /// (That History loads and renders an unbounded row set is a product
     /// finding, not a test one. It is recorded against the History persistence
     /// work rather than worked around further here.)
+    ///
+    /// The labels are matched on their own identifiers because the row's does
+    /// not reach them. `.accessibilityElement(children: .contain)` keeps a
+    /// child's identity rather than lending it the container's -- which is the
+    /// opposite of what the untyped query's behaviour suggested, and the
+    /// reason `historyRow_title_<id>` and `historyRow_meta_<id>` exist.
     func assertHistoryRowsLayoutIntact(filteredTo text: String) {
         navigate(to: .history)
         let search = element("history_searchField", type: .searchField)
@@ -389,45 +395,36 @@ class VocelloMacUITestCase: XCTestCase {
         var checked = 0
         var unmeasured: [String] = []
         for rowID in visibleRowIDs {
-            let texts = app.staticTexts
-                .matching(NSPredicate(format: "identifier == %@", "historyRow_\(rowID)"))
-                .allElementsBoundByIndex
-                .filter { $0.frame.intersects(window) }
-            guard let metadata = texts.max(by: { $0.frame.minY < $1.frame.minY }) else {
+            let title = element("historyRow_title_\(rowID)", type: .staticText)
+            let metadata = element("historyRow_meta_\(rowID)", type: .staticText)
+            guard title.exists, metadata.exists else {
                 unmeasured.append(rowID)
                 continue
             }
             checked += 1
 
             // The metadata line is `lineLimit(1)` at 12 pt: it must truncate
-            // under a doubled string, never wrap.
+            // under a doubled string, never wrap. That is where the duration
+            // lives, and a wrapped date pushes it out of view.
             VocelloUILayoutAssert.assertSingleLine(metadata, maxHeight: 24, minWidth: 40)
             // The title above it is `lineLimit(2)` at 13 pt.
-            for title in texts where title.frame.minY < metadata.frame.minY {
-                VocelloUILayoutAssert.assertSingleLine(title, maxHeight: 44, minWidth: 40)
-            }
-            for text in texts {
-                VocelloUILayoutAssert.assertWithinWindow(text, of: app)
-            }
-            for action in ["historyRow_play_\(rowID)", "historyRow_saveAs_\(rowID)"] {
-                let control = button(action)
-                if control.exists {
-                    VocelloUILayoutAssert.assertWithinWindow(control, of: app)
-                }
+            VocelloUILayoutAssert.assertSingleLine(title, maxHeight: 44, minWidth: 40)
+            for control in [title, metadata, button("historyRow_play_\(rowID)")] {
+                VocelloUILayoutAssert.assertWithinWindow(control, of: app)
             }
         }
 
         // An empty History is legitimate and must not fail. A visible row whose
-        // text this could not find is not: that is the vacuous pass this guards
-        // against, the failure mode that looks exactly like success. The
-        // identifier those texts are matched on is inherited from the card
-        // rather than declared on them, so it is precisely the kind of contract
-        // that can lapse without anyone editing this file.
+        // labels this could not find is not: that is the vacuous pass this
+        // guards against, the failure mode that looks exactly like success.
+        // It has already earned its keep once -- the first version of this
+        // assumed the card's identifier reached its labels, found nothing, and
+        // would have reported a clean pass over zero measurements.
         XCTAssertTrue(
             unmeasured.isEmpty,
             "\(unmeasured.count) of \(visibleRowIDs.count) visible History row(s) exposed no "
-            + "measurable text: \(unmeasured). The row identifier no longer reaches the labels "
-            + "this assertion reads, so it is watching nothing."
+            + "measurable text: \(unmeasured). historyRow_title_<id> and historyRow_meta_<id> "
+            + "are gone from MacHistoryItemCard, so this is watching nothing."
         )
         XCTContext.runActivity(
             named: "History rows measured: \(checked) of \(visibleRowIDs.count) visible"
@@ -548,7 +545,8 @@ class VocelloMacUITestCase: XCTestCase {
         let rowPredicate = NSPredicate(
             format: "identifier BEGINSWITH 'historyRow_' AND NOT ("
                 + "identifier CONTAINS '_saveVoice_' OR identifier CONTAINS '_saveAs_' "
-                + "OR identifier CONTAINS '_delete_' OR identifier CONTAINS '_play_')"
+                + "OR identifier CONTAINS '_delete_' OR identifier CONTAINS '_play_' "
+                + "OR identifier CONTAINS '_title_' OR identifier CONTAINS '_meta_')"
         )
         let rows = app.descendants(matching: .any).matching(rowPredicate)
         // SwiftUI propagates each row's identifier onto every child element

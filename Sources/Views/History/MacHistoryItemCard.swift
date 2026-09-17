@@ -67,6 +67,7 @@ struct MacHistoryItemCard: View {
                     .foregroundStyle(MacTheme.Text.primary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
+                    .accessibilityIdentifier("historyRow_title_\(rowID)")
 
                 HStack(spacing: VocelloTheme.Spacing.tight) {
                     VocelloModeDot(tint: modeTint)
@@ -79,6 +80,12 @@ struct MacHistoryItemCard: View {
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(metadataParts.joined(separator: ", "))
+                // The two labels carry their own identifiers because the row's
+                // does not reach them: `children: .contain` keeps a child's
+                // identity rather than handing it the container's, so a layout
+                // assertion looking for them under `historyRow_<id>` finds
+                // nothing at all. The row counter excludes both suffixes.
+                .accessibilityIdentifier("historyRow_meta_\(rowID)")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 

@@ -395,10 +395,19 @@ class VocelloMacUITestCase: XCTestCase {
         var checked = 0
         var unmeasured: [String] = []
         for rowID in visibleRowIDs {
-            let title = element("historyRow_title_\(rowID)", type: .staticText)
-            let metadata = element("historyRow_meta_\(rowID)", type: .staticText)
+            // Matched on the identifier alone, not on an element type. The
+            // metadata line is `.accessibilityElement(children: .ignore)`, so
+            // what the tree exposes for it is a combined element rather than
+            // the `staticText` the words suggest, and guessing that type wrong
+            // is a silent empty match. Bounded because the list is filtered:
+            // an exact-identifier lookup over one row resolves immediately.
+            let title = element("historyRow_title_\(rowID)")
+            let metadata = element("historyRow_meta_\(rowID)")
             guard title.exists, metadata.exists else {
-                unmeasured.append(rowID)
+                // Say which one is missing. A bare row id sends the next
+                // reader back to the app to find out, and this assertion has
+                // already cost two lane runs to answers that were one word.
+                unmeasured.append("\(rowID)(title=\(title.exists) meta=\(metadata.exists))")
                 continue
             }
             checked += 1
@@ -424,7 +433,7 @@ class VocelloMacUITestCase: XCTestCase {
             unmeasured.isEmpty,
             "\(unmeasured.count) of \(visibleRowIDs.count) visible History row(s) exposed no "
             + "measurable text: \(unmeasured). historyRow_title_<id> and historyRow_meta_<id> "
-            + "are gone from MacHistoryItemCard, so this is watching nothing."
+            + "must exist in MacHistoryItemCard, or this is watching nothing."
         )
         XCTContext.runActivity(
             named: "History rows measured: \(checked) of \(visibleRowIDs.count) visible"

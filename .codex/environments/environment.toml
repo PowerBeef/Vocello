@@ -1,0 +1,40 @@
+version = 1
+name = "Vocello"
+
+[setup]
+script = ""
+
+[[actions]]
+name = "Status"
+icon = "tool"
+command = "scripts/dev.sh status"
+
+[[actions]]
+name = "Check"
+icon = "test"
+command = "scripts/dev.sh check"
+
+[[actions]]
+name = "Native tests"
+icon = "test"
+command = "scripts/dev.sh test"
+
+[[actions]]
+name = "Build Mac app"
+icon = "tool"
+command = "scripts/dev.sh build"
+
+[[actions]]
+name = "Run Mac app"
+icon = "run"
+command = "scripts/dev.sh run"
+
+[[actions]]
+name = "Website checks"
+icon = "test"
+command = "npm --prefix website run check"
+
+[[actions]]
+name = "Toolchain audit"
+icon = "tool"
+command = "python3 scripts/supply_chain_contract.py --installed all"

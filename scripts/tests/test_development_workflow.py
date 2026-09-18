@@ -94,6 +94,14 @@ class CheckPlanTests(unittest.TestCase):
 
 
 class PythonSelectionTests(unittest.TestCase):
+    def test_agent_configuration_selects_both_clients_hook_tests(self) -> None:
+        for path in (".claude/settings.json", ".codex/hooks.json", ".codex/environments/environment.toml"):
+            with self.subTest(path=path):
+                selection = MODULE.python_test_selection([path])
+                self.assertEqual(selection["mode"], "selected")
+                self.assertIn("scripts/tests/test_claude_hooks.py", selection["tests"])
+                self.assertIn("scripts/tests/test_agent_hooks.py", selection["tests"])
+
     def test_real_tooling_dependency_selection_reaches_consumers(self) -> None:
         selection = MODULE.python_test_selection(["scripts/analyze_prosody.py"])
         self.assertEqual(selection["mode"], "selected")

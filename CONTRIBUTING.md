@@ -1,7 +1,9 @@
 # Contributing to Vocello
 
 Thank you for helping improve Vocello. This guide is the human contribution path. Repository
-automation and coding agents use the additional durable instructions in [`CLAUDE.md`](CLAUDE.md).
+automation and coding agents use the shared durable instructions in [`CLAUDE.md`](CLAUDE.md).
+Codex discovers them through [`AGENTS.md`](AGENTS.md); both assistants follow the
+[same handoff procedure](docs/reference/development-workflow.md#claude-and-codex-handoffs).
 
 ## Before starting
 

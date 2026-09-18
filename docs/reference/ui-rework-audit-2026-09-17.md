@@ -13,6 +13,11 @@ sourceOfTruth:
 
 # UI rework audit, 2026-09-17
 
+The [September 18 independent review](project-review-2026-09-18.md) revalidates all twelve AUD items
+against current code and supersedes their severity/causal interpretations below where noted. In
+particular, do not implement the original unverified-transaction finish recommendation without the
+new investigation gate. This report preserves the historical audit; the roadmap owns current status.
+
 Seventeen commits landed a macOS UI-fidelity pass between `3874b70d` and `18bb3b81`. Each had a green
 local check and most had a green lane chain and green CI. The maintainer asked for an exhaustive audit
 anyway, on the grounds that green gates were not evidence the work was safe.

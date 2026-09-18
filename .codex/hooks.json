@@ -1,0 +1,55 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$(git rev-parse --show-toplevel)\"/scripts/hooks/session_start.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$(git rev-parse --show-toplevel)\"/scripts/hooks/commit_lint.sh",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "\"$(git rev-parse --show-toplevel)\"/scripts/hooks/policy_guard.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "^apply_patch$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$(git rev-parse --show-toplevel)\"/scripts/hooks/generated_file_guard.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^apply_patch$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$(git rev-parse --show-toplevel)\"/scripts/hooks/project_yml_reminder.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

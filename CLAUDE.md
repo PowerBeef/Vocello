@@ -4,6 +4,10 @@
 > servers, devices and models never are. **Plans:** `docs/ROADMAP.md` · **Narrative:**
 > `docs/development-progress.md` · **Architecture:** `docs/ARCHITECTURE.md` · **Rules:** `.claude/rules/`
 
+This is the shared policy for Claude and Codex. `AGENTS.md` is Codex's entry point, not a second
+rulebook. Claude leads development; Codex reviews and implements assigned work. One assistant edits
+at a time on the existing checkout; use the [handoff procedure](docs/reference/development-workflow.md#claude-and-codex-handoffs).
+
 ## Product and authority
 
 **Vocello** is local-first Qwen3-TTS on MLX in Swift 6: a macOS app and an iOS app that both host the
@@ -60,7 +64,7 @@ publication and device consent are always explicit; ordinary work never needs a 
 | **Concurrency and MLX** | Owned unsafe concurrency is registered in `config/concurrency-safety.json`; MLX arrays stay isolated, randomness is request-local, pins move in lockstep, no Core ML. |
 | **One lifecycle authority** | Actor-owned lifecycle, typed cancellation, serialized prewarm, frame-bounded suspending audio; phases in `config/runtime-refactor-contract.json`. |
 | **Exact model delivery** | The production catalog is generated from `config/model-artifact-receipts.json` and activates only complete, digest-verified artifacts. |
-| **Privacy** | Never track PII, private paths, prompts, transcripts, credentials or raw diagnostics; `scripts/privacy_scan.py` enforces it. |
+| **Privacy** | Never track PII, private paths, prompts, transcripts, credentials or raw diagnostics. `scripts/privacy_scan.py` detects known literal patterns; runtime interpolation and unrecognized content still require review. |
 | **Owned output** | `config/build-output-policy.json` owns `build/`; reuse `build/cache/xcode/{macos,macos-optimized,macos-tsan,ios-device}`; no ad hoc DerivedData or whole-cache deletion. |
 | **Evidence retention** | Only qualified privacy-safe PASS enters `benchmarks/runs/`; raw WAV, telemetry, screenshots and xcresult stay untracked. `rtf` is the standard real-time factor (synthesis wall ÷ audio, lower is faster; `decodeSpeedupX` is the old inverted figure) and `toolchain.optimization` comes from a hash-bound build receipt, never a literal. |
 | **Exact-source releases** | Candidates need a GitHub-verified annotated tag on `origin/main` with green `CI required`; `scripts/release_source_authority.py` fails closed and the release workflow runs Security on the tagged commit. |
@@ -89,6 +93,13 @@ deletion, force pushes, new branches, `project.pbxproj` writes), `generated_file
 the production catalog, `docs/charts/*.svg`, `benchmarks/HISTORY.md`, frozen `benchmarks/runs/*`, the
 `.xcodeproj`, the owned-package inventory and facade baseline), `project_yml_reminder.sh` (regenerate after editing `project.yml`) and `session_start.sh`. Behaviour is pinned by `scripts/tests/test_claude_hooks.py`. Personal
 overrides live in the untracked `settings.local.json` under `.claude/`.
+
+`.codex/hooks.json` wires the same guards for Codex after its project-hook trust review. The shared
+input adapter accepts Claude file paths and every path in a Codex patch, including moves. Tests in
+`scripts/tests/test_agent_hooks.py` exercise patches and Codex wiring; settings-only edits select both
+clients' hook suites locally and in CI. Hooks are best-effort guardrails, not a complete enforcement
+boundary: shell programs and tools outside their coverage still require these instructions. Codex's
+project actions use the existing commands, with no automatic setup or new build entry point.
 
 Optional assists, verified before relying on them: user-invoked skills `/ios-lane`, `/macos-ui-lane`,
 `/device-diagnostics`, `/release-evidence`; subagents `swift-review` and `xcresult-triage`; the

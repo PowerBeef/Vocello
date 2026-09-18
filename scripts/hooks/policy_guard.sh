@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Code PreToolUse hook (matcher: Bash): repository policy guard.
+# Claude/Codex PreToolUse hook (matcher: Bash): repository policy guard.
 #
 # Reads the hook JSON from stdin and inspects `tool_input.command`. It blocks
 # (exit 2, reason on stderr) the handful of shell commands that violate a hard
@@ -23,15 +23,8 @@ set -euo pipefail
 # Heredoc bodies are data, not commands: a commit message or a generated file that
 # merely mentions a guarded pattern must not trip the guard. They are stripped
 # before matching; everything else in the command line is inspected verbatim.
-payload="$(cat 2>/dev/null || true)"
-command_text="$(printf '%s' "$payload" \
-  | python3 -c 'import json,re,sys
-try:
-    text = json.load(sys.stdin).get("tool_input", {}).get("command", "")
-except Exception:
-    text = ""
-text = re.sub(r"<<-?\s*[\x27\"]?([A-Za-z_][A-Za-z0-9_]*)[\x27\"]?[^\n]*\n.*?\n[ \t]*\1[ \t]*(?=\n|$)", "<<HEREDOC", text, flags=re.S)
-print(text)' 2>/dev/null || true)"
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+command_text="$(python3 "$HOOK_DIR/agent_hook_input.py" policy-command)"
 
 [[ -n "$command_text" ]] || exit 0
 

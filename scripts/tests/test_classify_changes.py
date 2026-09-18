@@ -25,6 +25,13 @@ def git(cwd: Path, *arguments: str) -> str:
 
 
 class RoutingTests(unittest.TestCase):
+    def test_agent_configuration_routes_to_python_without_native_lanes(self) -> None:
+        for path in (".claude/settings.json", ".codex/hooks.json", ".codex/environments/environment.toml"):
+            with self.subTest(path=path):
+                lanes = MODULE.classify([path])
+                self.assertTrue(lanes["python"])
+                self.assertFalse(lanes["swift"] or lanes["ios"] or lanes["website"])
+
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.repo = Path(self.temp.name)
@@ -141,7 +148,7 @@ class ClassificationTests(unittest.TestCase):
     def test_inert_paths_route_nowhere(self) -> None:
         for path in ("Packages/VocelloQwen3Core/README.md", "Packages/VocelloQwen3Core/UPSTREAM.md",
                      "benchmarks/OPTIMIZATION.md", "benchmarks/baseline-2026-05-30-06166f0.md",
-                     "benchmarks/README.md", "docs/reference/cli.md", "CONTRIBUTING.md", ".claude/settings.json"):
+                     "benchmarks/README.md", "docs/reference/cli.md", "CONTRIBUTING.md", "AGENTS.md"):
             self.assertEqual(self.lanes(path), set(), path)
         self.assertEqual(self.lanes("config/roadmap.json"), {"python"})
         self.assertEqual(self.lanes("scripts/tests/test_foo.py"), {"python"})

@@ -6,6 +6,8 @@ paths:
   - "benchmarks/**"
   - "docs/**"
   - ".claude/**"
+  - ".codex/**"
+  - "AGENTS.md"
 ---
 # Release / QA rule — scripts, CI, packaging, benchmarks, evidence
 
@@ -102,8 +104,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
 - **TSan.** `config/tsan-policy.json` names the subset, the tests that skip under the sanitizer and the
   blocking decision; push CI and the nightly run it; never weaken deterministic or MLX runtime coverage
   to make it pass, and never relax the status without a new dated decision.
-- **Claude Code state stays external.** Sessions, memory and `settings.local.json` never enter Git,
-  CI or evidence; the repository tracks only `.claude/settings.json`, rules, skills and subagents.
+- **Assistant state stays external.** Sessions, memory, credentials and personal settings never enter
+  Git, CI or evidence. Track only shared instructions, reviewed hooks and project actions. Claude and
+  Codex share the repository guards; their executable configuration changes route to Python tests.
 
 ## Common mistakes
 

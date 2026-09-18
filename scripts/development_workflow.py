@@ -75,7 +75,10 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
     consumer, or tooling everything depends on changed, the whole suite runs.
     """
     root = root or ROOT
-    inputs = [p for p in paths if p.startswith(("scripts/", "config/")) or p in {"project.yml", "Package.resolved"}]
+    agent_inputs = [p for p in paths if p.startswith((".claude/", ".codex/"))
+                    and p.endswith((".json", ".toml", ".py", ".sh"))]
+    inputs = [p for p in paths if p.startswith(("scripts/", "config/"))
+              or p in {"project.yml", "Package.resolved"}] + agent_inputs
     if any(p.startswith(FULL_PYTHON_PATTERNS) for p in paths):
         return {"mode": "full", "tests": [], "reason": "shared tooling changed"}
     modules = sorted(root.glob("scripts/tests/**/test_*.py"))
@@ -83,6 +86,8 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
     texts = {p.relative_to(root).as_posix(): p.read_text(encoding="utf-8")
              for p in (root / "scripts").rglob("*.py") if p.is_file() and "__pycache__" not in p.parts}
     selected: set[str] = set()
+    if agent_inputs:
+        selected.update({"scripts/tests/test_claude_hooks.py", "scripts/tests/test_agent_hooks.py"})
     for changed in inputs:
         if not (root / changed).is_file():
             return {"mode": "full", "tests": [], "reason": "deleted or missing tooling input"}
@@ -95,6 +100,8 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
                 break
             affected = expanded
         tests = affected & test_paths
+        if not tests and changed in agent_inputs:
+            continue  # the shared adapter and both clients' wiring are covered above
         if not tests:
             return {"mode": "full", "tests": [], "reason": "no known test consumer for changed input"}
         selected.update(tests)

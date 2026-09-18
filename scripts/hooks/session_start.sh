@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Code SessionStart hook: branch and dirty state, dev.sh status, the "Resume now"
+# Shared Claude/Codex SessionStart hook: branch and dirty state, dev.sh status, the "Resume now"
 # head of docs/development-progress.md, paired-iPhone reachability. Read-only, bounded, never fails.
 
 root="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"

@@ -1,26 +1,18 @@
 #!/usr/bin/env bash
-# Claude Code PreToolUse hook (matcher: Edit|Write|MultiEdit|NotebookEdit).
+# Claude file-edit / Codex apply_patch PreToolUse hook.
 #
-# Reads `tool_input.file_path` and refuses (exit 2) direct edits of files the
+# Reads all normalized edit paths and refuses (exit 2) direct edits of files the
 # repository generates or freezes, naming the generator so the fix is one
 # command away. Path checks are plain `case` globs on the repository-relative
 # path; the hook never reads git state and finishes in milliseconds.
 
 set -euo pipefail
 
-payload="$(cat 2>/dev/null || true)"
-file_path="$(printf '%s' "$payload" \
-  | python3 -c 'import json,sys
-try:
-    print(json.load(sys.stdin).get("tool_input", {}).get("file_path", ""))
-except Exception:
-    print("")' 2>/dev/null || true)"
-
-[[ -n "$file_path" ]] || exit 0
-
-root="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
-relative="${file_path#"$root"/}"
-relative="${relative#./}"
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+file_paths="$(python3 "$HOOK_DIR/agent_hook_input.py" paths)"
+[[ -n "$file_paths" ]] || exit 0
+root="${CLAUDE_PROJECT_DIR:-$(cd "$HOOK_DIR/../.." && pwd)}"
+root="$(cd "$root" && pwd -P)"
 
 block() {
   echo "generated-file guard: BLOCKED — $relative is generated or frozen; do not hand-edit it." >&2
@@ -28,7 +20,9 @@ block() {
   exit 2
 }
 
-case "$relative" in
+while IFS= read -r file_path; do
+  relative="${file_path#"$root"/}"
+  case "$relative" in
   docs/ROADMAP.md)
     block "edit config/roadmap.json, then python3 scripts/roadmap.py render" ;;
   Sources/Resources/qwenvoice_production_model_catalog.json)
@@ -45,6 +39,7 @@ case "$relative" in
     block "python3 scripts/qwen3_core_contract.py rebuild-current-inventory" ;;
   Packages/VocelloQwen3Core/FACADE_API_BASELINE.json)
     block "python3 scripts/qwen3_core_contract.py rebuild-facade-api-baseline" ;;
-esac
+  esac
+done <<< "$file_paths"
 
 exit 0

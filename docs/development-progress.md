@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-15
+reviewed: 2026-09-18
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -16,6 +16,23 @@ Checkpoints older than the ones below live in git history (`git log -p -- docs/d
 last full copy at commit 25a895ed).
 
 ## Resume now
+
+### Shared Claude–Codex workflow and independent review (September 18)
+
+Claude remains primary; Codex reviews and implements assigned work on the same local `main`, one
+editor at a time. Root and website `AGENTS.md` route to existing rules; the five shared hooks have a
+Codex adapter, configuration changes select their tests, and seven project actions use the existing
+scripts with empty automatic setup. Follow the
+[baseline/evidence handoff](reference/development-workflow.md#claude-and-codex-handoffs), checking the
+actual diff before taking ownership. Codex discovered the hooks without errors but reported them
+untrusted; platform trust and fresh-session automatic dispatch remain to be verified.
+
+The [dated review](reference/project-review-2026-09-18.md) maps ownership and coverage and revalidates
+AUD-01 through AUD-12 without changing their work status or the primary plan. It narrows unsupported
+claims, especially AUD-07's former unconditional StoreKit finish prescription. Native deterministic
+tests, TSan, generic iOS compilation, Python and website checks passed locally; local Xcode 27 differs
+from CI's pinned 26.6. No application runtime or schema changed. Device/UI/model and release work
+retain their explicit-request requirements. Use the roadmap for the next assignment.
 
 ### The Mac screens read like the iOS app, on a desktop (September 15, evening)
 

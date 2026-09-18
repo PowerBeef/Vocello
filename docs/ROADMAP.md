@@ -61,9 +61,9 @@ Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](referen
 
 `audit-remediation-2026-09` · **active** · backend-and-platform · adopted 2026-09-17
 
-Close the conditions the 2026-09-17 specialist audit surfaced. None were caused by the macOS UI-fidelity range that prompted the audit; they are pre-existing and were ranked by severity rather than by how close they sat to the changed code. The defects that range did introduce were fixed inside it and are not tracked here.
+Resolve the twelve existing audit items using the September 18 independent revalidation of the September 17 findings. Distinguish confirmed code properties, hypotheses requiring device evidence, policy decisions and documentation drift; preserve identifiers and existing assignment status. Application remediation is separately assigned from collaboration setup.
 
-Narrative authority: [`docs/reference/ui-rework-audit-2026-09-17.md`](reference/ui-rework-audit-2026-09-17.md)
+Narrative authority: [`docs/reference/project-review-2026-09-18.md`](reference/project-review-2026-09-18.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
@@ -73,11 +73,11 @@ Narrative authority: [`docs/reference/ui-rework-audit-2026-09-17.md`](reference/
 | `AUD-04` | parked | Clone readiness reflects the context it actually has | — |
 | `AUD-05` | planned | History persistence, and what History shows | — |
 | `AUD-06` | parked | iOS modals hide their background from VoiceOver | — |
-| `AUD-07` | parked | Finish the transaction that cannot be verified | — |
+| `AUD-07` | parked | Verify recovery from an unverified StoreKit purchase | — |
 | `AUD-08` | planned | Make the logging half of the privacy invariant a gate | — |
 | `AUD-09` | planned | Smoke test01 owns the fixture it depends on | — |
 | `AUD-10` | planned | The engine is kept hot by intent, not by browsing | — |
-| `AUD-11` | planned | Repetition-penalty dedup uses the set it already has | — |
+| `AUD-11` | planned | Use constant-time sampler membership without changing token order | — |
 | `AUD-12` | parked | Migrate off the deprecated audio-session interruption keys | — |
 
 ### Open items in detail
@@ -94,30 +94,30 @@ Narrative authority: [`docs/reference/ui-rework-audit-2026-09-17.md`](reference/
   gate: No Studio screen starts a generation Task; the actor-owned lifecycle owns cancellation and prewarm; macOS smoke and the cancellation journey pass unchanged.
 
 - **`AUD-04`** (parked) — Clone readiness reflects the context it actually has.
-  gate: canGenerate accounts for cloneContextStatus; a failure to prime the clone reference is surfaced rather than swallowed; a degraded take is impossible or announced.
+  gate: Define which clone-context states permit on-demand preparation; required preparation failures produce a visible outcome; regression tests preserve the requested transcript/reference through optional prime failure and verify any deliberate fallback.
   unparkWhen: the paired iPhone is available and unlocked for a consented lane (CONV-20)
 
 - **`AUD-05`** (planned) — History persistence, and what History shows.
-  gate: No filesystem work runs inside the database queue; the iOS delete failure is surfaced rather than swallowed; History displays a bounded page with a way to reach the rest.
+  gate: Audio-file deletion failures have a visible, recoverable outcome; filesystem reconciliation holds the database queue only as required to preserve recovery integrity; History offers bounded pages with access to the complete archive.
 
 - **`AUD-06`** (parked) — iOS modals hide their background from VoiceOver.
   gate: With a panel presented, VoiceOver focus cannot reach a control behind it.
   unparkWhen: the paired iPhone is available and unlocked for a consented lane (CONV-20)
 
-- **`AUD-07`** (parked) — Finish the transaction that cannot be verified.
-  gate: An .unverified transaction is finished rather than left pending; Restore clears it; the purchase lane passes on the phone.
+- **`AUD-07`** (parked) — Verify recovery from an unverified StoreKit purchase.
+  gate: A consented StoreKit lane establishes verification-failure and retry/Restore behavior; the resulting handling policy preserves fail-closed entitlements and has deterministic repeated/delayed-update tests. Do not unconditionally finish unverified transactions without that evidence.
   unparkWhen: the paired iPhone is available and unlocked for a consented lane (CONV-20)
 
 - **`AUD-08`** (planned) — Make the logging half of the privacy invariant a gate.
-  gate: A check refuses a log statement that interpolates a transcript, prompt, path or credential, or the invariant is narrowed to what can actually be enforced and says so.
+  gate: The documented lexical scan scope remains accurate; runtime diagnostic boundaries use privacy-safe classifications or redaction and synthetic path/prompt-bearing failures prove prohibited content is not retained.
 
 - **`AUD-09`** (planned) — Smoke test01 owns the fixture it depends on.
-  gate: test01 either creates the clone voice it asserts, or stops claiming to leave no persisted state; the macOS smoke lane passes from a clean store.
+  gate: Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome.
 
 - **`AUD-10`** (planned) — The engine is kept hot by intent, not by browsing.
   gate: On the high-memory Mac tier a warm prefetch is followed by an idle unload or a pressure response; navigating between tabs alone does not pin the engine in memory.
 
-- **`AUD-11`** (planned) — Repetition-penalty dedup uses the set it already has.
+- **`AUD-11`** (planned) — Use constant-time sampler membership without changing token order.
   gate: The per-step token dedup is a set membership test; runtime parity is proven by the seeded runtime tests and the gate bench shows no regression.
 
 - **`AUD-12`** (parked) — Migrate off the deprecated audio-session interruption keys.

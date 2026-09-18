@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Code PreToolUse hook (matcher: Bash): the commit lint.
+# Claude/Codex PreToolUse hook (matcher: Bash): the commit lint.
 #
 # Fired for every Bash tool call; exits instantly unless the command contains
 # `git commit`. For commits it requires the symbolic branch to be exactly `main`,
@@ -9,20 +9,14 @@
 
 set -euo pipefail
 
-payload="$(cat 2>/dev/null || true)"
-command_text="$(printf '%s' "$payload" \
-  | python3 -c 'import json,sys
-try:
-    print(json.load(sys.stdin).get("tool_input", {}).get("command", ""))
-except Exception:
-    print("")' 2>/dev/null || true)"
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+command_text="$(python3 "$HOOK_DIR/agent_hook_input.py" command)"
 
 case "$command_text" in
   *"git commit"*) ;;
   *) exit 0 ;;
 esac
 
-HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="${CLAUDE_PROJECT_DIR:-$(cd "$HOOK_DIR/../.." && pwd)}"
 cd "$ROOT_DIR"
 

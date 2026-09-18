@@ -232,10 +232,13 @@ relevant System Settings panes. Full permission model: [`macos-permissions.md`](
 
 Diagnostics should be user-initiated. The app may write local logs or exportable diagnostic files for model download, generation, playback, and model-admission failures, but it should not report those details over the network automatically.
 
-`scripts/privacy_scan.py` is the deterministic gate for the rules in this document. It runs inside
+`scripts/privacy_scan.py` is a deterministic lexical check supporting these rules. It runs inside
 `./scripts/check_project_inputs.sh` (the `contracts` lane of `scripts/dev.sh check`) and the CI
-`contracts` job, and it rejects tracked files or evidence that carry private paths, prompts,
-transcripts, credentials or raw diagnostics.
+`contracts` job and rejects known private-path and credential patterns and credential file types.
+It cannot prove that arbitrary text is free of prompts or transcripts, or determine the values of
+runtime log interpolation. Review error descriptions and logging boundaries separately; typed,
+allowlisted diagnostic records provide stronger guarantees than this source scan. AUD-08 tracks the
+remaining runtime-log review and regression coverage.
 
 When runtime telemetry is explicitly enabled, `generation-failures.jsonl` is a privacy-reduced
 schema-v3 support log capped at 200 entries and 256 KiB; schema-v2 rows remain decodable. It stores

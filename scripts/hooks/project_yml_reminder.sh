@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Code PostToolUse hook (matcher: Edit|Write|MultiEdit).
+# Claude file-edit / Codex apply_patch PostToolUse hook.
 #
 # After project.yml changes, remind the session that the Xcode project is
 # generated and the generation stamp must be refreshed before a checkpoint.
@@ -7,16 +7,12 @@
 
 set -euo pipefail
 
-payload="$(cat 2>/dev/null || true)"
-file_path="$(printf '%s' "$payload" \
-  | python3 -c 'import json,sys
-try:
-    print(json.load(sys.stdin).get("tool_input", {}).get("file_path", ""))
-except Exception:
-    print("")' 2>/dev/null || true)"
-
-case "$(basename -- "${file_path:-}")" in
-  project.yml)
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+file_paths="$(python3 "$HOOK_DIR/agent_hook_input.py" paths)"
+root="${CLAUDE_PROJECT_DIR:-$(cd "$HOOK_DIR/../.." && pwd)}"
+root="$(cd "$root" && pwd -P)"
+while IFS= read -r file_path; do
+  if [[ "$file_path" == "$root/project.yml" ]]; then
     python3 - <<'PY'
 import json
 print(json.dumps({
@@ -29,7 +25,8 @@ print(json.dumps({
     }
 }))
 PY
-    ;;
-esac
+    break
+  fi
+done <<< "$file_paths"
 
 exit 0

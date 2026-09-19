@@ -502,16 +502,19 @@ class VocelloiOSUITestCase: XCTestCase {
             XCTAssertTrue(VocelloUITextEntry.replace(in: editor, with: text, timeout: 20))
         }
 
-        let lengthCount = element("textInput_lengthCount")
         XCTAssertTrue(
             VocelloUIWait.condition("composer to contain the entered script", timeout: 15) {
-                guard lengthCount.exists else { return false }
                 if text.isEmpty {
-                    return !clear.exists && lengthCount.label.hasPrefix("0 /")
+                    let value = editor.value as? String
+                    return !clear.exists && (value == nil || value?.isEmpty == true)
                 }
                 return (editor.value as? String) == text
             }
         )
+
+        if text.isEmpty {
+            XCTAssertFalse(element("textInput_longFormIndicator").exists)
+        }
 
         // The production editor configures Return as Done, so this is a semantic
         // keyboard dismissal rather than a coordinate tap.

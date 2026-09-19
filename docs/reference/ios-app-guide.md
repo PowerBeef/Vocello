@@ -147,7 +147,7 @@ mode segments, composer, and primary action; there is no hidden screen-presence 
 | Element | Identifier | Notes |
 |---|---|---|
 | Mode segment | `generateSection_custom\|design\|clone` | Tap to switch mode (keeps its id — not shadowed) |
-| Script composer | `textInput_textEditor` | Multi-line; live char counter `textInput_lengthCount`; over-limit warning `textInput_limitMessage` |
+| Script composer | `textInput_textEditor` | Multi-line; `textInput_longFormIndicator` shows localized Long-form above the shared 900-character single-take threshold and is absent for shorter scripts. Editor retains the shared 30,000-character ceiling. |
 | **Generate CTA** | `textInput_generateButton` | Shown when the mode's model is installed |
 | **Install CTA** | `textInput_installModelButton` | Shown instead of Generate when the model is **missing** (see §3) |
 | Cancel | `textInput_cancelButton` | Inside the generating progress bar |
@@ -529,7 +529,9 @@ final model language, think/no-think token mode, and conditioning mode separatel
   seed in History (schema v6); "Pin seed" on a History row reproduces that take on demand and the
   Studio Seed chip shows/unpins the state (DP-15). Batch
   generation is intentionally absent from iOS.
-- **Text limits** — enforced live (`textInput_lengthCount` + `textInput_limitMessage`); custom-tone cap `/500`.
+- **Script length** — Studio shows `textInput_longFormIndicator` above 900 characters, where
+  generation automatically becomes long-form. The editor retains its 30,000-character ceiling;
+  the separate custom-tone field retains its `/500` cap.
 
 ---
 

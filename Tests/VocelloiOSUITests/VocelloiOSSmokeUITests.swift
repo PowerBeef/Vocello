@@ -454,6 +454,7 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
               let beforeJoinedIDs = historyRowCensus(expectedScript: script) else { return }
         select(tab: .studio)
         replaceScript(with: script)
+        XCTAssertTrue(VocelloUIWait.exists(element("textInput_longFormIndicator"), timeout: 15))
         let generationID = generateAndWaitForCompletedPlayer(timeout: 900)
         guard !generationID.isEmpty else { return }
         VocelloUIScreenshot.attach(app, named: "ios-longform-complete")

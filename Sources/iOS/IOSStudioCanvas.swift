@@ -17,8 +17,8 @@ private enum IOSStudioCanvasLayout {
 
 /// Unified Studio surface from design_references/Vocello iOS/studio.jsx.
 /// Lays out (top → bottom): composer pad, setup-chip row, dock area with
-/// idle / generating / complete states. The composer + meta + counter
-/// match the design exactly; the dock area carries the Generate CTA,
+/// idle / generating / complete states. The composer metadata indicates
+/// automatic long-form routing; the dock area carries the Generate CTA,
 /// the generating waveform, or the inline player depending on
 /// `genState`.
 ///
@@ -31,7 +31,6 @@ struct IOSStudioCanvas<SetupChips: View>: View {
     @Binding var script: String
     let placeholder: String
     let modeMetaLabel: String
-    let charLimit: Int
     let tint: Color
     let genState: IOSStudioGenState
     let errorMessage: String?
@@ -56,7 +55,6 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         script: Binding<String>,
         placeholder: String,
         modeMetaLabel: String,
-        charLimit: Int = 800,
         tint: Color,
         genState: IOSStudioGenState,
         errorMessage: String? = nil,
@@ -75,7 +73,6 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         self._script = script
         self.placeholder = placeholder
         self.modeMetaLabel = modeMetaLabel
-        self.charLimit = charLimit
         self.tint = tint
         self.genState = genState
         self.errorMessage = errorMessage
@@ -228,9 +225,9 @@ struct IOSStudioCanvas<SetupChips: View>: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .onChange(of: script) { _, newValue in
-                let cap = charLimit + 200
-                if newValue.count > cap {
-                    script = String(newValue.prefix(cap))
+                let clamped = IOSGenerationTextLimitPolicy.clamped(newValue, mode: mode)
+                if newValue != clamped {
+                    script = clamped
                 }
             }
 
@@ -241,7 +238,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                         HStack {
                             clearScriptButton
                             Spacer()
-                            lengthCountText
+                            longFormIndicator
                         }
                     }
                 } else {
@@ -249,7 +246,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                         modeMetaText
                         Spacer()
                         clearScriptButton
-                        lengthCountText
+                        longFormIndicator
                     }
                 }
             }
@@ -288,11 +285,17 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         }
     }
 
-    private var lengthCountText: some View {
-        Text("\(script.count) / \(charLimit)")
-            .font(.caption.weight(.medium).monospacedDigit())
-            .foregroundStyle(script.count > charLimit ? Color.orange : Theme.Text.secondary)
-            .accessibilityIdentifier("textInput_lengthCount")
+    @ViewBuilder
+    private var longFormIndicator: some View {
+        if IOSGenerationTextLimitPolicy.state(for: script, mode: mode).routesToLongForm {
+            Label(IOSInterfaceText.longForm, systemImage: "text.alignleft")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(tint)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityElement(children: .combine)
+                .accessibilityHint(IOSAppLanguage.shared.presentation.longFormGuidance)
+                .accessibilityIdentifier("textInput_longFormIndicator")
+        }
     }
 
     // MARK: - Setup row

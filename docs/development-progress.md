@@ -17,6 +17,20 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### iPhone long-form indicator (September 19)
+
+After approving Studio spacing, the maintainer requested replacing the misleading character
+counter with a long-form mode indicator. From clean `82843da6`, all three iPhone Studio modes
+show the existing localized Long-form label only when the shared generation policy routes the
+draft to long-form (above 900 characters). Short drafts leave that area empty. The editor uses
+the shared 30,000-character clamp directly; the UI no longer has a separate counter-derived cap.
+The control inventory and UI journeys now identify the mode indicator and read the editor itself
+to confirm text entry. Generation routing and the threshold are unchanged.
+`scripts/dev.sh check` passed: native tests `mac-test-20260919-113724` (including the existing
+900/901-character routing boundaries), generic iOS app/logic builds, the updated iOS UI-test
+bundle compile, and 751 Python tests with 395 subtests. Device generation/UI journeys were not
+run for this presentation change; the installed build is for maintainer visual review.
+
 ### iPhone Studio spacing (September 19)
 
 The maintainer visually approved the refreshed Settings and requested more separation between

@@ -156,7 +156,7 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
 
     func test06SettingsScroll() {
         beginScenario("settings-scroll")
-        navigate(to: .settings)
+        openSettingsCategory("modelsFiles")
         // Window-anchored coordinate for the same reason as history-scroll:
         // element-addressed scrolls re-query the tree per event on the
         // app's main thread.

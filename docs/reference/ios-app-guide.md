@@ -297,6 +297,10 @@ Design & Clone Export; Privacy & Permissions, Accessibility, and About. The shar
 unchanged. Six `iosSettings_<category>Row` links push into the existing Settings navigation stack;
 categories are `audio`, `appLanguage`, `modelsFiles`, `privacyPermissions`, `accessibility`, and `about`.
 Each has `screen_settings_<category>` and a 44-point `iosSettings_<category>BackButton`.
+The hub now uses the shared Settings group and destination-row presentation with macOS.
+Its secondary lines show current variation, interface language, model readiness and app version;
+full explanations remain in the detail pages and accessibility hints. Values wrap below titles
+instead of competing for a narrow trailing column.
 No nested navigation stack is introduced. App Language adds a UI-only persisted preference,
 defaulting to System Default, then native-name choices from complete bundled translations
 (currently English and French). It does not select the language of generated speech. The

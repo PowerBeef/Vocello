@@ -2,14 +2,8 @@ import AppKit
 import QwenVoiceCore
 import SwiftUI
 
-/// Settings in the iOS design (`SettingsScreen`): flat icon-row sections on
-/// the canvas, with the desktop rows the iOS hub does not have (the Speed
-/// and Quality packages per mode with repair, update, recommended setup and
-/// Manage; the lower-memory toggle; the output folder; Application data)
-/// and the interface-language picker the iOS hub already had. The sidebar
-/// item and the Cmd+, scene host the same screen. Every `settings_*` and
-/// `preferences_*` identifier and `voiceCloning_consentAcknowledgment` are
-/// the lane contract; the consent section deliberately stays last.
+/// Shared Settings overview with desktop-owned detail controls. Both the sidebar and
+/// Cmd+, scene host this view; Studio installation links still target the exact model row.
 struct MacSettingsScreen: View {
     @Environment(ModelManagerViewModel.self) private var viewModel
     /// Mode-keyed deep-link target: when the sidebar redirects to Settings
@@ -29,6 +23,15 @@ struct MacSettingsScreen: View {
     @AppStorage(MacModelVariantPreferences.preferSpeedEverywhereKey, store: AppDefaults.store)
     private var preferSpeedEverywhere = false
 
+    private enum Category: String {
+        case audio, appLanguage, modelsFiles, cloning
+    }
+
+    @State private var selectedCategory: Category?
+    private var settingsText: VocelloPresentationText {
+        VocelloPresentationText(localization: MacInterfaceLanguage.current)
+    }
+
     @State private var flashedMode: GenerationMode?
     @State private var flashResetTask: Task<Void, Never>?
     @State private var modelToDelete: TTSModel?
@@ -42,25 +45,38 @@ struct MacSettingsScreen: View {
     init(highlightedMode: Binding<GenerationMode?>, showsNavigationTitle: Bool = true) {
         _highlightedMode = highlightedMode
         self.showsNavigationTitle = showsNavigationTitle
+        _selectedCategory = State(initialValue: highlightedMode.wrappedValue == nil ? nil : .modelsFiles)
     }
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: MacTheme.Spacing.xl) {
-                    modelsSection
-                    interfaceSection
-                    playbackSection
-                    generationSection
-                    performanceSection
-                    storageSection
-                    cloningSection
+                    if let selectedCategory {
+                        detailHeader(selectedCategory)
+                        switch selectedCategory {
+                        case .audio:
+                            playbackSection
+                            generationSection
+                        case .appLanguage:
+                            interfaceSection
+                        case .modelsFiles:
+                            performanceSection
+                            modelsSection.onAppear { focusHighlighted(using: proxy) }
+                            storageSection
+                        case .cloning:
+                            cloningSection
+                        }
+                    } else {
+                        overview
+                    }
                 }
                 .frame(maxWidth: contentMaxWidth)
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, MacTheme.Spacing.xl)
                 .padding(.vertical, MacTheme.Spacing.xl)
             }
+            .id(selectedCategory)
             .settingsNavigationTitle(showsNavigationTitle)
             .accessibilityIdentifier("screen_settings")
             .task {
@@ -68,8 +84,13 @@ struct MacSettingsScreen: View {
                 await viewModel.refresh()
                 focusHighlighted(using: proxy)
             }
-            .onChange(of: highlightedMode) { _, _ in
-                focusHighlighted(using: proxy)
+            .onChange(of: highlightedMode) { _, mode in
+                guard mode != nil else { return }
+                if selectedCategory == .modelsFiles {
+                    focusHighlighted(using: proxy)
+                } else {
+                    selectedCategory = .modelsFiles
+                }
             }
             .onChange(of: outputDirectory) { _, _ in
                 outputDirectoryIssue = AudioService.configuredOutputDirectoryIssue()
@@ -95,6 +116,69 @@ struct MacSettingsScreen: View {
             if let model = modelToDelete {
                 Text(deleteMessage(for: model))
             }
+        }
+    }
+
+    private var overview: some View {
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.lg) {
+            MacSettingsSection {
+                categoryButton(.audio, symbol: "waveform", subtitle: settingsText.settingsAudioSummary)
+                MacSettingsDivider()
+                categoryButton(.appLanguage, symbol: "globe", subtitle: selectedLanguageName)
+                MacSettingsDivider()
+                categoryButton(.modelsFiles, symbol: "internaldrive", subtitle: viewModel.modelSetupSummary().text)
+            }
+            MacSettingsSection {
+                categoryButton(.cloning, symbol: "waveform.badge.mic", subtitle: MacInterfaceText.settingsCloneConsentDetail)
+            }
+            Text(appVersion)
+                .macType(.caption)
+                .foregroundStyle(MacTheme.Text.tertiary)
+        }
+    }
+
+    private var selectedLanguageName: String {
+        IOSUILanguage(rawValue: MacInterfaceLanguage.selection)?.nativeName ?? MacInterfaceText.settingsSystemLanguage
+    }
+
+    private func categoryTitle(_ category: Category) -> String {
+        switch category {
+        case .audio: settingsText.settingsAudio
+        case .appLanguage: MacInterfaceText.settingsAppLanguage
+        case .modelsFiles: settingsText.settingsModelsFiles
+        case .cloning: MacInterfaceText.settingsVoiceCloning
+        }
+    }
+
+    private func categoryButton(_ category: Category, symbol: String, subtitle: String) -> some View {
+        Button { selectedCategory = category } label: {
+            VocelloSettingsNavigationRow(
+                symbol: symbol, title: categoryTitle(category), subtitle: subtitle,
+                titleFont: .system(size: MacType.style(.rowTitle).size, weight: .semibold),
+                detailFont: .system(size: MacType.style(.rowMeta).size), verticalInset: 10
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("settings_category_\(category.rawValue)")
+        .accessibilityLabel(categoryTitle(category))
+        .accessibilityValue(subtitle)
+    }
+
+    private func detailHeader(_ category: Category) -> some View {
+        HStack(spacing: MacTheme.Spacing.sm) {
+            Button { selectedCategory = nil } label: {
+                Image(systemName: "chevron.left")
+                    .macType(.buttonLabel)
+                    .frame(width: 30, height: 30)
+                    .background(MacTheme.Surface.panelMuted, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(settingsText.settingsBack)
+            .accessibilityIdentifier("settings_backButton")
+            Text(categoryTitle(category))
+                .macType(.screenTitle)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("settings_detail_\(category.rawValue)")
         }
     }
 

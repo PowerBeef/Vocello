@@ -159,19 +159,19 @@
     {
       "id": "UIF-04",
       "title": "Settings categories and secondary surfaces from iOS",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Adapt the approved iOS category/detail Settings flow to both the sidebar and Cmd+, window. Share row/section content; preserve desktop variant, repair/update, output-folder and other existing capabilities. Convert remaining secondary surfaces, remove old duplicates, and pass builds, relevant tests and consented visual/behavior acceptance.",
       "sourceOfTruth": [
+        "Sources/SharedSupport/Views/VocelloSettingsViews.swift",
+        "Sources/Views/Settings/MacSettingsScreen.swift",
+        "Sources/iOS/Settings/SettingsScreen.swift",
         "Sources/Views/Settings/MacSettingsRows.swift",
-        "Sources/Views/Settings/MacModelRow.swift",
-        "Sources/Views/Shell/MacInlinePlayerCard.swift"
+        "Sources/Views/Settings/MacModelRow.swift"
       ],
-      "notes": "September 18 reset supersedes the earlier single-scroll Settings prescription: start with the approved iOS category/detail flow and shared row content, adapting the Cmd+, window and desktop-only capabilities. Other screens stay operational until this pass; no appearance picker or parallel theme.",
+      "notes": "September 19: maintainer assigned Settings on both Mac and iOS. Shared groups, destination rows and typed copy serve both apps; iOS overview shows current values. Mac category/detail pages preserve existing controls and model links. Local gate and Mac localization macos-xcui-localization-20260919-135822-84f9678f passed; 19 interaction-policy tests pass. Authorized iPhone run ios-xcui-localization-20260919-144816-4590e8d3 completed English, French, AX-L and AX-XXXL cases but failed Pseudo-AX-XXXL language navigation because the test scroll helper excluded available anchors. Full iOS acceptance remains open; failed runs are retained, including an alarm-interrupted run. Next: maintainer visual review, bounded scroll-helper correction and a complete device localization pass. Broader secondary surfaces, separate Cmd+, and model-link UI acceptance remain open. Evidence: docs/development-progress.md.",
       "plan": "macos-ui-fidelity-2026-09",
-      "blockedBy": [
-        "UIF-06"
-      ],
-      "updated": "2026-09-18"
+      "blockedBy": [],
+      "updated": "2026-09-19"
     },
     {
       "id": "CONV-20",

@@ -180,17 +180,25 @@ language boundary.
 
 ### Settings (`sidebar_settings` → `screen_settings`)
 
+The overview groups Audio, App Language and Models & Files, with Voice Cloning in a separate
+consent destination. Shared `VocelloSettingsGroup` and `VocelloSettingsNavigationRow` provide the
+same quiet surfaces as iOS, with desktop typography. The sidebar and Cmd+, window host the same
+screen. Audio owns playback/variation; Models & Files owns memory preference, model management
+and storage. Studio installation links open Models & Files and focus the requested mode.
+Category buttons use `settings_category_<audio|appLanguage|modelsFiles|cloning>`; detail headings
+use `settings_detail_<category>`, and `settings_backButton` returns to the overview.
+
 | Element | Identifier |
 |---|---|
 | Model summary | `settings_modelDownloadsSummary`; recommended setup `settings_downloadRecommendedModels` / `settings_cancelRecommendedSetup` / `settings_recommendedSetupProgress` |
-| Mode row | `settings_mode_<mode>` (scrolled to and flashed when a disabled sidebar mode redirects here) |
+| Mode row | `settings_mode_<mode>` (scrolled to and flashed from a Studio installation link) |
 | Package row | `settings_package_<modelID>` / `settings_packageBadge_<modelID>` (Recommended or Heavy) / `settings_packageStatus_<modelID>` / `settings_downloadProgress_<modelID>` |
 | Download / cancel / repair / update | `settings_download_<id>` / `settings_cancel_<id>` / `settings_repair_<id>` / `settings_update_<id>` / `settings_manage_<id>` (AppKit menu: Reveal in Finder, Delete Model) |
 | App language | `settings_appLanguage` (menu: System Default plus the bundle's languages; `MacInterfaceLanguage` owns the selection in `AppDefaults.store` and feeds it to `MacInterfaceText`; smoke test05 reads System Default) |
 | Auto-play | `preferences_autoPlayToggle` |
 | Variation | `settings_generationVariation` (segmented: Expressive/Balanced/Consistent) |
 | Prefer lower-memory models | `settings_preferSpeedEverywhere` |
-| Clone consent | `voiceCloning_consentAcknowledgment`; persistent and required before Clone Generate; deliberately the last section |
+| Clone consent | `voiceCloning_consentAcknowledgment`; persistent and required before Clone Generate; in the Voice Cloning detail page |
 | Output dir | `preferences_outputDirectory` / `preferences_browseButton` / `preferences_outputResetButton` / `preferences_outputDirectoryWarning` / `preferences_outputDirectoryIssue` / `preferences_openFinderButton` |
 | Version label | read-only `version (build)` caption in the Application data row (beside `preferences_openFinderButton`); the runtime debug gate is a launch environment (`QWENVOICE_DEBUG=1`, internal-diagnostics builds only), not an in-app toggle |
 
@@ -241,7 +249,7 @@ generation-resume feature. A joined-row commit reloads the complete History proj
 ## 3. Model download management
 
 macOS has **both Speed (4-bit) and Quality (8-bit)** variants (unlike iOS Speed-only).
-Settings → Model downloads shows per-mode packages. Download via `settings_download_<id>`;
+Settings → Models & Files → Model downloads shows per-mode packages. Download via `settings_download_<id>`;
 cancel via `settings_cancel_<id>`; repair via `settings_repair_<id>`; a complete install whose files no longer match the pinned catalog identity shows **Update available** with `settings_update_<id>` (the same authenticated download path repairs it in place).
 
 The shared foreground downloader distinguishes queued, waiting for connectivity, downloading,

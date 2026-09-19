@@ -12,6 +12,51 @@ struct VocelloPresentationText: Sendable {
     init(localization: VocelloLocalization = VocelloLocalization()) {
         self.localization = localization
     }
+    var settingsAudio: String {
+        localization.string(localized: "vocello.settings.refinement.audio", defaultValue: "Audio",
+               comment: "Settings audio; preserve product and consent meaning.")
+    }
+    var settingsAudioSummary: String {
+        localization.string(localized: "vocello.settings.refinement.audioSummary", defaultValue: "Playback and take variation",
+               comment: "Settings audioSummary; preserve product and consent meaning.")
+    }
+    var settingsModelsFiles: String {
+        localization.string(localized: "vocello.settings.refinement.modelsFiles", defaultValue: "Models & Files",
+               comment: "Settings modelsFiles; preserve product and consent meaning.")
+    }
+    var settingsModelsFilesSummary: String {
+        localization.string(localized: "vocello.settings.refinement.modelsFilesSummary", defaultValue: "Voice models and saved outputs",
+               comment: "Settings modelsFilesSummary; preserve product and consent meaning.")
+    }
+    var settingsPrivacyPermissions: String {
+        localization.string(localized: "vocello.settings.refinement.privacyPermissions", defaultValue: "Privacy & Permissions",
+               comment: "Settings privacyPermissions; preserve product and consent meaning.")
+    }
+    var settingsPrivacyPermissionsSummary: String {
+        localization.string(localized: "vocello.settings.refinement.privacyPermissionsSummary", defaultValue: "Voice consent and permissions",
+               comment: "Settings privacyPermissionsSummary; preserve product and consent meaning.")
+    }
+    var settingsAccessibility: String {
+        localization.string(localized: "vocello.settings.refinement.accessibility", defaultValue: "Accessibility",
+               comment: "Settings accessibility; preserve product and consent meaning.")
+    }
+    var settingsAccessibilitySummary: String {
+        localization.string(localized: "vocello.settings.refinement.accessibilitySummary", defaultValue: "Motion and transparency",
+               comment: "Settings accessibilitySummary; preserve product and consent meaning.")
+    }
+    var settingsAbout: String {
+        localization.string(localized: "vocello.settings.refinement.about", defaultValue: "About",
+               comment: "Settings about; preserve product and consent meaning.")
+    }
+    var settingsAboutSummary: String {
+        localization.string(localized: "vocello.settings.refinement.aboutSummary", defaultValue: "Support and app information",
+               comment: "Settings aboutSummary; preserve product and consent meaning.")
+    }
+    var settingsBack: String {
+        localization.string(localized: "vocello.settings.refinement.back", defaultValue: "Back to Settings",
+               comment: "Settings back; preserve product and consent meaning.")
+    }
+
     // Navigation vocabulary used by both platform adapters.
     var tabVoices: String {
         localization.string(localized: "vocello.ui.tabVoices", defaultValue: "Voices",

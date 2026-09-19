@@ -174,7 +174,7 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
         designShot.lifetime = .keepAlways
         add(designShot)
 
-        navigate(to: .settings)
+        openSettingsCategory("modelsFiles")
         XCTAssertTrue(
             VocelloUIWait.exists(element("settings_packageStatus_pro_custom_speed"), timeout: 20)
         )

@@ -58,16 +58,7 @@ struct IOSSettingsSection<Content: View>: View {
                 .padding(.bottom, 6)
             }
 
-            VStack(alignment: .leading, spacing: 0) {
-                content
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(accent?.opacity(0.07) ?? Color.white.opacity(0.04))
-            .overlay {
-                RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-                    .stroke(accent?.opacity(0.25) ?? Theme.Surface.panelStroke, lineWidth: 0.5)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+            VocelloSettingsGroup(accent: accent) { content }
         }
     }
 }
@@ -77,7 +68,7 @@ struct IOSSettingsDivider: View {
         Rectangle()
             .fill(Theme.Surface.hairline)
             .frame(height: 0.5)
-            .padding(.leading, 50)
+            .padding(.leading, 56)
     }
 }
 
@@ -220,7 +211,6 @@ struct IOSSettingsValueRow: View {
 }
 
 struct IOSSettingsNavigationRow: View {
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let symbol: String
     let title: String
     let subtitle: String?
@@ -229,33 +219,8 @@ struct IOSSettingsNavigationRow: View {
     var showsChevron = true
 
     var body: some View {
-        HStack(spacing: 10) {
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
-                : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
-            layout {
-                IOSSettingsLabel(symbol: symbol, title: title, subtitle: subtitle, tint: tint)
-                if !value.isEmpty {
-                    Text(value)
-                        .font(.footnote)
-                        .foregroundStyle(Theme.Text.secondary)
-                        .multilineTextAlignment(dynamicTypeSize.isAccessibilitySize ? .leading : .trailing)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.leading, dynamicTypeSize.isAccessibilitySize ? 38 : 0)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            if showsChevron {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.Text.tertiary)
-                    .accessibilityHidden(true)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-        .contentShape(Rectangle())
+        VocelloSettingsNavigationRow(symbol: symbol, title: title, subtitle: subtitle,
+                                     value: value, tint: tint, showsChevron: showsChevron)
     }
 }
 

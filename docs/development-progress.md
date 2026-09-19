@@ -17,6 +17,47 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Shared Settings refinement (September 19, visual review pending)
+
+The maintainer assigned Settings on both platforms after the benchmark checkpoint. Codex owns
+this slice from clean `34d49ca4`: shared quiet Settings groups and navigation rows, shared typed
+category copy, a compact Mac overview/detail flow, and value-led iOS overview rows. The Mac keeps
+all existing model, memory, playback, variation, language, storage and consent controls, in both
+the sidebar and Cmd+, host. Studio model links still select and focus the correct package mode.
+The Mac UI tests now navigate the real category buttons and cover overview/audio/language fit.
+No engine, download, preference-key, commerce or persistence behavior changes.
+
+Validation: `scripts/dev.sh check` passed (deterministic Mac tests
+`mac-test-20260919-095017`, generic iOS compile and Mac UI bundle compile); contracts passed
+with 690 Python tests and 367 subtests. Mac localization
+`macos-xcui-localization-20260919-135822-84f9678f` passed; overview, Audio and doubled-string
+captures were inspected. The subsequently corrected UI interaction helpers pass all 19 focused
+`UIInteractionPolicyTests`; each device lane rebuilt its current iOS test bundle.
+
+The maintainer made the iPhone available for the requested installation/layout check. Four
+failed localization runs are retained, without merging their verdicts:
+
+- `ios-xcui-localization-20260919-140555-e9353b74`: the generic status query resolved a decorative
+  image. The layout test now explicitly queries the readable status text.
+- `ios-xcui-localization-20260919-141903-c09e20c2`: repeated gestures used a heading clipped at
+  the top edge. The maintainer also reported an alarm interruption. The helper now prefers
+  central visible content, with a captured-bounds regression test.
+- `ios-xcui-localization-20260919-143339-e7679bb6`: doubled strings stopped language navigation
+  because a tall row was not wholly visible. Navigation now requires its visible central tap
+  band; full-frame layout assertions remain separate and unchanged, with regression coverage.
+- `ios-xcui-localization-20260919-144816-4590e8d3`: English, French, AX-L and AX-XXXL completed
+  their layout walks, but Pseudo-AX-XXXL still stopped at language navigation: the scroll
+  helper's delta-dependent anchor-size limit excluded the available visible text. The complete
+  device lane remains **failed**, and the doubled-string configuration is unverified.
+
+Raw captures and forensics remain untracked under `build/artifacts/ui-tests/`. No application
+layout defect is established by these helper failures. Next: maintainer visual review of the
+installed Settings, then resolve the bounded scrolling helper and run a new complete iOS
+localization lane. Model-download deep links and the separate Cmd+, window were reviewed in
+source but not independently exercised in this slice. UIF-04 and broader secondary surfaces
+remain open; this is not release or complete native acceptance.
+
+
 ### Speed versus Quality benchmark (September 19)
 
 The maintainer requested a complete mode/preset performance and peak-memory comparison before

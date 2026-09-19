@@ -1,13 +1,13 @@
 import Foundation
 
 /// Visibility and actionability are different claims. Layout checks always require
-/// the whole frame. An explicitly selected oversized control may be activated only
+/// the whole frame. An explicitly selected navigation control may be activated only
 /// when its central 44-point band is safely inside the viewport (plus XCUI hittability).
 enum VocelloUIRevealRequirement {
     case fullVisibility, navigation
 
     func requiredFrame(_ frame: CGRect, visible: CGRect) -> CGRect {
-        guard self == .navigation, frame.height > visible.height else { return frame }
+        guard self == .navigation, frame.height > 44 else { return frame }
         return CGRect(x: frame.minX, y: frame.midY - 22, width: frame.width, height: 44)
     }
 
@@ -141,7 +141,12 @@ enum VocelloUITouchScrollAnchor {
             return VocelloUIRevealRequirement.valid(frame) && safe.contains(frame)
                 && frame.width >= 44 && frame.height >= 12 && frame.height <= maximumHeight
         }.sorted { lhs, rhs in
-            // Largest permitted anchor advances efficiently; ties stay deterministic.
+            // Stay away from system-edge overlays. XCUI can omit the status bar
+            // while reporting a partially clipped heading as hittable; preferring
+            // the largest label then repeats a gesture that never moves content.
+            let lhsDistance = abs(frames[lhs].midY - safe.midY)
+            let rhsDistance = abs(frames[rhs].midY - safe.midY)
+            if lhsDistance != rhsDistance { return lhsDistance < rhsDistance }
             if frames[lhs].height != frames[rhs].height { return frames[lhs].height > frames[rhs].height }
             return lhs < rhs
         }.first

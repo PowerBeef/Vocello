@@ -226,6 +226,7 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             openSettingsRoot()
             XCTAssertTrue(VocelloUIWait.exists(settings, timeout: 20))
             XCTAssertTrue(VocelloUIWait.exists(element("iosSettings_title"), timeout: 20))
+            VocelloUIScreenshot.attach(app, named: "ios-settings-\(category.name)-overview")
             if category.name == "French-Default" {
                 XCTAssertEqual(element("iosSettings_title").label, "Réglages")
                 for (id, title) in [
@@ -268,7 +269,9 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             let back = element("iosSettings_voiceModelsBackButton")
             assertAccessibilityControl(back, named: "Voice Models Back", category: category.name)
 
-            let cloneStatus = element("iosModelStatus_pro_clone")
+            // Label exposes its identifier on both the decorative image and text.
+            // Check the complete readable status, never the non-hittable icon.
+            let cloneStatus = app.staticTexts["iosModelStatus_pro_clone"].firstMatch
             XCTAssertTrue(VocelloUIWait.exists(cloneStatus, timeout: 60))
             XCTAssertTrue(revealSettingsElement(cloneStatus, swipingUp: true))
             assertAboveTabDock(cloneStatus, named: "Voice Cloning status", category: category.name)

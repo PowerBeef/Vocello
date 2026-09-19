@@ -135,10 +135,24 @@ class VocelloMacUITestCase: XCTestCase {
         )
     }
 
+    func openSettingsOverview() {
+        navigate(to: .settings)
+        if button("settings_backButton").exists {
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("settings_backButton"), timeout: 20))
+        }
+        XCTAssertTrue(VocelloUIWait.exists(button("settings_category_audio"), timeout: 20))
+    }
+
+    func openSettingsCategory(_ category: String) {
+        openSettingsOverview()
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("settings_category_\(category)"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("settings_detail_\(category)"), timeout: 20))
+    }
+
     /// Requires the three visible Speed package rows to report Ready. This is
     /// deliberately not replaced by a headless inventory check.
     func assertVisibleSpeedModelReadiness() {
-        navigate(to: .settings)
+        openSettingsCategory("modelsFiles")
         XCTAssertTrue(
             VocelloUIWait.exists(element("settings_modelDownloadsSummary"), timeout: 60)
         )
@@ -156,7 +170,7 @@ class VocelloMacUITestCase: XCTestCase {
     /// telemetry must never synthesize this milestone.
     @discardableResult
     func ensureAutoplayEnabled() -> Bool {
-        navigate(to: .settings)
+        openSettingsCategory("audio")
         let toggle = element("preferences_autoPlayToggle")
         XCTAssertTrue(VocelloUIWait.exists(toggle, timeout: 20))
         guard let wasEnabled = VocelloUIToggle.state(of: toggle) else {
@@ -185,11 +199,11 @@ class VocelloMacUITestCase: XCTestCase {
     /// Settings control users operate. This is deliberately not a launch
     /// environment shortcut or seeded application state.
     func ensureCloneConsentEnabled() {
-        navigate(to: .settings)
+        openSettingsCategory("cloning")
         let consent = element("voiceCloning_consentAcknowledgment")
         XCTAssertTrue(VocelloUIWait.exists(consent, timeout: 20))
-        // The consent section deliberately sits last in Settings; scroll it
-        // into view before any read/click at the test window height.
+        // The focused consent page retains the full disclosure and can scroll
+        // with longer localized text.
         _ = VocelloUIScroll.intoView(consent, in: element("screen_settings"))
         guard let consentState = VocelloUIToggle.state(of: consent) else {
             XCTFail("Could not read the visible Clone consent state")
@@ -207,7 +221,7 @@ class VocelloMacUITestCase: XCTestCase {
 
     private func restorePendingAutoplayPreference() {
         guard pendingAutoplayPreferenceRestore == false, session != nil else { return }
-        navigate(to: .settings)
+        openSettingsCategory("audio")
         let toggle = element("preferences_autoPlayToggle")
         XCTAssertTrue(VocelloUIWait.exists(toggle, timeout: 20))
         if VocelloUIToggle.state(of: toggle) != false {
@@ -282,8 +296,11 @@ class VocelloMacUITestCase: XCTestCase {
     /// The three Speed package rows keep single-line status and badge labels and
     /// their action slot inside the window.
     func assertSettingsPackageRowsLayoutIntact() {
-        navigate(to: .settings)
+        openSettingsCategory("modelsFiles")
         for id in ["pro_custom_speed", "pro_design_speed", "pro_clone_speed"] {
+            XCTAssertTrue(VocelloUIScroll.intoView(
+                element("settings_packageStatus_\(id)"), in: element("screen_settings")
+            ))
             VocelloUILayoutAssert.assertSingleLine(
                 element("settings_packageStatus_\(id)"), maxHeight: 24, minWidth: 30
             )

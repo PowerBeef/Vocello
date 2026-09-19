@@ -37,7 +37,7 @@ final class UIInteractionPolicyTests: XCTestCase {
                                    visible: viewport), .down)
     }
 
-    func testOrdinaryRowsAndInvalidFramesCannotUseOversizedException() {
+    func testShortRowsAndInvalidFramesCannotUseNavigationBand() {
         let invalid: [CGRect] = [.zero, .null, .infinite,
                                 CGRect(x: -1, y: 100, width: 400, height: 44),
                                 CGRect(x: 20, y: 690, width: 360, height: 44)]
@@ -45,6 +45,17 @@ final class UIInteractionPolicyTests: XCTestCase {
             XCTAssertFalse(VocelloUIRevealRequirement.navigation.satisfied(by: frame, visible: viewport))
             XCTAssertFalse(VocelloUIRevealRequirement.fullVisibility.satisfied(by: frame, visible: viewport))
         }
+    }
+
+    func testPartiallyVisibleNavigationDoesNotClaimCompleteLayout() {
+        // Doubled strings at AX-XXXL leave the first line above the viewport,
+        // while the real navigation button's center remains fully actionable.
+        let visible = CGRect(x: 0, y: 0, width: 402, height: 651)
+        let row = CGRect(x: 16.2, y: -24.7, width: 370.3, height: 468.3)
+        XCTAssertTrue(VocelloUIRevealRequirement.navigation.satisfied(by: row, visible: visible))
+        XCTAssertFalse(VocelloUIRevealRequirement.fullVisibility.satisfied(by: row, visible: visible))
+        XCTAssertFalse(VocelloUIRevealRequirement.navigation.satisfied(
+            by: row.offsetBy(dx: 0, dy: 500), visible: visible))
     }
 
     func testRetainedBottomOfHubOverridesUpwardPreference() {
@@ -125,7 +136,7 @@ final class UIInteractionPolicyTests: XCTestCase {
             CGRect(x: 54, y: 300, width: 220, height: 50),
             CGRect(x: 54, y: 400, width: 220, height: 90),
         ]
-        XCTAssertEqual(VocelloUITouchScrollAnchor.index(frames: frames, visible: viewport, desiredDelta: -120), 4)
+        XCTAssertEqual(VocelloUITouchScrollAnchor.index(frames: frames, visible: viewport, desiredDelta: -120), 3)
         XCTAssertEqual(VocelloUITouchScrollAnchor.index(frames: frames, visible: viewport, desiredDelta: 30), 3)
         XCTAssertNil(VocelloUITouchScrollAnchor.index(frames: Array(frames.prefix(3)), visible: viewport, desiredDelta: -120))
     }
@@ -137,6 +148,22 @@ final class UIInteractionPolicyTests: XCTestCase {
         XCTAssertNil(VocelloUITouchScrollAnchor.index(frames: [small], visible: .zero, desiredDelta: 30))
         XCTAssertNil(VocelloUITouchScrollAnchor.index(frames: [small], visible: viewport, desiredDelta: .nan))
         XCTAssertNil(VocelloUITouchScrollAnchor.index(frames: [small], visible: viewport, desiredDelta: 0))
+    }
+
+    func testTouchAnchorPrefersVisibleContentOverSystemEdgeHeading() {
+        // AX-XXXL device failure: XCUI omitted the status bar and reported the
+        // clipped 116-point heading as hittable. Three swipes made no progress.
+        let visible = CGRect(x: 0, y: 0, width: 402, height: 704)
+        let frames = [
+            CGRect(x: 72, y: 22, width: 267, height: 116.7),
+            CGRect(x: 72, y: 322.8, width: 278.7, height: 58.7),
+            CGRect(x: 72, y: 384.5, width: 244.7, height: 104.7),
+            CGRect(x: 72, y: 575.3, width: 257, height: 104.7),
+        ]
+        for delta: CGFloat in [-120, 120] {
+            XCTAssertEqual(VocelloUITouchScrollAnchor.index(
+                frames: frames, visible: visible, desiredDelta: delta), 1)
+        }
     }
 
     func testBoundedScrollReversalReducesMovement() throws {

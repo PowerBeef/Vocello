@@ -207,8 +207,22 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         assertStudioDockFitsAtMinimumWindow()
         VocelloUIScreenshot.attach(app, named: "mac-smoke-readiness-pseudolocalized")
 
+        openSettingsOverview()
+        for category in ["audio", "appLanguage", "modelsFiles", "cloning"] {
+            VocelloUILayoutAssert.assertFullyWithinWindow(button("settings_category_\(category)"), of: app)
+        }
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-settings-overview-pseudolocalized")
+        openSettingsCategory("appLanguage")
+        VocelloUILayoutAssert.assertFullyWithinWindow(element("settings_appLanguage"), of: app)
+
         // Check the compact library with ordinary copy as well as doubled strings.
         relaunchApp(additionalEnvironment: [:])
+        openSettingsOverview()
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-settings-overview")
+        openSettingsCategory("audio")
+        VocelloUILayoutAssert.assertFullyWithinWindow(element("preferences_autoPlayToggle"), of: app)
+        VocelloUILayoutAssert.assertFullyWithinWindow(element("settings_generationVariation"), of: app)
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-settings-audio")
         assertSavedVoicesLayoutIntact()
         let voiceID = VocelloUIBenchMatrix.cloneVoiceID
         let name = element("voicesRow_\(voiceID)", type: .staticText)
@@ -383,8 +397,9 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
             VocelloUIWait.exists(element("history_searchField", type: .searchField), timeout: 20)
         )
         XCTAssertTrue(VocelloUIWait.exists(element("history_sortPicker"), timeout: 20))
-        navigate(to: .settings)
+        openSettingsCategory("modelsFiles")
         XCTAssertTrue(VocelloUIWait.exists(element("settings_modelDownloadsSummary"), timeout: 20))
+        openSettingsCategory("appLanguage")
         // The interface-language picker is a genuine control (CONV-14); the
         // lane never selects a language, so it reads System Default here.
         let appLanguage = element("settings_appLanguage")

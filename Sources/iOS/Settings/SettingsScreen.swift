@@ -205,50 +205,17 @@ import QwenVoiceCore
         case .consistent: IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.consistent", defaultValue: "Consistent")
         }
     }
-    static var audio: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.audio", defaultValue: "Audio",
-               comment: "Settings audio; preserve product and consent meaning.")
-    }
-    static var audioSummary: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.audioSummary", defaultValue: "Playback and take variation",
-               comment: "Settings audioSummary; preserve product and consent meaning.")
-    }
-    static var modelsFiles: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.modelsFiles", defaultValue: "Models & Files",
-               comment: "Settings modelsFiles; preserve product and consent meaning.")
-    }
-    static var modelsFilesSummary: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.modelsFilesSummary", defaultValue: "Voice models and saved outputs",
-               comment: "Settings modelsFilesSummary; preserve product and consent meaning.")
-    }
-    static var privacyPermissions: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.privacyPermissions", defaultValue: "Privacy & Permissions",
-               comment: "Settings privacyPermissions; preserve product and consent meaning.")
-    }
-    static var privacyPermissionsSummary: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.privacyPermissionsSummary", defaultValue: "Voice consent and permissions",
-               comment: "Settings privacyPermissionsSummary; preserve product and consent meaning.")
-    }
-    static var accessibility: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.accessibility", defaultValue: "Accessibility",
-               comment: "Settings accessibility; preserve product and consent meaning.")
-    }
-    static var accessibilitySummary: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.accessibilitySummary", defaultValue: "Motion and transparency",
-               comment: "Settings accessibilitySummary; preserve product and consent meaning.")
-    }
-    static var about: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.about", defaultValue: "About",
-               comment: "Settings about; preserve product and consent meaning.")
-    }
-    static var aboutSummary: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.aboutSummary", defaultValue: "Support and app information",
-               comment: "Settings aboutSummary; preserve product and consent meaning.")
-    }
-    static var back: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.back", defaultValue: "Back to Settings",
-               comment: "Settings back; preserve product and consent meaning.")
-    }
+    static var audio: String { IOSAppLanguage.shared.presentation.settingsAudio }
+    static var audioSummary: String { IOSAppLanguage.shared.presentation.settingsAudioSummary }
+    static var modelsFiles: String { IOSAppLanguage.shared.presentation.settingsModelsFiles }
+    static var modelsFilesSummary: String { IOSAppLanguage.shared.presentation.settingsModelsFilesSummary }
+    static var privacyPermissions: String { IOSAppLanguage.shared.presentation.settingsPrivacyPermissions }
+    static var privacyPermissionsSummary: String { IOSAppLanguage.shared.presentation.settingsPrivacyPermissionsSummary }
+    static var accessibility: String { IOSAppLanguage.shared.presentation.settingsAccessibility }
+    static var accessibilitySummary: String { IOSAppLanguage.shared.presentation.settingsAccessibilitySummary }
+    static var about: String { IOSAppLanguage.shared.presentation.settingsAbout }
+    static var aboutSummary: String { IOSAppLanguage.shared.presentation.settingsAboutSummary }
+    static var back: String { IOSAppLanguage.shared.presentation.settingsBack }
     static var backModelsFiles: String {
         IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.backModelsFiles", defaultValue: "Back to Models & Files",
                comment: "Settings backModelsFiles; preserve product and consent meaning.")
@@ -524,6 +491,7 @@ struct SettingsScreen: View {
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("iosSettings_modelsFilesRow")
                         .accessibilityLabel(IOSSettingsCategory.modelsFiles.title)
+                        .accessibilityValue(modelReadinessSummary)
                         .accessibilityHint(IOSSettingsCategory.modelsFiles.hint)
                     }
                     exportPurchaseSection
@@ -567,13 +535,24 @@ struct SettingsScreen: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier(category.linkID)
         .accessibilityLabel(category.title)
+        .accessibilityValue(categorySummary(category))
         .accessibilityHint(category.hint)
     }
 
     private func categoryLabel(_ category: IOSSettingsCategory) -> some View {
         IOSSettingsNavigationRow(symbol: category.symbol, title: category.title,
-                                 subtitle: category.subtitle,
-                                 value: category == .appLanguage ? selectedLanguageName : "")
+                                 subtitle: categorySummary(category), value: "")
+    }
+
+    private func categorySummary(_ category: IOSSettingsCategory) -> String {
+        switch category {
+        case .audio:
+            IOSSettingsText.variationName(Qwen3SamplingVariation(rawValue: generationVariation) ?? .expressive)
+        case .appLanguage: selectedLanguageName
+        case .modelsFiles: modelReadinessSummary
+        case .about: IOSSettingsText.versionIdentity(IOSSettingsSupportInfo.version, build: IOSSettingsSupportInfo.build)
+        case .privacyPermissions, .accessibility: category.subtitle
+        }
     }
 
     private var selectedLanguageName: String {

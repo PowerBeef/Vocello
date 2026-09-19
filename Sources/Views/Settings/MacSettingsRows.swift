@@ -16,25 +16,17 @@ struct MacSettingsSection<Content: View>: View {
     }
 
     var body: some View {
-        let shape = VocelloShape.card()
         VStack(alignment: .leading, spacing: 0) {
             if let title {
                 Text(title)
                     .textCase(.uppercase)
                     .macType(.eyebrow)
                     .foregroundStyle(MacTheme.Text.secondary)
-                    .lineLimit(1)
                     .accessibilityAddTraits(.isHeader)
                     .padding(.bottom, MacTheme.Spacing.tight)
             }
 
-            VStack(alignment: .leading, spacing: 0) {
-                content
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(accent?.opacity(0.07) ?? Color.white.opacity(0.04))
-            .clipShape(shape)
-            .overlay { shape.strokeBorder(accent?.opacity(0.25) ?? MacTheme.Surface.panelStroke, lineWidth: VocelloTheme.Stroke.hairline) }
+            VocelloSettingsGroup(accent: accent) { content }
         }
     }
 }

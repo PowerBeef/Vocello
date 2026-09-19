@@ -35,7 +35,7 @@ Narrative authority: [`docs/reference/macos-ios-ui-reset-2026-09.md`](reference/
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `UIF-03` | in-flight | Voices and History from the approved iOS screens | — |
-| `UIF-04` | planned | Settings categories and secondary surfaces from iOS | `UIF-06` |
+| `UIF-04` | in-flight | Settings categories and secondary surfaces from iOS | — |
 | `UIF-05` | in-flight | Shared presentation with explicit platform metrics | — |
 | `UIF-06` | in-flight | Shared shell and iOS-derived Studio acceptance | — |
 | `UIF-07` | planned | Verify the adapted screens at supported window sizes | `UIF-06` |
@@ -45,7 +45,7 @@ Narrative authority: [`docs/reference/macos-ios-ui-reset-2026-09.md`](reference/
 - **`UIF-03`** (in-flight) — Voices and History from the approved iOS screens.
   gate: Share row/filter presentation with the approved iOS screens; retain inline search, filters, avatars/waveforms, saved and built-in voices, record/import flows, desktop sort and file actions. Remove replaced Mac presentation. Both builds, relevant tests, consented localization/smoke/perf and maintainer review pass.
 
-- **`UIF-04`** (planned) — Settings categories and secondary surfaces from iOS.
+- **`UIF-04`** (in-flight) — Settings categories and secondary surfaces from iOS.
   gate: Adapt the approved iOS category/detail Settings flow to both the sidebar and Cmd+, window. Share row/section content; preserve desktop variant, repair/update, output-folder and other existing capabilities. Convert remaining secondary surfaces, remove old duplicates, and pass builds, relevant tests and consented visual/behavior acceptance.
 
 - **`UIF-05`** (in-flight) — Shared presentation with explicit platform metrics.

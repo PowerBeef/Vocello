@@ -65,7 +65,7 @@ class VocelloiOSUITestCase: XCTestCase {
     func openAppLanguageSettings() {
         openSettingsRoot()
         let row = element("iosSettings_appLanguageRow")
-        XCTAssertTrue(revealSettingsElement(row, swipingUp: true))
+        XCTAssertTrue(VocelloUISettingsReveal.perform(row, in: app, swipingUp: true, requirement: .navigation))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: row, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("screen_settings_appLanguage"), timeout: 20))
     }

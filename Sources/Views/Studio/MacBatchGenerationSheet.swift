@@ -174,14 +174,6 @@ struct MacBatchGenerationSheet: View {
         .onChange(of: batchText) { _, _ in
             hidesRetainedLongFormOutcome = true
         }
-        .onChange(of: segmentationMode) { _, _ in
-            // Flipping the picker never swaps the editor for a project this
-            // sheet did not start; the retained outcome stays reachable
-            // through Resume / Regenerate once a batch runs from here.
-            if !longForm.isProcessing, !hasStartedFromThisSheet {
-                hidesRetainedLongFormOutcome = true
-            }
-        }
         .onChange(of: longForm.isProcessing) { _, isProcessing in
             if !isProcessing { longFormCancelRequested = false }
         }
@@ -214,17 +206,10 @@ struct MacBatchGenerationSheet: View {
             .macType(.body)
             .foregroundStyle(MacTheme.Text.secondary)
 
-        Picker(MacInterfaceText.batchSegmentation, selection: $segmentationMode) {
-            Text(MacInterfaceText.batchLineByLine).tag(MacBatchSegmentationMode.lineSeparated)
-            Text(MacInterfaceText.batchLongForm).tag(MacBatchSegmentationMode.longForm)
-        }
-        .pickerStyle(.segmented)
-        // Every other control on this sheet is mode-tinted; an untinted
-        // segmented picker renders in the system accent, which was the only
-        // blue in the app and the loudest thing on the sheet.
-        .tint(tint)
-        .disabled(isProcessing)
-        .accessibilityIdentifier("batch_segmentationMode")
+        Text(isLongForm ? MacInterfaceText.batchLongFormMode : MacInterfaceText.batchLineByLine)
+            .macType(.captionEmphasis)
+            .foregroundStyle(tint)
+            .accessibilityIdentifier("batch_segmentationMode")
 
         if let emotion = configuration.emotion?.trimmingCharacters(in: .whitespacesAndNewlines), !emotion.isEmpty {
             GroupBox(MacInterfaceText.batchCurrentDelivery) {

@@ -261,9 +261,11 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
         navigate(to: .customVoice)
         replaceScript(with: "One line per take, and the batch runs them in order.")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("textInput_batchButton"), timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("textInput_generateButton"), timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("batch_cancelButton"), timeout: 20))
         VocelloUIScreenshot.attach(window, named: "layout-sheet-batch-\(Int(frame.width))")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("batch_cancelButton"), timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("textInput_batchButton"), timeout: 20))
 
         navigate(to: .voices)
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("voices_enrollButton"), timeout: 20))

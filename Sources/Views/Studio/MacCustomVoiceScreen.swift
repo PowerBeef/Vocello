@@ -4,12 +4,12 @@ import SwiftUI
 
 /// Built-in Voice on the iOS Studio canvas (`IOSCustomVoiceView`): the
 /// composer, the Voice / Delivery / Language chips (menus on the desktop),
-/// the pinned-seed and batch chips, the readiness line, and the dock with the
+/// the readiness line and the dock with the line-by-line toggle and
 /// Generate CTA, the generating bar or the player card. Generation runs on
 /// the shared pipeline: `StudioGenerationCoordinator` (owned by
 /// `MacAppModel`), a request from `MacStudioGenerationRequestFactory`, and
-/// `IOSSingleTakeGenerationExecutor` with the macOS hooks. Long scripts and
-/// the Batch chip open the batch sheet, as before. Every `customVoice_*`,
+/// `IOSSingleTakeGenerationExecutor` with the macOS hooks. Generate opens the
+/// batch sheet for long scripts or the line-by-line override. Every `customVoice_*`,
 /// `textInput_*` and `delivery_*` identifier is the lane contract.
 struct MacCustomVoiceScreen: View {
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
@@ -19,6 +19,7 @@ struct MacCustomVoiceScreen: View {
 
     @Binding var draft: CustomVoiceDraft
 
+    @State private var lineByLine = false
     @State private var detectedPromptLanguage: Qwen3SupportedLanguage = .auto
     @State private var presentedSheet: CustomVoicePresentedSheet?
     @State private var deliverySelection = MacDeliverySelection()
@@ -139,11 +140,11 @@ struct MacCustomVoiceScreen: View {
                 errorMessage: coordinator.errorMessage,
                 canGenerate: canGenerate,
                 canRunBatch: canRunBatch,
+                lineByLine: $lineByLine,
                 modelInstalled: isModelAvailable,
                 setupChips: { setupChips },
                 footer: { chipFooter },
                 onGenerate: generate,
-                onBatch: { presentedSheet = .batch(.custom(draft: draft, model: activeModel)) },
                 onCancel: cancelGeneration,
                 onInstallModel: openSettingsForModel,
                 onPlayerDismiss: { coordinator.dismissInlinePlayer() }
@@ -300,8 +301,8 @@ struct MacCustomVoiceScreen: View {
             coordinator.rejectStart(modelManager.recoveryDetail(for: model))
             return
         }
-        if LongTextGenerationRouter.shouldRouteToLongFormBatch(draft.text) {
-            presentedSheet = .batch(.custom(draft: draft, model: model, initialText: draft.text, initialSegmentationMode: .longForm))
+        if let batchMode = LongTextGenerationRouter.batchMode(for: draft.text, lineByLine: lineByLine) {
+            presentedSheet = .batch(.custom(draft: draft, model: model, initialText: draft.text, initialSegmentationMode: batchMode))
             return
         }
 

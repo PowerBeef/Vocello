@@ -112,7 +112,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     /// the phone's composition.
     let footer: Footer
     let onGenerate: () -> Void
-    let onBatch: () -> Void
+    @Binding var lineByLine: Bool
     let onCancel: () -> Void
     let onInstallModel: () -> Void
     let onPlayerDismiss: () -> Void
@@ -132,11 +132,11 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         errorMessage: String? = nil,
         canGenerate: Bool,
         canRunBatch: Bool,
+        lineByLine: Binding<Bool>,
         modelInstalled: Bool,
         @ViewBuilder setupChips: () -> SetupChips,
         @ViewBuilder footer: () -> Footer,
         onGenerate: @escaping () -> Void,
-        onBatch: @escaping () -> Void,
         onCancel: @escaping () -> Void,
         onInstallModel: @escaping () -> Void,
         onPlayerDismiss: @escaping () -> Void,
@@ -157,7 +157,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         self.setupChips = setupChips()
         self.footer = footer()
         self.onGenerate = onGenerate
-        self.onBatch = onBatch
+        _lineByLine = lineByLine
         self.onCancel = onCancel
         self.onInstallModel = onInstallModel
         self.onPlayerDismiss = onPlayerDismiss
@@ -257,7 +257,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             .frame(minHeight: MacStudioMetrics.composerMinHeight, maxHeight: .infinity)
 
             // The meta line sits right under the script, above the chips:
-            // mode, readiness, Clear, count.
+            // mode, readiness, Clear, and the active batch mode.
             HStack(alignment: .center, spacing: MacTheme.Spacing.md) {
                 HStack(spacing: MacTheme.Spacing.tight) {
                     Text(modeMetaLabel)
@@ -284,13 +284,13 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
                     .accessibilityIdentifier("textInput_clearButton")
                 }
 
-                characterCount
+                generationModeIndicator
                     .fixedSize()
             }
             .padding(.top, MacTheme.Spacing.xs)
             .padding(.bottom, MacTheme.Spacing.snug)
         }
-        // The cap covers the meta line as well as the editor, so the counter
+        // The cap covers the meta line as well as the editor, so the indicator
         // and Clear finish where the text does instead of floating a hundred
         // and eighty points past its right edge. Leading alignment is what
         // keeps the spine: the script, the chips and Generate still begin on
@@ -333,18 +333,18 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         .accessibilityIdentifier(readiness.accessibilityIdentifier)
     }
 
-    /// The phone's counter: written against the shared script ceiling, so the
-    /// number means the same thing on both platforms. The spoken value keeps
-    /// the "N characters" phrasing.
-    private var characterCount: some View {
-        let state = GenerationTextLimitPolicy.state(for: script, mode: mode)
-        let spoken = MacInterfaceText.textInputCharacterCount(String(state.count))
-        return Text(verbatim: "\(state.count) / \(state.displayLimit)")
-            .macType(.counter)
-            .foregroundStyle(state.isOverLimit ? MacTheme.Status.guarded : MacTheme.Text.secondary)
-            .accessibilityLabel(spoken)
-            .accessibilityValue(spoken)
-            .accessibilityIdentifier("textInput_charCount")
+    @ViewBuilder
+    private var generationModeIndicator: some View {
+        if let batchMode = LongTextGenerationRouter.batchMode(for: script, lineByLine: lineByLine) {
+            Label(
+                batchMode == .longForm ? MacInterfaceText.batchLongFormMode : MacInterfaceText.batchLineByLine,
+                systemImage: batchMode == .longForm ? "text.alignleft" : "list.bullet.rectangle"
+            )
+            .macType(.captionEmphasis)
+            .foregroundStyle(tint)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("textInput_longFormIndicator")
+        }
     }
 
     // MARK: - Dock area
@@ -382,9 +382,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         }
     }
 
-    /// Generate takes the width; Batch, the desktop's own action, is a square
-    /// of the same height at its right end rather than a setup chip (it does
-    /// not describe the take, and as a chip it wrapped the row).
+    /// Generate takes the width; the line-by-line override stays beside it.
     private var actionRow: some View {
         HStack(spacing: MacTheme.Spacing.sm) {
             if modelInstalled {
@@ -392,7 +390,9 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             } else {
                 installCTA
             }
-            MacStudioBatchButton(tint: tint, isEnabled: canRunBatch && modelInstalled, action: onBatch)
+            MacStudioBatchButton(tint: tint, isEnabled: canRunBatch && modelInstalled, isOn: lineByLine) {
+                lineByLine.toggle()
+            }
         }
     }
 
@@ -519,11 +519,12 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     }
 }
 
-/// The desktop's Batch entry as the square at the right end of the Generate
-/// row: the CTA's height, the chip's chrome, `textInput_batchButton`.
+/// Line-by-line override. Off stays clickable with the quiet disabled-CTA
+/// appearance; selection is also exposed through accessibility and the meta label.
 struct MacStudioBatchButton: View {
     let tint: Color
     let isEnabled: Bool
+    let isOn: Bool
     let action: () -> Void
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -534,13 +535,13 @@ struct MacStudioBatchButton: View {
             Image(systemName: "list.bullet.rectangle")
                 .font(.system(size: MacControl.primary.glyph, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(MacTheme.Text.primary)
+                .foregroundStyle(isOn ? MacTheme.Text.primary : MacTheme.Text.tertiary)
                 .macControlSquare(.primary)
                 .background { shape.fill(fillStyle) }
                 .overlay { shape.stroke(Color.white.opacity(0.12), lineWidth: VocelloTheme.Stroke.hairline) }
                 .overlay { shape.inset(by: 0.65).stroke(Color.white.opacity(0.04), lineWidth: VocelloTheme.Stroke.hairline) }
                 .shadow(
-                    color: reduceTransparency ? .clear : VocelloTheme.Elevation.glowColor(tint),
+                    color: reduceTransparency || !isOn ? .clear : VocelloTheme.Elevation.glowColor(tint),
                     radius: VocelloTheme.Elevation.glowRadius,
                     y: VocelloTheme.Elevation.glowY
                 )
@@ -550,12 +551,14 @@ struct MacStudioBatchButton: View {
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : VocelloTheme.Opacity.disabled)
         .vocelloFocusRing(tint, radius: MacTheme.Radius.stage)
-        .help(MacInterfaceText.textInputBatch)
-        .accessibilityLabel(MacInterfaceText.textInputBatch)
+        .help(MacInterfaceText.batchLineByLine)
+        .accessibilityLabel(MacInterfaceText.batchLineByLine)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
         .accessibilityIdentifier("textInput_batchButton")
     }
 
     private var fillStyle: AnyShapeStyle {
+        guard isOn else { return AnyShapeStyle(Color.white.opacity(0.04)) }
         if reduceTransparency {
             return AnyShapeStyle(tint.opacity(0.22))
         }

@@ -17,6 +17,20 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Mac Studio automatic mode and line-by-line override (September 19)
+
+From clean `dac06129`, the maintainer requested the iPhone long-form indicator on Mac and a
+line-by-line toggle in place of the batch-sheet shortcut. All three Studio modes now show the
+active batch mode instead of a character counter. Grey off remains clickable; tinted on also
+exposes the selected accessibility trait and a Line-by-line label. Generate and its keyboard
+shortcut route the current draft to line-by-line when selected, otherwise to long-form above
+900 characters or an ordinary take. The router now counts the exact script like iOS, including
+outer whitespace. The sheet retains its review/start/recovery workflow with a read-only mode.
+Validation: `scripts/dev.sh check` passed, including native tests
+`mac-test-20260919-121757` (900/901 routing, whitespace parity and the line-by-line override),
+909 Python tests with 610 subtests, generic iOS app/logic builds and both UI-test bundle builds.
+No generation or XCUITest journeys were run. UIF-06 remains in flight for visual acceptance.
+
 ### iPhone long-form indicator (September 19)
 
 After approving Studio spacing, the maintainer requested replacing the misleading character

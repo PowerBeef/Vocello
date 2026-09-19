@@ -41,7 +41,10 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         let nonce = "smoke-batch-\(Self.pronounceableNonce())"
         prepare(mode: .custom)
 
+        replaceScript(with: "First batch line.\nSecond batch line.")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("textInput_batchButton"), timeout: 30))
+        XCTAssertTrue(button("textInput_batchButton").isSelected)
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("textInput_generateButton"), timeout: 30))
         let editor = element("batch_textEditor")
         XCTAssertTrue(VocelloUIWait.exists(editor, timeout: 30))
         let lines = "First batch line about the morning tide \(nonce).\nSecond batch line about the evening harbor \(nonce)."

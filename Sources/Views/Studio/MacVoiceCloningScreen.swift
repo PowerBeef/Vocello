@@ -32,6 +32,7 @@ struct MacVoiceCloningScreen: View {
     @Binding var draft: VoiceCloningDraft
     @Binding var pendingSavedVoiceHandoff: PendingVoiceCloningHandoff?
 
+    @State private var lineByLine = false
     @State private var session = CloneReferenceSessionState()
     @State private var transcriptionTask: Task<Void, Never>?
     @State private var detectedPromptLanguage: Qwen3SupportedLanguage = .auto
@@ -210,11 +211,11 @@ struct MacVoiceCloningScreen: View {
                 errorMessage: coordinator.errorMessage,
                 canGenerate: canGenerate,
                 canRunBatch: canRunBatch,
+                lineByLine: $lineByLine,
                 modelInstalled: isModelAvailable,
                 setupChips: { setupChips },
                 footer: { chipFooter },
                 onGenerate: generate,
-                onBatch: { presentedSheet = .batch(.clone(draft: draft, voice: selectedVoice?.name)) },
                 onCancel: cancelGeneration,
                 onInstallModel: openSettingsForModel,
                 onPlayerDismiss: { coordinator.dismissInlinePlayer() }
@@ -913,9 +914,9 @@ struct MacVoiceCloningScreen: View {
             coordinator.rejectStart(MacInterfaceText.cloningReferenceRequired)
             return
         }
-        if LongTextGenerationRouter.shouldRouteToLongFormBatch(currentDraft.text) {
+        if let batchMode = LongTextGenerationRouter.batchMode(for: currentDraft.text, lineByLine: lineByLine) {
             presentedSheet = .batch(.clone(
-                draft: currentDraft, voice: selectedVoice?.name, initialText: currentDraft.text, initialSegmentationMode: .longForm
+                draft: currentDraft, voice: selectedVoice?.name, initialText: currentDraft.text, initialSegmentationMode: batchMode
             ))
             return
         }

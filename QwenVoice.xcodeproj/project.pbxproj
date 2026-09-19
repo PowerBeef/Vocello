@@ -657,6 +657,7 @@
 		FCCE330E59AC279B18DA3671 /* IOSModelDownloadCancellationSequenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE9EB77045E28CAA92AE3CBE /* IOSModelDownloadCancellationSequenceTests.swift */; };
 		FDEB16B4E669707B8B8D0327 /* IOSStartupReliabilityRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 232D2030911B51F4A2D991B4 /* IOSStartupReliabilityRecord.swift */; };
 		FE5FA62325678411A11D14DF /* HistoryPersistenceError.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F8727F31A416A0EB376386 /* HistoryPersistenceError.swift */; };
+		FE6A167E57D941174806BBD7 /* LongTextGenerationRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A4F18EF6E8C4624607CF181 /* LongTextGenerationRouter.swift */; };
 		FF540F76D257DCBF303A314D /* GenerationVariationPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AC640F31070C11F3F6C432D /* GenerationVariationPreference.swift */; };
 		FFB2EA7443B237F35578C3FD /* SavedVoicesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71761C4FD04CF031A72524C2 /* SavedVoicesViewModel.swift */; };
 		FFB8F7B808241163222DFFA1 /* StudioGenerationAttemptAuthority.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92DFCD99553C1599E2FA9090 /* StudioGenerationAttemptAuthority.swift */; };
@@ -2881,6 +2882,7 @@
 				949F4B0977647EFE6CCD7DC2 /* LongFormHistoryAcceptance.swift in Sources */,
 				DF3DAF9007342D3E300F75BF /* LongFormHistoryAcceptanceTests.swift in Sources */,
 				239B41803755A4BB2741E159 /* LongFormPlanningTests.swift in Sources */,
+				FE6A167E57D941174806BBD7 /* LongTextGenerationRouter.swift in Sources */,
 				D9BCA00C9BC83AAE18461013 /* MacChipFlowTests.swift in Sources */,
 				B6E404A585D6460A8CCDDD41 /* MacChipRowBudget.swift in Sources */,
 				C14C50C6AC3650CF1C2D06CA /* MacControlMetrics.swift in Sources */,

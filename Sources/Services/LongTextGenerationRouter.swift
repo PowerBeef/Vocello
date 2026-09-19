@@ -1,13 +1,21 @@
 import Foundation
 
+enum MacBatchSegmentationMode: String, Equatable {
+    case lineSeparated
+    case longForm
+}
+
 enum LongTextGenerationRouter {
-    /// Single-take texts up to this length generate directly; longer scripts
-    /// route to the long-form v4 planner. The limit is the shared
-    /// `GenerationTextLimitPolicy.singleTakeScriptLimit` (900) both apps use;
-    /// macOS keeps counting the trimmed script as it always has.
     static let directGenerationCharacterLimit = GenerationTextLimitPolicy.singleTakeScriptLimit
 
     static func shouldRouteToLongFormBatch(_ text: String) -> Bool {
-        text.trimmingCharacters(in: .whitespacesAndNewlines).count > directGenerationCharacterLimit
+        text.count > directGenerationCharacterLimit
+    }
+
+    /// Explicit line-by-line takes precedence; otherwise both platforms use
+    /// the shared character threshold. Nil means an ordinary single take.
+    static func batchMode(for text: String, lineByLine: Bool) -> MacBatchSegmentationMode? {
+        if lineByLine { return .lineSeparated }
+        return shouldRouteToLongFormBatch(text) ? .longForm : nil
     }
 }

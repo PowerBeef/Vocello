@@ -87,13 +87,13 @@ setup chips wrap when the actual available width cannot fit them.
 | Speaker chip | `customVoice_speakerPicker` (menu anchored to the chip; the selected speaker is its accessibility value; "Recommended for your script" section from the detected language) inside `customVoice_voiceSetup` |
 | Language chip | `customVoice_languagePicker` inside `customVoice_languageSetup`; native-speaker hint `customVoice_languageHint` |
 | Delivery chip | `delivery_tonePicker` inside `customVoice_toneSpeed`, sectioned since DP-14 into "Distinct deliveries" (Neutral/Calm/Whisper/Sad), "Directional hints" (Happy/Angry/Fearful/Surprised) and Custom; a hint shows `delivery_hintAdvisory`, Custom shows the field `delivery_toneField` (duration advisory `delivery_durationAdvisory`); `customVoice_deliveryUnsupported` when the package has no delivery control |
-| Script editor | `textInput_textEditor` / `textInput_charCount` (reads "96 / 900" against the shared script ceiling; its spoken value stays "N characters") / `textInput_clearButton` / `textInput_modeMetaLabel` |
+| Script editor | `textInput_textEditor` / `textInput_longFormIndicator` (localized Long-form above 900 characters, or Line-by-line while explicitly selected; absent for ordinary short drafts) / `textInput_clearButton` / `textInput_modeMetaLabel` |
 | Readiness | `customVoice_readiness` (value "Ready" or "Waiting"), one caption after the mode label in the meta line, where the phone puts it |
 | Generate CTA | `textInput_generateButton`; error bar `textInput_generationError` retries |
 | Generating | `textInput_generatingBar` with `textInput_cancelButton`; once audio streams, the player card `studio_livePreview_card` carries the same cancel |
 | Live preview | `studio_livePreview_card`, with `studio_livePreview_playPause`, `studio_livePreview_scrubber`, `studio_livePreview_badge` and `textInput_cancelButton` |
 | Completed take | `studio_inlinePlayer_generation_<id>` carries the inline waveform, `studio_inlinePlayer_playPause`, `studio_inlinePlayer_scrubber`, `studio_inlinePlayer_retry`, `studio_inlinePlayer_saveAs`, `studio_inlinePlayer_reveal` and `studio_inlinePlayer_dismiss` (confirmed by `studio_inlinePlayer_dismissConfirm`). All three modes suppress duplicate sidebar transport while their displayed take owns audio. |
-| Batch | `textInput_batchButton` chip (opens the batch sheet) |
+| Batch | `textInput_batchButton` line-by-line toggle (grey off, tinted and selected on; Generate opens the matching workflow) |
 | Pinned seed chip | `textInput_seedPinChip` while a seed is pinned (DP-15); its confirmation's `textInput_seedUnpin` clears it back to fresh-seed-per-take. Shared across all three modes |
 
 ### Voice Design (`sidebar_voiceDesign` → `screen_voiceDesign`)
@@ -212,9 +212,14 @@ use `settings_detail_<category>`, and `settings_backButton` returns to the overv
 
 ### Batch generation
 
+Generate automatically selects long-form above the shared 900-character threshold. The
+line-by-line toggle overrides both single-take and long-form routing in all three Studio modes.
+Switching it off restores automatic routing. The batch sheet receives the current script and
+selected segmentation, with its existing review, Generate all, cancel and recovery actions.
+
 | Element | Identifier |
 |---|---|
-| Segmentation | `batch_segmentationMode` |
+| Segmentation | `batch_segmentationMode` (read-only mode selected in Studio) |
 | Editor | `batch_textEditor` |
 | Generate all | `batch_generateAllButton` / `batch_cancelButton` / `batch_doneButton` |
 | Item status | `batch_itemStatusList` / `batch_regenerateSegment_<index>` (long-form, per accepted segment) |

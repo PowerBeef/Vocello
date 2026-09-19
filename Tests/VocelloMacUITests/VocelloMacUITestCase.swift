@@ -515,8 +515,8 @@ class VocelloMacUITestCase: XCTestCase {
         }
         XCTAssertTrue(
             VocelloUIWait.value(
-                element("textInput_charCount"),
-                contains: "\(text.count) characters",
+                editor,
+                contains: text,
                 timeout: 10
             )
         )

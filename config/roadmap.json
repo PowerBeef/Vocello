@@ -138,7 +138,7 @@
         "Sources/Views/Studio/MacVoiceBriefEditor.swift",
         "Sources/Views/Studio/MacVoiceCloningScreen.swift"
       ],
-      "notes": "Maintainer approved the iOS-derived Mac shell and Built-in Voice, then the shared Studio modes and refined iPhone spacing. September 19: requested replacement of the iPhone character counter with a localized Long-form indicator above the shared 900-character routing threshold. All three modes use the same policy; short drafts show no counter. Editor retains the shared 30,000-character clamp. Validation and prior evidence: docs/development-progress.md. Broader native acceptance remains open.",
+      "notes": "Maintainer approved the iOS-derived Mac shell and Built-in Voice, then the shared Studio modes and refined iPhone spacing. September 19: requested replacement of the iPhone character counter with a localized Long-form indicator above the shared 900-character routing threshold. All three modes use the same policy; short drafts show no counter. Editor retains the shared 30,000-character clamp. Mac now uses the same automatic indicator and exact character threshold, with a grey-off/tinted-on line-by-line override for all three modes. Generate routes the current draft into the selected workflow. Validation and prior evidence: docs/development-progress.md. Broader native acceptance remains open.",
       "updated": "2026-09-19"
     },
     {

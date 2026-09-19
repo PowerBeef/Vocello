@@ -1,11 +1,6 @@
 import Foundation
 import QwenVoiceCore
 
-enum MacBatchSegmentationMode: String, Equatable {
-    case lineSeparated
-    case longForm
-}
-
 /// What a Studio screen hands the batch sheet: the mode's conditioning as the
 /// draft holds it when the sheet opens (the shared iOS drafts, resolved the
 /// way the iOS long-form start resolves them), the script routed from the

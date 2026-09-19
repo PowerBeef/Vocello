@@ -10,7 +10,7 @@ private struct VoiceDesignActionAlert: Identifiable {
 
 /// Voice Design on the iOS Studio canvas (`IOSVoiceDesignView`): the brief
 /// editor behind a setup chip, the Delivery and Language chips, the pinned-seed and
-/// Batch chips, the readiness line, the save-as-voice action for the last
+/// line-by-line toggle, the readiness line, the save-as-voice action for the last
 /// take, and the dock. Generation runs on the shared pipeline with the
 /// Design request from `MacStudioGenerationRequestFactory`. Every
 /// `voiceDesign_*`, `textInput_*` and `delivery_*` identifier is the lane
@@ -24,6 +24,7 @@ struct MacVoiceDesignScreen: View {
 
     @Binding var draft: VoiceDesignDraft
 
+    @State private var lineByLine = false
     @State private var detectedPromptLanguage: Qwen3SupportedLanguage = .auto
     @State private var presentedSheet: VoiceDesignPresentedSheet?
     @State private var deliverySelection = MacDeliverySelection()
@@ -155,11 +156,11 @@ struct MacVoiceDesignScreen: View {
                 errorMessage: coordinator.errorMessage,
                 canGenerate: canGenerate,
                 canRunBatch: canRunBatch,
+                lineByLine: $lineByLine,
                 modelInstalled: isModelAvailable,
                 setupChips: { setupChips },
                 footer: { chipFooter },
                 onGenerate: generate,
-                onBatch: { presentedSheet = .batch(.design(draft: draft)) },
                 onCancel: cancelGeneration,
                 onInstallModel: openSettingsForModel,
                 onPlayerDismiss: { coordinator.dismissInlinePlayer() },
@@ -335,8 +336,8 @@ struct MacVoiceDesignScreen: View {
             coordinator.rejectStart(modelManager.recoveryDetail(for: model))
             return
         }
-        if LongTextGenerationRouter.shouldRouteToLongFormBatch(draft.text) {
-            presentedSheet = .batch(.design(draft: draft, initialText: draft.text, initialSegmentationMode: .longForm))
+        if let batchMode = LongTextGenerationRouter.batchMode(for: draft.text, lineByLine: lineByLine) {
+            presentedSheet = .batch(.design(draft: draft, initialText: draft.text, initialSegmentationMode: batchMode))
             return
         }
 

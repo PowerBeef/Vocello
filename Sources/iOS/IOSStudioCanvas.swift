@@ -3,6 +3,7 @@ import QwenVoiceCore
 
 private enum IOSStudioCanvasLayout {
     static let tabDockReservation: CGFloat = 97
+    static let tabDockClearance: CGFloat = 12
     static let compactDockAreaHeight: CGFloat = 64
     static let completeDockAreaHeight: CGFloat = 135
     static let cadenceNoticeExtraHeight: CGFloat = 58
@@ -133,12 +134,13 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         // propagate the bottom chrome's safeAreaInset reservation to
         // the canvas cleanly. The React reference reserves 97 pt for
         // the tab dock; Studio's CTA / inline player then bottom-align
-        // immediately above that reservation.
+        // above that reservation, with a separate gap before the tab dock.
         .padding(
             .bottom,
-            dynamicTypeSize.isAccessibilitySize
+            (dynamicTypeSize.isAccessibilitySize
                 ? 132
-                : IOSStudioCanvasLayout.tabDockReservation
+                : IOSStudioCanvasLayout.tabDockReservation)
+                + IOSStudioCanvasLayout.tabDockClearance
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // Keep the composer layout fixed: the keyboard OVERLAYS the bottom

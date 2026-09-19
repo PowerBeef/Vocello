@@ -17,7 +17,18 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### Shared Settings refinement (September 19, visual review pending)
+### iPhone Studio spacing (September 19)
+
+The maintainer visually approved the refreshed Settings and requested more separation between
+Generate and the iPhone tab bar. From clean `9602678c`, the iOS Studio canvas adds 12 points of
+bottom clearance across all modes and text sizes. The action area's internal height is unchanged;
+the flexible composer yields the extra space. This is an iOS presentation-only adjustment.
+`scripts/dev.sh check` passed, including deterministic native tests
+`mac-test-20260919-111115`, generic iOS app/logic compilation and repository contracts.
+This spacing-only follow-up uses the maintainer's screenshot and manual device review;
+it does not reopen or claim a pass for the pending doubled-string Settings lane.
+
+### Shared Settings refinement (September 19, visually approved)
 
 The maintainer assigned Settings on both platforms after the benchmark checkpoint. Codex owns
 this slice from clean `34d49ca4`: shared quiet Settings groups and navigation rows, shared typed
@@ -51,8 +62,8 @@ failed localization runs are retained, without merging their verdicts:
   device lane remains **failed**, and the doubled-string configuration is unverified.
 
 Raw captures and forensics remain untracked under `build/artifacts/ui-tests/`. No application
-layout defect is established by these helper failures. Next: maintainer visual review of the
-installed Settings, then resolve the bounded scrolling helper and run a new complete iOS
+layout defect is established by these helper failures. The maintainer visually approved the
+installed Settings. Next: resolve the bounded scrolling helper and run a new complete iOS
 localization lane. Model-download deep links and the separate Cmd+, window were reviewed in
 source but not independently exercised in this slice. UIF-04 and broader secondary surfaces
 remain open; this is not release or complete native acceptance.

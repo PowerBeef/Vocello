@@ -83,7 +83,7 @@ class VocelloMacUITestCase: XCTestCase {
         // later interaction times out with a cryptic "not hittable" error.
         VocelloUIWait.assertForegroundUnobstructed(
             app,
-            probe: button(VocelloMacScreen.customVoice.sidebarID)
+            probe: button("sidebar_studio")
         )
         navigate(to: .customVoice)
     }
@@ -109,7 +109,19 @@ class VocelloMacUITestCase: XCTestCase {
         element(id, type: .button, in: scope)
     }
 
+    /// A live query across the dock transition, preserving both production IDs.
+    /// On Built-in Voice, the completed card's Retry replaces idle Generate.
+    var generationAction: XCUIElement {
+        app.buttons.matching(NSPredicate(
+            format: "identifier IN %@",
+            ["textInput_generateButton", "studio_inlinePlayer_retry"]
+        )).firstMatch
+    }
+
     func navigate(to screen: VocelloMacScreen) {
+        if [.customVoice, .voiceDesign, .voiceCloning].contains(screen) {
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("sidebar_studio"), timeout: 20))
+        }
         let sidebar = button(screen.sidebarID)
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: sidebar, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element(screen.screenID), timeout: 20))
@@ -235,7 +247,7 @@ class VocelloMacUITestCase: XCTestCase {
     func assertSavedVoicesLayoutIntact() {
         navigate(to: .voices)
         let window = app.windows.firstMatch.frame
-        let excluded = ["_use_", "_play_", "_delete_", "_transcriptStatus", "_qualityWarning", "_replaceReference"]
+        let excluded = ["_use_", "_play_", "_delete_", "_more_", "_transcriptStatus", "_qualityWarning", "_replaceReference"]
         let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
             NSPredicate(format: "identifier BEGINSWITH %@", "voicesRow_"),
             NSCompoundPredicate(notPredicateWithSubpredicate: NSCompoundPredicate(
@@ -255,11 +267,14 @@ class VocelloMacUITestCase: XCTestCase {
             )
             let warning = button("\(identifier)_qualityWarning")
             if warning.exists {
-                VocelloUILayoutAssert.assertSingleLine(warning, maxHeight: 34, minWidth: 80)
+                VocelloUILayoutAssert.assertSingleLine(warning, maxHeight: 30, minWidth: 24)
             }
-            for action in ["voicesRow_use_\(voiceID)", "voicesRow_play_\(voiceID)", "voicesRow_delete_\(voiceID)"] {
+            for action in ["voicesRow_use_\(voiceID)", "voicesRow_play_\(voiceID)"] {
                 VocelloUILayoutAssert.assertWithinWindow(button(action), of: app)
             }
+            VocelloUILayoutAssert.assertWithinWindow(
+                element("voicesRow_more_\(voiceID)", type: .menuButton), of: app
+            )
         }
         XCTAssertGreaterThan(checked, 0, "no visible Saved Voices row was checked; the query cannot pass vacuously")
     }
@@ -329,7 +344,7 @@ class VocelloMacUITestCase: XCTestCase {
         for screen in [VocelloMacScreen.customVoice, .voiceDesign, .voiceCloning] {
             navigate(to: screen)
             VocelloUILayoutAssert.assertFullyWithinWindow(
-                button("textInput_generateButton"), of: app
+                generationAction, of: app
             )
         }
     }
@@ -446,6 +461,7 @@ class VocelloMacUITestCase: XCTestCase {
             navigate(to: .customVoice)
         case .design:
             navigate(to: .voiceDesign)
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studioChip_voiceBrief"), timeout: 20))
             let brief = element("voiceDesign_voiceDescriptionField")
             if (brief.value as? String) != VocelloUIBenchMatrix.voiceDesignBrief {
                 XCTAssertTrue(
@@ -463,12 +479,15 @@ class VocelloMacUITestCase: XCTestCase {
                     timeout: 10
                 )
             )
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("voiceBrief_confirm"), timeout: 20))
         case .clone:
             navigate(to: .voices)
             let useButton = element("voicesRow_use_\(VocelloUIBenchMatrix.cloneVoiceID)")
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: useButton, timeout: 20))
             XCTAssertTrue(VocelloUIWait.exists(element("screen_voiceCloning"), timeout: 20))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studioChip_reference"), timeout: 20))
             XCTAssertTrue(VocelloUIWait.exists(element("voiceCloning_activeReference"), timeout: 20))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("cloneReference_confirm"), timeout: 20))
         }
     }
 
@@ -499,7 +518,7 @@ class VocelloMacUITestCase: XCTestCase {
             // otherwise (capital R distinguishes the states).
             VocelloUIWait.value(element(readinessID), contains: "Ready", timeout: 60)
         )
-        XCTAssertTrue(VocelloUIWait.enabled(button("textInput_generateButton"), timeout: 60))
+        XCTAssertTrue(VocelloUIWait.enabled(generationAction, timeout: 60))
     }
 
     /// Starts a generation and waits until the visible Cancel control owns the
@@ -507,7 +526,7 @@ class VocelloMacUITestCase: XCTestCase {
     func startGenerationAndAwaitCancelControl(mode: VocelloUIBenchMatrix.Mode) {
         assertReadyToGenerate(mode: mode)
         XCTAssertTrue(
-            VocelloUIPrimaryAction.perform(on: button("textInput_generateButton"), timeout: 30)
+            VocelloUIPrimaryAction.perform(on: generationAction, timeout: 30)
         )
         XCTAssertTrue(
             VocelloUIWait.exists(button("textInput_cancelButton"), timeout: 30),
@@ -519,7 +538,7 @@ class VocelloMacUITestCase: XCTestCase {
     /// cleanly: Generate re-enabled, Cancel gone, and no visible backend error
     /// or crash badge — user cancellation is not a failure.
     func cancelActiveGenerationAndAssertCleanReset() {
-        let generate = button("textInput_generateButton")
+        let generate = generationAction
         let cancel = button("textInput_cancelButton")
         let backendError = element("sidebar_backendStatus_error")
         let backendCrash = element("sidebar_backendStatus_crashed")
@@ -582,9 +601,9 @@ class VocelloMacUITestCase: XCTestCase {
         onAfterGenerateClick: (() -> Void)? = nil
     ) {
         assertReadyToGenerate(mode: mode)
-        let generate = button("textInput_generateButton")
+        let generate = generationAction
         let cancel = button("textInput_cancelButton")
-        let player = element("sidebarPlayer_bar")
+        let player = button("studio_inlinePlayer_playPause")
         let backendError = element("sidebar_backendStatus_error")
         let backendCrash = element("sidebar_backendStatus_crashed")
 
@@ -644,13 +663,14 @@ class VocelloMacUITestCase: XCTestCase {
         XCTAssertFalse(backendCrash.exists, "Generation must not expose a backend crash")
     }
 
-    /// Waits until the sidebar player reports it stopped playing. The control
+    /// Waits until the visible Studio or sidebar player stops playing. The control
     /// is labelled with the action it will perform, so "Play" means playback
     /// is not running. The label is read rather than a value because the state
     /// words the app used to publish were hardcoded English; every lane pins
     /// `-AppleLanguages (en)`, so the label here is deterministic.
     func waitForPlaybackToFinish(timeout: TimeInterval) -> Bool {
-        let control = button("sidebarPlayer_playPause")
+        let inline = button("studio_inlinePlayer_playPause")
+        let control = inline.exists ? inline : button("sidebarPlayer_playPause")
         return VocelloUIWait.condition("playback to finish", timeout: timeout) {
             !control.exists || control.label == "Play"
         }

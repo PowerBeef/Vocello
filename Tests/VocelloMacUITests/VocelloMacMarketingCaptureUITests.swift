@@ -98,7 +98,7 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
         XCTAssertTrue(VocelloUIScroll.intoView(useButton, in: element("screen_voices")))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: useButton, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("screen_voiceCloning"), timeout: 20))
-        XCTAssertTrue(VocelloUIWait.exists(element("voiceCloning_activeReference"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(button("studioChip_reference"), timeout: 20))
         let cloneScript = "Some stories are best told slowly, in a voice that remembers "
             + "where it has been."
         replaceScript(with: cloneScript)
@@ -155,6 +155,7 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
         beginSession()
         defer { endSession() }
         navigate(to: .voiceDesign)
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studioChip_voiceBrief"), timeout: 20))
         let brief = element("voiceDesign_voiceDescriptionField")
         let marketingBrief = "A warm, unhurried narrator in her fifties with a soft Irish lilt, "
             + "gentle humor, and a clear, even pace."
@@ -162,6 +163,7 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
             XCTAssertTrue(VocelloUITextEntry.replace(in: brief, with: marketingBrief, timeout: 20))
         }
         XCTAssertTrue(VocelloUIWait.value(brief, contains: marketingBrief, timeout: 10))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("voiceBrief_confirm"), timeout: 20))
         let designScript = "The harbor opens at first light, and the town wakes slowly "
             + "to the sound of gulls."
         replaceScript(with: designScript)

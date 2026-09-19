@@ -5,12 +5,12 @@
   "plans": [
     {
       "id": "macos-ui-fidelity-2026-09",
-      "title": "macOS UI fidelity — the Mac screens read like the iOS app",
+      "title": "macOS UI reset — adapt the approved iOS implementation",
       "status": "active",
       "owner": "backend-and-platform",
       "adopted": "2026-09-15",
-      "goal": "The convergence plan adopted the iOS screens but re-implemented every surface by hand, so the Mac drifted: chips that hug their labels and wrap, a Generate button stranded at the left edge, a flat canvas with no mode wash, a readiness paragraph the phone never shows, and library screens with different row, icon and button metrics. Each commit brings one surface back to the iOS composition and moves the primitive that defines it into SharedSupport so the two apps cannot drift apart again. Maintainer decisions (2026-09-15): chip labels are full words on one line, the Studio title row goes and Speed/Quality moves to the window toolbar, search and filter chips come inline on History and Saved Voices while the sort menu and the enroll button stay window chrome.",
-      "authority": "docs/reference/macos-ios-convergence-2026-09.md"
+      "goal": "September 18 maintainer reset: use the approved iOS 3.0.0 (24) UI at ca5a10cd as the reference. Replace the failed Mac presentation forward while keeping the in-process engine, shared pipeline and correctness fixes. Share screen composition and row components; platform wrappers own navigation, input and file actions. First prove the shell and Built-in Voice on the running Mac, obtain visual approval, then convert the remaining screens. Existing UIF identifiers remain the sole work authority.",
+      "authority": "docs/reference/macos-ios-ui-reset-2026-09.md"
     },
     {
       "id": "release-first-3-0-2026-09",
@@ -107,68 +107,71 @@
     {
       "id": "UIF-05",
       "plan": "macos-ui-fidelity-2026-09",
-      "title": "One scale: type, control sizes, radii, strokes, spacing",
+      "title": "Shared presentation with explicit platform metrics",
       "status": "in-flight",
       "blockedBy": [],
-      "gate": "VocelloTypography (role vocabulary + VocelloTextStyle spec) and the macOS table in MacTypeScale exist, with six sizes covering thirteen roles and no role appearing twice; MacControl carries the six control heights with the glyph size and shape that belong to each; VocelloTheme gains Radius.row, Stroke, Elevation, Opacity and the two intra-control spacing steps; Sources/Views carries no hand-written font size, control height, corner radius, stroke width or shadow that a token covers; one screen gutter across every destination; the layout assertions (assertSingleLine 24 pt, assertSavedVoicesLayoutIntact) and the localization lane pass at the narrow window; captures reviewed by the maintainer.",
+      "gate": "Shared selectors, Studio composition and retained primitives render both platforms with unchanged iOS defaults. Mac-only metrics have a desktop justification, not an independent visual system. Remove duplicate presentation as each replacement lands; retain Dynamic Type, motion/transparency and accessibility semantics.",
       "sourceOfTruth": [
         "Sources/SharedSupport/Theme/VocelloTypography.swift",
         "Sources/Views/Theme/MacTypeScale.swift",
         "Sources/Views/Theme/MacControlMetrics.swift",
         "Sources/SharedSupport/Theme/VocelloThemeTokens.swift"
       ],
-      "notes": "Opened 2026-09-16 on the maintainer's verdict that the composition is right but the elements and text proportions are not cohesive. Inventories measured 38 text styles for 13 roles, 14 interactive heights, half the layout numbers off the grid. Landed 614d7205 (tokens), 3874b70d (sweep), a93186f3 (the scroll budget the taller Settings broke). Rescaled 2026-09-17: the composer and buttons were oversized beside the sidebar, so script 22->17 (the top step had one user), pill 46->40 onto the row step, primary 56->48, glyphs 16 and 14. The desktop CTA's height and symbol moved into VocelloPrimaryCTAButton.Traits so the phone keeps 56/18; the chip glyph became a parameter, retiring MacControl.pill.glyph as dead code. composerMinHeight 176->140 by hand (the editor never measures its own text); composerMaxWidth 600 holds the ~71 character measure. The chips still share the row and span the Generate button -- two attempts to bound their width were rejected on sight; what was too big was the height. Only the floor moved, 132->116 with the smaller glyph, which let windowMinSize come down to 780x560. Open: SharedSupport/Views is partly off the scale.",
-      "updated": "2026-09-17"
+      "notes": "September 18 reset: retain the existing shared primitives and parameterized platform metrics, but treat the prior Mac numeric prescriptions as provisional. Share composition as well as chrome; remove the implementation replaced by each extraction. The iOS selector body and composer/setup/dock layout are now shared. Both-platform compilation and device preservation evidence remain gates; historical token sweeps do not establish visual approval.",
+      "updated": "2026-09-18"
     },
     {
       "id": "UIF-06",
       "plan": "macos-ui-fidelity-2026-09",
-      "title": "See the window at every width, then find the layout and proportions",
+      "title": "Shared shell and iOS-derived Studio acceptance",
       "status": "in-flight",
       "blockedBy": [],
-      "gate": "A test-target window-frame helper sizes the macOS window to a known width, and every capture is named for the width it reached rather than the one requested; every macOS surface is captured at the scene minimum, the default and the widest the display allows, plus one pseudo-localized narrow pass; a written layout-and-proportions thesis, synthesized from two isolated assessments, is delivered and approved before any screen is rewritten; SharedSupport/Views carries no raw stroke width, shadow or hand-written Capsule() that a token covers; one content left edge across all six destinations, with section headings over their own rows; the Studio chip row's arithmetic is unit-tested for the invariant that a row never hands out more width than it has; and every defect the specialist audit attributes to this plan's own commits is fixed with evidence.",
+      "gate": "Four sidebar destinations and the shared iOS mode selector; shared composer/setup/dock layout with one playback owner. Built-in layout approval precedes Design/Clone conversion. Preserve brief/reference editing, delivery, language, seed, batch, Save as Voice and native file actions. Verify idle/live/complete/error/missing-model behavior, both builds, source-bound minimum/default/wide captures and localization; obtain maintainer review per screen.",
       "sourceOfTruth": [
-        "Tests/VocelloMacUITests/VocelloMacMarketingCaptureUITests.swift",
-        "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift",
-        "Sources/SharedSupport/Views/VocelloSectionHeading.swift",
-        "Sources/SharedSupport/Views/VocelloPrimaryCTAButton.swift"
+        "Sources/ContentView.swift",
+        "Sources/Views/Sidebar/SidebarView.swift",
+        "Sources/SharedSupport/Views/VocelloCapsuleSelector.swift",
+        "Sources/SharedSupport/Views/VocelloStudioLayout.swift",
+        "Sources/Views/Studio/MacStudioCanvas.swift",
+        "Tests/VocelloMacUITests/VocelloMacUITestCase.swift",
+        "Sources/Views/Studio/MacVoiceDesignScreen.swift",
+        "Sources/Views/Studio/MacVoiceBriefEditor.swift",
+        "Sources/Views/Studio/MacVoiceCloningScreen.swift"
       ],
-      "notes": "Opened 2026-09-16 to run the Impeccable Operate-mode method over the macOS app: two isolated assessments, then one written thesis before any edit. Refinement, not redesign. Landed: shared primitives on their own tokens, one transport instead of two, the script taking the leftover height, one content gutter, the chip row flattened. Then an exhaustive specialist audit, because green gates covered almost none of it -- no gate compiled the XCUITest bundles (dev.sh check now does) and none checks geometry. Five defects it found are fixed; c967f807 reverted the assertion that hung the localization lane. A second review pass on 2026-09-17, the maintainer reading the running app: the Speed/Quality switch stopped nesting its track inside macOS 26's toolbar-item glass (sharedBackgroundVisibility hidden); the sidebar row became the Studio chip -- same step, size, weight and glyph, its tile removed as a container the Studio has no counterpart for; a hairline marks the column boundary the shared wash had erased; and the wash gained a compositingGroup, without which its plusLighter tint resolved against the sidebar's vibrancy and added nothing. Captures and the thesis sign-off stay open.",
-      "updated": "2026-09-17"
+      "notes": "September 18: approved iOS reference at ca5a10cd; maintainer approved Built-in/full-third highlight and proceeded through Design to Clone. All three modes now share the column and inline player. Design brief and Clone reference review open from setup chips; Save as Voice remains in the Design player. Final dev.sh check and lint passed. Localization macos-xcui-localization-20260919-014410-be602795 passed; smoke macos-xcui-smoke-20260919-014828-1e1fcc0b passed 9/9, including reference retention, recording, Clone generation and transport ownership, with crash/playback checks. Ready/reference/completed captures inspected. Initial incomplete-switch build failure retained and corrected. September 19: maintainer approved the completed Studio and subsequent library/status refinements and requested commit/push. Final localization macos-xcui-localization-20260919-040439-201d99cc and dev.sh check passed. Settings, exhaustive window/accessibility states and physical iOS regression remain pending. Evidence and limits: docs/development-progress.md.",
+      "updated": "2026-09-18"
     },
     {
       "id": "UIF-03",
-      "title": "History and Saved Voices on the iOS row and chip metrics",
-      "status": "planned",
-      "gate": "Filter chips are equal width at 32 pt with 13 pt labels; History rows use the 15 pt title with -0.15 tracking, 10 pt padding and one ellipsis menu carrying every action identifier; both screens show the inline search field; Saved Voices gains the All/Built-in/Saved filters, the built-in speakers section and the dashed save-a-new-voice card, and drops the extra glass layer; sort and enroll stay in the toolbar; localization, smoke and perf pass.",
+      "title": "Voices and History from the approved iOS screens",
+      "status": "in-flight",
+      "gate": "Share row/filter presentation with the approved iOS screens; retain inline search, filters, avatars/waveforms, saved and built-in voices, record/import flows, desktop sort and file actions. Remove replaced Mac presentation. Both builds, relevant tests, consented localization/smoke/perf and maintainer review pass.",
       "sourceOfTruth": [
         "Sources/Views/History/MacHistoryScreen.swift",
         "Sources/Views/History/MacHistoryItemCard.swift",
         "Sources/Views/Voices/MacVoicesScreen.swift"
       ],
-      "notes": "Opened 2026-09-15. The desktop keeps hover affordances, the context menu's Reveal in Finder, the 960 pt content cap and the toolbar's sort and enroll controls; everything else matches the phone. Lands after UIF-05 and adopts its type, control, radius and stroke tokens rather than today's numbers.",
+      "notes": "Maintainer explicitly assigned the compact Voices pass after Studio conversion. Rows now use smaller avatars, two-line metadata, inline Play/Use, a compact warning and a secondary actions menu, with subtle surfaces. Width-driven stacked actions are removed. Localization macos-xcui-localization-20260919-030105-1f97cbec passed doubled-label geometry, normal alignment and menu discovery; captures inspected. Initial incorrect Button query for MenuButton retained and corrected. Final scripts/dev.sh check passed. History native date headers were also replaced by transparent heading rows; localization macos-xcui-localization-20260919-032042-5341bb4a passed and its capture confirms the rule/material band are gone. Final History scripts/dev.sh check passed. September 19: maintainer visually approved compact Voices and corrected History headings. Broader History/filter acceptance remains open. Evidence: docs/development-progress.md.",
       "plan": "macos-ui-fidelity-2026-09",
-      "blockedBy": [
-        "UIF-06"
-      ],
-      "updated": "2026-09-16"
+      "blockedBy": [],
+      "updated": "2026-09-18"
     },
     {
       "id": "UIF-04",
-      "title": "Settings and shell polish",
+      "title": "Settings categories and secondary surfaces from iOS",
       "status": "planned",
-      "gate": "Settings icons are 20 pt symbols in the 28 pt slot, action buttons 44 pt tall, the section border the clipped hairline, gutters 16/12/16, and the nested package cards flattened to the iOS model-row shape so no label truncates; the inline player card adopts the iOS card geometry; the sidebar selection pill matches the phone's; MacWaveformBars gains the third band and the playhead; the marketing captures are retaken and sent; localization, smoke and perf pass.",
+      "gate": "Adapt the approved iOS category/detail Settings flow to both the sidebar and Cmd+, window. Share row/section content; preserve desktop variant, repair/update, output-folder and other existing capabilities. Convert remaining secondary surfaces, remove old duplicates, and pass builds, relevant tests and consented visual/behavior acceptance.",
       "sourceOfTruth": [
         "Sources/Views/Settings/MacSettingsRows.swift",
         "Sources/Views/Settings/MacModelRow.swift",
         "Sources/Views/Shell/MacInlinePlayerCard.swift"
       ],
-      "notes": "Opened 2026-09-15. The Mac keeps its flat single-scroll Settings rather than the phone's hub and drill-down, and keeps the 680 pt cap; the sidebar and the persistent footer player stay, both convergence-plan decisions. Lands after UIF-05 and adopts its type, control, radius and stroke tokens rather than today's numbers.",
+      "notes": "September 18 reset supersedes the earlier single-scroll Settings prescription: start with the approved iOS category/detail flow and shared row content, adapting the Cmd+, window and desktop-only capabilities. Other screens stay operational until this pass; no appearance picker or parallel theme.",
       "plan": "macos-ui-fidelity-2026-09",
       "blockedBy": [
         "UIF-06"
       ],
-      "updated": "2026-09-16"
+      "updated": "2026-09-18"
     },
     {
       "id": "CONV-20",
@@ -1375,20 +1378,20 @@
     },
     {
       "id": "UIF-07",
-      "title": "The window minimum the app declares is the one it enforces",
+      "title": "Verify the adapted screens at supported window sizes",
       "status": "planned",
-      "gate": "Every Studio mode's column fits the declared minimum window with a finished take on screen, or the column scrolls; the declared minimum is the enforced one; the geometry assertion runs at that size and says so in its activity.",
+      "gate": "Each converted screen fits its actual minimum/default/wide window bounds, including completion, long labels and error states. Long scripts scroll inside the editor. Any changed window minimum or additional scrolling behavior is explicitly reviewed and proven by genuine window-frame and control-geometry assertions.",
       "sourceOfTruth": [
         "Sources/Views/Shell/MacShellMetrics.swift",
         "Sources/Views/Studio/MacStudioCanvas.swift",
         "Tests/VocelloMacUITests/VocelloUIWindowFrame.swift"
       ],
-      "notes": "MacShellMetrics declares a minimum and SwiftUI enforces whatever the content subtree demands, which is never written down. The audit measured Voice Design needing ~633 pt of column and Voice Cloning ~603 with a finished take, against a declared 560. The GeometryReader restored in e1755734 stops the column's floors becoming the window's floor, which prevents the window refusing to shrink -- and leaves clipping as the other outcome, since nothing there scrolls. Two honest answers: raise the declared minimum, or let the column scroll. Both are product decisions; scrolling was tried on 2026-09-17 and withdrawn by the maintainer. That day's rescale lowered the demand rather than resolving it -- composer floor 176->140, chip 46->40, dock 64->56, so the column needs roughly fifty points less and the declared width came down to 780 -- but declared and enforced remain two numbers. Separately the geometry assertion's height half does not bind here: the screen is 1280x720, so the window's bottom edge sits under the Dock and the resize affordance cannot be pressed. The pin says so on every run.",
+      "notes": "The previous audit found disagreement between declared and enforced window minima; GeometryReader allowed shrinking but did not prove content fit. The September 18 reset must measure the new composition at actual minimum/default/wide sizes, including Design/Cloning inline content during migration. Do not hide clipping by weakening assertions. A changed minimum or additional scrolling is a reviewable product choice; prior rescaling did not close this item.",
       "plan": "macos-ui-fidelity-2026-09",
       "blockedBy": [
         "UIF-06"
       ],
-      "updated": "2026-09-17"
+      "updated": "2026-09-18"
     }
   ]
 }

@@ -1,7 +1,7 @@
 import AVFoundation
 @preconcurrency import XCTest
 
-/// The macOS smoke suite: seven focused journeys that run in the numbered
+/// The macOS smoke suite: focused journeys that run in the numbered
 /// order (XCTest executes methods alphabetically). Each test owns a fresh
 /// app session and leaves no persisted state behind, so a mid-suite failure
 /// never poisons the journeys after it and the suite passes back-to-back.
@@ -94,6 +94,75 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         return String((0..<8).map { _ in letters.randomElement()! })
     }
 
+    func test08_DesignBriefAndCompletedPlayer() {
+        beginSession()
+        defer { endSession() }
+
+        prepare(mode: .design)
+        XCTAssertFalse(element("voiceDesign_voiceDescriptionField").exists,
+                       "The brief editor closes so the script owns the Studio canvas")
+        replaceScript(with: "The harbor is quiet, and the first light rests on the water.")
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-studio-design-ready")
+
+        // Reopening the genuine chip must retain the brief used for generation.
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studioChip_voiceBrief"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.value(element("voiceDesign_voiceDescriptionField"),
+                                          contains: VocelloUIBenchMatrix.voiceDesignBrief, timeout: 10))
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-studio-design-brief")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("voiceBrief_confirm"), timeout: 20))
+        generateAndWaitForCompletion(mode: .design, timeout: 300)
+
+        XCTAssertTrue(button("studio_inlinePlayer_playPause").exists)
+        XCTAssertFalse(element("sidebarPlayer_bar").exists)
+        pinToNarrowestWindow()
+        VocelloUILayoutAssert.assertFullyWithinWindow(button("voiceDesign_saveVoiceButton"), of: app)
+        VocelloUILayoutAssert.assertFullyWithinWindow(button("studio_inlinePlayer_playPause"), of: app)
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-studio-design-complete")
+
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("voiceDesign_saveVoiceButton"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("voicesEnroll_nameField"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.value(element("voicesEnroll_transcriptField"),
+                                          contains: "The harbor is quiet", timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("voicesEnroll_cancelButton"), timeout: 20))
+        XCTAssertTrue(button("voiceDesign_saveVoiceButton").exists,
+                      "Cancelling enrollment must leave the generated take available to save")
+    }
+
+    func test09_CloneReferenceAndCompletedPlayer() {
+        beginSession()
+        defer { endSession() }
+
+        ensureCloneConsentEnabled()
+        prepare(mode: .clone)
+        replaceScript(with: "The harbor is quiet, and the first light rests on the water.")
+        XCTAssertFalse(element("voiceCloning_transcriptInput").exists)
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-studio-clone-ready")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studioChip_reference"), timeout: 20))
+        let transcript = element("voiceCloning_transcriptInput")
+        XCTAssertTrue(VocelloUIWait.exists(transcript, timeout: 20))
+        let originalTranscript = transcript.value as? String ?? ""
+        XCTAssertFalse(originalTranscript.isEmpty, "Saved reference hydration must retain its transcript")
+        XCTAssertTrue(button("voiceCloning_importButton").exists)
+        XCTAssertTrue(button("voiceCloning_recordReferenceButton").exists)
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-studio-clone-reference")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("cloneReference_confirm"), timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studioChip_reference"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.value(transcript, contains: originalTranscript, timeout: 10))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("cloneReference_confirm"), timeout: 20))
+
+        generateAndWaitForCompletion(mode: .clone, timeout: 300)
+        XCTAssertFalse(element("sidebarPlayer_bar").exists)
+        pinToNarrowestWindow()
+        VocelloUILayoutAssert.assertFullyWithinWindow(button("studio_inlinePlayer_playPause"), of: app)
+        VocelloUILayoutAssert.assertFullyWithinWindow(button("studio_inlinePlayer_retry"), of: app)
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-studio-clone-complete")
+        navigate(to: .history)
+        XCTAssertTrue(VocelloUIWait.exists(element("sidebarPlayer_bar"), timeout: 20))
+        navigate(to: .voiceCloning)
+        XCTAssertTrue(VocelloUIWait.exists(button("studio_inlinePlayer_playPause"), timeout: 20))
+        XCTAssertFalse(element("sidebarPlayer_bar").exists)
+    }
+
     func test01_NavigationAndReadiness() {
         // Long-string acceptance uses Foundation's standard pseudo-localization
         // launch arguments. Stable identifiers keep the journey independent of
@@ -107,6 +176,16 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         for screen in VocelloMacScreen.allCases {
             navigate(to: screen)
         }
+        // The four-destination shell returns to the last Studio mode without
+        // restoring a different draft or requiring a second navigation click.
+        navigate(to: .voiceDesign)
+        navigate(to: .voices)
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("sidebar_studio"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("screen_voiceDesign"), timeout: 20))
+        XCTAssertTrue(button("sidebar_voiceDesign").isSelected)
+        XCTAssertTrue(button("sidebar_studio").isSelected)
+        XCTAssertTrue(element("studio_modePicker").exists)
+
         assertVisibleSpeedModelReadiness()
         ensureCloneConsentEnabled()
         assertSavedCloneVoice()
@@ -124,8 +203,33 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         // collapse in Saved Voices was visible only in the screenshot).
         assertSettingsPackageRowsLayoutIntact()
         assertSavedVoicesLayoutIntact()
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-voices-heading-pseudolocalized")
         assertStudioDockFitsAtMinimumWindow()
         VocelloUIScreenshot.attach(app, named: "mac-smoke-readiness-pseudolocalized")
+
+        // Check the compact library with ordinary copy as well as doubled strings.
+        relaunchApp(additionalEnvironment: [:])
+        assertSavedVoicesLayoutIntact()
+        let voiceID = VocelloUIBenchMatrix.cloneVoiceID
+        let name = element("voicesRow_\(voiceID)", type: .staticText)
+        let use = button("voicesRow_use_\(voiceID)")
+        XCTAssertLessThan(abs(name.frame.midY - use.frame.midY), 28,
+                          "Primary actions must remain beside the metadata, not below it")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("voicesRow_more_\(voiceID)", type: .menuButton), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("voicesRow_delete_\(voiceID)"), timeout: 10))
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(VocelloUIWait.disappears(element("voicesRow_delete_\(voiceID)"), timeout: 10))
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-voices-compact")
+
+        navigate(to: .history)
+        let search = element("history_searchField", type: .searchField)
+        XCTAssertTrue(VocelloUITextEntry.replace(in: search, with: "", timeout: 20))
+        let heading = app.staticTexts.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "history_sectionHeading_")
+        ).firstMatch
+        XCTAssertTrue(VocelloUIWait.exists(heading, timeout: 20))
+        VocelloUILayoutAssert.assertFullyWithinWindow(heading, of: app)
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-history-transparent-heading")
     }
 
     func test02_CustomGenerationAndHistory() {
@@ -135,6 +239,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         let nonce = "smoke-complete-\(Self.pronounceableNonce())"
         prepare(mode: .custom)
         replaceScript(with: "Automated Built-in Voice smoke generation \(nonce).")
+        VocelloUIScreenshot.attach(app, named: "mac-studio-built-in-ready")
         // Played-audio capture (PC-02): the smoke lane taps this one take like a
         // benchmark take; an absent or failing capture never fails the journey.
         let environment = ProcessInfo.processInfo.environment
@@ -158,6 +263,8 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         } else {
             capture?.endTake(playbackEnded: false)
         }
+        XCTAssertTrue(button("studio_inlinePlayer_playPause").exists)
+        XCTAssertFalse(element("sidebarPlayer_bar").exists, "Studio owns the active take's transport")
         VocelloUIScreenshot.attach(app, named: "mac-smoke-custom-complete")
 
         // The tallest the Studio column ever gets: a finished take turns the
@@ -166,8 +273,12 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         // Generation is over by here, so the pin perturbs no timing.
         pinToNarrowestWindow()
         VocelloUILayoutAssert.assertFullyWithinWindow(
-            button("textInput_generateButton"), of: app
+            generationAction, of: app
         )
+        VocelloUILayoutAssert.assertFullyWithinWindow(
+            button("studio_inlinePlayer_playPause"), of: app
+        )
+        VocelloUIScreenshot.attach(app, named: "mac-studio-built-in-complete-minimum")
 
         // The completed take must be visible in History exactly once.
         assertHistoryRows(matching: nonce, expected: 1)
@@ -175,7 +286,12 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         // all: filtered to one known row, the geometry is bounded and the pass
         // cannot be vacuous, which is not true of History at rest.
         assertHistoryRowsLayoutIntact(filteredTo: nonce)
+        XCTAssertTrue(element("sidebarPlayer_bar").exists, "The sidebar carries playback outside Studio")
         VocelloUIScreenshot.attach(app, named: "mac-smoke-history-completed")
+
+        navigate(to: .customVoice)
+        XCTAssertTrue(button("studio_inlinePlayer_playPause").exists)
+        XCTAssertFalse(element("sidebarPlayer_bar").exists, "Returning to Studio restores one inline transport")
     }
 
     func test03_GenerationCancellation() {
@@ -207,6 +323,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         // Consent lives in Settings; enable it first, then land on Voice Cloning.
         ensureCloneConsentEnabled()
         navigate(to: .voiceCloning)
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studioChip_reference"), timeout: 20))
 
         XCTAssertTrue(
             VocelloUIPrimaryAction.perform(on: button("voiceCloning_recordReferenceButton"), timeout: 20),
@@ -339,7 +456,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         replaceScript(with: script)
 
         // Long scripts route the visible Generate action to the long-form sheet.
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("textInput_generateButton"), timeout: 30))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: generationAction, timeout: 30))
         let generateAll = button("batch_generateAllButton")
         XCTAssertTrue(VocelloUIWait.exists(generateAll, timeout: 30))
         let projectStartedAt = Date()

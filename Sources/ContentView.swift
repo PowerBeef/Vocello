@@ -7,11 +7,9 @@ struct SavedVoiceCloneHandoffPlan: Equatable {
     let cloneModelID: String?
 }
 
-/// The macOS window: the sidebar (`SidebarView`) beside the selected screen,
-/// the destination-specific window toolbar, and the shell state in
-/// `MacAppModel`. Screens are hosted one per sidebar item; the legacy screens
-/// remain until each is replaced by its iOS-derived successor (CONV-12 to
-/// CONV-17).
+/// Four desktop destinations hosting the iOS-derived presentation. Studio mode
+/// routes keep their stored identities and drafts; the sidebar and mode selector
+/// both use the same selection owner.
 @MainActor
 struct ContentView: View {
     @Environment(ModelManagerViewModel.self) private var modelManager
@@ -26,8 +24,7 @@ struct ContentView: View {
     @EnvironmentObject private var appCommandRouter: AppCommandRouter
 
     @State private var appModel: MacAppModel
-    /// Bound so the shell knows when the sidebar column is collapsed; the
-    /// sidebar footer is the only playback transport for a finished take.
+    /// Tracks sidebar visibility while each Studio mode owns its inline transport.
     @State private var sidebarColumnVisibility: NavigationSplitViewVisibility = .all
     @State private var customVoiceDraft = CustomVoiceDraft()
     @State private var voiceDesignDraft = VoiceDesignDraft()
@@ -38,10 +35,6 @@ struct ContentView: View {
     @State private var didCompleteInitialAvailabilityRefresh = false
     @StateObject private var generationWarmupCoordinator = MacGenerationWarmupCoordinator()
 
-    private var disabledSidebarItems: Set<SidebarItem> {
-        Set(SidebarItem.generationItems.filter { !$0.isAvailable(using: modelManager) })
-    }
-
     private var canUseSavedVoicesInVoiceCloning: Bool {
         modelManager.hasInstalledVariant(for: .clone)
     }
@@ -51,7 +44,7 @@ struct ContentView: View {
             get: { appModel.selectedItem },
             set: { newValue in
                 guard let newValue else { return }
-                selectSidebarItemIfEnabled(newValue)
+                selectDestination(newValue)
             }
         )
     }
@@ -103,10 +96,7 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $sidebarColumnVisibility) {
-            SidebarView(
-                selection: sidebarSelectionBinding,
-                disabledItems: disabledSidebarItems
-            )
+            SidebarView(selection: sidebarSelectionBinding)
             // One hairline where the columns meet. The wash runs across both
             // of them without a seam, which is the point of painting it once --
             // and it left the two panels floating in the same field with
@@ -170,7 +160,7 @@ struct ContentView: View {
             handleEngineSnapshotChange(newSnapshot)
         }
         .onReceive(appCommandRouter.sidebarSelection) { item in
-            selectSidebarItemIfEnabled(item)
+            selectDestination(item)
         }
     }
 
@@ -178,8 +168,18 @@ struct ContentView: View {
     private var detailContent: some View {
         Group {
             if let selectedItem = appModel.selectedItem {
-                screenView(for: selectedItem)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                VStack(spacing: 0) {
+                    if selectedItem.generationMode != nil {
+                        MacStudioModeSelector(selection: sidebarSelectionBinding)
+                            .padding(.horizontal, MacStudioMetrics.horizontalInset)
+                            .padding(.top, MacTheme.Spacing.tight)
+                            .padding(.bottom, MacTheme.Spacing.snug)
+                            .frame(maxWidth: MacStudioMetrics.composerMaxWidth)
+                            .frame(maxWidth: .infinity)
+                    }
+                    screenView(for: selectedItem)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
             } else {
                 Color.clear
             }
@@ -214,13 +214,13 @@ struct ContentView: View {
                     switch generation.mode {
                     case GenerationMode.custom.rawValue:
                         customVoiceDraft.pinnedSeed = seedValue
-                        selectSidebarItemIfEnabled(.customVoice)
+                        selectDestination(.customVoice)
                     case GenerationMode.design.rawValue:
                         voiceDesignDraft.pinnedSeed = seedValue
-                        selectSidebarItemIfEnabled(.voiceDesign)
+                        selectDestination(.voiceDesign)
                     case GenerationMode.clone.rawValue:
                         voiceCloningDraft.pinnedSeed = seedValue
-                        selectSidebarItemIfEnabled(.voiceCloning)
+                        selectDestination(.voiceCloning)
                     default:
                         break
                     }
@@ -265,10 +265,7 @@ struct ContentView: View {
                 engineStore: ttsEngineStore
             )
         }
-        selectSidebarItemIfEnabled(
-            .voiceCloning,
-            bypassDisabledCheck: true
-        )
+        selectDestination(.voiceCloning)
     }
 
     static func beginSavedVoiceClonePreloadIfPossible(
@@ -298,7 +295,6 @@ struct ContentView: View {
     private func handleInitialLoad() async {
         await modelManager.refresh()
         didCompleteInitialAvailabilityRefresh = true
-        reconcileSelectionWithAvailability()
         scheduleGenerationWarmupIfNeeded(for: appModel.selectedItem, allowClonePrime: false)
     }
 
@@ -308,13 +304,11 @@ struct ContentView: View {
 
     private func handleStatusesChange() {
         guard didCompleteInitialAvailabilityRefresh else { return }
-        reconcileSelectionWithAvailability()
         scheduleGenerationWarmupIfNeeded(for: appModel.selectedItem)
     }
 
     private func handleActiveVariantChange() {
         guard didCompleteInitialAvailabilityRefresh else { return }
-        reconcileSelectionWithAvailability()
         scheduleGenerationWarmupIfNeeded(for: appModel.selectedItem)
     }
 
@@ -329,25 +323,14 @@ struct ContentView: View {
 
     // MARK: - Helper methods
 
-    private func selectSidebarItemIfEnabled(_ item: SidebarItem, bypassDisabledCheck: Bool = false) {
-        guard bypassDisabledCheck || !disabledSidebarItems.contains(item) else { return }
+    private func selectDestination(_ item: SidebarItem) {
+        // Like iOS, a missing model leaves its Studio accessible with an Install
+        // action. Only switching generation modes during a take is blocked.
+        if item.generationMode != nil, item != appModel.lastStudioItem,
+           ttsEngineStore.hasActiveGeneration { return }
+        guard appModel.selectedItem != item else { return }
         AppPerformanceSignposts.emit("Sidebar Selection")
-        if appModel.selectedItem == item {
-            return
-        }
         appModel.selectedItem = item
-    }
-
-    private func reconcileSelectionWithAvailability() {
-        guard let selectedItem = appModel.selectedItem, disabledSidebarItems.contains(selectedItem) else {
-            return
-        }
-
-        if let mode = selectedItem.generationMode {
-            appModel.pendingHighlightedMode = mode
-        }
-
-        appModel.selectedItem = .settings
     }
 
     private func scheduleGenerationWarmupIfNeeded(

@@ -1,10 +1,8 @@
 import QwenVoiceCore
 import SwiftUI
 
-/// The six destinations of the macOS shell. The rawValue is a stored identity
-/// (the last selection persists under `MacAppModel.lastSidebarItemKey`); the
-/// visible label comes from the catalog and the accessibility identifier from
-/// the case name, so `sidebar_customVoice` and `screen_customVoice` never move.
+/// Stored routes and command identities. The shell groups the three generation
+/// routes under Studio; raw values and mode control identifiers remain stable.
 enum SidebarItem: String, CaseIterable, Identifiable {
     case customVoice = "Built-in Voice"
     case voiceDesign = "Voice Design"
@@ -27,6 +25,11 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .voices: MacInterfaceText.menuSavedVoices
         case .settings: MacInterfaceText.settingsTitle
         }
+    }
+
+    var studioTitle: String {
+        if let generationMode { return MacInterfaceText.studioModeTitle(generationMode) }
+        return title
     }
 
     var accessibilityID: String { "sidebar_\(String(describing: self))" }
@@ -68,33 +71,6 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .history: "clock.arrow.circlepath"
         case .voices: "person.2.fill"
         case .settings: "gearshape"
-        }
-    }
-
-    enum Section: String, CaseIterable {
-        case generate = "Generate"
-        case library = "Library"
-        case settings = "Settings"
-
-        var accessibilityID: String {
-            "sidebarSection_\(String(describing: self))"
-        }
-
-        /// Catalog-owned section header; the rawValue stays the internal identity.
-        var title: String {
-            switch self {
-            case .generate: MacInterfaceText.shellSectionStudio
-            case .library: MacInterfaceText.sidebarSectionLibrary
-            case .settings: MacInterfaceText.settingsTitle
-            }
-        }
-
-        var items: [SidebarItem] {
-            switch self {
-            case .generate: [.customVoice, .voiceDesign, .voiceCloning]
-            case .library: [.history, .voices]
-            case .settings: [.settings]
-            }
         }
     }
 

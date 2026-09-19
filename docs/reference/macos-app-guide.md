@@ -1,7 +1,7 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-09-12
+reviewed: 2026-09-18
 summary: Consolidated macOS app map — screens, elements, and options, and how XCUITest addresses each through the stable accessibility surface.
 sourceOfTruth:
   - Sources/Views
@@ -25,25 +25,26 @@ benchmark tests and stable accessibility surface.
 
 ## 1. Overview
 
-A `NavigationSplitView` with a **sidebar** (6 items) + a detail pane. The engine runs
+A `NavigationSplitView` with a **sidebar** (Studio, Voices, History, Settings) + a detail pane. The engine runs
 **in-process** (since 2026-09-15) on the same `TTSEngineStore` the iOS app uses; an engine
 fault takes the app down with it, so crash deltas stay part of every lane's verdict.
 
-The shell (since 2026-09-15, CONV-11) is the iOS design on the desktop: the brand lockup on
-top of the sidebar, **Studio** and **Library** sections plus Settings as rows with mode-tinted
-glyph tiles (`sidebarSection_generate`, `sidebarSection_library`), the selected row a tint-glass
-pill, a mode whose model is missing dimmed with an "Install in Settings" caption, and the inline
-player card and engine status strip pinned in the sidebar footer. Dark-only. Window minimum
-780×560, default 1040×680 (`MacShellMetrics`).
+The September 18 shell adapts the approved iOS navigation: four sidebar destinations, with
+Built-in, Design and Clone inside Studio's shared mode selector. Studio resumes its last mode.
+A missing model leaves the Studio accessible with its Install action. All three Studio modes keep
+the active take's transport inline; the sidebar carries playback on other destinations. Dark-only.
+Window minimum and default dimensions are owned by `MacShellMetrics`; UI acceptance measures
+actual reachable sizes rather than treating those constants as proof of fit.
 
-| Sidebar | Identifier | Shortcut |
+| Control | Identifier | Shortcut |
 |---------|------------|----------|
-| Built-in Voice | `sidebar_customVoice` | Cmd+1 |
-| Voice Design | `sidebar_voiceDesign` | Cmd+2 |
-| Voice Cloning | `sidebar_voiceCloning` | Cmd+3 |
-| History | `sidebar_history` | Cmd+4 |
-| Saved Voices | `sidebar_voices` | Cmd+5 |
-| Settings | `sidebar_settings` | Cmd+6 (labeled "Models" in the Navigate menu, opens the unified Settings/Models surface) |
+| Studio destination | `sidebar_studio` | Mode shortcuts below |
+| Built-in mode segment | `sidebar_customVoice` | Cmd+1 |
+| Design mode segment | `sidebar_voiceDesign` | Cmd+2 |
+| Clone mode segment | `sidebar_voiceCloning` | Cmd+3 |
+| History destination | `sidebar_history` | Cmd+4 |
+| Voices destination | `sidebar_voices` | Cmd+5 |
+| Settings destination | `sidebar_settings` | Cmd+6 |
 
 Three generation modes (Custom / Design / Clone) — same engine contract as iOS, but macOS
 has **both Speed (4-bit) and Quality (8-bit)** variants.
@@ -62,27 +63,22 @@ factory/engine, not the editor.
 ### Semantic state surfaces
 
 XCUITest inspects the real accessibility state. Destination containers use `screen_*`, primary
-controls expose stable identifiers, and `{mode}_readiness` values report `ready=true` or `ready=false`.
+controls expose stable identifiers, and `{mode}_readiness` values report `Ready` or `Waiting`.
 Tests assert these visible production surfaces directly.
 
 ### Studio composition
 
-The three Studio screens are one canvas (`MacStudioCanvas`) arranged for a desktop: the composer
-on top, taking every point the rest of the column does not (a six-line floor at the 17 pt face, and a measure capped at 600 pt so the line length does not run with the column, scrolling past its
-height), then the meta line (mode, readiness, Clear, counter) flush below it, one row of setup
-chips, and the dock. Nothing trails the dock: the script is the flexible element, so a taller
-window grows the writing surface rather than the space under the button. The dock holds the full-width Generate button with
-the square Batch button (`textInput_batchButton`) at its right end, the generating bar, the error bar
-that retries when clicked, or the player card, and never falls below 56 pt. The column caps at
-780 pt. One mode-tinted wash (`VocelloModeBackdrop`, shared with iOS) is painted behind the whole
-window by `ContentView`, tinted by the selected destination, and the title bar is transparent over
-it with no visible title. There is no title row — the sidebar names the mode, as the phone's capsule
-does — so the desktop's Speed/Quality switch (`<prefix>_speedVariantButton`,
-`<prefix>_qualityVariantButton`, `<prefix>_heavyBadge`) lives in the window toolbar. Setup chips share the row and span
-exactly the Generate button's width; a 116 pt floor is the only bound, and below it the row wraps.
-Four ordinary chips stay on one row at the window's 780 pt minimum, which is the arithmetic that
-minimum encodes; a fifth (an emotion-bank delivery) or a sixth (a pinned seed) wraps rather than
-squeezing.
+Both platforms use `VocelloStudioLayout` for the composer, setup and dock. The Mac adapter
+supplies its AppKit text editor, native menus/popovers, batch action and file actions. The editor
+fills remaining height; metadata, setup chips and dock retain their natural sizes.
+All three modes share a column capped at `MacStudioMetrics.composerMaxWidth`. The mode selector aligns with the active column.
+
+The dock holds Generate and Batch while idle, progress/cancellation while preparing, and the
+inline player once live audio or a completed take is available. All three modes replace the
+idle action row with the completed player; Retry, Save As, Reveal and Dismiss remain on that card.
+Design additionally offers Save as Voice when its completed take still matches the current draft.
+The shared backdrop and per-mode accents follow iOS. Speed/Quality remain in the window toolbar;
+setup chips wrap when the actual available width cannot fit them.
 
 ### Built-in Voice (`sidebar_customVoice` → `screen_customVoice`)
 
@@ -95,8 +91,8 @@ squeezing.
 | Readiness | `customVoice_readiness` (value "Ready" or "Waiting"), one caption after the mode label in the meta line, where the phone puts it |
 | Generate CTA | `textInput_generateButton`; error bar `textInput_generationError` retries |
 | Generating | `textInput_generatingBar` with `textInput_cancelButton`; once audio streams, the player card `studio_livePreview_card` carries the same cancel |
-| Live preview | `studio_livePreview_card` holds the transport a streaming take needs: `studio_livePreview_playPause`, `studio_livePreview_scrubber`, `studio_livePreview_badge`, and `studio_inlinePlayer_cadenceNotice`. On iOS the scrubber identifier spans both phases; on macOS it is live-only, because a completed take is a result row |
-| Completed take | `studio_inlinePlayer_generation_<id>`: a result row, not a player — the take's identity plus `studio_inlinePlayer_retry`, `studio_inlinePlayer_saveAs`, `studio_inlinePlayer_reveal` and `studio_inlinePlayer_dismiss` (confirmed by `studio_inlinePlayer_dismissConfirm`). It carries no waveform, clock, scrubber or play/pause: playback of a finished take belongs to the sidebar footer card, which is reachable from every destination (maintainer decision 2026-09-16). The one exception is a collapsed sidebar — macOS lets the user hide that column, and the card takes the transport back rather than leaving a finished take unplayable, keeping the `studio_inlinePlayer_*` identifiers it had |
+| Live preview | `studio_livePreview_card`, with `studio_livePreview_playPause`, `studio_livePreview_scrubber`, `studio_livePreview_badge` and `textInput_cancelButton` |
+| Completed take | `studio_inlinePlayer_generation_<id>` carries the inline waveform, `studio_inlinePlayer_playPause`, `studio_inlinePlayer_scrubber`, `studio_inlinePlayer_retry`, `studio_inlinePlayer_saveAs`, `studio_inlinePlayer_reveal` and `studio_inlinePlayer_dismiss` (confirmed by `studio_inlinePlayer_dismissConfirm`). All three modes suppress duplicate sidebar transport while their displayed take owns audio. |
 | Batch | `textInput_batchButton` chip (opens the batch sheet) |
 | Pinned seed chip | `textInput_seedPinChip` while a seed is pinned (DP-15); its confirmation's `textInput_seedUnpin` clears it back to fresh-seed-per-take. Shared across all three modes |
 
@@ -104,24 +100,24 @@ squeezing.
 
 | Element | Identifier |
 |---|---|
-| Voice brief | inline editor `voiceDesign_voiceDescriptionField` inside `voiceDesign_voiceSetup` (the brief is the container's accessibility value); starters menu `voiceDesign_briefStarters` with `voiceDesign_briefStarter_<n>`; count `voiceDesign_briefCharCount` |
+| Voice brief | `studioChip_voiceBrief` opens the native popover `voiceDesign_voiceSetup`; its editor keeps `voiceDesign_voiceDescriptionField`. Starting points: `voiceDesign_briefStarters` / `voiceDesign_briefStarter_<n>`; count: `voiceDesign_briefCharCount`; Done: `voiceBrief_confirm`. Edits bind directly to the draft. |
 | Delivery chip | `delivery_tonePicker` inside `voiceDesign_toneSpeed` (same sections, `delivery_hintAdvisory`, `delivery_toneField` as Built-in Voice) |
 | Language chip | `voiceDesign_languagePicker` inside `voiceDesign_languageSetup` |
 | Readiness | `voiceDesign_readiness` (value "Ready" or "Waiting") |
-| Save voice | `voiceDesign_saveVoiceButton` beside the readiness line after a take; `voiceDesign_saveVoiceCompleted` once saved |
+| Save voice | `voiceDesign_saveVoiceButton` inside the completed player; `voiceDesign_saveVoiceCompleted` below setup once saved. Cancelling the enrollment sheet preserves the take and save action. |
 | Script + CTAs + dock | `textInput_*` and `studio_inlinePlayer_*` (shared) |
 
 ### Voice Cloning (`sidebar_voiceCloning` → `screen_voiceCloning`)
 
 | Element | Identifier |
 |---|---|
-| Reference chip | `voiceCloning_savedVoicePicker` inside `voiceCloning_voiceSetup`: a menu of the saved voices (standalone voices as `<name> · transcript` / `<name> · audio only`; emotion-bank members collapse into one persona row, see [emotion-reference-banks.md](emotion-reference-banks.md)) plus Import, Record and Clear; the selected voice is its accessibility value |
+| Reference chip | `studioChip_reference` inside `voiceCloning_voiceSetup` opens `voiceCloning_referencePanel`; its `voiceCloning_savedVoicePicker` menu lists saved voices (standalone voices as `<name> · transcript` / `<name> · audio only`; emotion-bank members collapse into one persona row, see [emotion-reference-banks.md](emotion-reference-banks.md)) plus Clear; the selected voice is its accessibility value |
 | Bank delivery chip | `voiceCloning_bankDeliveryPicker`, visible only while a bank member is selected; lists Neutral (the persona's base) plus its curated emotion variants and swaps the concrete member |
-| Import / Record chips | `voiceCloning_importButton` (Import or Replace) / `voiceCloning_recordReferenceButton`; audio files can also be dropped on the screen |
+| Reference panel actions | `voiceCloning_importButton` / `voiceCloning_recordReferenceButton`, plus `cloneReference_confirm` to close; audio files can also be dropped on the screen |
 | Language chip | `voiceCloning_languagePicker` inside `voiceCloning_languageSetup` |
-| Active reference | `voiceCloning_activeReference` (file name, detail or `voiceCloning_referenceWarning` chip, Clear) under the chips; `voiceCloning_consentNotice` above it |
+| Active reference | `voiceCloning_activeReference` (file name, detail or `voiceCloning_referenceWarning` chip, Clear) inside the reference panel; `voiceCloning_consentNotice` remains on the canvas |
 | Warnings | `voiceCloning_savedVoicesWarning` (+ `voiceCloning_savedVoicesRetry`) / `voiceCloning_transcriptWarning` / `voiceCloning_dropWarning` (a dropped file of an unsupported type; the dock error bar is reserved for takes) |
-| Transcript (optional) | `voiceCloning_transcriptInput` inside `voiceCloning_transcriptField`, shown once a reference exists; blank selects genuine audio-only x-vector conditioning; `voiceCloning_transcriptionUnavailable` explains a missing auto-fill |
+| Transcript (optional) | `voiceCloning_transcriptInput` inside `voiceCloning_transcriptField`, in the reference panel once a reference exists; blank selects genuine audio-only x-vector conditioning; `voiceCloning_transcriptionUnavailable` explains a missing auto-fill |
 | Consent | `voiceCloning_inlineConsent` (one-time, same key as the Settings toggle) |
 | Readiness | `voiceCloning_readiness` (value "Ready" or "Waiting") |
 | Record clip sheet | `recordClip_record` / `_stop` / `_retake` / `_use` / `_cancel` / `_timer` / `_levelMeter` |
@@ -155,12 +151,15 @@ Corrupt long-form journals leave unrelated standalone clips readable while proje
 remain gated. Export Recovery Files retains bounded journals for repair with a private-text/path
 warning; it does not repair or delete them.
 
+History date headings render as transparent List rows (`history_sectionHeading_<bucket>`),
+without native pinned-header material or section rules. Search still renders a flat result list.
+
 ### Saved Voices (`sidebar_voices` → `screen_voices`)
 
 | Element | Identifier |
 |---|---|
 | Enroll | `voices_enrollButton` (toolbar) |
-| Row | `voicesRow_<voiceID>` (name) / `voicesRow_<voiceID>_transcriptStatus` (badge) / `voicesRow_<voiceID>_qualityWarning` (chip, opens the popover with `voicesRow_<voiceID>_replaceReference`) / `voicesRow_play_<voiceID>` / `voicesRow_use_<voiceID>` / `voicesRow_delete_<voiceID>`; rows lay out from the List width and the action cluster width, never their own rendered width |
+| Row | `voicesRow_<voiceID>` (name) / `voicesRow_<voiceID>_transcriptStatus` (metadata) / `voicesRow_<voiceID>_qualityWarning` (compact icon, opens the popover with `voicesRow_<voiceID>_replaceReference`) / `voicesRow_play_<voiceID>` / `voicesRow_use_<voiceID>` / `voicesRow_more_<voiceID>` (native MenuButton containing `voicesRow_delete_<voiceID>`); a 32-point avatar, two-line metadata and compact actions share one horizontal row |
 | Enrollment sheet | `voicesEnroll_nameField` / `_audioPathField` / `_browseButton` / `_recordButton` / `_transcriptField` / `_transcriptionStatus` / `_referenceLanguagePicker` / `_useAudioOnlyButton` / `_confirmButton` / `_cancelButton` |
 
 Confirm prepares a private candidate first. A clean candidate commits immediately; a warned

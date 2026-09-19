@@ -392,28 +392,31 @@ struct MacHistoryScreen: View {
         } else {
             List {
                 ForEach(sections) { section in
-                    Section {
-                        ForEach(section.entries) { entry in
-                            rowView(for: entry)
-                                .listRowInsets(EdgeInsets(
-                                    top: 0,
-                                    leading: MacShellMetrics.libraryRowHorizontalInset,
-                                    bottom: 0,
-                                    trailing: MacShellMetrics.libraryRowHorizontalInset
-                                ))
-                                .listRowSeparator(.hidden)
-                                .listRowBackground(Color.clear)
-                        }
-                    } header: {
-                        if let bucket = section.bucket {
-                            VocelloSectionHeading(
-                                bucket.title,
-                                titleFontSize: MacType.style(.eyebrow).size,
-                                topPadding: VocelloTheme.Spacing.xl,
-                                titleLineLimit: 1,
-                                expandsWidth: true
-                            )
-                        }
+                    if let bucket = section.bucket {
+                        // Plain rows avoid the native pinned-header material and rule.
+                        VocelloSectionHeading(
+                            bucket.title,
+                            titleFontSize: MacType.style(.eyebrow).size,
+                            topPadding: VocelloTheme.Spacing.xl,
+                            titleLineLimit: 1,
+                            expandsWidth: true,
+                            horizontalInset: MacShellMetrics.libraryRowHorizontalInset
+                        )
+                        .accessibilityIdentifier("history_sectionHeading_\(section.id)")
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                    }
+                    ForEach(section.entries) { entry in
+                        rowView(for: entry)
+                            .listRowInsets(EdgeInsets(
+                                top: 0,
+                                leading: MacShellMetrics.libraryRowHorizontalInset,
+                                bottom: 0,
+                                trailing: MacShellMetrics.libraryRowHorizontalInset
+                            ))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                     }
                 }
             }

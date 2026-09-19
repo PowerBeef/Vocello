@@ -1,12 +1,10 @@
 import AppKit
 import SwiftUI
 
-/// The Voice Design brief, inline on the desktop (the iOS brief sheet's
-/// content without the sheet): a short multi-line editor with the shared
+/// The native Voice Design brief popover: a multi-line editor with the shared
 /// starting points in a menu, the helper line and the character count,
 /// clamped to `VoiceDesignBriefCatalog.descriptionLimit`. The field keeps
-/// `voiceDesign_voiceDescriptionField`, which the benchmark types into
-/// directly, so it never hides behind a sheet.
+/// `voiceDesign_voiceDescriptionField` on the genuine editor after the chip opens it.
 struct MacVoiceBriefEditor: View {
     @Binding var text: String
     let tint: Color
@@ -38,9 +36,9 @@ struct MacVoiceBriefEditor: View {
                 font: .systemFont(ofSize: MacType.style(.body).size, weight: .medium),
                 isFocused: $isEditorFocused,
                 accessibilityIdentifier: "voiceDesign_voiceDescriptionField",
-                idealHeight: 60
+                idealHeight: 160
             )
-            .frame(minHeight: 52, maxHeight: 72)
+            .frame(height: 160)
             .padding(.horizontal, MacTheme.Spacing.sm)
             .padding(.vertical, MacTheme.Spacing.tight)
             .background { shape.fill(MacTheme.Surface.field) }
@@ -63,7 +61,7 @@ struct MacVoiceBriefEditor: View {
                 Text(MacInterfaceText.briefHelper)
                     .macType(.caption)
                     .foregroundStyle(MacTheme.Text.secondary)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Spacer(minLength: MacTheme.Spacing.sm)
 

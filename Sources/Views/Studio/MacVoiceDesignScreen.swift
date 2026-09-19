@@ -9,8 +9,7 @@ private struct VoiceDesignActionAlert: Identifiable {
 }
 
 /// Voice Design on the iOS Studio canvas (`IOSVoiceDesignView`): the brief
-/// editor inline above the composer (the desktop has the room the phone's
-/// sheet did not), the Delivery and Language chips, the pinned-seed and
+/// editor behind a setup chip, the Delivery and Language chips, the pinned-seed and
 /// Batch chips, the readiness line, the save-as-voice action for the last
 /// take, and the dock. Generation runs on the shared pipeline with the
 /// Design request from `MacStudioGenerationRequestFactory`. Every
@@ -29,6 +28,7 @@ struct MacVoiceDesignScreen: View {
     @State private var presentedSheet: VoiceDesignPresentedSheet?
     @State private var deliverySelection = MacDeliverySelection()
     @State private var actionAlert: VoiceDesignActionAlert?
+    @State private var isBriefPresented = false
 
     private let tint = MacTheme.Brand.modeDesign
 
@@ -75,9 +75,14 @@ struct MacVoiceDesignScreen: View {
         return candidate
     }
 
+    private var saveVoiceHandler: (() -> Void)? {
+        guard let candidate = currentSavedVoiceCandidate, !candidate.isSaved else { return nil }
+        return { presentSavedVoiceSheet(for: candidate) }
+    }
+
     private var briefDisplayName: String {
         let trimmed = draft.voiceDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? MacInterfaceText.designVoiceBriefLabel : SavedVoiceNameSuggestion.designResultName(from: trimmed)
+        return trimmed.isEmpty ? MacInterfaceText.designVoiceBriefLabel : trimmed
     }
 
     private var studioGenState: MacStudioGenState {
@@ -133,7 +138,6 @@ struct MacVoiceDesignScreen: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            briefSection
             MacStudioCanvas(
                 mode: .design,
                 accessibilityPrefix: "voiceDesign",
@@ -158,7 +162,8 @@ struct MacVoiceDesignScreen: View {
                 onBatch: { presentedSheet = .batch(.design(draft: draft)) },
                 onCancel: cancelGeneration,
                 onInstallModel: openSettingsForModel,
-                onPlayerDismiss: { coordinator.dismissInlinePlayer() }
+                onPlayerDismiss: { coordinator.dismissInlinePlayer() },
+                onSaveAsVoice: saveVoiceHandler
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -200,21 +205,46 @@ struct MacVoiceDesignScreen: View {
     }
 
 
-    private var briefSection: some View {
-        MacVoiceBriefEditor(text: $draft.voiceDescription, tint: tint)
-            .padding(.horizontal, MacStudioMetrics.horizontalInset)
-            .padding(.top, MacTheme.Spacing.snug)
-            .frame(maxWidth: MacStudioMetrics.contentMaxWidth)
-            .frame(maxWidth: .infinity)
+    private var briefChip: some View {
+        Button { isBriefPresented = true } label: {
+            MacStudioSetupChipPill(
+                symbol: "text.bubble.fill",
+                eyebrow: MacInterfaceText.designVoiceBriefLabel,
+                value: briefDisplayName,
+                tint: tint,
+                isPlaceholder: !draft.hasVoiceDescription
+            )
+        }
+        .buttonStyle(.plain)
+        .vocelloFocusRing(tint, radius: MacStudioChipMetrics.pillHeight / 2)
+        .accessibilityLabel(MacInterfaceText.designVoiceBriefLabel)
+        .accessibilityValue(draft.voiceDescription)
+        .accessibilityIdentifier("studioChip_voiceBrief")
+        .popover(isPresented: $isBriefPresented) {
+            VStack(alignment: .leading, spacing: MacTheme.Spacing.lg) {
+                MacVoiceBriefEditor(text: $draft.voiceDescription, tint: tint)
+                HStack {
+                    Spacer()
+                    Button(MacInterfaceText.done) { isBriefPresented = false }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(!draft.hasVoiceDescription)
+                        .accessibilityIdentifier("voiceBrief_confirm")
+                }
+            }
+            .padding(MacTheme.Spacing.xl)
+            .frame(width: 480)
+            .tint(tint)
+            .onExitCommand { isBriefPresented = false }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("voiceDesign_voiceSetup")
-            .accessibilityValue(draft.voiceDescription)
+        }
     }
 
     // MARK: - Chips
 
     @ViewBuilder
     private var setupChips: some View {
+        briefChip
         MacStudioChipContainer(accessibilityIdentifier: "voiceDesign_toneSpeed") {
             MacStudioDeliveryChip(selection: $deliverySelection, emotion: $draft.emotion, tint: tint)
         }
@@ -245,14 +275,6 @@ struct MacVoiceDesignScreen: View {
                     .lineLimit(1)
                     .accessibilityIdentifier("voiceDesign_saveVoiceCompleted")
                     .accessibilityValue(candidate.savedVoiceName ?? "")
-            } else {
-                Button {
-                    presentSavedVoiceSheet(for: candidate)
-                } label: {
-                    Label(MacInterfaceText.historySaveToSavedVoices, systemImage: "person.crop.circle.badge.plus")
-                }
-                .buttonStyle(MacSettingsActionButtonStyle(tint: tint, prominence: .primary))
-                .accessibilityIdentifier("voiceDesign_saveVoiceButton")
             }
         }
     }

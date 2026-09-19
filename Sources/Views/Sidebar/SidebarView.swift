@@ -1,33 +1,29 @@
 import QwenVoiceCore
 import SwiftUI
 
-/// The macOS sidebar in the iOS visual language (plan
-/// `macos-ios-convergence-2026-09`, CONV-11): the brand lockup on top, the
-/// Studio and Library sections plus Settings as rows with mode-tinted glyph
-/// tiles, the selected row a quiet tint-glass pill (the iOS `TabDock`
-/// selection recipe), disabled modes dimmed with the install hint, and the
-/// inline player card and engine status strip pinned in the footer. Every
-/// `sidebar_*`, `sidebarSection_*` and `sidebarPlayer_*` identifier is the
-/// lane contract and stays.
+/// The phone's four destinations, presented as a desktop sidebar. Studio modes
+/// live in the shared capsule selector in the detail column.
 struct SidebarView: View {
     @Binding var selection: SidebarItem?
-    let disabledItems: Set<SidebarItem>
+    @Environment(MacAppModel.self) private var appModel
 
-    private var usesNativeListSelection: Bool {
-        guard let selection else { return true }
-        return !disabledItems.contains(selection)
+    private var destination: Binding<SidebarItem?> {
+        Binding(
+            get: { selection?.generationMode != nil ? .customVoice : selection },
+            set: { selection = $0 == .customVoice ? appModel.lastStudioItem : $0 }
+        )
     }
 
     var body: some View {
-        Group {
-            if usesNativeListSelection {
-                List(selection: $selection) {
-                    sidebarListContent
-                }
-            } else {
-                List {
-                    sidebarListContent
-                }
+        List(selection: destination) {
+            ForEach([SidebarItem.customVoice, .voices, .history, .settings]) { item in
+                MacSidebarRow(item: item, selection: destination)
+                    .tag(item as SidebarItem?)
+                    .listRowInsets(
+                        EdgeInsets(top: 2, leading: MacShellMetrics.sidebarInset, bottom: 2, trailing: MacShellMetrics.sidebarInset)
+                    )
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
             }
         }
         .listStyle(.sidebar)
@@ -54,35 +50,6 @@ struct SidebarView: View {
         }
     }
 
-    @ViewBuilder
-    private var sidebarListContent: some View {
-        ForEach(SidebarItem.Section.allCases, id: \.self) { section in
-            Section {
-                ForEach(section.items) { item in
-                    MacSidebarRow(
-                        item: item,
-                        selection: $selection,
-                        isDisabled: disabledItems.contains(item)
-                    )
-                    .tag(item as SidebarItem?)
-                    .listRowInsets(
-                        EdgeInsets(top: 2, leading: MacShellMetrics.sidebarInset, bottom: 2, trailing: MacShellMetrics.sidebarInset)
-                    )
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-                }
-            } header: {
-                // The Settings section holds exactly the Settings row; a
-                // header would restate the row directly beneath it.
-                if section != .settings {
-                    MacSidebarSectionHeader(
-                        title: section.title,
-                        accessibilityID: section.accessibilityID
-                    )
-                }
-            }
-        }
-    }
 }
 
 // MARK: - Brand header
@@ -106,32 +73,12 @@ private struct MacSidebarBrandHeader: View {
     }
 }
 
-// MARK: - Section header
-
-private struct MacSidebarSectionHeader: View {
-    let title: String
-    let accessibilityID: String
-
-    var body: some View {
-        Text(title.uppercased())
-            .macType(.eyebrow)
-            .foregroundStyle(MacTheme.Text.secondary)
-            .lineLimit(1)
-            .textCase(nil)
-            .padding(.leading, MacTheme.Spacing.xs)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(title)
-            .accessibilityIdentifier(accessibilityID)
-    }
-}
-
 // MARK: - Row
 
 private struct MacSidebarRow: View {
+    @Environment(MacAppModel.self) private var appModel
     let item: SidebarItem
     @Binding var selection: SidebarItem?
-    let isDisabled: Bool
     @State private var isHovered = false
 
     /// The chip's glyph size, not the icon step's. A sidebar row and a Studio
@@ -141,11 +88,22 @@ private struct MacSidebarRow: View {
     @ScaledMetric(relativeTo: .body) private var glyphColumnWidth: CGFloat = MacShellMetrics.sidebarGlyphColumn
 
     private var isSelected: Bool { selection == item }
-    private var tint: Color { MacTheme.tint(for: item) }
+    private var title: String {
+        switch item {
+        case .customVoice: MacInterfaceText.shellSectionStudio
+        case .voices: MacInterfaceText.tabVoices
+        default: item.title
+        }
+    }
+    private var symbol: String { item == .customVoice ? "waveform" : item.iconName }
+    private var identifier: String { item == .customVoice ? "sidebar_studio" : item.accessibilityID }
+    private var tint: Color {
+        MacTheme.tint(for: item == .customVoice ? appModel.lastStudioItem : item)
+    }
 
     var body: some View {
         // A Button so VoiceOver announces the row as a button, keyboard
-        // activation works and `.disabled` gates activation and traits.
+        // activation works without a second, invisible navigation control.
         Button {
             selection = item
         } label: {
@@ -153,7 +111,7 @@ private struct MacSidebarRow: View {
                 glyphColumn
 
                 VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {
-                    Text(item.title)
+                    Text(title)
                         // The same step and weight as a Studio chip's label,
                         // which is the point: these rows and those chips are
                         // the two halves of the window and they are now the
@@ -170,13 +128,6 @@ private struct MacSidebarRow: View {
                         .macType(.rowTitle)
                         .foregroundStyle(MacTheme.Text.primary)
                         .lineLimit(1)
-
-                    if isDisabled {
-                        Text(MacInterfaceText.shellModelMissingHint)
-                            .macType(.caption)
-                            .foregroundStyle(MacTheme.Text.tertiary)
-                            .lineLimit(1)
-                    }
                 }
 
                 Spacer(minLength: 0)
@@ -189,25 +140,16 @@ private struct MacSidebarRow: View {
             .contentShape(VocelloShape.row())
         }
         .buttonStyle(.plain)
-        .opacity(isDisabled ? VocelloTheme.Opacity.disabled : 1)
-        .onHover { hovering in
-            isHovered = isDisabled ? false : hovering
-        }
-        .onChange(of: isDisabled) { _, disabled in
-            if disabled {
-                isHovered = false
-            }
-        }
+        .onHover { isHovered = $0 }
         .appAnimation(MacTheme.Motion.stateChange, value: isHovered)
         .appAnimation(MacTheme.Motion.stateChange, value: isSelected)
-        .disabled(isDisabled)
-        .accessibilityLabel(item.title)
+        .accessibilityLabel(title)
         // The trait, not a string. VoiceOver synthesises "selected" in the
         // user's own language from this; the words it replaces were English
         // on an app that ships in French, and "disabled" was a second copy of
         // what `.disabled` already tells the accessibility layer.
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-        .accessibilityIdentifier(item.accessibilityID)
+        .accessibilityIdentifier(identifier)
     }
 
     /// The glyph, at the size and strength a Studio chip's glyph has, in a
@@ -220,7 +162,7 @@ private struct MacSidebarRow: View {
     /// frame stays because it is what aligns icons of different intrinsic
     /// widths; only the chrome goes.
     private var glyphColumn: some View {
-        Image(systemName: item.iconName)
+        Image(systemName: symbol)
             .font(.system(size: glyphSize, weight: .semibold))
             // Full strength when unselected, not secondary: dimmed as well as
             // small left the icons reading as decoration beside a chip whose
@@ -269,6 +211,23 @@ private struct MacSidebarSelectionPill: View {
 // MARK: - Footer
 
 private struct SidebarFooterRegion: View {
+    @Environment(MacAppModel.self) private var appModel
+
+    private var studioOwnsTransport: Bool {
+        let coordinator: StudioGenerationCoordinator
+        switch appModel.selectedItem {
+        case .customVoice: coordinator = appModel.customCoordinator
+        case .voiceDesign: coordinator = appModel.designCoordinator
+        case .voiceCloning: coordinator = appModel.cloneCoordinator
+        default: return false
+        }
+        if coordinator.isGenerating {
+            return coordinator.liveItem != nil && audioPlayer.isLiveStream
+                && audioPlayer.activeGeneratePreviewVisibilityState == .ready
+        }
+        guard let output = coordinator.lastCompletedOutput else { return false }
+        return audioPlayer.currentFilePath == output.audioURL.path
+    }
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
 
@@ -288,11 +247,11 @@ private struct SidebarFooterRegion: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
-            if audioPlayer.hasAudio {
+            if audioPlayer.hasAudio && !studioOwnsTransport {
                 MacInlinePlayerCard(inlinePlayerActivity: footerPresentation.inlinePlayerActivity)
             }
 
-            if footerPresentation.showsStandaloneStatus {
+            if footerPresentation.showsStandaloneStatus && !studioOwnsTransport {
                 MacStatusStrip(
                     status: status,
                     clearError: { ttsEngineStore.clearVisibleError() }

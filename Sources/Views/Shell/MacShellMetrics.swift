@@ -41,7 +41,7 @@ enum MacShellMetrics {
     static let libraryRowHorizontalInset: CGFloat = VocelloTheme.Spacing.xl
 
     /// Content column of the History and Saved Voices lists; wider than the
-    /// Studio column (`MacStudioMetrics.contentMaxWidth`) so rows keep their
+    /// Studio column (`MacStudioMetrics.composerMaxWidth`) so rows keep their
     /// legacy width and do not tear apart on wide displays.
     static let libraryContentMaxWidth: CGFloat = 960
     /// Width cap of the empty, error and loading state cards on the History

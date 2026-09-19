@@ -10,6 +10,17 @@ import QwenVoiceCore
 enum MacInterfaceText {
     /// The interface language selected in Settings (`MacInterfaceLanguage`).
     private static var localization: VocelloLocalization { MacInterfaceLanguage.current }
+    /// Shared iOS navigation vocabulary, resolved through the Mac language owner.
+    static var tabVoices: String { VocelloPresentationText(localization: localization).tabVoices }
+    static func studioModeTitle(_ mode: GenerationMode) -> String {
+        let text = VocelloPresentationText(localization: localization)
+        return switch mode {
+        case .custom: text.modeBuiltIn
+        case .design: text.modeDesign
+        case .clone: text.modeClone
+        }
+    }
+
     static func activityGenerating(_ mode: String) -> String {
         localization.format(localization.string(localized: "vocello.mac.activity.generating",
             defaultValue: "Generating %@…",
@@ -1754,6 +1765,14 @@ enum MacInterfaceText {
     static var voicesNoVoicesTitle: String {
         localization.string(localized: "vocello.mac.voices.noVoicesTitle", defaultValue: "No saved voices",
                comment: "macOS interface: Saved Voices empty-state title. Presentation only.")
+    }
+    static var voicesUse: String {
+        localization.string(localized: "vocello.mac.voices.use", defaultValue: "Use",
+               comment: "macOS interface: compact button that selects a saved voice in Voice Cloning.")
+    }
+    static var voicesMoreActions: String {
+        localization.string(localized: "vocello.mac.voices.moreActions", defaultValue: "More actions",
+               comment: "macOS interface: accessibility label for a saved voice row's secondary actions menu.")
     }
     static var voicesOpenInCloning: String {
         localization.string(localized: "vocello.mac.voices.openInCloning", defaultValue: "Open in Cloning",

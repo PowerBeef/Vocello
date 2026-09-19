@@ -16,16 +16,9 @@ private struct CloneReferenceSessionState: Equatable {
     var dropError: String?
 }
 
-/// Voice Cloning on the iOS Studio canvas (`IOSVoiceCloningView`): the
-/// reference chip (saved voices as a menu), the desktop's Import and Record
-/// chips, the bank delivery chip for a persona, the Language, pinned-seed and
-/// Batch chips, then the reference status, warnings, the transcript field,
-/// the inline consent and the readiness line, and the dock. Drag-and-drop
-/// import stays. Generation runs on the shared pipeline with the clone
-/// request from `MacStudioGenerationRequestFactory`; the clone reference is
-/// primed proactively and again on demand before the take. Every
-/// `voiceCloning_*`, `textInput_*` and `recordClip_*` identifier is the lane
-/// contract.
+/// The iOS-derived Studio canvas with a native reference popover. Reference
+/// selection, import, recording and transcript review share one focused surface;
+/// generation and proactive priming retain their existing owners.
 struct MacVoiceCloningScreen: View {
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
@@ -44,6 +37,7 @@ struct MacVoiceCloningScreen: View {
     @State private var detectedPromptLanguage: Qwen3SupportedLanguage = .auto
     @State private var presentedSheet: VoiceCloningPresentedSheet?
     @State private var isRecordSheetPresented = false
+    @State private var isReferencePresented = false
     @State private var showsWarningDetails = false
 
     private let tint = MacTheme.Brand.modeClone
@@ -189,13 +183,7 @@ struct MacVoiceCloningScreen: View {
         return MacInterfaceText.cloningChooseSavedVoice
     }
 
-    private var modeMetaLabel: String {
-        var parts = [MacInterfaceText.modeName(.clone)]
-        if let cloneModel {
-            parts.append(modelManager.generationVariantDisplayName(for: cloneModel))
-        }
-        return parts.joined(separator: " · ")
-    }
+    private var modeMetaLabel: String { MacInterfaceText.modeName(.clone) }
 
     // MARK: - Body
 
@@ -298,34 +286,27 @@ struct MacVoiceCloningScreen: View {
     }
 
 
-    // MARK: - Chips (two rows: the reference and its sources, then the take)
+    // MARK: - Setup
 
-    /// A flat list, like the other two Studio screens. It used to be a VStack
-    /// of two nested `MacChipFlow`s, which broke: the canvas already lays these
-    /// out in a `MacChipFlow`, and a flow measures its subviews at unspecified
-    /// width. The outer flow therefore sized this one child for the two rows it
-    /// reports unconstrained, while at 720 pt under doubled text it needed
-    /// three — so the language chip drew outside the height reserved for it,
-    /// on top of the permission caption and the reference clip card.
     @ViewBuilder
     private var setupChips: some View {
-        MacStudioChipContainer(accessibilityIdentifier: "voiceCloning_voiceSetup") { referenceChip }
-        MacStudioActionChip(
-            eyebrow: MacInterfaceText.cloningReferenceSection,
-            value: draft.referenceAudioPath == nil ? MacInterfaceText.cloningImport : MacInterfaceText.cloningReplace,
-            leadingSymbol: "waveform.badge.plus",
-            tint: tint,
-            accessibilityIdentifier: "voiceCloning_importButton",
-            action: browseForAudio
-        )
-        MacStudioActionChip(
-            eyebrow: MacInterfaceText.cloningReferenceSection,
-            value: MacInterfaceText.recordRecord,
-            leadingSymbol: "mic.fill",
-            tint: tint,
-            accessibilityIdentifier: "voiceCloning_recordReferenceButton",
-            action: { isRecordSheetPresented = true }
-        )
+        MacStudioChipContainer(accessibilityIdentifier: "voiceCloning_voiceSetup") {
+            Button { isReferencePresented = true } label: {
+                MacStudioSetupChipPill(
+                    symbol: "waveform",
+                    eyebrow: MacInterfaceText.cloningReferenceSection,
+                    value: referenceChipValue.replacingOccurrences(of: "_", with: " "),
+                    tint: tint,
+                    isPlaceholder: draft.referenceAudioPath == nil
+                )
+            }
+            .buttonStyle(.plain)
+            .vocelloFocusRing(tint, radius: MacStudioChipMetrics.pillHeight / 2)
+            .accessibilityLabel(MacInterfaceText.cloningReferenceSection)
+            .accessibilityValue(referenceChipValue)
+            .accessibilityIdentifier("studioChip_reference")
+            .popover(isPresented: $isReferencePresented) { referencePanel }
+        }
         if let persona = selectedBankPersona {
             bankDeliveryChip(persona)
         }
@@ -338,6 +319,49 @@ struct MacVoiceCloningScreen: View {
             )
         }
         MacSeedPinChip(pinnedSeed: $draft.pinnedSeed, tint: tint)
+    }
+
+    private var referencePanel: some View {
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.lg) {
+            Text(MacInterfaceText.cloningReferenceSection)
+                .macType(.screenTitle)
+            referenceChip
+            HStack(spacing: MacTheme.Spacing.sm) {
+                Button(MacInterfaceText.cloningImport) {
+                    isReferencePresented = false
+                    browseForAudio()
+                }
+                .accessibilityIdentifier("voiceCloning_importButton")
+                Button(MacInterfaceText.recordRecord) {
+                    isReferencePresented = false
+                    isRecordSheetPresented = true
+                }
+                .accessibilityIdentifier("voiceCloning_recordReferenceButton")
+            }
+            referenceStatus
+            if draft.referenceAudioPath != nil {
+                transcriptField
+                if let message = session.transcriptionUnavailableMessage {
+                    Label(message, systemImage: "waveform.badge.mic")
+                        .macType(.caption)
+                        .foregroundStyle(MacTheme.Text.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("voiceCloning_transcriptionUnavailable")
+                }
+            }
+            HStack {
+                Spacer()
+                Button(MacInterfaceText.done) { isReferencePresented = false }
+                    .keyboardShortcut(.defaultAction)
+                    .accessibilityIdentifier("cloneReference_confirm")
+            }
+        }
+        .padding(MacTheme.Spacing.xl)
+        .frame(width: 480)
+        .tint(tint)
+        .onExitCommand { isReferencePresented = false }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("voiceCloning_referencePanel")
     }
 
     private struct SourceEntry: Identifiable {
@@ -397,9 +421,6 @@ struct MacVoiceCloningScreen: View {
                     )
                 }
             }
-            Divider()
-            Button(MacInterfaceText.cloningImport, action: browseForAudio)
-            Button(MacInterfaceText.recordRecord) { isRecordSheetPresented = true }
             if draft.referenceAudioPath != nil || draft.selectedSavedVoiceID != nil {
                 Divider()
                 Button(MacInterfaceText.clear, role: .destructive, action: clearReference)
@@ -447,8 +468,6 @@ struct MacVoiceCloningScreen: View {
             .foregroundStyle(MacTheme.Text.secondary)
             .accessibilityIdentifier("voiceCloning_consentNotice")
 
-        referenceStatus
-
         if let savedVoicesLoadError {
             warningCard(
                 message: savedVoicesLoadError,
@@ -468,17 +487,6 @@ struct MacVoiceCloningScreen: View {
 
         if let dropError = session.dropError {
             warningCard(message: dropError, accessibilityIdentifier: "voiceCloning_dropWarning")
-        }
-
-        if draft.referenceAudioPath != nil {
-            transcriptField
-            if let unavailableMessage = session.transcriptionUnavailableMessage {
-                Label(unavailableMessage, systemImage: "waveform.badge.mic")
-                    .macType(.caption)
-                    .foregroundStyle(MacTheme.Text.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("voiceCloning_transcriptionUnavailable")
-            }
         }
 
         if !cloneConsentAcknowledged, !isGenerationActive {

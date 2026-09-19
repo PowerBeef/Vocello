@@ -16,17 +16,20 @@ final class MacAppModel {
     static let lastSidebarItemKey = "QwenVoice.LastSelectedSidebarItem"
     static let lastVoiceCloningSavedVoiceIDKey = "QwenVoice.LastVoiceCloningSavedVoiceID"
 
+    /// Returning from a library destination resumes the last Studio mode.
+    /// Persisted route raw values remain compatible with existing installations.
+    private(set) var lastStudioItem: SidebarItem = .customVoice
+
     var selectedItem: SidebarItem? {
         didSet {
             guard let selectedItem, selectedItem != oldValue else { return }
+            if selectedItem.generationMode != nil { lastStudioItem = selectedItem }
             defaults.set(selectedItem.rawValue, forKey: Self.lastSidebarItemKey)
         }
     }
 
-    /// When the user clicks a disabled generation destination the shell
-    /// redirects to Settings and asks the Models page to flash that mode's
-    /// row. Keyed by mode because the row is mode-keyed and the missing
-    /// variant might not be the active one.
+    /// The Studio Install action opens Settings at this mode's model row.
+    /// Missing models do not prevent navigation to their Studio.
     var pendingHighlightedMode: GenerationMode?
 
     var historySearchText = ""
@@ -63,7 +66,9 @@ final class MacAppModel {
 
     init(defaults: UserDefaults = AppDefaults.store) {
         self.defaults = defaults
-        selectedItem = Self.restoredSelection(from: defaults)
+        let restored = Self.restoredSelection(from: defaults)
+        selectedItem = restored
+        lastStudioItem = restored.generationMode == nil ? .customVoice : restored
     }
 
     static func restoredSelection(from defaults: UserDefaults) -> SidebarItem {

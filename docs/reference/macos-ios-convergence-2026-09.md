@@ -71,6 +71,12 @@ cost that landed as predicted: push CI pins Xcode 26.6 while the Mac runs Xcode 
 main-actor call from a nonisolated test override compiled locally and failed on CI until fixed
 forward (ea795cde); the rule is to read CI after every push.
 
+## September 18 replacement direction
+
+The engine convergence remains accepted. The maintainer rejected the subsequent Mac UI attempt and
+approved the [iOS-derived UI reset](macos-ios-ui-reset-2026-09.md). That reference supersedes the
+visual prescriptions below; these paragraphs retain the history rather than govern new UI work.
+
 ## UI fidelity follow-up (2026-09-15)
 
 The close-out captures showed that adopting the iOS screens had not adopted the iOS design: the

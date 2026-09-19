@@ -37,17 +37,6 @@ enum MacStudioGenState: Equatable {
 }
 
 enum MacStudioMetrics {
-    /// The Studio column. The phone's canvas is 390 pt. 640 kept the phone's
-    /// proportions but capped the chip row at 600, which is why the setup chips
-    /// split onto two rows however wide the window was -- the window was never
-    /// the constraint, this was. 780 holds all five chips on one row (739 pt of
-    /// chips plus the gutters).
-    ///
-    /// It used to carry a second job -- giving the 22 pt script a measure of
-    /// roughly 71 characters -- which it no longer does. The face came down to
-    /// 17 and the measure moved to `composerMaxWidth`, so this number now
-    /// answers to the chip row alone.
-    static let contentMaxWidth: CGFloat = 780
     /// The iOS canvas gutter, which is the app's screen gutter token. The
     /// composer uses it, the chip row and the dock use it, so the script, the
     /// chips and the Generate button share one left edge — the spine the
@@ -127,6 +116,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     let onCancel: () -> Void
     let onInstallModel: () -> Void
     let onPlayerDismiss: () -> Void
+    let onSaveAsVoice: (() -> Void)?
 
     @State private var isScriptFocused = false
 
@@ -149,7 +139,8 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         onBatch: @escaping () -> Void,
         onCancel: @escaping () -> Void,
         onInstallModel: @escaping () -> Void,
-        onPlayerDismiss: @escaping () -> Void
+        onPlayerDismiss: @escaping () -> Void,
+        onSaveAsVoice: (() -> Void)? = nil
     ) {
         self.mode = mode
         self.accessibilityPrefix = accessibilityPrefix
@@ -170,6 +161,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         self.onCancel = onCancel
         self.onInstallModel = onInstallModel
         self.onPlayerDismiss = onPlayerDismiss
+        self.onSaveAsVoice = onSaveAsVoice
     }
 
     var body: some View {
@@ -201,9 +193,9 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     }
 
     private var canvasColumn: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VocelloStudioLayout {
             composerPad
-
+        } setup: {
             VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
                 // Lock voice, delivery and language while a take is in flight
                 // (the request already captured them); re-enabled on complete.
@@ -230,6 +222,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             // readiness and dock identifiers the lanes read.
             .accessibilityElement(children: .contain)
 
+        } dock: {
             dockArea
                 .frame(minHeight: MacStudioMetrics.dockMinHeight, alignment: .top)
                 .padding(.horizontal, MacStudioMetrics.horizontalInset)
@@ -237,7 +230,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
                 .accessibilityElement(children: .contain)
 
         }
-        .frame(maxWidth: MacStudioMetrics.contentMaxWidth)
+        .frame(maxWidth: MacStudioMetrics.composerMaxWidth)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .appAnimation(MacTheme.Motion.stateChange, value: genState)
     }
@@ -356,11 +349,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
 
     // MARK: - Dock area
 
-    /// The player card is a top-level `if let` (not a `switch` branch) so it
-    /// keeps one view identity across live → complete. Unlike the phone, the
-    /// desktop keeps the Generate control under a completed card and beside an
-    /// error: the next take is one click away and the lanes read
-    /// `textInput_generateButton` after every completion.
+    /// Keep one player identity across live → complete, with retry in the card.
     @ViewBuilder
     private var dockArea: some View {
         VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
@@ -370,7 +359,9 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
                     tint: tint,
                     onDismiss: onPlayerDismiss,
                     onCancel: onCancel,
-                    onRetry: onGenerate
+                    onRetry: onGenerate,
+                    canRetry: canGenerate,
+                    onSaveAsVoice: onSaveAsVoice
                 )
                 .id("studioPlayerCard")
             }
@@ -380,7 +371,9 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
                 if !genState.isLivePlayerVisible {
                     generatingBar
                 }
-            case .idle, .complete:
+            case .complete:
+                if let errorMessage { errorBar(errorMessage) }
+            case .idle:
                 if let errorMessage {
                     errorBar(errorMessage)
                 }

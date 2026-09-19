@@ -89,6 +89,7 @@ struct MacStatusStrip: View {
                     .foregroundStyle(MacTheme.Text.primary)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(minHeight: MacControl.badge.height, alignment: .leading)
 
                 if let message = descriptor.message, !message.isEmpty {
                     Text(message)
@@ -125,12 +126,17 @@ struct MacStatusStrip: View {
         }
         .padding(.horizontal, MacTheme.Spacing.md)
         .padding(.vertical, MacTheme.Spacing.sm)
-        .macSubtleGlassSurface(
-            in: shape,
-            tint: descriptor.tint,
-            fill: MacTheme.Surface.glassSurfaceMuted,
-            strokeOpacity: 0.16
-        )
+        .background {
+            // Ready/standby are supporting text, not action-shaped panels.
+            if descriptor.message != nil || descriptor.fraction != nil {
+                Color.clear.macSubtleGlassSurface(
+                    in: shape,
+                    tint: descriptor.tint,
+                    fill: MacTheme.Surface.glassSurfaceMuted,
+                    strokeOpacity: 0.16
+                )
+            }
+        }
         .accessibilityIdentifier("sidebar_backendStatus_\(descriptor.stateKey)")
         .accessibilityValue(percent.map { "\($0)%" } ?? descriptor.title)
     }

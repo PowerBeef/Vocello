@@ -17244,6 +17244,42 @@
           }
         }
       }
+    },
+    "vocello.mac.voices.use": {
+      "comment": "Compact button that selects a saved voice in Voice Cloning.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utiliser"
+          }
+        }
+      }
+    },
+    "vocello.mac.voices.moreActions": {
+      "comment": "Accessibility label for a saved voice row secondary actions menu.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More actions"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autres actions"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

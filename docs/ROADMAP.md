@@ -4,7 +4,7 @@
 > Open work lives in `config/roadmap.json`; finished items and completed plans are in
 > `config/roadmap-archive.json` and only count toward progress here.
 
-**Current execution plan: macOS UI fidelity — the Mac screens read like the iOS app** (`macos-ui-fidelity-2026-09`).
+**Current execution plan: macOS UI reset — adapt the approved iOS implementation** (`macos-ui-fidelity-2026-09`).
 Follow its ordered milestones; the other plans retain the underlying defect records
 and deferred backlog. Milestone progress is not a release-readiness score.
 
@@ -24,38 +24,38 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
-## macOS UI fidelity — the Mac screens read like the iOS app
+## macOS UI reset — adapt the approved iOS implementation
 
 `macos-ui-fidelity-2026-09` · **active** · backend-and-platform · adopted 2026-09-15
 
-The convergence plan adopted the iOS screens but re-implemented every surface by hand, so the Mac drifted: chips that hug their labels and wrap, a Generate button stranded at the left edge, a flat canvas with no mode wash, a readiness paragraph the phone never shows, and library screens with different row, icon and button metrics. Each commit brings one surface back to the iOS composition and moves the primitive that defines it into SharedSupport so the two apps cannot drift apart again. Maintainer decisions (2026-09-15): chip labels are full words on one line, the Studio title row goes and Speed/Quality moves to the window toolbar, search and filter chips come inline on History and Saved Voices while the sort menu and the enroll button stay window chrome.
+September 18 maintainer reset: use the approved iOS 3.0.0 (24) UI at ca5a10cd as the reference. Replace the failed Mac presentation forward while keeping the in-process engine, shared pipeline and correctness fixes. Share screen composition and row components; platform wrappers own navigation, input and file actions. First prove the shell and Built-in Voice on the running Mac, obtain visual approval, then convert the remaining screens. Existing UIF identifiers remain the sole work authority.
 
-Narrative authority: [`docs/reference/macos-ios-convergence-2026-09.md`](reference/macos-ios-convergence-2026-09.md)
+Narrative authority: [`docs/reference/macos-ios-ui-reset-2026-09.md`](reference/macos-ios-ui-reset-2026-09.md)
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `UIF-03` | planned | History and Saved Voices on the iOS row and chip metrics | `UIF-06` |
-| `UIF-04` | planned | Settings and shell polish | `UIF-06` |
-| `UIF-05` | in-flight | One scale: type, control sizes, radii, strokes, spacing | — |
-| `UIF-06` | in-flight | See the window at every width, then find the layout and proportions | — |
-| `UIF-07` | planned | The window minimum the app declares is the one it enforces | `UIF-06` |
+| `UIF-03` | in-flight | Voices and History from the approved iOS screens | — |
+| `UIF-04` | planned | Settings categories and secondary surfaces from iOS | `UIF-06` |
+| `UIF-05` | in-flight | Shared presentation with explicit platform metrics | — |
+| `UIF-06` | in-flight | Shared shell and iOS-derived Studio acceptance | — |
+| `UIF-07` | planned | Verify the adapted screens at supported window sizes | `UIF-06` |
 
 ### Open items in detail
 
-- **`UIF-03`** (planned) — History and Saved Voices on the iOS row and chip metrics.
-  gate: Filter chips are equal width at 32 pt with 13 pt labels; History rows use the 15 pt title with -0.15 tracking, 10 pt padding and one ellipsis menu carrying every action identifier; both screens show the inline search field; Saved Voices gains the All/Built-in/Saved filters, the built-in speakers section and the dashed save-a-new-voice card, and drops the extra glass layer; sort and enroll stay in the toolbar; localization, smoke and perf pass.
+- **`UIF-03`** (in-flight) — Voices and History from the approved iOS screens.
+  gate: Share row/filter presentation with the approved iOS screens; retain inline search, filters, avatars/waveforms, saved and built-in voices, record/import flows, desktop sort and file actions. Remove replaced Mac presentation. Both builds, relevant tests, consented localization/smoke/perf and maintainer review pass.
 
-- **`UIF-04`** (planned) — Settings and shell polish.
-  gate: Settings icons are 20 pt symbols in the 28 pt slot, action buttons 44 pt tall, the section border the clipped hairline, gutters 16/12/16, and the nested package cards flattened to the iOS model-row shape so no label truncates; the inline player card adopts the iOS card geometry; the sidebar selection pill matches the phone's; MacWaveformBars gains the third band and the playhead; the marketing captures are retaken and sent; localization, smoke and perf pass.
+- **`UIF-04`** (planned) — Settings categories and secondary surfaces from iOS.
+  gate: Adapt the approved iOS category/detail Settings flow to both the sidebar and Cmd+, window. Share row/section content; preserve desktop variant, repair/update, output-folder and other existing capabilities. Convert remaining secondary surfaces, remove old duplicates, and pass builds, relevant tests and consented visual/behavior acceptance.
 
-- **`UIF-05`** (in-flight) — One scale: type, control sizes, radii, strokes, spacing.
-  gate: VocelloTypography (role vocabulary + VocelloTextStyle spec) and the macOS table in MacTypeScale exist, with six sizes covering thirteen roles and no role appearing twice; MacControl carries the six control heights with the glyph size and shape that belong to each; VocelloTheme gains Radius.row, Stroke, Elevation, Opacity and the two intra-control spacing steps; Sources/Views carries no hand-written font size, control height, corner radius, stroke width or shadow that a token covers; one screen gutter across every destination; the layout assertions (assertSingleLine 24 pt, assertSavedVoicesLayoutIntact) and the localization lane pass at the narrow window; captures reviewed by the maintainer.
+- **`UIF-05`** (in-flight) — Shared presentation with explicit platform metrics.
+  gate: Shared selectors, Studio composition and retained primitives render both platforms with unchanged iOS defaults. Mac-only metrics have a desktop justification, not an independent visual system. Remove duplicate presentation as each replacement lands; retain Dynamic Type, motion/transparency and accessibility semantics.
 
-- **`UIF-06`** (in-flight) — See the window at every width, then find the layout and proportions.
-  gate: A test-target window-frame helper sizes the macOS window to a known width, and every capture is named for the width it reached rather than the one requested; every macOS surface is captured at the scene minimum, the default and the widest the display allows, plus one pseudo-localized narrow pass; a written layout-and-proportions thesis, synthesized from two isolated assessments, is delivered and approved before any screen is rewritten; SharedSupport/Views carries no raw stroke width, shadow or hand-written Capsule() that a token covers; one content left edge across all six destinations, with section headings over their own rows; the Studio chip row's arithmetic is unit-tested for the invariant that a row never hands out more width than it has; and every defect the specialist audit attributes to this plan's own commits is fixed with evidence.
+- **`UIF-06`** (in-flight) — Shared shell and iOS-derived Studio acceptance.
+  gate: Four sidebar destinations and the shared iOS mode selector; shared composer/setup/dock layout with one playback owner. Built-in layout approval precedes Design/Clone conversion. Preserve brief/reference editing, delivery, language, seed, batch, Save as Voice and native file actions. Verify idle/live/complete/error/missing-model behavior, both builds, source-bound minimum/default/wide captures and localization; obtain maintainer review per screen.
 
-- **`UIF-07`** (planned) — The window minimum the app declares is the one it enforces.
-  gate: Every Studio mode's column fits the declared minimum window with a finished take on screen, or the column scrolls; the declared minimum is the enforced one; the geometry assertion runs at that size and says so in its activity.
+- **`UIF-07`** (planned) — Verify the adapted screens at supported window sizes.
+  gate: Each converted screen fits its actual minimum/default/wide window bounds, including completion, long labels and error states. Long scripts scroll inside the editor. Any changed window minimum or additional scrolling behavior is explicitly reviewed and proven by genuine window-frame and control-geometry assertions.
 
 ## Specialist-audit remediation
 

@@ -86,20 +86,15 @@ XCUITest lanes only when explicitly requested.
   `AppLaunchConfiguration.performAnimated`; no color-only signal; `accessibilityIdentifier`s such as
   `voicesRow_*`, `textInput_*`, `studioChip_*` survive refactors; test-only code lives in the UI test
   target.
-- **The Studio canvas is the phone's, arranged for a desktop.** `MacStudioCanvas`: the composer takes
-  every point the rest does not (six-line floor, then it scrolls), meta line flush below it, one row
-  of setup chips, then the dock with Generate and the square Batch button. No trailing spacer — the
-  script is the flexible element, as `IOSStudioCanvas` states for the phone, and no card or border
-  around it. One `VocelloModeBackdrop` wash behind the whole window from `ContentView`, transparent
-  title bar. No title row (the sidebar names the mode); the Speed/Quality switch is window-toolbar
-  chrome. Numbers that must not drift: column 780 pt, chip pill 40 pt tall with a 116 pt width floor,
-  CTA and Batch 48 pt, dock floor 56 pt, composer 17 pt at −0.17 tracking with a 140 pt floor capped
-  to a 600 pt measure, 20 pt gutters, window minimum 780×560 and default 1040×680. The chips share
-  the row and span exactly the Generate button's width, as on the phone; the floor is the only
-  bound, and it is what the window minimum encodes (a sidebar, two gutters and four chips). The chip
-  and the sidebar row are the same 40 pt step on purpose; the desktop CTA's height and symbol live
-  in `VocelloPrimaryCTAButton.Traits.desktop`, because the phone keeps 56/18. A completed take is a result row (identity plus Generate again, Save
-  As, Reveal, Dismiss); playback lives in the sidebar player, never in both.
+- **iOS is the UI reference.** The September 18 approved reset is
+  `docs/reference/macos-ios-ui-reset-2026-09.md`. Four sidebar destinations adapt the phone's tabs;
+  Studio modes use the shared capsule selector. `VocelloStudioLayout` owns composer/setup/dock
+  ordering on both platforms. Preserve the flexible borderless script and shared tinted pills;
+  platform wrappers own editors, safe areas, keyboard commands and file actions. Do not reimpose
+  superseded Mac pixel prescriptions. First prove Built-in Voice, then convert other screens after
+  maintainer review. All three Studio modes use the inline player; the sidebar carries playback on other
+  destinations. Never operate unrelated audio from a stale result card. Keep iOS behavior and
+  identifiers stable, and update actual Mac test navigation when controls move.
 - **Studio generation runs on the shared pipeline.** `StudioGenerationCoordinator` (owned by `MacAppModel`)
   holds the attempt-scoped terminal state, `IOSSingleTakeGenerationExecutor` runs the take through
   `MacStudioSingleTakeGenerationHooks` (timeline, playback handoff, History, telemetry merge) and

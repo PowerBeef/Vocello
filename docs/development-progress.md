@@ -17,6 +17,141 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### iOS-derived Mac UI reset (September 18)
+
+The maintainer confirmed the installed iOS 3.0.0 (24) UI from `ca5a10cd` and approved replacing
+Mac presentation with shared iOS-derived screens. Follow
+[the reset map and acceptance sequence](reference/macos-ios-ui-reset-2026-09.md); it supersedes
+conflicting layout and pixel prescriptions in the older entries below. Preserve the engine migration
+and correctness/accessibility fixes. UIF-06 owns the first shell/Built-in Voice slice and its visual
+checkpoint; UIF-05 owns sharing/metrics, with library, Settings and window acceptance in the existing
+UIF items. No automated device/UI acceptance is implied by the earlier manual iPhone review.
+
+Codex owns the first implementation slice, based on the clean `ca5a10cd` checkout: four sidebar
+destinations, the shared capsule selector and Studio composition, and Built-in Voice's inline
+transport. The iOS wrappers immediately consume the extracted components and shared navigation
+labels. Mac navigation and playback XCUITest queries follow the genuine replacement controls.
+The changed-file scope is the shell, Studio presentation, those iOS adapters, shared presentation,
+Mac UI tests, generated project and the associated roadmap/guidance. Subsequent Studio, compact Voices and History heading assignments and evidence are recorded below;
+Settings and broader library acceptance remain open. Before another assistant edits, check the
+actual diff and HEAD against the committed handoff.
+
+Verification on September 18: `scripts/dev.sh check` passed after the final source correction:
+contracts, 690 selected Python tests plus 367 subtests, deterministic Mac tests
+(`mac-test-20260918-130741`), generic iOS app/logic compilation, and the Mac app/XCUITest bundle
+build. The aggregate log is `build/artifacts/macos/ios-ui-reset-check-2026-09-18.log` (untracked).
+This is local Xcode 27 evidence, not pinned-toolchain CI or maintainer visual approval.
+
+The maintainer then authorized Mac localization and smoke QA. Localization passed in
+`macos-xcui-localization-20260918-171455-4d66e569`. The first smoke run,
+`macos-xcui-smoke-20260918-171958-4eb258ae`, is retained as failed: six journeys passed, while
+the Built-in completion helper still required the retired sidebar transport. Its capture and
+element tree confirmed the completed inline player. The correction changed tests only, selecting
+the mode's actual player and checking inline/sidebar ownership across History navigation.
+Confirmation `macos-xcui-smoke-20260918-173621-fa6a4301` passed all seven journeys, crash checks
+and playback capture (one of one captured, no capture gate failures). Lint passed after the
+correction. Ready/completed/minimum-window Built-in captures were inspected; raw evidence stays
+untracked under the corresponding `build/artifacts/ui-tests/macos/` run directories.
+
+The maintainer approved the Built-in Voice layout, requesting one correction: the selected mode's
+highlight should fill its equal-width third of the rail. The shared selector now offers segment-width
+fill, enabled by the Mac adapter; the approved iOS presentation keeps its original default.
+The sizing correction passed `scripts/dev.sh check` and the focused localization lane
+`macos-xcui-localization-20260918-181344-6693debf`; its inspected capture confirms the full-third
+highlight. Aggregate logs: `build/artifacts/macos/ios-ui-reset-segment-check-2026-09-18.log` and
+`build/artifacts/macos/ios-ui-reset-segment-localization-2026-09-18.log` (untracked).
+The seven-journey smoke evidence above predates this visual-only adjustment.
+The maintainer next assigned Voice Design. Its implementation now uses the approved column and
+inline player. The permanent brief form is replaced by a Voice brief chip and native popover;
+the existing brief editor/catalog, character limit and accessibility field identity are retained.
+Save as Voice moves into the completed player; saved confirmation, seed, batch and generation
+request ownership remain with their existing owners. The Mac UI helpers open the genuine brief
+control; a new smoke journey covers retention, Design generation, player fit and save-dialog
+prefill/cancellation. Captures exposed a filename-style display label; the final presentation
+uses readable brief text and the Design accent on the popover confirmation.
+
+Design verification: final `scripts/dev.sh check` passed (737 Python tests plus 553 subtests,
+Mac deterministic run `mac-test-20260918-145417`, generic iOS app/logic compile and Mac UI-test
+bundle build). Localization passed in `macos-xcui-localization-20260918-183415-a688dd70` before
+the label polish. The first Design smoke run passed all eight journeys; final confirmation
+`macos-xcui-smoke-20260918-190108-5dcf5888` also passed 8/8, including its pseudolocalized
+navigation journey, crash checks and captured playback (1/1, no capture gate failures).
+The ready, brief-popover and completed-player window captures were inspected. Aggregate logs are
+`build/artifacts/macos/ios-ui-reset-design-final-check-2026-09-18.log` and
+`build/artifacts/macos/ios-ui-reset-design-confirmation-2026-09-18.log` (untracked).
+The new journey checks save-dialog prefill and cancellation, not committing a new saved voice.
+
+The maintainer next assigned Voice Clone. Its reference chip now opens a focused native
+popover containing saved-voice selection, import, recording, active-reference details and the
+editable transcript. Consent and actionable load/drop warnings remain on the canvas. Clone
+now shares the same column and inline-player ownership as Built-in and Design. Reference
+hydration, transcription, proactive priming and generation execution retain their existing owners.
+The recording journey opens the genuine reference control, and a new Clone journey checks
+reference retention, generation, narrow player fit and transport ownership across History.
+
+Clone verification: `scripts/dev.sh check` passed (737 Python tests plus 553 subtests,
+Mac deterministic run `mac-test-20260918-213831`, generic iOS app/logic compilation and Mac
+UI-test bundle compilation). The initial check found an incomplete presentation-state switch;
+its failed build evidence remains in `mac-test-20260918-213413`. The corrected check and final
+lint passed. Localization `macos-xcui-localization-20260919-014410-be602795` and smoke
+`macos-xcui-smoke-20260919-014828-1e1fcc0b` both finished with full runner PASS. Smoke passed
+all nine journeys, including recording from the reference panel and Clone reference/transcript
+retention, generation, narrow player fit and History transport ownership; playback capture was
+1/1 with no capture gate failures. Ready/reference/completed window captures were inspected.
+The temporary sidebar-dependent Studio player branch and obsolete wider Clone column are removed.
+Aggregate logs are `build/artifacts/macos/ios-ui-reset-clone-final-check-2026-09-18.log` and
+`build/artifacts/macos/ios-ui-reset-clone-smoke-2026-09-18.log` (untracked). The run IDs use UTC;
+the local work date is September 18. Import panels, drag/drop and saving a newly recorded reference
+were not exercised by these journeys.
+
+The maintainer then flagged a horizontal rule beneath the Voices heading. Hiding the native
+section separator compiled but did not remove the visible rule. The correction replaces the
+native section header with a plain, separator-free heading row and retains the voice rows,
+scroll-to-voice behavior and controls. Localization confirmation
+`macos-xcui-localization-20260919-022755-735a2909` passed; its explicit Voices screenshot was
+inspected and confirms the rule is gone. A preceding UI preflight refused a manually launched
+app at another build location; that instance was closed before the confirmation run.
+The verified optimized app was reopened for the maintainer. Final `scripts/dev.sh check` passed;
+its log is `build/artifacts/macos/voices-heading-final-check.log` (untracked).
+
+The maintainer assigned a compact Voices pass after finding the cards disproportionately large.
+Rows now use a 32-point avatar, two-line metadata, inline Play/Use controls, a compact warning
+icon and an actions menu for Delete. The heavy glass surface and width-driven second action row
+are removed; French Use/More actions labels are maintained in the catalog. The existing warning
+popover and replacement action remain available. UI queries now address the menu as the actual
+macOS `MenuButton`; the initial wrong-button-query failure is retained at
+`macos-xcui-localization-20260919-025626-a89168cc`. Confirmation
+`macos-xcui-localization-20260919-030105-1f97cbec` passed, including doubled-label geometry,
+normal-text primary-control alignment and menu discovery without deleting a voice. Both captures
+were inspected; the normal capture catches the menu fading after Escape. No additional visual
+polish pass was run. Final `scripts/dev.sh check` passed (log: `build/artifacts/macos/voices-compact-final-check.log`);
+History and broader library acceptance remain open under UIF-03.
+
+The maintainer next flagged the same native header rule and material band in History. Its date
+buckets now render as transparent heading rows, matching the corrected Voices approach; date
+bucketing, search, filtering, sorting and project grouping retain their existing implementation.
+Localization `macos-xcui-localization-20260919-032042-5341bb4a` passed and its explicit History
+capture confirms the full-width header rule and material band are gone. The genuine heading
+has an accessibility identifier so the capture cannot silently pass on an empty/filtered screen.
+Final `scripts/dev.sh check` passed (`build/artifacts/macos/history-heading-final-check.log`);
+aggregate UI log: `build/artifacts/macos/history-heading-localization.log`.
+
+September 19: the sidebar status title now has the same minimum height as its symbol frame,
+centering single-line labels such as Ready/Prêt while retaining the existing message/progress
+layout. Localization `macos-xcui-localization-20260919-040439-201d99cc` passed; the inspected
+History capture confirms the alignment. Final `scripts/dev.sh check` passed; log:
+`build/artifacts/macos/status-alignment-final-check.log` (untracked).
+
+September 19: the maintainer approved the resulting Studio, compact Voices, corrected History
+headings and status alignment, and requested committing and pushing all changes from the original
+`ca5a10cd` baseline. This change records that visual approval. Next: the remaining Settings and
+broader library/window acceptance work in the roadmap. Check HEAD and repository state before
+handing editing ownership back to Claude.
+The extracted iOS presentation still has compile proof only; physical regression remains deferred
+under CONV-20. Missing-model/error states, wide-window coverage, and accessibility preference
+combinations were not exhaustively exercised by these two Mac lanes.
+
+
 ### Shared Claude–Codex workflow and independent review (September 18)
 
 Claude remains primary; Codex reviews and implements assigned work on the same local `main`, one

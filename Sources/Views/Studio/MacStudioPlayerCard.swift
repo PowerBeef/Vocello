@@ -1,20 +1,8 @@
 import SwiftUI
 
-/// The Studio dock card (the iOS `IOSStudioPlayerCard`): one card for the live
-/// streaming preview and the completed take, so the live → complete transition
-/// morphs in place.
-///
-/// The two phases are deliberately not the same shape. **Live** is a player:
-/// waveform, clock, scrubber, play/pause, and the lanes' `textInput_cancelButton`
-/// — it is the surface being watched while a take streams. **Complete** is a
-/// result row: the take's identity and what you can do with it (Generate again,
-/// Save As, Reveal in Finder, Dismiss), and no transport at all. Playback of a
-/// finished take belongs to the sidebar footer card, which is on screen from
-/// every destination; showing a second one here gave one sound two play buttons
-/// and two clocks, which the maintainer asked to remove on 2026-09-16.
-///
-/// The shared `AudioPlayerViewModel` owns the audio either way, so both this
-/// card and the sidebar's read and drive the same player.
+/// Live/completed Studio output over the shared audio owner. Built-in Voice and
+/// Design use inline transport; Clone retains its routing until its presentation
+/// pass. A stale result never controls another take.
 struct MacStudioPlayerCard: View {
     enum Phase: Equatable {
         case live(IOSStudioLivePreviewItem)
@@ -55,17 +43,13 @@ struct MacStudioPlayerCard: View {
     }
 
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    /// The completed take is a result row because the sidebar footer carries
-    /// the transport. macOS lets the user collapse that column, which took the
-    /// transport with it and left a finished take with no way to play it except
-    /// through History — so the card takes it back when the sidebar is gone.
-    @Environment(\.vocelloSidebarIsVisible) private var sidebarIsVisible
-
     let phase: Phase
     let tint: Color
     let onDismiss: () -> Void
     let onCancel: () -> Void
     let onRetry: () -> Void
+    var canRetry = true
+    var onSaveAsVoice: (() -> Void)? = nil
 
     @State private var isConfirmingDismiss = false
 
@@ -73,16 +57,18 @@ struct MacStudioPlayerCard: View {
         let shape = VocelloShape.stage()
 
         VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
-            // Transport belongs to the sidebar player, which is always on
-            // screen; a finished take showing its own waveform, clock and
-            // scrubber gave one sound two play buttons and two clocks
-            // (maintainer decision 2026-09-16). The live preview keeps its
-            // own, because it is the surface being watched while a take
-            // streams and it carries Cancel.
-            if showsTransport {
+            if ownsAudio {
                 MacStudioWaveformRow(tint: tint, isLive: phase.isLive)
             }
             controlsRow
+
+            if phase.completedItem != nil, let onSaveAsVoice {
+                Button(action: onSaveAsVoice) {
+                    Label(MacInterfaceText.historySaveToSavedVoices, systemImage: "person.crop.circle.badge.plus")
+                }
+                .buttonStyle(MacSettingsActionButtonStyle(tint: tint, prominence: .primary))
+                .accessibilityIdentifier("voiceDesign_saveVoiceButton")
+            }
 
             if let notice = phase.completedItem?.cadenceNotice {
                 cadenceNoticeRow(notice)
@@ -123,7 +109,7 @@ struct MacStudioPlayerCard: View {
             Button(MacInterfaceText.playerClose, role: .destructive) {
                 // Stop the shared player too, so dismissing never leaves audio
                 // playing with no visible card.
-                audioPlayer.dismiss()
+                if ownsAudio { audioPlayer.dismiss() }
                 onDismiss()
             }
             .accessibilityIdentifier("studio_inlinePlayer_dismissConfirm")
@@ -133,18 +119,23 @@ struct MacStudioPlayerCard: View {
         }
     }
 
-    /// The live preview always shows transport; a completed take shows it only
-    /// when the sidebar player is not on screen to carry it.
-    private var showsTransport: Bool { phase.isLive || !sidebarIsVisible }
+    /// Reading or dismissing an old result must not affect another playing take.
+    private var ownsAudio: Bool {
+        if let item = phase.completedItem { return audioPlayer.currentFilePath == item.audioURL.path }
+        return audioPlayer.isLiveStream
+    }
 
-    /// See the note beside `sidebarIsVisible`.
     private var playPauseButton: some View {
         Button {
             AppLaunchConfiguration.performAnimated(MacTheme.Motion.stateChange) {
-                audioPlayer.togglePlayPause()
+                if let item = phase.completedItem, !ownsAudio {
+                    audioPlayer.playFile(item.audioURL.path, title: item.voiceName, presentationContext: .generatePreview)
+                } else {
+                    audioPlayer.togglePlayPause()
+                }
             }
         } label: {
-            Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
+            Image(systemName: ownsAudio && audioPlayer.isPlaying ? "pause.fill" : "play.fill")
                 .font(.system(size: MacControl.field.glyph, weight: .semibold))
                 .foregroundStyle(MacTheme.Text.onAccent)
                 .macControlSquare(.field)
@@ -160,21 +151,16 @@ struct MacStudioPlayerCard: View {
                 .overlay { Circle().stroke(Color.white.opacity(0.18), lineWidth: VocelloTheme.Stroke.hairline) }
         }
         .buttonStyle(.plain)
-        .disabled(!audioPlayer.hasAudio)
-        .accessibilityLabel(audioPlayer.isPlaying ? MacInterfaceText.playerPause : MacInterfaceText.playerPlay)
+        .disabled(phase.isLive && !audioPlayer.hasAudio)
+        .accessibilityLabel(ownsAudio && audioPlayer.isPlaying ? MacInterfaceText.playerPause : MacInterfaceText.playerPlay)
         .accessibilityIdentifier(
-            // Named for the phase, not for why it is on screen: a
-            // completed take showing transport because the sidebar is
-            // collapsed is still the inline player.
             phase.isLive ? "studio_livePreview_playPause" : "studio_inlinePlayer_playPause"
         )
     }
 
     private var controlsRow: some View {
         HStack(spacing: MacTheme.Spacing.snug) {
-            if showsTransport {
-                playPauseButton
-            }
+            playPauseButton
 
             VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {
                 Text(phase.voiceName)
@@ -223,6 +209,7 @@ struct MacStudioPlayerCard: View {
                     size: MacControl.icon.height,
                     action: onRetry
                 )
+                .disabled(!canRetry)
                 MacIconButton(
                     symbol: "square.and.arrow.down",
                     label: MacInterfaceText.historySaveAs,

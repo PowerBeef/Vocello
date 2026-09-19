@@ -1020,10 +1020,7 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.ui.tabStudio", defaultValue: "Studio",
                comment: "Bottom navigation tab for generation.")
     }
-    static var tabVoices: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.ui.tabVoices", defaultValue: "Voices",
-               comment: "Bottom navigation tab for saved voices.")
-    }
+    static var tabVoices: String { IOSAppLanguage.shared.presentation.tabVoices }
     static var tabHistory: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.tabHistory", defaultValue: "History",
                comment: "Bottom navigation tab for generated clips.")
@@ -1032,18 +1029,9 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.ui.tabSettings", defaultValue: "Settings",
                comment: "Bottom navigation tab for app settings.")
     }
-    static var modeBuiltIn: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.ui.modeBuiltIn", defaultValue: "Built-in",
-               comment: "Compact Studio selector for built-in voices; presentation only.")
-    }
-    static var modeDesign: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.ui.modeDesign", defaultValue: "Design",
-               comment: "Compact Studio selector for voice design; presentation only.")
-    }
-    static var modeClone: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.ui.modeClone", defaultValue: "Clone",
-               comment: "Compact Studio selector for voice cloning; presentation only.")
-    }
+    static var modeBuiltIn: String { IOSAppLanguage.shared.presentation.modeBuiltIn }
+    static var modeDesign: String { IOSAppLanguage.shared.presentation.modeDesign }
+    static var modeClone: String { IOSAppLanguage.shared.presentation.modeClone }
     static var skip: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.skip", defaultValue: "Skip",
                comment: "Dismiss informational onboarding without installing a model.")

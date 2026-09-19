@@ -113,10 +113,9 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         // leftover height via `.layoutPriority(1)` + maxHeight infinity;
         // chips + dock keep their natural sizes and pin against the
         // bottom safe-area inset chain owned by RootView (Phase 2).
-        VStack(alignment: .leading, spacing: 0) {
+        VocelloStudioLayout {
             composerPad
-                .frame(maxHeight: .infinity)
-                .layoutPriority(1)
+        } setup: {
             setupRow
                 // Lock voice/delivery/language changes while a take is generating
                 // (the in-flight request already captured its config; mutating mid-
@@ -124,12 +123,11 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                 .disabled(isGenerationActive)
                 .opacity(isGenerationActive ? 0.5 : 1)
                 .iosAppAnimation(Theme.Motion.stateChange, value: isGenerationActive)
-                .layoutPriority(2)
+        } dock: {
             dockArea
                 .padding(.horizontal, 16)
                 .padding(.bottom, IOSStudioCanvasLayout.dockBottomPadding)
                 .frame(height: dockAreaHeight, alignment: .bottom)
-                .layoutPriority(3)
         }
         // Bottom clearance: NavigationStack inside RootView doesn't
         // propagate the bottom chrome's safeAreaInset reservation to

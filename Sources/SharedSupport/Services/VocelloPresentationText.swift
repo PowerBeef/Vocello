@@ -12,6 +12,24 @@ struct VocelloPresentationText: Sendable {
     init(localization: VocelloLocalization = VocelloLocalization()) {
         self.localization = localization
     }
+    // Navigation vocabulary used by both platform adapters.
+    var tabVoices: String {
+        localization.string(localized: "vocello.ui.tabVoices", defaultValue: "Voices",
+               comment: "Bottom navigation tab for saved voices.")
+    }
+    var modeBuiltIn: String {
+        localization.string(localized: "vocello.ui.modeBuiltIn", defaultValue: "Built-in",
+               comment: "Compact Studio selector for built-in voices; presentation only.")
+    }
+    var modeDesign: String {
+        localization.string(localized: "vocello.ui.modeDesign", defaultValue: "Design",
+               comment: "Compact Studio selector for voice design; presentation only.")
+    }
+    var modeClone: String {
+        localization.string(localized: "vocello.ui.modeClone", defaultValue: "Clone",
+               comment: "Compact Studio selector for voice cloning; presentation only.")
+    }
+
     func playerSubtitle(_ subtitle: String, duration: String) -> String {
         localization.format(localization.string(localized: "vocello.presentation.playerSubtitle",
             defaultValue: "%1$@ · %2$@",

@@ -17,6 +17,22 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Speed versus Quality benchmark (September 19)
+
+The maintainer requested a complete mode/preset performance and peak-memory comparison before
+continuing UI work. The optimized shared-engine CLI campaign on clean `b23d8a7e` completed all
+58 takes across Built-in Voice, Design and Clone, Speed/Quality, three text lengths and three warm
+repetitions (plus four Built-in/Design cold-model takes). All six runs passed evidence validation
+with soft-trim warnings, 100% memory sampling coverage, nominal thermals and no crashes. Quality
+used 35.7–40.1% more normalized synthesis time on warm long text and 0.54–0.76 GiB more peak
+physical footprint; the largest observed peak was Clone Quality at 4.04 GiB on the 8 GiB M2 Mac.
+The approved clone fixture and all six model variants were verified; missing Design/Clone Quality
+weights were installed through the production downloader. See the
+[full report and retained evidence](reference/speed-quality-benchmark-2026-09-19.md).
+These are engine cost measurements, not a perceptual-quality verdict or an iPhone/UI benchmark.
+No application source changed; the existing UI acceptance work remains the next assignment.
+
+
 ### iOS-derived Mac UI reset (September 18)
 
 The maintainer confirmed the installed iOS 3.0.0 (24) UI from `ca5a10cd` and approved replacing

@@ -156,6 +156,12 @@ trend percentages carry their direction in words.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-04 | [`macos-engine-20260804-213556-c564dbd3`](runs/engine-generation/macos-engine-20260804-213556-c564dbd3.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `11be98b7f400` | baseline | dp18-4bit |
 
+## engine-generation / macos / mac-mini-m2-8gb / config `131244e30dda`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-19 | [`mac-custom-speed-20260919-044142-5f7862eb`](runs/engine-generation/mac-custom-speed-20260919-044142-5f7862eb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | 0.59 | `b23d8a7e9ff0` | `131244e30dda` | baseline | speed-quality-20260919 |
+
 ## engine-generation / macos / mac-mini-m2-8gb / config `13ce0b166fd6`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
@@ -246,11 +252,23 @@ trend percentages carry their direction in words.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-04 | [`macos-engine-20260804-214046-7811a3a9`](runs/engine-generation/macos-engine-20260804-214046-7811a3a9.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | ~0.92 | `5c67ee1d3431` | `2e864adbdc08` | baseline | dp18-4bit |
 
+## engine-generation / macos / mac-mini-m2-8gb / config `31e4189165a8`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-19 | [`mac-design-quality-20260919-044511-f9914b60`](runs/engine-generation/mac-design-quality-20260919-044511-f9914b60.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | 0.78 | `b23d8a7e9ff0` | `31e4189165a8` | baseline | speed-quality-20260919 |
+
 ## engine-generation / macos / mac-mini-m2-8gb / config `31f16259e54b`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-01 | [`macos-engine-20260801-043703-99a2e02f`](runs/engine-generation/macos-engine-20260801-043703-99a2e02f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 3 | ~0.83 | `3884622b632a` | `31f16259e54b` | baseline | r2a-sadstrong-20260827 |
+
+## engine-generation / macos / mac-mini-m2-8gb / config `322d7a3405c6`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-19 | [`mac-design-speed-20260919-044402-da647d43`](runs/engine-generation/mac-design-speed-20260919-044402-da647d43.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | 0.56 | `b23d8a7e9ff0` | `322d7a3405c6` | baseline | speed-quality-20260919 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `32de19d94a4e`
 
@@ -373,6 +391,12 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-05 | [`macos-engine-20260805-235654-f1a64776`](runs/engine-generation/macos-engine-20260805-235654-f1a64776.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.93 | `d8e31ffe4957` | `58c5504060f9` | baseline | dp23-crosstier |
+
+## engine-generation / macos / mac-mini-m2-8gb / config `592bddc40f03`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-19 | [`mac-clone-quality-20260919-044744-a38d2266`](runs/engine-generation/mac-clone-quality-20260919-044744-a38d2266.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | 0.85 | `b23d8a7e9ff0` | `592bddc40f03` | baseline | speed-quality-20260919 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `59788482751f`
 
@@ -584,6 +608,12 @@ trend percentages carry their direction in words.
 | 2026-08-01 | [`macos-engine-20260801-235214-7c9fb220`](runs/engine-generation/macos-engine-20260801-235214-7c9fb220.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 5 | ~0.92 | `32be405a46d0` dirty | `excluded` | baseline | codec-f16-promotion |
 | 2026-08-01 | [`macos-engine-20260801-235401-e16dae33`](runs/engine-generation/macos-engine-20260801-235401-e16dae33.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 5 | ~0.95 | `32be405a46d0` dirty | `excluded` | baseline | codec-f16-promotion |
 
+## engine-generation / macos / mac-mini-m2-8gb / config `9afdcd222a2b`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-19 | [`mac-clone-speed-20260919-044640-c0a26f3c`](runs/engine-generation/mac-clone-speed-20260919-044640-c0a26f3c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | 0.62 | `b23d8a7e9ff0` | `9afdcd222a2b` | baseline | speed-quality-20260919 |
+
 ## engine-generation / macos / mac-mini-m2-8gb / config `9b6eae19b3fa`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
@@ -738,6 +768,12 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-01 | [`macos-engine-20260801-042022-0a8d4954`](runs/engine-generation/macos-engine-20260801-042022-0a8d4954.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 4 | ~0.84 | `6d02a99c1886` dirty | `excluded` | baseline | delivery-r1c2-s5 |
+
+## engine-generation / macos / mac-mini-m2-8gb / config `c169a72f5740`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-19 | [`mac-custom-quality-20260919-044236-41a53bcc`](runs/engine-generation/mac-custom-quality-20260919-044236-41a53bcc.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 10 | 0.80 | `b23d8a7e9ff0` | `c169a72f5740` | baseline | speed-quality-20260919 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `c4e70ace53eb`
 

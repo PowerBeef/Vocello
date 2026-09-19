@@ -3,7 +3,9 @@ import QwenVoiceCore
 
 private enum IOSStudioCanvasLayout {
     static let tabDockReservation: CGFloat = 97
-    static let tabDockClearance: CGFloat = 12
+    // The existing reservation already leaves a small visible gap below the CTA.
+    // Add only the remainder to match the 10-point selector-to-CTA spacing.
+    static let tabDockClearance: CGFloat = 7
     static let compactDockAreaHeight: CGFloat = 64
     static let completeDockAreaHeight: CGFloat = 135
     static let cadenceNoticeExtraHeight: CGFloat = 58

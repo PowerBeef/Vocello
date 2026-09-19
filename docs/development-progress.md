@@ -20,11 +20,13 @@ last full copy at commit 25a895ed).
 ### iPhone Studio spacing (September 19)
 
 The maintainer visually approved the refreshed Settings and requested more separation between
-Generate and the iPhone tab bar. From clean `9602678c`, the iOS Studio canvas adds 12 points of
-bottom clearance across all modes and text sizes. The action area's internal height is unchanged;
+Generate and the iPhone tab bar. The initial 12-point addition from `9602678c` was too large;
+the maintainer requested a gap matching the selectors above Generate. From clean `b1958526`,
+the extra clearance is reduced to 7 points, accounting for the existing gap below the button.
+The action area's internal height is unchanged;
 the flexible composer yields the extra space. This is an iOS presentation-only adjustment.
 `scripts/dev.sh check` passed, including deterministic native tests
-`mac-test-20260919-111115`, generic iOS app/logic compilation and repository contracts.
+`mac-test-20260919-112133` for the refined spacing, generic iOS app/logic compilation and repository contracts.
 This spacing-only follow-up uses the maintainer's screenshot and manual device review;
 it does not reopen or claim a pass for the pending doubled-string Settings lane.
 

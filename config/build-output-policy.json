@@ -12,6 +12,7 @@
       "lanes": [
         "smoke",
         "localization",
+        "marketing",
         "benchmark",
         "control-audit",
         "model-download",
@@ -75,6 +76,10 @@
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
       },
       "ui-localization": {
+        "requiredFreeBytes": 12884901888,
+        "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
+      },
+      "ui-marketing": {
         "requiredFreeBytes": 12884901888,
         "cleanupHint": "scripts/clean_build_caches.sh --prune-ui-results"
       },

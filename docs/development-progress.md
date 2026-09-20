@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-18
+reviewed: 2026-09-20
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -16,6 +16,26 @@ Checkpoints older than the ones below live in git history (`git log -p -- docs/d
 last full copy at commit 25a895ed).
 
 ## Resume now
+
+### Marketing lane and screen close-out (September 20)
+
+Claude returned to a dirty tree left on the afternoon of September 19: a new
+`scripts/ui_test.sh macos marketing` lane (`test00_WebsiteRefresh`, `test06_ModelDownloadsRefresh`,
+the lane registered in `config/orchestration-contract.json` and `config/build-output-policy.json`)
+and ten refreshed README and website images, with no narrative entry, roadmap note or handoff
+naming an owner. The maintainer transferred ownership to Claude. The lane drives genuine controls at
+a 1040×680 window, generates two demo takes and saves one designed voice; its run record carries
+`evidenceClass: marketing-assets` and never counts as acceptance, promotion or benchmark evidence.
+Runs `macos-xcui-marketing-20260919-165526-a31fd916` (all scenarios) and
+`macos-xcui-marketing-20260919-170123-cb31c03d` (models) passed with their crash checks; the two
+earlier attempts that afternoon are retained as failed. The Model Downloads capture had not been
+copied: `docs/screenshots/vocello-model-downloads.png` and the website `model-downloads.png` now come
+from the second run, so all six Mac images share one 2080×1380 capture size. The lane is documented
+beside the other macOS lanes in `macos-testing.md` and `macos-app-guide.md`, whose smoke row now
+counts the nine journeys the class actually runs. The contract gate had never been run on this tree: `scripts/repo_invariants.sh` rejected the inherited test's two visible-label lookups of the enrolled "Studio narrator" row, now replaced by an identifier-anchored row lookup that waits without recording a failure. That is a test-only change after the captures; the lane was not rerun for it.
+Validation: `scripts/dev.sh check` passed on the corrected tree (deterministic Mac tests
+`mac-test-20260920-151733`, 1,566 Python tests with 944 subtests, the generic iOS compile, the
+website check and the Mac UI-test bundle build).
 
 ### Mac Studio automatic mode and line-by-line override (September 19)
 

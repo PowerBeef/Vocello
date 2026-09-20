@@ -6,9 +6,9 @@ import XCTest
 /// (`test04`-`test05`), which photographs every destination at each width the
 /// app is designed against.
 ///
-/// Not part of any acceptance lane and never run by `scripts/ui_test.sh`:
-/// invoke explicitly with
-/// `-only-testing:VocelloMacUITests/VocelloMacMarketingCaptureUITests`.
+/// `scripts/ui_test.sh macos marketing` runs the current authored refresh.
+/// Older captures and layout surveys remain explicit individual test selections.
+/// Asset captures never count as acceptance or benchmark evidence.
 /// The journey drives only genuine visible controls (the same identifiers the
 /// smoke lane observes), attaches captures for asset export, and publishes
 /// nothing. Script copy must follow website/PRODUCT.md rules: local not
@@ -21,6 +21,139 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
             ProcessInfo.processInfo.environment["QVOICE_MARKETING_CAPTURE"] == "1",
             "marketing captures run only with QVOICE_MARKETING_CAPTURE=1"
         )
+    }
+
+    /// Refresh the current Mac product assets without changing global keyboard
+    /// accessibility settings. All content is entered through genuine controls;
+    /// History is filtered to these public scripts, never a private-store export.
+    func test00_WebsiteRefresh() throws {
+        beginSession(additionalArguments: ["-AppleKeyboardUIMode", "0"])
+        defer { endSession() }
+        VocelloUIWindowFrame.require(app, width: 1040, height: 680)
+        captureBuiltInRefresh()
+        captureDesignRefresh()
+        captureCloneRefresh()
+        navigate(to: .history)
+        let search = element("history_searchField", type: .searchField)
+        XCTAssertTrue(VocelloUITextEntry.replace(in: search, with: "Made with Vocello", timeout: 20))
+        XCTAssertTrue(VocelloUIWait.value(search, contains: "Made with Vocello", timeout: 10))
+        app.typeKey(.tab, modifierFlags: [])
+        captureRefresh("history")
+        // A fresh app session clears the search field's keyboard traversal
+        // focus before taking the Settings image, without changing host prefs.
+        endSession()
+        beginSession(additionalArguments: ["-AppleKeyboardUIMode", "0"])
+        VocelloUIWindowFrame.require(app, width: 1040, height: 680)
+        captureModelsRefresh()
+    }
+
+    func test06_ModelDownloadsRefresh() {
+        beginSession(additionalArguments: ["-AppleKeyboardUIMode", "0"])
+        defer { endSession() }
+        VocelloUIWindowFrame.require(app, width: 1040, height: 680)
+        captureModelsRefresh()
+    }
+
+    private func captureModelsRefresh() {
+        openSettingsCategory("modelsFiles")
+        XCTAssertTrue(VocelloUIWait.exists(element("settings_packageStatus_pro_custom_speed"), timeout: 20))
+        captureRefresh("model-downloads")
+    }
+
+    private func captureBuiltInRefresh() {
+        prepare(mode: .custom)
+        replaceScript(with: "Made with Vocello. Bring your words to life, with a voice that feels right. "
+            + "Created locally on your Mac. Yours from the first word to the last.")
+        navigate(to: .voices)
+        navigate(to: .customVoice)
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("delivery_tonePicker"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(app.menuItems["Calm"].firstMatch, timeout: 10))
+        captureRefresh("delivery-presets")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: app.menuItems["Calm"].firstMatch, timeout: 10))
+        generateAndWaitForCompletion(mode: .custom, timeout: 360)
+        captureRefresh("custom-voice")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studio_inlinePlayer_dismiss"), timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studio_inlinePlayer_dismissConfirm"), timeout: 20))
+    }
+
+    private func captureDesignRefresh() {
+        navigate(to: .voiceDesign)
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studioChip_voiceBrief"), timeout: 20))
+        let brief = element("voiceDesign_voiceDescriptionField")
+        XCTAssertTrue(VocelloUITextEntry.replace(in: brief,
+            with: "A warm, clear narrator with a gentle British accent and an unhurried, natural pace.", timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("voiceBrief_confirm"), timeout: 20))
+        replaceScript(with: "Made with Vocello. A little warmth, a touch of character, "
+            + "and a story ready to be told.")
+        navigate(to: .voices)
+        navigate(to: .voiceDesign)
+        assertReadyToGenerate(mode: .design)
+        captureRefresh("voice-design")
+        generateAndWaitForCompletion(mode: .design, timeout: 360)
+        navigate(to: .voices)
+        if savedVoiceRow(named: "Studio narrator", timeout: 10) != nil { return }
+        navigate(to: .voiceDesign)
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("voiceDesign_saveVoiceButton"), timeout: 20))
+        XCTAssertTrue(VocelloUITextEntry.replace(in: element("voicesEnroll_nameField"),
+            with: "Studio narrator", timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("voicesEnroll_confirmButton"), timeout: 60))
+        XCTAssertTrue(VocelloUIWait.condition("designed voice to be saved", timeout: 60) {
+            !self.element("voicesEnroll_confirmButton").exists
+        })
+        let confirmation = app.alerts.buttons["OK"].firstMatch
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: confirmation, timeout: 20))
+    }
+
+    private func captureCloneRefresh() {
+        ensureCloneConsentEnabled()
+        navigate(to: .voices)
+        guard let name = savedVoiceRow(named: "Studio narrator", timeout: 20) else {
+            XCTFail("The designed voice saved by the Design capture must be visible in Saved Voices")
+            return
+        }
+        let voiceID = String(name.identifier.dropFirst("voicesRow_".count))
+        let use = element("voicesRow_use_\(voiceID)")
+        XCTAssertTrue(VocelloUIScroll.intoView(use, in: element("screen_voices")))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: use, timeout: 20))
+        replaceScript(with: "A familiar voice, a new story. Keep the character you created, "
+            + "and give it something new to say.")
+        navigate(to: .history)
+        navigate(to: .voiceCloning)
+        if button("sidebarPlayer_dismiss").exists {
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("sidebarPlayer_dismiss"), timeout: 20))
+        }
+        assertReadyToGenerate(mode: .clone)
+        captureRefresh("voice-cloning")
+    }
+
+    /// The Saved Voices name row for the voice this journey enrolled, resolved
+    /// through the stable `voicesRow_<id>` identifiers (the id is minted at
+    /// enrollment, so the row is matched on the name the journey itself typed).
+    /// Returns nil without recording a failure: a first run has no saved voice
+    /// yet and enrolls it; a rerun on the same store reuses the existing one.
+    private func savedVoiceRow(named voiceName: String, timeout: TimeInterval) -> XCUIElement? {
+        let excluded = ["_use_", "_play_", "_delete_", "_more_", "_transcriptStatus", "_qualityWarning", "_replaceReference"]
+        let rows = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            NSPredicate(format: "identifier BEGINSWITH %@", "voicesRow_"),
+            NSCompoundPredicate(notPredicateWithSubpredicate: NSCompoundPredicate(
+                orPredicateWithSubpredicates: excluded.map { NSPredicate(format: "identifier CONTAINS %@", $0) }
+            )),
+        ])
+        func match() -> XCUIElement? {
+            app.staticTexts.matching(rows).allElementsBoundByIndex.first { row in
+                row.label == voiceName || (row.value as? String) == voiceName
+            }
+        }
+        let found = NSPredicate { _, _ in match() != nil }
+        _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: found, object: NSObject())], timeout: timeout)
+        return match()
+    }
+
+    private func captureRefresh(_ name: String) {
+        let shot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        shot.name = "refresh-\(name)"
+        shot.lifetime = .keepAlways
+        add(shot)
     }
 
     func test01_CustomVoiceCapture() throws {

@@ -25,6 +25,7 @@ test_models_init "$ROOT_DIR"
 usage() {
   cat >&2 <<'EOF'
 Usage:
+  scripts/ui_test.sh macos marketing [--scenario all|models]
   scripts/ui_test.sh macos localization
   scripts/ui_test.sh macos smoke [--long-form-segments N]
   scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
@@ -45,6 +46,8 @@ Usage:
   scripts/ui_test.sh ios screen-protection --scenario inspect|enable
 
 The iOS destination is the paired physical iPhone only. Simulator destinations are unsupported.
+`marketing` captures authored Mac product images, generates two demo takes, and saves one designed
+voice through visible controls. It is an asset workflow, not an acceptance or benchmark verdict.
 `localization` runs the focused pseudo-localization, long-string, and accessibility-size layout walk
 without generating audio or changing installed model state.
 `model-download` is an opt-in isolated lifecycle proof and never runs in smoke, benchmark, CI, or release.
@@ -83,7 +86,8 @@ platform="$1"
 lane="$2"
 shift 2
 [[ "$platform" == "macos" || "$platform" == "ios" ]] || usage
-[[ "$lane" == "localization" || "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "control-audit" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" || "$lane" == "screen-protection" || "$lane" == "purchase" ]] || usage
+[[ "$lane" == "marketing" || "$lane" == "localization" || "$lane" == "smoke" || "$lane" == "benchmark" || "$lane" == "model-download" || "$lane" == "control-audit" || "$lane" == "delivery-cohort" || "$lane" == "startup-parity" || "$lane" == "perf" || "$lane" == "enroll-clone-fixture" || "$lane" == "saved-voice-lifecycle" || "$lane" == "screen-protection" || "$lane" == "purchase" ]] || usage
+[[ "$lane" != "marketing" || "$platform" == "macos" ]] || usage
 [[ "$lane" != "purchase" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "model-download" || "$platform" == "ios" ]] || usage
 [[ "$lane" != "control-audit" || "$platform" == "ios" ]] || usage
@@ -160,7 +164,11 @@ if [[ -n "$candidate_evidence" ]]; then
     || die "--preinstalled-candidate requires ios smoke and verified release evidence"
 fi
 
-if [[ "$lane" == "model-download" ]]; then
+if [[ "$lane" == "marketing" ]]; then
+  scenario_argument="${scenario_argument:-all}"
+  [[ "$scenario_argument" == "all" || "$scenario_argument" == "models" ]] \
+    || die "marketing --scenario must be all or models"
+elif [[ "$lane" == "model-download" ]]; then
   model_scenario="${scenario_argument:-acceptance}"
 elif [[ "$lane" == "control-audit" ]]; then
   control_scenario="${scenario_argument:-all}"
@@ -358,6 +366,11 @@ payload = {
     "exitCode": int(sys.argv[12]) if sys.argv[12] else None,
     "schemaVersion": 2,
 }
+if payload["lane"] == "marketing":
+    payload["evidenceClass"] = "marketing-assets"
+    payload["scenario"] = sys.argv[20]
+    payload["warm"] = 0
+    payload["lengths"] = []
 if sys.argv[13]:
     payload["treeFingerprint"] = sys.argv[13]
     payload["controlAuditScenario"] = sys.argv[14]
@@ -1344,7 +1357,13 @@ if [[ -n "$candidate_evidence" ]]; then
   run_preinstalled_candidate || die "preinstalled candidate proof failed; retained evidence: $out"
 elif [[ "$platform" == "macos" ]]; then
   terminate_macos_app
-  if [[ "$lane" == "localization" ]]; then
+  if [[ "$lane" == "marketing" ]]; then
+    only_test="VocelloMacUITests/VocelloMacMarketingCaptureUITests/test00_WebsiteRefresh"
+    if [[ "$scenario_argument" == "models" ]]; then
+      only_test="VocelloMacUITests/VocelloMacMarketingCaptureUITests/test06_ModelDownloadsRefresh"
+    fi
+    export TEST_RUNNER_QVOICE_MARKETING_CAPTURE=1
+  elif [[ "$lane" == "localization" ]]; then
     only_test="VocelloMacUITests/VocelloMacSmokeUITests/test01_NavigationAndReadiness"
   elif [[ "$lane" == "smoke" ]]; then
     # The smoke class runs its ordered journeys (navigation/readiness,

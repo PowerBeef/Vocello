@@ -1,7 +1,7 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-09-12
+reviewed: 2026-09-20
 summary: macOS test lanes — deterministic development verification, the platform gate, model fixtures, explicit XCUITest smoke/benchmark/perf acceptance with the ui-perf baseline protocol (copy reports out between runs; discard-and-replace on concurrent use), and crash/profile evidence.
 sourceOfTruth:
   - scripts/macos_test.sh
@@ -131,7 +131,15 @@ scripts/ui_test.sh macos benchmark --modes custom --lengths short --warm 1 --lab
 scripts/ui_test.sh macos smoke --long-form-segments 10
 # SwiftUI performance / animation-smoothness scenarios (local evidence only):
 scripts/ui_test.sh macos perf
+# Product image refresh (asset workflow, never acceptance or benchmark evidence):
+scripts/ui_test.sh macos marketing [--scenario all|models]
 ```
+
+The `marketing` lane refreshes the README and website images through genuine controls at a
+1040×680 window (`VocelloMacMarketingCaptureUITests.test00_WebsiteRefresh`; `--scenario models`
+runs `test06_ModelDownloadsRefresh` alone): it generates two demo takes and saves one designed
+voice, attaches the captures for export and publishes nothing. Its run record carries
+`evidenceClass: marketing-assets`; it is never acceptance, promotion or benchmark evidence.
 
 The benchmark lane also records what the app actually plays: the test runner taps the app's own
 audio output for every take (Core Audio process tap, physical output muted while tapped, one

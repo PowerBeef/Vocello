@@ -483,6 +483,19 @@
         "ui-build"
       ]
     },
+    "ui-macos-marketing": {
+      "producer": "scripts/ui_test.sh",
+      "requiredSteps": [
+        "source-provenance",
+        "xcuitest",
+        "crash-delta"
+      ],
+      "optionalSteps": [
+        "result-retention",
+        "ui-preflight",
+        "ui-build"
+      ]
+    },
     "ui-macos-perf": {
       "producer": "scripts/ui_test.sh",
       "requiredSteps": [

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-18
+reviewed: 2026-09-20
 summary: Replace the unsuccessful Mac presentation with the approved iOS design, sharing composition and retaining small desktop adapters.
 sourceOfTruth:
   - config/roadmap.json
@@ -78,3 +78,16 @@ destinations retain footer transport. Library/Settings screens remain for their 
 
 Success means one implementation for common presentation, the approved iOS hierarchy on Mac,
 preserved desktop capabilities, and a documented reason for each remaining platform-specific view.
+
+## Outcome (September 19 and 20)
+
+Every screen in the map was converted on the shared composition and approved on the running Mac:
+the four-destination shell and Built-in Voice, Voice Design behind a brief chip, Voice Clone behind
+a reference popover, compact Voices rows, transparent History headings, the sidebar status
+alignment, and Settings as shared groups and rows in both the sidebar and the Cmd+, window. The
+per-screen evidence and run ids are recorded in the archived UIF-03, UIF-04, UIF-05 and UIF-06
+entries of `config/roadmap-archive.json`. Two items stay open under the plan: UIF-07 (the adapted
+screens measured at real minimum, default and wide window sizes with genuine geometry assertions)
+and UIF-08 (a consented lane set on current source covering error, missing-model and wide-window
+states, the Cmd+, window and model links, and the iOS localization lane once its scroll helper is
+corrected). Release-first is the primary plan again.

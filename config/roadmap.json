@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "primaryPlan": "macos-ui-fidelity-2026-09",
+  "primaryPlan": "release-first-3-0-2026-09",
   "description": "Single source of truth for open work: active plans and their unfinished items. Finished items and completed plans live in config/roadmap-archive.json (history and progress counts only). Validated by scripts/roadmap.py; rendered to docs/ROADMAP.md.",
   "plans": [
     {
@@ -14,7 +14,7 @@
     },
     {
       "id": "release-first-3-0-2026-09",
-      "title": "Vocello 3.0 — release-first execution plan (secondary while harness-stabilization-2026-09 is primary)",
+      "title": "Vocello 3.0 — release-first execution plan",
       "status": "active",
       "owner": "release-qa",
       "adopted": "2026-09-04",
@@ -104,75 +104,6 @@
     }
   ],
   "items": [
-    {
-      "id": "UIF-05",
-      "plan": "macos-ui-fidelity-2026-09",
-      "title": "Shared presentation with explicit platform metrics",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "Shared selectors, Studio composition and retained primitives render both platforms with unchanged iOS defaults. Mac-only metrics have a desktop justification, not an independent visual system. Remove duplicate presentation as each replacement lands; retain Dynamic Type, motion/transparency and accessibility semantics.",
-      "sourceOfTruth": [
-        "Sources/SharedSupport/Theme/VocelloTypography.swift",
-        "Sources/Views/Theme/MacTypeScale.swift",
-        "Sources/Views/Theme/MacControlMetrics.swift",
-        "Sources/SharedSupport/Theme/VocelloThemeTokens.swift"
-      ],
-      "notes": "September 18 reset: retain the existing shared primitives and parameterized platform metrics, but treat the prior Mac numeric prescriptions as provisional. Share composition as well as chrome; remove the implementation replaced by each extraction. The iOS selector body and composer/setup/dock layout are now shared. Both-platform compilation and device preservation evidence remain gates; historical token sweeps do not establish visual approval.",
-      "updated": "2026-09-18"
-    },
-    {
-      "id": "UIF-06",
-      "plan": "macos-ui-fidelity-2026-09",
-      "title": "Shared shell and iOS-derived Studio acceptance",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "Four sidebar destinations and the shared iOS mode selector; shared composer/setup/dock layout with one playback owner. Built-in layout approval precedes Design/Clone conversion. Preserve brief/reference editing, delivery, language, seed, batch, Save as Voice and native file actions. Verify idle/live/complete/error/missing-model behavior, both builds, source-bound minimum/default/wide captures and localization; obtain maintainer review per screen.",
-      "sourceOfTruth": [
-        "Sources/ContentView.swift",
-        "Sources/Views/Sidebar/SidebarView.swift",
-        "Sources/SharedSupport/Views/VocelloCapsuleSelector.swift",
-        "Sources/SharedSupport/Views/VocelloStudioLayout.swift",
-        "Sources/Views/Studio/MacStudioCanvas.swift",
-        "Tests/VocelloMacUITests/VocelloMacUITestCase.swift",
-        "Sources/Views/Studio/MacVoiceDesignScreen.swift",
-        "Sources/Views/Studio/MacVoiceBriefEditor.swift",
-        "Sources/Views/Studio/MacVoiceCloningScreen.swift"
-      ],
-      "notes": "Maintainer approved the iOS-derived Mac shell and Built-in Voice, then the shared Studio modes and refined iPhone spacing. September 19: requested replacement of the iPhone character counter with a localized Long-form indicator above the shared 900-character routing threshold. All three modes use the same policy; short drafts show no counter. Editor retains the shared 30,000-character clamp. Mac now uses the same automatic indicator and exact character threshold, with a grey-off/tinted-on line-by-line override for all three modes. Generate routes the current draft into the selected workflow. Validation and prior evidence: docs/development-progress.md. Broader native acceptance remains open.",
-      "updated": "2026-09-19"
-    },
-    {
-      "id": "UIF-03",
-      "title": "Voices and History from the approved iOS screens",
-      "status": "in-flight",
-      "gate": "Share row/filter presentation with the approved iOS screens; retain inline search, filters, avatars/waveforms, saved and built-in voices, record/import flows, desktop sort and file actions. Remove replaced Mac presentation. Both builds, relevant tests, consented localization/smoke/perf and maintainer review pass.",
-      "sourceOfTruth": [
-        "Sources/Views/History/MacHistoryScreen.swift",
-        "Sources/Views/History/MacHistoryItemCard.swift",
-        "Sources/Views/Voices/MacVoicesScreen.swift"
-      ],
-      "notes": "Maintainer explicitly assigned the compact Voices pass after Studio conversion. Rows now use smaller avatars, two-line metadata, inline Play/Use, a compact warning and a secondary actions menu, with subtle surfaces. Width-driven stacked actions are removed. Localization macos-xcui-localization-20260919-030105-1f97cbec passed doubled-label geometry, normal alignment and menu discovery; captures inspected. Initial incorrect Button query for MenuButton retained and corrected. Final scripts/dev.sh check passed. History native date headers were also replaced by transparent heading rows; localization macos-xcui-localization-20260919-032042-5341bb4a passed and its capture confirms the rule/material band are gone. Final History scripts/dev.sh check passed. September 19: maintainer visually approved compact Voices and corrected History headings. Broader History/filter acceptance remains open. Evidence: docs/development-progress.md.",
-      "plan": "macos-ui-fidelity-2026-09",
-      "blockedBy": [],
-      "updated": "2026-09-18"
-    },
-    {
-      "id": "UIF-04",
-      "title": "Settings categories and secondary surfaces from iOS",
-      "status": "in-flight",
-      "gate": "Adapt the approved iOS category/detail Settings flow to both the sidebar and Cmd+, window. Share row/section content; preserve desktop variant, repair/update, output-folder and other existing capabilities. Convert remaining secondary surfaces, remove old duplicates, and pass builds, relevant tests and consented visual/behavior acceptance.",
-      "sourceOfTruth": [
-        "Sources/SharedSupport/Views/VocelloSettingsViews.swift",
-        "Sources/Views/Settings/MacSettingsScreen.swift",
-        "Sources/iOS/Settings/SettingsScreen.swift",
-        "Sources/Views/Settings/MacSettingsRows.swift",
-        "Sources/Views/Settings/MacModelRow.swift"
-      ],
-      "notes": "September 19: maintainer assigned Settings on both Mac and iOS. Shared groups, destination rows and typed copy serve both apps; iOS overview shows current values. Mac category/detail pages preserve existing controls and model links. Local gate and Mac localization macos-xcui-localization-20260919-135822-84f9678f passed; 19 interaction-policy tests pass. Authorized iPhone run ios-xcui-localization-20260919-144816-4590e8d3 completed English, French, AX-L and AX-XXXL cases but failed Pseudo-AX-XXXL language navigation because the test scroll helper excluded available anchors. Full iOS acceptance remains open; failed runs are retained, including an alarm-interrupted run. Maintainer visually approved the installed Settings. Next: bounded scroll-helper correction and a complete device localization pass. Broader secondary surfaces, separate Cmd+, and model-link UI acceptance remain open. Evidence: docs/development-progress.md.",
-      "plan": "macos-ui-fidelity-2026-09",
-      "blockedBy": [],
-      "updated": "2026-09-19"
-    },
     {
       "id": "CONV-20",
       "plan": "release-first-3-0-2026-09",
@@ -1388,10 +1319,23 @@
       ],
       "notes": "The previous audit found disagreement between declared and enforced window minima; GeometryReader allowed shrinking but did not prove content fit. The September 18 reset must measure the new composition at actual minimum/default/wide sizes, including Design/Cloning inline content during migration. Do not hide clipping by weakening assertions. A changed minimum or additional scrolling is a reviewable product choice; prior rescaling did not close this item.",
       "plan": "macos-ui-fidelity-2026-09",
-      "blockedBy": [
-        "UIF-06"
+      "blockedBy": [],
+      "updated": "2026-09-20"
+    },
+    {
+      "id": "UIF-08",
+      "plan": "macos-ui-fidelity-2026-09",
+      "title": "Native acceptance of the iOS-derived screens on current source",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "On one committed source identity after the September 19 Studio changes: consented macOS localization, smoke and perf lanes pass; the error, missing-model and wide-window states of all three Studio modes, the Cmd+, Settings window and the Studio model links are exercised through genuine controls; the iOS scroll helper's delta-dependent anchor-size limit is corrected with a captured-bounds regression test and one complete consented iOS localization lane passes including Pseudo-AX-XXXL. Runner PASS requires diagnostics, crash deltas and restoration; no retries, no hidden state.",
+      "sourceOfTruth": [
+        "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift",
+        "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift",
+        "Sources/Views/Settings/MacSettingsScreen.swift"
       ],
-      "updated": "2026-09-18"
+      "notes": "Opened 2026-09-20 when UIF-03, UIF-04, UIF-05 and UIF-06 closed on maintainer visual approval. The last two Mac Studio commits (dac06129, 5780927a) ran no XCUITest journeys, and the last full Mac lane set predates them. UIF-04's authorized iPhone lane ios-xcui-localization-20260919-144816-4590e8d3 failed at Pseudo-AX-XXXL language navigation because the scroll helper's delta-dependent anchor-size limit excluded the available visible text; the helper correction is phone-free, the device lane and the Mac lanes need explicit consent.",
+      "updated": "2026-09-20"
     }
   ]
 }

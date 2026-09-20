@@ -3422,6 +3422,98 @@
         "file:Sources/SharedSupport/Views/VocelloPrimaryCTAButton.swift",
         "file:scripts/ios_control_audit.py"
       ]
+    },
+    {
+      "id": "UIF-06",
+      "plan": "macos-ui-fidelity-2026-09",
+      "title": "Shared shell and iOS-derived Studio acceptance",
+      "status": "done",
+      "gate": "Four sidebar destinations and the shared iOS mode selector; shared composer/setup/dock layout with one playback owner. Built-in layout approval precedes Design/Clone conversion. Preserve brief/reference editing, delivery, language, seed, batch, Save as Voice and native file actions. Verify idle/live/complete/error/missing-model behavior, both builds, source-bound minimum/default/wide captures and localization; obtain maintainer review per screen.",
+      "sourceOfTruth": [
+        "Sources/ContentView.swift",
+        "Sources/Views/Sidebar/SidebarView.swift",
+        "Sources/SharedSupport/Views/VocelloCapsuleSelector.swift",
+        "Sources/SharedSupport/Views/VocelloStudioLayout.swift",
+        "Sources/Views/Studio/MacStudioCanvas.swift",
+        "Tests/VocelloMacUITests/VocelloMacUITestCase.swift",
+        "Sources/Views/Studio/MacVoiceDesignScreen.swift",
+        "Sources/Views/Studio/MacVoiceBriefEditor.swift",
+        "Sources/Views/Studio/MacVoiceCloningScreen.swift"
+      ],
+      "notes": "Closed 2026-09-20 on the maintainer's per-screen visual approval recorded in docs/development-progress.md: the four-destination shell and Built-in Voice (September 18; smoke 173621-fa6a4301 7/7 after the retained 171958-4eb258ae failure), the segment-width highlight (localization 181344-6693debf), Voice Design behind a brief chip with Save as Voice in the completed player (smoke 190108-5dcf5888 8/8), Voice Clone behind a reference popover (smoke 014828-1e1fcc0b 9/9), then the shared long-form indicator and the Mac line-by-line override (dac06129, 5780927a, deterministic tests only). All three modes own the inline player; other destinations keep footer transport. Not covered by these lanes and carried by UIF-08: error, missing-model and wide-window states, a fresh lane set on the post-5780927a source, and the iOS device regression under CONV-20.",
+      "updated": "2026-09-20",
+      "evidence": [
+        "commit:b23d8a7e",
+        "commit:5780927a",
+        "run:macos-xcui-smoke-20260918-173621-fa6a4301",
+        "run:macos-xcui-smoke-20260918-190108-5dcf5888",
+        "run:macos-xcui-smoke-20260919-014828-1e1fcc0b",
+        "run:macos-xcui-localization-20260918-181344-6693debf",
+        "file:docs/reference/macos-ios-ui-reset-2026-09.md"
+      ]
+    },
+    {
+      "id": "UIF-03",
+      "title": "Voices and History from the approved iOS screens",
+      "status": "done",
+      "gate": "Share row/filter presentation with the approved iOS screens; retain inline search, filters, avatars/waveforms, saved and built-in voices, record/import flows, desktop sort and file actions. Remove replaced Mac presentation. Both builds, relevant tests, consented localization/smoke/perf and maintainer review pass.",
+      "sourceOfTruth": [
+        "Sources/Views/History/MacHistoryScreen.swift",
+        "Sources/Views/History/MacHistoryItemCard.swift",
+        "Sources/Views/Voices/MacVoicesScreen.swift"
+      ],
+      "notes": "Closed 2026-09-20 on the maintainer's September 19 visual approval. Compact Voices rows (32 pt avatar, two-line metadata, inline Play/Use, compact warning, actions menu addressed as the real MenuButton) passed localization 030105-1f97cbec after the retained wrong-query failure 025626-a89168cc; the Voices heading rule left with 022755-735a2909; History date buckets became transparent heading rows with an identifier (032042-5341bb4a); the sidebar status title alignment passed 040439-201d99cc. Search, filters, sorting, project grouping, record/import and desktop file actions kept their implementation and identifiers. Broader History filter/sort and saved-voice lifecycle acceptance through the smoke lane moves to UIF-08.",
+      "plan": "macos-ui-fidelity-2026-09",
+      "updated": "2026-09-20",
+      "evidence": [
+        "commit:b23d8a7e",
+        "run:macos-xcui-localization-20260919-030105-1f97cbec",
+        "run:macos-xcui-localization-20260919-032042-5341bb4a",
+        "run:macos-xcui-localization-20260919-040439-201d99cc"
+      ]
+    },
+    {
+      "id": "UIF-04",
+      "title": "Settings categories and secondary surfaces from iOS",
+      "status": "done",
+      "gate": "Adapt the approved iOS category/detail Settings flow to both the sidebar and Cmd+, window. Share row/section content; preserve desktop variant, repair/update, output-folder and other existing capabilities. Convert remaining secondary surfaces, remove old duplicates, and pass builds, relevant tests and consented visual/behavior acceptance.",
+      "sourceOfTruth": [
+        "Sources/SharedSupport/Views/VocelloSettingsViews.swift",
+        "Sources/Views/Settings/MacSettingsScreen.swift",
+        "Sources/iOS/Settings/SettingsScreen.swift",
+        "Sources/Views/Settings/MacSettingsRows.swift",
+        "Sources/Views/Settings/MacModelRow.swift"
+      ],
+      "notes": "Closed 2026-09-20 on the maintainer's September 19 visual approval of the installed Settings on both platforms (9602678c): shared quiet groups, navigation rows and typed category copy in Sources/SharedSupport/Views/VocelloSettingsViews.swift; a compact Mac overview/detail flow in the sidebar and the Cmd+, host keeping every model, memory, playback, variation, language, storage and consent control; value-led iOS overview rows. Mac localization 135822-84f9678f passed and the Mac UI tests navigate the real category buttons. The authorized iPhone localization lane ios-xcui-localization-20260919-144816-4590e8d3 failed at Pseudo-AX-XXXL language navigation (the test scroll helper, not the app); three earlier failed runs are retained. The helper correction and the complete iOS lane are UIF-08 clauses (ISU-4 owns the iOS Settings walk); the Cmd+, window and model links were reviewed in source only.",
+      "plan": "macos-ui-fidelity-2026-09",
+      "updated": "2026-09-20",
+      "evidence": [
+        "commit:9602678c",
+        "run:macos-xcui-localization-20260919-135822-84f9678f",
+        "file:Sources/SharedSupport/Views/VocelloSettingsViews.swift"
+      ]
+    },
+    {
+      "id": "UIF-05",
+      "plan": "macos-ui-fidelity-2026-09",
+      "title": "Shared presentation with explicit platform metrics",
+      "status": "done",
+      "gate": "Shared selectors, Studio composition and retained primitives render both platforms with unchanged iOS defaults. Mac-only metrics have a desktop justification, not an independent visual system. Remove duplicate presentation as each replacement lands; retain Dynamic Type, motion/transparency and accessibility semantics.",
+      "sourceOfTruth": [
+        "Sources/SharedSupport/Theme/VocelloTypography.swift",
+        "Sources/Views/Theme/MacTypeScale.swift",
+        "Sources/Views/Theme/MacControlMetrics.swift",
+        "Sources/SharedSupport/Theme/VocelloThemeTokens.swift"
+      ],
+      "notes": "Closed 2026-09-20. The one-scale pass (e0a46313: fourteen control heights to six, pill 40 / primary 48 / script 17) was followed by the September 18 reset, which shares composition rather than only chrome: the iOS capsule selector (VocelloCapsuleSelector, with the Mac-only fillsSegmentWidth adapter flag), composer/setup/dock ordering (VocelloStudioLayout) and the Settings groups and rows (VocelloSettingsViews) render both platforms with unchanged iOS defaults; the replaced Mac presentation was deleted with each extraction. Remaining Mac-only metrics are desktop adapters with a stated reason: the AppKit script editor, toolbar Speed/Quality, native menus/popovers/sheets and file actions. Dynamic Type, motion/transparency gating and accessibility semantics are retained through the shared primitives. Historical token sweeps did not establish visual approval; the per-screen approvals recorded under UIF-06, UIF-03 and UIF-04 did.",
+      "updated": "2026-09-20",
+      "evidence": [
+        "commit:e0a46313",
+        "commit:b23d8a7e",
+        "commit:9602678c",
+        "file:Sources/SharedSupport/Views/VocelloCapsuleSelector.swift",
+        "file:Sources/SharedSupport/Views/VocelloStudioLayout.swift"
+      ]
     }
   ]
 }

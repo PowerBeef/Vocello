@@ -37,6 +37,15 @@ Validation: `scripts/dev.sh check` passed on the corrected tree (deterministic M
 `mac-test-20260920-151733`, 1,566 Python tests with 944 subtests, the generic iOS compile, the
 website check and the Mac UI-test bundle build).
 
+The maintainer then had the roadmap reflect the finished redesign: UIF-03, UIF-04, UIF-05 and
+UIF-06 are archived on the per-screen visual approvals and lane runs recorded above, with the
+open acceptance clauses re-homed into UIF-07 (window-size geometry) and a new UIF-08 (consented
+lane set on current source, error/missing-model/wide-window states, the Cmd+, window and model
+links, and the iOS localization lane after its scroll-helper correction). The reset document
+records the outcome; `release-first-3-0-2026-09` is `primaryPlan` again and its stale title
+parenthetical is gone. Next: the phone-free backlog, starting with the iOS scroll-helper
+correction (UIF-08, ISU-4) and AUD-03.
+
 ### Mac Studio automatic mode and line-by-line override (September 19)
 
 From clean `dac06129`, the maintainer requested the iPhone long-form indicator on Mac and a

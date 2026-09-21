@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude file-edit / Codex apply_patch PostToolUse hook.
+# Codex apply_patch PostToolUse hook.
 #
 # After project.yml changes, remind the session that the Xcode project is
 # generated and the generation stamp must be refreshed before a checkpoint.
@@ -9,7 +9,7 @@ set -euo pipefail
 
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 file_paths="$(python3 "$HOOK_DIR/agent_hook_input.py" paths)"
-root="${CLAUDE_PROJECT_DIR:-$(cd "$HOOK_DIR/../.." && pwd)}"
+root="$(cd "$HOOK_DIR/../.." && pwd)"
 root="$(cd "$root" && pwd -P)"
 while IFS= read -r file_path; do
   if [[ "$file_path" == "$root/project.yml" ]]; then

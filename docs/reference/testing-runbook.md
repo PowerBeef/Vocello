@@ -35,33 +35,37 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 | Telemetry fields / schema / knobs | [Telemetry reference](telemetry-and-benchmarking.md) | Interpretation, not another operator runbook |
 | Delivery / emotion research | [Delivery harness](delivery-harness.md) | Serial local analyzers after TTS exits; frozen independent-reference automated holdouts, measured claims only; listening optional |
 | Release / submission programme | [Release-first plan](release-first-execution-2026-09.md) | Implementation, candidate verification, publication approval are separate |
-| Gate or contract changes | [Development workflow](development-workflow.md), `.claude/rules/release.md` | Add a check only for a product invariant; prove rejection as well as success; never assert another file's wording |
+| Gate or contract changes | [Development workflow](development-workflow.md), `docs/reference/agent-rules/release.md` | Add a check only for a product invariant; prove rejection as well as success; never assert another file's wording |
 
-## Claude Code routes
+## Codex QA shortcuts
 
-Claude Code sessions reach the same procedures through repository-owned skills and subagents
-(`CLAUDE.md`, Hooks and assists). They add no gate and change no evidence rule: a skill runs the
-named script, and a subagent only reads what the run produced. Routine edits, derived files and the
-roadmap need no skill: `scripts/dev.sh check`, `scripts/dev.sh regen` and
-`python3 scripts/roadmap.py validate` are the commands.
+Routine edits use `scripts/dev.sh`; no skill is required. The four explicit repository skills under
+`.agents/skills` are shortcuts to the procedures below and add no gate or new evidence rule.
 
-| Route | Skill (user-invoked) | Triage | Evidence owner |
-| --- | --- | --- | --- |
-| macOS UI lanes | `/macos-ui-lane <lane>` | `xcresult-triage` | [macOS testing](macos-testing.md) |
-| iPhone XCUITest lanes | `/ios-lane <lane>` | `xcresult-triage`, then `axiom:test-failure-analyzer` (when installed) for interruption patterns | [iOS testing](ios-device-testing.md) |
-| iPhone headless diagnostics | `/device-diagnostics <verb>` | `axiom:crash-analyzer` (when installed) for `.ips` | [iOS testing](ios-device-testing.md) |
-| Release readiness (read-only) | `/release-evidence <tag>` | — | [Quality promotion](quality-promotion.md) |
-| Swift change review | `swift-review` subagent, `/code-review` | — | Domain rules under `.claude/rules/` |
+| Work | Explicit shortcut | Authority |
+| --- | --- | --- |
+| macOS UI lanes | `$macos-ui-lane <lane>` | [macOS testing](macos-testing.md) |
+| iPhone XCUITest lanes | `$ios-lane <lane>` | [iOS testing](ios-device-testing.md) |
+| iPhone headless diagnostics | `$device-diagnostics <verb>` | [iOS testing](ios-device-testing.md) |
+| Release readiness, read-only | `$release-evidence <tag>` | [Quality promotion](quality-promotion.md) |
 
-XcodeBuildMCP (`macos` and `ios-device` profiles) is an inner-loop assist for scratch builds and single
-XCTest classes; it never produces evidence and never drives the UI. Axiom's Simulator-only tools are not
-used. Physical-device and model lanes stay explicit and are never scheduled by a skill on its own.
-What actually stops a session from starting a consent-bound lane is the permission list in
-`.claude/settings.json`: `scripts/ui_test.sh`, `scripts/ios_device.sh`, `scripts/macos_test.sh
-memory|lang-bench`, `scripts/clean_build_caches.sh`, `git commit` and `git push` are `ask`;
-`scripts/release.sh`, `gh release create|edit`, Simulator lifecycle commands and `rm -rf build/cache`
-are `deny`. Independently of that list, the `scripts/hooks/policy_guard.sh` hook blocks Simulator
-destinations, whole-cache deletion, force pushes, new branches, worktrees and `project.pbxproj` writes.
+Only an explicit device/UI/benchmark request authorizes its lane; publication is separately
+explicit. Hook guards are best-effort checks, not a permissions system. XcodeBuildMCP and Axiom can
+assist relevant discovery and diagnostics but never replace repository native UI/evidence routes.
+
+### Read a finished run
+
+Codex reads the artifacts directly and stops when the deciding evidence is clear:
+
+1. Read `run.json`, the required-step ledger and aggregate result. A missing required step is not PASS.
+2. Inspect the failed test and xcresult summary, then nearby log context. Use the existing bootstrap
+   and external-interruption classifiers when applicable; zero launched cases can be infrastructure.
+3. Check the crash delta and attachment manifest for relevant screenshots or control observations.
+4. Report run id, verdict (product failure, infrastructure, interruption, restoration gap or PASS),
+   deciding step and artifact paths. Never turn a failed run into a pass or silently rerun it.
+
+For Swift review, use the native domain rules and relevant installed specialist guidance directly;
+there is no required reviewer agent or extra review gate.
 
 ## Model readiness
 

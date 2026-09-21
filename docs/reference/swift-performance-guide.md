@@ -118,7 +118,7 @@ public final class TTSEngineStore {
 
 - Every `await` on the actor is a potential suspension point.
 - The actor's executor is a single serial queue; long synchronous work inside it blocks all other callers.
-- The prewarm slot gate (`acquirePrewarmSlot` / `releasePrewarmSlot`) exists because the actor mutex alone is not enough: the prewarm body itself `await`s inside MLX, releasing actor access while the KV-cache is still mutating. See the "Prewarm reentrancy gate" invariant in `.claude/rules/native.md`.
+- The prewarm slot gate (`acquirePrewarmSlot` / `releasePrewarmSlot`) exists because the actor mutex alone is not enough: the prewarm body itself `await`s inside MLX, releasing actor access while the KV-cache is still mutating. See the "Prewarm reentrancy gate" invariant in `docs/reference/agent-rules/native.md`.
 
 Rule: keep actor-isolated methods short. Move heavy MLX work off the actor when possible, or design explicit gates when MLX calls suspend but must remain mutually exclusive.
 
@@ -321,7 +321,7 @@ WWDC 2025 demonstrated profiling a test from Xcode's test navigator (secondary-c
 
 ### 9.2 iOS memory policy is Swift-layer driven
 
-`NativeMemoryPolicyResolver` picks a policy per `NativeDeviceMemoryClass`. The Swift code sets MLX `Memory.cacheLimit` in `NativeMemoryPolicyResolver.apply(_:)` (and `Memory.memoryLimit` only when the registered iPhone override supplies one), clears caches, and triggers idle-unloads. The iOS `iPhonePro` tier is the most aggressive because the engine runs in-process and shares the app's Jetsam budget. Any Swift change that increases long-lived heap usage directly threatens the iOS streaming guarantee. The 2026 iPhone program that produced these tiers is recorded historically in [`ios-engine-optimization.md`](ios-engine-optimization.md); the resolver and `.claude/rules/native.md` are the current policy.
+`NativeMemoryPolicyResolver` picks a policy per `NativeDeviceMemoryClass`. The Swift code sets MLX `Memory.cacheLimit` in `NativeMemoryPolicyResolver.apply(_:)` (and `Memory.memoryLimit` only when the registered iPhone override supplies one), clears caches, and triggers idle-unloads. The iOS `iPhonePro` tier is the most aggressive because the engine runs in-process and shares the app's Jetsam budget. Any Swift change that increases long-lived heap usage directly threatens the iOS streaming guarantee. The 2026 iPhone program that produced these tiers is recorded historically in [`ios-engine-optimization.md`](ios-engine-optimization.md); the resolver and `docs/reference/agent-rules/native.md` are the current policy.
 
 ### 9.3 Core audio and frontend events both backpressure safely
 
@@ -368,9 +368,9 @@ evidence. Before promoting or releasing a Swift performance change, complete the
 
 - [`mlx-guide.md`](mlx-guide.md) — MLX runtime, lazy evaluation, streams, quantization.
 - [`qwen3-tts-guide.md`](qwen3-tts-guide.md) — model architecture, generation modes, parameters.
-- [`ios-engine-optimization.md`](ios-engine-optimization.md) — historical iPhone memory/streaming program notes (current policy lives in `NativeMemoryPolicyResolver` and `.claude/rules/native.md`).
+- [`ios-engine-optimization.md`](ios-engine-optimization.md) — historical iPhone memory/streaming program notes (current policy lives in `NativeMemoryPolicyResolver` and `docs/reference/agent-rules/native.md`).
 - [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) — telemetry schema and benchmark procedure.
-- [`CLAUDE.md`](../../CLAUDE.md) — build system, architecture, and critical invariants.
+- [`AGENTS.md`](../../AGENTS.md) — build system, architecture, and critical invariants.
 - Apple: [Explore Swift performance (WWDC 2024)](https://developer.apple.com/videos/play/wwdc2024/10217)
 - Apple: [Improve memory usage and performance with Swift (WWDC 2025)](https://developer.apple.com/videos/play/wwdc2025/312)
 - Apple: [Consume noncopyable types in Swift (WWDC 2024)](https://developer.apple.com/videos/play/wwdc2024/10170)

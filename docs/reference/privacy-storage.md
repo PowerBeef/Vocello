@@ -252,9 +252,9 @@ Repository-local build and QA state lives under the ignored `build/` tree. Its m
 contract is `config/build-output-policy.json`; `scripts/build_output_policy.py validate` rejects an
 unowned root or a tracked command that bypasses the contract.
 
-Claude Code session transcripts, auto-memory and personal settings are separate user-scoped
-developer-tool data under `~/.claude/`, not Vocello app data or repository build output. Nothing in
-the repository reads, edits or prunes them.
+Assistant transcripts, memory, credentials and personal settings are user-scoped developer-tool
+data, not Vocello app data or repository build output. Repository workflows never read, edit,
+track or prune them. Retired assistant data remains untouched.
 
 The table below is rendered from the manifest by
 `python3 scripts/build_output_policy.py status --markdown`. Policy validation compares the marked

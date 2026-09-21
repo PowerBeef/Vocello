@@ -17,6 +17,27 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Codex-only development workflow (September 20)
+
+Codex is the sole development agent. Baseline: `cb9ff234`; the pre-existing paused change in
+`Tests/VocelloMacUITests/VocelloMacMarketingCaptureUITests.swift` is outside this assignment.
+Root and website `AGENTS.md` now own instructions; native/release rules live under
+`docs/reference/agent-rules/`. Four explicit `.agents/skills` shortcuts reuse existing scripts.
+Tracked Claude configuration and reviewer definitions are retired; personal settings and historical
+attribution remain untouched. The five Codex hooks share one input adapter, use local checkout paths,
+and no longer probe the iPhone at startup. Hook tests are consolidated, and local/CI routing covers
+Codex configuration and skill metadata without selecting native lanes for instruction-only changes.
+No application, product-test, release-gate or toolchain changes. Routed verification passed lint,
+contracts and 1,563 Python tests plus 959 subtests. Its native stage first hit sandbox cache denial
+(`mac-test-20260920-232235`, retained), then passed with compiler-cache access
+(`mac-test-20260920-232320`); the remaining generic iOS app/logic compilation and full website checks
+(12 fixtures, rendered accessibility, production build, two Playwright tests) passed serially.
+All four skills validate; root/website hook fixtures cover allowed and blocked operations. Local
+compatibility is separate from pinned CI: check the migration commit's GitHub checks before resuming
+product work. Fresh-session instruction/skill discovery and platform hook trust activation remain
+unverified; fixtures do not prove runtime activation. The marketing test remains paused.
+
+
 ### Marketing lane and screen close-out (September 20)
 
 Claude returned to a dirty tree left on the afternoon of September 19: a new

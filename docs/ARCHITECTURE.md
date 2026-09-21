@@ -48,7 +48,7 @@ build 24 candidate); public facts live in `config/public-product-facts.json`: th
 release is **Vocello 2.4.0** and iOS 2.4.0 is the live **public TestFlight beta**.
 
 > For repo conventions,
-> build commands, engine invariants, and release process, read [`CLAUDE.md`](../CLAUDE.md).
+> build commands, engine invariants, and release process, read [`AGENTS.md`](../AGENTS.md).
 > This document provides the deeper architecture narrative.
 
 ---
@@ -1142,7 +1142,7 @@ Most-frequent imports across `Sources/**/*.swift`:
 ## 17. Related documents
 
 - [`development-progress.md`](development-progress.md) — active checkpoint: deterministic development status, the completed XCUITest stack, and the agent resume route.
-- [`CLAUDE.md`](../CLAUDE.md) — repo operating manual: build, conventions, engine invariants, dependency pinning, release/QA.
+- [`AGENTS.md`](../AGENTS.md) — repo operating manual: build, conventions, engine invariants, dependency pinning, release/QA.
 - [`README.md`](../README.md) — product overview + install.
 - [`PRODUCT.md`](../PRODUCT.md) — product/brand guidance.
 - Per-subsystem deep-dives in `docs/reference/`:

@@ -1,16 +1,15 @@
 ---
 name: macos-ui-lane
 description: Run one explicit macOS XCUITest lane (smoke, benchmark, perf, localization) through scripts/ui_test.sh, then triage the run. User-invoked only.
-argument-hint: "<smoke|benchmark|perf|localization> [ui_test options]"
-disable-model-invocation: true
-allowed-tools: Bash(scripts/ui_test.sh macos *) Bash(scripts/macos_test.sh models *) Bash(xcrun xcresulttool *) Bash(ls *) Read Grep Glob Agent
 ---
 
 # macOS UI lane
 
-Authority: `docs/reference/macos-testing.md` and `.claude/rules/native.md`. Explicit QA scope: the lane
+Authority: `docs/reference/macos-testing.md` and `docs/reference/agent-rules/native.md`. Explicit QA scope: the lane
 launches the built app, may generate speech with real models, and owns the screen while it runs. It
 never runs unasked and never retries.
+
+All commands and authority paths below are relative to the repository root.
 
 ## Preflight
 
@@ -23,11 +22,11 @@ never runs unasked and never retries.
 
 ## Run
 
-`scripts/ui_test.sh macos $ARGUMENTS`
+`scripts/ui_test.sh macos <requested lane and options>`
 
 The run id and `build/artifacts/ui-tests/macos/<run_id>/` are the result.
 
 ## Triage
 
-Delegate the run directory to the `xcresult-triage` subagent and report verdict, ledger summary, crash
+Read the run artifacts directly using `docs/reference/testing-runbook.md` and report verdict, ledger summary, crash
 delta and attachment paths. UI-perf ceilings are warn-only; say so when they trip.

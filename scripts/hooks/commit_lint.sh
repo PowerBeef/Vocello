@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude/Codex PreToolUse hook (matcher: Bash): the commit lint.
+# Codex PreToolUse hook (matcher: Bash): the commit lint.
 #
 # Fired for every Bash tool call; exits instantly unless the command contains
 # `git commit`. For commits it requires the symbolic branch to be exactly `main`,
@@ -17,7 +17,7 @@ case "$command_text" in
   *) exit 0 ;;
 esac
 
-ROOT_DIR="${CLAUDE_PROJECT_DIR:-$(cd "$HOOK_DIR/../.." && pwd)}"
+ROOT_DIR="$(cd "$HOOK_DIR/../.." && pwd)"
 cd "$ROOT_DIR"
 
 current_branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"

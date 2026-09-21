@@ -1179,7 +1179,7 @@
       "sourceOfTruth": [
         "Sources/Views/Studio/MacCustomVoiceScreen.swift",
         "Sources/Views/Studio/MacVoiceCloningScreen.swift",
-        ".claude/rules/native.md",
+        "docs/reference/agent-rules/native.md",
         "Sources/Views/Studio/MacVoiceDesignScreen.swift",
         "Sources/iOS/Studio/StudioGenerationCoordinator.swift"
       ],

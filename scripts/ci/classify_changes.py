@@ -138,8 +138,8 @@ def _is_ios(path: str) -> bool:
 def _is_python(path: str) -> bool:
     # Agent settings and actions execute repository code; settings-only changes
     # must exercise their adapters and wiring even when no script changed.
-    if path.startswith((".claude/", ".codex/")):
-        return path.endswith((".json", ".toml", ".py", ".sh"))
+    if path.startswith((".agents/", ".codex/")):
+        return path.endswith((".json", ".toml", ".yaml", ".yml", ".py", ".sh"))
     if path.startswith("scripts/"):
         return not path.endswith(".md")
     if path.startswith("Packages/"):

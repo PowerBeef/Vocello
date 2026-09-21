@@ -25,7 +25,9 @@ scripts/dev.sh contracts             # the contract gate alone (check_project_in
 scripts/dev.sh ios                   # generic device-SDK compile (incremental, no phone)
 scripts/dev.sh regen                 # regenerate roadmap render, catalog, inventories, charts
 scripts/dev.sh ci                    # what push CI runs, serially, when you want the push green first time
-git add -A && git commit && git push
+git add <assigned-files>
+git commit
+git push
 ```
 
 Routing is `scripts/ci/classify_changes.py`, the same file CI uses, so the local plan and the CI lanes
@@ -42,12 +44,12 @@ selection, `website` runs `npm --prefix website run check`. A change to shared t
 
 ## The commit lint
 
-`scripts/hooks/commit_lint.sh` (a shared `PreToolUse` hook wired by both assistants) requires
+`scripts/hooks/commit_lint.sh` (a Codex `PreToolUse` hook) requires
 branch `main`, a whitespace-clean staged diff (`git diff --cached --check`) and a clean
 `scripts/privacy_scan.py --staged` (no developer home path, no credential-shaped token, no key file).
 It never builds or tests. Two more guards block Simulator destinations, whole-cache deletion, force
 pushes, new branches, `project.pbxproj` writes and hand edits of generated files;
-`scripts/tests/test_claude_hooks.py` pins all of them.
+`scripts/tests/test_agent_hooks.py` pins all of them.
 
 ## The contract gate
 
@@ -151,85 +153,66 @@ on the tagged commit.
 XCUITest, model downloads, generated audio, benchmarks, signing, notarization, App Store work and
 releases run only when the task explicitly asks for that evidence, through their canonical scripts.
 
-## Claude and Codex handoffs
+## Codex development workflow
 
-Claude is the primary developer. Codex independently reviews and implements explicitly assigned work.
-Both read `CLAUDE.md` and the same domain rules; `AGENTS.md` and `website/AGENTS.md` are small discovery
-entry points. Work takes place on local `main`, with one editor and one native command at a time.
-Reviews are read-only unless the assignment also requests implementation. Do not automatically launch
-the other assistant, add another task ledger, or copy conversation transcripts into the repository.
+Codex is the sole development agent; `AGENTS.md` owns the working agreement. Work on the existing
+local `main` checkout without delegation. Before editing, record HEAD, dirty files and the relevant
+roadmap item or user assignment. Preserve unrelated work; reconcile an unexpected change before
+editing or staging overlapping files. Implement, run affected checks, review the diff, commit only
+the assignment and push. Report the behavior change, checks and limitations, commit/CI evidence and
+next action. Update the existing checkpoint or roadmap only when status changes; no transcripts or
+second work ledger.
 
-1. Identify the roadmap item, objective, current assistant, permitted scope and acceptance criteria.
-2. Record `git rev-parse HEAD`, `git status --short --branch` and any pre-existing dirty paths before
-   editing. Prefer a coherent committed checkpoint for transfer; a dirty handoff must name exactly
-   which changes belong to whom.
-3. Make or review the assigned change, using the relevant rule and authoritative scripts. Never
-   assume another assistant's claim of PASS proves the current source.
-4. Record the implementation or findings, commands and verdicts, source identity, skipped checks and
-   next action. Findings need a concrete trigger, impact, file/line, correction and regression case.
-5. The receiving assistant checks HEAD, the actual diff and dirty paths against the handoff. If they
-   differ unexpectedly, preserve the changes and reconcile ownership before editing or staging
-   overlapping files. Never stash, reset, broadly stage or overwrite another assistant's work to
-   make the handoff fit.
+Keep the loop small: focused tests while editing, one routed check before completion, broader checks
+only for new changes or unresolved failures. `check --paths <assigned paths...>` scopes the outer
+build/lint plan when unrelated work is paused; its contract gate still selects Python tests from the
+actual dirty tooling. A skipped CI lane is not a new test run. Do not add validators for prose,
+plugin inventories, or tool availability. Existing product and release gates remain authoritative.
 
-Use this compact handoff in the task response, or as a technical checkpoint in an existing relevant
-reference document when durable evidence is needed. Roadmap status remains in `config/roadmap.json`:
+## Codex setup and tool routing
 
-```text
-Assignment: roadmap ID; objective; Claude or Codex; review or implementation
-Baseline: commit SHA; pre-existing dirty paths and ownership
-Scope and acceptance: allowed areas; observable success criteria
-Result: changed behavior or severity-ordered findings with file/line references
-Verification: source identity; exact commands; PASS/FAIL/BLOCKED; artifact references
-Open issues: existing roadmap IDs; unresolved hypotheses; deferred device/UI/model checks
-Handoff: resulting commit/dirty paths; next action; ownership transferred by the user
-```
+The existing environment actions expose Status, Check, Native tests, Build Mac app, Run Mac app,
+Website checks and Toolchain audit. Automatic setup is empty. Opening a task never installs tools,
+builds, probes a phone or starts an app. Native commands are serialized on the owned caches.
 
-The [2026-09-18 review](project-review-2026-09-18.md) records the initial cross-project assessment and
-revalidation of the earlier audit. Reports explain evidence; they are not another status ledger.
+`.codex/hooks.json` wires the five repository guards. Shell calls, including unified exec and nested
+code-mode tool calls, match `Bash`; patch calls match `apply_patch` and provide patch text in
+`tool_input.command`. The input adapter inspects every added, updated, deleted and moved path,
+including both sides of renames. Unreadable patch input is rejected. The project reminder names the
+existing regeneration command. Hooks resolve from the checkout rather than a personal environment
+variable. Startup prints only bounded local Git/status/checkpoint context.
 
-## Codex project setup and tool routing
+Project hooks require platform trust and cover only supported tool routes. Passing fixtures do not
+prove that a running session enabled them; they cannot undo post-tool side effects or replace the
+sandbox. See the [hook contract](https://learn.chatgpt.com/docs/hooks) and
+[instruction discovery](https://learn.chatgpt.com/docs/agent-configuration/agents-md). After changing
+instructions or hooks, use a fresh session to check root/website guidance, explicit skill discovery,
+the startup summary and harmless allowed/blocked fixture behavior. Report runtime activation as
+unverified when a fresh trusted session is unavailable. Never try a real destructive command as a
+hook test.
 
-`.codex/environments/environment.toml` exposes Status, Check, Native tests, Build Mac app, Run Mac app,
-Website checks and Toolchain audit using existing commands. Automatic setup is empty; opening a task
-does not install dependencies, start an app or launch a build. Select the existing local checkout in
-Codex; the repository prohibits worktrees. Actions that build or test native code must be serialized.
-
-`.codex/hooks.json` runs the same five shell hooks as Claude. The shell matcher is `Bash`; file edits
-arrive as `apply_patch`, with patch text in `tool_input.command`. `agent_hook_input.py` normalizes that
-input and Claude file/notebook paths, including all patch operations and both sides of a rename.
-Generated-file inspection rejects unreadable patch payloads. The PostToolUse reminder identifies the
-root `project.yml`, including a move to or from that path. See the
-[official hook contract](https://learn.chatgpt.com/docs/hooks) and
-[instruction discovery](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
-
-Codex requires project hooks to be reviewed and trusted before they execute. The repository does not
-alter that trust, global model choices, sandbox policy or personal tool configuration. Start a fresh
-session after setup/trust changes; verify that the session summary appears and that root and website
-tasks read the right entry points. A configuration file or a passing fixture is not evidence that a
-particular app session has activated its hooks. Hooks have limited tool coverage and do not replace
-the sandbox, source review or repository checks; they also cannot undo PostToolUse side effects.
-
-| Need | Authoritative route | Optional assistance |
+| Work | Authoritative route | Relevant optional assistance |
 | --- | --- | --- |
-| Native compile and deterministic tests | `scripts/dev.sh`, repository lane scripts and owned caches | XcodeBuildMCP discovery/debugging, with the checked-in profiles; never an alternative native UI driver |
-| Apple behavior and diagnostics | Current source, Apple documentation, test artifacts | Axiom skills, Apple documentation tools, symbolication and crash analysis |
-| CI and release evidence | GitHub check results for the exact commit | `gh` or connected GitHub tools; a skipped lane is not a freshly executed test |
-| Website acceptance | `npm --prefix website run check`, including Playwright production-browser tests | Connected browser tools only as permitted by `website/CLAUDE.md` |
-| Model and dependency research | Checked-in receipts, exact pins and maintenance contracts | Hugging Face and primary upstream documentation; availability never authorizes downloads or pin changes |
+| Native build/test/UI evidence | Repository scripts, owned caches and XCUITest | XcodeBuildMCP discovery/debugging with existing profiles; no alternative native UI driver |
+| Apple code and diagnostics | Source, Apple documentation and test artifacts | Axiom, Apple documentation MCP, native-app and Swift/MLX skills; select the relevant specialty only |
+| Website | `npm --prefix website run check` with Playwright | Codex browser tools for visual/interactive checks; Impeccable and relevant Vercel/library guidance under `website/AGENTS.md` |
+| CI and release evidence | Exact-commit GitHub checks and repository release scripts | GitHub CLI or connector; release tools require explicit publication authority |
+| Model/dependency research | Receipts, exact pins and maintenance contracts | Hugging Face and upstream documentation; no implied download or pin-change permission |
 
-Ordinary development needs no new plugin or second MCP server. A missing optional connection is a
-reason to use the script route, not to change a product gate. Deployment and release tools do not
-grant publication authority.
+Use tools callable in the current session, with script/primary-documentation fallbacks. Do not
+install plugins, duplicate servers or change global settings just to satisfy this table. Personal
+plugins, accounts and skill caches are not CI dependencies. Generic plugin advice never overrides
+physical-iPhone-only, script-owned native UI, cache ownership or consent requirements.
 
-Use `python3 scripts/supply_chain_contract.py --installed native|website|release|all` to compare the
-installed tools with the manifest (choose one value after `--installed`). The Toolchain audit action
-uses `all` and returns nonzero for drift. Report native/website readiness separately from release
-readiness; an old release CLI does not prevent editing or deterministic development checks. The dated
-review records this machine's observed versions. Keep local Xcode compatibility results distinct from
-the pinned CI verdict; do not update pins or global installations merely to make the audit green.
+Four explicit shortcuts live under `.agents/skills`: `$ios-lane`, `$macos-ui-lane`,
+`$device-diagnostics` and `$release-evidence`. Their `agents/openai.yaml` disables implicit invocation;
+they call existing scripts, not a second execution engine. Codex triages the resulting evidence
+itself using the [testing runbook](testing-runbook.md). No installed specialist skill or MCP server is
+mandatory. Codex executable configuration and skill invocation metadata route into the existing
+Python lane; prose alone does not select native work.
 
-Claude/Codex executable configuration changes select the shared hook tests locally and the Python
-lane in CI. A native failure caused by restricted compiler-cache access, or a browser failure caused
-by a denied loopback listener, is an environment blocker: preserve the failed attempt and request the
-narrow host permission needed for the existing command, without clearing caches or weakening checks.
+The Toolchain audit action runs `python3 scripts/supply_chain_contract.py --installed all`.
+Choose `native`, `website` or `release` for focused audits. Report local compatibility separately
+from pinned CI and release readiness. Keep pins/global installations unchanged unless assigned;
+release CLI drift does not block ordinary development. For compiler-cache or loopback permission
+failures, preserve the failed attempt and request the narrow access the existing command needs.

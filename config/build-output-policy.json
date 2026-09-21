@@ -691,8 +691,9 @@
   ],
   "referencePolicy": {
     "scanRoots": [
-      "CLAUDE.md",
-      ".claude",
+      "AGENTS.md",
+      ".agents",
+      ".codex",
       ".github",
       ".xcodebuildmcp",
       "README.md",

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude file-edit / Codex apply_patch PreToolUse hook.
+# Codex apply_patch PreToolUse hook.
 #
 # Reads all normalized edit paths and refuses (exit 2) direct edits of files the
 # repository generates or freezes, naming the generator so the fix is one
@@ -11,7 +11,7 @@ set -euo pipefail
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 file_paths="$(python3 "$HOOK_DIR/agent_hook_input.py" paths)"
 [[ -n "$file_paths" ]] || exit 0
-root="${CLAUDE_PROJECT_DIR:-$(cd "$HOOK_DIR/../.." && pwd)}"
+root="$(cd "$HOOK_DIR/../.." && pwd)"
 root="$(cd "$root" && pwd -P)"
 
 block() {

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Claude/Codex PreToolUse hook (matcher: Bash): repository policy guard.
+# Codex PreToolUse hook (matcher: Bash): repository policy guard.
 #
 # Reads the hook JSON from stdin and inspects `tool_input.command`. It blocks
 # (exit 2, reason on stderr) the handful of shell commands that violate a hard
-# invariant in CLAUDE.md regardless of intent:
+# invariant in AGENTS.md regardless of intent:
 #
 #   * Simulator destinations and simulator lifecycle commands (Physical iPhone only)
 #   * whole build-cache deletion outside scripts/clean_build_caches.sh (Owned output)
@@ -46,7 +46,7 @@ re_sim_tools="(build_run|test|launch|boot|install_app)${sim_suffix}([^a-z_]|$)"
 if [[ "$lower_command" =~ $re_sim_destination ]] \
   || [[ "$lower_command" =~ $re_simctl_lifecycle ]] \
   || [[ "$lower_command" =~ $re_sim_tools ]]; then
-  block "Simulator destinations are unsupported (CLAUDE.md: Physical iPhone only)." \
+  block "Simulator destinations are unsupported (AGENTS.md: Physical iPhone only)." \
     "Use the paired iPhone through scripts/ui_test.sh ios <lane> or scripts/ios_device.sh, or the macOS lanes."
 fi
 
@@ -54,7 +54,7 @@ fi
 re_rm_cache='rm[[:space:]]+-[A-Za-z]*[rR][A-Za-z]*[[:space:]][^|;&]*build/cache'
 re_rm_build='rm[[:space:]]+-[A-Za-z]*[rR][A-Za-z]*[[:space:]]+(\./)?build/?([[:space:]]|$)'
 if [[ "$command_text" =~ $re_rm_cache ]] || [[ "$command_text" =~ $re_rm_build ]]; then
-  block "whole build-output deletion bypasses config/build-output-policy.json (CLAUDE.md: Owned output)." \
+  block "whole build-output deletion bypasses config/build-output-policy.json (AGENTS.md: Owned output)." \
     "Use scripts/clean_build_caches.sh with one selective --cache target, or the retention pruning it owns."
 fi
 
@@ -63,18 +63,18 @@ re_force_push='git[[:space:]]+push[^|;&]*([[:space:]]--force|[[:space:]]-f([[:sp
 re_new_branch='git[[:space:]]+(checkout[[:space:]]+-b|switch[[:space:]]+(-c|--create)|worktree[[:space:]]+add)'
 re_branch_create='git[[:space:]]+branch[[:space:]]+[A-Za-z0-9._/][A-Za-z0-9._/-]*([[:space:]]|$)'
 if [[ "$command_text" =~ $re_force_push ]]; then
-  block "force pushes are never allowed (CLAUDE.md: Main only, Exact-source releases)." \
+  block "force pushes are never allowed (AGENTS.md: Main only, Exact-source releases)." \
     "Push fast-forward commits only; CI required protects main."
 fi
 if [[ "$command_text" =~ $re_new_branch ]] || [[ "$command_text" =~ $re_branch_create ]]; then
-  block "development happens on local main only; no branches or worktrees (CLAUDE.md: Main only)." \
-    "Keep working on main. If you were asked to preserve work, stash or commit a coherent checkpoint instead."
+  block "development happens on local main only; no branches or worktrees (AGENTS.md: Main only)." \
+    "Keep working on main. Preserve unrelated edits and commit only an assigned coherent checkpoint."
 fi
 
 # 4. Generated project.
 re_pbxproj_write='(sed[[:space:]]+-[A-Za-z]*i|perl[[:space:]]+-[A-Za-z]*i|tee[[:space:]]|>>?[[:space:]]*)[^|;&]*project\.pbxproj'
 if [[ "$command_text" =~ $re_pbxproj_write ]]; then
-  block "QwenVoice.xcodeproj/project.pbxproj is generated (CLAUDE.md: Generated project)." \
+  block "QwenVoice.xcodeproj/project.pbxproj is generated (AGENTS.md: Generated project)." \
     "Edit project.yml and run ./scripts/regenerate_project.sh --fast."
 fi
 

@@ -35,15 +35,14 @@ requires a connected phone, and together they are what routine commits, pushes a
 results must not block preserving and sharing development work.
 
 Everything below the compile is consent-bound: `scripts/ui_test.sh` and `scripts/ios_device.sh` are
-`ask` in `.claude/settings.json`, are never run unasked, and only an explicit QA or device request
+never run unasked; only an explicit QA or device request
 authorizes them. The timing verbs (`ios_device.sh gate`, `bench`, `lang-bench`, `memory`, and
 `ui_test.sh ios benchmark|perf`) additionally refuse to start on a busy Mac host:
 `require_quiet_host` in `scripts/lib/host_preflight.sh` rejects a one-minute load above twice the
 core count or a kernel memory-pressure level above normal before the phone is touched, and
 `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues only for an explicitly exploratory run.
-Claude Code sessions reach these lanes through the user-invoked `/ios-lane` and
-`/device-diagnostics` skills and read the results with the `xcresult-triage` subagent; they are
-optional assists that add no gate and change no evidence rule.
+Codex can use the explicit `$ios-lane` and `$device-diagnostics` shortcuts and triage the
+artifacts directly using the testing runbook. These optional skills add no gate or evidence rule.
 
 ### Host toolchain prerequisite
 
@@ -345,7 +344,7 @@ Do not repeat completed phases merely for a green aggregate or reuse a token aft
    and confirm required runs are `explicitly-pinned`. Retire pins only after explicit closure.
 4. **Frozen source:** record run IDs, source/build/device/plan identities, outcomes, remaining
    rows and the validated next command in the existing untracked run checkpoints. Do not edit
-   the roadmap, this guide, `CLAUDE.md`, or any tracked file between shards.
+   the roadmap, this guide, `AGENTS.md`, or any tracked file between shards.
 5. **Deliberate source checkpoint:** incorporate collected results into `config/roadmap.json`
    and the current narrative. A changed full-tree identity requires new acceptance identity;
    previous results remain history, never merged current-source PASS.

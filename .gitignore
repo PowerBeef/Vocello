@@ -95,7 +95,7 @@ samples-*.jsonl
 id_rsa
 id_ed25519
 
-# Claude Code personal overrides, worktrees and optional LSP build-server config
+# Retired assistant personal state and optional LSP build-server config
 .claude/settings.local.json
 .claude/worktrees/
 buildServer.json

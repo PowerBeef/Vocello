@@ -471,11 +471,11 @@ class BuildOutputPolicyTests(unittest.TestCase):
 
     def test_validate_rejects_retired_tracked_reference_and_absolute_build_path(self) -> None:
         self.initialize_git()
-        agents = self.root / "CLAUDE.md"
+        agents = self.root / "AGENTS.md"
         agents.write_text(
             f"legacy build/DerivedData and {self.root}/build/private\n", encoding="utf-8"
         )
-        subprocess.run(["git", "-C", str(self.root), "add", "CLAUDE.md"], check=True)
+        subprocess.run(["git", "-C", str(self.root), "add", "AGENTS.md"], check=True)
         result = self.command("validate", "--json")
         self.assertEqual(result.returncode, 1)
         violations = json.loads(result.stdout)["violations"]
@@ -485,6 +485,21 @@ class BuildOutputPolicyTests(unittest.TestCase):
         agents.write_text("canonical build/cache/xcode/macos\n", encoding="utf-8")
         result = self.command("validate")
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_reference_validation_covers_codex_configuration_and_skills(self) -> None:
+        self.initialize_git()
+        paths = (".codex/hooks.json", ".agents/skills/ios-lane/SKILL.md",
+                 ".agents/skills/ios-lane/agents/openai.yaml")
+        for name in paths:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("legacy build/DerivedData\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(self.root), "add", *paths], check=True)
+        result = self.command("validate", "--json")
+        self.assertEqual(result.returncode, 1)
+        violations = "\n".join(json.loads(result.stdout)["violations"])
+        for name in paths:
+            self.assertIn(name, violations)
 
     def test_reference_validation_rejects_legacy_ios_and_one_off_derived_data(self) -> None:
         self.initialize_git()
@@ -505,20 +520,20 @@ class BuildOutputPolicyTests(unittest.TestCase):
     def test_reference_validation_covers_benchmark_and_website_guidance(self) -> None:
         self.initialize_git()
         benchmark = self.root / "benchmarks/README.md"
-        website = self.root / "website/CLAUDE.md"
+        website = self.root / "website/AGENTS.md"
         benchmark.parent.mkdir(parents=True)
         website.parent.mkdir(parents=True)
         benchmark.write_text("legacy build/DerivedData benchmark path\n", encoding="utf-8")
         website.write_text("legacy build/ios/Build website path\n", encoding="utf-8")
         subprocess.run(
-            ["git", "-C", str(self.root), "add", "benchmarks/README.md", "website/CLAUDE.md"],
+            ["git", "-C", str(self.root), "add", "benchmarks/README.md", "website/AGENTS.md"],
             check=True,
         )
         result = self.command("validate", "--json")
         self.assertEqual(result.returncode, 1)
         violations = "\n".join(json.loads(result.stdout)["violations"])
         self.assertIn("benchmarks/README.md", violations)
-        self.assertIn("website/CLAUDE.md", violations)
+        self.assertIn("website/AGENTS.md", violations)
 
     def test_reference_validation_excludes_immutable_benchmark_records(self) -> None:
         self.initialize_git()

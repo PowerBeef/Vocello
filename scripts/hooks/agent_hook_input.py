@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Normalize Claude edits and Codex apply_patch input for the shared shell hooks.
+"""Normalize Codex apply_patch input for the repository shell hooks.
 
-Codex exposes shell and patch text as tool_input.command. Claude exposes edit
-paths as tool_input.file_path (notebook_path for NotebookEdit). Print one
+Codex exposes shell and patch text as tool_input.command. Print one
 canonical absolute path per line, including both ends of moves. Never execute
 or persist tool input. This is a guardrail adapter, not a shell/patch sandbox.
 """
@@ -10,7 +9,6 @@ or persist tool input. This is a guardrail adapter, not a shell/patch sandbox.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 import re
 import sys
@@ -21,23 +19,20 @@ def edit_paths(payload: dict, root: Path) -> list[str]:
     if not isinstance(tool_input, dict):
         raise ValueError("file-edit input must be an object")
     paths = []
-    if payload.get("tool_name") == "apply_patch":
-        patch = tool_input.get("command")
-        if not isinstance(patch, str):
-            raise ValueError("apply_patch input needs tool_input.command")
-        lines = patch.strip().splitlines()
-        if not lines or lines[0] != "*** Begin Patch" or lines[-1] != "*** End Patch":
-            raise ValueError("cannot inspect malformed apply_patch boundaries")
-        for line in lines[1:-1]:
-            match = re.fullmatch(r"\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)", line)
-            if match:
-                paths.append(match[1])
-        if not paths:
-            raise ValueError("apply_patch contains no inspectable file paths")
-    else:
-        path = tool_input.get("file_path") or tool_input.get("notebook_path")
-        if path:
-            paths.append(path)
+    if payload.get("tool_name") != "apply_patch":
+        raise ValueError("file guard requires an apply_patch payload")
+    patch = tool_input.get("command")
+    if not isinstance(patch, str):
+        raise ValueError("apply_patch input needs tool_input.command")
+    lines = patch.strip().splitlines()
+    if not lines or lines[0] != "*** Begin Patch" or lines[-1] != "*** End Patch":
+        raise ValueError("cannot inspect malformed apply_patch boundaries")
+    for line in lines[1:-1]:
+        match = re.fullmatch(r"\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)", line)
+        if match:
+            paths.append(match[1])
+    if not paths:
+        raise ValueError("apply_patch contains no inspectable file paths")
     cwd = Path(payload.get("cwd") or root)
     if not cwd.is_absolute():
         raise ValueError("hook cwd must be absolute")
@@ -65,7 +60,7 @@ def main() -> int:
         return 2
     try:
         if mode == "paths":
-            root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2])
+            root = Path(__file__).resolve().parents[2]
             for path in edit_paths(payload, root):
                 print(path)
         else:

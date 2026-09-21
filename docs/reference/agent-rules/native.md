@@ -1,15 +1,3 @@
----
-paths:
-  - "Sources/**"
-  - "Packages/**"
-  - "Tests/**"
-  - "project.yml"
-  - "config/runtime-debug-knobs.json"
-  - "config/concurrency-safety.json"
-  - "config/runtime-refactor-contract.json"
-  - "config/model-artifact-receipts.json"
-  - "config/macos-entitlement-policy.json"
----
 # Native rule — engine, macOS app, iOS app
 
 References, read only what the change needs: `docs/reference/mlx-guide.md`,
@@ -26,6 +14,9 @@ XCUITest lanes only when explicitly requested.
 - **MLX is the only backend.** No Core ML or other runtime. `mlx-swift` and `mlx-swift-lm` move
   together, only with maintainer authorization and a benchmark-gated review; review the
   `swift-transformers` pin in the same change.
+- **Owned-package boundary.** Product code imports the `VocelloQwen3Core` facade, never MLXAudio
+  implementation modules. MLX arrays stay inside their owning isolation domain; evaluate lazily built
+  results before they cross an allowed boundary.
 - **Prewarm reentrancy gate.** `acquirePrewarmSlot()` / `releasePrewarmSlot()` stay paired; never pair a
   throwing `try? await acquirePrewarmSlot()` with an unconditional `defer { releasePrewarmSlot() }`.
 - **Lossless core audio; non-dropping frontend events.** Final PCM crosses the actor-owned,

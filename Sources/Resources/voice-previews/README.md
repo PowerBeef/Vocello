@@ -36,7 +36,7 @@ These samples are already bundled. Replacing them is an explicit asset-generatio
 not part of ordinary documentation or app builds. Use the repository XCUITest/macOS generation
 route in **Built-in Voice** mode (internal mode id `custom`) with the approved catalog and recorded
 seed/model identity. That route runs through `scripts/ui_test.sh`, which is consent-bound: it starts
-only on the maintainer's explicit request (CLAUDE.md), never as part of ordinary documentation or
+only on the maintainer's explicit request (AGENTS.md), never as part of ordinary documentation or
 build work. The project has only a Release configuration; internal diagnostics are a
 separate compile capability and runtime gate, not a Debug configuration.
 

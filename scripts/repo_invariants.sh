@@ -13,7 +13,7 @@ command -v rg >/dev/null 2>&1 || fail "ripgrep is required"
 
 # Physical iPhone only: no Simulator destination or Simulator tool route anywhere active.
 out="$(rg -n -i 'platform=iOS Simulator|build_run_sim|test_sim|launch_sim' \
-  AGENTS.md CLAUDE.md README.md .claude .codex website/AGENTS.md docs scripts project.yml .github \
+  AGENTS.md README.md .agents .codex website/AGENTS.md docs scripts project.yml .github \
   --glob '!scripts/repo_invariants.sh' 2>/dev/null || true)"
 [[ -z "$out" ]] || fail "Simulator route in an active surface:\n$out"
 

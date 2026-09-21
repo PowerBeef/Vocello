@@ -24,7 +24,9 @@ def commands(plan: dict) -> list[str]:
 
 class CheckPlanTests(unittest.TestCase):
     def test_prose_only_change_runs_no_native_lane(self) -> None:
-        plan = MODULE.check_plan(["docs/reference/cli.md", "README.md"])
+        plan = MODULE.check_plan(["docs/reference/cli.md", "README.md", "AGENTS.md",
+                                  "docs/reference/agent-rules/native.md",
+                                  ".agents/skills/ios-lane/SKILL.md"])
         joined = commands(plan)
         self.assertFalse(any("macos_test.sh" in c or "build_foundation_targets" in c for c in joined))
         self.assertIn("git diff --check", joined)
@@ -94,12 +96,11 @@ class CheckPlanTests(unittest.TestCase):
 
 
 class PythonSelectionTests(unittest.TestCase):
-    def test_agent_configuration_selects_both_clients_hook_tests(self) -> None:
-        for path in (".claude/settings.json", ".codex/hooks.json", ".codex/environments/environment.toml"):
+    def test_codex_configuration_selects_agent_hook_tests(self) -> None:
+        for path in (".agents/skills/ios-lane/agents/openai.yaml", ".codex/hooks.json", ".codex/environments/environment.toml"):
             with self.subTest(path=path):
                 selection = MODULE.python_test_selection([path])
                 self.assertEqual(selection["mode"], "selected")
-                self.assertIn("scripts/tests/test_claude_hooks.py", selection["tests"])
                 self.assertIn("scripts/tests/test_agent_hooks.py", selection["tests"])
 
     def test_real_tooling_dependency_selection_reaches_consumers(self) -> None:
@@ -111,6 +112,12 @@ class PythonSelectionTests(unittest.TestCase):
     def test_unknown_input_and_shared_tooling_fall_back_to_the_full_suite(self) -> None:
         self.assertEqual(MODULE.python_test_selection(["scripts/tests/nonexistent_helper.py"])["mode"], "full")
         self.assertEqual(MODULE.python_test_selection(["scripts/lib/build_paths.sh"])["mode"], "full")
+
+    def test_instruction_changes_do_not_select_python(self) -> None:
+        for path in ("AGENTS.md", "website/AGENTS.md", "docs/reference/agent-rules/native.md",
+                     ".agents/skills/ios-lane/SKILL.md"):
+            with self.subTest(path=path):
+                self.assertEqual(MODULE.python_test_selection([path])["mode"], "none")
 
     def test_no_tooling_input_selects_nothing(self) -> None:
         selection = MODULE.python_test_selection(["Sources/iOS/A.swift"])

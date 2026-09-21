@@ -1,14 +1,14 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-12
+reviewed: 2026-09-21
 summary: App-facing quick guide to tone and emotion control; the sourced qwen3-tts-prompting-guide wins on any disagreement.
 sourceOfTruth:
   - Sources/QwenVoiceCore/EmotionPreset.swift
 ---
 # Tone and Emotion in Vocello
 
-_Last reviewed: 2026-09-12. Provenance pass 2026-08-02._
+_Last reviewed: 2026-09-21. Provenance pass 2026-08-02; instruction-language correction 2026-09-21._
 
 `angry.normal` now has one governed bilingual variant: English remains canonical, while Mandarin is
 selected only for CustomVoice when both the catalog speaker is Chinese-native and output language
@@ -68,7 +68,7 @@ Useful instruction patterns:
 - Keep strong emotions intelligible: add constraints like `while keeping words clear`, `without shouting`, or `still understandable`.
 - For whisper delivery, say `whisper` explicitly. Generic `soft and quiet` wording can produce soft-spoken delivery instead of an actual whisper.
 - Phrase instructions as **descriptions, not requests**: a conversational instruction ("Could you read this like…") can leak a spoken "OK" acknowledgment into the audio.
-- Write the instruction in **English or Chinese** regardless of the output language — those are the trained instruction languages; the spoken-text language is controlled separately (the Language picker / auto-detection).
+- **English is the current preset baseline, not a requirement to match the script.** Freeform instructions remain verbatim. French instruction adherence has not been comparatively qualified; hosted English/Chinese support does not prove exclusive local training languages. The Language picker / auto-detection controls spoken language separately. See the [instruction-language research](reference/instruction-language-research-2026-09-21.md).
 - **Don't expect dialect or accent switching from instructions** — emotion and style follow, but `speak in a Sichuan dialect` yields standard Mandarin. Dialects come from the dialect speakers (Dylan — Beijing, Eric — Sichuan) or from cloning an accented reference.
 - **Speakers carry baked-in delivery biases**: Ryan is inherently expressive and resists a flat newscast read; for neutral delivery start from a calmer voice (Aiden, Serena) instead of fighting the timbre with instructions.
 - Iterate wording: instruction following is probabilistic, so small prompt changes can materially change the result.

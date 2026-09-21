@@ -509,8 +509,10 @@ distinction only at the normal tier; `EmotionPreset.normalTierShippedIDs`) and e
 ships its strong copy. `EmotionIntensity` survives internally so the delivery matrix harness can still address
 both texts and drafts saved earlier resolve to exactly what they stored. Or write a **custom tone** (free text, 500-char cap) — see
 [`../qwen_tone.md`](../qwen_tone.md) for the prompt-writing rules (combine emotion + pace +
-pitch + timbre; negative constraints like "without laughing" work; write instructions in
-English or Chinese regardless of output language; describe the sound, not a persona).
+pitch + timbre; negative constraints like "without laughing" work; English is the current preset
+baseline, while freeform directions need not match the spoken language; describe the sound, not a
+persona). Comparative instruction-language quality remains unqualified; see the
+[dated language research](instruction-language-research-2026-09-21.md).
 
 ### Languages — `GenerationSemantics` / language picker
 

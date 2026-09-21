@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-12
+reviewed: 2026-09-21
 summary: Sourced reference for the three model-facing text surfaces (script, delivery instruction, voice description) — every claim labeled OFFICIAL/RESEARCH/MEASURED-HERE/COMMUNITY/UNVERIFIED.
 sourceOfTruth:
   - config/delivery-instruction-contract.json
@@ -365,17 +365,25 @@ copy. This result makes speaker, script semantics, language, seed, and the indep
 talker/subtalker settings first-class experimental factors rather than noise to hide behind one
 aggregate score.
 
-### 4.4 Instruction language: Chinese leads on our checkpoint
+### 4.4 Instruction language: separate inputs, unresolved comparative quality
 
-`OFFICIAL`. The instruction field accepts **Chinese and English only**, regardless of the output
-language, with a documented ceiling of 1,600 tokens on the hosted surface.
+`OFFICIAL`, **hosted-service scope**. Alibaba documents English/Chinese instructions for its
+Instruct-Flash services and English/Chinese descriptions for hosted voice design. That is not an
+exclusive instruction-language rule for Vocello's open local models. Their inspected wrappers
+and our MLX path accept instructions separately from the spoken-language hint, without an
+instruction-language equality check or translation.
 
-`OFFICIAL`, Table 8 above: on CustomVoice-12Hz — the checkpoint Vocello uses for delivery control —
-Chinese beats English on APS by 5.7 points and on DSD by 0.7, while English edges RP by 2.5. The
-asymmetry is real and it favours Chinese.
+`RESEARCH`, **interpretation corrected 2026-09-21**. Table 8 compares English and Chinese
+InstructTTSEval datasets, not translated instructions on the same script. Its differing scores
+cannot identify the effect of instruction language. Neither those results nor the published
+training description establish that French instructions cannot work, that matching the script
+is best, or that Chinese instructions improve French output.
 
-`UNVERIFIED`. Whether a Chinese instruction paired with English output text transfers cleanly is
-undocumented and I found no experiment either way. Worth an A/B (§10.5); do not ship it on faith.
+`UNVERIFIED`. Comparative EN/FR/ZH adherence with the speech held constant remains unqualified.
+Keep canonical English as the operational baseline, preserve freeform text, and do not expand
+translation/routing based on cross-dataset scores. The
+[dated instruction-language research](instruction-language-research-2026-09-21.md) contains the
+primary sources, French recommendations, mode distinctions and proposed controlled experiment.
 
 `MEASURED-HERE`, **maintainer-directed routing checkpoint, 2026-08-26.** Vocello now uses the
 versioned Mandarin instruction only for canonical `angry.normal` when CustomVoice has both a
@@ -654,7 +662,7 @@ search.
 
 ### 8.2 The one defect the audit found
 
-`MEASURED-HERE`. Every English instruction is candidate for an appended 76-character boilerplate
+`MEASURED-HERE`. Every instruction for English output is candidate for an appended 76-character boilerplate
 sentence:
 
 > `Native English pronunciation with clear English diction and natural stress.`
@@ -920,7 +928,8 @@ experiment below is a matrix run plus a paired comparison, pre-registered per
    (§1.3), and the technical report credits the thinking pattern specifically for instruction
    following.
 5. **A Chinese instruction against the English one** on CustomVoice, output text held constant.
-   Table 8 says Chinese leads English by 5.7 APS points on our exact checkpoint (§4.4).
+   This requires a controlled comparison; Table 8's separate language datasets do not predict
+   the result (§4.4). The dated research also proposes French-output comparisons.
 `MEASURED-HERE`, **DP-6, 2026-08-03 — an instruction clause can be simply ignored.** Over 23 seeds
 the shipped `angry` copy moves pitch **+5.98 semitones** (d=1.40, win rate 0.91), confirming the
 `required` +1 expectation. But the retired `angry.normal` copy asks for *"a lower clipped tone"* and

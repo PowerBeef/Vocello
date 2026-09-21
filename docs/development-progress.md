@@ -17,6 +17,20 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Instruction-language research (September 21)
+
+Baseline `cf373d7d`. The [source-backed research](reference/instruction-language-research-2026-09-21.md)
+separates voice description, delivery, spoken language and accent across all three generation modes.
+No matching-language requirement exists in the inspected local/upstream paths, and no controlled
+French-script instruction-translation result was found. Corrected active guidance that treated
+hosted EN/ZH support as an exclusive local training rule and cross-dataset benchmark differences
+as a causal Chinese advantage. English remains the operational baseline, not a proven winner.
+The report proposes a bounded evaluation using existing tooling; DP-31/DP-32 remain open.
+The scoped routed check passed repository contracts, invariants and privacy checks; this
+documentation-only change selected no Python tests or native builds.
+No runtime, presets, models or device state changed; no new audio experiment ran. The paused Mac
+marketing-test edit remains outside this documentation assignment. Resume the device backlog below.
+
 ### Physical iPhone backlog and Settings accessibility (September 21)
 
 Baseline `5e000a3c`; the maintainer authorized autonomous device testing. Fixed Settings at

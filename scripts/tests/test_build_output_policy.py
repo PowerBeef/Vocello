@@ -711,7 +711,9 @@ class BuildOutputPolicyTests(unittest.TestCase):
             }
         )
         subprocess.run(
-            ["git", "commit", "-q", "-m", "fixture"],
+            # The checkout is copied immediately below. Do not leave background
+            # maintenance mutating its object store while copytree walks it.
+            ["git", "-c", "maintenance.auto=false", "commit", "-q", "-m", "fixture"],
             cwd=mac_checkout,
             env=environment,
             check=True,

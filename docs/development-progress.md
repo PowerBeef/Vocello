@@ -32,7 +32,10 @@ subtests, 709 core tests and 122 runtime tests (three existing skips), and gener
 compilation. Native run: `mac-test-20260921-145849`; all seven language/content/request-boundary
 tests passed. The final Mac app build passed. Native visual acceptance remains under UIF-08,
 including cross-language UI/output combinations and draft preservation. No model or device run
-was performed. The paused marketing-test edit remains untouched.
+was performed. Implementation: `15f5d4b7`. Its first CI run exposed an unrelated temporary-Git
+fixture race (`maintenance.lock` vanished during `copytree`); automatic maintenance is now disabled
+only for that fixture's commit. The follow-up routed check passed contracts and all 28 build-output
+policy tests plus three subtests. The paused marketing-test edit remains untouched.
 
 ### Instruction-language research (September 21)
 

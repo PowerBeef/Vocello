@@ -528,7 +528,9 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             select(tab: .settings)
             for identifier in ["iosSettings_autoPlayToggle", "iosSettings_variationRow"] {
                 openSettingsPage(for: identifier)
-                assertAccessibleTarget(element(identifier), category: name)
+                let target = element(identifier)
+                XCTAssertTrue(revealSettingsElement(target, swipingUp: true))
+                assertAccessibleTarget(target, category: name)
             }
             VocelloUIScreenshot.attach(app, named: "ios-control-audit-accessibility-\(name)")
             // Geometry and the full accessibility label can pass while the rendered title

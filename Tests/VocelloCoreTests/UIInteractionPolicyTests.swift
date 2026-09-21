@@ -150,6 +150,25 @@ final class UIInteractionPolicyTests: XCTestCase {
         XCTAssertNil(VocelloUITouchScrollAnchor.index(frames: [small], visible: viewport, desiredDelta: 0))
     }
 
+    func testNearVisiblePseudoLanguageRowKeepsLargeTextAnchorEligible() throws {
+        // Retained Pseudo-AX-XXXL failure: the navigation band ended 11.5 points
+        // below the viewport. That small delta capped anchors at 39 points,
+        // excluding ordinary accessibility-size text despite full visibility.
+        let visible = CGRect(x: 0, y: 0, width: 402, height: 651)
+        let row = CGRect(x: 16.1667, y: 406.3333, width: 370.3333, height: 468.3333)
+        let required = VocelloUIRevealRequirement.navigation.requiredFrame(row, visible: visible)
+        var search = VocelloUIRevealSearch(preferred: .up)
+        let delta = try XCTUnwrap(search.nextScroll(target: required, visible: visible))
+        XCTAssertLessThan(abs(delta), 30)
+        // Representative fully visible large-text descendant, plus unsafe alternatives.
+        let frames = [CGRect(x: 72, y: 300, width: 260, height: 59), row,
+                      CGRect(x: 72, y: 640, width: 260, height: 59)]
+        XCTAssertEqual(VocelloUITouchScrollAnchor.index(
+            frames: frames, visible: visible, desiredDelta: delta), 0)
+        XCTAssertEqual(VocelloUITouchScrollAnchor.index(
+            frames: frames, visible: visible, desiredDelta: -delta), 0)
+    }
+
     func testTouchAnchorPrefersVisibleContentOverSystemEdgeHeading() {
         // AX-XXXL device failure: XCUI omitted the status bar and reported the
         // clipped 116-point heading as hittable. Three swipes made no progress.
@@ -164,6 +183,20 @@ final class UIInteractionPolicyTests: XCTestCase {
             XCTAssertEqual(VocelloUITouchScrollAnchor.index(
                 frames: frames, visible: visible, desiredDelta: delta), 1)
         }
+    }
+
+    func testExpandedDescriptionCanAnchorReturnToSettingsRoot() {
+        let visible = CGRect(x: 0, y: 0, width: 402, height: 651)
+        let description = CGRect(x: 28, y: 214, width: 346, height: 312.7)
+        let frames = [
+            CGRect(x: 28, y: -136.7, width: 346, height: 342.7),
+            description,
+            CGRect(x: 66, y: 543.2, width: 308, height: 116.7),
+        ]
+        XCTAssertEqual(VocelloUITouchScrollAnchor.index(
+            frames: frames, visible: visible, desiredDelta: 120), 1)
+        XCTAssertNil(VocelloUITouchScrollAnchor.index(
+            frames: [description.offsetBy(dx: 0, dy: 200)], visible: visible, desiredDelta: 120))
     }
 
     func testBoundedScrollReversalReducesMovement() throws {

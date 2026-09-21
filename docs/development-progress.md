@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-20
+reviewed: 2026-09-21
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -16,6 +16,44 @@ Checkpoints older than the ones below live in git history (`git log -p -- docs/d
 last full copy at commit 25a895ed).
 
 ## Resume now
+
+### Physical iPhone backlog and Settings accessibility (September 21)
+
+Baseline `5e000a3c`; the maintainer authorized autonomous device testing. Fixed Settings at
+accessibility text sizes: Auto-play's long explanation is readable separately from its reachable
+switch, and the variation menu's selected label wraps fully. The element-only scroll helper now
+accepts bounded, wholly visible large text regardless of the remaining reveal distance; two
+captured-geometry regressions protect it. The audit reveals controls before clipping checks and
+screenshots. Smoke selects its two documented journeys instead of also repeating localization.
+Purchase tests observe, normalize and restore the app's own language through genuine controls.
+
+Retained device evidence (full runner results include crash checks and observed restoration):
+
+- `ios-xcui-localization-20260921-054309-966a91d7`: PASS across Default, French-Default, AX-L,
+  AX-XXXL and pseudo-AX-XXXL. This precedes the final variation-label correction.
+- `ios-xcui-control-audit-20260921-064147-ef16ae49`: final accessibility PASS at four sizes and
+  an unforced system audit; inspected pseudo-AX-XXXL screenshot confirms complete label reflow.
+- `ios-xcui-control-audit-20260921-063335-d71bad24`: completed with limitations: nine passes,
+  four prerequisite blocks and two preservation blocks. Preferences and variation were restored.
+- `ios-xcui-smoke-20260921-060820-9ba0262c`: failed readiness; all three production models show
+  Update Available. Generation, critical-pressure cancellation, long-form, benchmarks and perf
+  remain unqualified. The redundant localization test was interrupted; its observed original
+  System Default language was subsequently restored and verified by the purchase cleanup.
+- `ios-xcui-purchase-20260921-062851-9551e713`: local environment, locked state and unowned
+  restore passed; injected cancellation showed the generic App Store error. Language and local
+  transactions were cleaned up. A speculative adapter correction did not help and was reverted;
+  investigate the StoreKit injection/error boundary before repeating the full lifecycle/export lane.
+
+Earlier failed/interrupted attempts are retained separately, never merged into the passes. No
+live purchase, model update, personal voice mutation or Auto-Lock change was performed. The simple
+saved-voice lane still needs observed Studio/draft/consent preservation before use on personal
+state. French accessibility-size and spoken VoiceOver acceptance remain open. Existing roadmap
+items ISU-4/5, UIF-08, CONV-20, RF-13, F-01 and AV-14 carry the precise remaining gates.
+The scoped routed check passed contracts, 734 Python tests plus 572 subtests, 705 core tests
+and 122 runtime tests (three existing skips; `mac-test-20260921-025400`), generic iOS app/logic
+compilation and both UI-test bundle builds. The unchanged owned MLX package emitted concurrency
+warnings during the local Xcode 27 UI-bundle build; pinned-toolchain CI remains separate evidence.
+The paused Mac marketing-test modification remains outside this assignment.
 
 ### macOS player ownership and compact transport (September 21)
 

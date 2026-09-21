@@ -1515,7 +1515,7 @@ else
   if [[ "$lane" == "localization" ]]; then
     only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testSettingsAccessibilityLayoutWalk"
   elif [[ "$lane" == "smoke" ]]; then
-    only_test="VocelloiOSUITests/VocelloiOSSmokeUITests"
+    only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testPhysicalDeviceSmokeJourney"
     if [[ "$scenario_argument" == "history-transcript" ]]; then
       only_test="VocelloiOSUITests/VocelloiOSHistoryObservationUITests/testRetainedHistoryTranscript"
       export TEST_RUNNER_QVOICE_IOS_HISTORY_OBSERVATION_ROW_ID="$history_row_id"
@@ -1592,6 +1592,10 @@ else
     fi
   fi
 
+  test_selection_args=("-only-testing:$only_test")
+  if [[ "$lane" == "smoke" && "$scenario_argument" != "history-transcript" ]]; then
+    test_selection_args+=("-only-testing:VocelloiOSUITests/VocelloiOSSmokeUITests/testZLongFormProjectJourney")
+  fi
   note "physical-iPhone XCUITest $lane on $device → $out"
   xcuitest_status=0
   if ! required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test \
@@ -1601,7 +1605,7 @@ else
       -disableAutomaticPackageResolution \
       -onlyUsePackageVersionsFromResolvedFile \
       -resultBundlePath "$result" -collect-test-diagnostics never \
-      -only-testing:"$only_test" -parallel-testing-enabled NO \
+      "${test_selection_args[@]}" -parallel-testing-enabled NO \
       -allowProvisioningUpdates DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
       ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
       QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \

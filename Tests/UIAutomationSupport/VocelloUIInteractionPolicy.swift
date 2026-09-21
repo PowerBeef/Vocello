@@ -127,15 +127,17 @@ struct VocelloUIRevealSearch {
     }
 }
 
-/// A native element swipe chooses its own endpoints. Only use a small, completely
-/// visible descendant of the owning scroll view, so neither endpoint starts on the
-/// dock or outside the window. Never swipe the oversized row/window as a fallback.
+/// A native element swipe chooses its own endpoints. Only use a completely visible
+/// text descendant bounded to half the safe viewport, so endpoints stay on content.
+/// Never swipe an oversized row/window or a clipped descendant as a fallback.
 enum VocelloUITouchScrollAnchor {
     static func index(frames: [CGRect], visible: CGRect, desiredDelta: CGFloat) -> Int? {
         guard VocelloUIRevealRequirement.valid(visible), desiredDelta.isFinite,
               desiredDelta != 0 else { return nil }
         let safe = visible.insetBy(dx: 4, dy: 8)
-        let maximumHeight = min(120, max(24, abs(desiredDelta) * 2))
+        // Native swipe distance is not controlled by the remaining reveal delta.
+        // A nearly visible target must not exclude otherwise safe large-text labels.
+        let maximumHeight = max(120, safe.height / 2)
         return frames.indices.filter { index in
             let frame = frames[index]
             return VocelloUIRevealRequirement.valid(frame) && safe.contains(frame)

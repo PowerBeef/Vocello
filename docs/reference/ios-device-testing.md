@@ -266,6 +266,9 @@ diagnostic and never publishes benchmark history; `purchase` is the focused loca
 (`VocelloiOSPurchaseUITests` over an `SKTestSession` on the bundled test fixture, never a live
 account; `--scenario exports` additionally exercises the export surfaces) and its documented
 invocation always passes `--retain-result` (the script does not refuse a run without it).
+The purchase fixture observes the in-app interface language, selects English through Settings for
+its English notice assertions, and restores the observed choice during cleanup, including after
+failure. Process launch language alone does not override a saved in-app language preference.
 `--retain-result` on any lane writes an untracked `retention-pin.json`
 into the run artifact so routine UI-result pruning keeps it; remove the pin only after the
 evidence set is retired.
@@ -283,6 +286,10 @@ the extended >220-character long corpus; the iPhone lane never bypasses the user
 | Model delivery | Fixed test-owned root normalized through visible state-appropriate controls. `diagnose` covers Custom cancel/restart/process adoption/Ready/remove; `queue` proves independent active/queued cancellation; `acceptance` adds Design/Clone shared-component reuse and all-model removal; `soak` repeats the lifecycle; `recover` inspects and visibly clears retained failure state without starting a transfer. Every transfer records exact logical bytes, milestone row/bar screenshots, phase activity, action exclusivity, five-minute advancement bounds, correlated delivery events, and exact canonical-state preservation |
 | Perf | Nine frame-health scenarios (`Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`), each a fresh app launch with the in-app `CADisplayLink` probe pinned to the app's 60 Hz cap and one marked wall-clock window; `scripts/check_ios_ui_perf.py` joins windows to the pulled 500 ms probe rows |
 
+Smoke explicitly selects its two generation journeys. The Settings layout walk is selected only by
+the separate `localization` lane; running smoke does not repeat it. Model-dependent journeys require
+the current catalog's Ready state: an installed model showing Update Available is not readiness proof.
+
 The control-audit accessibility lane checks targets and `.textClipped` at Default, AX-L,
 AX-XXXL, and pseudo-AX-XXXL, then runs the complete system audit without a forced size. The system
 clipping audit can pass an ellipsized label whose accessibility name is complete. Inspect the
@@ -296,15 +303,18 @@ draft and consent before use against personal state; do not infer that protectio
 lane. See the current checkpoint for this explicit acceptance limitation.
 
 Settings reveal uses the shared test-only `VocelloUISettingsReveal` helper. It preserves full
-visibility and whole-dock clearance while issuing slow native touch swipes on small static-text
-descendants of one genuine containing scroll view, not full-window swipes. Pointer-based
-`scroll(byDeltaX:deltaY:)` is not supported on the touch-only iPhone. Missing/ambiguous containers,
-an unsafe container center or no wholly visible small anchor fail closed. Each accessibility snapshot
-determines the desired movement and bounds the anchor size; velocity is not a distance guarantee.
-Direction reversal reduces the anchor bound, unchanged frames stop the search, and oversized full-visibility
-requirements remain failures. The separate navigation-only band is not layout acceptance. Retained
-pre-gesture and failure attachments include sampled frames and desired movement. Host geometry tests do not
-prove actual UIKit scrolling; new physical AX-XXXL/pseudo acceptance is required after changes.
+visibility and whole-dock clearance while issuing slow native touch swipes on wholly visible
+static-text descendants of one genuine containing scroll view, never full-window or coordinate
+gestures. Anchors are bounded to half the safe viewport, independent of the remaining reveal delta,
+so expanded descriptions can remain usable when there are no short labels. Missing/ambiguous
+containers, an unsafe container center or no wholly visible bounded text anchor fail closed.
+Pointer-based `scroll(byDeltaX:deltaY:)` is not supported on the touch-only iPhone. Native swipe
+distance is not controlled by the requested reveal delta or velocity. Each gesture is followed by
+a fresh geometry sample; direction reversal reduces the search step limit, unchanged frames stop
+the search, and oversized full-visibility requirements remain failures. The separate navigation-only
+band is not layout acceptance. Retained pre-gesture and failure attachments include sampled frames
+and desired movement. Host geometry tests do not prove actual UIKit scrolling; new physical
+AX-XXXL/pseudo acceptance is required after changes.
 
 Every lane uses the paired physical-device destination. Tests use stable accessibility identifiers,
 condition-based waits, XCTest activities, screenshots, and failure attachments. Coordinate tables,

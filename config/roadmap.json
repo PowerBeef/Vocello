@@ -115,9 +115,9 @@
         "config/ios-control-audit.json",
         "Tests/VocelloiOSUITests/VocelloiOSControlAuditUITests.swift"
       ],
-      "updated": "2026-09-15",
-      "unparkWhen": "the paired iPhone is available and unlocked for a consented lane",
-      "notes": "Re-homed 2026-09-15 from macos-ios-convergence-2026-09 when that plan completed; the phone-side re-verification and the toolchain bump are release-first work."
+      "updated": "2026-09-21",
+      "unparkWhen": "Current production models are Ready and the remaining control-audit fixture/preservation prerequisites are satisfied; phone availability is no longer the blocker.",
+      "notes": "Re-homed 2026-09-15 from macos-ios-convergence-2026-09 when that plan completed; the phone-side re-verification and the toolchain bump are release-first work. September 21 device window: stateful control audit ios-xcui-control-audit-20260921-063335-d71bad24 completed with limitations (9 PASS, 4 blocked prerequisites, 2 preservation blocks; restoration and crash checks passed). Accessibility audit ios-xcui-control-audit-20260921-064147-ef16ae49 passed with the variation control visible at all four sizes. Smoke ios-xcui-smoke-20260921-060820-9ba0262c failed model readiness: all three installed production models showed Update Available; generation and long-form were not qualified. The subsequently selected redundant localization test was interrupted; smoke now selects only its two documented journeys. No prior pass is promoted to current-source full smoke."
     },
     {
       "id": "CONV-21",
@@ -292,9 +292,9 @@
         "Tests/VocelloiOSLogicTests/IOSSavedOutputsDestinationTests.swift",
         "scripts/repo_invariants.sh"
       ],
-      "updated": "2026-09-14",
-      "notes": "Source side closed 2026-09-14 (phone-free). Outward-export inventory audited and written to ios-app-guide.md: Studio card, expanded player, History rows, failed-storage recovery, the unqueued-generation banner (iOS branch), the saved-outputs folder copy (single take and long-form); no App Intent, URL scheme, drag, pasteboard, Quick Look or document-browser route; generated output lives in the App Group container while UIFileSharingEnabled exposes only import defaults and enrollment staging. repo_invariants.sh pins the export boundary over Sources/iOS, iOSSupport and the shared views and refuses new Documents writers. The folder copy takes an injected policy and IOSSavedOutputsDestinationTests prove a locked Design clip never leaves the app. IAP audit (read-only): no defect; risks recorded: unverified transactions are never finished so their notice repeats each launch, and a wrong-type product reads like offline. September 10 device acceptance stands (79fd9b31: 10 phases; 613fa5c8: 23 phases). Parked on the phone for offline, remaining surfaces and sandbox. (Earlier history: git log -p -- config/roadmap.json.)",
-      "unparkWhen": "The paired iPhone is available for the remaining device gates on current source: true offline owned access, the outward-export surfaces the acceptance lane does not drive (Studio inline card, saved-outputs folder copy, long-form joined output, recovery banners), then the App Store sandbox pass once RF-02 supplies the account setup."
+      "updated": "2026-09-21",
+      "notes": "Source export-boundary work completed September 14; historical September 10 device runs (79fd9b31, 613fa5c8) remain evidence only for their source. September 21 local runs 062537-2698653b and 062851-9551e713 passed local-environment, initially locked and restore-without-ownership checks, then failed injected cancellation: generic App Store error instead of the cancellation notice. This is an unresolved local StoreKit injection/error-boundary mismatch, not proven live behavior. The fixture now observes, normalizes and restores the in-app language through Settings; cleanup cleared local transactions and restored language/tab. A speculative adapter change did not fix it and was reverted. No current full lifecycle/export PASS or live purchase. True offline, Studio inline, folder-copy, long-form and recovery export acceptance remain open; RF-02/RF-12 own live setup/submission. Details and retained run IDs: docs/development-progress.md. Earlier history: git log -p -- config/roadmap.json.",
+      "unparkWhen": "Resolve and requalify local StoreKit cancellation, then remaining export/offline surfaces on Ready models; live sandbox acceptance still depends on RF-02 and separate account authorization."
     },
     {
       "id": "F-15",
@@ -426,9 +426,9 @@
         "Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
         "Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift"
       ],
-      "updated": "2026-09-13",
-      "notes": "Closed in source and deterministic verification on 2026-08-20. The product lifecycle no longer commits before review, and iOS deletion no longer requires a one-off build. Physical-device acceptance then passed on the paired iPhone in ios-xcui-saved-voice-lifecycle-20260820-061924-73065027: the genuine picker flow imported the staged reference, previewed the committed voice, handed it to Clone, deleted the exact named row, and proved the matching Studio state was cleared. The single XCUITest passed in 82.362 seconds with source-provenance, crash-baseline, xcuitest, crash-delta, and result-retention steps all passing. Reopened September 4 for V26-02 at 75ecb740: replacement/delete error handlers suppress a failed backup restore and then remove the transaction directory. Post-publication cleanup also shares the rollback path. Prior source/device evidence above remains valid for its tested schedules, not secondary restoration failure. Source-proven P1 preservation defect; no personal-data loss was reproduced in this review. Owner: backend-and-platform. See docs/reference/engineering-audit-grounding-2026-09-04.md. (Earlier history: git log -p -- config/roadmap.json.)",
-      "unparkWhen": "A device window runs the saved-voice lifecycle lane on current source, including the V26-02 secondary-failure schedules."
+      "updated": "2026-09-21",
+      "notes": "Initial transactional review and iOS deletion passed source/device acceptance August 20 (ios-xcui-saved-voice-lifecycle-20260820-061924-73065027). Reopened September 4 for V26-02 at 75ecb740: replacement/delete handlers can suppress backup-restore failure then remove the transaction directory; post-publication cleanup also shares rollback. This source-proven P1 preservation defect has no reproduced personal-data loss; prior pass does not cover secondary failures. See docs/reference/engineering-audit-grounding-2026-09-04.md. September 21: the simple device lane was not run against personal state because it lacks complete Studio selection/draft/consent restoration (ios-device-testing.md); current models also show Update Available. No user voice was imported, replaced or deleted. V26-02 secondary-failure schedules remain unqualified. Earlier history: git log -p -- config/roadmap.json.",
+      "unparkWhen": "Implement observed-state preservation in the existing saved-voice lane, obtain Ready models and run the current-source lifecycle plus V26-02 secondary-failure schedules."
     },
     {
       "id": "F-05",
@@ -593,8 +593,8 @@
         "file:scripts/repo_invariants.sh",
         "file:Tests/VocelloiOSLogicTests/IOSExportPurchaseTests.swift"
       ],
-      "updated": "2026-09-12",
-      "notes": "Source is complete: ISU-5 landed the dock's Dynamic Type ceiling (the September 10 geometry finding), the export-contract text tests became exact greps in scripts/repo_invariants.sh plus a StoreKit-fixture parity test in IOSExportPurchaseTests, and 14 native policy and 108 Python tests pass. Open: one separately authorized scripts/ui_test.sh ios localization walk on post-ISU-5 source covering English/French AX-XXXL and pseudo-AX-XXXL. The latest authorized run ios-xcui-localization-20260910-184111-4c20b0d2 completed Default, French-Default and AX-L (including the repaired Clone status reveal) and restored System Default; AX-XXXL launched only before the deadline collection interrupted the owned Xcode process and pseudo was not reached, so no full-lane PASS exists. All retained localization run bundles were removed by the 2026-09-11 host cleanup. (Earlier history: git log -p -- config/roadmap.json.)"
+      "updated": "2026-09-21",
+      "notes": "Source hub/purchase-sheet work is implemented. September 21: localization runner PASS ios-xcui-localization-20260921-054309-966a91d7 covered Default, French-Default, AX-L, AX-XXXL and pseudo-AX-XXXL with restoration/crash checks. It exposed a truncated variation selection; the subsequent accessibility-size Menu label fix passed ios-xcui-control-audit-20260921-064147-ef16ae49, including visible-control clipping checks and screenshot inspection at all four sizes. Stateful audit 063335-d71bad24 observed/mutated/restored preferences and variation (9 PASS; 6 explicit blocks). Earlier failures remain retained. Full French accessibility-size coverage, spoken VoiceOver acceptance and successful local purchase lifecycle remain open; the localization pass predates the final picker-label change. See ISU-5 and docs/development-progress.md. Earlier history: git log -p -- config/roadmap.json."
     },
     {
       "id": "AV-07",
@@ -1054,9 +1054,9 @@
       "plan": "ios-settings-2026-08",
       "title": "AX-XXXL reachability: cap the tab dock's Dynamic Type growth, restore the switch role and adapt the App Language rows",
       "status": "in-flight",
-      "updated": "2026-09-11",
+      "updated": "2026-09-21",
       "gate": "Physical iPhone English/French AX-XXXL and pseudo-localization Settings walks reach and mutate App Language with the existing identifiers; VoiceOver announces the accessibility toggles as switches; no new identifiers or copy.",
-      "notes": "Source fix landed 2026-09-11 from the accessibility audit: the persistent dock had no Dynamic Type ceiling and grew upward at AX-XXXL into the region a Settings scroll gesture starts in (the two earlier test-layer swipe experiments treated the symptom). Also: compact toggle style lost the switch trait, the tab icon was announced twice, and the App Language rows kept a horizontal layout at accessibility sizes. Physical qualification is a separate explicit lane (scripts/ui_test.sh ios localization). September 11 review note: in the accessibility-size branch of appLanguageOption (Sources/iOS/Settings/SettingsScreen.swift:595-601) the row's Spacer(minLength:) is now vertical inside the 44-point frame, so the checkmark reflows below the label; decide whether that stacked layout is intended before the physical walk, since the walk will capture it. Cross-reference ISU-4, which owns the qualification run.",
+      "notes": "September 11 source fixes capped dock growth, restored switch semantics, hid decorative tab icons and adapted App Language rows. September 21 localization 054309-966a91d7 completed all five configured layouts and language restoration. Earlier retained failures proved combined Auto-play title/description exceeded the viewport; accessibility sizes now separate the readable description from the reachable switch. The scroll helper uses bounded fully visible text anchors independent of reveal delta, with captured-geometry regressions. Final accessibility audit 064147-ef16ae49 passed and inspected screenshots confirm the expanded variation label wraps completely. French AX-XXXL and actual VoiceOver speech/role acceptance remain open; geometry and system audits do not establish spoken behavior. Full run IDs and source distinctions: docs/development-progress.md. Earlier history: git log -p -- config/roadmap.json.",
       "evidence": [
         "file:Sources/iOS/App/TabDock.swift",
         "file:Sources/iOS/IOSSettingsViews.swift",
@@ -1136,9 +1136,9 @@
         "config/ui-perf-thresholds-ios.json",
         "scripts/lib/host_preflight.sh"
       ],
-      "updated": "2026-09-13",
-      "notes": "macOS clauses done on September 13: (1) gate bench PASS after three harness fixes (6ab8c461 clock divisor, b1824091 warm-only verdict, b88d6d03 footprint dispersion), baseline re-saved from mac-gate-bench-20260912-225643-0fd52c77, first standard-RTF gate record mac-gate-bench-20260912-234613-c8f8a8c6; (2) canonical UI records macos-xcui-benchmark-20260913-170946-488a9ed0 and 181112-6cb80773, the latter paired with CLI matrix macos-engine-20260913-180702-42b26142 (engine rtf equal within 0.04; the UI adds 60 to 120 ms to the first chunk); (3) macos-xcui-perf-20260913-174907-79e014f2 after ee97e92c; (4) charts and website repinned (ae676061, 4ea74266); (5) mac-lang-bench-20260913-000655-546b90cf after acba7581 and 5ca95a73. Open: the iOS halves of (2) and (3); run ios-xcui-benchmark-20260913-184908-a94cbc47 aborted before its build because CoreDevice reported the paired iPhone unavailable. The replay cache-policy flake is fixed in 5619004c.",
-      "unparkWhen": "The paired iPhone is available for one ios benchmark and one ios perf run (the macOS clauses are done)."
+      "updated": "2026-09-21",
+      "notes": "macOS clauses done on September 13: (1) gate bench PASS after three harness fixes (6ab8c461 clock divisor, b1824091 warm-only verdict, b88d6d03 footprint dispersion), baseline re-saved from mac-gate-bench-20260912-225643-0fd52c77, first standard-RTF gate record mac-gate-bench-20260912-234613-c8f8a8c6; (2) canonical UI records macos-xcui-benchmark-20260913-170946-488a9ed0 and 181112-6cb80773, the latter paired with CLI matrix macos-engine-20260913-180702-42b26142 (engine rtf equal within 0.04; the UI adds 60 to 120 ms to the first chunk); (3) macos-xcui-perf-20260913-174907-79e014f2 after ee97e92c; (4) charts and website repinned (ae676061, 4ea74266); (5) mac-lang-bench-20260913-000655-546b90cf after acba7581 and 5ca95a73. Open: the iOS halves of (2) and (3); run ios-xcui-benchmark-20260913-184908-a94cbc47 aborted before its build because CoreDevice reported the paired iPhone unavailable. The replay cache-policy flake is fixed in 5619004c. September 21: the paired phone was available, but smoke observed Update Available for Custom, Design and Clone. No iOS benchmark or perf run was launched against stale catalog readiness; no new timing, RAM, QC or threshold claims are made.",
+      "unparkWhen": "All current production models are Ready on the paired phone, then run the iOS benchmark and perf lanes; macOS clauses remain complete."
     },
     {
       "id": "AUD-01",
@@ -1326,7 +1326,7 @@
       "id": "UIF-08",
       "plan": "macos-ui-fidelity-2026-09",
       "title": "Native acceptance of the iOS-derived screens on current source",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "On one committed source identity after the September 19 Studio changes: consented macOS localization, smoke and perf lanes pass; the error, missing-model and wide-window states of all three Studio modes, the Cmd+, Settings window and the Studio model links are exercised through genuine controls; the iOS scroll helper's delta-dependent anchor-size limit is corrected with a captured-bounds regression test and one complete consented iOS localization lane passes including Pseudo-AX-XXXL. Runner PASS requires diagnostics, crash deltas and restoration; no retries, no hidden state.",
       "sourceOfTruth": [
@@ -1334,8 +1334,8 @@
         "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift",
         "Sources/Views/Settings/MacSettingsScreen.swift"
       ],
-      "notes": "Opened 2026-09-20 when UIF-03, UIF-04, UIF-05 and UIF-06 closed on maintainer visual approval. The last two Mac Studio commits (dac06129, 5780927a) ran no XCUITest journeys, and the last full Mac lane set predates them. UIF-04's authorized iPhone lane ios-xcui-localization-20260919-144816-4590e8d3 failed at Pseudo-AX-XXXL language navigation because the scroll helper's delta-dependent anchor-size limit excluded the available visible text; the helper correction is phone-free, the device lane and the Mac lanes need explicit consent. September 20 player fixes add operation-scoped playback ownership, mode tint, file-scoped errors and a collapsed-sidebar fallback. Deterministic ownership/placement regressions are in AudioPlaybackResumePolicyTests.swift; native acceptance must still cover dismissal during streaming, selecting other audio before completion, long-form join, and sidebar collapse.",
-      "updated": "2026-09-20"
+      "notes": "Opened September 20 after UIF-03/04/05/06 visual approval; Mac Studio/player changes still need current-source native acceptance. September 21 iOS progress: captured-bounds regressions cover the excluded large-text anchor and Settings return path; localization runner 054309-966a91d7 passed all five configurations. Subsequent accessibility-size picker reflow and visible-target audit passed 064147-ef16ae49 with screenshot inspection, restoration and crash checks. Full localization predates that final picker change. Mac acceptance must cover error/missing-model/wide-window states, Settings/model links, playback dismissal during streaming, selecting another clip, long-form join and sidebar collapse. Current iOS generation remains blocked: smoke found all three models Update Available. Full run IDs and limitations: docs/development-progress.md. Earlier history: git log -p -- config/roadmap.json.",
+      "updated": "2026-09-21"
     }
   ]
 }

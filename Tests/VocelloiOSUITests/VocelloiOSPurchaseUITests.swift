@@ -33,6 +33,8 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
         store.storefront = "USA"
         store.locale = Locale(identifier: "en_US")
         var originalTab: String?
+        var languageToRestore: String?
+        var languageRestored = true
         var appLaunched = false
         var complete = false
         defer {
@@ -60,6 +62,10 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
                     if element("exportPurchase_close").exists { try tap("exportPurchase_close") }
                     if element("iosPlayer_close").exists { try tap("iosPlayer_close") }
                     presentationRestored = true
+                    if let languageToRestore {
+                        try selectInterfaceLanguage(languageToRestore)
+                        languageRestored = true
+                    }
                     if let originalHistoryFilter {
                         restoration.historyFilter = .failed
                         try tap("rootTab_history")
@@ -76,7 +82,11 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
             app.terminate()
             XCUIDevice.shared.press(.home)
             restoration.appStopped = app.state == .notRunning
-            let cleaned = restoration.complete
+            let cleaned = restoration.complete && languageRestored
+            let languageEvidence = XCTAttachment(string: "Interface language restored: \(languageRestored)")
+            languageEvidence.name = "purchase-language-restoration"
+            languageEvidence.lifetime = .keepAlways
+            add(languageEvidence)
             XCTAssertTrue(cleaned, "Local transaction/app cleanup must succeed")
             emit(["schemaVersion": 3, "scenario": exportChecks ? "exports" : "lifecycle",
                   "runID": runID, "fixtureSHA256": digest,
@@ -104,6 +114,14 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
         originalTab = ["studio", "voices", "history", "settings"].map { "rootTab_\($0)" }
             .first { element($0).isSelected }
         guard originalTab != nil else { throw Failure.observation }
+        let observedLanguage = try currentInterfaceLanguage()
+        languageToRestore = observedLanguage
+        languageRestored = false
+        let languageBaseline = XCTAttachment(string: "Original App Language: \(observedLanguage)")
+        languageBaseline.name = "purchase-language-baseline"
+        languageBaseline.lifetime = .keepAlways
+        add(languageBaseline)
+        try selectInterfaceLanguage("en")
         try openPurchase()
         try locked()
         record("initial_locked")
@@ -269,17 +287,48 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
     private func tap(_ id: String) throws {
         guard VocelloUIPrimaryAction.perform(on: element(id)) else { throw Failure.observation }
     }
-    private func openPurchase() throws {
+    private func openSettingsRoot() throws {
         try tap("rootTab_settings")
         for _ in 0..<3 {
             let ids = ["iosAttributionDetailBackButton", "iosSettings_voiceModelsBackButton", "iosSettings_openSourceBackButton"]
-                + ["audio", "modelsFiles", "privacyPermissions", "accessibility", "about"].map { "iosSettings_\($0)BackButton" }
+                + ["audio", "appLanguage", "modelsFiles", "privacyPermissions", "accessibility", "about"].map { "iosSettings_\($0)BackButton" }
             guard let back = ids.map({ element($0) }).first(where: { $0.exists }) else { break }
             guard VocelloUISettingsReveal.perform(back, in: app, swipingUp: false),
                   VocelloUIPrimaryAction.perform(on: back), VocelloUIWait.disappears(back, timeout: 20) else {
                 throw Failure.observation
             }
         }
+    }
+    private let interfaceLanguages = ["system", "en", "fr", "es", "de", "it", "pt-BR", "zh-Hans", "ja", "ko", "ru"]
+    private func currentInterfaceLanguage() throws -> String {
+        try openSettingsRoot()
+        let row = element("iosSettings_appLanguageRow")
+        guard VocelloUISettingsReveal.perform(row, in: app, swipingUp: true, requirement: .navigation) else {
+            throw Failure.observation
+        }
+        try tap("iosSettings_appLanguageRow")
+        try require("interface language picker") { self.element("screen_settings_appLanguage").exists }
+        let selected = interfaceLanguages.filter {
+            let option = element("iosSettings_appLanguageOption_\($0)")
+            return option.exists && option.isSelected
+        }
+        guard selected.count == 1, let selected = selected.first else { throw Failure.observation }
+        return selected
+    }
+    private func selectInterfaceLanguage(_ language: String) throws {
+        guard interfaceLanguages.contains(language) else { throw Failure.observation }
+        let current = try currentInterfaceLanguage()
+        if current != language {
+            let option = element("iosSettings_appLanguageOption_\(language)")
+            guard VocelloUISettingsReveal.perform(option, in: app, swipingUp: true) else { throw Failure.observation }
+            try tap("iosSettings_appLanguageOption_\(language)")
+        }
+        try require("interface language selected") {
+            self.element("iosSettings_appLanguageOption_\(language)").isSelected
+        }
+    }
+    private func openPurchase() throws {
+        try openSettingsRoot()
         let row = element("iosSettings_exportPurchaseRow")
         guard VocelloUISettingsReveal.perform(row, in: app, swipingUp: true) else { throw Failure.observation }
         try tap("iosSettings_exportPurchaseRow")

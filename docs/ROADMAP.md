@@ -48,7 +48,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`CONV-20`** (parked) — Device re-verification of the frozen iOS behavior.
   gate: On the paired iPhone, scripts/ui_test.sh ios smoke and the control audit pass on the source that shares the store, tokens and policies with macOS; no iOS identifier or control count changed.
-  unparkWhen: the paired iPhone is available and unlocked for a consented lane
+  unparkWhen: Current production models are Ready and the remaining control-audit fixture/preservation prerequisites are satisfied; phone availability is no longer the blocker.
 
 - **`CONV-21`** (planned) — Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages.
   gate: config/toolchain.json pins a CI toolchain that GitHub's runners provide; the macOS and iOS deployment targets stay at 26 in project.yml; any mlx-swift, mlx-swift-lm or swift-transformers move is one authorized change reviewed with the gate benchmark (medians of three warm takes) and a clean unit lane; scripts/dev.sh ci is green on the new pin.
@@ -79,7 +79,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-13`** (parked) — implement the one-time iOS Design and Clone export unlock before freeze.
   gate: Implement one verified StoreKit non-consumable entitlement for Design/Clone output export. All other functionality, generation/listening/internal History in every mode and Built-in output export remain free. Define local StoreKit test configuration first; centralize entitlement and output-provenance-based export authorization across Studio/full player/History, Files/share/save destination, long-form/segments, recovery and applicable automation. Audit document sharing/storage bypasses without deleting personal files or paywalling original reference recovery. Test purchased/unpurchased, cancelled/pending/failed/unverified transactions, restore, relaunch/offline owned access, refund/revocation and free-mode controls using deterministic policy/StoreKit tests and focused physical XCUITest. Preserve model/QC/seed policies and macOS/CLI behavior. RF-02 owns product ID/name/price/Family Sharing and live account setup; RF-12 owns processed-candidate purchase and first-IAP review proof. No live purchase or account mutation without separate authorization. Source/focused verification precedes RF-09 freeze and RF-11 full campaign; local test configuration is not a live product. Monetization and App Store submission are iOS-only. macOS remains distributed through GitHub Releases; macOS/CLI exports must not depend on StoreKit entitlements. Do not introduce a Mac App Store submission route.
-  unparkWhen: The paired iPhone is available for the remaining device gates on current source: true offline owned access, the outward-export surfaces the acceptance lane does not drive (Studio inline card, saved-outputs folder copy, long-form joined output, recovery banners), then the App Store sandbox pass once RF-02 supplies the account setup.
+  unparkWhen: Resolve and requalify local StoreKit cancellation, then remaining export/offline surfaces on Ready models; live sandbox acceptance still depends on RF-02 and separate account authorization.
 
 ## Specialist-audit remediation
 
@@ -183,7 +183,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 - **`AV-14`** (parked) — re-baseline the benchmark harness under the standard RTF definition (consent-bound runs).
   gate: After the 2026-09-12 harness fixes: (1) run `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` and re-save `benchmarks/baselines/mac-gate-bench.json` from a three-take run so it carries `rtfDefinition`, `rtfMAD`, n=3 and the host OS/Xcode identity; (2) one canonical `scripts/ui_test.sh macos benchmark` and one `scripts/ui_test.sh ios benchmark` run publish the first records with `run.rtfDefinition`, validate the provenance-bound optimization label, the iOS cell-length check and the sleep hold; (3) one macOS and one iOS `perf` run re-derive the warn-only thresholds under the clipped window arithmetic and the macOS environment row; (4) repin `scripts/generate_readme_charts.py` and the website chart to the new canonical macOS record. (5) one macOS `scripts/macos_test.sh lang-bench --subset quick` run publishes the first whisper-verified (`focused`, single-family) macOS language record and exercises the producer on generated audio under the host-quiet preflight. Each run needs explicit consent (model download, phone).
-  unparkWhen: The paired iPhone is available for one ios benchmark and one ios perf run (the macOS clauses are done).
+  unparkWhen: All current production models are Ready on the paired phone, then run the iOS benchmark and perf lanes; macOS clauses remain complete.
 
 - **`AV-15`** (planned) — Download scheduling tests drive a controllable clock.
   gate: HuggingFaceDownloader's throttle windows take an injected clock instead of ProcessInfo.systemUptime and ModelDownloadChunkSchedulingTests advance it deterministically without sleeping, while one real-throttle integration proof remains; the deterministic macOS test lane runs the suite in under a second.
@@ -248,7 +248,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 
 - **`F-01`** (parked) — High — make saved-voice review transactional and add iOS deletion.
   gate: Interactive saved-voice review must stage an opaque, catalog-invisible candidate and publish only on explicit commit; Cancel, Discard, and outside dismissal must remove it. Replacement and delete must be recoverable across interruption. iOS must confirm individual deletion, stop a matching preview, clear engine and Studio state, preserve voice-bank siblings, and surface retryable failure. Deterministic repository, wire, source-surface, macOS test/build, and generic iOS device-SDK compilation must pass; physical-device UI acceptance remains explicit QA. Secondary-failure fixtures must inject backup-restore failure, post-publication cleanup failure and same-name replacement interruptions. Retain the last recoverable audio/transcript/metadata and journal until recovery succeeds, distinguish committed-but-needs-cleanup from rollback failure, and prove restart reconciliation is idempotent without relying only on target existence.
-  unparkWhen: A device window runs the saved-voice lifecycle lane on current source, including the V26-02 secondary-failure schedules.
+  unparkWhen: Implement observed-state preservation in the existing saved-voice lane, obtain Ready models and run the current-source lifecycle plus V26-02 secondary-failure schedules.
 
 - **`F-05`** (parked) — Medium — restore packaged macOS launch verification.
   gate: Run the existing packaged-app launch smoke on the declared macos-26 release runner. The release workflow and extracted-DMG verifier must require external startup evidence and reject a QWENVOICE_SKIP_LAUNCH_SMOKE bypass in CI. Close only after the next signed candidate records that hosted macos-26 proof.
@@ -434,14 +434,14 @@ Narrative authority: [`docs/reference/macos-ios-ui-reset-2026-09.md`](reference/
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `UIF-07` | planned | Verify the adapted screens at supported window sizes | — |
-| `UIF-08` | planned | Native acceptance of the iOS-derived screens on current source | — |
+| `UIF-08` | in-flight | Native acceptance of the iOS-derived screens on current source | — |
 
 ### Open items in detail
 
 - **`UIF-07`** (planned) — Verify the adapted screens at supported window sizes.
   gate: Each converted screen fits its actual minimum/default/wide window bounds, including completion, long labels and error states. Long scripts scroll inside the editor. Any changed window minimum or additional scrolling behavior is explicitly reviewed and proven by genuine window-frame and control-geometry assertions.
 
-- **`UIF-08`** (planned) — Native acceptance of the iOS-derived screens on current source.
+- **`UIF-08`** (in-flight) — Native acceptance of the iOS-derived screens on current source.
   gate: On one committed source identity after the September 19 Studio changes: consented macOS localization, smoke and perf lanes pass; the error, missing-model and wide-window states of all three Studio modes, the Cmd+, Settings window and the Studio model links are exercised through genuine controls; the iOS scroll helper's delta-dependent anchor-size limit is corrected with a captured-bounds regression test and one complete consented iOS localization lane passes including Pseudo-AX-XXXL. Runner PASS requires diagnostics, crash deltas and restoration; no retries, no hidden state.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability

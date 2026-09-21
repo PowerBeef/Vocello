@@ -313,12 +313,14 @@ class VocelloiOSUITestCase: XCTestCase {
     func assertVisibleModelReadiness() {
         openVoiceModels()
         for modelID in ["pro_custom", "pro_design", "pro_clone"] {
-            let status = element("iosModelStatus_\(modelID)")
+            let status = app.staticTexts["iosModelStatus_\(modelID)"].firstMatch
             XCTAssertTrue(VocelloUIWait.exists(status, timeout: 60))
-            XCTAssertTrue(VocelloUIWait.value(status, contains: "Ready", timeout: 20))
+            XCTAssertTrue(VocelloUIWait.value(status, contains: "Ready", timeout: 20),
+                          "Generation QA requires current Ready models; resolve Download, Update or Repair in Voice Models first")
 
             let installedControl = element("iosModelDelete_\(modelID)")
             XCTAssertTrue(VocelloUIWait.exists(installedControl, timeout: 60))
+            XCTAssertTrue(revealSettingsElement(installedControl, swipingUp: true))
             XCTAssertTrue(installedControl.isHittable)
 
             for unavailableState in ["Download", "Repair", "Cancel", "Retry"] {

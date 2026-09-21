@@ -162,6 +162,7 @@ private struct IOSSettingsCompactToggleStyle: ToggleStyle {
 }
 
 struct IOSSettingsToggleRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let symbol: String
     let title: String
     let subtitle: String?
@@ -170,13 +171,28 @@ struct IOSSettingsToggleRow: View {
     var tint: Color = Theme.Brand.silver
 
     var body: some View {
-        Toggle(isOn: $isOn) {
-            IOSSettingsLabel(symbol: symbol, title: title, subtitle: subtitle, tint: tint)
+        VStack(alignment: .leading, spacing: 8) {
+            toggle
+            if dynamicTypeSize.isAccessibilitySize, let subtitle, !subtitle.isEmpty {
+                // Keep the switch and its title reachable together even when a long
+                // description wraps beyond one screen. Keep the explanation independently readable.
+                Text(subtitle)
+                    .font(.footnote)
+                    .foregroundStyle(Theme.Text.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .toggleStyle(IOSSettingsCompactToggleStyle(tint: tint))
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .frame(minHeight: 52)
+    }
+
+    private var toggle: some View {
+        Toggle(isOn: $isOn) {
+            IOSSettingsLabel(symbol: symbol, title: title,
+                             subtitle: dynamicTypeSize.isAccessibilitySize ? nil : subtitle, tint: tint)
+        }
+        .toggleStyle(IOSSettingsCompactToggleStyle(tint: tint))
+        .frame(minHeight: 36)
         .accessibilityIdentifier(accessibilityIdentifier)
         .accessibilityLabel(title)
         .accessibilityValue(isOn ? IOSSettingsText.on : IOSSettingsText.off)
@@ -238,7 +254,7 @@ struct IOSSettingsPickerRow: View {
             : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
         layout {
             label
-            picker.padding(.leading, dynamicTypeSize.isAccessibilitySize ? 38 : 0)
+            picker
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -254,6 +270,41 @@ struct IOSSettingsPickerRow: View {
     }
 
     private var picker: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                // The native menu-picker label clips multi-line selections at AX sizes.
+                // Keep the system selection menu, with a label that can grow vertically.
+                Menu {
+                    variationPicker
+                } label: {
+                    HStack(alignment: .center, spacing: 12) {
+                        Text(currentDisplayName)
+                            .lineLimit(nil)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .buttonStyle(.plain)
+            } else {
+                variationPicker.pickerStyle(.menu).labelsHidden()
+            }
+        }
+        .font(.subheadline.weight(.semibold))
+        .tint(Theme.Text.secondary)
+        .foregroundStyle(Theme.Text.secondary)
+        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+        .contentShape(Rectangle())
+        .accessibilityIdentifier("iosSettings_variationRow")
+        .accessibilityLabel(IOSSettingsText.variation)
+        .accessibilityValue(currentDisplayName)
+        .accessibilityHint(IOSSettingsText.variationHint)
+    }
+
+    private var variationPicker: some View {
         Picker(IOSSettingsText.variation, selection: $selection) {
             ForEach(Qwen3SamplingVariation.allCases, id: \.self) { variation in
                 Text(IOSSettingsText.variationName(variation))
@@ -261,16 +312,6 @@ struct IOSSettingsPickerRow: View {
                     .tag(variation.rawValue)
             }
         }
-        .pickerStyle(.menu)
-        .labelsHidden()
-        .font(.subheadline.weight(.semibold))
-        .tint(Theme.Text.secondary)
-        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
-        .contentShape(Rectangle())
-        .accessibilityIdentifier("iosSettings_variationRow")
-        .accessibilityLabel(IOSSettingsText.variation)
-        .accessibilityValue(currentDisplayName)
-        .accessibilityHint(IOSSettingsText.variationHint)
     }
 }
 

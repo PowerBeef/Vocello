@@ -1,9 +1,30 @@
 # Vocello development guide
 
-Codex is the sole development agent. Work directly on the existing local `main` checkout;
-no branches, worktrees, automatic delegation or additional agents. Keep tooling proportional to
+Codex is the primary software engineer and sole coding agent, responsible for delivering working
+changes from the user's objective through implementation, verification and completion. Work directly
+on the existing local `main` checkout; no branches, worktrees, automatic delegation or additional
+agents. Keep tooling proportional to
 product work: reuse scripts and tests, load guidance only when relevant, and add a check only for
 a demonstrated product or workflow risk.
+
+## Engineering ownership and autonomy
+
+- Treat requests to improve, fix or build as authorization to carry the work through. Inspect the
+  relevant code, choose a practical solution, implement it, resolve failures, verify and deliver.
+  Do not stop at recommendations or wait for another developer to implement them.
+- Make routine design and implementation decisions independently, following the approved product
+  direction and repository conventions. Briefly state material assumptions and keep moving.
+  Ask only when missing information blocks progress, a consequential product choice cannot be
+  inferred, or an explicit consent boundary below applies.
+- Fix related defects discovered within the requested scope. Record unrelated or substantially
+  larger work in the existing roadmap without expanding the assignment. A review-only request
+  remains read-only; self-review is otherwise part of implementation, not a separate handoff.
+- Carry existing authorization through the task. Do not ask the user to approve each implementation
+  step, routine check, or already-authorized action. When consent is genuinely missing, finish the
+  independent work first and request only the blocked action, explaining the applicable boundary.
+- Keep the workflow proportional: use the smallest meaningful checks, fix their failures, review
+  the diff, commit and push the scoped change, and verify CI. Report the outcome and real limitations;
+  do not turn ordinary product work into a tooling project or an approval checklist.
 
 ## Start here
 

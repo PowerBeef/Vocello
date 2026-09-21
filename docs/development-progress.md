@@ -32,8 +32,11 @@ contracts and 1,563 Python tests plus 959 subtests. Its native stage first hit s
 (`mac-test-20260920-232235`, retained), then passed with compiler-cache access
 (`mac-test-20260920-232320`); the remaining generic iOS app/logic compilation and full website checks
 (12 fixtures, rendered accessibility, production build, two Playwright tests) passed serially.
-All four skills validate; root/website hook fixtures cover allowed and blocked operations. Local
-compatibility is separate from pinned CI: check the migration commit's GitHub checks before resuming
+All four skills validate; root/website hook fixtures cover allowed and blocked operations. Initial
+CI exposed an accidental PyYAML import in the metadata smoke test; the fix uses only the standard
+library, verified by all 24 hook tests with `python3 -S -m unittest discover -s scripts/tests -p
+test_agent_hooks.py`. No CI dependency or pin was added. Local compatibility is separate from pinned
+CI: check the latest migration commit's GitHub checks before resuming
 product work. Fresh-session instruction/skill discovery and platform hook trust activation remain
 unverified; fixtures do not prove runtime activation. The marketing test remains paused.
 

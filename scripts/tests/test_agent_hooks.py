@@ -13,9 +13,6 @@ import tempfile
 import tomllib
 import unittest
 
-import yaml
-
-
 ROOT = Path(__file__).resolve().parents[2]
 HOOKS = ROOT / "scripts/hooks"
 
@@ -352,8 +349,11 @@ class ProjectSkillTests(unittest.TestCase):
                          {"ios-lane", "macos-ui-lane", "device-diagnostics", "release-evidence"})
         for path in skills:
             with self.subTest(skill=path.parent.name):
-                metadata = yaml.safe_load(path.read_text().split("---", 2)[1])
+                # The checked-in skill metadata is a flat name/description header.
+                # Keep this smoke check dependency-free like the hook runtime.
+                metadata = dict(line.split(": ", 1) for line in
+                                path.read_text().split("---", 2)[1].strip().splitlines())
                 self.assertEqual(metadata["name"], path.parent.name)
                 self.assertTrue(metadata["description"])
-                policy = yaml.safe_load((path.parent / "agents/openai.yaml").read_text())
-                self.assertIs(policy["policy"]["allow_implicit_invocation"], False)
+                policy = (path.parent / "agents/openai.yaml").read_text()
+                self.assertRegex(policy, r"(?m)^policy:\s*\n +allow_implicit_invocation: false\s*$")

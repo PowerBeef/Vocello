@@ -18,16 +18,24 @@ enum GenerationPersistence {
         result: PersistenceGenerationResult,
         text: String,
         audioPlayer: AudioPlayerViewModel,
-        caller: String
+        caller: String,
+        playbackOperationID: UUID? = nil
     ) async -> GenerationHistoryPersistenceOutcome {
         emitClonePromptMetricsIfNeeded(result: result, caller: caller)
         AppPerformanceSignposts.emit("Final File Ready")
 
+        #if os(macOS)
+        let allowsPlayback = playbackOperationID.map(audioPlayer.ownsGenerationPlayback) ?? false
+        if !allowsPlayback {
+            return await saveToHistory(generation, caller: caller)
+        }
+        #endif
         if result.usedStreaming {
             audioPlayer.completeStreamingPreview(
                 result: result,
                 title: String(text.prefix(40)),
-                shouldAutoPlay: AudioService.shouldAutoPlay
+                shouldAutoPlay: AudioService.shouldAutoPlay,
+                playbackOperationID: playbackOperationID
             )
         } else {
             let autoplayStart = DispatchTime.now().uptimeNanoseconds
@@ -35,7 +43,9 @@ enum GenerationPersistence {
                 result.audioPath,
                 title: String(text.prefix(40)),
                 isAutoplay: AudioService.shouldAutoPlay,
-                presentationContext: .generatePreview
+                presentationContext: .generatePreview,
+                generationMode: GenerationMode(rawValue: generation.mode),
+                playbackOperationID: playbackOperationID
             )
             if TelemetryGate.resolvedEnabled {
                 print("[Performance][\(caller)] autoplay_start_wall_ms=\(elapsedMs(since: autoplayStart))")

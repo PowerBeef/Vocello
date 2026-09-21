@@ -12,6 +12,8 @@ import QwenVoiceCore
 final class MacStudioSingleTakeGenerationHooks: IOSSingleTakeGenerationExecutionHooks {
     private let engine: TTSEngineStore
     private let audioPlayer: AudioPlayerViewModel
+    private let playbackOperationID = UUID()
+    private var beganPlaybackOperation = false
 
     init(engine: TTSEngineStore, audioPlayer: AudioPlayerViewModel) {
         self.engine = engine
@@ -19,6 +21,11 @@ final class MacStudioSingleTakeGenerationHooks: IOSSingleTakeGenerationExecution
     }
 
     func generationSubmitted(_ plan: IOSSingleTakeGenerationPlan) async {
+        if !beganPlaybackOperation {
+            audioPlayer.beginGenerationPlayback(operationID: playbackOperationID, mode: plan.request.mode)
+            beganPlaybackOperation = true
+        }
+        audioPlayer.claimGenerationStream(plan.generationID, operationID: playbackOperationID)
         audioPlayer.setLivePreviewEstimate(LivePreviewEstimate(text: plan.request.text))
         await AppGenerationTimeline.shared.recordSubmitted(
             id: plan.generationID,
@@ -38,7 +45,8 @@ final class MacStudioSingleTakeGenerationHooks: IOSSingleTakeGenerationExecution
             result: result,
             text: plan.request.text,
             audioPlayer: audioPlayer,
-            caller: plan.persistenceCaller
+            caller: plan.persistenceCaller,
+            playbackOperationID: playbackOperationID
         )
         await AppGenerationTimeline.shared.recordCompleted(
             id: plan.generationID,

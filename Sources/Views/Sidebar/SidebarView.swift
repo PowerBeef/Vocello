@@ -32,7 +32,7 @@ struct SidebarView: View {
             MacSidebarBrandHeader()
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            SidebarFooterRegion()
+            MacPlaybackFooter(isSidebar: true)
         }
         // The column's own material would sit over any window background, so
         // the sidebar paints its slice of the window-wide mode wash.
@@ -205,70 +205,5 @@ private struct MacSidebarSelectionPill: View {
                     )
             }
             .macGatedGlass(tint: MacTheme.glassTint(tint, intensity: 0.9), in: shape, interactive: true)
-    }
-}
-
-// MARK: - Footer
-
-private struct SidebarFooterRegion: View {
-    @Environment(MacAppModel.self) private var appModel
-
-    private var studioOwnsTransport: Bool {
-        let coordinator: StudioGenerationCoordinator
-        switch appModel.selectedItem {
-        case .customVoice: coordinator = appModel.customCoordinator
-        case .voiceDesign: coordinator = appModel.designCoordinator
-        case .voiceCloning: coordinator = appModel.cloneCoordinator
-        default: return false
-        }
-        if coordinator.isGenerating {
-            return coordinator.liveItem != nil && audioPlayer.isLiveStream
-                && audioPlayer.activeGeneratePreviewVisibilityState == .ready
-        }
-        guard let output = coordinator.lastCompletedOutput else { return false }
-        return audioPlayer.currentFilePath == output.audioURL.path
-    }
-    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
-    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
-
-    private var status: MacShellStatus {
-        MacShellStatusPresentation.resolve(
-            snapshot: ttsEngineStore.snapshot,
-            prefersInlinePresentation: audioPlayer.isLiveStream
-        )
-    }
-
-    private var footerPresentation: MacShellFooterPresentation {
-        MacShellFooterPresentation.resolve(
-            status: status,
-            isLiveStream: audioPlayer.isLiveStream
-        )
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
-            if audioPlayer.hasAudio && !studioOwnsTransport {
-                MacInlinePlayerCard(inlinePlayerActivity: footerPresentation.inlinePlayerActivity)
-            }
-
-            if footerPresentation.showsStandaloneStatus && !studioOwnsTransport {
-                MacStatusStrip(
-                    status: status,
-                    clearError: { ttsEngineStore.clearVisibleError() }
-                )
-            }
-        }
-        .padding(.horizontal, MacShellMetrics.sidebarInset)
-        .padding(.top, MacTheme.Spacing.sm)
-        .padding(.bottom, MacShellMetrics.sidebarInset)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [MacTheme.Surface.canvasBottom.opacity(0), MacTheme.Surface.canvasBottom.opacity(0.9)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        )
     }
 }

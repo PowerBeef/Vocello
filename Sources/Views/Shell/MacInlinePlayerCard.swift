@@ -1,21 +1,24 @@
 import SwiftUI
 
-/// The iOS Studio player card (`IOSStudioPlayerCard`) at sidebar width: the
-/// waveform row on top, then a mode-tinted play/pause control, the take's
-/// title and the trailing dismiss. One card serves the live stream and the
-/// completed take, so the transition is an in-place morph. Keeps every
+/// Compact now-playing card: title and transport above a slim waveform.
+/// The tint follows the audio's origin, independently of the selected screen.
+/// One card serves the live stream and the completed take, so the transition is an in-place morph. Keeps every
 /// `sidebarPlayer_*` identifier the lanes assert.
 struct MacInlinePlayerCard: View {
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     let inlinePlayerActivity: MacShellActivity?
-    var tint: Color = MacTheme.accent
+    private var tint: Color {
+        audioPlayer.currentGenerationMode.map { MacTheme.tint(for: $0) } ?? MacTheme.voicesTint
+    }
 
     var body: some View {
         let shape = VocelloShape.stage()
 
-        VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
-            MacInlineWaveformRow(tint: tint)
+        VStack(alignment: .leading, spacing: MacTheme.Spacing.sm) {
             controlsRow
+            if audioPlayer.hasAudio {
+                MacInlineWaveformRow(tint: tint)
+            }
 
             if let inlinePlayerActivity {
                 MacInlineLiveStatusRow(activity: inlinePlayerActivity, tint: tint)
@@ -30,7 +33,7 @@ struct MacInlinePlayerCard: View {
                     .accessibilityIdentifier("sidebarPlayer_error")
             }
         }
-        .padding(.horizontal, MacTheme.Spacing.lg)
+        .padding(.horizontal, MacTheme.Spacing.md)
         .padding(.top, MacTheme.Spacing.md)
         .padding(.bottom, MacTheme.Spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -59,9 +62,9 @@ struct MacInlinePlayerCard: View {
                 }
             } label: {
                 Image(systemName: audioPlayer.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: MacControl.field.glyph, weight: .semibold))
+                    .font(.system(size: MacControl.icon.glyph, weight: .semibold))
                     .foregroundStyle(MacTheme.Text.onAccent)
-                    .macControlSquare(.field)
+                    .macControlSquare(.icon)
                     .background {
                         Circle().fill(
                             LinearGradient(
@@ -76,6 +79,8 @@ struct MacInlinePlayerCard: View {
             .buttonStyle(.plain)
             .accessibilityLabel(audioPlayer.isPlaying ? MacInterfaceText.playerPause : MacInterfaceText.playerPlay)
             .accessibilityIdentifier("sidebarPlayer_playPause")
+            .accessibilityValue(audioPlayer.isPlaying ? "pause" : "play")
+            .disabled(!audioPlayer.hasAudio)
 
             VStack(alignment: .leading, spacing: MacTheme.Spacing.xs) {
                 Text(audioPlayer.currentTitle)
@@ -159,7 +164,7 @@ private struct MacInlineWaveformRow: View {
                     audioPlayer.seek(to: max(0, min(1, location.x / geo.size.width)))
                 }
             }
-            .macControlHeight(.icon)
+            .frame(height: 24)
             .opacity(audioPlayer.canSeek ? 1.0 : 0.8)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(MacInterfaceText.playerPosition)
@@ -231,5 +236,84 @@ private struct MacInlineLiveStatusRow: View {
         .accessibilityIdentifier("sidebarPlayer_liveStatus")
         .accessibilityLabel(activity.label)
         .accessibilityValue(percentLabel ?? MacInterfaceText.shellInProgress)
+    }
+}
+
+// MARK: - Footer
+
+/// Shared transport host: sidebar normally, detail footer when the sidebar is hidden.
+struct MacPlaybackFooter: View {
+    let isSidebar: Bool
+    @Environment(\.vocelloSidebarIsVisible) private var sidebarVisible
+    @Environment(MacAppModel.self) private var appModel
+
+    private var studioOwnsTransport: Bool {
+        let coordinator: StudioGenerationCoordinator
+        switch appModel.selectedItem {
+        case .customVoice: coordinator = appModel.customCoordinator
+        case .voiceDesign: coordinator = appModel.designCoordinator
+        case .voiceCloning: coordinator = appModel.cloneCoordinator
+        default: return false
+        }
+        if coordinator.isGenerating {
+            return coordinator.liveItem != nil && audioPlayer.isLiveStream
+                && audioPlayer.activeGeneratePreviewVisibilityState == .ready
+        }
+        guard let output = coordinator.lastCompletedOutput else { return false }
+        return audioPlayer.currentFilePath == output.audioURL.path
+            || audioPlayer.playbackError(forFile: output.audioURL.path) != nil
+    }
+    @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
+    @EnvironmentObject private var ttsEngineStore: TTSEngineStore
+
+    private var status: MacShellStatus {
+        MacShellStatusPresentation.resolve(
+            snapshot: ttsEngineStore.snapshot,
+            prefersInlinePresentation: audioPlayer.isLiveStream
+        )
+    }
+
+    private var footerPresentation: MacShellFooterPresentation {
+        MacShellFooterPresentation.resolve(
+            status: status,
+            isLiveStream: audioPlayer.isLiveStream
+        )
+    }
+
+    private var placement: PlaybackTransportPlacement {
+        .resolve(hasAudio: audioPlayer.hasAudio || audioPlayer.playbackError != nil,
+                 studioOwnsAudio: studioOwnsTransport, sidebarVisible: sidebarVisible)
+    }
+
+    @ViewBuilder
+    var body: some View {
+        if isSidebar || placement == .detail {
+            VStack(alignment: .leading, spacing: MacTheme.Spacing.sm) {
+                if placement == (isSidebar ? .sidebar : .detail) {
+                    MacInlinePlayerCard(inlinePlayerActivity: footerPresentation.inlinePlayerActivity)
+                        .frame(maxWidth: isSidebar ? .infinity : 560)
+                        .frame(maxWidth: .infinity)
+                }
+
+                if isSidebar && footerPresentation.showsStandaloneStatus && !studioOwnsTransport {
+                    MacStatusStrip(
+                        status: status,
+                        clearError: { ttsEngineStore.clearVisibleError() }
+                    )
+                }
+            }
+            .padding(.horizontal, MacShellMetrics.sidebarInset)
+            .padding(.top, MacTheme.Spacing.sm)
+            .padding(.bottom, MacShellMetrics.sidebarInset)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                LinearGradient(
+                    colors: [MacTheme.Surface.canvasBottom.opacity(0), MacTheme.Surface.canvasBottom.opacity(0.9)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+            )
+        }
     }
 }

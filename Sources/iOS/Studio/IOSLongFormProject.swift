@@ -351,6 +351,9 @@ final class IOSLongFormCoordinator {
               let priorSegments = outcome?.segments,
               index >= 0, index < priorSegments.count else { return }
         guard let attempt = studioCoordinator.start(live: nil) else { return }
+        #if os(macOS)
+        audioPlayer.beginGenerationPlayback(operationID: attempt.rawValue, mode: request.mode)
+        #endif
         let acceptedOutcome = outcome
         isProcessing = true
         // A new operation owns a new cancellation token. An asynchronously
@@ -441,6 +444,9 @@ final class IOSLongFormCoordinator {
             replacements = []
         }
         guard let attempt = studioCoordinator.start(live: nil) else { return }
+        #if os(macOS)
+        audioPlayer.beginGenerationPlayback(operationID: attempt.rawValue, mode: request.mode)
+        #endif
         lastRequest = request
         lastMode = request.mode
         outcome = nil
@@ -510,7 +516,8 @@ final class IOSLongFormCoordinator {
                     usedStreaming: false
                 ),
                 title: String(request.lines.joined(separator: " ").prefix(40)),
-                shouldAutoPlay: shouldAutoPlay
+                shouldAutoPlay: shouldAutoPlay,
+                playbackOperationID: studioAttempt.rawValue
             )
             let transcript = request.lines.joined(separator: " ")
             let accepted = studioCoordinator.complete(
@@ -653,7 +660,8 @@ final class IOSLongFormProjectRunner {
                 audioPlayer.setLivePreviewEstimate(LivePreviewEstimate(text: line))
                 audioPlayer.prepareStreamingPreview(
                     title: hooks.segmentTitle(index: index, total: total),
-                    shouldAutoPlay: AudioService.shouldAutoPlay
+                    shouldAutoPlay: AudioService.shouldAutoPlay,
+                    generationID: generationID, playbackOperationID: studioAttempt.rawValue
                 )
                 studioCoordinator.updateLiveItem(IOSStudioLivePreviewItem(
                     voiceName: hooks.segmentTitle(index: index, total: total),
@@ -748,7 +756,7 @@ final class IOSLongFormProjectRunner {
         // Close the final segment's live session deterministically before the
         // join so the completed-project handoff never overlaps a draining
         // live tail.
-        audioPlayer.abortLivePreviewIfNeeded()
+        audioPlayer.finishGenerationPreview(playbackOperationID: studioAttempt.rawValue)
         publish(active: nil, message: hooks.presentation.joiningSegments(total))
         var candidateJoinedURL: URL?
         defer { if let candidateJoinedURL { try? FileManager.default.removeItem(at: candidateJoinedURL) } }
@@ -859,7 +867,8 @@ final class IOSLongFormProjectRunner {
             audioPlayer.setLivePreviewEstimate(LivePreviewEstimate(text: line))
             audioPlayer.prepareStreamingPreview(
                 title: hooks.segmentTitle(index: segmentIndex, total: total),
-                shouldAutoPlay: AudioService.shouldAutoPlay
+                shouldAutoPlay: AudioService.shouldAutoPlay,
+                generationID: generationID, playbackOperationID: studioAttempt.rawValue
             )
             studioCoordinator.updateLiveItem(IOSStudioLivePreviewItem(
                 voiceName: hooks.segmentTitle(index: segmentIndex, total: total),
@@ -942,7 +951,7 @@ final class IOSLongFormProjectRunner {
                 )
             )
 
-            audioPlayer.abortLivePreviewIfNeeded()
+            audioPlayer.finishGenerationPreview(playbackOperationID: studioAttempt.rawValue)
             // Keep the accepted visible segments until the whole replacement
             // transaction succeeds; the candidate is local to this operation.
             onProgress(IOSLongFormProgressSnapshot(totalCount: total, statusMessage: hooks.presentation.joiningSegments(total)))

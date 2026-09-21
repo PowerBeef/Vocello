@@ -120,6 +120,11 @@ struct ContentView: View {
             )
         } detail: {
             detailContent
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    if sidebarColumnVisibility == .detailOnly {
+                        MacPlaybackFooter(isSidebar: false)
+                    }
+                }
                 .toolbar {
                     MacWindowToolbar(selectedItem: appModel.selectedItem)
                 }

@@ -204,6 +204,18 @@ use `settings_detail_<category>`, and `settings_backButton` returns to the overv
 
 ### Sidebar player + engine status
 
+The compact global player places transport and title above a slim waveform. It follows the
+playing audio's mode color (saved references use the Voices tint), independently of navigation.
+Studio owns transport only for its displayed playing take. On other destinations, or while
+another take plays, the global player lives in the sidebar; hiding the sidebar moves the same
+card into the detail footer, preserving its identifiers. No duplicate transport is shown.
+
+Closing the global preview or explicitly choosing other audio revokes automatic playback for
+that entire generation operation, including later batch lines and long-form segments. Generation
+can still complete and save to History. Starting a new generation grants playback ownership again.
+Internal segment cleanup preserves the joined-output handoff. Studio result errors belong only to
+the file that failed; a stale card cannot display or control another clip's failure.
+
 | Element | Identifier |
 |---|---|
 | Player card | `sidebarPlayer_bar` / `sidebarPlayer_playPause` (value `play` / `pause`) / `sidebarPlayer_waveform` / `sidebarPlayer_time` / `sidebarPlayer_dismiss` / `sidebarPlayer_error` |

@@ -442,7 +442,8 @@ struct MacHistoryScreen: View {
                 waveformSeed: item.waveformSeed,
                 allowsDeletion: !databaseUnavailable,
                 onPlay: {
-                    audioPlayer.playFile(item.generation.audioPath, title: item.textPreview)
+                    audioPlayer.playFile(item.generation.audioPath, title: item.textPreview,
+                                         generationMode: GenerationMode(rawValue: item.generation.mode))
                 },
                 onSaveToSavedVoices: item.saveVoiceSource == nil ? nil : {
                     savedVoiceSheetConfiguration = item.makeSaveVoiceConfiguration()

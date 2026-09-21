@@ -84,7 +84,7 @@ XCUITest lanes only when explicitly requested.
   platform wrappers own editors, safe areas, keyboard commands and file actions. Do not reimpose
   superseded Mac pixel prescriptions. First prove Built-in Voice, then convert other screens after
   maintainer review. All three Studio modes use the inline player; the sidebar carries playback on other
-  destinations. Never operate unrelated audio from a stale result card. Keep iOS behavior and
+  destinations, with a detail-footer fallback when the sidebar is hidden. Never operate unrelated audio from a stale result card. Keep iOS behavior and
   identifiers stable, and update actual Mac test navigation when controls move.
 - **Studio generation runs on the shared pipeline.** `StudioGenerationCoordinator` (owned by `MacAppModel`)
   holds the attempt-scoped terminal state, `IOSSingleTakeGenerationExecutor` runs the take through

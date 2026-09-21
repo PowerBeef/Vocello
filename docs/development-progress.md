@@ -17,6 +17,23 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### macOS player ownership and compact transport (September 21)
+
+Baseline `6c879a84`. Playback now belongs to an explicit generation operation: closing a live
+preview or selecting another file prevents late chunks, later batch lines and final results from
+reclaiming the player, while successful outputs still save to History. Internal long-form segment
+cleanup preserves the joined-file handoff. The compact global card follows the audio's mode tint
+and moves into the detail footer when the sidebar is hidden; Studio keeps one transport for its
+own take. Playback errors stay with their attempted file. iOS retains its existing handoff.
+
+Verification: nine new ownership/placement regressions passed within the deterministic Mac suite
+(`mac-test-20260920-235907`: 703 core tests; 125 runtime tests, three existing skips). Contracts and
+687 selected Python tests plus 382 subtests passed. Generic iOS compilation initially caught an
+unreachable Mac-only guard branch under warnings-as-errors; the conditional was corrected and
+both the generic iOS app and logic-test bundle then compiled successfully. Native visual/model/device acceptance remains unrun and tracked in UIF-07/UIF-08, including sidebar
+collapse, error states, dismissal during streaming, selecting another clip and long-form completion.
+The pre-existing marketing-capture test edit remains paused and unchanged.
+
 ### Codex-only development workflow (September 20)
 
 Codex is the sole development agent. Baseline: `cb9ff234`; the pre-existing paused change in

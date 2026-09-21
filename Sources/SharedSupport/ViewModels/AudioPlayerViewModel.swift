@@ -99,6 +99,29 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     @Published var currentTitle: String = ""
     @Published var waveformSamples: [Float] = []
     @Published var playbackError: String?
+    @Published private(set) var playbackTargetFilePath: String?
+    @Published private(set) var currentGenerationMode: GenerationMode?
+    private var generationPlaybackOwnership = GenerationPlaybackOwnership()
+    private var generationPlaybackMode: GenerationMode?
+
+    func beginGenerationPlayback(operationID: UUID, mode: GenerationMode) {
+        generationPlaybackOwnership.begin(operationID)
+        generationPlaybackMode = mode
+    }
+
+    func ownsGenerationPlayback(_ operationID: UUID) -> Bool {
+        generationPlaybackOwnership.owns(operationID)
+    }
+
+    @discardableResult
+    func claimGenerationStream(_ generationID: UUID, operationID: UUID) -> Bool {
+        generationPlaybackOwnership.claimStream(generationID, operationID: operationID)
+    }
+
+    func playbackError(forFile path: String) -> String? {
+        playbackTargetFilePath == path ? playbackError : nil
+    }
+
     @Published private(set) var isLiveStream = false
     // Demoted from @Published (iOS frontend perf audit, Wave 3): these have ZERO SwiftUI
     // readers — `livePreviewQueueDepth` is written on every streamed chunk but consumed only
@@ -393,8 +416,17 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     func load(
         filePath: String,
         title: String = "",
-        presentationContext: PlaybackPresentationContext = .library
+        presentationContext: PlaybackPresentationContext = .library,
+        generationMode: GenerationMode? = nil,
+        playbackOperationID: UUID? = nil
     ) {
+        if let playbackOperationID {
+            guard ownsGenerationPlayback(playbackOperationID) else { return }
+        } else {
+            generationPlaybackOwnership.revoke()
+        }
+        playbackTargetFilePath = filePath
+        currentGenerationMode = generationMode
         pendingAutoplaySignpost = false
         teardownLivePlayback(clearSession: true)
         stopFilePlayback(clearPlayer: true)
@@ -411,6 +443,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         } catch {
             clearLoadedAudio()
             resetPresentationState()
+            currentTitle = title.isEmpty ? URL(fileURLWithPath: filePath).lastPathComponent : title
             playbackError = error.localizedDescription
         }
     }
@@ -472,6 +505,13 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     }
 
     func dismiss() {
+        generationPlaybackOwnership.revoke()
+        clearPlayback()
+    }
+
+    private func clearPlayback() {
+        playbackTargetFilePath = nil
+        currentGenerationMode = nil
         pendingAutoplaySignpost = false
         stop()
         teardownLivePlayback(clearSession: true)
@@ -508,9 +548,13 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         _ path: String,
         title: String = "",
         isAutoplay: Bool = false,
-        presentationContext: PlaybackPresentationContext = .library
+        presentationContext: PlaybackPresentationContext = .library,
+        generationMode: GenerationMode? = nil,
+        playbackOperationID: UUID? = nil
     ) {
-        load(filePath: path, title: title, presentationContext: presentationContext)
+        if let playbackOperationID, !ownsGenerationPlayback(playbackOperationID) { return }
+        load(filePath: path, title: title, presentationContext: presentationContext,
+             generationMode: generationMode, playbackOperationID: playbackOperationID)
         if isAutoplay {
             pendingAutoplaySignpost = true
         }
@@ -527,7 +571,16 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         pendingLivePreviewEstimate = estimate
     }
 
-    func prepareStreamingPreview(title: String, shouldAutoPlay: Bool) {
+    func prepareStreamingPreview(
+        title: String, shouldAutoPlay: Bool,
+        generationID: UUID? = nil, playbackOperationID: UUID? = nil
+    ) {
+        #if os(macOS)
+        guard let generationID, let playbackOperationID,
+              claimGenerationStream(generationID, operationID: playbackOperationID) else { return }
+        currentGenerationMode = generationPlaybackMode
+        #endif
+        playbackTargetFilePath = nil
         let sessionEstimate = pendingLivePreviewEstimate
             ?? livePreviewEstimate
             ?? LivePreviewEstimate(text: title)
@@ -583,14 +636,28 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         }
     }
 
-    func completeStreamingPreview(result: PlaybackGenerationResult, title: String, shouldAutoPlay: Bool) {
+    func completeStreamingPreview(
+        result: PlaybackGenerationResult, title: String, shouldAutoPlay: Bool,
+        playbackOperationID: UUID? = nil
+    ) {
+        #if os(macOS)
+        guard let playbackOperationID, ownsGenerationPlayback(playbackOperationID) else { return }
+        let authorizedPlaybackOperationID: UUID? = playbackOperationID
+        currentGenerationMode = generationPlaybackMode
+        #else
+        // iOS retains its existing playback handoff; operation ownership is Mac-only.
+        let authorizedPlaybackOperationID: UUID? = nil
+        #endif
+        playbackTargetFilePath = result.audioPath
         guard result.usedStreaming else {
             if shouldAutoPlay {
                 playFile(
                     result.audioPath,
                     title: title,
                     isAutoplay: true,
-                    presentationContext: .generatePreview
+                    presentationContext: .generatePreview,
+                    generationMode: generationPlaybackMode,
+                    playbackOperationID: authorizedPlaybackOperationID
                 )
             }
             return
@@ -659,6 +726,18 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         dismiss()
     }
 
+    /// Internal long-form cleanup preserves the operation's final-file handoff.
+    /// A user dismissal or another audio selection still wins over this cleanup.
+    func finishGenerationPreview(playbackOperationID: UUID) {
+        #if os(macOS)
+        guard ownsGenerationPlayback(playbackOperationID) else { return }
+        generationPlaybackOwnership.finishStream(operationID: playbackOperationID)
+        #endif
+        pendingLivePreviewEstimate = nil
+        guard playbackMode == .live || liveSessionID != nil else { return }
+        clearPlayback()
+    }
+
     // MARK: - Notifications
 
     private struct ChunkInfo: Sendable {
@@ -718,6 +797,9 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     }
 
     private func handleGenerationChunk(_ chunk: ChunkInfo) {
+        #if os(macOS)
+        guard generationPlaybackOwnership.acceptsChunk(chunk.generationID) else { return }
+        #endif
         #if os(iOS)
         // Batch runs headlessly: drop streamed chunks so items don't live-play.
         if batchSuppressionActive { return }
@@ -775,6 +857,8 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     }
 
     private func startLiveSession(id: String, title: String, sessionDirectory: String?, autoPlay: Bool) {
+        playbackTargetFilePath = nil
+        currentGenerationMode = generationPlaybackMode
         let sessionEstimate = pendingLivePreviewEstimate
             ?? livePreviewEstimate
             ?? LivePreviewEstimate(text: title)
@@ -1300,6 +1384,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         player = audioPlayer
         playbackMode = .file
         currentFilePath = filePath
+        playbackTargetFilePath = filePath
         currentTitle = title.isEmpty ? url.lastPathComponent : title
         duration = audioPlayer.duration
         let clampedTime = min(max(preserveCurrentTime, 0), audioPlayer.duration)

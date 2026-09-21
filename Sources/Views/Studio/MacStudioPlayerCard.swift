@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// Live/completed Studio output over the shared audio owner. Built-in Voice and
-/// Design use inline transport; Clone retains its routing until its presentation
-/// pass. A stale result never controls another take.
+/// Live/completed output for all Studio modes over the shared audio owner.
+/// A stale result never controls or displays an error from another take.
 struct MacStudioPlayerCard: View {
     enum Phase: Equatable {
         case live(IOSStudioLivePreviewItem)
@@ -74,7 +73,7 @@ struct MacStudioPlayerCard: View {
                 cadenceNoticeRow(notice)
             }
 
-            if let playbackError = audioPlayer.playbackError {
+            if let playbackError = displayedPlaybackError {
                 Text(playbackError)
                     .macType(.caption)
                     .foregroundStyle(MacTheme.Status.guarded)
@@ -109,7 +108,7 @@ struct MacStudioPlayerCard: View {
             Button(MacInterfaceText.playerClose, role: .destructive) {
                 // Stop the shared player too, so dismissing never leaves audio
                 // playing with no visible card.
-                if ownsAudio { audioPlayer.dismiss() }
+                if ownsAudio || displayedPlaybackError != nil { audioPlayer.dismiss() }
                 onDismiss()
             }
             .accessibilityIdentifier("studio_inlinePlayer_dismissConfirm")
@@ -125,11 +124,19 @@ struct MacStudioPlayerCard: View {
         return audioPlayer.isLiveStream
     }
 
+    private var displayedPlaybackError: String? {
+        if let item = phase.completedItem {
+            return audioPlayer.playbackError(forFile: item.audioURL.path)
+        }
+        return ownsAudio ? audioPlayer.playbackError : nil
+    }
+
     private var playPauseButton: some View {
         Button {
             AppLaunchConfiguration.performAnimated(MacTheme.Motion.stateChange) {
                 if let item = phase.completedItem, !ownsAudio {
-                    audioPlayer.playFile(item.audioURL.path, title: item.voiceName, presentationContext: .generatePreview)
+                    audioPlayer.playFile(item.audioURL.path, title: item.voiceName, presentationContext: .generatePreview,
+                                         generationMode: item.mode)
                 } else {
                     audioPlayer.togglePlayPause()
                 }
@@ -271,8 +278,7 @@ private struct MacStudioWaveformRow: View {
     @EnvironmentObject private var playbackProgress: AudioPlayerViewModel.PlaybackProgress
     let tint: Color
     /// Names the scrubber for the card it is in. The row appears in the live
-    /// preview, and in a completed take only when a collapsed sidebar has left
-    /// it carrying the transport.
+    /// preview and whenever this completed take owns the shared transport.
     let isLive: Bool
 
     private var percentValue: String {

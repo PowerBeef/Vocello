@@ -1317,7 +1317,7 @@
         "Sources/Views/Studio/MacStudioCanvas.swift",
         "Tests/VocelloMacUITests/VocelloUIWindowFrame.swift"
       ],
-      "notes": "The previous audit found disagreement between declared and enforced window minima; GeometryReader allowed shrinking but did not prove content fit. The September 18 reset must measure the new composition at actual minimum/default/wide sizes, including Design/Cloning inline content during migration. Do not hide clipping by weakening assertions. A changed minimum or additional scrolling is a reviewable product choice; prior rescaling did not close this item.",
+      "notes": "The previous audit found disagreement between declared and enforced window minima; GeometryReader allowed shrinking but did not prove content fit. The September 18 reset must measure the new composition at actual minimum/default/wide sizes, including Design/Cloning inline content during migration. September 20 player follow-up adds a compact card and detail-footer fallback when the sidebar is hidden; include both placements and error-only cards in window-fit acceptance. Do not hide clipping by weakening assertions. A changed minimum or additional scrolling is a reviewable product choice; prior rescaling did not close this item.",
       "plan": "macos-ui-fidelity-2026-09",
       "blockedBy": [],
       "updated": "2026-09-20"
@@ -1334,7 +1334,7 @@
         "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift",
         "Sources/Views/Settings/MacSettingsScreen.swift"
       ],
-      "notes": "Opened 2026-09-20 when UIF-03, UIF-04, UIF-05 and UIF-06 closed on maintainer visual approval. The last two Mac Studio commits (dac06129, 5780927a) ran no XCUITest journeys, and the last full Mac lane set predates them. UIF-04's authorized iPhone lane ios-xcui-localization-20260919-144816-4590e8d3 failed at Pseudo-AX-XXXL language navigation because the scroll helper's delta-dependent anchor-size limit excluded the available visible text; the helper correction is phone-free, the device lane and the Mac lanes need explicit consent.",
+      "notes": "Opened 2026-09-20 when UIF-03, UIF-04, UIF-05 and UIF-06 closed on maintainer visual approval. The last two Mac Studio commits (dac06129, 5780927a) ran no XCUITest journeys, and the last full Mac lane set predates them. UIF-04's authorized iPhone lane ios-xcui-localization-20260919-144816-4590e8d3 failed at Pseudo-AX-XXXL language navigation because the scroll helper's delta-dependent anchor-size limit excluded the available visible text; the helper correction is phone-free, the device lane and the Mac lanes need explicit consent. September 20 player fixes add operation-scoped playback ownership, mode tint, file-scoped errors and a collapsed-sidebar fallback. Deterministic ownership/placement regressions are in AudioPlaybackResumePolicyTests.swift; native acceptance must still cover dismissal during streaming, selecting other audio before completion, long-form join, and sidebar collapse.",
       "updated": "2026-09-20"
     }
   ]

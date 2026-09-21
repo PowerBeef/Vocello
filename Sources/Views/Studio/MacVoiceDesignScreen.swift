@@ -27,6 +27,14 @@ struct MacVoiceDesignScreen: View {
     @State private var lineByLine = false
     @State private var detectedPromptLanguage: Qwen3SupportedLanguage = .auto
     @State private var presentedSheet: VoiceDesignPresentedSheet?
+    private var promptContentLanguage: Qwen3SupportedLanguage {
+        StudioPromptContent.language(
+            selected: draft.selectedLanguage,
+            detected: detectedPromptLanguage,
+            interfaceLanguage: MacInterfaceLanguage.current.language ?? "en"
+        )
+    }
+
     @State private var deliverySelection = MacDeliverySelection()
     @State private var actionAlert: VoiceDesignActionAlert?
     @State private var isBriefPresented = false
@@ -223,7 +231,7 @@ struct MacVoiceDesignScreen: View {
         .accessibilityIdentifier("studioChip_voiceBrief")
         .popover(isPresented: $isBriefPresented) {
             VStack(alignment: .leading, spacing: MacTheme.Spacing.lg) {
-                MacVoiceBriefEditor(text: $draft.voiceDescription, tint: tint)
+                MacVoiceBriefEditor(text: $draft.voiceDescription, tint: tint, contentLanguage: promptContentLanguage)
                 HStack {
                     Spacer()
                     Button(MacInterfaceText.done) { isBriefPresented = false }
@@ -247,7 +255,10 @@ struct MacVoiceDesignScreen: View {
     private var setupChips: some View {
         briefChip
         MacStudioChipContainer(accessibilityIdentifier: "voiceDesign_toneSpeed") {
-            MacStudioDeliveryChip(selection: $deliverySelection, emotion: $draft.emotion, tint: tint)
+            MacStudioDeliveryChip(
+                selection: $deliverySelection, emotion: $draft.emotion, tint: tint,
+                contentLanguage: promptContentLanguage
+            )
         }
         MacStudioChipContainer(accessibilityIdentifier: "voiceDesign_languageSetup") {
             MacStudioLanguageChip(
@@ -262,7 +273,10 @@ struct MacVoiceDesignScreen: View {
 
     @ViewBuilder
     private var chipFooter: some View {
-        MacStudioDeliveryFooter(selection: $deliverySelection, emotion: $draft.emotion, tint: tint)
+        MacStudioDeliveryFooter(
+            selection: $deliverySelection, emotion: $draft.emotion, tint: tint,
+            contentLanguage: promptContentLanguage
+        )
         saveVoiceAction
     }
 

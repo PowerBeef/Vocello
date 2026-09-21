@@ -14,6 +14,12 @@ Research date: **September 21, 2026**. Local source baseline: `cf373d7d`.
 Scope: Vocello's local Qwen3-TTS 12Hz 1.7B CustomVoice, VoiceDesign and Base paths,
 with particular attention to French. This is source research, not a new audio experiment.
 
+**Subsequent product decision, September 21:** starter briefs and delivery preset descriptions
+are presented in the selected speech language so users can understand and edit them. A selected
+starter becomes the actual editable input; fixed delivery presets retain their canonical internal
+instructions. Existing drafts are never translated on a language change. This is an accessibility
+and usability decision, not a new comparative audio-quality finding. See [localization](localization.md).
+
 ## 1. Decision and confidence
 
 **Do not require the instruction language to match the script. Keep English as the current

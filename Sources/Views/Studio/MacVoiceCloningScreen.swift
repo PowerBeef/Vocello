@@ -429,10 +429,17 @@ struct MacVoiceCloningScreen: View {
         }
     }
 
+    private var promptContentLanguage: Qwen3SupportedLanguage {
+        StudioPromptContent.language(
+            selected: draft.selectedLanguage, detected: detectedPromptLanguage,
+            interfaceLanguage: MacInterfaceLanguage.current.language ?? "en"
+        )
+    }
+
     private func bankDeliveryChip(_ persona: VoiceBankCatalog.Persona) -> some View {
         let selectedID = draft.selectedSavedVoiceID
-        let label = selectedID.flatMap { persona.presetID(for: $0) }.flatMap { EmotionPreset.preset(id: $0)?.label }
-            ?? MacInterfaceText.deliveryNeutral
+        let presetID = selectedID.flatMap { persona.presetID(for: $0) } ?? "neutral"
+        let label = StudioPromptContent.deliveryName(presetID, in: promptContentLanguage)
         return MacStudioSetupChip(
             eyebrow: MacInterfaceText.delivery,
             value: label,
@@ -442,7 +449,7 @@ struct MacVoiceCloningScreen: View {
             accessibilityValue: label
         ) {
             Toggle(
-                MacInterfaceText.deliveryNeutral,
+                StudioPromptContent.deliveryName("neutral", in: promptContentLanguage),
                 isOn: Binding(
                     get: { selectedID == persona.baseVoiceID },
                     set: { _ in selectSavedVoice(id: persona.baseVoiceID) }
@@ -450,7 +457,7 @@ struct MacVoiceCloningScreen: View {
             )
             ForEach(persona.orderedVariants, id: \.voiceID) { variant in
                 Toggle(
-                    EmotionPreset.preset(id: variant.presetID)?.label ?? variant.presetID.capitalized,
+                    StudioPromptContent.deliveryName(variant.presetID, in: promptContentLanguage),
                     isOn: Binding(
                         get: { selectedID == variant.voiceID },
                         set: { _ in selectSavedVoice(id: variant.voiceID) }

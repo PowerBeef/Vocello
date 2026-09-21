@@ -22,6 +22,14 @@ struct MacCustomVoiceScreen: View {
     @State private var lineByLine = false
     @State private var detectedPromptLanguage: Qwen3SupportedLanguage = .auto
     @State private var presentedSheet: CustomVoicePresentedSheet?
+    private var promptContentLanguage: Qwen3SupportedLanguage {
+        StudioPromptContent.language(
+            selected: draft.selectedLanguage,
+            detected: detectedPromptLanguage,
+            interfaceLanguage: MacInterfaceLanguage.current.language ?? "en"
+        )
+    }
+
     @State private var deliverySelection = MacDeliverySelection()
 
     private let tint = MacTheme.Brand.modeCustom
@@ -189,7 +197,8 @@ struct MacCustomVoiceScreen: View {
                 MacStudioDeliveryChip(
                     selection: $deliverySelection,
                     emotion: $draft.emotion,
-                    tint: tint
+                    tint: tint,
+                    contentLanguage: promptContentLanguage
                 )
             }
         }
@@ -257,7 +266,8 @@ struct MacCustomVoiceScreen: View {
             MacStudioDeliveryFooter(
                 selection: $deliverySelection,
                 emotion: $draft.emotion,
-                tint: tint
+                tint: tint,
+                contentLanguage: promptContentLanguage
             )
         } else {
             Label(MacInterfaceText.customDeliveryUnsupported, systemImage: "slider.horizontal.3")

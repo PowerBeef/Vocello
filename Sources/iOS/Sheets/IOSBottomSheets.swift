@@ -36,6 +36,7 @@ struct IOSDeliveryPickerSheet: View {
     @Binding var selectedPresetID: String
     @Binding var intensity: EmotionIntensity
     @Binding var customText: String
+    let contentLanguage: Qwen3SupportedLanguage
     let tint: Color
     /// Optional escape hatch: when set, a small "Use custom tone…" link sits
     /// below the intensity row. Tapping it switches the sheet to the custom-tone
@@ -67,6 +68,7 @@ struct IOSDeliveryPickerSheet: View {
         selectedPresetID: Binding<String>,
         intensity: Binding<EmotionIntensity>,
         customText: Binding<String>,
+        contentLanguage: Qwen3SupportedLanguage,
         tint: Color,
         onUseCustomTone: (() -> Void)? = nil,
         onDismiss: (() -> Void)? = nil,
@@ -75,6 +77,7 @@ struct IOSDeliveryPickerSheet: View {
         self._selectedPresetID = selectedPresetID
         self._intensity = intensity
         self._customText = customText
+        self.contentLanguage = contentLanguage
         self.tint = tint
         self.onUseCustomTone = onUseCustomTone
         self.onDismiss = onDismiss
@@ -181,7 +184,7 @@ struct IOSDeliveryPickerSheet: View {
                         }
                     }
 
-                    Text(EmotionPreset.directionalHintAdvisory)
+                    Text(StudioPromptContent.directionalHintAdvisory(in: contentLanguage))
                         .iosScaledFont(size: 12, relativeTo: .caption)
                         .foregroundStyle(Theme.Text.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -441,23 +444,6 @@ struct IOSDeliveryPickerSheet: View {
             .foregroundStyle(Theme.Text.secondary)
     }
 
-    private func description(for preset: EmotionPreset) -> String {
-        // The hint half's copy is honest about what was measured (DP-12):
-        // these move energy and pace hard, but the named emotion is not what
-        // listeners reliably hear.
-        switch preset.id {
-        case "neutral":  return IOSInterfaceText.neutralHint
-        case "happy":    return IOSInterfaceText.happyHint
-        case "sad":      return IOSInterfaceText.sadHint
-        case "angry":    return IOSInterfaceText.angryHint
-        case "fearful":  return IOSInterfaceText.fearfulHint
-        case "surprised":return IOSInterfaceText.surprisedHint
-        case "whisper":  return IOSInterfaceText.whisperHint
-        case "calm":     return IOSInterfaceText.calmHint
-        default:         return ""
-        }
-    }
-
     /// Mode-tinted dot color per preset. Delegates to the shared
     /// `IOSEmotionPresetPalette` so the Studio's delivery chip can pick
     /// up the same color identity.
@@ -488,7 +474,7 @@ struct IOSDeliveryPickerSheet: View {
                     Circle()
                         .fill(dot)
                         .frame(width: 8, height: 8)
-                    Text(IOSInterfaceText.presetName(preset.id, fallback: preset.label))
+                    Text(StudioPromptContent.delivery(preset, in: contentLanguage).name)
                         .iosScaledFont(size: 14, weight: .semibold, relativeTo: .footnote)
                         .foregroundStyle(Theme.Text.primary)
                     Spacer(minLength: 0)
@@ -499,11 +485,10 @@ struct IOSDeliveryPickerSheet: View {
                     }
                 }
 
-                Text(description(for: preset))
+                Text(StudioPromptContent.delivery(preset, in: contentLanguage).detail)
                     .iosScaledFont(size: 12, weight: .regular, relativeTo: .caption)
                     .foregroundStyle(Theme.Text.secondary)
                     .multilineTextAlignment(.leading)
-                    .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 14)

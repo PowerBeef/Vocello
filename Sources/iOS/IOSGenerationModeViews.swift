@@ -87,6 +87,21 @@ struct IOSCustomVoiceView: View {
         speakerDisplay?.displayName ?? draft.selectedSpeaker.capitalized
     }
 
+    private var promptContentLanguage: Qwen3SupportedLanguage {
+        StudioPromptContent.language(
+            selected: draft.selectedLanguage,
+            detected: detectedPromptLanguage,
+            interfaceLanguage: IOSAppLanguage.shared.resolvedLanguage
+        )
+    }
+
+    private var deliveryPresetName: String {
+        guard let preset = EmotionPreset.preset(id: draft.delivery.selectedPresetID) else {
+            return draft.delivery.selectedPresetLabel
+        }
+        return StudioPromptContent.delivery(preset, in: promptContentLanguage).name
+    }
+
     private var deliveryChipLabel: String {
         if draft.delivery.mode == .custom {
             let trimmed = draft.delivery.customText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -97,7 +112,7 @@ struct IOSCustomVoiceView: View {
             }
             return trimmed
         }
-        return IOSInterfaceText.presetName(draft.delivery.selectedPresetID, fallback: draft.delivery.selectedPresetLabel)
+        return deliveryPresetName
     }
 
     private var activeModel: TTSModel? {
@@ -310,7 +325,7 @@ struct IOSCustomVoiceView: View {
         IOSStudioSetupChip(
             eyebrow: IOSInterfaceText.delivery,
             value: deliveryChipLabel,
-            abbreviation: IOSStudioChipAbbreviation.prefix2(draft.delivery.selectedPresetLabel),
+            abbreviation: IOSStudioChipAbbreviation.prefix2(deliveryPresetName),
             leadingSymbol: "theatermasks.fill",
             tint: IOSEmotionPresetPalette.dotColor(forID: draft.delivery.selectedPresetID),
             accessibilityID: "studioChip_delivery",
@@ -395,6 +410,7 @@ struct IOSCustomVoiceView: View {
                     ),
                     intensity: $draft.delivery.selectedIntensity,
                     customText: $draft.delivery.customText,
+                    contentLanguage: promptContentLanguage,
                     tint: Theme.Brand.modeCustom,
                     onUseCustomTone: { draft.delivery.mode = .custom },
                     onDismiss: dismiss,
@@ -570,12 +586,27 @@ struct IOSVoiceDesignView: View {
         presentPlayerSheet(output.playerSheetItem)
     }
 
+    private var promptContentLanguage: Qwen3SupportedLanguage {
+        StudioPromptContent.language(
+            selected: draft.selectedLanguage,
+            detected: detectedPromptLanguage,
+            interfaceLanguage: IOSAppLanguage.shared.resolvedLanguage
+        )
+    }
+
+    private var deliveryPresetName: String {
+        guard let preset = EmotionPreset.preset(id: draft.delivery.selectedPresetID) else {
+            return draft.delivery.selectedPresetLabel
+        }
+        return StudioPromptContent.delivery(preset, in: promptContentLanguage).name
+    }
+
     private var deliveryChipLabel: String {
         if draft.delivery.mode == .custom {
             let trimmed = draft.delivery.customText.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? IOSInterfaceText.customDelivery : trimmed
         }
-        return IOSInterfaceText.presetName(draft.delivery.selectedPresetID, fallback: draft.delivery.selectedPresetLabel)
+        return deliveryPresetName
     }
 
     private var briefChipLabel: String {
@@ -1045,7 +1076,7 @@ struct IOSVoiceDesignView: View {
         IOSStudioSetupChip(
             eyebrow: IOSInterfaceText.delivery,
             value: deliveryChipLabel,
-            abbreviation: IOSStudioChipAbbreviation.prefix2(draft.delivery.selectedPresetLabel),
+            abbreviation: IOSStudioChipAbbreviation.prefix2(deliveryPresetName),
             leadingSymbol: "theatermasks.fill",
             tint: IOSEmotionPresetPalette.dotColor(forID: draft.delivery.selectedPresetID),
             accessibilityID: "studioChip_delivery",
@@ -1077,6 +1108,7 @@ struct IOSVoiceDesignView: View {
                 IOSVoiceDesignBriefSheet(
                     voiceDescription: $draft.voiceDescription,
                     tint: Theme.Brand.modeDesign,
+                    contentLanguage: promptContentLanguage,
                     presentation: .edgeToEdge(
                         bottomSafeAreaInset: bottomSafeAreaInset,
                         height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
@@ -1117,6 +1149,7 @@ struct IOSVoiceDesignView: View {
                     ),
                     intensity: $draft.delivery.selectedIntensity,
                     customText: $draft.delivery.customText,
+                    contentLanguage: promptContentLanguage,
                     tint: Theme.Brand.modeDesign,
                     onUseCustomTone: { draft.delivery.mode = .custom },
                     onDismiss: dismiss,
@@ -1325,23 +1358,28 @@ struct IOSVoiceCloningView: View {
         bankCatalog.persona(containing: draft.selectedSavedVoiceID)
     }
 
+    private var promptContentLanguage: Qwen3SupportedLanguage {
+        StudioPromptContent.language(
+            selected: draft.selectedLanguage, detected: detectedPromptLanguage,
+            interfaceLanguage: IOSAppLanguage.shared.resolvedLanguage
+        )
+    }
+
     private func bankDeliveryLabel(_ persona: VoiceBankCatalog.Persona) -> String {
-        guard let selectedID = draft.selectedSavedVoiceID,
-              let presetID = persona.presetID(for: selectedID),
-              let preset = EmotionPreset.preset(id: presetID) else {
-            return IOSInterfaceText.neutral
-        }
-        return IOSInterfaceText.presetName(preset.id, fallback: preset.label)
+        let presetID = draft.selectedSavedVoiceID.flatMap { persona.presetID(for: $0) } ?? "neutral"
+        return StudioPromptContent.deliveryName(presetID, in: promptContentLanguage)
     }
 
     private func bankDeliveryOptions(_ persona: VoiceBankCatalog.Persona) -> [IOSBankDeliveryOption] {
-        [IOSBankDeliveryOption(id: persona.baseVoiceID, label: IOSInterfaceText.neutral)]
-            + persona.orderedVariants.map { variant in
-                IOSBankDeliveryOption(
-                    id: variant.voiceID,
-                    label: IOSInterfaceText.presetName(variant.presetID, fallback: variant.presetID.capitalized)
-                )
-            }
+        [IOSBankDeliveryOption(
+            id: persona.baseVoiceID,
+            label: StudioPromptContent.deliveryName("neutral", in: promptContentLanguage)
+        )] + persona.orderedVariants.map { variant in
+            IOSBankDeliveryOption(
+                id: variant.voiceID,
+                label: StudioPromptContent.deliveryName(variant.presetID, in: promptContentLanguage)
+            )
+        }
     }
 
     private var clonePrimingRequestKey: String? {

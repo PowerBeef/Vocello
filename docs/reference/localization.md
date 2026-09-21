@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-09-12
+reviewed: 2026-09-21
 summary: Vocello localization architecture, String Catalog ownership, typed presentation vocabulary, literal-growth guard, and pseudo-localization acceptance.
 sourceOfTruth:
   - project.yml
@@ -9,6 +9,7 @@ sourceOfTruth:
   - Sources/iOS/InfoPlist.xcstrings
   - Sources/iOS/IOSRootNavigationModels.swift
   - Sources/SharedSupport/Services/VocelloPresentationText.swift
+  - Sources/SharedSupport/Services/VoiceDesignBriefCatalog.swift
   - Sources/Services/MacInterfaceText.swift
   - Sources/SharedSupport/Services/VocelloLocalization.swift
   - Sources/iOSSupport/Services/IOSAppLanguage.swift
@@ -28,9 +29,20 @@ by the system. The expanded migration covers secondary sheets, recording and enr
 History filters/actions/recovery, player controls, download transfer details, long-form progress,
 displayed language/preset names and additional accessibility descriptions. Catalog completeness is
 **not whole-app acceptance**: rendered layouts and indirect errors from shared/system services
-still require review. Canonical starter briefs shown as editable model content, stored names,
-technical diagnostics, raw system error details and original license bodies are not translated by
-string substitution.
+still require review. Stored names, user-authored briefs, technical diagnostics, raw system error
+details and original license bodies are not translated by string substitution.
+
+Studio's Voice Design starting points and delivery preset names/descriptions follow the selected
+speech language, independently of interface localization. `StudioPromptContent` in
+`VoiceDesignBriefCatalog.swift` owns this bounded content for all ten speech languages (Simplified
+Chinese and Brazilian Portuguese). Auto follows script detection; without a detected language it
+uses the resolved interface language, then English. This content does not add compiled interface
+locales or advertise a translated application in those languages. Selecting a starter explicitly
+inserts its displayed text into the editable brief; changing language alone never replaces that
+brief or a custom delivery. Preset translations are presentation only: IDs, intensity and canonical
+model-facing instructions remain unchanged. macOS menu help and accessibility hints carry the
+delivery descriptions; iOS displays them below each preset. Starting-point placeholders use the
+same speech-language content. Ordinary labels and controls still follow the interface language.
 
 The generated-audio language and app UI language are independent. Never translate user scripts,
 reference transcripts, saved voice names, model IDs, enum raw values, seeds, or model-facing delivery

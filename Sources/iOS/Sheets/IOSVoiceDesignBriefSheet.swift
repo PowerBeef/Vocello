@@ -1,3 +1,4 @@
+import QwenVoiceCore
 import SwiftUI
 import UIKit
 
@@ -10,6 +11,7 @@ import UIKit
 struct IOSVoiceDesignBriefSheet: View {
     @Binding var voiceDescription: String
     let tint: Color
+    let contentLanguage: Qwen3SupportedLanguage
     var presentation: IOSBottomSheetPresentationStyle = .system
     var onDismiss: (() -> Void)?
 
@@ -20,7 +22,7 @@ struct IOSVoiceDesignBriefSheet: View {
 
     // Research-aligned starter briefs, sourced from the shared catalog so the iOS sheet and
     // the macOS inline editor stay in lockstep.
-    private let startingPoints = VoiceDesignBriefCatalog.startingPoints
+    private var startingPoints: [String] { VoiceDesignBriefCatalog.startingPoints(in: contentLanguage) }
 
     private var isBriefEmpty: Bool {
         voiceDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -74,7 +76,7 @@ struct IOSVoiceDesignBriefSheet: View {
                     )
 
                     if voiceDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text(IOSInterfaceText.briefPlaceholder)
+                        Text(VoiceDesignBriefCatalog.placeholder(in: contentLanguage))
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(Theme.Text.tertiary)
                             .padding(.horizontal, 16)
@@ -127,7 +129,7 @@ struct IOSVoiceDesignBriefSheet: View {
                     .padding(.bottom, 10)
 
                 VStack(spacing: 8) {
-                    ForEach(Array(startingPoints.enumerated()), id: \.element) { index, startingPoint in
+                    ForEach(Array(startingPoints.enumerated()), id: \.offset) { index, startingPoint in
                         Button {
                             voiceDescription = startingPoint
                             IOSHaptics.selection()
@@ -137,7 +139,6 @@ struct IOSVoiceDesignBriefSheet: View {
                                 .iosScaledFont(size: 14, weight: .regular, relativeTo: .footnote)
                                 .lineSpacing(1)
                                 .foregroundStyle(Theme.Text.primary)
-                                .lineLimit(2)
                                 .multilineTextAlignment(.leading)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)

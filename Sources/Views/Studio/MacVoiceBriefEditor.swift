@@ -1,4 +1,5 @@
 import AppKit
+import QwenVoiceCore
 import SwiftUI
 
 /// The native Voice Design brief popover: a multi-line editor with the shared
@@ -8,6 +9,7 @@ import SwiftUI
 struct MacVoiceBriefEditor: View {
     @Binding var text: String
     let tint: Color
+    let contentLanguage: Qwen3SupportedLanguage
 
     @State private var isEditorFocused = false
 
@@ -32,7 +34,7 @@ struct MacVoiceBriefEditor: View {
 
             MacScriptTextEditor(
                 text: $text,
-                placeholder: VoiceDesignBriefCatalog.placeholder,
+                placeholder: VoiceDesignBriefCatalog.placeholder(in: contentLanguage),
                 font: .systemFont(ofSize: MacType.style(.body).size, weight: .medium),
                 isFocused: $isEditorFocused,
                 accessibilityIdentifier: "voiceDesign_voiceDescriptionField",
@@ -78,7 +80,7 @@ struct MacVoiceBriefEditor: View {
     /// sentence; the full starter lands in the editor.
     private var startingPointsMenu: some View {
         Menu {
-            ForEach(Array(VoiceDesignBriefCatalog.startingPoints.enumerated()), id: \.offset) { index, starter in
+            ForEach(Array(VoiceDesignBriefCatalog.startingPoints(in: contentLanguage).enumerated()), id: \.offset) { index, starter in
                 Button(starterItemLabel(for: starter)) {
                     text = starter
                 }
@@ -112,10 +114,10 @@ struct MacVoiceBriefEditor: View {
         .accessibilityIdentifier("voiceDesign_briefStarters")
     }
 
-    /// Menu items show the first words of each starter; the full sentence
-    /// would run the menu several hundred points wide.
+    /// Bound menu width by characters, including scripts without word spaces.
+    /// The full starter remains the accessibility label and inserted text.
     private func starterItemLabel(for starter: String) -> String {
-        let words = starter.split(separator: " ").prefix(8)
-        return words.joined(separator: " ") + "…"
+        let prefix = String(starter.prefix(55))
+        return prefix.count < starter.count ? prefix + "…" : prefix
     }
 }

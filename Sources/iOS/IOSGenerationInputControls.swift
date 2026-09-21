@@ -126,6 +126,10 @@ struct IOSDeliveryPicker: View {
                     ),
                     intensity: $delivery.selectedIntensity,
                     customText: $delivery.customText,
+                    contentLanguage: StudioPromptContent.language(
+                        selected: .auto, detected: .auto,
+                        interfaceLanguage: IOSAppLanguage.shared.resolvedLanguage
+                    ),
                     tint: tint,
                     onUseCustomTone: {
                         delivery.mode = .custom

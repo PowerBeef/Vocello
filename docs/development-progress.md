@@ -17,6 +17,23 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Studio content follows the speech language (September 21)
+
+Baseline `19992ff9`. Voice Design starting points/placeholders and delivery preset presentation
+now follow the selected speech language on Mac and iPhone, including Clone's voice-bank delivery
+names. Auto follows script detection, then the interface language when detection is unavailable.
+The shared catalog covers all ten speech languages without adding interface locales. Explicit
+starter selection inserts the displayed text; language changes never replace a brief or custom
+delivery. Canonical preset instructions, IDs, intensity and saved reference selections are stable.
+iPhone descriptions wrap fully; Mac menu help/accessibility carries the delivery explanation.
+
+Verification: the scoped routed check passed contracts, lint/privacy, 687 Python tests plus 382
+subtests, 709 core tests and 122 runtime tests (three existing skips), and generic iOS app/logic-test
+compilation. Native run: `mac-test-20260921-145849`; all seven language/content/request-boundary
+tests passed. The final Mac app build passed. Native visual acceptance remains under UIF-08,
+including cross-language UI/output combinations and draft preservation. No model or device run
+was performed. The paused marketing-test edit remains untouched.
+
 ### Instruction-language research (September 21)
 
 Baseline `cf373d7d`. The [source-backed research](reference/instruction-language-research-2026-09-21.md)

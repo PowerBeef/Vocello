@@ -75,18 +75,24 @@ struct MacStudioDeliveryChip: View {
     @Binding var emotion: String
     var deliveryProfile: Binding<DeliveryProfile?>? = nil
     let tint: Color
+    let contentLanguage: Qwen3SupportedLanguage
     var accessibilityIdentifier = "delivery_tonePicker"
 
     private var selectedPreset: EmotionPreset? { selection.selectedPreset(for: emotion) }
 
+    private var displayedValue: String {
+        if let selectedPreset { return StudioPromptContent.delivery(selectedPreset, in: contentLanguage).name }
+        return selection.chipValue(for: emotion)
+    }
+
     var body: some View {
         MacStudioSetupChip(
             eyebrow: MacInterfaceText.delivery,
-            value: selection.chipValue(for: emotion),
+            value: displayedValue,
             leadingSymbol: "theatermasks.fill",
             tint: MacTheme.emotionColor(for: selectedPreset?.id, fallback: tint),
             accessibilityIdentifier: accessibilityIdentifier,
-            accessibilityValue: emotion
+            accessibilityValue: displayedValue
         ) {
             Section(MacInterfaceText.emotionDistinctDeliveries) {
                 ForEach(EmotionPreset.all.filter { !$0.isDirectionalHint }) { preset in
@@ -119,7 +125,7 @@ struct MacStudioDeliveryChip: View {
     /// items and the setter only ever selects.
     private func presetRow(_ preset: EmotionPreset) -> some View {
         Toggle(
-            preset.label,
+            StudioPromptContent.delivery(preset, in: contentLanguage).name,
             isOn: Binding(
                 get: { !selection.isCustom && selectedPreset?.id == preset.id },
                 set: { _ in
@@ -129,6 +135,8 @@ struct MacStudioDeliveryChip: View {
                 }
             )
         )
+        .help(StudioPromptContent.delivery(preset, in: contentLanguage).detail)
+        .accessibilityHint(StudioPromptContent.delivery(preset, in: contentLanguage).detail)
     }
 }
 
@@ -139,6 +147,7 @@ struct MacStudioDeliveryFooter: View {
     @Binding var emotion: String
     var deliveryProfile: Binding<DeliveryProfile?>? = nil
     let tint: Color
+    let contentLanguage: Qwen3SupportedLanguage
     var accessibilityPrefix = "delivery"
 
     private let customToneCharacterLimit = GenerationTextLimitPolicy.deliveryInstructionLimit
@@ -180,7 +189,7 @@ struct MacStudioDeliveryFooter: View {
                 }
             }
         } else if selection.selectedPreset(for: emotion)?.isDirectionalHint == true {
-            Label(EmotionPreset.directionalHintAdvisory, systemImage: "wand.and.sparkles")
+            Label(StudioPromptContent.directionalHintAdvisory(in: contentLanguage), systemImage: "wand.and.sparkles")
                 .macType(.caption)
                 .foregroundStyle(MacTheme.Text.secondary)
                 .accessibilityIdentifier("\(accessibilityPrefix)_hintAdvisory")

@@ -66,9 +66,18 @@ REQUIRED_PLURAL_KEYS = {
     "vocello.models.ready_count",
     "vocello.history.recovery_export_failure",
 }
-REQUIRED_LOCALES = ("en", "fr")
+REQUIRED_LOCALES = ("en", "fr", "es", "de", "it", "pt-BR", "zh-Hans", "ja", "ko", "ru")
 # UI identifiers, deliberately separate from the model's spoken-language enum.
 SUPPORTED_UI_LOCALES = {"en", "fr", "es", "de", "it", "pt-BR", "zh-Hans", "ja", "ko", "ru"}
+# CLDR cardinal categories, including the fallback used by String Catalogs.
+# https://www.unicode.org/cldr/charts/48/supplemental/language_plural_rules.html
+PLURAL_CATEGORIES = {
+    "en": {"one", "other"}, "de": {"one", "other"},
+    "fr": {"one", "many", "other"}, "es": {"one", "many", "other"},
+    "it": {"one", "many", "other"}, "pt-BR": {"one", "many", "other"},
+    "zh-Hans": {"other"}, "ja": {"other"}, "ko": {"other"},
+    "ru": {"one", "few", "many", "other"},
+}
 FORMAT_ARGUMENT = re.compile(
     r"%(?:(?P<position>[1-9][0-9]*)\$)?(?P<type>@|lld|llu|ld|lu|d|u|f|g|s)"
 )
@@ -82,14 +91,14 @@ def _format_arguments(value: str) -> Counter[tuple[int, str]]:
     return arguments
 
 
-def _translation_units(payload: dict[str, Any], label: str) -> dict[str, str]:
+def _translation_units(payload: dict[str, Any], label: str, locale: str) -> dict[str, str]:
     variations = payload.get("variations", {})
     if not isinstance(variations, dict):
         raise ContractError(f"{label} has malformed variations")
     plural = variations.get("plural")
     variants = plural if isinstance(plural, dict) else {"value": payload}
-    if plural is not None and (not isinstance(plural, dict) or not {"one", "other"} <= plural.keys()):
-        raise ContractError(f"{label} requires plural one and other")
+    if plural is not None and (not isinstance(plural, dict) or set(plural) != PLURAL_CATEGORIES[locale]):
+        raise ContractError(f"{label} requires plural categories {sorted(PLURAL_CATEGORIES[locale])}")
     result = {}
     for category, variant in variants.items():
         unit = variant.get("stringUnit", {}) if isinstance(variant, dict) else {}
@@ -105,12 +114,12 @@ def _validate_translations(entry: dict[str, Any], key: str, locales=REQUIRED_LOC
     unknown = set(localizations) - SUPPORTED_UI_LOCALES
     if unknown:
         raise ContractError(f"{key} has unsupported UI locales: {sorted(unknown)}")
-    english = _translation_units(localizations["en"], f"{key} en")
+    english = _translation_units(localizations["en"], f"{key} en", "en")
     for locale in set(locales) | set(localizations):
         payload = localizations.get(locale)
         if not isinstance(payload, dict):
             raise ContractError(f"{key} missing required localization {locale}")
-        translated = _translation_units(payload, f"{key} {locale}")
+        translated = _translation_units(payload, f"{key} {locale}", locale)
         if ("value" in english) != ("value" in translated):
             raise ContractError(f"{key} {locale} must preserve plural structure")
         for category, value in translated.items():

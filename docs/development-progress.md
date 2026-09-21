@@ -17,6 +17,31 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Ten-language interface catalogs (September 21)
+
+Baseline `4968ebf8`. Added Spanish, German, Italian, Brazilian Portuguese, Simplified Chinese,
+Japanese, Korean and Russian to all 948 interface entries and both iOS permission messages.
+Both app pickers discover the compiled locales. Model-facing instructions, speech-language
+selection, user scripts and saved content remain unchanged. Locale-specific plural forms and
+format arguments are enforced by the existing catalog contract; compiled-bundle tests cover
+selection/persistence, regional matching and Russian/East Asian count boundaries.
+
+The routed check passes: contracts, 712 Python tests plus 420 subtests, 712 core tests,
+122 runtime tests (three existing private-fixture skips), generic iOS app/logic compilation and
+the Mac UI bundle. The separate generic iOS UI bundle compile also passes. The 21 focused
+catalog tests and compiled language suite also pass; all ten compiled iOS locales include both
+permission-purpose messages.
+Mac UI validation encountered a restored launch with no visible window, a duplicated App Language
+accessibility label and an English-width assertion that rejected a readable 22 pt Chinese badge.
+The launch-only isolation, redundant-label removal and locale-aware fixture widths address these;
+the corrected complete journey is pending. Run `macos-xcui-localization-20260921-232214-16021619`
+completed EN/FR/ES/DE/IT/pt-BR before the Chinese badge assertion, but remains a failed run.
+The expanded Mac journey checks all ten locales; the iOS equivalent
+is prepared but phone execution remains deferred. [Localization guidance](reference/localization.md)
+separates catalog coverage from visual, VoiceOver and signed-candidate acceptance (ASR-12/ISU-4).
+The pseudo-localized window reached 780x612 pt, not the declared 780x560 minimum; UIF-07
+retains that existing discrepancy. The paused Mac marketing-test edit remains untouched.
+
 ### French instruction pilot (September 21)
 
 Baseline `13378439`; harness `ebe65e18`. The authorized Quality pilot completed all 192

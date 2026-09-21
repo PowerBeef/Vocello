@@ -39,6 +39,17 @@ targets:
 """
 
 
+def translated_fixture(english: dict, locale: str) -> dict:
+    result = copy.deepcopy(english)
+    if "variations" in result:
+        forms = result["variations"]["plural"]
+        result["variations"]["plural"] = {
+            category: copy.deepcopy(forms.get(category, forms["other"]))
+            for category in localization_contract.PLURAL_CATEGORIES[locale]
+        }
+    return result
+
+
 def valid_catalog() -> dict[str, object]:
     strings: dict[str, object] = {}
     for key in localization_contract.REQUIRED_KEYS:
@@ -56,7 +67,8 @@ def valid_catalog() -> dict[str, object]:
         strings[key] = {
             "comment": f"Translator context for {key}",
             "extractionState": "manual",
-            "localizations": {"en": english, "fr": copy.deepcopy(english)},
+            "localizations": {locale: translated_fixture(english, locale)
+                              for locale in localization_contract.REQUIRED_LOCALES},
         }
     return {"sourceLanguage": "en", "strings": strings, "version": "1.0"}
 
@@ -88,7 +100,7 @@ class LocalizationContractTests(unittest.TestCase):
             "sourceLanguage": "en", "version": "1.0",
             "strings": {key: {"localizations": {
                 locale: {"stringUnit": {"state": "translated", "value": value}}
-                for locale in ("en", "fr")}} for key, value in purposes.items()}}))
+                for locale in localization_contract.REQUIRED_LOCALES}} for key, value in purposes.items()}}))
         presentation = "\n".join(
             f'let key_{index} = String(localized: "{key}")'
             for index, key in enumerate(sorted(localization_contract.REQUIRED_KEYS))
@@ -140,6 +152,33 @@ class LocalizationContractTests(unittest.TestCase):
     def test_valid_contract_passes(self) -> None:
         self.assertEqual(localization_contract.validate(self.root), 1)
 
+    def test_each_shipped_locale_is_required_even_if_removed_everywhere(self) -> None:
+        for locale in localization_contract.REQUIRED_LOCALES[1:]:
+            with self.subTest(locale=locale):
+                catalog = valid_catalog()
+                for entry in catalog["strings"].values():
+                    del entry["localizations"][locale]
+                (self.root / localization_contract.CATALOG).write_text(json.dumps(catalog))
+                with self.assertRaisesRegex(localization_contract.ContractError, f"missing required localization {locale}"):
+                    localization_contract.validate(self.root)
+
+    def test_locale_specific_plural_forms_and_arguments(self) -> None:
+        expected = {"ja": {"other"}, "zh-Hans": {"other"}, "ko": {"other"},
+                    "ru": {"one", "few", "many", "other"}, "pt-BR": {"one", "many", "other"}}
+        for locale, categories in expected.items():
+            with self.subTest(locale=locale):
+                entry = valid_catalog()["strings"]["vocello.models.ready_count"]
+                forms = entry["localizations"][locale]["variations"]["plural"]
+                self.assertEqual(set(forms), categories)
+                localization_contract._validate_translations(entry, "fixture")
+                forms["other"]["stringUnit"]["value"] = "%@ models"
+                with self.assertRaisesRegex(localization_contract.ContractError, "format arguments"):
+                    localization_contract._validate_translations(entry, "fixture")
+                forms["other"]["stringUnit"]["value"] = "%lld models"
+                del forms[next(iter(categories))]
+                with self.assertRaisesRegex(localization_contract.ContractError, "requires plural categories"):
+                    localization_contract._validate_translations(entry, "fixture")
+
     def test_process_locale_formatting_is_rejected(self) -> None:
         bad = self.root / "Sources/iOS/Bad.swift"
         bad.write_text(
@@ -153,7 +192,7 @@ class LocalizationContractTests(unittest.TestCase):
     def test_partial_new_locale_cannot_ship(self) -> None:
         catalog = valid_catalog()
         entry = next(iter(catalog["strings"].values()))
-        entry["localizations"]["de"] = copy.deepcopy(entry["localizations"]["en"])
+        del entry["localizations"]["de"]
         (self.root / localization_contract.CATALOG).write_text(json.dumps(catalog))
         with self.assertRaisesRegex(localization_contract.ContractError, "missing required localization de"):
             localization_contract.validate(self.root)
@@ -162,12 +201,15 @@ class LocalizationContractTests(unittest.TestCase):
         entry = next(iter(valid_catalog()["strings"].values()))
         entry["localizations"]["chinese"] = copy.deepcopy(entry["localizations"]["en"])
         with self.assertRaisesRegex(localization_contract.ContractError, "unsupported UI locales"):
-            localization_contract._validate_translations(entry, "fixture")
+            localization_contract._validate_translations(entry, "fixture", ("en", "fr"))
 
     def test_new_locale_requires_permission_translations_too(self) -> None:
         catalog = valid_catalog()
-        for entry in catalog["strings"].values():
-            entry["localizations"]["de"] = copy.deepcopy(entry["localizations"]["en"])
+        permission_path = self.root / "Sources/iOS/InfoPlist.xcstrings"
+        permissions = json.loads(permission_path.read_text())
+        for entry in permissions["strings"].values():
+            del entry["localizations"]["de"]
+        permission_path.write_text(json.dumps(permissions))
         (self.root / localization_contract.CATALOG).write_text(json.dumps(catalog))
         with self.assertRaisesRegex(localization_contract.ContractError, "missing required localization de"):
             localization_contract.validate(self.root)
@@ -197,10 +239,10 @@ class LocalizationContractTests(unittest.TestCase):
                     "state": "translated", "value": value}}
                     for locale, value in (("en", "%lld %@"), ("fr", french))}}
                 if accepted:
-                    localization_contract._validate_translations(entry, "fixture")
+                    localization_contract._validate_translations(entry, "fixture", ("en", "fr"))
                 else:
                     with self.assertRaisesRegex(localization_contract.ContractError, "format arguments"):
-                        localization_contract._validate_translations(entry, "fixture")
+                        localization_contract._validate_translations(entry, "fixture", ("en", "fr"))
 
     def test_french_plural_requires_both_forms_and_matching_arguments(self) -> None:
         for change in ("missing", "type", "flat"):
@@ -213,14 +255,14 @@ class LocalizationContractTests(unittest.TestCase):
             else:
                 entry["localizations"]["fr"] = {"stringUnit": {"state": "translated", "value": "%lld modèles"}}
             with self.subTest(change=change), self.assertRaises(localization_contract.ContractError):
-                localization_contract._validate_translations(entry, "fixture")
+                localization_contract._validate_translations(entry, "fixture", ("en", "fr"))
 
     def test_typed_interface_default_must_match_catalog_english(self) -> None:
         catalog_path = self.root / localization_contract.CATALOG
         catalog = json.loads(catalog_path.read_text())
         catalog["strings"]["vocello.ui.fixture"] = {
             "comment": "fixture", "extractionState": "manual",
-            "localizations": {locale: {"stringUnit": {"state": "translated", "value": "Fixture"}} for locale in ("en", "fr")},
+            "localizations": {locale: {"stringUnit": {"state": "translated", "value": "Fixture"}} for locale in localization_contract.REQUIRED_LOCALES},
         }
         catalog_path.write_text(json.dumps(catalog))
         source = self.root / localization_contract.INTERFACE_DEFAULTS_SOURCE
@@ -243,7 +285,7 @@ class LocalizationContractTests(unittest.TestCase):
         catalog = json.loads(catalog_path.read_text())
         catalog["strings"]["vocello.mac.fixture.label"] = {
             "comment": "fixture", "extractionState": "manual",
-            "localizations": {locale: {"stringUnit": {"state": "translated", "value": "Fixture"}} for locale in ("en", "fr")},
+            "localizations": {locale: {"stringUnit": {"state": "translated", "value": "Fixture"}} for locale in localization_contract.REQUIRED_LOCALES},
         }
         catalog_path.write_text(json.dumps(catalog))
         source = self.root / localization_contract.MAC_INTERFACE_SOURCE
@@ -339,8 +381,10 @@ class LocalizationContractTests(unittest.TestCase):
                 catalog = valid_catalog()
                 catalog["strings"]["vocello.fixture.count"] = {
                     "comment": "Fixture count", "extractionState": "manual",
-                    "localizations": {locale: {"variations": {"plural": plural}}
-                                      for locale in ("en", "fr")},
+                    "localizations": {locale: (translated_fixture({"variations": {"plural": plural}}, locale)
+                                              if isinstance(plural, dict) and "other" in plural
+                                              else {"variations": {"plural": plural}})
+                                      for locale in localization_contract.REQUIRED_LOCALES},
                 }
                 (self.root / localization_contract.CATALOG).write_text(json.dumps(catalog), encoding="utf-8")
                 if isinstance(plural, dict) and "other" in plural:

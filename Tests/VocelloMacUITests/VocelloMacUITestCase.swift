@@ -19,6 +19,12 @@ enum VocelloMacScreen: String, CaseIterable {
 class VocelloMacUITestCase: XCTestCase {
     private(set) var session: VocelloUIApplicationSession!
     private var pendingAutoplayPreferenceRestore: Bool?
+    private var pendingInterfaceLanguageRestore: String?
+    private static let interfaceLanguageNames = [
+        "system": "System Default", "en": "English", "fr": "Français", "es": "Español",
+        "de": "Deutsch", "it": "Italiano", "pt-BR": "Português (Brasil)", "zh-Hans": "简体中文",
+        "ja": "日本語", "ko": "한국어", "ru": "Русский",
+    ]
 
     var app: XCUIApplication { session.app }
 
@@ -49,7 +55,32 @@ class VocelloMacUITestCase: XCTestCase {
     }
 
     func cleanUpPerTest() {
+        if let original = pendingInterfaceLanguageRestore, session != nil {
+            pendingInterfaceLanguageRestore = nil
+            selectInterfaceLanguage(original)
+        }
         restorePendingAutoplayPreference()
+    }
+
+    /// Selects a genuine menu item by its stable identifier, then reads its visible value.
+    func selectInterfaceLanguage(_ identifier: String) {
+        openSettingsCategory("appLanguage")
+        let picker = element("settings_appLanguage")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: picker, timeout: 20))
+        let choice = element("settings_appLanguageOption_\(identifier)", type: .menuItem)
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: choice, timeout: 10))
+        XCTAssertTrue(VocelloUIWait.value(picker, contains: Self.interfaceLanguageNames[identifier]!, timeout: 10))
+    }
+
+    func preserveInterfaceLanguage() {
+        openSettingsCategory("appLanguage")
+        let picker = element("settings_appLanguage")
+        guard let value = picker.value as? String,
+              let identifier = Self.interfaceLanguageNames.first(where: { $0.value == value })?.key else {
+            XCTFail("Cannot preserve the visible interface-language selection")
+            return
+        }
+        pendingInterfaceLanguageRestore = identifier
     }
 
     func launchApp(
@@ -90,9 +121,9 @@ class VocelloMacUITestCase: XCTestCase {
 
     static let englishLaunchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
 
-    func relaunchApp(additionalEnvironment: [String: String]) {
+    func relaunchApp(additionalEnvironment: [String: String], additionalArguments: [String] = []) {
         session.terminate()
-        launchApp(additionalEnvironment: additionalEnvironment)
+        launchApp(additionalEnvironment: additionalEnvironment, additionalArguments: additionalArguments)
     }
 
     func element(
@@ -258,7 +289,7 @@ class VocelloMacUITestCase: XCTestCase {
     /// warning pill, and its action buttons stay inside the window. Under the
     /// pseudo-localized launch this is the check that catches a collapsed row
     /// (2026-09-13: a chip rendered one character per line at 30 × 340 pt).
-    func assertSavedVoicesLayoutIntact() {
+    func assertSavedVoicesLayoutIntact(minimumStatusWidth: CGFloat = 60) {
         navigate(to: .voices)
         let window = app.windows.firstMatch.frame
         let excluded = ["_use_", "_play_", "_delete_", "_more_", "_transcriptStatus", "_qualityWarning", "_replaceReference"]
@@ -277,7 +308,8 @@ class VocelloMacUITestCase: XCTestCase {
             checked += 1
             VocelloUILayoutAssert.assertSingleLine(name, maxHeight: 30, minWidth: 40)
             VocelloUILayoutAssert.assertSingleLine(
-                element("\(identifier)_transcriptStatus", type: .staticText), maxHeight: 30, minWidth: 60
+                element("\(identifier)_transcriptStatus", type: .staticText),
+                maxHeight: 30, minWidth: minimumStatusWidth
             )
             let warning = button("\(identifier)_qualityWarning")
             if warning.exists {
@@ -295,18 +327,18 @@ class VocelloMacUITestCase: XCTestCase {
 
     /// The three Speed package rows keep single-line status and badge labels and
     /// their action slot inside the window.
-    func assertSettingsPackageRowsLayoutIntact() {
+    func assertSettingsPackageRowsLayoutIntact(minimumStatusWidth: CGFloat = 30) {
         openSettingsCategory("modelsFiles")
         for id in ["pro_custom_speed", "pro_design_speed", "pro_clone_speed"] {
             XCTAssertTrue(VocelloUIScroll.intoView(
                 element("settings_packageStatus_\(id)"), in: element("screen_settings")
             ))
             VocelloUILayoutAssert.assertSingleLine(
-                element("settings_packageStatus_\(id)"), maxHeight: 24, minWidth: 30
+                element("settings_packageStatus_\(id)"), maxHeight: 24, minWidth: minimumStatusWidth
             )
             let badge = element("settings_packageBadge_\(id)", type: .staticText)
             if badge.exists {
-                VocelloUILayoutAssert.assertSingleLine(badge, maxHeight: 24, minWidth: 30)
+                VocelloUILayoutAssert.assertSingleLine(badge, maxHeight: 24, minWidth: minimumStatusWidth)
             }
             let manage = button("settings_manage_\(id)")
             if manage.exists {

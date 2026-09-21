@@ -920,10 +920,12 @@
         "docs/reference/ios-device-testing.md"
       ],
       "evidence": [
-        "commit:87636935"
+        "commit:87636935",
+        "doc:docs/reference/localization.md",
+        "file:Tests/VocelloCoreTests/MacInterfaceLanguageTests.swift"
       ],
-      "updated": "2026-09-11",
-      "notes": "September 11 reconciliation: the previous updated stamp (2026-08-26) predated notes that begin on September 10; the stamp now follows the notes. September 10 app-language continuation: persistent Settings selector and observable UI-only localization context implemented for the complete EN/FR catalogs (491 entries), with compiled-catalog, observation, preference and regional-format tests plus source-bound XCUI selection/relaunch/restoration assertions. This is a partial implementation, not ten-language or device acceptance. Finish indirect stored error/status ownership and ISU-4 AX-XXXL/pseudo navigation qualification before ES/DE/IT/pt-BR then zh-Hans/JA/KO/RU catalogs; keep incomplete locales out of the bundle. Physical testing requires separate authorization. September 10 expanded-source physical evidence is partial, not signed-candidate proof: EN/FR Default and AX-L Settings completed after measured dock-clearance correction; AX-XXXL/pseudo reveal and full accessibility remain open under ISU-4. Stateful Settings passes with explicit blocked rows; local ten/23-phase StoreKit results belong to RF-13, not live acceptance. (Earlier history: git log -p -- config/roadmap.json.)"
+      "updated": "2026-09-21",
+      "notes": "September 21: all 948 UI entries and both iOS permission messages now cover EN/FR/ES/DE/IT/pt-BR/zh-Hans/JA/KO/RU. Compiled-catalog tests cover all ten choices, persistence, regional matching and Russian/East Asian plurals; catalog fixtures reject missing translations and format/category drift. Mac localization now exercises all ten selectors and relaunches. The physical iOS journey is prepared for all ten; the maintainer deferred phone execution for this assignment. The earlier EN/FR localization and accessibility runs under ISU-4 do not qualify these new catalogs or an exact signed candidate. Full device layout/VoiceOver, purchase and broader signed-candidate scenarios remain open. No App Store metadata or release promotion. See docs/reference/localization.md and docs/development-progress.md for source-bound outcomes and limitations. Earlier history: git log -p -- config/roadmap.json."
     },
     {
       "id": "ICA-04",
@@ -1317,10 +1319,10 @@
         "Sources/Views/Studio/MacStudioCanvas.swift",
         "Tests/VocelloMacUITests/VocelloUIWindowFrame.swift"
       ],
-      "notes": "The previous audit found disagreement between declared and enforced window minima; GeometryReader allowed shrinking but did not prove content fit. The September 18 reset must measure the new composition at actual minimum/default/wide sizes, including Design/Cloning inline content during migration. September 20 player follow-up adds a compact card and detail-footer fallback when the sidebar is hidden; include both placements and error-only cards in window-fit acceptance. Do not hide clipping by weakening assertions. A changed minimum or additional scrolling is a reviewable product choice; prior rescaling did not close this item.",
+      "notes": "The previous audit found disagreement between declared and enforced window minima; GeometryReader allowed shrinking but did not prove content fit. The September 18 reset must measure the new composition at actual minimum/default/wide sizes, including Design/Cloning inline content during migration. September 20 player follow-up adds a compact card and detail-footer fallback when the sidebar is hidden; include both placements and error-only cards in window-fit acceptance. Do not hide clipping by weakening assertions. A changed minimum or additional scrolling is a reviewable product choice; prior rescaling did not close this item. September 21 ten-language localization run measured 780x612 pt under pseudo-localization; the declared 780x560 minimum was not reached. This confirms the existing discrepancy, not acceptance at 560 pt. Ordinary language screenshots after relaunch use the actual restored/default bounds; wider/completed/error states remain separate.",
       "plan": "macos-ui-fidelity-2026-09",
       "blockedBy": [],
-      "updated": "2026-09-20"
+      "updated": "2026-09-21"
     },
     {
       "id": "UIF-08",

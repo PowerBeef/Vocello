@@ -205,7 +205,14 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
             if category.name == "Default" {
                 let editor = element("textInput_textEditor")
                 let originalDraft = editor.value as? String
-                for (locale, title) in [("fr", "Réglages"), ("en", "Settings")] {
+                // Prepared for the next authorized physical-device run; interface
+                // switching must never replace the current speech draft.
+                let languages = [
+                    ("fr", "Réglages"), ("es", "Ajustes"), ("de", "Einstellungen"),
+                    ("it", "Impostazioni"), ("pt-BR", "Ajustes"), ("zh-Hans", "设置"),
+                    ("ja", "設定"), ("ko", "설정"), ("ru", "Настройки"), ("en", "Settings"),
+                ]
+                for (locale, title) in languages {
                     selectInterfaceLanguageForTest(locale)
                     XCTAssertEqual(element("iosSettings_title").label, title)
                     VocelloUIScreenshot.attach(app, named: "ios-app-language-\(locale)")

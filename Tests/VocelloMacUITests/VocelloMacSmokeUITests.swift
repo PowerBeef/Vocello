@@ -171,6 +171,8 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         // launch arguments. Stable identifiers keep the journey independent of
         // translated labels; no product-only test route is involved.
         beginSession(additionalArguments: [
+            // Isolate window restoration, not persisted language or Studio drafts.
+            "-ApplePersistenceIgnoreState", "YES",
             "-NSDoubleLocalizedStrings", "YES",
             "-NSShowNonLocalizedStrings", "YES",
         ])
@@ -219,7 +221,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         VocelloUILayoutAssert.assertFullyWithinWindow(element("settings_appLanguage"), of: app)
 
         // Check the compact library with ordinary copy as well as doubled strings.
-        relaunchApp(additionalEnvironment: [:])
+        relaunchApp(additionalEnvironment: [:], additionalArguments: ["-ApplePersistenceIgnoreState", "YES"])
         openSettingsOverview()
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-settings-overview")
         openSettingsCategory("audio")
@@ -247,6 +249,75 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         XCTAssertTrue(VocelloUIWait.exists(heading, timeout: 20))
         VocelloUILayoutAssert.assertFullyWithinWindow(heading, of: app)
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-history-transparent-heading")
+        assertAllInterfaceLanguages()
+    }
+
+    private func assertAllInterfaceLanguages() {
+        preserveInterfaceLanguage()
+        let locales = [
+            ("zh-Hans", "简体中文", "应用语言"), ("ja", "日本語", "アプリの言語"),
+            ("ko", "한국어", "앱 언어"), ("ru", "Русский", "Язык приложения"),
+            ("en", "English", "App Language"), ("fr", "Français", "Langue de l’app"),
+            ("es", "Español", "Idioma de la app"), ("de", "Deutsch", "App-Sprache"),
+            ("it", "Italiano", "Lingua dell’app"), ("pt-BR", "Português (Brasil)", "Idioma do app"),
+        ]
+        let modes: [VocelloMacScreen] = [.customVoice, .voiceDesign, .voiceCloning]
+        var drafts: [String: String] = [:]
+        for mode in modes {
+            navigate(to: mode)
+            drafts[mode.rawValue] = element("textInput_textEditor").value as? String
+            XCTAssertNotNil(drafts[mode.rawValue], "Each mode must expose its actual draft")
+        }
+        for (identifier, nativeName, label) in locales {
+            XCTContext.runActivity(named: "Interface language \(identifier): live switch, layout and relaunch") { _ in
+                selectInterfaceLanguage(identifier)
+                XCTAssertTrue(VocelloUIWait.condition("localized language picker label", timeout: 10) {
+                    self.element("settings_appLanguage").label == label
+                })
+                VocelloUILayoutAssert.assertFullyWithinWindow(element("settings_appLanguage"), of: app)
+                VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-locale-\(identifier)-language")
+                for category in ["audio", "modelsFiles", "cloning"] {
+                    openSettingsCategory(category)
+                    VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-locale-\(identifier)-\(category)")
+                }
+                // CJK labels can be only two or three glyphs wide. Keep the
+                // single-line/window checks without imposing English word widths.
+                assertSettingsPackageRowsLayoutIntact(minimumStatusWidth: 20)
+                assertSavedVoicesLayoutIntact(minimumStatusWidth: 20)
+                VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-locale-\(identifier)-voices")
+                navigate(to: .history)
+                VocelloUILayoutAssert.assertFullyWithinWindow(element("history_searchField", type: .searchField), of: app)
+                VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-locale-\(identifier)-history")
+                for mode in modes {
+                    navigate(to: mode)
+                    XCTAssertEqual(element("textInput_textEditor").value as? String, drafts[mode.rawValue],
+                                   "Switching interface language must preserve \(mode.rawValue) text")
+                    XCTAssertFalse(generationAction.label.isEmpty)
+                    XCTAssertFalse(generationAction.label.hasPrefix("vocello."))
+                    VocelloUILayoutAssert.assertFullyWithinWindow(generationAction, of: app)
+                    VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-locale-\(identifier)-\(mode.rawValue)")
+                }
+                navigate(to: .voiceDesign)
+                XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studioChip_voiceBrief"), timeout: 20))
+                VocelloUILayoutAssert.assertFullyWithinWindow(button("voiceBrief_confirm"), of: app)
+                VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-locale-\(identifier)-brief")
+                // An empty brief disables Done. Escape closes this genuine popover
+                // without inventing a brief or changing the user's draft.
+                app.typeKey(.escape, modifierFlags: [])
+                XCTAssertTrue(VocelloUIWait.disappears(element("voiceDesign_voiceSetup"), timeout: 10))
+                relaunchApp(additionalEnvironment: [:], additionalArguments: ["-ApplePersistenceIgnoreState", "YES"])
+                openSettingsCategory("appLanguage")
+                XCTAssertTrue(VocelloUIWait.value(element("settings_appLanguage"), contains: nativeName, timeout: 10))
+                XCTAssertEqual(element("settings_appLanguage").label, label)
+                for mode in modes {
+                    navigate(to: mode)
+                    XCTAssertEqual(element("textInput_textEditor").value as? String, drafts[mode.rawValue],
+                                   "Relaunch must preserve \(mode.rawValue) text in \(identifier)")
+                }
+                print("Verified interface language: \(identifier)")
+                fflush(stdout)
+            }
+        }
     }
 
     func test02_CustomGenerationAndHistory() {

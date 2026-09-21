@@ -21,8 +21,9 @@ sourceOfTruth:
 ---
 # Localization architecture
 
-English is the source language. The current checkout maintains English/French coverage for every
-manually owned entry in the main catalog, including Settings/purchase copy, enrollment transcription
+English is the source language. The main catalog contains 948 entries with complete English, French,
+Spanish, German, Italian, Brazilian Portuguese (`pt-BR`), Simplified Chinese (`zh-Hans`), Japanese,
+Korean and Russian translations, including Settings/purchase copy, enrollment transcription
 states, storage recovery, model terminal states, onboarding, tab labels and primary Studio actions.
 The iOS permission catalog supplies microphone and Speech purpose strings separately, as required
 by the system. The expanded migration covers secondary sheets, recording and enrollment warnings,
@@ -36,8 +37,8 @@ Studio's Voice Design starting points and delivery preset names/descriptions fol
 speech language, independently of interface localization. `StudioPromptContent` in
 `VoiceDesignBriefCatalog.swift` owns this bounded content for all ten speech languages (Simplified
 Chinese and Brazilian Portuguese). Auto follows script detection; without a detected language it
-uses the resolved interface language, then English. This content does not add compiled interface
-locales or advertise a translated application in those languages. Selecting a starter explicitly
+uses the resolved interface language, then English. This speech-language content has its own selection rules; the interface catalog separately
+provides the ten UI locales. Selecting a starter explicitly
 inserts its displayed text into the editable brief; changing language alone never replaces that
 brief or a custom delivery. Preset translations are presentation only: IDs, intensity and canonical
 model-facing instructions remain unchanged. macOS menu help and accessibility hints carry the
@@ -54,8 +55,8 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
 
 - `IOSAppLanguage.shared` is the observable, app-lifetime iOS interface-language owner.
   Settings → App Language stores `vocello.ios.interfaceLanguage`; absence or an unsupported value
-  means System Default. Choices are filtered against compiled bundle localizations: currently
-  English/French only. The ten-language identifier list is preparation, not shipped translations.
+  means System Default. Choices are filtered against compiled bundle localizations; both apps now compile all ten
+  complete locales listed above.
   System Default uses OS language preferences and bundle matching, with English fallback.
   No `AppleLanguages` preference mutation, bundle swizzling, or root identity reset is used.
   The SwiftUI locale retains the current region; StoreKit prices remain opaque supplied strings.
@@ -69,11 +70,13 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
   the existing static interfaces.
   Startup and unsupported-device presentation receive the same app-boundary locale.
   Already stored error strings are not reverse-translated; completing indirect error/status
-  ownership remains part of the EN/FR review. Do not claim whole-app live switching from catalog tests.
+  ownership remains part of interface acceptance. Do not claim whole-app live switching from catalog tests.
 
 - `Sources/Resources/Localizable.xcstrings` owns interface translations. Manual entries require
-  English and French content and non-empty translator context. Both languages retain complete
-  plural forms and matching format-argument positions/types/counts. Positional reordering is allowed.
+  all ten locales and non-empty translator context. Locale-specific cardinal categories are
+  enforced: EN/DE one/other; FR/ES/IT/pt-BR one/many/other; Russian one/few/many/other;
+  Chinese/Japanese/Korean other. Every form preserves format-argument positions/types/counts;
+  positional reordering is allowed. The French many form retains the existing plural wording.
 - `Sources/iOS/InfoPlist.xcstrings` owns only the two system purpose-string translations. English
   must match the declared Info.plist text. It is explicitly included in the iOS resources phase.
 - `IOSInterfaceText` supplies iOS-only onboarding/navigation/Studio, enrollment, History/player,
@@ -84,7 +87,7 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
   strings.
 - `MacInterfaceText` (`Sources/Services/MacInterfaceText.swift`, macOS target only) owns the macOS
   interface copy: sidebar, menus, Settings, Saved Voices, History, the generation surfaces and their
-  sheets read plain `String`s from `vocello.mac.*` entries with English, French and translator context.
+  sheets read plain `String`s from `vocello.mac.*` entries with all ten locales and translator context.
   Since 2026-09-14 no direct presentation literal remains under `Sources/Views` except the empty
   keyboard-shortcut bridge button and the brief starters label, whose interpolation key holds two
   placeholders and no words (`Text + Text` is deprecated on macOS 26); since 2026-09-15 the
@@ -122,62 +125,36 @@ Never refresh the baseline merely to silence an unexplained failure. The baselin
 paths, presentation API names, counts, and SHA-256 identities; it does not duplicate user-facing
 copy.
 
-## Migration and acceptance order
+## Acceptance scope and routes
 
-Work status remains in `config/roadmap.json`: ASR-12 owns candidate-wide localization/layout
-acceptance and cross-references ISU-4 for the existing Settings navigation defect.
+The September 21 assignment completes all eight additional UI catalogs for both apps, with
+macOS UI validation and phone-free iOS compilation. Physical-iPhone acceptance is deferred until
+the phone is available. Website and App Store metadata are separate work. Catalog completeness
+and a successful compile do not qualify a ten-language release or prove native-speaker review.
+`config/roadmap.json` remains the work authority: ASR-12 owns signed-candidate device acceptance;
+ISU-4 owns the remaining Settings/accessibility and purchase qualification.
 
-1. Complete English/French source migration, including indirect strings, errors, permissions,
-   enrollment, player/History controls and VoiceOver descriptions. Keep identifiers and behavior.
-2. Qualify the large-text layouts on post-ISU-5 source. The AX-L fixed-padding defect is corrected
-   by measured dock clearance and has partial physical confirmation. The AX-XXXL/pseudo overshoot
-   had a product cause, not only a harness one: the persistent tab dock had no Dynamic Type ceiling
-   and grew upward into the region a Settings scroll gesture starts in. ISU-5 (2026-09-11) caps the
-   dock at the first accessibility size, restores the switch trait on the compact toggles, hides the
-   duplicated tab icon from VoiceOver and stacks the App Language rows at accessibility sizes. The
-   two earlier element-swipe experiments treated the symptom and stay reverted. What remains is one
-   separately authorized `scripts/ui_test.sh ios localization` walk covering English/French AX-XXXL
-   and pseudo-AX-XXXL; ISU-4 owns that run. Preserve the helper's strict visibility predicates and
-   bounded failure observations. A visible screenshot is not proof of hittability, and clipping-audit
-   success is not proof of every row's visibility.
-3. After the English/French and long-string walks qualify, expand in bounded batches:
-   Spanish/German/Italian/Brazilian Portuguese, then Simplified Chinese/Japanese/Korean/Russian.
-   The maintainer selected Brazilian Portuguese (`pt-BR`) and Simplified Chinese (`zh-Hans`)
-   on September 10. This choice does not change generated-speech language identities.
-   Do not add partially translated locales to shipping resources just to advertise ten languages.
-4. Prepare matching App Store text/screenshots separately for accepted UI locales. Account metadata
-   changes need separate authorization. Generated speech support does not imply localized UI support.
+- `scripts/localization_contract.py validate` requires every locale in every entry, matching format
+  arguments and locale-specific plurals. Its Python fixtures reject missing locales/categories,
+  malformed catalogs and permission-catalog gaps.
+- `scripts/dev.sh test --only MacInterfaceLanguageTests` uses the actual compiled catalog to check
+  all ten choices, immediate lookup, persisted selection, detached-reader snapshots, regional
+  matching and Russian/East Asian plural boundaries. Both apps share the language owner.
+- `scripts/ui_test.sh macos localization` runs the existing pseudo-localized minimum-window walk,
+  then selects all ten languages through the real Settings picker. It checks translated labels,
+  Settings/library/Studio geometry, unchanged drafts, Voice Design's popover and selection after
+  relaunch, with screenshots and restoration of the original language. The journey passes
+  `-ApplePersistenceIgnoreState YES` only in its launch argument domain to isolate saved window
+  state; it does not clear stored preferences or drafts. Apple documents this option for automated
+  tests in its [AppKit notes](https://developer.apple.com/library/archive/releasenotes/AppKit/RN-AppKitOlderNotes/index.html).
+- `scripts/ui_test.sh ios localization` now prepares all ten explicit language selections in its
+  Default arm, checking Settings copy, persisted choice and unchanged Studio text. The existing
+  French, AX-L, AX-XXXL and pseudo-AX-XXXL arms remain. Every run observes and restores the original
+  interface preference through genuine controls. This expanded journey has not yet run on a phone.
 
-The implementation batches are not permission to skip remaining English/French review or claim a
-ten-language release. Device work remains separately authorized.
-
-## Existing acceptance routes
-
-The focused `scripts/ui_test.sh macos localization` readiness journey launches with Foundation's
-double-length and untranslated-string diagnostics (its attachment is
-`mac-smoke-readiness-pseudolocalized`: doubled text is the stress, UPPERCASE marks a key absent from
-`Localizable.xcstrings`), and since 2026-09-14 asserts single-line rows, chips and badges plus
-in-window controls under it; the same journey opens every `smoke` lane. The `scripts/ui_test.sh ios localization`
-Settings layout walk adds a `Pseudo-AX-XXXL` arm combining the same diagnostics with the largest
-tested accessibility content-size category. Both use stable accessibility identifiers and genuine
-product controls; there is no hidden test UI. iOS acceptance remains physical-device XCUITest only.
-
-The existing iOS localization walk additionally selects English/French through
-`iosSettings_appLanguageOption_<locale>`, verifies immediate Settings copy, relaunch selection
-and unchanged Studio text, then returns to System Default. Test sessions record the original
-interface preference before selecting System Default for process-local language fixtures and restore
-it during cleanup; failed restoration is not a pass. New page IDs are
-`iosSettings_appLanguageRow`, `screen_settings_appLanguage` and `iosSettings_appLanguageBackButton`.
-Authorized September 10 runs exercised English/French selection, relaunch and draft preservation.
-The latest bounded run completed Default/French-Default/AX-L, but was interrupted for the phone
-deadline before AX-XXXL/pseudo acceptance. These are source-bound partial observations, not a
-passing whole-lane result; the retained run identities are in the ISU-4 notes of `config/roadmap.json`
-(`python3 scripts/roadmap.py status`), and the run bundles themselves were removed by a host cleanup
-on 2026-09-11.
-
-Broad translations may be accepted only after the relevant deterministic checks, macOS smoke, and
-physical-iPhone long-string/accessibility walk pass for the exact source change. Completed
-English/French Default and AX-L Settings checks from September 10 remain historical evidence;
-AX-XXXL/pseudo navigation failures and incomplete broader accessibility coverage remain open,
-not inherited PASS for later translations. The ISU-4 notes in `config/roadmap.json` name the exact
-runs.
+The September 21 physical run `ios-xcui-localization-20260921-054309-966a91d7` passed its then-current
+EN/FR and text-size walk. The later variation-label fix passed the accessibility control audit
+`ios-xcui-control-audit-20260921-064147-ef16ae49`. These precede the eight new catalogs and cannot
+qualify them. Full French accessibility-size coverage, spoken VoiceOver, the remaining purchase
+lifecycle and broader signed-candidate scenarios remain open under ISU-4/ASR-12. Earlier September
+10 partial evidence and failed navigation attempts remain historical; see the roadmap and Git history.

@@ -206,16 +206,19 @@ struct MacSettingsScreen: View {
                 MacSettingsDetailText(MacInterfaceText.settingsAppLanguageDetail)
             } trailing: {
                 Picker(MacInterfaceText.settingsAppLanguage, selection: appLanguageSelection) {
-                    Text(MacInterfaceText.settingsSystemLanguage).tag(IOSAppLanguage.system)
+                    Text(MacInterfaceText.settingsSystemLanguage)
+                        .tag(IOSAppLanguage.system)
+                        .accessibilityIdentifier("settings_appLanguageOption_system")
                     ForEach(MacInterfaceLanguage.availableLanguages, id: \.rawValue) { language in
-                        Text(language.nativeName).tag(language.rawValue)
+                        Text(language.nativeName)
+                            .tag(language.rawValue)
+                            .accessibilityIdentifier("settings_appLanguageOption_\(language.rawValue)")
                     }
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
                 .frame(width: 200)
                 .accessibilityIdentifier("settings_appLanguage")
-                .accessibilityLabel(MacInterfaceText.settingsAppLanguage)
             }
         }
     }

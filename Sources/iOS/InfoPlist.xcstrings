@@ -5,16 +5,132 @@
       "comment": "System microphone permission for locally recording a cloning reference. Do not imply cloud recording.",
       "extractionState": "manual",
       "localizations": {
-        "en": {"stringUnit": {"state": "translated", "value": "Vocello records reference clips you use to clone voices on-device. Recordings stay on this iPhone."}},
-        "fr": {"stringUnit": {"state": "translated", "value": "Vocello enregistre les clips de référence utilisés pour cloner des voix sur l’appareil. Les enregistrements restent sur cet iPhone."}}
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello records reference clips you use to clone voices on-device. Recordings stay on this iPhone."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello enregistre les clips de référence utilisés pour cloner des voix sur l’appareil. Les enregistrements restent sur cet iPhone."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello graba clips de referencia para clonar voces en el dispositivo. Las grabaciones permanecen en este iPhone."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello nimmt Referenzclips auf, mit denen du Stimmen auf dem Gerät klonst. Die Aufnahmen bleiben auf diesem iPhone."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello registra clip di riferimento per clonare voci sul dispositivo. Le registrazioni restano su questo iPhone."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello grava referências que você usa para clonar vozes no dispositivo. As gravações ficam neste iPhone."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 录制参考音频，用于在设备上克隆声音。录音始终保留在此 iPhone 上。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello はデバイス上で声をクローンするための参照音声を録音します。録音はこの iPhone に保存されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello는 기기에서 음성을 복제하는 데 사용할 참조 오디오를 녹음합니다. 녹음은 이 iPhone에 보관됩니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello записывает образцы для клонирования голосов на устройстве. Записи остаются на этом iPhone."
+          }
+        }
       }
     },
     "NSSpeechRecognitionUsageDescription": {
       "comment": "System Speech permission for on-device reference transcription. Do not imply remote transcription.",
       "extractionState": "manual",
       "localizations": {
-        "en": {"stringUnit": {"state": "translated", "value": "Vocello transcribes your reference recording on-device to improve clone quality. Audio never leaves your iPhone."}},
-        "fr": {"stringUnit": {"state": "translated", "value": "Vocello transcrit votre enregistrement de référence sur l’appareil pour améliorer la qualité du clonage. L’audio ne quitte jamais votre iPhone."}}
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello transcribes your reference recording on-device to improve clone quality. Audio never leaves your iPhone."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello transcrit votre enregistrement de référence sur l’appareil pour améliorer la qualité du clonage. L’audio ne quitte jamais votre iPhone."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello transcribe la grabación de referencia en el dispositivo para mejorar la clonación. El audio nunca sale de tu iPhone."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello transkribiert deine Referenzaufnahme auf dem Gerät, um die Klonqualität zu verbessern. Das Audio verlässt dein iPhone nie."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello trascrive la registrazione di riferimento sul dispositivo per migliorare la clonazione. L’audio non lascia mai il tuo iPhone."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello transcreve sua gravação de referência no dispositivo para melhorar a clonagem. O áudio nunca sai do seu iPhone."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 在设备上转录参考录音，以提高克隆质量。音频不会离开你的 iPhone。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello はクローンの品質を高めるため、参照音声をデバイス上で文字起こしします。音声が iPhone から出ることはありません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello는 복제 품질을 높이기 위해 참조 녹음을 기기에서 받아씁니다. 오디오는 iPhone을 떠나지 않습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello расшифровывает образец на устройстве для улучшения качества клонирования. Аудио никогда не покидает ваш iPhone."
+          }
+        }
       }
     }
   },

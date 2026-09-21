@@ -22,6 +22,9 @@ from delivery_experiment_runner import (  # noqa: E402
     analyze_execution,
     classify_cli_failure,
     create_execution_plan,
+    create_french_pilot_plan,
+    FRENCH_PILOT,
+    _reference_key,
     execution_verdict,
     run_execution_plan,
     summarize_screen,
@@ -66,6 +69,10 @@ print(json.dumps({
     "generationID": hashlib.sha256(out.name.encode()).hexdigest()[:32],
     "audioPath": str(out), "durationSeconds": 1.0, "wallSeconds": 0.1,
     "finishReason": "eos",
+    "requestReceiptSchemaVersion": 2, "variant": value("--variant"),
+    "finalModelLanguage": value("--language"),
+    "targetTextDigest": hashlib.sha256(value("--text").encode()).hexdigest(),
+    "modelIntegrityManifestDigest": "a" * 64, "speechTokenizerDigest": "b" * 64,
     "audioQC": {"algorithmVersion": 6, "verdict": "pass", "durationSeconds": 1.0,
                 "writtenOutputVerdict": "pass", "instabilityVerdict": "pass", "flags": [],
                 "nonFiniteSamples": 0, "clippedSamples": 0, "hotSamples": 0, "clickEvents": 0,
@@ -110,6 +117,71 @@ class DeliveryExperimentRunnerTests(unittest.TestCase):
             key: value for key, value in plan.items() if key != "executionPlanDigest"
         })
         return plan
+
+    def _pilot_plan(self) -> dict:
+        spec = json.loads(FRENCH_PILOT.read_text())
+        for preset, wording in spec["instructions"].items():
+            wording["english"] = f"Production {preset}."
+        path = self.root / "pilot.json"
+        path.write_text(json.dumps(spec))
+        return create_french_pilot_plan(self.binary, path)
+
+    def test_french_pilot_is_paired_frozen_and_reuses_neutral_controls(self) -> None:
+        plan = self._pilot_plan()
+        self.assertEqual(plan, self._pilot_plan())
+        self.assertEqual(validate_execution_plan(plan, self.binary), plan)
+        self.assertEqual(len(plan["rows"]), 192)
+        self.assertEqual(len({_reference_key(row) for row in plan["rows"]}), 24)
+        for index in range(0, 192, 2):
+            left, right = plan["rows"][index:index + 2]
+            self.assertEqual({left["instruction"]["instructionLanguage"],
+                              right["instruction"]["instructionLanguage"]}, {"english", "french"})
+            self.assertNotEqual(left["instruction"]["sha256"], right["instruction"]["sha256"])
+            for field in ("speakerID", "script", "seed", "preset", "sampling", "variant",
+                          "outputLanguage", "neutralReferenceInstruction", "shippedIntensity"):
+                self.assertEqual(left[field], right[field])
+            self.assertEqual(left["outputLanguage"], "French")
+
+    def test_french_pilot_refuses_production_prompt_drift(self) -> None:
+        with self.assertRaisesRegex(RunnerError, "baseline differs"):
+            create_french_pilot_plan(self.binary)
+
+    def test_interrupted_launch_is_preserved_without_retry_on_resume(self) -> None:
+        plan = self._pilot_plan()
+        kwargs = dict(plan=plan, binary=self.binary, data_dir=None,
+                      run_dir=self.root / "interrupted", lock_root=self.root / "lock", limit=1)
+        with mock.patch("delivery_experiment_runner._invoke_generate", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                run_execution_plan(**kwargs)
+        with mock.patch("delivery_experiment_runner._invoke_generate") as invoke:
+            state = run_execution_plan(**kwargs)
+            invoke.assert_not_called()
+        self.assertEqual(state["counts"]["failedOrBlocked"], 1)
+        self.assertEqual(next(iter(state["references"].values()))["status"],
+                         "started-no-terminal-result")
+
+    def test_pilot_runs_both_receipts_once_and_does_not_retry_failures(self) -> None:
+        plan = self._pilot_plan()
+        kwargs = dict(plan=plan, binary=self.binary, data_dir=None,
+                      run_dir=self.root / "run", lock_root=self.root / "lock", limit=2)
+        state = run_execution_plan(**kwargs)
+        self.assertEqual(state["counts"]["complete"], 2)
+        self.assertEqual(int(self.counter.read_text()), 3)
+        for row in plan["rows"][:2]:
+            self.assertEqual(state["takes"][row["takeID"]]["instructionDigest"],
+                             row["instruction"]["sha256"])
+        failed_id = plan["rows"][0]["takeID"]
+        state["takes"][failed_id] = {"status": "failed-timeout", "timeoutSeconds": 1}
+        (self.root / "run/execution-state.json").write_text(json.dumps(state))
+        with mock.patch("delivery_experiment_runner._invoke_generate",
+                        return_value={"status": "failed-timeout"}) as invoke:
+            run_execution_plan(**dict(kwargs, limit=1))
+            self.assertTrue(invoke.called)
+            for call in invoke.call_args_list:
+                self.assertNotIn(call.kwargs["row"]["takeID"],
+                                 [row["takeID"] for row in plan["rows"][:2]])
+        retained = json.loads((self.root / "run/execution-state.json").read_text())
+        self.assertEqual(retained["takes"][failed_id]["status"], "failed-timeout")
 
     def test_plan_is_binary_bound_and_contains_cross_language_cells(self) -> None:
         plan = create_execution_plan(

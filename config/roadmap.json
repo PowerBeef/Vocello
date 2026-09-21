@@ -553,8 +553,8 @@
         "file:scripts/tests/test_delivery_promotion_decision.py",
         "file:scripts/tests/test_delivery_statistics.py"
       ],
-      "updated": "2026-09-12",
-      "notes": "September 12: the optional listening-session script was deleted with the listening lane; the automated schema-2 decision path is the only route."
+      "updated": "2026-09-21",
+      "notes": "September 12: the optional listening-session script was deleted with the listening lane; the automated schema-2 decision path is the only route. September 21: approved separate exploratory EN/FR instruction pilot for French Built-in output: 192 treatment takes plus 24 shared Neutral controls, Quality, Aiden/Vivian, four deliveries. Existing runner extended; production prompts and confirmation status unchanged. Results and limitations: docs/development-progress.md."
     },
     {
       "id": "DP-32",

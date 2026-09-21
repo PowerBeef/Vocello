@@ -17,6 +17,18 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### French instruction pilot (September 21)
+
+Baseline `13378439`. The authorized pilot compares shipped English instructions with exact French
+translations for French Built-in speech. The bounded specification freezes Quality, Aiden/Vivian,
+four deliveries, three neutral passages and four paired development seeds: 192 instructed rows and
+24 shared canonical Neutral controls. It reuses the serial delivery runner, receipts, acoustics,
+local ASR and clip-quality tools. Production instructions remain unchanged. Generation is running
+under `french-instruction-pilot-20260921`; no terminal take is retried. Initial pair and its control
+passed receipt checks. The optimized CLI build and scoped routed check passed, including 38 Python
+tests plus three subtests. This remains exploratory and cannot close DP-31/DP-32. The paused Mac
+marketing-test edit is excluded.
+
 ### Studio content follows the speech language (September 21)
 
 Baseline `19992ff9`. Voice Design starting points/placeholders and delivery preset presentation

@@ -17,6 +17,7 @@ import hashlib
 import json
 import math
 import os
+import random
 from pathlib import Path
 import subprocess
 import sys
@@ -44,6 +45,8 @@ from delivery_experiment import (
     digest,
     validate_contract,
     validate_corpus,
+    sampling_policy,
+    compile_instruction,
 )
 from lib import jsonio  # noqa: E402
 
@@ -52,6 +55,7 @@ REPO = Path(__file__).resolve().parents[1]
 DEFAULT_SERIAL_LOCK_ROOT = REPO / "build/cache/delivery-analysis"
 SCHEMA_VERSION = 1
 DEFAULT_TIMEOUT_SECONDS = 3_600
+FRENCH_PILOT = REPO / "config/delivery-french-pilot.json"
 ACOUSTIC_FEATURES = (
     "durationSec",
     "f0_median_hz", "f0_std_semitones", "f0_range_semitones",
@@ -237,6 +241,10 @@ def create_execution_plan(
         "balancedSeedRotation": balanced_script_rotation and len(seeds) > 1,
         "promotionAuthority": False,
     }
+    return seal_execution_plan(plan, binary)
+
+
+def seal_execution_plan(plan: dict[str, Any], binary: Path) -> dict[str, Any]:
     plan_body = dict(plan)
     plan_body.pop("planDigest", None)
     plan["planDigest"] = digest(plan_body)
@@ -253,6 +261,83 @@ def create_execution_plan(
     }
     plan["executionPlanDigest"] = digest(plan)
     return plan
+
+
+def create_french_pilot_plan(
+    binary: Path, spec_path: Path = FRENCH_PILOT,
+) -> dict[str, Any]:
+    """One bounded paired study; production/corpus and confirmation arms stay untouched."""
+    spec = _load(spec_path)
+    if (spec.get("schemaVersion") != 1 or spec.get("status") != "experimental-only"
+            or spec.get("speakers") != ["aiden", "vivian"]
+            or spec.get("presets") != ["happy", "sad", "angry", "whisper"]
+            or spec.get("seeds") != [32000001, 32000002, 32000003, 32000004]
+            or spec.get("variant") != "quality" or spec.get("sampling") != "balanced-official"):
+        raise RunnerError("French pilot factors differ from the approved bounded study")
+    scripts = spec.get("scripts", [])
+    if (len(scripts) != 3 or len({s.get("id") for s in scripts}) != 3
+            or len({s.get("text") for s in scripts}) != 3
+            or any(not isinstance(s.get("text"), str) or not 1 <= len(s["text"]) < 900
+                   for s in scripts)):
+        raise RunnerError("French pilot requires three distinct short-form passages")
+    contract = validate_contract(_load(DEFAULT_CONTRACT))
+    product = _load(PRODUCT_CONTRACT)
+    deliveries = discover_production_deliveries(binary)
+    for preset in spec["presets"]:
+        wording = spec["instructions"][preset]
+        if (wording["english"] != deliveries[preset]["instruction"]
+                or wording["intensity"] != deliveries[preset]["intensity"]):
+            raise RunnerError(f"{preset}: frozen English baseline differs from shipped instructions")
+        if (not isinstance(wording.get("french"), str) or not wording["french"].strip()
+                or wording["french"] == wording["english"]):
+            raise RunnerError(f"{preset}: missing distinct French translation")
+    neutral = compile_instruction(contract, "neutral", "current", "english",
+                                  production_instruction=deliveries["neutral"]["instruction"])
+    blocks = []
+    for speaker in spec["speakers"]:
+        for script in scripts:
+            for seed in spec["seeds"]:
+                for preset in spec["presets"]:
+                    pair = []
+                    for language in ("english", "french"):
+                        text = spec["instructions"][preset][language]
+                        instruction = dict(neutral, preset=preset, arm="current-translation",
+                                           instructionLanguage=language, text=text,
+                                           sha256=hashlib.sha256(text.encode()).hexdigest(),
+                                           wordCount=len(text.split()),
+                                           dimensions=contract["presets"][preset]["dimensions"])
+                        row = {
+                            "speakerID": speaker,
+                            "nativeLanguage": product["speakerMetadata"][speaker]["nativeLanguage"],
+                            "outputLanguage": "French", "coverageRole": "experimental-french-pilot",
+                            "preset": preset, "instruction": instruction,
+                            "neutralReferenceInstruction": neutral,
+                            "script": {"scriptID": script["id"], "text": script["text"],
+                                       "sha256": hashlib.sha256(script["text"].encode()).hexdigest(),
+                                       "language": "French", "length": "medium",
+                                       "semanticCondition": "neutral", "split": "development"},
+                            "seed": seed, "variant": spec["variant"],
+                            "sampling": sampling_policy(contract, spec["sampling"]),
+                            "shippedIntensity": deliveries[preset]["intensity"],
+                        }
+                        row["takeID"] = digest(row)[:24]
+                        pair.append(row)
+                    blocks.append(pair)
+    rng = random.Random(spec["orderSeed"])
+    rng.shuffle(blocks)
+    for pair in blocks:
+        rng.shuffle(pair)
+    plan = {
+        "schemaVersion": SCHEMA_VERSION, "designation": "development",
+        "arm": "current-translation", "instructionLanguage": "paired-english-french",
+        "variant": spec["variant"], "samplingCombination": spec["sampling"],
+        "seeds": spec["seeds"], "contractDigest": digest(contract),
+        "corpusDigest": digest(scripts), "productContractDigest": digest(product),
+        "pilotSpecDigest": digest(spec), "studyID": spec["id"], "orderSeed": spec["orderSeed"],
+        "promotionAuthority": False, "semanticAuthority": False,
+        "rows": [row for pair in blocks for row in pair],
+    }
+    return seal_execution_plan(plan, binary)
 
 
 def validate_execution_plan(plan: dict[str, Any], binary: Path) -> dict[str, Any]:
@@ -349,6 +434,22 @@ def _invoke_generate(
         return {"status": "failed-invalid-json", "returnCode": result.returncode}
     if not isinstance(payload, dict):
         return {"status": "failed-invalid-json-shape"}
+    receipt_keys = (
+        "requestReceiptSchemaVersion", "modelID", "variant", "finalModelLanguage",
+        "storedLanguageSelection", "targetTextDigest", "modelArtifactVersion",
+        "modelIntegrityManifestDigest", "speechTokenizerDigest", "languageTokenMode",
+        "conditioningMode", "deliveryInstructionDigest", "modelFacingInstructionLanguage",
+    )
+    receipt = {key: payload.get(key) for key in receipt_keys}
+    if row.get("coverageRole") == "experimental-french-pilot" and (
+        payload.get("requestReceiptSchemaVersion") != 2
+        or str(payload.get("finalModelLanguage", "")).lower() != "french"
+        or payload.get("targetTextDigest") != row["script"]["sha256"]
+        or payload.get("variant") != "quality"
+        or not payload.get("modelIntegrityManifestDigest")
+        or not payload.get("speechTokenizerDigest")
+    ):
+        return {"status": "failed-generation-receipt", "receipt": receipt}
     if payload.get("deliveryInstructionDigest") != instruction["sha256"]:
         return {
             "status": "failed-instruction-receipt",
@@ -369,6 +470,7 @@ def _invoke_generate(
         "finishReason": payload.get("finishReason"),
         "instructionDigest": instruction["sha256"],
         "scriptDigest": row["script"]["sha256"],
+        "receipt": receipt,
         # Preserve the native, published-byte QC. Canonical PCM integrity is
         # not a substitute for the engine's limiter/cadence/final-WAV checks.
         "audioQC": payload.get("audioQC"),
@@ -461,6 +563,8 @@ def _run_execution_plan_locked(
         if not reference or (reference.get("status") != "complete" and retry_failures):
             reference_attempts = _retry_attempts(reference)
             reference_path = audio_dir / f"reference-{reference_key}.wav"
+            state["references"][reference_key] = {"status": "started-no-terminal-result"}
+            atomic_json(state_path, state)
             reference = _invoke_generate(
                 binary=binary, data_dir=data_dir, row=row,
                 instruction=row["neutralReferenceInstruction"],
@@ -479,6 +583,10 @@ def _run_execution_plan_locked(
             continue
         instructed_path = audio_dir / f"take-{take_id}.wav"
         take_attempts = _retry_attempts(retained) if retry_failures else []
+        state["takes"][take_id] = {
+            "status": "started-no-terminal-result", "referenceKey": reference_key,
+        }
+        atomic_json(state_path, state)
         take = _invoke_generate(
             binary=binary, data_dir=data_dir, row=row, instruction=row["instruction"],
             output_path=instructed_path, timeout_seconds=timeout_seconds,
@@ -867,6 +975,9 @@ def _parse_labeled_paths(raw: str) -> dict[str, Path]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
+    french_parser = commands.add_parser("plan-french-pilot")
+    french_parser.add_argument("--binary", type=Path, default=REPO / "build/vocello")
+    french_parser.add_argument("--out", type=Path, required=True)
     plan_parser = commands.add_parser("plan")
     plan_parser.add_argument("--binary", type=Path, default=REPO / "build/vocello")
     plan_parser.add_argument("--data-dir", type=Path)
@@ -911,7 +1022,10 @@ def main() -> int:
     )
     args = parser.parse_args()
     try:
-        if args.command == "plan":
+        if args.command == "plan-french-pilot":
+            result = create_french_pilot_plan(args.binary.resolve())
+            atomic_json(args.out, result)
+        elif args.command == "plan":
             result = create_execution_plan(
                 binary=args.binary.resolve(), data_dir=args.data_dir,
                 split=args.split, arm=args.arm,

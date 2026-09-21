@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "id": "french-instruction-pilot-v1",
+  "status": "experimental-only",
+  "speakers": [
+    "aiden",
+    "vivian"
+  ],
+  "presets": [
+    "happy",
+    "sad",
+    "angry",
+    "whisper"
+  ],
+  "seeds": [
+    32000001,
+    32000002,
+    32000003,
+    32000004
+  ],
+  "variant": "quality",
+  "sampling": "balanced-official",
+  "orderSeed": 20260921,
+  "scripts": [
+    {
+      "id": "fr-pilot-library",
+      "text": "La bibliothèque ouvre à neuf heures. Les livres réservés se trouvent sur une étagère près de l'accueil. Chaque lecteur peut les retirer en présentant sa carte."
+    },
+    {
+      "id": "fr-pilot-station",
+      "text": "Le train part du quai numéro quatre. Le trajet comprend deux arrêts avant la gare centrale. Les voyageurs peuvent consulter les horaires sur le panneau à droite de l'entrée."
+    },
+    {
+      "id": "fr-pilot-kitchen",
+      "text": "Les assiettes sont rangées dans le placard. Une carafe d'eau et quatre verres sont posés sur la table. La recette indique de laisser reposer la pâte pendant vingt minutes."
+    }
+  ],
+  "instructions": {
+    "happy": {
+      "english": "Speak with genuine warm delight and a relaxed smile in the voice. Use bright open resonance, smooth, clear, buoyant phrasing, a moderately lifted pitch, and a naturally lively pace; sustain pleasant warmth rather than sounding startled.",
+      "french": "Parlez avec une joie sincère et chaleureuse et un sourire détendu dans la voix. Utilisez une résonance claire et ouverte, un phrasé fluide, net et enjoué, une hauteur modérément élevée et un débit naturellement vif ; maintenez une chaleur agréable plutôt qu'un air surpris.",
+      "intensity": "normal"
+    },
+    "sad": {
+      "english": "Speak through deep sorrow, fragile and tearful, with words slow and weighted with grief; keep every word clear and audible.",
+      "french": "Parlez avec une profonde tristesse, d'une voix fragile et larmoyante, avec des mots lents et alourdis par le chagrin ; gardez chaque mot clair et audible.",
+      "intensity": "strong"
+    },
+    "angry": {
+      "english": "Sound fiercely angry and frustrated. Use a tense, forceful voice, hard clipped consonants, strong energy, and fast emphatic pacing.",
+      "french": "Exprimez une colère intense et de la frustration. Utilisez une voix tendue et puissante, des consonnes dures et brèves, une forte énergie et un débit rapide et appuyé.",
+      "intensity": "normal"
+    },
+    "whisper": {
+      "english": "Whisper at the very edge of hearing, hushed flat breath with minimal pitch movement, close and secretive; every word still audible, never lifted into normal speech.",
+      "french": "Chuchotez à la limite de l'audible, dans un souffle feutré et uniforme, avec très peu de variations de hauteur, de près et sur le ton du secret ; chaque mot doit rester audible, sans jamais passer à une voix normale.",
+      "intensity": "strong"
+    }
+  }
+}

@@ -102,6 +102,23 @@ default `scripts/dev.sh py`, which selects the modules the dirty tree affects) r
 | `scripts/prosody_quality_gate.py` | Reference-free per-take prosody gate (monotone / rushed / flat / pause issues) | `test_prosody_quality_gate.py` |
 | `scripts/check_delivery_instructions.py` | Deterministic text-level contract gate on shipped delivery copy (T1/CI) → [`config/delivery-instruction-contract.json`](../../config/delivery-instruction-contract.json) | `test_check_delivery_instructions.py` |
 
+### French instruction-language pilot
+
+`delivery_experiment_runner.py plan-french-pilot --out <plan.json>` freezes the bounded
+`config/delivery-french-pilot.json` study into the same source-bound runner plan. The study compares
+exact shipped English instructions with complete French translations, using Aiden/Vivian, three
+neutral French passages, four development seeds and happy/sad/angry/whisper on Quality with
+balanced-official sampling. Its 192 interleaved treatment rows share 24 canonical Neutral controls;
+these controls are instructed, not instruction-free. The standard `run --plan ... --run-dir ...`
+and `analyze --plan ... --run-dir ...` commands own execution and acoustics. Never use
+`--retry-failures` for this study. Launch markers preserve interrupted attempts on resume.
+
+The planner refuses shipped prompt drift. French rows require language, target-text and model
+receipts, retained alongside native QC. Keep all raw evidence untracked. Compare full-file French
+ASR and paired acoustic deltas separately from clip-quality warnings; neither acoustics nor NISQA
+establishes semantic emotion correctness. This development pilot has no promotion authority and
+leaves the multilingual confirmation corpus and production prompts unchanged.
+
 ### Clone identity, enrollment transcription, and French Design reliability
 
 The VLR lane is a diagnosis surface, not another delivery-promotion authority. Its tracked contract

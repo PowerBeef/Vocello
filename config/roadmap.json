@@ -554,7 +554,7 @@
         "file:scripts/tests/test_delivery_statistics.py"
       ],
       "updated": "2026-09-21",
-      "notes": "September 12: the optional listening-session script was deleted with the listening lane; the automated schema-2 decision path is the only route. September 21: approved separate exploratory EN/FR instruction pilot for French Built-in output: 192 treatment takes plus 24 shared Neutral controls, Quality, Aiden/Vivian, four deliveries. Existing runner extended; production prompts and confirmation status unchanged. Results and limitations: docs/development-progress.md."
+      "notes": "September 21 exploratory French pilot completed 192 paired treatments plus 24 shared Neutral controls with zero terminal failures/retries. French instructions improved advisory NISQA, while English passed more delivery acoustic checks; ASR improvement was not consistent. Neither semantic superiority nor confirmation is established. Results/limits: docs/reference/french-delivery-pilot-2026-09-21.md. Production prompts unchanged. The automated schema-2 decision remains the promotion route; the optional listening lane was removed September 12."
     },
     {
       "id": "DP-32",

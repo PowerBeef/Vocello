@@ -19,15 +19,16 @@ last full copy at commit 25a895ed).
 
 ### French instruction pilot (September 21)
 
-Baseline `13378439`. The authorized pilot compares shipped English instructions with exact French
-translations for French Built-in speech. The bounded specification freezes Quality, Aiden/Vivian,
-four deliveries, three neutral passages and four paired development seeds: 192 instructed rows and
-24 shared canonical Neutral controls. It reuses the serial delivery runner, receipts, acoustics,
-local ASR and clip-quality tools. Production instructions remain unchanged. Generation is running
-under `french-instruction-pilot-20260921`; no terminal take is retried. Initial pair and its control
-passed receipt checks. The optimized CLI build and scoped routed check passed, including 38 Python
-tests plus three subtests. This remains exploratory and cannot close DP-31/DP-32. The paused Mac
-marketing-test edit is excluded.
+Baseline `13378439`; harness `ebe65e18`. The authorized Quality pilot completed all 192
+English/French instructed takes and 24 shared Neutral controls, with EOS, one model/tokenizer
+identity and no retries or terminal failures. Native QC: 173 pass/43 warn/0 hard fail. Full-file
+Whisper, paired acoustics and NISQA completed. French scored higher on NISQA (4.197 vs 3.875), while
+English passed more delivery acoustic checks (44/96 vs 26/96); WER was 7.46% EN vs 8.19% FR with
+small-cohort uncertainty and numerical/homophone transcription caveats. No production change or
+semantic superiority claim follows. See [the report](reference/french-delivery-pilot-2026-09-21.md).
+Raw evidence and fixed representative pairs remain untracked under `french-instruction-pilot-20260921`.
+The optimized CLI build, focused tests, routed check and harness CI passed. DP-31/DP-32 remain open;
+confirmation is separate. The paused Mac marketing-test edit is untouched.
 
 ### Studio content follows the speech language (September 21)
 

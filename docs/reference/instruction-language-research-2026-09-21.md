@@ -20,6 +20,11 @@ starter becomes the actual editable input; fixed delivery presets retain their c
 instructions. Existing drafts are never translated on a language change. This is an accessibility
 and usability decision, not a new comparative audio-quality finding. See [localization](localization.md).
 
+**Subsequent experiment, September 21:** the [216-clip pilot](french-delivery-pilot-2026-09-21.md)
+is complete. French instructions scored higher on generic clip quality, while English instructions
+passed more delivery acoustic checks. No universal language winner or production promotion was
+established. The source research and proposed experiment below predate that run.
+
 ## 1. Decision and confidence
 
 **Do not require the instruction language to match the script. Keep English as the current

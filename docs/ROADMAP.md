@@ -22,6 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
+| `project-audit-2026-09` | active | backend-and-platform | 1/9 (11%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -439,6 +440,51 @@ Narrative authority: [`docs/reference/macos-ios-ui-reset-2026-09.md`](reference/
 
 - **`UIF-08`** (in-flight) — Native acceptance of the iOS-derived screens on current source.
   gate: On one committed source identity after the September 19 Studio changes: consented macOS localization, smoke and perf lanes pass; the error, missing-model and wide-window states of all three Studio modes, the Cmd+, Settings window and the Studio model links are exercised through genuine controls; the iOS scroll helper's delta-dependent anchor-size limit is corrected with a captured-bounds regression test and one complete consented iOS localization lane passes including Pseudo-AX-XXXL. Runner PASS requires diagnostics, crash deltas and restoration; no retries, no hidden state.
+
+## Takeover audit follow-ups
+
+`project-audit-2026-09` · **active** · backend-and-platform · adopted 2026-09-22
+
+Resolve the defects and maintainability findings the September 22 whole-project audit confirmed in source at the Claude Code takeover: a prewarm-slot leak, diagnostics that do not fail closed, harness isolation and routing gaps, release-workflow toolchain drift, dead code and duplicated platform logic. Each fix keeps the existing product boundaries and lands with its own deterministic proof.
+
+Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/project-audit-2026-09-22.md)
+
+| Item | Status | Title | Blocked by |
+| --- | --- | --- | --- |
+| `PA-01` | planned | P1 — release the prewarm slot when cancellation lands after the hand-off | — |
+| `PA-02` | planned | P2 — make the owned package's diagnostics gate require the internal build capability | — |
+| `PA-03` | planned | P3 — compile-gate the iOS diagnostics runners | — |
+| `PA-04` | planned | Harness isolation: UI bundle compiles and fixed temporary paths | — |
+| `PA-05` | planned | Release workflow uses the pinned toolchain action | — |
+| `PA-06` | planned | Routing cost and derived-artifact gaps | — |
+| `PA-07` | planned | Remove dead engine, downloader and XPC-era code | — |
+| `PA-08` | planned | Consolidate duplicated platform logic and misleading names | — |
+
+### Open items in detail
+
+- **`PA-01`** (planned) — P1 — release the prewarm slot when cancellation lands after the hand-off.
+  gate: A waiter cancelled after releasePrewarmSlot transferred the slot releases it before throwing, proven by a deterministic unit test of the slot gate; later prewarms are never blocked by a finished caller.
+
+- **`PA-02`** (planned) — P2 — make the owned package's diagnostics gate require the internal build capability.
+  gate: QVOICE_TALKER_KV_QUANT, QWENVOICE_SAMPLER_COMPILE and QWENVOICE_TOKENIZER_RESIDENCY have no effect in a distribution app or CLI even with QWENVOICE_DEBUG set; runtime_security_contract.py and a unit test prove it.
+
+- **`PA-03`** (planned) — P3 — compile-gate the iOS diagnostics runners.
+  gate: IOSStartupReliabilityRunner and IOSDeviceDiagnosticsRunner request detection compile only under QVOICE_DEVICE_DIAGNOSTICS, matching the knob registry; the generic iOS compile and device diagnostics routes still build.
+
+- **`PA-04`** (planned) — Harness isolation: UI bundle compiles and fixed temporary paths.
+  gate: build_ui_test_bundles.sh runs through the shared xcb_run lock and QVOICE_* policy paths into the arena its lane uses; probe and bench manifests use run-unique paths under the build-output policy.
+
+- **`PA-05`** (planned) — Release workflow uses the pinned toolchain action.
+  gate: release.yml selects Xcode and installs pinned tools through .github/actions/native-toolchain (no hard-coded Xcode version), and the TestFlight upload command is confirmed supported by the pinned Xcode.
+
+- **`PA-06`** (planned) — Routing cost and derived-artifact gaps.
+  gate: A Tests/VocelloMacUITests-only change no longer runs the full macOS test and TSan lanes; refresh_derived_artifacts validate_all checks every registered artifact; SwiftLint is pinned or reported when missing; nightly and cache-owner text describe TSan as blocking.
+
+- **`PA-07`** (planned) — Remove dead engine, downloader and XPC-era code.
+  gate: generateBatch, downloadRepo, samplerCompileEnabled and the unused handshake latch are removed or given a caller; stale XPC comments are corrected; the concurrency budget drops with any removed nonisolated(unsafe); the unused HuggingFace product link is removed or justified.
+
+- **`PA-08`** (planned) — Consolidate duplicated platform logic and misleading names.
+  gate: Each consolidation lands separately with unchanged identifiers and behavior: one download driver seam, one observation model for the model managers, one Mac player card, root models constructed once, generateVoiceDesign renamed for the all-mode loop, OWNERSHIP.json lists MLXAudioMark, and the Cmd-6 menu title matches its destination.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

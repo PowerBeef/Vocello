@@ -101,6 +101,15 @@
       "adopted": "2026-09-17",
       "goal": "Resolve the twelve existing audit items using the September 18 independent revalidation of the September 17 findings. Distinguish confirmed code properties, hypotheses requiring device evidence, policy decisions and documentation drift; preserve identifiers and existing assignment status. Application remediation is separately assigned from collaboration setup.",
       "authority": "docs/reference/project-review-2026-09-18.md"
+    },
+    {
+      "id": "project-audit-2026-09",
+      "title": "Takeover audit follow-ups",
+      "status": "active",
+      "owner": "backend-and-platform",
+      "adopted": "2026-09-22",
+      "goal": "Resolve the defects and maintainability findings the September 22 whole-project audit confirmed in source at the Claude Code takeover: a prewarm-slot leak, diagnostics that do not fail closed, harness isolation and routing gaps, release-workflow toolchain drift, dead code and duplicated platform logic. Each fix keeps the existing product boundaries and lands with its own deterministic proof.",
+      "authority": "docs/reference/project-audit-2026-09-22.md"
     }
   ],
   "items": [
@@ -1323,6 +1332,116 @@
         "Sources/Views/Settings/MacSettingsScreen.swift"
       ],
       "notes": "September 22 consolidated Mac acceptance on c66c5b79: full smoke 145946-95d3a54f PASS 13/13 including all ten languages and the new layout/recovery/content journeys; perf 162034-c8dcee40 passed 9/9 with 100% coverage. Identical source fingerprints include only the unchanged paused marketing edit; no retries or sampling. Required steps, crash checks and restoration passed. Performance retains idle 58.90 ms and Settings 70.45 ms warnings in cleanup-straddling blocks; fully enclosed maxima 16.667/16.797 ms. History scroll/filter maxima 125.72/174.07 ms remain exploratory, with no speedup claim. Dirty-source evidence is not release qualification. Detailed source-bound evidence and earlier separate failures: docs/reference/macos-ios-ui-reset-2026-09.md. Consolidated Mac execution is complete; the gate remains open for iPhone scroll/localization acceptance. No phone was used.",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-01",
+      "title": "P1 — release the prewarm slot when cancellation lands after the hand-off",
+      "status": "planned",
+      "gate": "A waiter cancelled after releasePrewarmSlot transferred the slot releases it before throwing, proven by a deterministic unit test of the slot gate; later prewarms are never blocked by a finished caller.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/NativeEngineRuntime.swift"
+      ],
+      "notes": "Confirmed in source 2026-09-22: acquirePrewarmSlot ends with try Task.checkCancellation() after a normal resume, when the slot is already held by this task. Callers use try await acquirePrewarmSlot() then defer releasePrewarmSlot(), or a catch that returns, so neither releases on that throw and prewarmInFlight stays set; the catch-branch slotAcquired release is unreachable. Likely fix: release before rethrowing on the post-resume check, or extract the gate into a small testable value. Covered by the native rule's prewarm reentrancy gate. See project-audit-2026-09-22.md.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-02",
+      "title": "P2 — make the owned package's diagnostics gate require the internal build capability",
+      "status": "planned",
+      "gate": "QVOICE_TALKER_KV_QUANT, QWENVOICE_SAMPLER_COMPILE and QWENVOICE_TOKENIZER_RESIDENCY have no effect in a distribution app or CLI even with QWENVOICE_DEBUG set; runtime_security_contract.py and a unit test prove it.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/RuntimeDebugGate.swift",
+        "config/runtime-debug-knobs.json"
+      ],
+      "notes": "VocelloQwen3ImplementationDebugGate checks QWENVOICE_DEBUG only; the VOCELLO_INTERNAL_DIAGNOSTICS compile condition reaches QwenVoiceCore but never the package, yet the registry classifies these keys unavailable-without-internal-capability. The distributed CLI is the easiest exposure. Options: the facade passes a capability the product gate derives at bootstrap, or the package receives the compile condition. Any new shared state is registered in config/concurrency-safety.json (budget has no headroom). Related to ASR-07's analyzer and logging hygiene.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-03",
+      "title": "P3 — compile-gate the iOS diagnostics runners",
+      "status": "planned",
+      "gate": "IOSStartupReliabilityRunner and IOSDeviceDiagnosticsRunner request detection compile only under QVOICE_DEVICE_DIAGNOSTICS, matching the knob registry; the generic iOS compile and device diagnostics routes still build.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSDeviceDiagnosticsRunner.swift",
+        "config/runtime-debug-knobs.json"
+      ],
+      "notes": "The startup-reliability runner and part of IOSDeviceDiagnosticsRunner.isRequested sit outside #if QVOICE_DEVICE_DIAGNOSTICS and depend only on TelemetryGate, while the registry says unavailable-without-diagnostics-compilation-condition. Practical risk on iOS is low (environment keys need a debugger or diagnostics launch). Needs ios_device.sh builds to keep working; phone-free proof is the generic compile.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-04",
+      "title": "Harness isolation: UI bundle compiles and fixed temporary paths",
+      "status": "planned",
+      "gate": "build_ui_test_bundles.sh runs through the shared xcb_run lock and QVOICE_* policy paths into the arena its lane uses; probe and bench manifests use run-unique paths under the build-output policy.",
+      "sourceOfTruth": [
+        "scripts/build_ui_test_bundles.sh",
+        "scripts/lib/ios_coredevice_probe.py",
+        "scripts/ui_test.sh"
+      ],
+      "notes": "build_ui_test_bundles.sh calls xcodebuild directly (no package-store lock, no shared cloned-packages path, hard-coded build/cache paths) and compiles VocelloMacUI into the -Onone arena while every macOS UI lane builds in macos-optimized. ios_coredevice_probe.py writes a fixed /tmp devicectl file that concurrent probes can race, and ui_test.sh MAC_TAKE_MANIFEST is a fixed /tmp path. The virtual-microphone temporary file is deliberate and documented.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-05",
+      "title": "Release workflow uses the pinned toolchain action",
+      "status": "planned",
+      "gate": "release.yml selects Xcode and installs pinned tools through .github/actions/native-toolchain (no hard-coded Xcode version), and the TestFlight upload command is confirmed supported by the pinned Xcode.",
+      "sourceOfTruth": [
+        ".github/workflows/release.yml",
+        ".github/actions/native-toolchain/action.yml",
+        "config/toolchain.json"
+      ],
+      "notes": "release.yml hard-codes Xcode_26.6 three times and duplicates the pinned-tool installation instead of the composite action ci.yml uses, so a toolchain bump must touch two routes; a comment also says timeout-minutes is 90 while the job allows 150. The archive job uploads with xcrun altool; confirm or replace for the pinned Xcode. Release changes need an exact-source dry run on explicit request.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-06",
+      "title": "Routing cost and derived-artifact gaps",
+      "status": "planned",
+      "gate": "A Tests/VocelloMacUITests-only change no longer runs the full macOS test and TSan lanes; refresh_derived_artifacts validate_all checks every registered artifact; SwiftLint is pinned or reported when missing; nightly and cache-owner text describe TSan as blocking.",
+      "sourceOfTruth": [
+        "scripts/ci/classify_changes.py",
+        "scripts/development_workflow.py",
+        "scripts/refresh_derived_artifacts.py",
+        "config/toolchain.json"
+      ],
+      "notes": "UI-test sources route to the swift lane although neither macos-tests nor macos-tsan compiles UI bundles (local check already compiles them separately). A clean-tree check routes every lane. validate_all omits the README-charts check its registry lists. SwiftLint is unpinned and silently skipped when missing, unlike shellcheck. nightly.yml's header and the macos-tsan cache owner still say TSan is scheduled-only although it is blocking on push since 2026-09-14.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-07",
+      "title": "Remove dead engine, downloader and XPC-era code",
+      "status": "planned",
+      "gate": "generateBatch, downloadRepo, samplerCompileEnabled and the unused handshake latch are removed or given a caller; stale XPC comments are corrected; the concurrency budget drops with any removed nonisolated(unsafe); the unused HuggingFace product link is removed or justified.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "Sources/QwenVoiceCore/NativeDeviceClassGate.swift",
+        "project.yml"
+      ],
+      "notes": "No callers: MLXTTSEngine.generateBatch (macOS line batch loops the single-take executor), HuggingFaceDownloader.downloadRepo (also keeps a live repository-enumeration path the catalog rule forbids), NativeDeviceClassGate.applyHandshakeForcedClass (one of the 7 nonisolated(unsafe) declarations). samplerCompileEnabled in Qwen3TTS.swift is never read. About 36 XPC or EngineServiceHost mentions remain in Sources. project.yml links the HuggingFace product to four targets but no owned source imports it. Package edits follow the owned-package inventory contract.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-08",
+      "title": "Consolidate duplicated platform logic and misleading names",
+      "status": "planned",
+      "gate": "Each consolidation lands separately with unchanged identifiers and behavior: one download driver seam, one observation model for the model managers, one Mac player card, root models constructed once, generateVoiceDesign renamed for the all-mode loop, OWNERSHIP.json lists MLXAudioMark, and the Cmd-6 menu title matches its destination.",
+      "sourceOfTruth": [
+        "Sources/ViewModels/ModelManagerViewModel.swift",
+        "Sources/ContentView.swift",
+        "Packages/VocelloQwen3Core/OWNERSHIP.json"
+      ],
+      "notes": "Maintainability observations, not measured defects: macOS ModelManagerViewModel is @Observable and the iOS one ObservableObject; three download drivers call downloadFiles; MacInlinePlayerCard and MacStudioPlayerCard coexist; ContentView and QVoiceiOSRootView build @Observable models through State(initialValue:) in init, re-running construction on parent re-init; Qwen3TTS.generateVoiceDesign is the core loop for every mode; OWNERSHIP.json omits MLXAudioMark; the Cmd-6 item titled Models opens Settings. Prefer small reversible steps; UI changes need their lanes on explicit request.",
+      "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     }
   ]

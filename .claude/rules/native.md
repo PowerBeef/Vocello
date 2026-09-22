@@ -66,8 +66,8 @@ XCUITest lanes only when explicitly requested.
   (prepare entry to the final WAV write, minus model load and prewarm, on the monotonic stage recorder)
   ÷ audio seconds, lower is faster; `audioSecondsPerWallSecond` is the decode-loop speedup and is never
   called RTF. Wall time for any throughput figure comes from `ContinuousClock`, never `Date()`.
-- **Telemetry semantics are typed.** Since telemetry schema v8 (the engine now emits v9), frontend
-  latency stops at playback scheduling; process
+- **Telemetry semantics are typed.** Since telemetry schema v8 (records stay v8; the streaming v9
+  projection is a digest-bound sidecar), frontend latency stops at playback scheduling; process
   memory belongs to the process that measured it; a macOS UI benchmark is authoritative only when the app
   and engine layers are complete (the merged record names its required layers).
 

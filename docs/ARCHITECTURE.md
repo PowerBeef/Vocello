@@ -95,7 +95,7 @@ graph TD
 ```
 
 (SPM products are also linked directly by the apps and the CLI where
-needed — e.g. `QwenVoiceCore` pulls `MLXRandom` for deterministic seeding. Only
+needed; the owned package uses `MLXRandom` for request-local seeding. Only
 the architectural edges are shown above; see `project.yml` for the exact link
 graph.)
 
@@ -177,7 +177,7 @@ Resolved versions (`QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
 | **mlx-swift-lm** | `3.31.4` | LM utilities (through the owned Qwen3 core package). The 3.x major externalized the Hub/Tokenizers implementations, which is why swift-transformers is now a direct dependency. |
 | **VocelloQwen3Core** | owned package derived from `mlx-audio-swift` `v0.1.2` | Stable first-party `VocelloQwen3Core` facade for model-bundle, capability, sampling, memory, synthesis, terminal, cancellation, and diagnostic contracts. Compatibility-preserved `MLXAudioCore`, `MLXAudioCodecs`, and `MLXAudioTTS` modules remain implementation surfaces for Qwen3-TTS load, tokenize, and decode. |
 | **GRDB.swift** | `7.10.0` | SQLite for local `history.sqlite`. |
-| **SwiftHuggingFace** | `0.9.0` | Hugging Face model download / hub client. |
+| **SwiftHuggingFace** | `0.9.0` | Hugging Face hub client, linked by `project.yml`; owned sources download through `HuggingFaceDownloader` (`URLSession`) and import no `HuggingFace` module. |
 | **swift-transformers** | `1.3.3` | Hub/Tokenizers implementation — a **direct**, exact-pinned dependency of `MLXAudioTTS`; the owned package manifest and resolved graph are authoritative. |
 | swift-jinja | `2.4.2` | Chat/template formatting (transitive via swift-transformers). |
 | yyjson | `0.12.0` | JSON parsing (transitive via swift-transformers). |
@@ -251,7 +251,7 @@ flowchart LR
 
 Defined in `Sources/QwenVoiceCore/TTSEngine.swift`. `TTSEngine` is an
 `@MainActor … ObservableObject` protocol; the streaming surface is split into a
-companion `TTSEngineEventStreaming` protocol (`var events: AsyncStream<GenerationEvent>`).
+companion `TTSEngineEventStreaming` protocol (`func events(for generationID: UUID) -> AsyncStream<GenerationEvent>`).
 
 `MLXTTSEngine` (`MLXTTSEngine.swift`) is the single concrete implementation. It
 exposes generation, batch generation, model load/unload, prewarm, clone-reference
@@ -403,8 +403,9 @@ Custom/Design/Clone proof, clean Phase 0 controls, and the canonical matrices al
 device into `NativeDeviceMemoryClass` and resolves an `NativeMemoryPolicy` per
 tier + mode + batch. Classification: iPhone → `.iPhonePro`; Mac ≤10 GB →
 `.floor8GBMac`; ≤24 GB → `.mid16GBMac`; else `.highMemoryMac`. Diagnostic override
-`QWENVOICE_FORCE_MEMORY_CLASS` is propagated over the `initialize` handshake only from an internal
-diagnostics build when the `QWENVOICE_DEBUG` master gate is enabled.
+`QWENVOICE_FORCE_MEMORY_CLASS` is read in-process through `RuntimeDebugGate`, so it applies only in an
+internal diagnostics build with the `QWENVOICE_DEBUG` master gate enabled (the old engine-process
+handshake latch in `NativeDeviceClassGate` no longer has a caller).
 
 | Tier (`NativeDeviceMemoryClass`) | MLX cache | Clone slots | Idle-unload | Token clear cadence | Post-batch trim |
 | --- | --- | --- | --- | --- | --- |
@@ -701,7 +702,7 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
   runner), `GenerationTelemetryMerger` (app + engine rows),
   `MacGenerationWarmupCoordinator`, `AudioService`, `WaveformService`.
 - `Sources/ViewModels/` — `ModelManagerViewModel` (model install/variant).
-- `Sources/QwenVoiceCore/` — `HuggingFaceDownloader` (SwiftHuggingFace + SHA-256).
+- `Sources/QwenVoiceCore/` — `HuggingFaceDownloader` (`URLSession` + CryptoKit SHA-256).
 - `Sources/Models/` — `TTSModel`, `Generation` (GRDB record), `Voice`,
   `TTSContract` (contract loader), `MacBatchSheetConfiguration`; the generation
   drafts (`CustomVoiceDraft` / `VoiceDesignDraft` / `VoiceCloningDraft`) are the
@@ -772,7 +773,7 @@ goes to stderr. Full reference: [`reference/cli.md`](reference/cli.md).
 both apps since 2026-09-15) and `Sources/SharedSupport/Database/GenerationMigrations.swift`. `generations`
 table (current schema, after migrations `v1_create_generations` →
 `v2_add_sortOrder` → `v3_drop_sortOrder` → `v4_index_generations_createdAt` →
-`v5_add_long_form_project` → `v6_add_seed`):
+`v5_add_long_form_project` → `v6_add_seed` → `v7_index_generations_audioPath`):
 
 | Column | Type | Notes |
 | --- | --- | --- |
@@ -940,9 +941,10 @@ and [`scripts/lib/test_models.sh`](../scripts/lib/test_models.sh).
 
 Telemetry is **off in production** and on only when `TelemetryGate.isEnabled` —
 resolved from `QWENVOICE_DEBUG` (1/true/on/yes) or
-`QWENVOICE_NATIVE_TELEMETRY_MODE` and propagated to the engine over the `initialize` handshake
-(never persisted). All diagnostic writers respect
-`TelemetryGate.resolvedEnabled` — when the gate is off, no JSONL is appended.
+`QWENVOICE_NATIVE_TELEMETRY_MODE` in the engine's own process (the engine is in-process on every
+host; `vocello bench` sets its mode through `TelemetryGate.applyHandshakeMode`), never persisted.
+All diagnostic writers respect `TelemetryGate.resolvedEnabled` — when the gate is off, no JSONL is
+appended.
 
 Environment-variable ownership is explicit. `config/runtime-debug-knobs.json` registers every
 supported key and classifies production-affecting overrides, bounded observability, and
@@ -954,7 +956,7 @@ values without retaining those values. Likewise,
 `config/concurrency-safety.json` is the authoritative inventory and justification for owned
 `@unchecked Sendable` and other unsafe concurrency declarations; unregistered exceptions fail
 `scripts/runtime_security_contract.py`. Registry schema v2 also requires a current review date and
-substantive removal condition for every exception and caps unreviewed growth at the registered 34
+substantive removal condition for every exception and caps unreviewed growth at the registered 33
 `@unchecked Sendable` and 7 `nonisolated(unsafe)` declarations (`budget` in
 `config/concurrency-safety.json`). The CPU-focused
 ThreadSanitizer subset is owned by `config/tsan-policy.json`; it covers the deterministic core
@@ -1095,7 +1097,7 @@ Most-frequent imports across `Sources/**/*.swift`:
 | SwiftUI | macOS + iOS UI. |
 | AppKit / UIKit | Platform-specific UI. |
 | AVFoundation | Audio playback, recording, PCM/WAV. |
-| Combine | Reactive event delivery (`GenerationChunkBroker`). |
+| Combine | `ObservableObject` publishers and the store's `snapshotChanges` stream. |
 | Observation | `@Observable` state. |
 | Speech | On-device recognition for clone transcripts. |
 | NaturalLanguage | Language detection. |

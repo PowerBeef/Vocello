@@ -3536,6 +3536,27 @@
         "run:macos-xcui-smoke-20260922-071752-a3ac3e43",
         "file:docs/reference/macos-ios-ui-reset-2026-09.md"
       ]
+    },
+    {
+      "id": "PA-00",
+      "title": "Return development to Claude Code as the sole coding agent",
+      "status": "done",
+      "gate": "CLAUDE.md, path-scoped .claude/rules, user-invoked .claude/skills, read-only subagents and .claude/settings.json hooks and permissions replace AGENTS.md, .agents and .codex; the hook adapter reads Claude input and fails closed otherwise; test_agent_hooks.py pins the wiring; the guards are confirmed live.",
+      "sourceOfTruth": [
+        "CLAUDE.md",
+        ".claude/settings.json",
+        "scripts/hooks/agent_hook_input.py",
+        "scripts/tests/test_agent_hooks.py"
+      ],
+      "notes": "Maintainer decision 2026-09-22: retire Codex, keep commit and push autonomy on main, allow read-only subagents. Inverts bb82e209 on the current tree and keeps every rule added since (the ownership and autonomy section). The audit also fixed the TSan swift-base gap, the git -c/-C commit-lint bypass and the dry-run lanes text in b36c1418. Fresh-session discovery is the maintainer's confirmation step.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22",
+      "evidence": [
+        "commit:b36c1418",
+        "commit:91e521ff",
+        "commit:015951c4",
+        "doc:docs/reference/project-audit-2026-09-22.md"
+      ]
     }
   ]
 }

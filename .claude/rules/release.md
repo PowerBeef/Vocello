@@ -78,9 +78,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   key with new ones. `toolchain.optimization` comes from the build receipt (`last-build.json`, executable
   digest bound) via `scripts/lib/build_provenance.py`; the gate bench compares medians of three warm takes
   and reports a loaded or throttled host as inconclusive (exit 3), never as pass or fail.
-- **Memory-qualified publication.** Telemetry schema v8 or newer (the engine emits v9), manifest v2,
-  exact sidecar digests, ≥95% coverage, zero capture failures, no critical pressure, warning, `hardTrim`
-  or `fullUnload`; 95–<100% coverage is `passedWithWarnings`. Marking evidence keeps the take peak
+- **Memory-qualified publication.** Telemetry schema v8 or newer (records are v8; streaming v9 is a
+  digest-bound sidecar), manifest v2, exact sidecar digests, ≥95% coverage, zero capture failures, no
+  critical pressure, warning, `hardTrim` or `fullUnload`; 95–<100% coverage is `passedWithWarnings`. Marking evidence keeps the take peak
   (`config/marking-peak-equality.json`).
 - **Audio QA is autonomous.** Fixed seeds, byte-bound PCM QC, locale-locked full-WAV ASR and
   prosody/delivery evidence are required; listening is optional, has no lane, and never clears a

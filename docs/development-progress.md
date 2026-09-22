@@ -17,6 +17,33 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Consolidated Mac acceptance (September 22)
+
+Source `c66c5b79`, with the unchanged paused marketing-test edit, completed the full serial Mac
+acceptance run: `macos-xcui-smoke-20260922-145946-95d3a54f` **PASS 13/13**, including all ten
+interface languages, and `macos-xcui-perf-20260922-162034-c8dcee40` **9/9**, with 100% probe
+coverage. Both recorded the same workspace fingerprint and passed required steps, crash checks
+and restoration. No retries, source edits between runs, or profiling sampler were used.
+
+Performance remains **passedWithWarnings**: idle 58.90 ms and Settings 70.45 ms exceed their
+unchanged max-gap ceilings. Both worst blocks straddle cleanup; fully enclosed maxima are
+16.667/16.797 ms. History scroll/filter maxima are 125.72/174.07 ms and remain exploratory;
+one run does not establish a speedup. The preserved dirty marketing edit also makes the registry
+record exploratory, not release qualification. Source `c66c5b79` passed
+[CI](https://github.com/PowerBeef/Vocello/actions/runs/35702227185).
+
+Final evidence review found that the perf publisher defaulted to the development-cache executable.
+It now verifies the run-owned build receipt, with coverage for wrong-cache selection and stale/missing
+receipts. The new uncommitted record was regenerated with the actual optimized arm64 app identity;
+its late-publication fingerprint mismatch is explicit. Original run-time metadata remains in raw
+artifacts. No measurements or previously committed records changed.
+The final scoped check passed contracts/privacy and 692 Python tests plus 382 subtests; no native
+rebuild was selected for the publisher/documentation correction.
+
+The consolidated Mac run is now recorded. UIF-08 stays open for iPhone scroll/localization
+acceptance; no phone was used. The existing display-height limit remains. See
+[evidence and limitations](reference/macos-ios-ui-reset-2026-09.md#consolidated-mac-acceptance-september-22).
+
 ### Remaining Mac UI work (September 22)
 
 Baseline `1b275857`. Fixed the duplicate idle error/Generate controls and the connected-engine

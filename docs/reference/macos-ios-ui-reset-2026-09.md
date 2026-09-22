@@ -228,3 +228,62 @@ and `37c77c1e` passed [CI](https://github.com/PowerBeef/Vocello/actions/runs/356
 Final scoped `scripts/dev.sh check --paths …` passed: contracts/privacy/lint, 691 Python tests plus
 382 subtests, 712 core tests, 122 runtime tests with three existing private-fixture skips, generic iOS
 app/logic compilation, and the Mac UI bundle. The unrelated marketing-test edit remains unstaged.
+
+## Consolidated Mac acceptance (September 22)
+
+The complete suites were rerun serially on `c66c5b794b66cf84139bce5d296a95446953e62f`, with no
+intervening source changes or retries. Both provenance snapshots have workspace fingerprint
+`80ef9af7eec5c0dca8094be683da27719ec7fcf1456e4d600080bf8f8135d672`; the sole dirty source was
+the unchanged paused marketing-test edit (five additions, one deletion). This is consistent local
+development acceptance, not a clean-tree or signed-release qualification.
+
+| Repository command | Run | Result |
+| --- | --- | --- |
+| `scripts/ui_test.sh macos smoke` | `macos-xcui-smoke-20260922-145946-95d3a54f` | PASS, 13/13 tests, no skips. Includes the complete ten-language/pseudolocalization journey, window matrix, three generation modes, cancellation, recording/review, libraries, long-form, line batch, missing-model links, error/retry recovery and cross-language Studio content. |
+| `scripts/ui_test.sh macos perf` | `macos-xcui-perf-20260922-162034-c8dcee40` | Runner PASS, 9/9 tests, 100% probe coverage; performance **passedWithWarnings**. No external stack sampler. |
+
+Both required-step ledgers and crash deltas passed. The smoke playback capture was available and
+passed its gate (1/1). Preference/output restoration completed; representative minimum error and
+recovered players plus bilingual custom-text captures were visually reviewed. Raw artifacts remain
+untracked. Existing actual outer bounds remain 780×612, 1040×678 and 1268×678; the configured
+680-point content height still cannot be reached on this display.
+
+The [performance record](../../benchmarks/runs/ui-perf/macos-xcui-perf-20260922-162034-c8dcee40.json)
+retains two unchanged warn-only ceiling breaches:
+
+| Scenario | Reported maximum gap | Ceiling | Worst block relative to window start | Window duration | Fully enclosed block maximum |
+| --- | --- | --- | --- | --- | --- |
+| Idle | 58.899 ms | 50 ms | 14793–15293 ms | 15005 ms | 16.667 ms |
+| Settings scroll | 70.447 ms | 40 ms | 8893–9397 ms | 9242 ms | 16.797 ms |
+
+Both worst blocks overlap cleanup, so their maxima cannot be assigned entirely to the interaction
+window. They remain warnings; the checker and thresholds were not altered. The other three
+confirmatory scenarios had no threshold warnings. All scenarios reported nominal thermal state.
+Exploratory History scroll/filter maxima were 125.721/174.072 ms, with both worst blocks fully
+inside their windows. The previous multi-second gaps were not reproduced here, but this single
+unsampled run does not isolate a cleanup improvement or prove compositor smoothness. History,
+resizing and active-generation timings keep their exploratory designation; the complete registry
+record is also exploratory because of the preserved dirty source.
+
+Review before committing found a publisher defect: the default toolchain enrichment inspected the
+development-cache app, while the UI runner had executed the optimized arm64 app. The run-owned
+`last-build.json` receipts agree on the tested executable digest
+`3251351076103eed6ed3d32eb451d121435754d4cddb7ffb1b7b18108d87118b` and optimization `-O`.
+The publisher now uses that verified receipt for macOS UI performance records and fails closed if it
+is missing or the executable changed. A deterministic regression test includes a conflicting
+development-cache binary and checks stale/missing receipt rejection.
+
+Only this new, uncommitted registry record was regenerated. Original resolved/publication metadata
+was retained beside the raw run. The corrected record explicitly carries a publication-time
+fingerprint mismatch because documentation and publisher corrections happened after execution;
+the two original run snapshots and original resolved metadata establish the common execution source.
+Measurements, warnings, thresholds and previously committed records were not changed. This remains
+exploratory evidence, not an exact-source release record.
+The final scoped routed check passed contracts, privacy and 692 Python tests plus 382 subtests.
+The correction touched only publication tooling, its regression test and evidence documentation;
+it selected no additional native build or UI run.
+
+This supplies the previously missing full smoke/performance evidence on one source identity.
+UIF-08 remains open for physical-iPhone scroll/localization acceptance. No phone, release or website
+lane ran. Local Xcode 27/Swift 6.4 evidence remains distinct from the tested source's
+[passing pinned-toolchain CI](https://github.com/PowerBeef/Vocello/actions/runs/35702227185).

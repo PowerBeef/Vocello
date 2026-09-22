@@ -39,6 +39,7 @@ if str(SCRIPT_DIRECTORY) not in sys.path:
 from build_output_policy import load_policy
 from lib import rtf as rtf_semantics
 from lib import jsonio  # noqa: E402
+from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -1105,6 +1106,23 @@ def app_identity(platform: str, outer: dict[str, Any], artifact_dir: Path) -> di
 
 
 def default_toolchain(platform: str, outer: dict[str, Any], artifact_dir: Path) -> dict[str, Any]:
+    if platform == "macos" and outer.get("benchmarkKind") == "ui-perf":
+        # UI acceptance runs the optimized cache, not the development cache.
+        # Bind publication to the run-owned receipt rather than guessing a bundle.
+        try:
+            receipt = load_build_provenance(
+                artifact_dir / "last-build.json", platform="macos", root=REPO_ROOT,
+                producer_prefix="scripts/ui_test.sh macos perf",
+            )
+        except ProvenanceError as error:
+            raise HistoryError(f"macOS ui-perf app identity is unproven: {error}") from error
+        executable = Path(receipt["executableRelativePath"])
+        outer = {
+            **outer,
+            "optimization": receipt["optimization"],
+            "appBundleRelativePath": str(executable.parents[2]),
+            "executableRelativePaths": {"Vocello": str(executable)},
+        }
     xcode_lines = run_command(["xcodebuild", "-version"]).splitlines()
     swift_line = run_command(["swiftc", "--version"]).splitlines()[0]
     sdk = "macosx" if platform == "macos" else "iphoneos"

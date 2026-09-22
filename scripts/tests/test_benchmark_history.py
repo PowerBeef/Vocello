@@ -979,6 +979,51 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.assertEqual(identity["appVersion"], "2.1.0")
         self.assertEqual(identity["appBuild"], "18")
 
+    def test_macos_perf_identity_uses_verified_run_receipt_not_development_cache(self) -> None:
+        repo = self.root / "perf-repo"
+        relative = Path("build/cache/xcode/macos-optimized/Build/Products/Release/Vocello.app/Contents/MacOS/Vocello")
+        executable = repo / relative
+        executable.parent.mkdir(parents=True)
+        executable.write_bytes(b"optimized-ui-app")
+        (executable.parents[1] / "Info.plist").write_bytes(history.plistlib.dumps({
+            "CFBundleExecutable": "Vocello", "CFBundleShortVersionString": "3.0.0",
+            "CFBundleVersion": "24",
+        }))
+        development = repo / "build/cache/xcode/macos/Build/Products/Release/Vocello.app"
+        other = development / "Contents/MacOS/Vocello"
+        other.parent.mkdir(parents=True)
+        other.write_bytes(b"unrelated-development-app")
+        (development / "Contents/Info.plist").write_bytes(history.plistlib.dumps({
+            "CFBundleExecutable": "Vocello", "CFBundleShortVersionString": "old",
+            "CFBundleVersion": "1",
+        }))
+        artifact = repo / "artifact"
+        artifact.mkdir()
+        receipt = artifact / "last-build.json"
+        receipt.write_text(json.dumps({
+            "schemaVersion": 1, "status": "passed", "platform": "macos",
+            "producer": "scripts/ui_test.sh macos perf", "optimization": "O",
+            "executableRelativePath": str(relative),
+            "executableSHA256": history.file_digest(executable),
+        }))
+        outer = {"benchmarkKind": "ui-perf"}
+        with (
+            mock.patch.object(history, "REPO_ROOT", repo.resolve()),
+            mock.patch.object(history, "MACOS_DERIVED_DATA", development.parents[3]),
+            mock.patch.object(history, "run_command", return_value="Xcode 27.0\nBuild version test"),
+        ):
+            result = history.default_toolchain("macos", outer, artifact)
+            self.assertEqual(result["optimization"], "-O")
+            self.assertEqual(result["executableHashes"], {"Vocello": history.file_digest(executable)})
+            self.assertEqual(result["appVersion"], "3.0.0")
+            self.assertEqual(result["appBuild"], "24")
+            executable.write_bytes(b"rebuilt-after-the-run")
+            with self.assertRaisesRegex(history.HistoryError, "changed since"):
+                history.default_toolchain("macos", outer, artifact)
+            receipt.unlink()
+            with self.assertRaisesRegex(history.HistoryError, "unreadable"):
+                history.default_toolchain("macos", outer, artifact)
+
     def test_pre_run_source_snapshot_is_compared_with_post_run_state(self) -> None:
         record = record_fixture()
         before = copy.deepcopy(record["source"])

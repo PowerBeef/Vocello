@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-20
+reviewed: 2026-09-22
 summary: Replace the unsuccessful Mac presentation with the approved iOS design, sharing composition and retaining small desktop adapters.
 sourceOfTruth:
   - config/roadmap.json
@@ -91,3 +91,69 @@ screens measured at real minimum, default and wide window sizes with genuine geo
 and UIF-08 (a consented lane set on current source covering error, missing-model and wide-window
 states, the Cmd+, window and model links, and the iOS localization lane once its scroll helper is
 corrected). Release-first is the primary plan again.
+
+## Mac acceptance (September 22)
+
+Source `d7058ea6`, including the unchanged, paused marketing-test edit in the run fingerprint:
+
+| Repository lane | Run | Result |
+| --- | --- | --- |
+| `scripts/ui_test.sh macos smoke` | `macos-xcui-smoke-20260922-041322-1258c968` | PASS: 11 tests, no failures or skips; required steps and crash delta pass. |
+| `scripts/ui_test.sh macos perf` | `macos-xcui-perf-20260922-052539-af73c69c` | PASS: nine scenarios, complete probe coverage, no configured-threshold warnings; required steps and crash delta pass. |
+
+Smoke includes the complete ten-language localization journey, so a duplicate standalone localization
+run was unnecessary. It also covers real Speed generation in all three Studio modes, completed
+players, History ownership, switching clips, dismissal during streaming followed by cancellation,
+recording, long-form joining and its segment map, line batch, Cmd+, Settings, and all three missing-model
+links. Missing models use an empty diagnostics-only storage root; installed models are not removed or
+downloaded, and normal-profile Speed readiness is checked afterward. Interface language and the
+autoplay preference changed by the streaming test are restored through genuine controls.
+
+The missing standard sidebar command group was added in `80feb7dc`. Ctrl+Cmd+S now toggles the
+sidebar, and smoke proves that playback remains accessible in the detail footer when it is collapsed.
+The stale library expectation was corrected in `d7058ea6`: the shared session helper deliberately
+selects English and restores the original language, so the test must not assume System Default.
+
+The earlier minimum-size discrepancy was a comparison of content size with outer window size.
+The toolbar occupies 52 points on this host. Strict viewport/control assertions and screenshots
+establish the following Studio bounds for long scripts, completed players and missing models:
+
+| Case | Actual content size | Actual outer window size |
+| --- | --- | --- |
+| Minimum | 780 × 560 | 780 × 612 |
+| Default width, display-limited height | 1040 × 638 | 1040 × 690 |
+| Display-limited wide | 1072 × 638 | 1072 × 690 |
+
+No application minimum, font scaling or scrolling behavior changed. The test measures the editor's
+scroll viewport rather than its potentially offscreen text document, and can resize from the top edge
+when the bottom edge reaches the display boundary. Representative completed-player and collapsed-sidebar
+screenshots were visually reviewed. The configured 680-point default content height and larger widths
+were not reached at the tested window placement; error-only player cards were not exercised. These remain
+explicit limits of UIF-07/UIF-08, alongside the deferred iPhone acceptance and remaining cross-language
+Studio-content cases. Neither item is closed by this pass.
+
+Performance details are in the [qualified record](../../benchmarks/runs/ui-perf/macos-xcui-perf-20260922-052539-af73c69c.json).
+Idle and Settings scrolling recorded zero hitch time. Navigation, delivery menus and typing stayed
+within their existing warn-only ceilings; no thresholds changed. Exploratory History scrolling and
+filtering reported maximum gaps of 4079.50 ms and 3322.23 ms, respectively. These measure app plus
+XCUITest accessibility work, not compositor presentation; `maxGapMS` also retains the worst gap of any
+probe block touching the measurement window. They are retained observations requiring attribution,
+not confirmed application stalls or evidence of uniformly smooth History performance. Resizing and
+generation-active measurements also remain exploratory. This is one local session, not a threshold
+recalibration or signed-candidate qualification.
+
+Earlier runs remain separate failures/incomplete evidence:
+
+| Run suffix (all `macos-xcui-smoke-20260922-…`) | Outcome |
+| --- | --- |
+| `022102-4bee9238` | Wrong assertion measured the scrolled text document rather than its viewport. |
+| `022515-ea673d69` | Bottom-edge resize could not shrink from the display boundary; the strict minimum assertion caught it. |
+| `023232-eaabe9b5` | Size/Settings test passed; run stopped before the remaining journeys to finish command and fixture corrections. |
+| `025338-8591ab82` | Ten tests passed; the library test failed on its stale System Default expectation. |
+
+The routed local checks passed, including deterministic core/runtime tests and the Mac UI bundle;
+the application change also passed generic iOS compilation. Application source `80feb7dc` passed
+[CI including generic iOS compilation](https://github.com/PowerBeef/Vocello/actions/runs/35681116335).
+Final test source `d7058ea6` passed [CI including Mac tests and TSan](https://github.com/PowerBeef/Vocello/actions/runs/35686046774).
+Local Xcode 27/Swift 6.4 evidence remains distinct from pinned CI. No phone, release or website lane
+was run for this Mac follow-up. Raw screenshots, logs and audio remain untracked.

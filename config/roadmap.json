@@ -925,8 +925,8 @@
         "file:Tests/VocelloCoreTests/MacInterfaceLanguageTests.swift",
         "commit:25f27b62"
       ],
-      "updated": "2026-09-21",
-      "notes": "September 21: all 948 UI entries and both iOS permission messages cover EN/FR/ES/DE/IT/pt-BR/zh-Hans/JA/KO/RU. Compiled tests cover selection, persistence, regional matching and Russian/East Asian plurals; contracts reject missing translations and format/category drift. Mac run macos-xcui-localization-20260922-004619-79391bc0 passed all ten languages, layouts, draft preservation, relaunches and cleanup on 25f27b62 plus the unchanged paused marketing-test edit; required steps and crash delta pass. CI passed implementation and fixtures. Actual compact size was 780x612; the declared 560 pt minimum remains UIF-07. iOS app/logic/UI bundles compile; the maintainer deferred phone execution. Earlier EN/FR device evidence does not qualify the new catalogs. Physical layout/VoiceOver, purchase and signed-candidate acceptance remain open. No App Store metadata or release promotion. Outcomes and retained failures: docs/reference/localization.md; current checkpoint: docs/development-progress.md."
+      "updated": "2026-09-22",
+      "notes": "September 21: all 948 UI entries and both iOS permission messages cover EN/FR/ES/DE/IT/pt-BR/zh-Hans/JA/KO/RU. Compiled tests cover selection, persistence, regional matching and Russian/East Asian plurals; contracts reject missing translations and format/category drift. September 22 smoke macos-xcui-smoke-20260922-041322-1258c968 passed all ten languages, draft preservation, relaunches and cleanup on d7058ea6 plus the unchanged paused marketing-test edit; required steps/crash delta and CI pass. The 780x612 outer frame contains 780x560 content; the earlier minimum discrepancy was a measurement interpretation error. iOS app/logic/UI bundles compile; phone execution remains deferred. Earlier EN/FR phone evidence does not qualify the new catalogs. Physical layout/VoiceOver, purchase and signed-candidate acceptance remain open. No App Store metadata or release promotion. Details and retained failures: docs/reference/localization.md."
     },
     {
       "id": "ICA-04",
@@ -1313,17 +1313,17 @@
     {
       "id": "UIF-07",
       "title": "Verify the adapted screens at supported window sizes",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Each converted screen fits its actual minimum/default/wide window bounds, including completion, long labels and error states. Long scripts scroll inside the editor. Any changed window minimum or additional scrolling behavior is explicitly reviewed and proven by genuine window-frame and control-geometry assertions.",
       "sourceOfTruth": [
         "Sources/Views/Shell/MacShellMetrics.swift",
         "Sources/Views/Studio/MacStudioCanvas.swift",
         "Tests/VocelloMacUITests/VocelloUIWindowFrame.swift"
       ],
-      "notes": "The previous audit found disagreement between declared and enforced window minima; GeometryReader allowed shrinking but did not prove content fit. The September 18 reset must measure the new composition at actual minimum/default/wide sizes, including Design/Cloning inline content during migration. September 20 player follow-up adds a compact card and detail-footer fallback when the sidebar is hidden; include both placements and error-only cards in window-fit acceptance. Do not hide clipping by weakening assertions. A changed minimum or additional scrolling is a reviewable product choice; prior rescaling did not close this item. September 21 ten-language localization run measured 780x612 pt under pseudo-localization; the declared 780x560 minimum was not reached. This confirms the existing discrepancy, not acceptance at 560 pt. Ordinary language screenshots after relaunch use the actual restored/default bounds; wider/completed/error states remain separate.",
+      "notes": "September 22 on d7058ea6: smoke macos-xcui-smoke-20260922-041322-1258c968 passed 11/11. Strict Studio assertions cover long scripts, completed players and missing models in all three modes. The earlier discrepancy compared outer and content sizes: 780x612 outer includes a 52 pt toolbar, leaving the declared 780x560 content. No minimum or scaling change. Default-width and wide cases reached 1040x690 and 1072x690 outer; at the tested window placement, runs did not reach the full 680 pt default content height or larger widths. Completed-player and collapsed-sidebar screenshots were reviewed. Error-only cards and fuller window-size coverage remain unverified, so this item stays open. Details and separate failed attempts: docs/reference/macos-ios-ui-reset-2026-09.md.",
       "plan": "macos-ui-fidelity-2026-09",
       "blockedBy": [],
-      "updated": "2026-09-21"
+      "updated": "2026-09-22"
     },
     {
       "id": "UIF-08",
@@ -1337,8 +1337,8 @@
         "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift",
         "Sources/Views/Settings/MacSettingsScreen.swift"
       ],
-      "notes": "September 21: physical localization/accessibility source checks passed with limitations recorded in docs/development-progress.md; no whole-app or signed-candidate acceptance. iOS generation remains blocked by all three models showing Update Available. Finish Mac localization/smoke/perf and supported window sizes, Settings/model links, playback dismissal during streaming, selecting another clip, long-form join and sidebar collapse. Studio starting points/placeholders and delivery presentation now follow the selected/detected speech language; undetected Auto uses the interface language. Canonical instructions and existing drafts remain unchanged. Include French output under English UI, English output under French UI, Auto detection, reopening sheets after language changes, custom-text preservation and long descriptions in Mac/iPhone acceptance. Ten-language content does not qualify ten-language UI or audio adherence. Exact prior run IDs and limitations remain in the checkpoint; earlier history is in git.",
-      "updated": "2026-09-21"
+      "notes": "September 22: smoke macos-xcui-smoke-20260922-041322-1258c968 (11/11, including all ten languages) and perf macos-xcui-perf-20260922-052539-af73c69c (9/9) PASS on d7058ea6 plus the unchanged paused marketing-test edit. Required steps/crash deltas pass. Covered all three Speed modes, completed players, Settings/model links, streaming dismissal/cancellation, clip switching, sidebar collapse, long-form join and line batch. Added standard sidebar commands; corrected stale test language and window measurement assumptions. Perf coverage 100%, no configured-threshold warnings; exploratory History max gaps 4.08 s/3.32 s are a combined app/XCUITest proxy and need attribution before a product fix. Remaining: error-only layouts, fuller size coverage, French-output/English-UI and inverse preset/custom-text cases, and iPhone acceptance. Evidence and limitations: docs/reference/macos-ios-ui-reset-2026-09.md; current checkpoint: docs/development-progress.md.",
+      "updated": "2026-09-22"
     }
   ]
 }

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-21
+reviewed: 2026-09-22
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -16,6 +16,31 @@ Checkpoints older than the ones below live in git history (`git log -p -- docs/d
 last full copy at commit 25a895ed).
 
 ## Resume now
+
+### Mac window and playback acceptance (September 22)
+
+Baseline `2e161aad`; final tested source `d7058ea6`. Added the standard sidebar commands so
+Ctrl+Cmd+S works, and extended the existing smoke journeys for window bounds, completed players,
+collapsed-sidebar playback, switching clips, streaming dismissal, Cmd+, Settings and missing-model
+links. The declared minimum was already correct: 780x612 outer includes 52 points of toolbar and
+780x560 content. No minimum or visual scaling change was needed.
+
+`macos-xcui-smoke-20260922-041322-1258c968` **PASS**: 11/11, including all ten languages and
+real Built-in/Design/Clone Speed generation, cancellation, recording, long-form joining and line batch.
+`macos-xcui-perf-20260922-052539-af73c69c` **PASS**: 9/9, 100% probe coverage and no configured
+threshold warnings. Both runs passed required steps and crash deltas on the same source fingerprint.
+The routed checks passed; `d7058ea6` passed [CI](https://github.com/PowerBeef/Vocello/actions/runs/35686046774).
+Generic iOS compilation passed with the application change in `80feb7dc`; no phone was used.
+
+UIF-07/UIF-08 remain open for error-only layouts, fuller window-size coverage, remaining cross-language
+Studio-content cases and iPhone acceptance. Actual default/wide windows were display-limited to
+1040x690 and 1072x690 outer. Exploratory History measurements retain 4.08 s/3.32 s maximum gaps;
+XCUITest query work and boundary probe blocks prevent attributing them directly to app stalls.
+Follow-up must distinguish that cost before choosing a product fix; the five configured scenarios
+passed unchanged thresholds. Evidence, limitations and the separate failed/incomplete runs are in
+[Mac acceptance](reference/macos-ios-ui-reset-2026-09.md#mac-acceptance-september-22).
+The paused marketing-test modification is untouched. Raw evidence stays untracked; only the qualified
+performance record and generated history index are published with this checkpoint.
 
 ### Ten-language interface catalogs (September 21)
 
@@ -45,8 +70,8 @@ remain separate in [localization guidance](reference/localization.md#september-2
 The iOS journey is compiled and prepared, but phone execution remains deferred. ASR-12/ISU-4
 retain physical layout, VoiceOver and signed-candidate qualification; no native-speaker review,
 App Store metadata or website localization is claimed.
-The pseudo-localized window reached 780x612 pt, not the declared 780x560 minimum; UIF-07
-retains that existing discrepancy. The paused Mac marketing-test edit remains untouched.
+The 780x612 measurement was an outer frame; the September 22 checkpoint above corrects its initial
+comparison with the 780x560 content minimum. The paused Mac marketing-test edit remains untouched.
 
 ### French instruction pilot (September 21)
 

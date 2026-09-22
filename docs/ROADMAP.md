@@ -433,12 +433,12 @@ Narrative authority: [`docs/reference/macos-ios-ui-reset-2026-09.md`](reference/
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `UIF-07` | planned | Verify the adapted screens at supported window sizes | — |
+| `UIF-07` | in-flight | Verify the adapted screens at supported window sizes | — |
 | `UIF-08` | in-flight | Native acceptance of the iOS-derived screens on current source | — |
 
 ### Open items in detail
 
-- **`UIF-07`** (planned) — Verify the adapted screens at supported window sizes.
+- **`UIF-07`** (in-flight) — Verify the adapted screens at supported window sizes.
   gate: Each converted screen fits its actual minimum/default/wide window bounds, including completion, long labels and error states. Long scripts scroll inside the editor. Any changed window minimum or additional scrolling behavior is explicitly reviewed and proven by genuine window-frame and control-geometry assertions.
 
 - **`UIF-08`** (in-flight) — Native acceptance of the iOS-derived screens on current source.

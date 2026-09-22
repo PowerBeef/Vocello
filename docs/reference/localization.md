@@ -163,8 +163,12 @@ ISU-4 owns the remaining Settings/accessibility and purchase qualification.
 steps, including crash delta, passed; the original development-profile language was restored.
 The production preference suite was untouched. Representative Russian, Japanese, Korean and
 German screenshots were visually reviewed. Evidence remains untracked under `build/artifacts/ui-tests/macos`.
-The actual compact window was 780x612 pt; the declared 780x560 minimum was not reached and
-remains UIF-07. This is local UI evidence, not signed-candidate, VoiceOver or native-speaker acceptance.
+The actual compact outer window was 780x612 pt. The September 22 follow-up corrected the initial
+interpretation: its 52-point toolbar leaves the declared 780x560 content area. Strict content/viewport
+assertions now prove that minimum. The complete ten-language journey also passed inside smoke run
+`macos-xcui-smoke-20260922-041322-1258c968` on `d7058ea6`; see the
+[Mac acceptance scope and limits](macos-ios-ui-reset-2026-09.md#mac-acceptance-september-22).
+This is local UI evidence, not signed-candidate, VoiceOver or native-speaker acceptance.
 
 Earlier attempts remain separate failures, never combined into this PASS:
 

@@ -1678,3 +1678,9 @@ trend percentages carry their direction in words.
 | 2026-09-05 | [`macos-xcui-perf-20260905-020438-6e5e7c09`](runs/ui-perf/macos-xcui-perf-20260905-020438-6e5e7c09.json) | canonical | exploratory | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` dirty | `excluded` | baseline | ui-followup-counted-01-20260905 |
 | 2026-09-05 | [`macos-xcui-perf-20260905-021246-5c9a093b`](runs/ui-perf/macos-xcui-perf-20260905-021246-5c9a093b.json) | canonical | exploratory | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` dirty | `excluded` | baseline | ui-followup-counted-02-20260905 |
 | 2026-09-05 | [`macos-xcui-perf-20260905-022054-71e88d78`](runs/ui-perf/macos-xcui-perf-20260905-022054-71e88d78.json) | canonical | exploratory | passedWithWarnings | not-applicable | 9 | — | `14dc148c94c8` dirty | `excluded` | baseline | ui-followup-counted-03-20260905 |
+
+## ui-perf / macos / mac-mini-m2-8gb / config `f8baac544b2e`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-22 | [`macos-xcui-perf-20260922-052539-af73c69c`](runs/ui-perf/macos-xcui-perf-20260922-052539-af73c69c.json) | canonical | exploratory | passed | not-applicable | 9 | — | `d7058ea6ddf0` dirty | `excluded` | baseline | macos-xcui-perf-20260922-052539-af73c69c |

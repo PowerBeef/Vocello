@@ -34,6 +34,10 @@ extension VocelloMacSmokeUITests {
             XCTAssertFalse(button("textInput_generateButton").exists, "An idle failure has one retry action, matching iOS")
             XCTAssertFalse(button("textInput_cancelButton").exists)
             assertStudioSizeMatrix("\(mode.rawValue)-write-error", failed: true)
+            replaceScript(with: "")
+            XCTAssertFalse(error.isEnabled, "Retry follows the same empty-input rule as Generate")
+            replaceScript(with: script)
+            XCTAssertTrue(error.isEnabled)
             assertHistoryRows(matching: script, expected: 0)
             let screen: VocelloMacScreen = mode == .custom ? .customVoice : mode == .design ? .voiceDesign : .voiceCloning
             navigate(to: screen)
@@ -149,8 +153,8 @@ extension VocelloMacSmokeUITests {
             assertHistoryRows(matching: "uiperf-seed-0000", expected: 1)
             assertHistoryRowsLayoutIntact(filteredTo: "uiperf-seed-0000")
             VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-history-\(name)")
-            openSettingsOverview()
             for category in ["audio", "appLanguage", "modelsFiles", "cloning"] {
+                openSettingsOverview()
                 VocelloUILayoutAssert.assertFullyWithinWindow(button("settings_category_\(category)"), of: app)
                 openSettingsCategory(category)
                 VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-settings-\(category)-\(name)")

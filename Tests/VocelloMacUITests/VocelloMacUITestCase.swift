@@ -98,6 +98,12 @@ class VocelloMacUITestCase: XCTestCase {
             return
         }
         pendingInterfaceLanguageRestore = identifier
+        // Explicit recovery after an interrupted prior journey. The runner
+        // still restores through the real Settings picker, never defaults writes.
+        if let recovery = ProcessInfo.processInfo.environment["QVOICE_MAC_RESTORE_INTERFACE_LANGUAGE"] {
+            XCTAssertNotNil(Self.interfaceLanguageNames[recovery], "Unknown recovery language")
+            pendingInterfaceLanguageRestore = recovery
+        }
     }
 
     func launchApp(

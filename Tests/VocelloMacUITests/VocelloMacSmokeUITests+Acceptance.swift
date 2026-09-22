@@ -115,7 +115,7 @@ extension VocelloMacSmokeUITests {
         let pathField = app.dialogs.textFields.firstMatch
         XCTAssertTrue(VocelloUITextEntry.replace(in: pathField, with: path, timeout: 20))
         app.typeKey(.return, modifierFlags: [])
-        let open = app.buttons["Open"].firstMatch
+        let open = app.dialogs["open-panel"].buttons["Open"].firstMatch
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: open, timeout: 20))
         XCTAssertTrue(VocelloUIWait.condition("chosen output directory", timeout: 10) {
             self.element("preferences_outputDirectory", type: .staticText).label == path
@@ -123,6 +123,13 @@ extension VocelloMacSmokeUITests {
     }
 
     func restoreOutputFolder(_ original: String?) {
+        // A failed selection can leave Go to Folder above the open panel.
+        // Dismiss only this test-owned picker before restoring Settings.
+        for _ in 0..<2 {
+            guard app.dialogs["open-panel"].exists else { break }
+            app.typeKey(.escape, modifierFlags: [])
+        }
+        XCTAssertTrue(VocelloUIWait.disappears(app.dialogs["open-panel"], timeout: 10))
         if let original {
             chooseOutputFolder(original)
         } else {

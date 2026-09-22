@@ -56,7 +56,11 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
 
     private func captureModelsRefresh() {
         openSettingsCategory("modelsFiles")
-        XCTAssertTrue(VocelloUIWait.exists(element("settings_packageStatus_pro_custom_speed"), timeout: 20))
+        let status = element("settings_packageStatus_pro_custom_speed")
+        XCTAssertTrue(VocelloUIWait.exists(status, timeout: 20))
+        // Move mouse focus into the visible content before capturing. Opening
+        // Settings can leave keyboard focus on the toolbar's sidebar toggle.
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: status, timeout: 20))
         captureRefresh("model-downloads")
     }
 

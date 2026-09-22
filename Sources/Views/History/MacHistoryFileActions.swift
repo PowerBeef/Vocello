@@ -15,18 +15,12 @@ enum MacHistoryFileActions {
         panel.allowedContentTypes = [.wav]
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return nil }
-        let sourceURL = URL(fileURLWithPath: audioPath)
-        let fileManager = FileManager.default
         do {
-            // NSSavePanel only stages the destination URL after the user
-            // confirms the overwrite prompt; it does not remove the existing
-            // file, and `copyItem` then throws on overwrite. Remove the
-            // destination first. `replaceItemAt` is not an option: it would
-            // move the History file out of place.
-            if fileManager.fileExists(atPath: url.path) {
-                try fileManager.removeItem(at: url)
-            }
-            try fileManager.copyItem(at: sourceURL, to: url)
+            // NSSavePanel confirms an overwrite but leaves the existing file in
+            // place. MacFileSaveCopy stages a copy and replaces the destination
+            // only once it is complete, and treats the take's own file as the
+            // destination as a no-op instead of deleting it.
+            _ = try MacFileSaveCopy.copy(from: URL(fileURLWithPath: audioPath), to: url)
             return nil
         } catch {
             return error.localizedDescription

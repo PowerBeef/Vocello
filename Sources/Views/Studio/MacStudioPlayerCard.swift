@@ -51,6 +51,7 @@ struct MacStudioPlayerCard: View {
     var onSaveAsVoice: (() -> Void)? = nil
 
     @State private var isConfirmingDismiss = false
+    @State private var saveAsFailure: String?
 
     var body: some View {
         let shape = VocelloShape.stage()
@@ -100,6 +101,14 @@ struct MacStudioPlayerCard: View {
         )
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(phase.accessibilityIdentifier)
+        .alert(
+            MacInterfaceText.historyExportError,
+            isPresented: Binding(get: { saveAsFailure != nil }, set: { if !$0 { saveAsFailure = nil } })
+        ) {
+            Button(MacInterfaceText.ok) { saveAsFailure = nil }
+        } message: {
+            Text(MacInterfaceText.historyExportErrorMessage(saveAsFailure ?? ""))
+        }
         .confirmationDialog(
             MacInterfaceText.studioDismissTake,
             isPresented: $isConfirmingDismiss,
@@ -222,7 +231,7 @@ struct MacStudioPlayerCard: View {
                     label: MacInterfaceText.historySaveAs,
                     accessibilityIdentifier: "studio_inlinePlayer_saveAs",
                     size: MacControl.icon.height,
-                    action: { _ = MacHistoryFileActions.saveCopy(of: item.audioURL.path) }
+                    action: { saveAsFailure = MacHistoryFileActions.saveCopy(of: item.audioURL.path) }
                 )
                 MacIconButton(
                     symbol: "folder",

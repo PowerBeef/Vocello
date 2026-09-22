@@ -428,12 +428,14 @@ class VocelloMacUITestCase: XCTestCase {
                                          "Wide acceptance requires a display wider than the default window")
                 }
             }
-            let editor = element("textInput_textEditor")
-            VocelloUILayoutAssert.assertFullyWithinWindow(editor, of: app)
+            // NSTextView is the scrolling document, not the visible editor.
+            // Its AX frame may extend above the window after typing long text.
+            let viewport = app.scrollViews.containing(.any, identifier: "textInput_textEditor").firstMatch
+            VocelloUILayoutAssert.assertFullyWithinWindow(viewport, of: app)
             let install = button("textInput_installModelButton")
             VocelloUILayoutAssert.assertFullyWithinWindow(install.exists ? install : generationAction, of: app)
             VocelloUILayoutAssert.assertFullyWithinWindow(element("textInput_modeMetaLabel"), of: app)
-            XCTAssertLessThanOrEqual(editor.frame.maxY, element("textInput_modeMetaLabel").frame.minY + 2,
+            XCTAssertLessThanOrEqual(viewport.frame.maxY, element("textInput_modeMetaLabel").frame.minY + 2,
                                      "Script must scroll inside its editor without covering setup")
             if completed {
                 VocelloUILayoutAssert.assertFullyWithinWindow(button("studio_inlinePlayer_playPause"), of: app)

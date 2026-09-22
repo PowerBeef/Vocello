@@ -51,6 +51,7 @@ struct QwenVoiceApp: App {
             height: MacShellMetrics.settingsWindowDefaultSize.height
         )
         .commands {
+            SidebarCommands()
             CommandGroup(replacing: .newItem) { }
 
             // Playback commands

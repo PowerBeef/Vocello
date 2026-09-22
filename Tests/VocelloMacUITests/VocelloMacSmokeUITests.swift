@@ -57,8 +57,13 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         // Existing registered storage isolation, not a model-state override.
         // The app creates an empty profile; installed user/development models
         // remain untouched. No download or deletion action is invoked.
+        guard let artifactDirectory = ProcessInfo.processInfo.environment["QVOICE_MAC_BENCH_CAPTURE_DIR"] else {
+            XCTFail("Run this journey through scripts/ui_test.sh macos smoke")
+            return
+        }
         relaunchApp(additionalEnvironment: [
-            "QWENVOICE_APP_SUPPORT_DIR": "/tmp/vocello-ui-empty-\(UUID().uuidString)",
+            "QWENVOICE_APP_SUPPORT_DIR": URL(fileURLWithPath: artifactDirectory)
+                .appendingPathComponent("empty-model-profile").path,
         ])
         for (screen, mode) in [(VocelloMacScreen.customVoice, "custom"), (.voiceDesign, "design"), (.voiceCloning, "clone")] {
             navigate(to: screen)
@@ -457,10 +462,16 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         beginSession()
         defer { endSession() }
 
+        ensureAutoplayEnabled()
         let nonce = "smoke-cancel-\(Self.pronounceableNonce())"
         prepare(mode: .custom)
         replaceScript(
-            with: VocelloUIBenchMatrix.text(for: .long) + " Cancellation token \(nonce)."
+            with: VocelloUIBenchMatrix.text(for: .long)
+                + " Beyond the harbor, a narrow road followed the water between fields of clover and weathered stone walls."
+                + " A cyclist paused beside the old lighthouse to watch fishing boats return with the changing tide."
+                + " In the village square, shopkeepers opened their doors and set baskets of fresh bread on wooden tables."
+                + " The quiet morning promised a leisurely journey through familiar streets and unexpected conversations."
+                + " Cancellation token \(nonce)."
         )
         startGenerationAndAwaitCancelControl(mode: .custom)
         XCTAssertTrue(VocelloUIWait.exists(button("studio_livePreview_playPause"), timeout: 180))

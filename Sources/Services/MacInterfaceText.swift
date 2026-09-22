@@ -3,7 +3,7 @@ import QwenVoiceCore
 
 /// Typed interface vocabulary for the macOS app: every user-visible literal the macOS views
 /// present goes through here and `Localizable.xcstrings` (keys `vocello.mac.*`, English source,
-/// French maintained alongside, translator context on every entry). Views read plain `String`s,
+/// all ten interface languages maintained alongside, translator context on every entry). Views read plain `String`s,
 /// so the catalog is the one owner and `scripts/localization_contract.py` binds each key to
 /// exactly one default here. Stored names, model ids, seeds, license bodies and generation text
 /// never enter this vocabulary.

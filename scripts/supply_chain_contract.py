@@ -4,7 +4,8 @@
 Every `uses:` in every workflow must reference a full 40-hex commit SHA that matches
 `config/toolchain.json`; Dependabot must watch the three ecosystems the repository
 consumes; the website keeps its deterministic npm scripts; and `--installed <group>`
-checks that the tools on this host report exactly the pinned versions.
+checks that the tools on this host report the pinned version components: `2.46.0` is
+exact, while a major-only pin such as the website's Node `24` accepts any 24.x.
 """
 
 from __future__ import annotations
@@ -90,7 +91,7 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
                 except ValueError as error:
                     errors.append(str(error))
                     continue
-                if not re.search(rf"(?<![0-9]){re.escape(str(expected))}(?![0-9])", output):
+                if not re.search(rf"(?<![0-9.]){re.escape(str(expected))}(?![0-9])", output):
                     first = output.splitlines()[0] if output.splitlines() else "<empty>"
                     errors.append(f"{name}: expected {expected}, observed {first}")
     return errors

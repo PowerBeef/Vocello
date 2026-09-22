@@ -7,6 +7,7 @@ import importlib.util
 import os
 from pathlib import Path
 import re
+import shlex
 import signal
 import subprocess
 import tempfile
@@ -267,16 +268,18 @@ class RequiredStepLedgerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             ledger = root / "ledger.json"
+            # Quoted: a clone path may contain spaces.
+            quoted = shlex.quote(str(ledger))
             script = f"""
 set -euo pipefail
-ROOT_DIR={ROOT!s}
-. {LIBRARY!s}
-required_steps_init {ledger!s} fixture-optional-lane fixture
+ROOT_DIR={shlex.quote(str(ROOT))}
+. {shlex.quote(str(LIBRARY))}
+required_steps_init {quoted} fixture-optional-lane fixture
 for step in source-provenance primary-run crash-delta; do
-  required_step_run {ledger!s} "$step" true || true
+  required_step_run {quoted} "$step" true || true
 done
-required_step_run {ledger!s} result-retention true || true
-required_steps_finalize {ledger!s}
+required_step_run {quoted} result-retention true || true
+required_steps_finalize {quoted}
 """
             fixture = root / "contract.json"
             self.write_fixture_contract(fixture)

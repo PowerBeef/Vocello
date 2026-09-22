@@ -124,14 +124,14 @@
   },
   "website": {
     "node": {
-      "version": "24.15.0",
+      "version": "24",
       "versionCommand": [
         "node",
         "--version"
       ]
     },
     "npm": {
-      "version": "11.12.1",
+      "version": "11",
       "versionCommand": [
         "npm",
         "--version"

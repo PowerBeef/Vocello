@@ -60,8 +60,8 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   distribution outputs.
 - **Action and toolchain identities are pinned.** Every action uses the full SHA in
   `config/toolchain.json`; xcodegen, ripgrep, xcbeautify and shellcheck install from SHA-pinned release
-  artifacts; numpy, pytest and pytest-xdist pip-pin to the manifest. Dependabot proposes, the manifest
-  and comment change together.
+  artifacts; numpy, pytest and pytest-xdist pip-pin to the manifest; the website's Node and npm pin
+  only their major version (24 / 11). Dependabot proposes, the manifest and comment change together.
 - **Exact-source releases.** `release_source_authority.py` proves a GitHub-verified annotated `v*` tag on
   the checked-out commit, containment in `origin/main` and a successful latest `CI required` run; the
   release workflow runs Security on that commit first. Lightweight tags, cross-SHA checks and incomplete

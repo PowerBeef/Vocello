@@ -95,12 +95,11 @@ npx --prefix website playwright install chromium
 npm --prefix website run check
 ```
 
-CI pins an exact Node and npm patch (`config/toolchain.json` `website.node`, `website.npm`), while
-Homebrew's `node@24` follows the latest 24.x. The website check works with any 24.x; only the exact
-identity check in `scripts/dev.sh ci` and `supply_chain_contract.py --installed website` reports the
-difference. That local drift is expected and never a reason to change the pin; install the exact
-release from nodejs.org only if you need `scripts/dev.sh ci` to pass end to end on this Mac. Vercel
-deploys through its Git integration; `vercel link --repo` is needed only to use the Vercel CLI.
+Node and npm pin only their major version (`config/toolchain.json` `website.node` 24, `website.npm`
+11): CI's `setup-node` takes the latest 24.x with its bundled npm, and Homebrew's `node@24` follows the
+same line, so `scripts/dev.sh ci` and `supply_chain_contract.py --installed website` pass on it. The
+dependencies themselves stay exact through `website/package-lock.json`. Vercel deploys through its Git
+integration; `vercel link --repo` is needed only to use the Vercel CLI.
 
 ## 5. Git
 
@@ -115,7 +114,7 @@ signed and GitHub-verified (`git tag -s`), so configure a signing key only if yo
 ```sh
 scripts/dev.sh status
 python3 scripts/supply_chain_contract.py --installed native     # a newer local Xcode shows as drift; expected
-python3 scripts/supply_chain_contract.py --installed website    # Homebrew node@24 shows as drift; expected
+python3 scripts/supply_chain_contract.py --installed website    # any Node 24.x / npm 11.x passes
 scripts/dev.sh check                                            # first run: regenerate, resolve packages, cold build
 scripts/dev.sh build && scripts/dev.sh run
 ```

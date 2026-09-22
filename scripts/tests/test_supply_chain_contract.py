@@ -109,6 +109,17 @@ class SupplyChainContractTests(unittest.TestCase):
             self.assertEqual(module.validate(self.root, "native"), [])
             module._tool_output = lambda command: "Version: 2.46.10\n"
             self.assertTrue(any("expected 2.46.0" in e for e in module.validate(self.root, "native")))
+            # A major-only pin (the website's Node) accepts any release in that line only.
+            self.write_toolchain(
+                {"actions/checkout": {"version": "v4", "sha": self.sha},
+                 "actions/upload-artifact": {"version": "v4", "sha": self.sha}},
+                native={"node": {"version": "24", "versionCommand": ["node", "--version"]}},
+            )
+            module._tool_output = lambda command: "v24.21.0\n"
+            self.assertEqual(module.validate(self.root, "native"), [])
+            for observed in ("v26.9.0\n", "v26.24.0\n", "v124.0.0\n"):
+                module._tool_output = lambda command, observed=observed: observed
+                self.assertTrue(any("expected 24" in e for e in module.validate(self.root, "native")), observed)
         finally:
             module._tool_output = original
 

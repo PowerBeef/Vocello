@@ -109,18 +109,13 @@ jobs:
       contents: read
       issues: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: File one issue per open nightly failure
         env:
           GH_TOKEN: ${{ github.token }}
           RESULTS: ${{ toJSON(needs) }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          body="Nightly run failed: ${RUN_URL}"$'\n\n'"Job results:"$'\n'"$(printf '%s' "$RESULTS" | python3 -c 'import json,sys; print("\n".join(f"- {k}: {v[\"result\"]}" for k, v in json.load(sys.stdin).items()))')"
-          existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --label nightly --state open --json number --jq '.[0].number // empty')"
-          if [[ -n "$existing" ]]; then
-            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$body"
-          else
-            gh label create nightly --repo "$GITHUB_REPOSITORY" --color B60205 --description "Nightly lane failure" 2>/dev/null || true
-            gh issue create --repo "$GITHUB_REPOSITORY" --label nightly --title "Nightly lane failing" --body "$body"
-          fi
+        run: python3 scripts/ci/failure_issue.py --label nightly --title "Nightly lane failing" --heading "Nightly run failed"

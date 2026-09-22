@@ -199,6 +199,47 @@ let package = Package(name: "Fixture", dependencies: [
         self.assertEqual(report["summary"]["advisoryCount"], 1)
         self.assertEqual(report["proposals"][0]["group"], "root-app")
 
+    def test_advisories_named_by_repository_path_match_their_pin(self) -> None:
+        # Dependabot names Swift packages github.com/<owner>/<repo>, as the
+        # dependency snapshot submits them, not by the SwiftPM identity.
+        policy, raw, current = self.loaded()
+        feeds = self.feeds()
+        feeds["ml-explore/mlx-swift"] = [{"tag_name": "0.31.6"}]
+        report = module.build_report(
+            policy,
+            raw,
+            current,
+            feeds,
+            [{
+                "state": "open",
+                "dependency": {"package": {"name": "github.com/groue/GRDB.swift"}},
+                "security_advisory": {"ghsa_id": "GHSA-abcd-1234-5678", "severity": "high"},
+            }, {
+                "state": "open",
+                "dependency": {"package": {"name": "github.com/someone/unrelated"}},
+                "security_advisory": {"ghsa_id": "GHSA-zzzz-1234-5678", "severity": "low"},
+            }],
+            generated_at="2026-08-26T19:00:00Z",
+        )
+        self.assertEqual(report["summary"]["advisoryCount"], 1)
+        self.assertEqual(report["proposals"][0]["group"], "root-app")
+
+    def test_http_errors_keep_githubs_message(self) -> None:
+        import io
+        import urllib.error
+        from unittest import mock
+
+        def refuse(request, timeout):
+            raise urllib.error.HTTPError(
+                request.full_url, 403, "Forbidden", {},
+                io.BytesIO(b'{"message": "Resource not accessible by integration"}'),
+            )
+
+        with mock.patch.object(module.urllib.request, "urlopen", side_effect=refuse):
+            with self.assertRaises(module.PolicyError) as raised:
+                module._github_json("/repos/o/r/dependabot/alerts", "token")
+        self.assertIn("HTTP 403 Resource not accessible by integration", str(raised.exception))
+
     def test_prerelease_does_not_create_a_false_update(self) -> None:
         policy, raw, current = self.loaded()
         feeds = self.feeds()

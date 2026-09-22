@@ -11,7 +11,9 @@ on:
 
 permissions:
   contents: read
-  security-events: read
+  # Listing Dependabot alerts needs this permission; security-events covers
+  # code scanning only and left every run refused with HTTP 403.
+  vulnerability-alerts: read
 
 concurrency:
   group: swift-dependency-watch

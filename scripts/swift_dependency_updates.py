@@ -262,7 +262,21 @@ def _stable_versions(rows: Any) -> list[str]:
     return sorted(versions, key=_version_tuple)
 
 
-def _advisories(rows: Any, identities: set[str]) -> dict[str, list[dict[str, str]]]:
+def _advisory_aliases(policy: dict[str, Any]) -> dict[str, str]:
+    """Advisory package names mapped to pin identities.
+
+    Dependabot names Swift packages by repository path (`github.com/<owner>/<repo>`,
+    as the dependency snapshot submits them), not by the SwiftPM identity.
+    """
+    aliases: dict[str, str] = {}
+    for package in policy["packages"]:
+        identity = package["identity"]
+        aliases[identity.casefold()] = identity
+        aliases[f"github.com/{package['repository']}".casefold()] = identity
+    return aliases
+
+
+def _advisories(rows: Any, aliases: dict[str, str]) -> dict[str, list[dict[str, str]]]:
     if not isinstance(rows, list):
         raise PolicyError("advisory feed must be a list")
     result: dict[str, list[dict[str, str]]] = defaultdict(list)
@@ -275,13 +289,14 @@ def _advisories(rows: Any, identities: set[str]) -> dict[str, list[dict[str, str
         advisory = row.get("security_advisory")
         ghsa = advisory.get("ghsa_id") if isinstance(advisory, dict) else None
         severity = advisory.get("severity") if isinstance(advisory, dict) else None
-        if not isinstance(name, str) or name not in identities:
+        identity = aliases.get(name.casefold()) if isinstance(name, str) else None
+        if identity is None:
             continue
         if not isinstance(ghsa, str) or not re.fullmatch(r"GHSA-[A-Za-z0-9-]+", ghsa):
             raise PolicyError(f"advisory for {name} has an invalid GHSA identifier")
         if severity not in {"low", "moderate", "high", "critical"}:
             raise PolicyError(f"advisory for {name} has an invalid severity")
-        result[name].append({"id": ghsa, "severity": severity})
+        result[identity].append({"id": ghsa, "severity": severity})
     for rows_for_package in result.values():
         rows_for_package.sort(key=lambda row: (row["severity"], row["id"]))
     return result
@@ -303,7 +318,7 @@ def build_report(
     if parsed_time.tzinfo is None:
         raise PolicyError("generated-at must include a timezone")
     timestamp = parsed_time.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    advisories = _advisories(advisory_feed, set(current))
+    advisories = _advisories(advisory_feed, _advisory_aliases(policy))
     package_rows: list[dict[str, Any]] = []
     group_candidates: dict[str, bool] = defaultdict(bool)
     for package in policy["packages"]:
@@ -412,6 +427,14 @@ def _github_json(path: str, token: str) -> Any:
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             return json.load(response)
+    except urllib.error.HTTPError as error:
+        # HTTPError subclasses URLError; keep GitHub's own message (for example a
+        # missing token permission) instead of a bare status line.
+        try:
+            detail = json.load(error).get("message", "")
+        except (json.JSONDecodeError, AttributeError, ValueError, OSError):
+            detail = ""
+        raise PolicyError(f"GitHub API request failed for {path}: HTTP {error.code} {detail}".rstrip()) from error
     except (urllib.error.URLError, json.JSONDecodeError) as error:
         raise PolicyError(f"GitHub API request failed for {path}: {error}") from error
 

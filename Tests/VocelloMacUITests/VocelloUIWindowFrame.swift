@@ -168,7 +168,13 @@ enum VocelloUIWindowFrame {
         // the minimum, and a height assertion run at whatever height the scene
         // restored to would pass while measuring nothing.
         _ = drag(app, edge: .right, toward: width)
-        let frame = drag(app, edge: .bottom, toward: height)
+        var frame = drag(app, edge: .bottom, toward: height)
+        // At the display's bottom edge the Dock can intercept the grab. The
+        // opposite window edge remains reachable; it resizes the same genuine
+        // window and the caller still verifies the resulting content bounds.
+        if abs(frame.height - height) > 6 {
+            frame = drag(app, edge: .top, toward: height)
+        }
         print("WINDOW_FRAME mechanism=\(Mechanism.edgeDrag.rawValue) "
             + "requested=\(Int(width))x\(Int(height)) "
             + "settled=\(Int(frame.width))x\(Int(frame.height))")
@@ -190,12 +196,14 @@ enum VocelloUIWindowFrame {
     enum Edge {
         case right
         case bottom
+        case top
 
         /// Normalized grab point: the edge's midpoint, never a corner.
         var anchor: CGVector {
             switch self {
             case .right: CGVector(dx: 1.0, dy: 0.5)
             case .bottom: CGVector(dx: 0.5, dy: 1.0)
+            case .top: CGVector(dx: 0.5, dy: 0.0)
             }
         }
 
@@ -205,13 +213,14 @@ enum VocelloUIWindowFrame {
             switch self {
             case .right: CGVector(dx: -1, dy: 0)
             case .bottom: CGVector(dx: 0, dy: -1)
+            case .top: CGVector(dx: 0, dy: 1)
             }
         }
 
         func extent(of frame: CGRect) -> CGFloat {
             switch self {
             case .right: frame.width
-            case .bottom: frame.height
+            case .bottom, .top: frame.height
             }
         }
 
@@ -219,6 +228,7 @@ enum VocelloUIWindowFrame {
             switch self {
             case .right: CGVector(dx: delta, dy: 0)
             case .bottom: CGVector(dx: 0, dy: delta)
+            case .top: CGVector(dx: 0, dy: -delta)
             }
         }
     }

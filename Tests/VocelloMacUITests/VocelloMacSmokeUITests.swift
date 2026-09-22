@@ -444,11 +444,13 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(
             on: button("voicesRow_play_\(VocelloUIBenchMatrix.cloneVoiceID)"), timeout: 20))
         navigate(to: .customVoice)
-        XCTAssertFalse(button("studio_inlinePlayer_playPause").exists,
-                       "The old completed take must not control another clip")
+        XCTAssertEqual(button("studio_inlinePlayer_playPause").label, "Play",
+                       "The old result must offer replay rather than pausing the other clip")
         XCTAssertTrue(button("sidebarPlayer_playPause").exists,
                       "The newly selected reference clip keeps its own transport")
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("sidebarPlayer_dismiss"), timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studio_inlinePlayer_playPause"), timeout: 20))
+        XCTAssertFalse(element("sidebarPlayer_bar").exists,
+                       "Replaying the result returns transport ownership to Studio")
     }
 
     func test03_GenerationCancellation() {
@@ -461,12 +463,12 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
             with: VocelloUIBenchMatrix.text(for: .long) + " Cancellation token \(nonce)."
         )
         startGenerationAndAwaitCancelControl(mode: .custom)
-        XCTAssertTrue(VocelloUIWait.exists(button("studio_inlinePlayer_playPause"), timeout: 180))
+        XCTAssertTrue(VocelloUIWait.exists(button("studio_livePreview_playPause"), timeout: 180))
         navigate(to: .history)
         XCTAssertTrue(VocelloUIWait.exists(element("sidebarPlayer_liveBadge"), timeout: 15))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("sidebarPlayer_dismiss"), timeout: 15))
         navigate(to: .customVoice)
-        XCTAssertFalse(button("studio_inlinePlayer_playPause").exists,
+        XCTAssertFalse(button("studio_livePreview_playPause").exists,
                        "A dismissed stream must not retake playback ownership")
         XCTAssertTrue(button("textInput_cancelButton").exists,
                       "Dismissing playback must leave generation under the Cancel control")

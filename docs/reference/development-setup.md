@@ -43,43 +43,51 @@ cd Vocello
   `python3 scripts/lib/ios_platform_preflight.py check`. The repository never downloads it for you
   and never uses it to run a Simulator.
 
-## 2. Pinned command-line tools
+## 2. Command-line tools (Homebrew plus the pinned installer)
+
+Homebrew supplies the general tools; the four tools whose exact version matters to the build come
+from the repository's SHA-pinned installer instead:
+
+```sh
+brew install gh python node@24 swiftlint
+./scripts/install_pinned_tools.sh
+cat >> ~/.zprofile <<'EOF'
+export PATH="$HOME/.qwenvoice-pinned-tools/bin:/opt/homebrew/opt/node@24/bin:$PATH"
+EOF
+exec zsh -l        # reload PATH, then check: which xcodegen rg python3 node
+gh auth login
+```
 
 `./scripts/install_pinned_tools.sh` downloads xcodegen, ripgrep, xcbeautify and shellcheck from the
 release artifacts pinned in `config/toolchain.json`, verifies each SHA-256 and installs them into
-`~/.qwenvoice-pinned-tools/bin` (CI runs the same script; name other pinned tools, such as `gh`, to
-install them instead). Put that directory first on `PATH`:
-
-```sh
-./scripts/install_pinned_tools.sh
-echo 'export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"' >> ~/.zprofile   # then open a new shell
-```
-
-xcodegen is needed on the very first build even if you never edit `project.yml`: the build scripts
-regenerate the project whenever their generation stamp under `build/` is missing. `rg` is required by
-`scripts/repo_invariants.sh` and the contract gate. SwiftLint is optional (`scripts/dev.sh lint` runs
-its advisory rules when installed). Install the GitHub CLI and sign in (`gh auth login`); it is the CI
+`~/.qwenvoice-pinned-tools/bin`; CI runs the same script, and naming other pinned tools (such as `gh`)
+installs those instead. Keep that directory first on `PATH` so a Homebrew copy never shadows it:
+xcodegen's version decides the bytes of the generated Xcode project. xcodegen is needed on the very
+first build even if you never edit `project.yml`, because the build scripts regenerate the project
+whenever their generation stamp under `build/` is missing; `rg` is required by
+`scripts/repo_invariants.sh` and the contract gate. `node@24` is keg-only, hence its `PATH` entry.
+SwiftLint is optional (`scripts/dev.sh lint` runs its advisory rules when installed). `gh` is the CI
 and release interface (`gh run watch`).
 
 ## 3. Python
 
-The tooling needs Python 3.11 or newer as `python3`, ahead of Apple's `/usr/bin/python3` on `PATH`
-(mise, Homebrew or python.org all work). The test suite also needs numpy, pytest and pytest-xdist at
-the pinned versions; this reads them from the manifest exactly as CI does:
+The tooling needs Python 3.11 or newer as `python3`, ahead of Apple's `/usr/bin/python3` on `PATH`;
+Homebrew's `python` provides it (`which python3` should print `/opt/homebrew/bin/python3`). The test
+suite also needs numpy, pytest and pytest-xdist at the pinned versions; this reads them from the
+manifest exactly as CI does:
 
 ```sh
-python3 -m pip install $(python3 -c 'import json; n = json.load(open("config/toolchain.json"))["native"]; print(" ".join(k + "==" + n[k]["version"] for k in ("numpy", "pytest", "pytest-xdist")))')
+python3 -m pip install --user --break-system-packages $(python3 -c 'import json; n = json.load(open("config/toolchain.json"))["native"]; print(" ".join(k + "==" + n[k]["version"] for k in ("numpy", "pytest", "pytest-xdist")))')
 ```
 
-(Homebrew's Python refuses a plain install; use a virtual environment you put on `PATH`, or add
-`--break-system-packages` as CI does.) The research-only `.venv` for advisory speech-emotion and MOS
-scoring is optional and never part of the ordinary loop; see
+Homebrew marks its Python as externally managed; `--user` installs the pins into your user
+site-packages without touching Homebrew's files (CI passes the same flag). The scripts always run
+`python3 -m pytest`, so the user `bin` directory does not need to be on `PATH`. After a Homebrew Python
+upgrade to a new minor version, run the command again. The research-only `.venv` for advisory
+speech-emotion and MOS scoring is optional and never part of the ordinary loop; see
 [`delivery-harness.md`](delivery-harness.md) and [`emotion-reference-banks.md`](emotion-reference-banks.md).
 
 ## 4. Website
-
-Node and npm must match `config/toolchain.json` (`website.node`, `website.npm`) exactly;
-`scripts/dev.sh ci` checks the identities and stops on drift. Then:
 
 ```sh
 npm --prefix website ci
@@ -87,7 +95,12 @@ npx --prefix website playwright install chromium
 npm --prefix website run check
 ```
 
-Vercel deploys through its Git integration; `vercel link --repo` is needed only to use the Vercel CLI.
+CI pins an exact Node and npm patch (`config/toolchain.json` `website.node`, `website.npm`), while
+Homebrew's `node@24` follows the latest 24.x. The website check works with any 24.x; only the exact
+identity check in `scripts/dev.sh ci` and `supply_chain_contract.py --installed website` reports the
+difference. That local drift is expected and never a reason to change the pin; install the exact
+release from nodejs.org only if you need `scripts/dev.sh ci` to pass end to end on this Mac. Vercel
+deploys through its Git integration; `vercel link --repo` is needed only to use the Vercel CLI.
 
 ## 5. Git
 
@@ -101,8 +114,8 @@ signed and GitHub-verified (`git tag -s`), so configure a signing key only if yo
 
 ```sh
 scripts/dev.sh status
-python3 scripts/supply_chain_contract.py --installed website    # exact Node/npm identities
-python3 scripts/supply_chain_contract.py --installed native     # reports a newer local Xcode as drift; expected
+python3 scripts/supply_chain_contract.py --installed native     # a newer local Xcode shows as drift; expected
+python3 scripts/supply_chain_contract.py --installed website    # Homebrew node@24 shows as drift; expected
 scripts/dev.sh check                                            # first run: regenerate, resolve packages, cold build
 scripts/dev.sh build && scripts/dev.sh run
 ```

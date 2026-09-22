@@ -17,6 +17,20 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Machine transition and next steps (September 22)
+
+Work pauses here for the maintainer's move to a new Mac; everything is committed and pushed. Set the
+new machine up with [development setup](reference/development-setup.md) (Homebrew plus the pinned
+installer), then run the fresh-session check it describes. Done today from the verified external
+audit ([report](audits/2026-09-22-project-audit.md), plan `project-audit-2026-09`): the release path
+(three toolchain blockers, signing hardening, tag-ref dispatch guard, weekly secrets-free
+`release-rehearsal.yml`), the nightly reporter and dependency watch (PA-09), Mac editor labels and
+Save As data loss (PA-12, MAC-02 still open) and the prewarm-slot leak (PA-01). Next, in order, each
+with its approved fix design in the roadmap notes: PA-12 MAC-02, PA-14 file I/O, PA-11 launch
+hashing, F-25, PA-13, then PA-15 (its device proof is consent-bound). Maintainer steps for PA-10:
+create the `release` environment (deployment tags `v*`, reviewer), move the release secrets into it,
+add a `v*` tag ruleset. Check the first green `release-rehearsal.yml` run before closing PA-05.
+
 ### Claude Code takeover (September 22)
 
 Baseline `7e26f94b`. At the maintainer's request Claude Code is the sole coding agent again; Codex is

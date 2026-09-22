@@ -170,14 +170,16 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         // Long-string acceptance uses Foundation's standard pseudo-localization
         // launch arguments. Stable identifiers keep the journey independent of
         // translated labels; no product-only test route is involved.
-        beginSession(additionalArguments: [
+        beginSession(additionalArguments: ["-ApplePersistenceIgnoreState", "YES"])
+        defer { endSession() }
+        preserveInterfaceLanguage()
+        selectInterfaceLanguage("en")
+        relaunchApp(additionalEnvironment: [:], additionalArguments: [
             // Isolate window restoration, not persisted language or Studio drafts.
             "-ApplePersistenceIgnoreState", "YES",
             "-NSDoubleLocalizedStrings", "YES",
             "-NSShowNonLocalizedStrings", "YES",
         ])
-        defer { endSession() }
-
         for screen in VocelloMacScreen.allCases {
             navigate(to: screen)
         }
@@ -253,7 +255,6 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
     }
 
     private func assertAllInterfaceLanguages() {
-        preserveInterfaceLanguage()
         let locales = [
             ("zh-Hans", "简体中文", "应用语言"), ("ja", "日本語", "アプリの言語"),
             ("ko", "한국어", "앱 언어"), ("ru", "Русский", "Язык приложения"),

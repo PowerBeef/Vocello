@@ -41,6 +41,13 @@ including TSan. Run `macos-xcui-localization-20260921-235914-d88393d2` completed
 Japanese before the same fixture assumption rejected a readable 19.5 pt Korean badge. Captured
 screens confirm both glyphs fit. The localized check now uses the rendered line height as its
 glyph-width floor, retaining the original English/pseudo width minima and all height/bounds checks.
+Fixture `87e6ce6a` passed [CI](https://github.com/PowerBeef/Vocello/actions/runs/35671496742).
+Run `macos-xcui-localization-20260922-002001-fbdd0a9d` completed Chinese, Japanese, Korean and
+Russian, then failed selecting English: AppKit's menu placed its row above the display, and
+cleanup hit the same condition. The captured menu confirms clipping, not a missing translation.
+The test now reveals offscreen menu choices with bounded keyboard navigation and preserves the
+original language before selecting the English pseudo-localization fixture. These runs use the
+isolated development defaults suite; the production interface-language preference was untouched.
 The expanded Mac journey checks all ten locales; the iOS equivalent
 is prepared but phone execution remains deferred. [Localization guidance](reference/localization.md)
 separates catalog coverage from visual, VoiceOver and signed-candidate acceptance (ASR-12/ISU-4).

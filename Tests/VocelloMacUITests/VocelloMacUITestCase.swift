@@ -68,6 +68,18 @@ class VocelloMacUITestCase: XCTestCase {
         let picker = element("settings_appLanguage")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: picker, timeout: 20))
         let choice = element("settings_appLanguageOption_\(identifier)", type: .menuItem)
+        XCTAssertTrue(VocelloUIWait.exists(choice, timeout: 10))
+        // AppKit aligns a popup with its selected row. Earlier choices can be
+        // above the display when Russian is selected; keyboard navigation scrolls
+        // the genuine menu until the target is visible, without coordinate clicks.
+        let menu = picker.descendants(matching: .menu).firstMatch
+        if !choice.isHittable, menu.exists {
+            let direction: XCUIKeyboardKey = choice.frame.midY < menu.frame.midY ? .upArrow : .downArrow
+            for _ in 0..<Self.interfaceLanguageNames.count {
+                if choice.isHittable { break }
+                app.typeKey(direction, modifierFlags: [])
+            }
+        }
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: choice, timeout: 10))
         XCTAssertTrue(VocelloUIWait.value(picker, contains: Self.interfaceLanguageNames[identifier]!, timeout: 10))
     }

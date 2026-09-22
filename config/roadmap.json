@@ -1093,8 +1093,8 @@
         "Sources/iOS/IOSVoicesView.swift",
         "Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift"
       ],
-      "updated": "2026-09-11",
-      "notes": "Filed 2026-09-11 from the roadmap reconciliation review of F-22; not fixed in that pass. Reproduction shape: start the macOS app, run any vocello command that touches Saved Voices in the same support root during a prepare or delete, and observe the second process fail initialization with an English generation error instead of waiting or reporting a typed busy state. Cross-reference F-22 (lock is correct), RF-10 (packaged coexistence)."
+      "updated": "2026-09-22",
+      "notes": "Filed 2026-09-11 from the roadmap reconciliation review of F-22; not fixed in that pass. Reproduction shape: start the macOS app, run any vocello command that touches Saved Voices in the same support root during a prepare or delete, and observe the second process fail initialization with an English generation error instead of waiting or reporting a typed busy state. Cross-reference F-22 (lock is correct), RF-10 (packaged coexistence). Widened 2026-09-22 (external audit IOS-05, CORE-09): a malformed or unknown voice transaction and a stray or hidden file such as .DS_Store in voice-transactions also make reconcile throw, which is fatal to engine init on both platforms (MLXTTSEngine.swift:702)."
     },
     {
       "id": "F-26",
@@ -1127,8 +1127,8 @@
         "config/ios-control-audit.json",
         "scripts/ios_control_audit.py"
       ],
-      "updated": "2026-09-14",
-      "notes": "Opened from the 2026-09-11 review of the XCUITest suites (commits 458a7410 onward); the iOS half was ICA-20 until 2026-09-13. The label-dependent iOS sites are VocelloiOSControlAuditUITests (History clear and delete dialogs, seed unpin, inline player Play/Pause) and VocelloiOSPurchaseUITests (player Play/Pause; the system share sheet's close button stays a system control). Tests written without a lane run stay unproven, so both halves wait for explicit UI QA scope. (Earlier history: git log -p -- config/roadmap.json.) 2026-09-14: blocked behind CONV-17 so coverage is written against the converged macOS screens.",
+      "updated": "2026-09-22",
+      "notes": "Opened from the 2026-09-11 review of the XCUITest suites (commits 458a7410 onward); the iOS half was ICA-20 until 2026-09-13. The label-dependent iOS sites are VocelloiOSControlAuditUITests (History clear and delete dialogs, seed unpin, inline player Play/Pause) and VocelloiOSPurchaseUITests (player Play/Pause; the system share sheet's close button stays a system control). Tests written without a lane run stay unproven, so both halves wait for explicit UI QA scope. (Earlier history: git log -p -- config/roadmap.json.) 2026-09-14: blocked behind CONV-17 so coverage is written against the converged macOS screens. Recounted 2026-09-22 (external audit TEST-05): 82 of 145 macOS and 38 of 113 iOS literal identifiers are unexercised.",
       "legacyIds": [
         "ICA-20"
       ]
@@ -1342,7 +1342,7 @@
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/NativeEngineRuntime.swift"
       ],
-      "notes": "Confirmed in source 2026-09-22: acquirePrewarmSlot ends with try Task.checkCancellation() after a normal resume, when the slot is already held by this task. Callers use try await acquirePrewarmSlot() then defer releasePrewarmSlot(), or a catch that returns, so neither releases on that throw and prewarmInFlight stays set; the catch-branch slotAcquired release is unreachable. Likely fix: release before rethrowing on the post-resume check, or extract the gate into a small testable value. Covered by the native rule's prewarm reentrancy gate. See project-audit-2026-09-22.md.",
+      "notes": "Confirmed in source 2026-09-22: acquirePrewarmSlot ends with try Task.checkCancellation() after a normal resume, when the slot is already held by this task. Callers use try await acquirePrewarmSlot() then defer releasePrewarmSlot(), or a catch that returns, so neither releases on that throw and prewarmInFlight stays set; the catch-branch slotAcquired release is unreachable. Likely fix: release before rethrowing on the post-resume check, or extract the gate into a small testable value. Covered by the native rule's prewarm reentrancy gate. See project-audit-2026-09-22.md. External audit CORE-01 (same defect, confirmed).",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },
@@ -1355,7 +1355,7 @@
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/RuntimeDebugGate.swift",
         "config/runtime-debug-knobs.json"
       ],
-      "notes": "VocelloQwen3ImplementationDebugGate checks QWENVOICE_DEBUG only; the VOCELLO_INTERNAL_DIAGNOSTICS compile condition reaches QwenVoiceCore but never the package, yet the registry classifies these keys unavailable-without-internal-capability. The distributed CLI is the easiest exposure. Options: the facade passes a capability the product gate derives at bootstrap, or the package receives the compile condition. Any new shared state is registered in config/concurrency-safety.json (budget has no headroom). Related to ASR-07's analyzer and logging hygiene.",
+      "notes": "VocelloQwen3ImplementationDebugGate checks QWENVOICE_DEBUG only; the VOCELLO_INTERNAL_DIAGNOSTICS compile condition reaches QwenVoiceCore but never the package, yet the registry classifies these keys unavailable-without-internal-capability. The distributed CLI is the easiest exposure. Options: the facade passes a capability the product gate derives at bootstrap, or the package receives the compile condition. Any new shared state is registered in config/concurrency-safety.json (budget has no headroom). Related to ASR-07's analyzer and logging hygiene. External audit SEC-06.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },
@@ -1368,7 +1368,7 @@
         "Sources/iOS/IOSDeviceDiagnosticsRunner.swift",
         "config/runtime-debug-knobs.json"
       ],
-      "notes": "The startup-reliability runner and part of IOSDeviceDiagnosticsRunner.isRequested sit outside #if QVOICE_DEVICE_DIAGNOSTICS and depend only on TelemetryGate, while the registry says unavailable-without-diagnostics-compilation-condition. Practical risk on iOS is low (environment keys need a debugger or diagnostics launch). Needs ios_device.sh builds to keep working; phone-free proof is the generic compile.",
+      "notes": "The startup-reliability runner and part of IOSDeviceDiagnosticsRunner.isRequested sit outside #if QVOICE_DEVICE_DIAGNOSTICS and depend only on TelemetryGate, while the registry says unavailable-without-diagnostics-compilation-condition. Practical risk on iOS is low (environment keys need a debugger or diagnostics launch). Needs ios_device.sh builds to keep working; phone-free proof is the generic compile. External audit IOS-15 (partly inside the compile gate already).",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },
@@ -1388,15 +1388,16 @@
     },
     {
       "id": "PA-05",
-      "title": "Release workflow uses the pinned toolchain action",
+      "title": "Release path works end to end and is rehearsed",
       "status": "planned",
-      "gate": "release.yml selects Xcode and installs pinned tools through .github/actions/native-toolchain (no hard-coded Xcode version), and the TestFlight upload command is confirmed supported by the pinned Xcode.",
+      "gate": "release.yml selects Xcode and installs every pinned tool (numpy, pytest, pytest-xdist, asc, gh) through .github/actions/native-toolchain, a secrets-free ad-hoc release rehearsal workflow runs release.sh and the packaged-DMG verification on a schedule and on release-input changes and is green, and the TestFlight upload command is confirmed supported by the pinned Xcode.",
       "sourceOfTruth": [
         ".github/workflows/release.yml",
         ".github/actions/native-toolchain/action.yml",
-        "config/toolchain.json"
+        "config/toolchain.json",
+        "scripts/supply_chain_contract.py"
       ],
-      "notes": "release.yml hard-codes Xcode_26.6 three times and duplicates the pinned-tool installation instead of the composite action ci.yml uses, so a toolchain bump must touch two routes; a comment also says timeout-minutes is 90 while the job allows 150. The archive job uploads with xcrun altool; confirm or replace for the pinned Xcode. Release changes need an exact-source dry run on explicit request.",
+      "notes": "External audit CI-01, verified worse on 2026-09-22: three stacked release blockers. The package, compile-ios and archive-ios jobs install numpy but run supply_chain_contract --installed native, which also checks pytest and pytest-xdist (pinned since 25a895ed); package also runs --installed release, whose asc only archive-ios installs; and the macos-26 image now ships gh 2.100.0 against the exact 2.96.0 pin (7261bfbc hit the same drift). release.yml hard-codes Xcode_26.6 three times and duplicates the tool install; a comment says timeout-minutes is 90 while the job allows 150. The archive job uploads with xcrun altool. Nothing exercised the release path between the v2.4.0 tag (Aug 1) and this audit.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },
@@ -1426,7 +1427,7 @@
         "Sources/QwenVoiceCore/NativeDeviceClassGate.swift",
         "project.yml"
       ],
-      "notes": "No callers: MLXTTSEngine.generateBatch (macOS line batch loops the single-take executor), HuggingFaceDownloader.downloadRepo (also keeps a live repository-enumeration path the catalog rule forbids), NativeDeviceClassGate.applyHandshakeForcedClass (one of the 7 nonisolated(unsafe) declarations). samplerCompileEnabled in Qwen3TTS.swift is never read. About 36 XPC or EngineServiceHost mentions remain in Sources. project.yml links the HuggingFace product to four targets but no owned source imports it. Package edits follow the owned-package inventory contract.",
+      "notes": "No callers: MLXTTSEngine.generateBatch (macOS line batch loops the single-take executor), HuggingFaceDownloader.downloadRepo (also keeps a live repository-enumeration path the catalog rule forbids), NativeDeviceClassGate.applyHandshakeForcedClass (one of the 7 nonisolated(unsafe) declarations). samplerCompileEnabled in Qwen3TTS.swift is never read. About 36 XPC or EngineServiceHost mentions remain in Sources. project.yml links the HuggingFace product to four targets but no owned source imports it. Package edits follow the owned-package inventory contract. External audit SEC-12 and ENG-18 add: fromPretrained/resolveOrDownloadModel still resolve revision main; chunkedDecode, SeanetDecoder and the generate*Stream APIs have no product callers. AnyTTSEngineBackend is live (CORE-20 is wrong about it).",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },
@@ -1440,7 +1441,250 @@
         "Sources/ContentView.swift",
         "Packages/VocelloQwen3Core/OWNERSHIP.json"
       ],
-      "notes": "Maintainability observations, not measured defects: macOS ModelManagerViewModel is @Observable and the iOS one ObservableObject; three download drivers call downloadFiles; MacInlinePlayerCard and MacStudioPlayerCard coexist; ContentView and QVoiceiOSRootView build @Observable models through State(initialValue:) in init, re-running construction on parent re-init; Qwen3TTS.generateVoiceDesign is the core loop for every mode; OWNERSHIP.json omits MLXAudioMark; the Cmd-6 item titled Models opens Settings. Prefer small reversible steps; UI changes need their lanes on explicit request.",
+      "notes": "Maintainability observations, not measured defects: macOS ModelManagerViewModel is @Observable and the iOS one ObservableObject; three download drivers call downloadFiles; MacInlinePlayerCard and MacStudioPlayerCard coexist; ContentView and QVoiceiOSRootView build @Observable models through State(initialValue:) in init, re-running construction on parent re-init; Qwen3TTS.generateVoiceDesign is the core loop for every mode; OWNERSHIP.json omits MLXAudioMark; the Cmd-6 item titled Models opens Settings. Prefer small reversible steps; UI changes need their lanes on explicit request. External audit ENG-14: MLXAudioMark is also missing from COMPATIBILITY.json and RUNTIME_MANIFEST.json target lists; qwen3_core_contract.py checks one direction only. MAC-23 is the root-view construction item.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-09",
+      "title": "Scheduled workflows report their failures",
+      "status": "planned",
+      "gate": "The nightly failure reporter files or updates its issue (logic in a tested scripts/ci module, not inline workflow Python), and swift-dependency-watch reads Dependabot alerts or reports the feed as unavailable instead of failing.",
+      "sourceOfTruth": [
+        ".github/workflows/nightly.yml",
+        ".github/workflows/swift-dependency-watch.yml",
+        "scripts/swift_dependency_updates.py"
+      ],
+      "notes": "External audit CI-02 and CI-03, confirmed 2026-09-22. nightly.yml's report job has an inline-Python SyntaxError (run 35585214770) and has never filed an issue. swift-dependency-watch failed 4 of 4 runs with HTTP 403 on /dependabot/alerts: GITHUB_TOKEN needs the vulnerability-alerts: read permission, not security-events. Latent: GitHub names Swift packages github.com/<owner>/<repo>, so advisories would never match the bare package identities.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-10",
+      "title": "Release signing is isolated from dispatch and build inputs",
+      "status": "planned",
+      "gate": "Signing jobs use a tag-restricted release environment, a dispatched release runs only from its own tag ref with a validated output name, the keychain grants codesign only, no Actions cache is restored after secrets exist, checkouts do not persist credentials, and signing material is removed right after release.sh.",
+      "sourceOfTruth": [
+        ".github/workflows/release.yml",
+        ".github/workflows/promote-release.yml",
+        "scripts/release_source_authority.py"
+      ],
+      "notes": "External audit SEC-01 (Medium: single admin collaborator), SEC-02 and SEC-07, confirmed 2026-09-22. No environment: on any job; 13 repository secrets; workflow_dispatch runs the dispatched ref's copy of the workflow with a free-text tag; keychain uses -A and a 6 h unlock; a prefix-keyed SwiftPM cache is restored after secrets; inputs.output_name is interpolated into run scripts; no checkout sets persist-credentials: false. Maintainer steps: create the release environment (deployment tags v*, reviewer), move the secrets, add a v* tag ruleset. Remaining: a separate build and sign job split, and signer pinning.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-11",
+      "title": "macOS launch never hashes models on the main thread",
+      "status": "planned",
+      "gate": "App launch and model-manager status on the main actor check manifests and sizes only; content digests are verified in the background, and a freshly downloaded file is not hashed a second time; a unit test proves the shallow path does not hash.",
+      "sourceOfTruth": [
+        "Sources/ViewModels/ModelManagerViewModel.swift",
+        "Sources/QwenVoiceCore/ModelAssets.swift"
+      ],
+      "notes": "External audit MAC-01 (High), confirmed 2026-09-22: QwenVoiceApp creates ModelManagerViewModel, whose init calls localModelInfo for all six variants and deepIntegrity SHA-256s every installed file (about 6.2 GB for the three Speed variants, 14.65 GB for all six) on the main actor before the first window; the hash cache is per-process, so every cold launch re-hashes; the post-download path hashes again on the main actor although the downloader already verified the files.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-12",
+      "title": "macOS settings and file actions do what they say",
+      "status": "planned",
+      "gate": "Prefer lower-memory models changes the default variant for every mode without overriding explicit choices; Save As never deletes its own source and never removes an existing destination on a failed copy; the script editors expose an accessibility label.",
+      "sourceOfTruth": [
+        "Sources/Views/Settings/MacSettingsScreen.swift",
+        "Sources/Views/History/MacHistoryFileActions.swift",
+        "Sources/Views/Primitives/MacScriptTextEditor.swift"
+      ],
+      "notes": "External audit MAC-02, MAC-03 and MAC-08, confirmed 2026-09-22. The lower-memory toggle's only reader (TTSContract.model(for:) via SidebarItem.requiredModel) has no callers, and Studio resolves variants in ModelManagerViewModel.activeVariant(for:) without it; 8 GB Macs already default to Speed, so the impact is on larger Macs. Save As removes the destination then copies with no same-file check, and the Studio player discards the result. The script editor sets only an identifier.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-13",
+      "title": "Quality-first decoding keeps every generated frame",
+      "status": "planned",
+      "gate": "Quality-first decode, replay and the in-context clone cut derive their sample window from explicit reference and generated frame counts, not from counting non-zero codes; a runtime unit test covers the window and a tiny decoder emits exactly frames times upsample.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
+      ],
+      "notes": "External audit ENG-02, confirmed 2026-09-22: decodeChunk trims with a > 0 test although code 0 is a legal token (only the top 1,024 ids are suppressed), and the ICL cut uses the already-trimmed length. Every CLI batch take is quality-first, and so is any non-streaming request. The fix intentionally changes affected output: truncated takes get their tail back, and ICL clone takes can shift by one sample.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-14",
+      "title": "File I/O and error classification fail safely",
+      "status": "planned",
+      "gate": "No legacy FileHandle write or readData remains on model, download or evidence paths (they raise Objective-C exceptions on a full disk); cancellation and allocation-retry decisions use typed errors, and MLX errors are captured instead of reaching fatalError.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "Sources/QwenVoiceCore/NativeEngineRuntime.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift"
+      ],
+      "notes": "External audit CORE-02 and CORE-03 plus ENG-05, confirmed 2026-09-22. write(_:) and readData(ofLength:) remain in HuggingFaceDownloader, ModelAssets, SharedModelComponentStore and SamplingEvidence; the only free-space check is on iOS. Cancellation and the one allocation retry are classified by matching error text (NativeEngineRuntime.swift:132-169), and with no MLX error handler installed a real Metal OOM probably reaches fatalError before any Swift error exists. The file-API half is phone-free; typed errors and MLX capture are a separate change.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-15",
+      "title": "iOS stops generation safely when the app leaves the foreground",
+      "status": "planned",
+      "gate": "On background with an active generation the app requests background time and cancels through the typed barrier (a single take is discarded, long-form keeps its completed segments), the screen stays awake while generating, the user is told on return, and a deferred background release never fires after returning; logic tests cover the policy and a physical-device run proves the cancel lands before GPU work is refused.",
+      "sourceOfTruth": [
+        "Sources/iOS/QVoiceiOSApp.swift",
+        "Sources/iOS/TTSEngineStore.swift"
+      ],
+      "notes": "External audit IOS-01 (High) and IOS-02, confirmed 2026-09-22 and stronger than written: beginBackgroundTask appears nowhere in Sources, isIdleTimerDisabled only in the diagnostics runner, and the .active handler never clears RuntimeReleaseCoordinator's pending background release. Maintainer decision 2026-09-22: cancel, keep finished long-form segments, notify on return. Alternative to record: BGContinuedProcessingTask with GPU background use could let long-form finish.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-16",
+      "title": "Speech-tokenizer attention honors the model's sliding windows",
+      "status": "planned",
+      "gate": "The decoder transformer applies its 72-frame sliding window with a bounded KV cache and the encoder its 250-frame window; a reference-parity fixture against the upstream tokenizer passes, and the fixed-seed QC battery and gate bench show no regression.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
+        "docs/reference/mimi-codec-guide.md"
+      ],
+      "notes": "External audit ENG-01 (High), confirmed 2026-09-22 and wider: the decoder mask is always full causal with an unbounded KVCacheSimple kept for the whole take, and sliding_window: 72 is decoded but never read; all six installed models declare it. Streaming resets only at start and end, so output diverges from the reference after about 6 s. The encoder also ignores its 250-frame window, which affects clone references longer than 10 s. Model runs and the listening sign-off are consent-bound. Changes all codec output.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-17",
+      "title": "Clone consent is enforced below the views",
+      "status": "planned",
+      "gate": "A core policy refuses clone generation and enrollment without recorded consent on every entry point, including the CLI, and unit tests prove the refusal.",
+      "sourceOfTruth": [
+        "Sources/Views/Studio/MacVoiceCloningScreen.swift",
+        "Sources/iOS/IOSGenerationModeViews.swift",
+        "Sources/VocelloCLI/Support.swift"
+      ],
+      "notes": "External audit SEC-04 and TEST-04 (issue #101), confirmed 2026-09-22: voiceCloningConsent is read only in the macOS and iOS clone screens and Settings; nothing in QwenVoiceCore, the store, the executor or the CLI checks it, and only UI tests exercise it. Needed before a CLI download ships.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-18",
+      "title": "Public claims match what each download ships",
+      "status": "planned",
+      "gate": "README and website scope every feature claim to the build it names (AudioSeal marking, Article 50, seed pinning and the new UI marked as 3.0), facts match source (concurrent files, chart record, recommended variant), AudioSeal is attributed with the correct upstream revision, and the website sends basic security headers.",
+      "sourceOfTruth": [
+        "README.md",
+        "website/src/sections/Engineering.jsx",
+        "config/public-product-facts.json"
+      ],
+      "notes": "External audit DOC-01 (High) plus WEB-01, WEB-04, WEB-05, DOC-06, DOC-07, DOC-08, SEC-10, SEC-13 and SEC-15, confirmed 2026-09-22. The v2.4.0 tag contains no AudioSeal code, yet the README describes the watermark and Article 50 marking next to the 2.4.0 download. AudioSeal is absent from the attribution manifest, NOTICES and ORIGINS, and AudioSealGenerator.swift cites a commit that is the UTMOSv2 pin. The website privacy policy update stays ASR-02.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-19",
+      "title": "Orchestrators and the generate loop have unit coverage",
+      "status": "planned",
+      "gate": "TTSEngineStore, StudioGenerationCoordinator, the long-form runner, DatabaseService, the model managers and IOSExportGate run under unit tests with a fake engine; a tiny seeded random-weight talker and generate-loop test and a synthetic AudioSeal fixture run in CI.",
+      "sourceOfTruth": [
+        "Tests/VocelloCoreTests",
+        "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests"
+      ],
+      "notes": "External audit TEST-01, TEST-02 and TEST-03, verified 2026-09-22 with corrections: the 15% app-code figure omits the linked and tested QwenVoiceCore; the decoder and code predictor already run on tiny random weights. The real gaps are the named orchestrators (0 test references), the talker and generate loop, and the AudioSeal transform call site (2 of 3 parity tests skip in CI). May need a shared framework target for code compiled by path.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-20",
+      "title": "Accessibility and localization reach every surface",
+      "status": "planned",
+      "gate": "macOS and iOS route computed English and typed errors through catalog keys with plural rules and the in-app locale, VoiceOver announces generation state changes, fixed fonts scale, timed banners with actions stay, and website text meets 4.5:1 contrast.",
+      "sourceOfTruth": [
+        "Sources/Services/MacInterfaceText.swift",
+        "Sources/iOS/IOSGenerationModeViews.swift",
+        "website/src/tokens.css"
+      ],
+      "notes": "External audit MAC-06, MAC-07, MAC-10, MAC-11, IOS-12, IOS-13, IOS-14 and WEB-03, confirmed 2026-09-22: engine display strings and localizedDescription reach Mac UI in English; formatters follow the system locale; no macOS InfoPlist catalog; 0 VoiceOver announcements and a 6 s action banner on iOS; fixed-size fonts in the player and sheets; website secondary text at about 3.8:1. AUD-06 (modal exclusion) stays its own item.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-21",
+      "title": "iOS lifecycle, audio session and startup are recoverable",
+      "status": "planned",
+      "gate": "Audio-session changes have one owner, previews pause shared playback, startup failures offer retry, saved-voice load errors are shown, downloads say they need Wi-Fi, drafts survive relaunch, and keep-audio-files is defined for iOS.",
+      "sourceOfTruth": [
+        "Sources/iOS/QVoiceiOSApp.swift",
+        "Sources/iOS/App/RootView.swift",
+        "Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift"
+      ],
+      "notes": "External audit IOS-03 to IOS-11 (IOS-05 is F-25), confirmed 2026-09-22 with corrections: the category flip happens on return to active, the Wi-Fi-only download policy is deliberate and only the copy is missing, and one of the two locks is non-blocking. AUD-01 and AUD-02 keep their own scope; storage protection runs on the main actor at launch.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-22",
+      "title": "Core storage and memory lifecycle is bounded",
+      "status": "planned",
+      "gate": "Clone-reference caching keys on the same fingerprint it stores, derived clone prompts follow their voice's lifecycle and backup class, all memory trims share one admission gate with load epochs, shared components and trash are pruned, and the prepared-model overlay lives outside the model folder.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/NativeCloneSupport.swift",
+        "Sources/QwenVoiceCore/SharedModelComponentStore.swift",
+        "Sources/QwenVoiceCore/MLXModelLoadCoordinator.swift"
+      ],
+      "notes": "External audit CORE-04 to CORE-08 and ENG-06, confirmed 2026-09-22 with corrections: CORE-08 is reached only for legacy or repairable installs, and the idle-unload half of CORE-06 is guarded. CORE-04 also makes reuse telemetry false. CORE-05's backup classification belongs with ASR-06.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-23",
+      "title": "Pull requests get the Linux checks",
+      "status": "planned",
+      "gate": "A pull_request trigger runs contracts, Python and website for Dependabot and outside PRs while own work stays direct to main, and Dependabot action bumps update config/toolchain.json in the same PR.",
+      "sourceOfTruth": [
+        ".github/workflows/ci.yml",
+        "config/toolchain.json"
+      ],
+      "notes": "External audit CI-04 and CI-05 (and REPO-05, SEC-17), confirmed 2026-09-22; maintainer decision the same day to add a Linux-only PR lane. ci.yml runs on push to main and dispatch only since 7db09171; five Dependabot PRs are open (#96, #100, #102, #103, #105). Correction: #100 did receive one CI run.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-24",
+      "title": "Push CI compiles the XCUITest bundles",
+      "status": "planned",
+      "gate": "Push CI builds the macOS and iOS UI-test bundles for testing without running them, and scripts/repo_invariants.sh check 2 plus the native and release rules forbid execution, not compilation.",
+      "sourceOfTruth": [
+        "scripts/repo_invariants.sh",
+        "scripts/build_ui_test_bundles.sh",
+        ".github/workflows/ci.yml"
+      ],
+      "notes": "External audit CI-07, confirmed 2026-09-22 (10,399 lines of UI-test Swift compile only locally). Maintainer decision the same day reverses the 2026-09-17 rule that CI never names the UI schemes: compiling is allowed, executing stays forbidden. Pair with PA-04's lock and path fixes.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-25",
+      "title": "Docs and tooling stay proportional",
+      "status": "planned",
+      "gate": "Resume now keeps only current checkpoints, dated reports move out of docs/reference with an index, research-only scripts run outside the product gate with their own environment, source-text tests are replaced, and a contract lands only when another retires.",
+      "sourceOfTruth": [
+        "docs/development-progress.md",
+        "docs/reference",
+        "scripts/tests"
+      ],
+      "notes": "External audit DOC-03, DOC-04, CI-08, CI-10, TEST-06 and TEST-07, confirmed 2026-09-22 (maintainer decision to adopt the diet the same day). development-progress.md is 1,132 lines with 30 dated sections under Resume now; docs/reference holds 13 dated files; test_bench_command_contract.py asserts whitespace-exact Swift source against the testing runbook's own rule.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-26",
+      "title": "Low-severity backlog from the external audit",
+      "status": "planned",
+      "gate": "Every Low and Info finding in the external audit that no other item covers is fixed or declined with a reason, section by section.",
+      "sourceOfTruth": [
+        "docs/audits/2026-09-22-project-audit.md"
+      ],
+      "notes": "External audit 2026-09-22, sections 5 to 12: the Low and Info rows not grouped into PA-01 to PA-25 or existing items (for example ENG-07 to ENG-17, CORE-10 to CORE-22, MAC-09 to MAC-26, IOS-16 to IOS-25, SEC-08 to SEC-16, CI-09 to CI-21, WEB-02, WEB-06 to WEB-08, UX-01, REPO-01 to REPO-04). Work them in batches by area; the report's verification addendum lists the rows that are wrong or already fixed.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     }

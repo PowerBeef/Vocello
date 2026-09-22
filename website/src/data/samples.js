@@ -36,17 +36,6 @@ export const SAMPLES = [
     wave: [0.2, 0.36, 0.22, 0.34, 0.06, 0.06, 0.51, 1, 0.54, 0.63, 0.42, 0.3, 0.45, 0.26, 0.38, 0.06, 0.06, 0.06, 0.06, 0.08, 0.32, 0.31, 0.3, 0.53, 0.18, 0.06, 0.06, 0.67, 0.99, 0.84, 0.58, 0.93, 0.39, 0.46, 0.29, 0.37, 0.06, 0.06, 0.06, 0.06],
   },
   {
-    id: "documentary",
-    mode: "Voice Cloning",
-    color: "var(--terracotta-300)",
-    voice: "Cloned from a 12-second narration clip",
-    quote: "Every measurement was logged, every observation written down. Only then could the model be trusted.",
-    duration: "0:09",
-    delivery: "Mirrors source clip",
-    src: "assets/voice-samples/voice-cloning-mirrors-source.wav",
-    wave: [0.06, 0.06, 0.06, 0.84, 0.84, 0.71, 0.57, 0.44, 0.27, 0.58, 0.46, 0.06, 0.06, 0.26, 0.81, 0.84, 0.42, 0.7, 0.6, 0.44, 0.51, 0.43, 0.38, 0.28, 0.13, 0.06, 0.06, 0.06, 0.63, 1, 0.73, 0.77, 0.35, 0.34, 0.44, 0.33, 0.27, 0.26, 0.08, 0.13],
-  },
-  {
     id: "narration",
     mode: "Built-in Voice",
     color: "var(--gold-300)",

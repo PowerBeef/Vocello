@@ -24,6 +24,12 @@ greps, and test-method counts are approximate. Each defect was confirmed in sour
 recorded. Follow-ups live in `config/roadmap.json` plan `project-audit-2026-09`; this document is the
 plan's authority, not a second ledger.
 
+A second, independent whole-project review of the same day (172 findings at `7e26f94b`) is kept as
+[`docs/audits/2026-09-22-project-audit.md`](../audits/2026-09-22-project-audit.md), with a
+verification addendum from `0beb6331` that marks what is fixed, overstated or wrong. Its confirmed
+findings are grouped into the same plan as PA-09 to PA-26, and PA-05 widens to the whole release
+path. This document remains the plan's authority; the report holds the line-level evidence.
+
 The same change returned development to Claude Code as the sole coding agent (see
 [the development workflow](development-workflow.md#claude-code-development-workflow)): `CLAUDE.md`,
 path-scoped `.claude/rules/`, user-invoked `.claude/skills/`, read-only subagents and

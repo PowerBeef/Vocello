@@ -244,6 +244,9 @@ The pre-existing marketing-capture test edit remains paused and unchanged.
 
 ### Codex-only development workflow (September 20)
 
+> Superseded September 22: Claude Code is the sole coding agent again (see *Claude Code takeover*
+> above); the file paths and agent roles below are historical.
+
 Codex is the sole development agent. Baseline: `cb9ff234`; the pre-existing paused change in
 `Tests/VocelloMacUITests/VocelloMacMarketingCaptureUITests.swift` is outside this assignment.
 Root and website `AGENTS.md` now own instructions; native/release rules live under
@@ -529,6 +532,9 @@ combinations were not exhaustively exercised by these two Mac lanes.
 
 
 ### Shared Claude–Codex workflow and independent review (September 18)
+
+> Superseded September 22: Claude Code is the sole coding agent again (see *Claude Code takeover*
+> above); the file paths and agent roles below are historical.
 
 Claude remains primary; Codex reviews and implements assigned work on the same local `main`, one
 editor at a time. Root and website `AGENTS.md` route to existing rules; the five shared hooks have a

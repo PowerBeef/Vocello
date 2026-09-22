@@ -22,7 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 1/9 (11%) |
+| `project-audit-2026-09` | active | backend-and-platform | 1/27 (4%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -455,10 +455,28 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-02` | planned | P2 — make the owned package's diagnostics gate require the internal build capability | — |
 | `PA-03` | planned | P3 — compile-gate the iOS diagnostics runners | — |
 | `PA-04` | planned | Harness isolation: UI bundle compiles and fixed temporary paths | — |
-| `PA-05` | planned | Release workflow uses the pinned toolchain action | — |
+| `PA-05` | planned | Release path works end to end and is rehearsed | — |
 | `PA-06` | planned | Routing cost and derived-artifact gaps | — |
 | `PA-07` | planned | Remove dead engine, downloader and XPC-era code | — |
 | `PA-08` | planned | Consolidate duplicated platform logic and misleading names | — |
+| `PA-09` | planned | Scheduled workflows report their failures | — |
+| `PA-10` | planned | Release signing is isolated from dispatch and build inputs | — |
+| `PA-11` | planned | macOS launch never hashes models on the main thread | — |
+| `PA-12` | planned | macOS settings and file actions do what they say | — |
+| `PA-13` | planned | Quality-first decoding keeps every generated frame | — |
+| `PA-14` | planned | File I/O and error classification fail safely | — |
+| `PA-15` | planned | iOS stops generation safely when the app leaves the foreground | — |
+| `PA-16` | planned | Speech-tokenizer attention honors the model's sliding windows | — |
+| `PA-17` | planned | Clone consent is enforced below the views | — |
+| `PA-18` | planned | Public claims match what each download ships | — |
+| `PA-19` | planned | Orchestrators and the generate loop have unit coverage | — |
+| `PA-20` | planned | Accessibility and localization reach every surface | — |
+| `PA-21` | planned | iOS lifecycle, audio session and startup are recoverable | — |
+| `PA-22` | planned | Core storage and memory lifecycle is bounded | — |
+| `PA-23` | planned | Pull requests get the Linux checks | — |
+| `PA-24` | planned | Push CI compiles the XCUITest bundles | — |
+| `PA-25` | planned | Docs and tooling stay proportional | — |
+| `PA-26` | planned | Low-severity backlog from the external audit | — |
 
 ### Open items in detail
 
@@ -474,8 +492,8 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-04`** (planned) — Harness isolation: UI bundle compiles and fixed temporary paths.
   gate: build_ui_test_bundles.sh runs through the shared xcb_run lock and QVOICE_* policy paths into the arena its lane uses; probe and bench manifests use run-unique paths under the build-output policy.
 
-- **`PA-05`** (planned) — Release workflow uses the pinned toolchain action.
-  gate: release.yml selects Xcode and installs pinned tools through .github/actions/native-toolchain (no hard-coded Xcode version), and the TestFlight upload command is confirmed supported by the pinned Xcode.
+- **`PA-05`** (planned) — Release path works end to end and is rehearsed.
+  gate: release.yml selects Xcode and installs every pinned tool (numpy, pytest, pytest-xdist, asc, gh) through .github/actions/native-toolchain, a secrets-free ad-hoc release rehearsal workflow runs release.sh and the packaged-DMG verification on a schedule and on release-input changes and is green, and the TestFlight upload command is confirmed supported by the pinned Xcode.
 
 - **`PA-06`** (planned) — Routing cost and derived-artifact gaps.
   gate: A Tests/VocelloMacUITests-only change no longer runs the full macOS test and TSan lanes; refresh_derived_artifacts validate_all checks every registered artifact; SwiftLint is pinned or reported when missing; nightly and cache-owner text describe TSan as blocking.
@@ -485,6 +503,60 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-08`** (planned) — Consolidate duplicated platform logic and misleading names.
   gate: Each consolidation lands separately with unchanged identifiers and behavior: one download driver seam, one observation model for the model managers, one Mac player card, root models constructed once, generateVoiceDesign renamed for the all-mode loop, OWNERSHIP.json lists MLXAudioMark, and the Cmd-6 menu title matches its destination.
+
+- **`PA-09`** (planned) — Scheduled workflows report their failures.
+  gate: The nightly failure reporter files or updates its issue (logic in a tested scripts/ci module, not inline workflow Python), and swift-dependency-watch reads Dependabot alerts or reports the feed as unavailable instead of failing.
+
+- **`PA-10`** (planned) — Release signing is isolated from dispatch and build inputs.
+  gate: Signing jobs use a tag-restricted release environment, a dispatched release runs only from its own tag ref with a validated output name, the keychain grants codesign only, no Actions cache is restored after secrets exist, checkouts do not persist credentials, and signing material is removed right after release.sh.
+
+- **`PA-11`** (planned) — macOS launch never hashes models on the main thread.
+  gate: App launch and model-manager status on the main actor check manifests and sizes only; content digests are verified in the background, and a freshly downloaded file is not hashed a second time; a unit test proves the shallow path does not hash.
+
+- **`PA-12`** (planned) — macOS settings and file actions do what they say.
+  gate: Prefer lower-memory models changes the default variant for every mode without overriding explicit choices; Save As never deletes its own source and never removes an existing destination on a failed copy; the script editors expose an accessibility label.
+
+- **`PA-13`** (planned) — Quality-first decoding keeps every generated frame.
+  gate: Quality-first decode, replay and the in-context clone cut derive their sample window from explicit reference and generated frame counts, not from counting non-zero codes; a runtime unit test covers the window and a tiny decoder emits exactly frames times upsample.
+
+- **`PA-14`** (planned) — File I/O and error classification fail safely.
+  gate: No legacy FileHandle write or readData remains on model, download or evidence paths (they raise Objective-C exceptions on a full disk); cancellation and allocation-retry decisions use typed errors, and MLX errors are captured instead of reaching fatalError.
+
+- **`PA-15`** (planned) — iOS stops generation safely when the app leaves the foreground.
+  gate: On background with an active generation the app requests background time and cancels through the typed barrier (a single take is discarded, long-form keeps its completed segments), the screen stays awake while generating, the user is told on return, and a deferred background release never fires after returning; logic tests cover the policy and a physical-device run proves the cancel lands before GPU work is refused.
+
+- **`PA-16`** (planned) — Speech-tokenizer attention honors the model's sliding windows.
+  gate: The decoder transformer applies its 72-frame sliding window with a bounded KV cache and the encoder its 250-frame window; a reference-parity fixture against the upstream tokenizer passes, and the fixed-seed QC battery and gate bench show no regression.
+
+- **`PA-17`** (planned) — Clone consent is enforced below the views.
+  gate: A core policy refuses clone generation and enrollment without recorded consent on every entry point, including the CLI, and unit tests prove the refusal.
+
+- **`PA-18`** (planned) — Public claims match what each download ships.
+  gate: README and website scope every feature claim to the build it names (AudioSeal marking, Article 50, seed pinning and the new UI marked as 3.0), facts match source (concurrent files, chart record, recommended variant), AudioSeal is attributed with the correct upstream revision, and the website sends basic security headers.
+
+- **`PA-19`** (planned) — Orchestrators and the generate loop have unit coverage.
+  gate: TTSEngineStore, StudioGenerationCoordinator, the long-form runner, DatabaseService, the model managers and IOSExportGate run under unit tests with a fake engine; a tiny seeded random-weight talker and generate-loop test and a synthetic AudioSeal fixture run in CI.
+
+- **`PA-20`** (planned) — Accessibility and localization reach every surface.
+  gate: macOS and iOS route computed English and typed errors through catalog keys with plural rules and the in-app locale, VoiceOver announces generation state changes, fixed fonts scale, timed banners with actions stay, and website text meets 4.5:1 contrast.
+
+- **`PA-21`** (planned) — iOS lifecycle, audio session and startup are recoverable.
+  gate: Audio-session changes have one owner, previews pause shared playback, startup failures offer retry, saved-voice load errors are shown, downloads say they need Wi-Fi, drafts survive relaunch, and keep-audio-files is defined for iOS.
+
+- **`PA-22`** (planned) — Core storage and memory lifecycle is bounded.
+  gate: Clone-reference caching keys on the same fingerprint it stores, derived clone prompts follow their voice's lifecycle and backup class, all memory trims share one admission gate with load epochs, shared components and trash are pruned, and the prepared-model overlay lives outside the model folder.
+
+- **`PA-23`** (planned) — Pull requests get the Linux checks.
+  gate: A pull_request trigger runs contracts, Python and website for Dependabot and outside PRs while own work stays direct to main, and Dependabot action bumps update config/toolchain.json in the same PR.
+
+- **`PA-24`** (planned) — Push CI compiles the XCUITest bundles.
+  gate: Push CI builds the macOS and iOS UI-test bundles for testing without running them, and scripts/repo_invariants.sh check 2 plus the native and release rules forbid execution, not compilation.
+
+- **`PA-25`** (planned) — Docs and tooling stay proportional.
+  gate: Resume now keeps only current checkpoints, dated reports move out of docs/reference with an index, research-only scripts run outside the product gate with their own environment, source-text tests are replaced, and a contract lands only when another retires.
+
+- **`PA-26`** (planned) — Low-severity backlog from the external audit.
+  gate: Every Low and Info finding in the external audit that no other item covers is fixed or declined with a reason, section by section.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

@@ -236,7 +236,9 @@ The decoder transformer (`pre_transformer`) is small but critical for temporal c
 - Multi-head attention with RoPE (`DecoderRotaryEmbedding`).
 - GQA (grouped query attention) when `numKeyValueHeads < numAttentionHeads`.
 - `KVCacheSimple` for incremental decoding.
-- Sliding-window causal mask when `seqLen > 1`.
+- A causal mask when `seqLen > 1`. The reference model limits attention to a 72-frame sliding
+  window (`sliding_window` in the decoder config), but the current Vocello decoder applies a full
+  causal mask; restoring the window is roadmap item PA-17.
 
 Because it sits *inside* the decoder, not before it, the transformer sees the already-quantized latent and can smooth discontinuities across frames.
 
@@ -331,7 +333,8 @@ Smaller chunks increase boundary count and can amplify any residual drift bug. L
 
 MLX uses **unified memory** on Apple Silicon. Decoder weights and KV caches live in the same pool as app allocations and OS pressure. On an 8 GB machine:
 
-- Keep the decoder transformer KV cache small: it is bounded by the sliding window (`slidingWindow = 72`), not by utterance length.
+- Keep the decoder transformer KV cache small. Today it grows with the take (up to the 2,048-frame cap,
+  about 128 MiB in fp32) because the 72-frame sliding window is not applied; PA-17 restores the bound.
 - Avoid materializing long intermediate arrays. Use `eval()` only on the audio chunk that is about to be handed to the audio player.
 - The decoder weights are not quantized in current Vocello builds; the 1.7 B talker and code predictor are. If memory is tight, the decoder is a smaller but non-zero contributor.
 

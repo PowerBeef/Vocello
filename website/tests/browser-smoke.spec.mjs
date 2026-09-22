@@ -5,6 +5,7 @@ import {
   validateHydrationProbe,
   validateInternalTargets,
 } from "../scripts/browser-smoke-contract.mjs";
+import { SAMPLES } from "../src/data/samples.js";
 
 function collectBrowserFailures(page) {
   const failures = [];
@@ -35,7 +36,7 @@ for (const viewport of VIEWPORTS) {
 
     await expect(page.locator("main#main-content")).toBeVisible();
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(page.locator(".listen-row")).toHaveCount(5);
+    await expect(page.locator(".listen-row")).toHaveCount(SAMPLES.length);
     await expect(page.locator("body")).not.toHaveJSProperty("scrollWidth", 0);
 
     const overflow = await page.evaluate(() =>

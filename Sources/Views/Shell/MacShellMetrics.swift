@@ -13,6 +13,9 @@ enum MacShellMetrics {
     /// to fill whatever it was given. Chips are sized to their content now and
     /// floored at 116, so four of them plus their gaps come to 488 rather than
     /// 552 and the same rule lands 100 pt lower.
+    /// Content size, excluding the system toolbar/title bar. UI acceptance
+    /// measures that chrome separately instead of comparing the outer frame
+    /// with this content floor.
     static let windowMinSize = CGSize(width: 780, height: 560)
     /// Opens with room for all five chips on one row, which is the case an
     /// emotion-bank voice produces, and with a working amount of canvas above

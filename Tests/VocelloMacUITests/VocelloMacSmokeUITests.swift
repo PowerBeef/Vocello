@@ -31,6 +31,48 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         ["QWENVOICE_FAKE_MIC_WAV": Self.virtualClipURL.path]
     }
 
+    func test00_WindowSizesAndSettingsScene() {
+        beginSession()
+        defer { endSession() }
+        for screen in [VocelloMacScreen.customVoice, .voiceDesign, .voiceCloning] {
+            navigate(to: screen)
+            replaceScript(with: String(repeating: "The morning light rests on the quiet harbor. ", count: 35))
+            assertStudioSizeMatrix("\(screen.rawValue)-long-script")
+        }
+        app.typeKey(",", modifierFlags: .command)
+        let settings = app.windows.containing(.button, identifier: "settings_category_audio").firstMatch
+        XCTAssertTrue(VocelloUIWait.exists(settings, timeout: 20), "Cmd+, must open the Settings scene")
+        for category in ["audio", "appLanguage", "modelsFiles", "cloning"] {
+            XCTAssertTrue(button("settings_category_\(category)", in: settings).isHittable)
+        }
+        VocelloUIScreenshot.attach(settings, named: "mac-settings-command-comma")
+        app.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(VocelloUIWait.condition("Settings window to close", timeout: 10) { !settings.exists })
+        XCTAssertTrue(element("screen_voiceCloning").exists, "Closing Settings must preserve Studio")
+    }
+
+    func test10_MissingModelsAndStudioLinks() {
+        beginSession()
+        defer { endSession() }
+        // Existing registered storage isolation, not a model-state override.
+        // The app creates an empty profile; installed user/development models
+        // remain untouched. No download or deletion action is invoked.
+        relaunchApp(additionalEnvironment: [
+            "QWENVOICE_APP_SUPPORT_DIR": "/tmp/vocello-ui-empty-\(UUID().uuidString)",
+        ])
+        for (screen, mode) in [(VocelloMacScreen.customVoice, "custom"), (.voiceDesign, "design"), (.voiceCloning, "clone")] {
+            navigate(to: screen)
+            XCTAssertTrue(VocelloUIWait.exists(button("textInput_installModelButton"), timeout: 30))
+            assertStudioSizeMatrix("\(mode)-missing-model")
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("textInput_installModelButton"), timeout: 20))
+            XCTAssertTrue(VocelloUIWait.exists(element("settings_detail_modelsFiles"), timeout: 20))
+            XCTAssertTrue(element("settings_package_pro_\(mode)_speed").exists)
+            VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-\(mode)-model-link")
+        }
+        relaunchApp(additionalEnvironment: additionalLaunchEnvironment)
+        assertVisibleSpeedModelReadiness()
+    }
+
     /// Ordinary line-separated batch on the unified sequential streaming
     /// path: two short lines generate as streamed takes with mandatory engine
     /// QC and land in History individually.
@@ -121,6 +163,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         VocelloUILayoutAssert.assertFullyWithinWindow(button("voiceDesign_saveVoiceButton"), of: app)
         VocelloUILayoutAssert.assertFullyWithinWindow(button("studio_inlinePlayer_playPause"), of: app)
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-studio-design-complete")
+        assertStudioSizeMatrix("design-complete", completed: true)
 
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("voiceDesign_saveVoiceButton"), timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("voicesEnroll_nameField"), timeout: 20))
@@ -159,6 +202,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         VocelloUILayoutAssert.assertFullyWithinWindow(button("studio_inlinePlayer_playPause"), of: app)
         VocelloUILayoutAssert.assertFullyWithinWindow(button("studio_inlinePlayer_retry"), of: app)
         VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-studio-clone-complete")
+        assertStudioSizeMatrix("clone-complete", completed: true)
         navigate(to: .history)
         XCTAssertTrue(VocelloUIWait.exists(element("sidebarPlayer_bar"), timeout: 20))
         navigate(to: .voiceCloning)
@@ -170,7 +214,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         // Long-string acceptance uses Foundation's standard pseudo-localization
         // launch arguments. Stable identifiers keep the journey independent of
         // translated labels; no product-only test route is involved.
-        beginSession(additionalArguments: ["-ApplePersistenceIgnoreState", "YES"])
+        beginSession(additionalArguments: ["-ApplePersistenceIgnoreState", "YES"], englishInterface: false)
         defer { endSession() }
         preserveInterfaceLanguage()
         selectInterfaceLanguage("en")
@@ -369,6 +413,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
             button("studio_inlinePlayer_playPause"), of: app
         )
         VocelloUIScreenshot.attach(app, named: "mac-studio-built-in-complete-minimum")
+        assertStudioSizeMatrix("built-in-complete", completed: true)
 
         // The completed take must be visible in History exactly once.
         assertHistoryRows(matching: nonce, expected: 1)
@@ -378,10 +423,32 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         assertHistoryRowsLayoutIntact(filteredTo: nonce)
         XCTAssertTrue(element("sidebarPlayer_bar").exists, "The sidebar carries playback outside Studio")
         VocelloUIScreenshot.attach(app, named: "mac-smoke-history-completed")
+        app.typeKey("s", modifierFlags: [.command, .control])
+        XCTAssertTrue(VocelloUIWait.condition("sidebar to collapse", timeout: 10) {
+            !self.button("sidebar_studio").isHittable
+        })
+        XCTAssertTrue(button("sidebarPlayer_playPause").isHittable,
+                      "Playback must remain available in the detail footer")
+        VocelloUILayoutAssert.assertFullyWithinWindow(button("sidebarPlayer_playPause"), of: app)
+        VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-playback-sidebar-collapsed")
+        app.typeKey("s", modifierFlags: [.command, .control])
+        XCTAssertTrue(VocelloUIWait.condition("sidebar to expand", timeout: 10) {
+            self.button("sidebar_studio").isHittable
+        })
 
         navigate(to: .customVoice)
         XCTAssertTrue(button("studio_inlinePlayer_playPause").exists)
         XCTAssertFalse(element("sidebarPlayer_bar").exists, "Returning to Studio restores one inline transport")
+
+        navigate(to: .voices)
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(
+            on: button("voicesRow_play_\(VocelloUIBenchMatrix.cloneVoiceID)"), timeout: 20))
+        navigate(to: .customVoice)
+        XCTAssertFalse(button("studio_inlinePlayer_playPause").exists,
+                       "The old completed take must not control another clip")
+        XCTAssertTrue(button("sidebarPlayer_playPause").exists,
+                      "The newly selected reference clip keeps its own transport")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("sidebarPlayer_dismiss"), timeout: 20))
     }
 
     func test03_GenerationCancellation() {
@@ -394,6 +461,15 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
             with: VocelloUIBenchMatrix.text(for: .long) + " Cancellation token \(nonce)."
         )
         startGenerationAndAwaitCancelControl(mode: .custom)
+        XCTAssertTrue(VocelloUIWait.exists(button("studio_inlinePlayer_playPause"), timeout: 180))
+        navigate(to: .history)
+        XCTAssertTrue(VocelloUIWait.exists(element("sidebarPlayer_liveBadge"), timeout: 15))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("sidebarPlayer_dismiss"), timeout: 15))
+        navigate(to: .customVoice)
+        XCTAssertFalse(button("studio_inlinePlayer_playPause").exists,
+                       "A dismissed stream must not retake playback ownership")
+        XCTAssertTrue(button("textInput_cancelButton").exists,
+                      "Dismissing playback must leave generation under the Cancel control")
         cancelActiveGenerationAndAssertCleanReset()
         VocelloUIScreenshot.attach(app, named: "mac-smoke-cancelled")
 

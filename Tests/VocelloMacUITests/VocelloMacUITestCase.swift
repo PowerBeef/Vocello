@@ -30,7 +30,7 @@ class VocelloMacUITestCase: XCTestCase {
 
     var additionalLaunchEnvironment: [String: String] { [:] }
 
-    func beginSession(additionalArguments: [String] = []) {
+    func beginSession(additionalArguments: [String] = [], englishInterface: Bool = true) {
         continueAfterFailure = false
         session = VocelloUIApplicationSession()
         VocelloUIInterruptionSentinel.install(on: self)
@@ -38,6 +38,11 @@ class VocelloMacUITestCase: XCTestCase {
             additionalEnvironment: additionalLaunchEnvironment,
             additionalArguments: additionalArguments
         )
+        if englishInterface {
+            preserveInterfaceLanguage()
+            if pendingInterfaceLanguageRestore != "en" { selectInterfaceLanguage("en") }
+            navigate(to: .customVoice)
+        }
     }
 
     func endSession() {
@@ -115,7 +120,7 @@ class VocelloMacUITestCase: XCTestCase {
         // sees the same English strings regardless of the host's settings.
         session.launch(
             environment: environment,
-            arguments: Self.englishLaunchArguments + additionalArguments
+            arguments: Self.englishLaunchArguments + ["-ApplePersistenceIgnoreState", "YES"] + additionalArguments
         )
         XCTAssertTrue(
             VocelloUIWait.exists(app.windows.firstMatch, timeout: 30),
@@ -376,22 +381,66 @@ class VocelloMacUITestCase: XCTestCase {
     /// reader can tell a run that measured the minimum from one that did not.
     @discardableResult
     func pinToNarrowestWindow() -> CGRect {
+        let chrome = windowChromeHeight()
         let frame = VocelloUIWindowFrame.require(
             app,
             width: VocelloUIWindowFrame.Width.minimum,
-            height: VocelloUIWindowFrame.Height.minimum
+            height: VocelloUIWindowFrame.Height.minimum + chrome
         )
-        let reached = abs(frame.width - VocelloUIWindowFrame.Width.minimum) <= 6
-            && abs(frame.height - VocelloUIWindowFrame.Height.minimum) <= 6
-        let verdict = reached
-            ? "reached"
-            : "NOT reached (\(VocelloUIWindowFrame.shrinkDiagnosis(app, from: frame)))"
+        let contentHeight = frame.height - windowChromeHeight()
+        XCTAssertEqual(frame.width, VocelloUIWindowFrame.Width.minimum, accuracy: 6)
+        XCTAssertEqual(contentHeight, VocelloUIWindowFrame.Height.minimum, accuracy: 6,
+                       "Minimum content size must be reached, not merely requested")
         XCTContext.runActivity(
-            named: "Window pinned to \(Int(frame.width))x\(Int(frame.height)) pt; "
-                + "declared minimum is \(Int(VocelloUIWindowFrame.Width.minimum))x"
-                + "\(Int(VocelloUIWindowFrame.Height.minimum)) — \(verdict)"
+            named: "Minimum content \(Int(frame.width))x\(Int(contentHeight)); "
+                + "outer frame \(Int(frame.width))x\(Int(frame.height)); chrome \(Int(chrome))"
         ) { _ in }
         return frame
+    }
+
+    /// The SwiftUI content floor excludes the system toolbar/title bar.
+    /// Measure the actual chrome; never bake one OS's toolbar height into tests.
+    func windowChromeHeight() -> CGFloat {
+        let window = app.windows.firstMatch
+        let toolbar = window.toolbars.firstMatch
+        XCTAssertTrue(toolbar.exists, "Main window must expose its native toolbar")
+        let height = toolbar.frame.maxY - window.frame.minY
+        XCTAssertGreaterThan(height, 0)
+        XCTAssertLessThan(height, window.frame.height / 2)
+        return height
+    }
+
+    func assertStudioSizeMatrix(_ name: String, completed: Bool = false) {
+        for (size, width, height) in [
+            ("minimum", VocelloUIWindowFrame.Width.minimum, VocelloUIWindowFrame.Height.minimum),
+            ("default", VocelloUIWindowFrame.Width.standard, VocelloUIWindowFrame.Height.standard),
+            ("wide", VocelloUIWindowFrame.Width.wide, VocelloUIWindowFrame.Height.standard),
+        ] {
+            let frame: CGRect
+            if size == "minimum" {
+                frame = pinToNarrowestWindow()
+            } else {
+                frame = VocelloUIWindowFrame.require(app, width: width, height: height + windowChromeHeight())
+                if size == "default" {
+                    XCTAssertEqual(frame.width, width, accuracy: 6)
+                } else {
+                    XCTAssertGreaterThan(frame.width, VocelloUIWindowFrame.Width.standard,
+                                         "Wide acceptance requires a display wider than the default window")
+                }
+            }
+            let editor = element("textInput_textEditor")
+            VocelloUILayoutAssert.assertFullyWithinWindow(editor, of: app)
+            let install = button("textInput_installModelButton")
+            VocelloUILayoutAssert.assertFullyWithinWindow(install.exists ? install : generationAction, of: app)
+            VocelloUILayoutAssert.assertFullyWithinWindow(element("textInput_modeMetaLabel"), of: app)
+            XCTAssertLessThanOrEqual(editor.frame.maxY, element("textInput_modeMetaLabel").frame.minY + 2,
+                                     "Script must scroll inside its editor without covering setup")
+            if completed {
+                VocelloUILayoutAssert.assertFullyWithinWindow(button("studio_inlinePlayer_playPause"), of: app)
+            }
+            VocelloUIScreenshot.attach(app.windows.firstMatch,
+                named: "mac-\(name)-\(size)-\(Int(frame.width))x\(Int(frame.height))")
+        }
     }
 
     /// Nothing in the Studio column scrolls. The composer flexes and everything

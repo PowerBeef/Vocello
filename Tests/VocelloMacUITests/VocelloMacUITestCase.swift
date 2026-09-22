@@ -191,8 +191,13 @@ class VocelloMacUITestCase: XCTestCase {
 
     func openSettingsOverview() {
         navigate(to: .settings)
-        if button("settings_backButton").exists {
-            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("settings_backButton"), timeout: 20))
+        let back = button("settings_backButton")
+        if back.exists {
+            for _ in 0..<8 {
+                if back.isHittable { break }
+                element("screen_settings").scroll(byDeltaX: 0, deltaY: 500)
+            }
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: back, timeout: 20))
         }
         XCTAssertTrue(VocelloUIWait.exists(button("settings_category_audio"), timeout: 20))
     }

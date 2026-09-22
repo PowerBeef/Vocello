@@ -15,7 +15,7 @@ extension VocelloMacSmokeUITests {
         }
         openSettingsCategory("modelsFiles")
         let original = button("preferences_outputResetButton").exists
-            ? element("preferences_outputDirectory", type: .staticText).label : nil
+            ? element("preferences_outputDirectory", type: .staticText).value as? String : nil
         // Base teardown calls the smoke cleanup even on stop-on-failure exits.
         acceptanceOutputRestore = (original, folders)
         chooseOutputFolder(root.path)
@@ -118,7 +118,7 @@ extension VocelloMacSmokeUITests {
         let open = app.dialogs["open-panel"].buttons["Open"].firstMatch
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: open, timeout: 20))
         XCTAssertTrue(VocelloUIWait.condition("chosen output directory", timeout: 10) {
-            self.element("preferences_outputDirectory", type: .staticText).label == path
+            self.element("preferences_outputDirectory", type: .staticText).value as? String == path
         })
     }
 

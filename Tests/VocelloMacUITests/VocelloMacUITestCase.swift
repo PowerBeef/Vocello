@@ -60,6 +60,9 @@ class VocelloMacUITestCase: XCTestCase {
     }
 
     func cleanUpPerTest() {
+        if session != nil, app.menus.firstMatch.exists {
+            app.typeKey(.escape, modifierFlags: [])
+        }
         if let original = pendingInterfaceLanguageRestore, session != nil {
             pendingInterfaceLanguageRestore = nil
             selectInterfaceLanguage(original)

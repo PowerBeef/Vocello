@@ -64,8 +64,7 @@ extension VocelloMacSmokeUITests {
             replaceScript(with: "The harbor is quiet. Le port est tranquille.")
             selectSpeechLanguage(speech, picker: "voiceDesign_languagePicker")
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studioChip_voiceBrief"), timeout: 20))
-            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("voiceDesign_briefStarters"), timeout: 20))
-            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("voiceDesign_briefStarter_0", type: .menuItem), timeout: 10))
+            selectStudioMenuItem(startingWith: [starterPrefix], picker: "voiceDesign_briefStarters")
             let brief = element("voiceDesign_voiceDescriptionField")
             XCTAssertTrue(VocelloUIWait.value(brief, contains: starterPrefix, timeout: 10))
             let authoredBrief = "Une voix grave et posée; keep this exact custom brief."
@@ -75,9 +74,9 @@ extension VocelloMacSmokeUITests {
                                      (.voiceDesign, "voiceDesign_languagePicker")] {
                 navigate(to: screen)
                 selectSpeechLanguage(speech, picker: picker)
-                selectDeliveryOption("delivery_preset_calm")
+                selectStudioMenuItem(startingWith: [calm], picker: "delivery_tonePicker")
                 XCTAssertTrue(VocelloUIWait.value(element("delivery_tonePicker"), contains: calm, timeout: 10))
-                selectDeliveryOption("delivery_customOption")
+                selectStudioMenuItem(startingWith: [interface == "en" ? "Custom" : "Personnalisé"], picker: "delivery_tonePicker")
                 let custom = "Speak gently. Garder cette consigne personnelle."
                 let field = element("delivery_toneField", type: .textField)
                 XCTAssertTrue(VocelloUITextEntry.replace(in: field, with: custom, timeout: 20))
@@ -98,13 +97,30 @@ extension VocelloMacSmokeUITests {
     }
 
     private func selectSpeechLanguage(_ language: String, picker: String) {
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element(picker), timeout: 20))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("studio_languageOption_\(language)", type: .menuItem), timeout: 10))
+        let titles = language == "french" ? ["French", "Français"] : ["English", "Anglais"]
+        selectStudioMenuItem(startingWith: titles, picker: picker)
     }
 
-    private func selectDeliveryOption(_ identifier: String) {
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("delivery_tonePicker"), timeout: 20))
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element(identifier, type: .menuItem), timeout: 10))
+    private func selectStudioMenuItem(startingWith titles: [String], picker: String) {
+        let control = element(picker)
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: control, timeout: 20))
+        // AppKit's SwiftUI Menu bridge exposes the visible title but replaces
+        // row accessibility identifiers with its shared menuAction: selector.
+        let choice = control.descendants(matching: .menuItem).matching(
+            NSCompoundPredicate(orPredicateWithSubpredicates: titles.map {
+                NSPredicate(format: "title BEGINSWITH %@", $0)
+            })
+        ).firstMatch
+        XCTAssertTrue(VocelloUIWait.exists(choice, timeout: 10))
+        let menu = control.descendants(matching: .menu).firstMatch
+        if !choice.isHittable, menu.exists {
+            let direction: XCUIKeyboardKey = choice.frame.midY < menu.frame.midY ? .upArrow : .downArrow
+            for _ in 0..<20 {
+                if choice.isHittable { break }
+                app.typeKey(direction, modifierFlags: [])
+            }
+        }
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: choice, timeout: 10))
     }
 
     private func chooseOutputFolder(_ path: String) {

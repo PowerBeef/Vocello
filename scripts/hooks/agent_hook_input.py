@@ -1,48 +1,45 @@
 #!/usr/bin/env python3
-"""Normalize Codex apply_patch input for the repository shell hooks.
+"""Normalize Claude Code hook input for the repository shell hooks.
 
-Codex exposes shell and patch text as tool_input.command. Print one
-canonical absolute path per line, including both ends of moves. Never execute
-or persist tool input. This is a guardrail adapter, not a shell/patch sandbox.
+Bash calls expose the shell text as tool_input.command. File-edit tools expose
+their target as tool_input.file_path (Edit, Write, MultiEdit) or
+tool_input.notebook_path (NotebookEdit). Print one canonical absolute path per
+line. Never execute or persist tool input. This is a guardrail adapter, not a
+sandbox.
 """
 
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import re
 import sys
+
+EDIT_PATH_KEYS = {
+    "Edit": "file_path",
+    "Write": "file_path",
+    "MultiEdit": "file_path",
+    "NotebookEdit": "notebook_path",
+}
 
 
 def edit_paths(payload: dict, root: Path) -> list[str]:
     tool_input = payload.get("tool_input", {})
     if not isinstance(tool_input, dict):
         raise ValueError("file-edit input must be an object")
-    paths = []
-    if payload.get("tool_name") != "apply_patch":
-        raise ValueError("file guard requires an apply_patch payload")
-    patch = tool_input.get("command")
-    if not isinstance(patch, str):
-        raise ValueError("apply_patch input needs tool_input.command")
-    lines = patch.strip().splitlines()
-    if not lines or lines[0] != "*** Begin Patch" or lines[-1] != "*** End Patch":
-        raise ValueError("cannot inspect malformed apply_patch boundaries")
-    for line in lines[1:-1]:
-        match = re.fullmatch(r"\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)", line)
-        if match:
-            paths.append(match[1])
-    if not paths:
-        raise ValueError("apply_patch contains no inspectable file paths")
+    tool_name = str(payload.get("tool_name"))
+    key = EDIT_PATH_KEYS.get(tool_name)
+    if key is None:
+        raise ValueError(f"cannot inspect tool {tool_name!r}")
+    value = tool_input.get(key)
+    if not isinstance(value, str) or not value or any(c in value for c in "\n\r\0"):
+        raise ValueError(f"{tool_name} input needs a representable tool_input.{key}")
     cwd = Path(payload.get("cwd") or root)
     if not cwd.is_absolute():
         raise ValueError("hook cwd must be absolute")
-    normalized = []
-    for value in paths:
-        if not isinstance(value, str) or any(c in value for c in "\n\r\0"):
-            raise ValueError("file path cannot be represented safely")
-        path = Path(value)
-        normalized.append(str((path if path.is_absolute() else cwd / path).resolve()))
-    return list(dict.fromkeys(normalized))
+    path = Path(value)
+    return [str((path if path.is_absolute() else cwd / path).resolve())]
 
 
 def main() -> int:
@@ -60,7 +57,7 @@ def main() -> int:
         return 2
     try:
         if mode == "paths":
-            root = Path(__file__).resolve().parents[2]
+            root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2])
             for path in edit_paths(payload, root):
                 print(path)
         else:

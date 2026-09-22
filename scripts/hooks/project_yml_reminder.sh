@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Codex apply_patch PostToolUse hook.
+# Claude Code PostToolUse hook (matcher: Edit|Write|MultiEdit).
 #
 # After project.yml changes, remind the session that the Xcode project is
 # generated and the generation stamp must be refreshed before a checkpoint.

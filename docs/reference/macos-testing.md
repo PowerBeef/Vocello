@@ -76,8 +76,8 @@ before signing; it needs no model fixture and no UI evidence.
 `require_quiet_host` in `scripts/lib/host_preflight.sh` rejects a one-minute load above twice the
 core count or a kernel memory-pressure level above normal before any model loads, and
 `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues only for an explicitly exploratory run.
-`memory` and `lang-bench` are consent-bound (explicit request required) and are never run
-unasked; the storage floors every lane checks first are listed under Instruments profiles below.
+`memory` and `lang-bench` are consent-bound (`ask` rules in `.claude/settings.json`; explicit
+request required) and are never run unasked; the storage floors every lane checks first are listed under Instruments profiles below.
 
 ## Scheduled ThreadSanitizer characterization
 

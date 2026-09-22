@@ -1,11 +1,12 @@
 # Vocello development guide
 
-Codex is the primary software engineer and sole coding agent, responsible for delivering working
-changes from the user's objective through implementation, verification and completion. Work directly
-on the existing local `main` checkout; no branches, worktrees, automatic delegation or additional
-agents. Keep tooling proportional to
-product work: reuse scripts and tests, load guidance only when relevant, and add a check only for
-a demonstrated product or workflow risk.
+Claude Code is the primary software engineer and sole coding agent, responsible for delivering
+working changes from the user's objective through implementation, verification and completion. Work
+directly on the existing local `main` checkout: no branches or worktrees, one editor and one native
+command at a time. Read-only subagents may research, triage finished runs and review; they never
+edit, commit, or run native, device, UI, model or benchmark commands. Keep tooling proportional to
+product work: reuse scripts and tests, load guidance only when relevant, and add a check only for a
+demonstrated product or workflow risk.
 
 ## Engineering ownership and autonomy
 
@@ -29,12 +30,14 @@ a demonstrated product or workflow risk.
 ## Start here
 
 1. Read `git status --short --branch`, `git rev-parse HEAD`, `python3 scripts/roadmap.py status`,
-   and the current **Resume now** section of `docs/development-progress.md`. Preserve existing edits;
-   reconcile unexpected changes before touching overlapping files. Never stash or broadly stage them.
-2. Load only the domain guidance in scope (paths below are repository-relative):
-   - Swift, owned packages, tests and project inputs: `docs/reference/agent-rules/native.md`.
-   - Scripts, contracts, CI, packaging, evidence or agent configuration: `docs/reference/agent-rules/release.md`.
-   - Website: `website/AGENTS.md`; read `website/PRODUCT.md` and `website/DESIGN.md` for visual/copy work.
+   and the current **Resume now** section of `docs/development-progress.md` (the session hook prints
+   a bounded summary). Preserve existing edits; reconcile unexpected changes before touching
+   overlapping files. Never stash or broadly stage them.
+2. Load only the domain guidance in scope. Path-scoped rules load automatically when you read
+   matching files; read them directly when planning:
+   - Swift, owned packages, tests and project inputs: `.claude/rules/native.md`.
+   - Scripts, contracts, CI, packaging, evidence or Claude configuration: `.claude/rules/release.md`.
+   - Website: `website/CLAUDE.md`; read `website/PRODUCT.md` and `website/DESIGN.md` for visual/copy work.
 3. Implement the smallest coherent change, verify affected behavior, review the actual diff, then
    commit the assigned files on `main` and push. CI on the pushed commit is the gate.
 4. Report changed behavior, checks and limitations, commit/CI evidence and remaining work. Update the
@@ -50,7 +53,7 @@ one shared store, alongside the `vocello` CLI, Python tooling and React/Vite web
 weights or cloud inference. Approved assets download through the production catalog.
 
 Authority: `Sources/` → `project.yml` → `config/` contracts → `scripts/` → `.github/workflows/` →
-this guide and domain rules → other prose. Correct conflicting prose in the same change. Public
+this guide and `.claude/rules/` → other prose. Correct conflicting prose in the same change. Public
 facts come from `config/public-product-facts.json` and `project.yml`.
 `config/roadmap.json` owns open work; `config/roadmap-archive.json` owns completed work;
 `docs/ROADMAP.md` is generated. Architecture lives in `docs/ARCHITECTURE.md`.
@@ -77,9 +80,12 @@ work must remain paused; its contract gate still considers dirty tooling inputs.
 are serialized and reuse owned caches. Website-only work never launches native builds or devices.
 `scripts/dev.sh ci` is the full serial CI replay when needed, not the default inner loop.
 UI-test source changes compile their affected bundles locally; ordinary CI never runs native UI.
+After a push, follow the run with `gh run list` / `gh run watch` until `CI required` settles.
 
 ## Hard boundaries
 
+- **Main only:** develop and commit on local `main`; no branches, worktrees or worktree-isolated
+  agents. Never force-push; stage explicit paths, never the whole tree.
 - **Physical iPhone only:** no Simulator build, launch or test. Generic iOS compilation is phone-free.
 - **One native UI driver:** repository XCUITest through `scripts/ui_test.sh`; no computer-use,
   coordinate, browser or MCP native UI routes. Genuine controls only; no hidden shippable test UI.
@@ -103,16 +109,36 @@ UI-test source changes compile their affected bundles locally; ordinary CI never
 - **Git/release:** never force-push. Releases require the existing verified tag, exact-source CI,
   signing and promotion gates. No changes to global installations or pins just to hide local drift.
 
-## Tools and skills
+## Claude Code setup
 
-Repository scripts are authoritative. Installed Axiom, Apple documentation, Swift/MLX, native-app,
-GitHub, browser, Hugging Face and Vercel tools can assist relevant work when callable; choose the
-smallest useful set, not every available skill. Preserve all boundaries above even when a plugin
-suggests another route. Missing optional tools do not block the script workflow or require a second
-server. CI does not depend on personal plugins or credentials.
+Repository scripts are authoritative; everything below assists them and never replaces a gate.
 
-The four explicit QA shortcuts live in `.agents/skills`; they call the same repository scripts.
-`.codex/environments/environment.toml` exposes existing commands with no automatic setup.
-`.codex/hooks.json` supplies fast guardrails. Project hooks require platform trust and have limited
-coverage; they are neither a sandbox nor proof of authorization. See the development guide for tool
-routing and fresh-session verification.
+- **`.claude/settings.json`** wires the repository guards through `scripts/hooks/`:
+  `session_start.sh` (bounded local context), `commit_lint.sh` (commits on `main`, clean staged
+  whitespace, staged privacy scan), `policy_guard.sh` (Simulator routes, whole-cache deletion,
+  force pushes, branches/worktrees, `project.pbxproj` writes), `generated_file_guard.sh` (generated
+  or frozen files, naming their generator) and `project_yml_reminder.sh`. Its permissions allow the
+  routine loop, including scoped commits and pushes to `main`, ask before consent-bound lanes and
+  cache cleanup, and deny force pushes, branching, worktrees, broad staging, stashing, releases and
+  `.xcodeproj` edits. Hooks and permissions are guardrails, not proof of authorization.
+  `scripts/tests/test_agent_hooks.py` pins the wiring; personal overrides belong in the untracked
+  `.claude/settings.local.json`.
+- **Skills** (user-invoked only; the invocation is the explicit request for that lane):
+  `/ios-lane <lane>`, `/macos-ui-lane <lane>`, `/device-diagnostics <verb>` and
+  `/release-evidence <tag>` (read-only). They call the existing scripts and add no gate.
+- **Subagents** (read-only): `xcresult-triage` reads a finished UI run as the testing runbook
+  describes and never reruns it; `swift-review` reviews Swift diffs against `.claude/rules/native.md`.
+  Built-in Explore/Plan agents may search and plan. None edits, commits or runs native commands.
+- **Tool routing:** XcodeBuildMCP (profiles `macos` and `ios-device` in `.xcodebuildmcp/config.yaml`)
+  for discovery, scratch builds and device debugging only, never Simulator or UI automation and never
+  as evidence; swift-lsp through `buildServer.json` (needs a warm `build/cache/xcode/macos`); Axiom
+  skills and Apple documentation for platform APIs; Context7 for library documentation; `gh` or the
+  GitHub MCP for CI and releases; Claude in Chrome or chrome-devtools for the website only; Hugging
+  Face tools read-only, with no implied download or pin change. Missing optional tools never block
+  the script workflow, and CI never depends on personal plugins or credentials.
+- **Guard literals:** hooks match raw Bash command text. Keep commit messages in heredocs, and build
+  strings that name Simulator routes, private home paths or the commit command from fragments in
+  commands and fixtures.
+
+Detailed routing, permissions rationale and fresh-session verification:
+`docs/reference/development-workflow.md#claude-code-setup-and-tool-routing`.

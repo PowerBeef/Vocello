@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-18
+reviewed: 2026-09-22
 summary: The local edit loop, the commit lint and how push CI routes lanes; scripts/dev.sh is the interface and CI on main is the gate.
 sourceOfTruth:
   - scripts/dev.sh
@@ -44,7 +44,7 @@ selection, `website` runs `npm --prefix website run check`. A change to shared t
 
 ## The commit lint
 
-`scripts/hooks/commit_lint.sh` (a Codex `PreToolUse` hook) requires
+`scripts/hooks/commit_lint.sh` (a Claude Code `PreToolUse` hook) requires
 branch `main`, a whitespace-clean staged diff (`git diff --cached --check`) and a clean
 `scripts/privacy_scan.py --staged` (no developer home path, no credential-shaped token, no key file).
 It never builds or tests. Two more guards block Simulator destinations, whole-cache deletion, force
@@ -153,13 +153,14 @@ on the tagged commit.
 XCUITest, model downloads, generated audio, benchmarks, signing, notarization, App Store work and
 releases run only when the task explicitly asks for that evidence, through their canonical scripts.
 
-## Codex development workflow
+## Claude Code development workflow
 
-Codex is the sole development agent; `AGENTS.md` owns the working agreement. Work on the existing
-local `main` checkout without delegation. Before editing, record HEAD, dirty files and the relevant
-roadmap item or user assignment. Preserve unrelated work; reconcile an unexpected change before
-editing or staging overlapping files. Implement, run affected checks, review the diff, commit only
-the assignment and push. Report the behavior change, checks and limitations, commit/CI evidence and
+Claude Code is the sole development agent; `CLAUDE.md` owns the working agreement and
+`.claude/rules/` holds the path-scoped domain rules. Work on the existing local `main` checkout with
+one editor. Before editing, record HEAD, dirty files and the relevant roadmap item or user
+assignment. Preserve unrelated work; reconcile an unexpected change before editing or staging
+overlapping files. Implement, run affected checks, review the diff, commit only the assignment
+(explicit paths) and push. Report the behavior change, checks and limitations, commit/CI evidence and
 next action. Update the existing checkpoint or roadmap only when status changes; no transcripts or
 second work ledger.
 
@@ -169,50 +170,72 @@ build/lint plan when unrelated work is paused; its contract gate still selects P
 actual dirty tooling. A skipped CI lane is not a new test run. Do not add validators for prose,
 plugin inventories, or tool availability. Existing product and release gates remain authoritative.
 
-## Codex setup and tool routing
+Read-only subagents keep large reads out of the main context: the built-in Explore and Plan agents
+for search and design, `xcresult-triage` for a finished UI run and `swift-review` for a Swift diff.
+They never edit, stage, commit, push or start native, device, UI, model or benchmark work, and they
+never run in a worktree; the main session owns every write and every native command.
 
-The existing environment actions expose Status, Check, Native tests, Build Mac app, Run Mac app,
-Website checks and Toolchain audit. Automatic setup is empty. Opening a task never installs tools,
-builds, probes a phone or starts an app. Native commands are serialized on the owned caches.
+## Claude Code setup and tool routing
 
-`.codex/hooks.json` wires the five repository guards. Shell calls, including unified exec and nested
-code-mode tool calls, match `Bash`; patch calls match `apply_patch` and provide patch text in
-`tool_input.command`. The input adapter inspects every added, updated, deleted and moved path,
-including both sides of renames. Unreadable patch input is rejected. The project reminder names the
-existing regeneration command. Hooks resolve from the checkout rather than a personal environment
-variable. Startup prints only bounded local Git/status/checkpoint context.
+`.claude/settings.json` is the tracked project configuration; opening a session never installs
+tools, builds, probes a phone or starts an app.
 
-Project hooks require platform trust and cover only supported tool routes. Passing fixtures do not
-prove that a running session enabled them; they cannot undo post-tool side effects or replace the
-sandbox. See the [hook contract](https://learn.chatgpt.com/docs/hooks) and
-[instruction discovery](https://learn.chatgpt.com/docs/agent-configuration/agents-md). After changing
-instructions or hooks, use a fresh session to check root/website guidance, explicit skill discovery,
-the startup summary and harmless allowed/blocked fixture behavior. Report runtime activation as
-unverified when a fresh trusted session is unavailable. Never try a real destructive command as a
-hook test.
+| Hook | Matcher | Script | Effect |
+| --- | --- | --- | --- |
+| `SessionStart` | `startup\|resume\|clear\|compact` | `session_start.sh` | Bounded local Git, `dev.sh status` and "Resume now" context |
+| `PreToolUse` | `^Bash$` | `commit_lint.sh` | Commits (including `git -c`/`-C` forms) need `main`, clean staged whitespace and a clean staged privacy scan |
+| `PreToolUse` | `^Bash$` | `policy_guard.sh` | Blocks Simulator routes, whole-cache deletion, force pushes, branches/worktrees and `project.pbxproj` writes; heredoc bodies are data |
+| `PreToolUse` | `^(Edit\|Write\|MultiEdit\|NotebookEdit)$` | `generated_file_guard.sh` | Refuses hand edits of generated or frozen files and names the generator |
+| `PostToolUse` | `^(Edit\|Write\|MultiEdit)$` | `project_yml_reminder.sh` | Reminds to run `./scripts/regenerate_project.sh --fast` after a root `project.yml` edit |
+
+`scripts/hooks/agent_hook_input.py` normalizes Claude Code hook input: Bash text from
+`tool_input.command`, edit targets from `tool_input.file_path` (`notebook_path` for NotebookEdit),
+resolved against the payload's `cwd`. Unreadable input, a missing path or an unexpected tool fails
+closed for the file guards. Hooks resolve through `$CLAUDE_PROJECT_DIR`.
+`scripts/tests/test_agent_hooks.py` pins the exact matcher-to-script matrix, the guard behavior, the
+skill and subagent metadata and the rule path scopes; changes under `.claude/` select it locally and
+in CI.
+
+Permissions encode the same boundaries. `allow` covers the routine loop: Git inspection, explicit-path
+staging, commits and fast-forward pushes to `main` (the maintainer's standing authorization; the
+commit lint still runs), `scripts/dev.sh`, the contract gate, pytest, the roadmap, `gh run` and the
+deterministic native lanes. `ask` covers the consent-bound lanes (`scripts/ui_test.sh`,
+`scripts/ios_device.sh`, the `scripts/macos_test.sh` model, memory, benchmark and release-readiness
+lanes, model installs), cache cleanup, workflow dispatch, destructive Git resets and the XcodeBuildMCP
+device and test tools. `deny` covers force pushes, branches, worktrees and worktree-isolated agents,
+stashing, broad staging, whole-cache deletion, releases and `.xcodeproj` edits. Hooks and permissions
+are guardrails, not a sandbox or proof of authorization; programs and tools outside their coverage
+still follow `CLAUDE.md`. Personal overrides belong in the ignored `.claude/settings.local.json`,
+where deny rules from the tracked file still win.
+
+After changing instructions, rules, skills or hooks, check a fresh session: the SessionStart banner
+names `CLAUDE.md`, `/memory` lists `CLAUDE.md`, `/hooks` shows the five hooks, `/permissions` shows
+the three lists, the four skills appear in the `/` menu, and a harmless blocked fixture (an Edit of
+`docs/ROADMAP.md`) is refused. Report runtime activation as unverified until then. Never try a real
+destructive command as a hook test.
 
 | Work | Authoritative route | Relevant optional assistance |
 | --- | --- | --- |
-| Native build/test/UI evidence | Repository scripts, owned caches and XCUITest | XcodeBuildMCP discovery/debugging with existing profiles; no alternative native UI driver |
-| Apple code and diagnostics | Source, Apple documentation and test artifacts | Axiom, Apple documentation MCP, native-app and Swift/MLX skills; select the relevant specialty only |
-| Website | `npm --prefix website run check` with Playwright | Codex browser tools for visual/interactive checks; Impeccable and relevant Vercel/library guidance under `website/AGENTS.md` |
-| CI and release evidence | Exact-commit GitHub checks and repository release scripts | GitHub CLI or connector; release tools require explicit publication authority |
-| Model/dependency research | Receipts, exact pins and maintenance contracts | Hugging Face and upstream documentation; no implied download or pin-change permission |
+| Native build/test/UI evidence | Repository scripts, owned caches and XCUITest | XcodeBuildMCP discovery, scratch builds and device debugging with the `macos`/`ios-device` profiles; swift-lsp through `buildServer.json`; no alternative native UI driver |
+| Apple code and diagnostics | Source, Apple documentation and test artifacts | Axiom skills and auditors, Apple documentation tools, `swift-review`; select the relevant specialty only |
+| Finished UI runs | [Testing runbook](testing-runbook.md#read-a-finished-run) | `xcresult-triage` subagent |
+| Website | `npm --prefix website run check` with Playwright | Claude in Chrome or chrome-devtools for visual/interactive checks; Impeccable and relevant Vercel/library guidance under `website/CLAUDE.md` |
+| CI and release evidence | Exact-commit GitHub checks and repository release scripts | `gh` or the GitHub MCP; release tools require explicit publication authority |
+| Model/dependency research | Receipts, exact pins and maintenance contracts | Hugging Face tools read-only and Context7 for library docs; no implied download or pin-change permission |
 
 Use tools callable in the current session, with script/primary-documentation fallbacks. Do not
 install plugins, duplicate servers or change global settings just to satisfy this table. Personal
 plugins, accounts and skill caches are not CI dependencies. Generic plugin advice never overrides
 physical-iPhone-only, script-owned native UI, cache ownership or consent requirements.
 
-Four explicit shortcuts live under `.agents/skills`: `$ios-lane`, `$macos-ui-lane`,
-`$device-diagnostics` and `$release-evidence`. Their `agents/openai.yaml` disables implicit invocation;
-they call existing scripts, not a second execution engine. Codex triages the resulting evidence
-itself using the [testing runbook](testing-runbook.md). No installed specialist skill or MCP server is
-mandatory. Codex executable configuration and skill invocation metadata route into the existing
-Python lane; prose alone does not select native work.
+Four explicit skills live under `.claude/skills`: `/ios-lane`, `/macos-ui-lane`,
+`/device-diagnostics` and `/release-evidence`. `disable-model-invocation: true` keeps them
+user-invoked; invoking one is the explicit request for that lane. Their `allowed-tools` cover only the
+lane's own script and read-only triage; they call existing scripts, not a second execution engine.
+No installed specialist skill or MCP server is mandatory.
 
-The Toolchain audit action runs `python3 scripts/supply_chain_contract.py --installed all`.
-Choose `native`, `website` or `release` for focused audits. Report local compatibility separately
-from pinned CI and release readiness. Keep pins/global installations unchanged unless assigned;
-release CLI drift does not block ordinary development. For compiler-cache or loopback permission
-failures, preserve the failed attempt and request the narrow access the existing command needs.
+The toolchain audit is `python3 scripts/supply_chain_contract.py --installed all`; choose `native`,
+`website` or `release` for focused audits. Report local compatibility separately from pinned CI and
+release readiness. Keep pins/global installations unchanged unless assigned; release CLI drift does
+not block ordinary development. For compiler-cache or loopback permission failures, preserve the
+failed attempt and request the narrow access the existing command needs.

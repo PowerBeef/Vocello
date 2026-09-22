@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Codex PreToolUse hook (matcher: Bash): the commit lint.
+# Claude Code PreToolUse hook (matcher: Bash): the commit lint.
 #
 # Fired for every Bash tool call; exits instantly unless the command runs
 # `git [global options] commit` (for example `git -c k=v commit` or

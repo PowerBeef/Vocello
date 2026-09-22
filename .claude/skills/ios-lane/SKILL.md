@@ -1,12 +1,15 @@
 ---
 name: ios-lane
 description: Run one explicit iPhone XCUITest lane through scripts/ui_test.sh on the paired physical device, with the device probe, storage floor and consent statement first, then triage the run. User-invoked only.
+argument-hint: "<smoke|localization|benchmark|perf|model-download|control-audit|delivery-cohort|startup-parity|enroll-clone-fixture|saved-voice-lifecycle|screen-protection|purchase> [ui_test options]"
+disable-model-invocation: true
+allowed-tools: Bash(python3 scripts/lib/ios_coredevice_probe.py probe), Bash(python3 scripts/build_output_policy.py *), Bash(scripts/ui_test.sh ios *), Bash(xcrun xcresulttool *), Bash(ls *), Read, Grep, Glob, Agent
 ---
 
 # iPhone lane
 
 Authority: `docs/reference/ios-device-testing.md` (lanes, pause/resume, retention) and
-`docs/reference/agent-rules/native.md`. This is explicit QA scope: it drives the paired physical iPhone, may generate
+`.claude/rules/native.md`. This is explicit QA scope: it drives the paired physical iPhone, may generate
 speech with real models, and takes minutes to hours. It never runs unasked and never retries.
 
 All commands and authority paths below are relative to the repository root.
@@ -23,14 +26,15 @@ All commands and authority paths below are relative to the repository root.
 
 ## Run
 
-`scripts/ui_test.sh ios <requested lane and options>`
+`scripts/ui_test.sh ios $ARGUMENTS`
 
 Keep the terminal output; the run id, artifacts directory (`build/artifacts/ui-tests/ios/<run_id>/`)
 and the final aggregate verdict are the result. Do not rerun on failure.
 
 ## Triage
 
-Read the run artifacts directly using the triage procedure in `docs/reference/testing-runbook.md`. Report: run id, verdict, required-step
+Delegate the run directory to the `xcresult-triage` subagent, or read it directly with the triage
+procedure in `docs/reference/testing-runbook.md`. Report: run id, verdict, required-step
 ledger summary, whether the failure (if any) is product, infrastructure bootstrap, interruption or a
 restoration gap, and the attachment paths a human should open. If the lane closes or reopens a
 roadmap item, update `config/roadmap.json` and re-render with `python3 scripts/roadmap.py render`.

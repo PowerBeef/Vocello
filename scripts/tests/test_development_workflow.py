@@ -24,9 +24,8 @@ def commands(plan: dict) -> list[str]:
 
 class CheckPlanTests(unittest.TestCase):
     def test_prose_only_change_runs_no_native_lane(self) -> None:
-        plan = MODULE.check_plan(["docs/reference/cli.md", "README.md", "AGENTS.md",
-                                  "docs/reference/agent-rules/native.md",
-                                  ".agents/skills/ios-lane/SKILL.md"])
+        plan = MODULE.check_plan(["docs/reference/cli.md", "README.md", "CLAUDE.md",
+                                  ".claude/rules/native.md", ".claude/skills/ios-lane/SKILL.md"])
         joined = commands(plan)
         self.assertFalse(any("macos_test.sh" in c or "build_foundation_targets" in c for c in joined))
         self.assertIn("git diff --check", joined)
@@ -96,8 +95,9 @@ class CheckPlanTests(unittest.TestCase):
 
 
 class PythonSelectionTests(unittest.TestCase):
-    def test_codex_configuration_selects_agent_hook_tests(self) -> None:
-        for path in (".agents/skills/ios-lane/agents/openai.yaml", ".codex/hooks.json", ".codex/environments/environment.toml"):
+    def test_claude_configuration_selects_agent_hook_tests(self) -> None:
+        for path in (".claude/settings.json", ".claude/skills/ios-lane/SKILL.md", ".claude/agents/xcresult-triage.md",
+                     ".claude/rules/native.md"):
             with self.subTest(path=path):
                 selection = MODULE.python_test_selection([path])
                 self.assertEqual(selection["mode"], "selected")
@@ -114,8 +114,7 @@ class PythonSelectionTests(unittest.TestCase):
         self.assertEqual(MODULE.python_test_selection(["scripts/lib/build_paths.sh"])["mode"], "full")
 
     def test_instruction_changes_do_not_select_python(self) -> None:
-        for path in ("AGENTS.md", "website/AGENTS.md", "docs/reference/agent-rules/native.md",
-                     ".agents/skills/ios-lane/SKILL.md"):
+        for path in ("CLAUDE.md", "website/CLAUDE.md", "docs/reference/development-workflow.md"):
             with self.subTest(path=path):
                 self.assertEqual(MODULE.python_test_selection([path])["mode"], "none")
 

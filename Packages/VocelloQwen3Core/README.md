@@ -82,7 +82,7 @@ boundary. The facade exposes owned Vocello contracts and opaque adapters; it doe
 MLX or `MLXAudio*` implementation declarations.
 
 Keep MLX dependency versions synchronized with `project.yml`; the lockstep rule is in
-`docs/reference/agent-rules/native.md` and the pin-bump procedure in `docs/reference/mlx-guide.md` §9.
+`.claude/rules/native.md` and the pin-bump procedure in `docs/reference/mlx-guide.md` §9.
 
 ```swift
 .package(path: "Packages/VocelloQwen3Core")

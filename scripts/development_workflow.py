@@ -75,8 +75,8 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
     consumer, or tooling everything depends on changed, the whole suite runs.
     """
     root = root or ROOT
-    agent_inputs = [p for p in paths if p.startswith((".agents/", ".codex/"))
-                    and p.endswith((".json", ".toml", ".yaml", ".yml", ".py", ".sh"))]
+    agent_inputs = [p for p in paths if p.startswith(".claude/")
+                    and p.endswith((".json", ".md", ".py", ".sh"))]
     inputs = [p for p in paths if p.startswith(("scripts/", "config/"))
               or p in {"project.yml", "Package.resolved"}] + agent_inputs
     if any(p.startswith(FULL_PYTHON_PATTERNS) for p in paths):
@@ -101,7 +101,7 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
             affected = expanded
         tests = affected & test_paths
         if not tests and changed in agent_inputs:
-            continue  # the Codex adapter, wiring and skill metadata are covered above
+            continue  # Claude settings, skill, subagent and rule metadata are covered above
         if not tests:
             return {"mode": "full", "tests": [], "reason": "no known test consumer for changed input"}
         selected.update(tests)

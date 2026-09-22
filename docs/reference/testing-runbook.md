@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-09-12
+reviewed: 2026-09-22
 summary: Testing entry point and evidence boundaries; platform guides own execution, the development workflow owns the edit loop, and delivery research stays opt-in.
 sourceOfTruth:
   - scripts/check_project_inputs.sh
@@ -35,19 +35,20 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 | Telemetry fields / schema / knobs | [Telemetry reference](telemetry-and-benchmarking.md) | Interpretation, not another operator runbook |
 | Delivery / emotion research | [Delivery harness](delivery-harness.md) | Serial local analyzers after TTS exits; frozen independent-reference automated holdouts, measured claims only; listening optional |
 | Release / submission programme | [Release-first plan](release-first-execution-2026-09.md) | Implementation, candidate verification, publication approval are separate |
-| Gate or contract changes | [Development workflow](development-workflow.md), `docs/reference/agent-rules/release.md` | Add a check only for a product invariant; prove rejection as well as success; never assert another file's wording |
+| Gate or contract changes | [Development workflow](development-workflow.md), `.claude/rules/release.md` | Add a check only for a product invariant; prove rejection as well as success; never assert another file's wording |
 
-## Codex QA shortcuts
+## Claude Code QA shortcuts
 
 Routine edits use `scripts/dev.sh`; no skill is required. The four explicit repository skills under
-`.agents/skills` are shortcuts to the procedures below and add no gate or new evidence rule.
+`.claude/skills` are user-invoked shortcuts to the procedures below and add no gate or new evidence
+rule.
 
 | Work | Explicit shortcut | Authority |
 | --- | --- | --- |
-| macOS UI lanes | `$macos-ui-lane <lane>` | [macOS testing](macos-testing.md) |
-| iPhone XCUITest lanes | `$ios-lane <lane>` | [iOS testing](ios-device-testing.md) |
-| iPhone headless diagnostics | `$device-diagnostics <verb>` | [iOS testing](ios-device-testing.md) |
-| Release readiness, read-only | `$release-evidence <tag>` | [Quality promotion](quality-promotion.md) |
+| macOS UI lanes | `/macos-ui-lane <lane>` | [macOS testing](macos-testing.md) |
+| iPhone XCUITest lanes | `/ios-lane <lane>` | [iOS testing](ios-device-testing.md) |
+| iPhone headless diagnostics | `/device-diagnostics <verb>` | [iOS testing](ios-device-testing.md) |
+| Release readiness, read-only | `/release-evidence <tag>` | [Quality promotion](quality-promotion.md) |
 
 Only an explicit device/UI/benchmark request authorizes its lane; publication is separately
 explicit. Hook guards are best-effort checks, not a permissions system. XcodeBuildMCP and Axiom can
@@ -55,7 +56,8 @@ assist relevant discovery and diagnostics but never replace repository native UI
 
 ### Read a finished run
 
-Codex reads the artifacts directly and stops when the deciding evidence is clear:
+Claude reads the artifacts directly, or hands the run directory to the read-only `xcresult-triage`
+subagent, and stops when the deciding evidence is clear:
 
 1. Read `run.json`, the required-step ledger and aggregate result. A missing required step is not PASS.
 2. Inspect the failed test and xcresult summary, then nearby log context. Use the existing bootstrap
@@ -64,8 +66,8 @@ Codex reads the artifacts directly and stops when the deciding evidence is clear
 4. Report run id, verdict (product failure, infrastructure, interruption, restoration gap or PASS),
    deciding step and artifact paths. Never turn a failed run into a pass or silently rerun it.
 
-For Swift review, use the native domain rules and relevant installed specialist guidance directly;
-there is no required reviewer agent or extra review gate.
+For Swift review, use the native domain rules and relevant installed specialist guidance; the
+read-only `swift-review` subagent is available but optional, and there is no extra review gate.
 
 ## Model readiness
 

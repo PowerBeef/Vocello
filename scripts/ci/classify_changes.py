@@ -44,6 +44,9 @@ LANE_COMPANION_JOBS = {
     "swift": ("macOS ThreadSanitizer subset",),
 }
 
+# Tracked Claude Code configuration (settings, skills, subagents, rules).
+CLAUDE_CONFIG_SUFFIXES = (".json", ".md", ".py", ".sh")
+
 # Owned sources that no iOS target compiles. Anything else under Sources/ or
 # Tests/ can change the device build.
 MACOS_ONLY = (
@@ -143,10 +146,11 @@ def _is_ios(path: str) -> bool:
 
 
 def _is_python(path: str) -> bool:
-    # Agent settings and actions execute repository code; settings-only changes
-    # must exercise their adapters and wiring even when no script changed.
-    if path.startswith((".agents/", ".codex/")):
-        return path.endswith((".json", ".toml", ".yaml", ".yml", ".py", ".sh"))
+    # Claude Code settings, skills, subagents and rule frontmatter execute or
+    # route repository code; config-only changes must exercise the hook adapter
+    # and wiring tests even when no script changed.
+    if path.startswith(".claude/"):
+        return path.endswith(CLAUDE_CONFIG_SUFFIXES)
     if path.startswith("scripts/"):
         return not path.endswith(".md")
     if path.startswith("Packages/"):

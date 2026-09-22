@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Codex apply_patch PreToolUse hook.
+# Claude Code PreToolUse hook (matcher: Edit|Write|MultiEdit|NotebookEdit).
 #
-# Reads all normalized edit paths and refuses (exit 2) direct edits of files the
+# Reads the normalized edit path and refuses (exit 2) direct edits of files the
 # repository generates or freezes, naming the generator so the fix is one
 # command away. Path checks are plain `case` globs on the repository-relative
 # path; the hook never reads git state and finishes in milliseconds.

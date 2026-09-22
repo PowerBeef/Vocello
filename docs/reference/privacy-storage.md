@@ -254,7 +254,10 @@ unowned root or a tracked command that bypasses the contract.
 
 Assistant transcripts, memory, credentials and personal settings are user-scoped developer-tool
 data, not Vocello app data or repository build output. Repository workflows never read, edit,
-track or prune them. Retired assistant data remains untouched.
+track or prune them. Claude Code keeps its sessions, memory and personal settings user-scoped
+under the home directory's `.claude/`; only the reviewed project configuration under the
+repository's `.claude/` (settings, rules, skills, subagents) is tracked, and
+`.claude/settings.local.json` stays ignored.
 
 The table below is rendered from the manifest by
 `python3 scripts/build_output_policy.py status --markdown`. Policy validation compares the marked

@@ -612,7 +612,7 @@ Distributed builds omit the capability.
 
 - [`mlx-guide.md`](mlx-guide.md) — MLX runtime, lazy evaluation, quantization.
 - [`swift-performance-guide.md`](swift-performance-guide.md) — Swift 6 concurrency and performance.
-- [`ios-engine-optimization.md`](ios-engine-optimization.md) — historical iOS memory/streaming/Jetsam program notes (current policy lives in `NativeMemoryPolicyResolver` and `docs/reference/agent-rules/native.md`).
+- [`ios-engine-optimization.md`](ios-engine-optimization.md) — historical iOS memory/streaming/Jetsam program notes (current policy lives in `NativeMemoryPolicyResolver` and `.claude/rules/native.md`).
 - [`mimi-codec-guide.md`](mimi-codec-guide.md) — Neural audio codec implementation.
 - [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) — Telemetry schema and benchmarking.
 

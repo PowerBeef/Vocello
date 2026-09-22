@@ -25,8 +25,9 @@ def git(cwd: Path, *arguments: str) -> str:
 
 
 class RoutingTests(unittest.TestCase):
-    def test_agent_configuration_routes_to_python_without_native_lanes(self) -> None:
-        for path in (".agents/skills/ios-lane/agents/openai.yaml", ".codex/hooks.json", ".codex/environments/environment.toml"):
+    def test_claude_configuration_routes_to_python_without_native_lanes(self) -> None:
+        for path in (".claude/settings.json", ".claude/skills/ios-lane/SKILL.md", ".claude/agents/xcresult-triage.md",
+                     ".claude/rules/native.md"):
             with self.subTest(path=path):
                 lanes = MODULE.classify([path])
                 self.assertTrue(lanes["python"])
@@ -166,8 +167,7 @@ class ClassificationTests(unittest.TestCase):
     def test_inert_paths_route_nowhere(self) -> None:
         for path in ("Packages/VocelloQwen3Core/README.md", "Packages/VocelloQwen3Core/UPSTREAM.md",
                      "benchmarks/OPTIMIZATION.md", "benchmarks/baseline-2026-05-30-06166f0.md",
-                     "benchmarks/README.md", "docs/reference/cli.md", "CONTRIBUTING.md", "AGENTS.md", "docs/reference/agent-rules/native.md",
-                     ".agents/skills/ios-lane/SKILL.md"):
+                     "benchmarks/README.md", "docs/reference/cli.md", "CONTRIBUTING.md", "CLAUDE.md"):
             self.assertEqual(self.lanes(path), set(), path)
         self.assertEqual(self.lanes("config/roadmap.json"), {"python"})
         self.assertEqual(self.lanes("scripts/tests/test_foo.py"), {"python"})

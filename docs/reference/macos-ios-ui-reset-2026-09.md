@@ -74,7 +74,7 @@ destinations retain footer transport. Library/Settings screens remain for their 
 - After shared extraction, generic iOS compilation is an immediate gate; physical-device regression
   remains required before declaring iOS preservation verified. Keep CONV-20 open until its own proof.
 - Record baseline SHA, owned files, removed duplication, intentional platform differences, checks,
-  deferred checks and next action. Codex edits the existing main checkout and preserves unrelated work.
+  deferred checks and next action. Claude Code edits the existing main checkout and preserves unrelated work.
 
 Success means one implementation for common presentation, the approved iOS hierarchy on Mac,
 preserved desktop capabilities, and a documented reason for each remaining platform-specific view.

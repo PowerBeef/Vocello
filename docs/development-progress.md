@@ -17,6 +17,20 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Claude Code takeover (September 22)
+
+Baseline `7e26f94b`. At the maintainer's request Claude Code is the sole coding agent again; Codex is
+retired. `AGENTS.md` became `CLAUDE.md` (every rule kept, plus a **Main only** boundary), the domain
+rules moved to path-scoped `.claude/rules/`, the four QA skills to `.claude/skills/` (user-invoked),
+and `.claude/settings.json` wires the five guards with allow/ask/deny permissions. Read-only subagents
+`xcresult-triage` and `swift-review` are back; `.codex/` and `.agents/` are gone. The hook adapter reads
+Claude Edit/Write/NotebookEdit input and fails closed otherwise; `.claude/` changes route to the Python
+lane. The edit and policy guards were confirmed live in the migrating session; fresh-session discovery
+(`/memory`, `/hooks`, `/permissions`, skill menu) is for the maintainer to confirm. The audit also
+fixed three harness defects (a TSan failure could leave the swift base advanced, `git -c`/`-C` commit
+forms bypassed the lint, dry-run "none"). Findings and follow-ups:
+[project audit](reference/project-audit-2026-09-22.md). The paused marketing-test edit is untouched.
+
 ### Consolidated Mac acceptance (September 22)
 
 Source `c66c5b79`, with the unchanged paused marketing-test edit, completed the full serial Mac

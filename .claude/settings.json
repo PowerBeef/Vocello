@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/session_start.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/commit_lint.sh",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/policy_guard.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "^(Edit|Write|MultiEdit|NotebookEdit)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/generated_file_guard.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^(Edit|Write|MultiEdit)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/project_yml_reminder.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(git rev-parse *)",
+      "Bash(git ls-files *)",
+      "Bash(git grep *)",
+      "Bash(git add *)",
+      "Bash(git mv *)",
+      "Bash(git commit *)",
+      "Bash(git push)",
+      "Bash(git push origin main)",
+      "Bash(scripts/dev.sh *)",
+      "Bash(./scripts/dev.sh *)",
+      "Bash(python3 scripts/roadmap.py *)",
+      "Bash(scripts/regenerate_project.sh *)",
+      "Bash(./scripts/regenerate_project.sh *)",
+      "Bash(./scripts/check_project_inputs.sh *)",
+      "Bash(scripts/repo_invariants.sh)",
+      "Bash(python3 scripts/privacy_scan.py *)",
+      "Bash(python3 scripts/build_output_policy.py *)",
+      "Bash(python3 scripts/refresh_derived_artifacts.py *)",
+      "Bash(python3 scripts/ci/*)",
+      "Bash(python3 -m pytest *)",
+      "Bash(npm --prefix website run check)",
+      "Bash(gh run *)",
+      "Bash(xcrun xcresulttool *)",
+      "Bash(xcrun xccov *)",
+      "Bash(xcrun devicectl list *)",
+      "Bash(python3 scripts/lib/ios_coredevice_probe.py probe)",
+      "Bash(scripts/macos_test.sh test*)",
+      "Bash(scripts/macos_test.sh core-test *)",
+      "Bash(scripts/macos_test.sh tsan*)",
+      "Bash(./scripts/build_foundation_targets.sh *)",
+      "Bash(./scripts/build_ui_test_bundles.sh *)"
+    ],
+    "ask": [
+      "Bash(scripts/ui_test.sh *)",
+      "Bash(./scripts/ui_test.sh *)",
+      "Bash(scripts/ios_device.sh *)",
+      "Bash(./scripts/ios_device.sh *)",
+      "Bash(scripts/macos_test.sh memory*)",
+      "Bash(scripts/macos_test.sh lang-bench*)",
+      "Bash(scripts/macos_test.sh gate*)",
+      "Bash(scripts/macos_test.sh profile*)",
+      "Bash(scripts/macos_test.sh telemetry-overhead*)",
+      "Bash(scripts/macos_test.sh release-readiness*)",
+      "Bash(scripts/macos_test.sh models install*)",
+      "Bash(scripts/macos_test.sh models ensure*)",
+      "Bash(scripts/clean_build_caches.sh --*)",
+      "Bash(./scripts/clean_build_caches.sh --*)",
+      "Bash(gh workflow run *)",
+      "Bash(git reset --hard*)",
+      "Bash(git restore *)",
+      "Bash(git checkout -- *)",
+      "Bash(git clean *)",
+      "mcp__XcodeBuildMCP__test_device",
+      "mcp__XcodeBuildMCP__build_run_device",
+      "mcp__XcodeBuildMCP__install_app_device",
+      "mcp__XcodeBuildMCP__launch_app_device",
+      "mcp__XcodeBuildMCP__test_macos"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git checkout -b*)",
+      "Bash(git switch -c*)",
+      "Bash(git switch --create*)",
+      "Bash(git worktree add*)",
+      "Bash(git stash*)",
+      "Bash(git add -A*)",
+      "Bash(git add --all*)",
+      "Bash(git add .)",
+      "Bash(git commit -a*)",
+      "Bash(xcrun simctl boot*)",
+      "Bash(xcrun simctl create*)",
+      "Bash(rm -rf build/cache*)",
+      "Bash(rm -rf build)",
+      "Bash(rm -rf ./build)",
+      "Bash(scripts/release.sh*)",
+      "Bash(./scripts/release.sh*)",
+      "Bash(bash scripts/release.sh*)",
+      "Bash(gh release create*)",
+      "Bash(gh release edit*)",
+      "Bash(gh release delete*)",
+      "Edit(QwenVoice.xcodeproj/**)",
+      "EnterWorktree",
+      "Agent(isolation:*)",
+      "mcp__XcodeBuildMCP__debug_attach_sim"
+    ]
+  }
+}

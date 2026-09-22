@@ -1,3 +1,15 @@
+---
+paths:
+  - "Sources/**"
+  - "Packages/**"
+  - "Tests/**"
+  - "project.yml"
+  - "config/runtime-debug-knobs.json"
+  - "config/concurrency-safety.json"
+  - "config/runtime-refactor-contract.json"
+  - "config/model-artifact-receipts.json"
+  - "config/macos-entitlement-policy.json"
+---
 # Native rule — engine, macOS app, iOS app
 
 References, read only what the change needs: `docs/reference/mlx-guide.md`,

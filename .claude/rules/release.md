@@ -1,3 +1,13 @@
+---
+paths:
+  - "scripts/**"
+  - ".github/**"
+  - "config/**"
+  - "benchmarks/**"
+  - "docs/**"
+  - ".claude/**"
+  - "CLAUDE.md"
+---
 # Release / QA rule — scripts, CI, packaging, benchmarks, evidence
 
 References, read only what the change needs: `docs/reference/development-workflow.md` (local loop and
@@ -94,8 +104,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   blocking decision; push CI and the nightly run it; never weaken deterministic or MLX runtime coverage
   to make it pass, and never relax the status without a new dated decision.
 - **Assistant state stays external.** Sessions, memory, credentials and personal settings never enter
-  Git, CI or evidence. Track only shared instructions, reviewed hooks and project actions. Codex
-  executable configuration and skill metadata changes route to the existing Python tests.
+  Git, CI or evidence. Track only shared instructions, reviewed hooks, rules, skills and subagents.
+  Claude Code settings, skill and subagent metadata and rule frontmatter are executable
+  configuration: their changes route to the existing Python tests (`test_agent_hooks.py`).
 
 ## Common mistakes
 

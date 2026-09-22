@@ -1,6 +1,6 @@
-# Vocello website guide
+# CLAUDE.md — Vocello website
 
-This file adds website-specific guidance to the root `../AGENTS.md`. The website is a React/Vite
+This file adds website-specific guidance to the root `../CLAUDE.md`. The website is a React/Vite
 marketing surface deployed by Vercel with `website/` as the project root. It is a non-native zone:
 do not run Swift, iOS, macOS, Xcode, or native-app UI workflows for website-only changes.
 
@@ -25,11 +25,13 @@ build outputs are generated; do not hand-edit them.
 - Read `PRODUCT.md` and `DESIGN.md` before visual or copy work.
 - Use current primary React/Vite/library documentation; Context7 may assist when callable.
 - For visual, responsive, interactive and accessibility inspection, drive the local dev or preview
-  server with the available Codex browser tools when they are connected; otherwise rely on Playwright output from `npm run check`. Browser
+  server with the Chrome browser tools this harness provides (Claude in Chrome or the chrome-devtools
+  MCP) when they are connected; otherwise rely on Playwright output from `npm run check`. Browser
   evidence supplements rather than replaces `npm run check`. Prefer a fresh tab; reuse an existing
   signed-in tab only when that state is explicitly needed.
 - Image generation is optional and only appropriate when the user requests new bitmap artwork.
-- Use browser automation only for the website; never launch Xcode, Simulator, or native UI automation to validate it.
+- Use browser automation only for the website. Never use computer-use, Xcode, Simulator, or native UI
+  automation to validate the site.
 
 ## Architecture
 
@@ -67,7 +69,7 @@ Existing copy is not evidence. Verify every product claim against the parent rep
 | Delivery presets and measured-best tiers | `../Sources/QwenVoiceCore/EmotionPreset.swift` |
 | Canonical performance hardware | `../benchmarks/hardware-profiles.json` |
 | Performance statements | compatible clean records under `../benchmarks/runs/` and generated `../benchmarks/HISTORY.md` |
-| Architecture, privacy, distribution | `../AGENTS.md`, `../docs/ARCHITECTURE.md`, and machine-readable contracts |
+| Architecture, privacy, distribution | `../CLAUDE.md`, `../docs/ARCHITECTURE.md`, and machine-readable contracts |
 
 Voice Cloning has no instruction channel. Its delivery banks select verified reference clips,
 not engine emotion/intensity instructions. Keep public language aligned with
@@ -129,7 +131,7 @@ from unrelated JSX.
 1. Cross-check changed claims against authoritative parent-repository sources.
 2. Run `npm --prefix website run check`.
 3. For visual or interaction changes, run the local server and inspect desktop, 900 px, and 600 px
-   boundaries with the in-app browser when callable.
+   boundaries with the Chrome browser tools when callable.
 4. Confirm reduced motion, keyboard navigation, anchors, audio mutual exclusion, and external-link
    safety when those surfaces changed.
 5. Refresh repository documentation/generated artifacts only when their registered inputs changed.

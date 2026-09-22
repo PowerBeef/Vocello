@@ -143,7 +143,11 @@ ISU-4 owns the remaining Settings/accessibility and purchase qualification.
 - `scripts/ui_test.sh macos localization` runs the existing pseudo-localized minimum-window walk,
   then selects all ten languages through the real Settings picker. It checks translated labels,
   Settings/library/Studio geometry, unchanged drafts, Voice Design's popover and selection after
-  relaunch, with screenshots and restoration of the original language. The journey passes
+  relaunch, with screenshots and restoration of the original language. Before the doubled-text
+  fixture, it preserves the current selection and selects English through genuine controls.
+  Offscreen popup options are revealed with bounded arrow-key navigation. Compact translations
+  use the rendered line height as their glyph-width floor; English/pseudo word-width minima and
+  all height/window checks remain. The journey passes
   `-ApplePersistenceIgnoreState YES` only in its launch argument domain to isolate saved window
   state; it does not clear stored preferences or drafts. Apple documents this option for automated
   tests in its [AppKit notes](https://developer.apple.com/library/archive/releasenotes/AppKit/RN-AppKitOlderNotes/index.html).
@@ -151,6 +155,31 @@ ISU-4 owns the remaining Settings/accessibility and purchase qualification.
   Default arm, checking Settings copy, persisted choice and unchanged Studio text. The existing
   French, AX-L, AX-XXXL and pseudo-AX-XXXL arms remain. Every run observes and restores the original
   interface preference through genuine controls. This expanded journey has not yet run on a phone.
+
+## September 21 Mac evidence
+
+`macos-xcui-localization-20260922-004619-79391bc0` passed the complete ten-language journey in
+1,807 seconds on source `25f27b62` plus the unchanged paused marketing-test edit. All required
+steps, including crash delta, passed; the original development-profile language was restored.
+The production preference suite was untouched. Representative Russian, Japanese, Korean and
+German screenshots were visually reviewed. Evidence remains untracked under `build/artifacts/ui-tests/macos`.
+The actual compact window was 780x612 pt; the declared 780x560 minimum was not reached and
+remains UIF-07. This is local UI evidence, not signed-candidate, VoiceOver or native-speaker acceptance.
+
+Earlier attempts remain separate failures, never combined into this PASS:
+
+| Run | Finding and correction |
+| --- | --- |
+| `macos-xcui-localization-20260921-230026-368d03bf` | Restored app launch exposed no window; isolate saved window state with Apple's launch-only option. |
+| `macos-xcui-localization-20260921-230850-985cf668` | Picker announced App Language twice; remove its redundant accessibility label. |
+| `macos-xcui-localization-20260921-232214-16021619` | English width assumption rejected a readable Chinese badge. |
+| `macos-xcui-localization-20260921-235914-d88393d2` | Fixed 20 pt floor rejected a readable 19.5 pt Korean badge; use a glyph-sized floor for localized labels. |
+| `macos-xcui-localization-20260922-002001-fbdd0a9d` | English was above the display in AppKit's scrolling menu after selecting Russian; reveal offscreen choices with real keyboard navigation. Cleanup encountered the same issue in this failed run. |
+
+The application/catalog commit `4ed9d357` passed [CI](https://github.com/PowerBeef/Vocello/actions/runs/35669981154),
+including the generic iOS compile. Final UI-test source `25f27b62` passed
+[CI](https://github.com/PowerBeef/Vocello/actions/runs/35673303543), including deterministic Mac tests
+and TSan. Local Xcode 27/Swift 6.4 results are separate from the pinned CI toolchain.
 
 The September 21 physical run `ios-xcui-localization-20260921-054309-966a91d7` passed its then-current
 EN/FR and text-size walk. The later variation-label fix passed the accessibility control audit

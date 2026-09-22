@@ -31,26 +31,20 @@ The routed check passes: contracts, 712 Python tests plus 420 subtests, 712 core
 the Mac UI bundle. The separate generic iOS UI bundle compile also passes. The 21 focused
 catalog tests and compiled language suite also pass; all ten compiled iOS locales include both
 permission-purpose messages.
-Mac UI validation encountered a restored launch with no visible window, a duplicated App Language
-accessibility label and an English-width assertion that rejected a readable 22 pt Chinese badge.
-The launch-only isolation, redundant-label removal and locale-aware fixture widths address these;
-the corrected complete journey is pending. Run `macos-xcui-localization-20260921-232214-16021619`
-completed EN/FR/ES/DE/IT/pt-BR before the Chinese badge assertion, but remains a failed run.
+
 Implementation `4ed9d357` passed [CI](https://github.com/PowerBeef/Vocello/actions/runs/35669981154),
-including TSan. Run `macos-xcui-localization-20260921-235914-d88393d2` completed Chinese and
-Japanese before the same fixture assumption rejected a readable 19.5 pt Korean badge. Captured
-screens confirm both glyphs fit. The localized check now uses the rendered line height as its
-glyph-width floor, retaining the original English/pseudo width minima and all height/bounds checks.
-Fixture `87e6ce6a` passed [CI](https://github.com/PowerBeef/Vocello/actions/runs/35671496742).
-Run `macos-xcui-localization-20260922-002001-fbdd0a9d` completed Chinese, Japanese, Korean and
-Russian, then failed selecting English: AppKit's menu placed its row above the display, and
-cleanup hit the same condition. The captured menu confirms clipping, not a missing translation.
-The test now reveals offscreen menu choices with bounded keyboard navigation and preserves the
-original language before selecting the English pseudo-localization fixture. These runs use the
-isolated development defaults suite; the production interface-language preference was untouched.
-The expanded Mac journey checks all ten locales; the iOS equivalent
-is prepared but phone execution remains deferred. [Localization guidance](reference/localization.md)
-separates catalog coverage from visual, VoiceOver and signed-candidate acceptance (ASR-12/ISU-4).
+including iOS compilation and TSan; final test correction `25f27b62` passed
+[CI](https://github.com/PowerBeef/Vocello/actions/runs/35673303543).
+Mac run `macos-xcui-localization-20260922-004619-79391bc0` **PASS**: all ten languages, immediate
+selection, Settings/library/Studio layouts, unchanged drafts, relaunch persistence and restoration
+of the run's original selection. Required steps and crash delta pass. Representative screenshots
+were reviewed; raw evidence stays untracked. The run uses the isolated development defaults suite
+and includes the unchanged paused marketing-test edit in its source identity. Earlier failed runs
+remain separate in [localization guidance](reference/localization.md#september-21-mac-evidence).
+
+The iOS journey is compiled and prepared, but phone execution remains deferred. ASR-12/ISU-4
+retain physical layout, VoiceOver and signed-candidate qualification; no native-speaker review,
+App Store metadata or website localization is claimed.
 The pseudo-localized window reached 780x612 pt, not the declared 780x560 minimum; UIF-07
 retains that existing discrepancy. The paused Mac marketing-test edit remains untouched.
 

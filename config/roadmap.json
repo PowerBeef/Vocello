@@ -922,10 +922,11 @@
       "evidence": [
         "commit:87636935",
         "doc:docs/reference/localization.md",
-        "file:Tests/VocelloCoreTests/MacInterfaceLanguageTests.swift"
+        "file:Tests/VocelloCoreTests/MacInterfaceLanguageTests.swift",
+        "commit:25f27b62"
       ],
       "updated": "2026-09-21",
-      "notes": "September 21: all 948 UI entries and both iOS permission messages now cover EN/FR/ES/DE/IT/pt-BR/zh-Hans/JA/KO/RU. Compiled-catalog tests cover all ten choices, persistence, regional matching and Russian/East Asian plurals; catalog fixtures reject missing translations and format/category drift. Mac localization now exercises all ten selectors and relaunches. The physical iOS journey is prepared for all ten; the maintainer deferred phone execution for this assignment. The earlier EN/FR localization and accessibility runs under ISU-4 do not qualify these new catalogs or an exact signed candidate. Full device layout/VoiceOver, purchase and broader signed-candidate scenarios remain open. No App Store metadata or release promotion. See docs/reference/localization.md and docs/development-progress.md for source-bound outcomes and limitations. Earlier history: git log -p -- config/roadmap.json."
+      "notes": "September 21: all 948 UI entries and both iOS permission messages cover EN/FR/ES/DE/IT/pt-BR/zh-Hans/JA/KO/RU. Compiled tests cover selection, persistence, regional matching and Russian/East Asian plurals; contracts reject missing translations and format/category drift. Mac run macos-xcui-localization-20260922-004619-79391bc0 passed all ten languages, layouts, draft preservation, relaunches and cleanup on 25f27b62 plus the unchanged paused marketing-test edit; required steps and crash delta pass. CI passed implementation and fixtures. Actual compact size was 780x612; the declared 560 pt minimum remains UIF-07. iOS app/logic/UI bundles compile; the maintainer deferred phone execution. Earlier EN/FR device evidence does not qualify the new catalogs. Physical layout/VoiceOver, purchase and signed-candidate acceptance remain open. No App Store metadata or release promotion. Outcomes and retained failures: docs/reference/localization.md; current checkpoint: docs/development-progress.md."
     },
     {
       "id": "ICA-04",

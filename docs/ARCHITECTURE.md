@@ -453,9 +453,11 @@ capability and remains inert unless `QWENVOICE_DEBUG` enables the master runtime
 ### 4.7 Prewarm
 
 `NativeEngineRuntime` serializes prewarm through a reentrancy gate —
-`acquirePrewarmSlot()` / `releasePrewarmSlot()`. **Never** pair a throwing
+`acquirePrewarmSlot()` / `releasePrewarmSlot()` over `PrewarmSlotGate`. **Never** pair a throwing
 `try? await acquirePrewarmSlot()` with an unconditional `defer { releasePrewarmSlot() }`
-(on a throw the slot isn't held and the defer releases someone else's slot).
+(on a throw the slot isn't held and the defer releases someone else's slot). A waiter cancelled
+after the slot was handed to it releases the slot before throwing, so a finished caller can never
+leave the gate held.
 Prewarm identity keys are per mode (e.g.
 `custom:<speakerID>:<instruction-hash>`); `NativeCustomPrewarmPolicy` is `.eager`
 on capable tiers and `.skipDedicatedCustomPrewarm` on `.floor8GBMac`. Depth is

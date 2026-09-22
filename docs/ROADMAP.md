@@ -22,7 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 1/27 (4%) |
+| `project-audit-2026-09` | active | backend-and-platform | 3/27 (11%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -451,7 +451,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `PA-01` | planned | P1 — release the prewarm slot when cancellation lands after the hand-off | — |
 | `PA-02` | planned | P2 — make the owned package's diagnostics gate require the internal build capability | — |
 | `PA-03` | planned | P3 — compile-gate the iOS diagnostics runners | — |
 | `PA-04` | planned | Harness isolation: UI bundle compiles and fixed temporary paths | — |
@@ -459,10 +458,9 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-06` | planned | Routing cost and derived-artifact gaps | — |
 | `PA-07` | planned | Remove dead engine, downloader and XPC-era code | — |
 | `PA-08` | planned | Consolidate duplicated platform logic and misleading names | — |
-| `PA-09` | in-flight | Scheduled workflows report their failures | — |
 | `PA-10` | in-flight | Release signing is isolated from dispatch and build inputs | — |
 | `PA-11` | planned | macOS launch never hashes models on the main thread | — |
-| `PA-12` | planned | macOS settings and file actions do what they say | — |
+| `PA-12` | in-flight | macOS settings and file actions do what they say | — |
 | `PA-13` | planned | Quality-first decoding keeps every generated frame | — |
 | `PA-14` | planned | File I/O and error classification fail safely | — |
 | `PA-15` | planned | iOS stops generation safely when the app leaves the foreground | — |
@@ -479,9 +477,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-26` | planned | Low-severity backlog from the external audit | — |
 
 ### Open items in detail
-
-- **`PA-01`** (planned) — P1 — release the prewarm slot when cancellation lands after the hand-off.
-  gate: A waiter cancelled after releasePrewarmSlot transferred the slot releases it before throwing, proven by a deterministic unit test of the slot gate; later prewarms are never blocked by a finished caller.
 
 - **`PA-02`** (planned) — P2 — make the owned package's diagnostics gate require the internal build capability.
   gate: QVOICE_TALKER_KV_QUANT, QWENVOICE_SAMPLER_COMPILE and QWENVOICE_TOKENIZER_RESIDENCY have no effect in a distribution app or CLI even with QWENVOICE_DEBUG set; runtime_security_contract.py and a unit test prove it.
@@ -504,16 +499,13 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-08`** (planned) — Consolidate duplicated platform logic and misleading names.
   gate: Each consolidation lands separately with unchanged identifiers and behavior: one download driver seam, one observation model for the model managers, one Mac player card, root models constructed once, generateVoiceDesign renamed for the all-mode loop, OWNERSHIP.json lists MLXAudioMark, and the Cmd-6 menu title matches its destination.
 
-- **`PA-09`** (in-flight) — Scheduled workflows report their failures.
-  gate: The nightly failure reporter files or updates its issue (logic in a tested scripts/ci module, not inline workflow Python), and swift-dependency-watch reads Dependabot alerts or reports the feed as unavailable instead of failing.
-
 - **`PA-10`** (in-flight) — Release signing is isolated from dispatch and build inputs.
   gate: Signing jobs use a tag-restricted release environment, a dispatched release runs only from its own tag ref with a validated output name, the keychain grants codesign only, no Actions cache is restored after secrets exist, checkouts do not persist credentials, and signing material is removed right after release.sh.
 
 - **`PA-11`** (planned) — macOS launch never hashes models on the main thread.
   gate: App launch and model-manager status on the main actor check manifests and sizes only; content digests are verified in the background, and a freshly downloaded file is not hashed a second time; a unit test proves the shallow path does not hash.
 
-- **`PA-12`** (planned) — macOS settings and file actions do what they say.
+- **`PA-12`** (in-flight) — macOS settings and file actions do what they say.
   gate: Prefer lower-memory models changes the default variant for every mode without overriding explicit choices; Save As never deletes its own source and never removes an existing destination on a failed copy; the script editors expose an accessibility label.
 
 - **`PA-13`** (planned) — Quality-first decoding keeps every generated frame.

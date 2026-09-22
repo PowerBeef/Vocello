@@ -336,7 +336,7 @@ Heavy output work belongs in `GenerationOutputAdapter` after the mandatory audio
 
 ### 9.4 Prewarm serialization
 
-The prewarm slot gate in `NativeEngineRuntime` is a project-specific invariant. Two callers cannot enter MLX prewarm simultaneously because the upstream KV cache is not thread-safe. The implementation uses `CheckedContinuation` and a FIFO waiter queue. When modifying this code, preserve the rule that a failed `acquirePrewarmSlot()` must not be balanced by a `defer { releasePrewarmSlot() }`.
+The prewarm slot gate in `NativeEngineRuntime` is a project-specific invariant. Two callers cannot enter MLX prewarm simultaneously because the upstream KV cache is not thread-safe. `PrewarmSlotGate` implements it with a lock-guarded FIFO of `CheckedContinuation` waiters: a successful acquire must be balanced by exactly one release, a failed acquire holds nothing (so it must not be balanced by a `defer { releasePrewarmSlot() }`), and a waiter cancelled after the slot was handed to it gives the slot back before throwing. `PrewarmSlotGateTests` pins those rules.
 
 ---
 

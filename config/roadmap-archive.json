@@ -3557,6 +3557,40 @@
         "commit:015951c4",
         "doc:docs/reference/project-audit-2026-09-22.md"
       ]
+    },
+    {
+      "id": "PA-01",
+      "title": "P1 — release the prewarm slot when cancellation lands after the hand-off",
+      "status": "done",
+      "gate": "A waiter cancelled after releasePrewarmSlot transferred the slot releases it before throwing, proven by a deterministic unit test of the slot gate; later prewarms are never blocked by a finished caller.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/NativeEngineRuntime.swift"
+      ],
+      "notes": "Closed 2026-09-22 (external audit CORE-01). PrewarmSlotGate (Sources/QwenVoiceCore) replaces NativeEngineRuntime's hand-rolled waiter queue: a lock-guarded FIFO whose contract is that a failed acquire holds nothing, and a waiter cancelled after release() handed it the slot releases it before throwing. The three call sites and the acquirePrewarmSlot/releasePrewarmSlot wrappers are unchanged. PrewarmSlotGateTests runs the race deterministically on the main actor (release then cancel with no suspension between); with the old trailing Task.checkCancellation() the slot stays held and the test fails. Full VocelloCoreTests, Qwen3RuntimeTests and the generic iOS compile passed.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22",
+      "evidence": [
+        "file:Sources/QwenVoiceCore/PrewarmSlotGate.swift",
+        "file:Tests/VocelloCoreTests/PrewarmSlotGateTests.swift"
+      ]
+    },
+    {
+      "id": "PA-09",
+      "title": "Scheduled workflows report their failures",
+      "status": "done",
+      "gate": "The nightly failure reporter files or updates its issue (logic in a tested scripts/ci module, not inline workflow Python), and swift-dependency-watch reads Dependabot alerts or reports the feed as unavailable instead of failing.",
+      "sourceOfTruth": [
+        ".github/workflows/nightly.yml",
+        ".github/workflows/swift-dependency-watch.yml",
+        "scripts/swift_dependency_updates.py"
+      ],
+      "notes": "Closed 2026-09-22 (external audit CI-02, CI-03). The nightly reporter now runs scripts/ci/failure_issue.py (unit-tested, including the real toJSON(needs) shape and a dry run); its first real use waits for the next nightly failure. swift-dependency-watch gained the vulnerability-alerts: read permission and passed for the first time on dispatch run 35779389994; advisories named github.com/<owner>/<repo> now match their pins.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22",
+      "evidence": [
+        "commit:ebcacd75",
+        "run:35779389994"
+      ]
     }
   ]
 }

@@ -1094,7 +1094,7 @@
         "Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift"
       ],
       "updated": "2026-09-22",
-      "notes": "Filed 2026-09-11 from the roadmap reconciliation review of F-22; not fixed in that pass. Reproduction shape: start the macOS app, run any vocello command that touches Saved Voices in the same support root during a prepare or delete, and observe the second process fail initialization with an English generation error instead of waiting or reporting a typed busy state. Cross-reference F-22 (lock is correct), RF-10 (packaged coexistence). Widened 2026-09-22 (external audit IOS-05, CORE-09): a malformed or unknown voice transaction and a stray or hidden file such as .DS_Store in voice-transactions also make reconcile throw, which is fatal to engine init on both platforms (MLXTTSEngine.swift:702)."
+      "notes": "Filed 2026-09-11 from the roadmap reconciliation review of F-22; not fixed in that pass. Reproduction shape: start the macOS app, run any vocello command that touches Saved Voices in the same support root during a prepare or delete, and observe the second process fail initialization with an English generation error instead of waiting or reporting a typed busy state. Cross-reference F-22 (lock is correct), RF-10 (packaged coexistence). Widened 2026-09-22 (external audit IOS-05, CORE-09): a malformed or unknown voice transaction and a stray or hidden file such as .DS_Store in voice-transactions also make reconcile throw, which is fatal to engine init on both platforms (MLXTTSEngine.swift:702). Planned fix (2026-09-22 design): reconcile skips hidden and non-directory root entries and quarantines uninterpretable transactions to voice-transactions-quarantine/ (never deletes); MLXTTSEngine.initialize records a typed startup issue instead of failing."
     },
     {
       "id": "F-26",
@@ -1335,18 +1335,6 @@
       "updated": "2026-09-22"
     },
     {
-      "id": "PA-01",
-      "title": "P1 — release the prewarm slot when cancellation lands after the hand-off",
-      "status": "planned",
-      "gate": "A waiter cancelled after releasePrewarmSlot transferred the slot releases it before throwing, proven by a deterministic unit test of the slot gate; later prewarms are never blocked by a finished caller.",
-      "sourceOfTruth": [
-        "Sources/QwenVoiceCore/NativeEngineRuntime.swift"
-      ],
-      "notes": "Confirmed in source 2026-09-22: acquirePrewarmSlot ends with try Task.checkCancellation() after a normal resume, when the slot is already held by this task. Callers use try await acquirePrewarmSlot() then defer releasePrewarmSlot(), or a catch that returns, so neither releases on that throw and prewarmInFlight stays set; the catch-branch slotAcquired release is unreachable. Likely fix: release before rethrowing on the post-resume check, or extract the gate into a small testable value. Covered by the native rule's prewarm reentrancy gate. See project-audit-2026-09-22.md. External audit CORE-01 (same defect, confirmed).",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
-    },
-    {
       "id": "PA-02",
       "title": "P2 — make the owned package's diagnostics gate require the internal build capability",
       "status": "planned",
@@ -1446,20 +1434,6 @@
       "updated": "2026-09-22"
     },
     {
-      "id": "PA-09",
-      "title": "Scheduled workflows report their failures",
-      "status": "in-flight",
-      "gate": "The nightly failure reporter files or updates its issue (logic in a tested scripts/ci module, not inline workflow Python), and swift-dependency-watch reads Dependabot alerts or reports the feed as unavailable instead of failing.",
-      "sourceOfTruth": [
-        ".github/workflows/nightly.yml",
-        ".github/workflows/swift-dependency-watch.yml",
-        "scripts/swift_dependency_updates.py"
-      ],
-      "notes": "External audit CI-02 and CI-03, confirmed 2026-09-22. nightly.yml's report job has an inline-Python SyntaxError (run 35585214770) and has never filed an issue. swift-dependency-watch failed 4 of 4 runs with HTTP 403 on /dependabot/alerts: GITHUB_TOKEN needs the vulnerability-alerts: read permission, not security-events. Latent: GitHub names Swift packages github.com/<owner>/<repo>, so advisories would never match the bare package identities. 2026-09-22: reporter moved to scripts/ci/failure_issue.py with tests; dependency watch uses vulnerability-alerts: read and matches github.com/<owner>/<repo> advisory names; closes after a green dispatch of the watch.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
-    },
-    {
       "id": "PA-10",
       "title": "Release signing is isolated from dispatch and build inputs",
       "status": "in-flight",
@@ -1482,21 +1456,21 @@
         "Sources/ViewModels/ModelManagerViewModel.swift",
         "Sources/QwenVoiceCore/ModelAssets.swift"
       ],
-      "notes": "External audit MAC-01 (High), confirmed 2026-09-22: QwenVoiceApp creates ModelManagerViewModel, whose init calls localModelInfo for all six variants and deepIntegrity SHA-256s every installed file (about 6.2 GB for the three Speed variants, 14.65 GB for all six) on the main actor before the first window; the hash cache is per-process, so every cold launch re-hashes; the post-download path hashes again on the main actor although the downloader already verified the files.",
+      "notes": "External audit MAC-01 (High), confirmed 2026-09-22: QwenVoiceApp creates ModelManagerViewModel, whose init calls localModelInfo for all six variants and deepIntegrity SHA-256s every installed file (about 6.2 GB for the three Speed variants, 14.65 GB for all six) on the main actor before the first window; the hash cache is per-process, so every cold launch re-hashes; the post-download path hashes again on the main actor although the downloader already verified the files. Planned fix (2026-09-22 design): LocalModelAssetStore.deepIntegrity(for:depth:) with .manifestSizes (manifest, identity, regular file, size, no SHA) and .contentDigest; every main-actor ModelManagerViewModel path uses .manifestSizes, only the detached performRefresh hashes, one background pass starts after launch; seed IntegrityHashCache from the downloader's same-process receipts (size, mtime, inode) so a fresh download is not hashed twice. Test: LocalModelAssetStoreIntegrityTests.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },
     {
       "id": "PA-12",
       "title": "macOS settings and file actions do what they say",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Prefer lower-memory models changes the default variant for every mode without overriding explicit choices; Save As never deletes its own source and never removes an existing destination on a failed copy; the script editors expose an accessibility label.",
       "sourceOfTruth": [
         "Sources/Views/Settings/MacSettingsScreen.swift",
         "Sources/Views/History/MacHistoryFileActions.swift",
         "Sources/Views/Primitives/MacScriptTextEditor.swift"
       ],
-      "notes": "External audit MAC-02, MAC-03 and MAC-08, confirmed 2026-09-22. The lower-memory toggle's only reader (TTSContract.model(for:) via SidebarItem.requiredModel) has no callers, and Studio resolves variants in ModelManagerViewModel.activeVariant(for:) without it; 8 GB Macs already default to Speed, so the impact is on larger Macs. Save As removes the destination then copies with no same-file check, and the Studio player discards the result. The script editor sets only an identifier.",
+      "notes": "External audit MAC-02, MAC-03 and MAC-08, confirmed 2026-09-22. The lower-memory toggle's only reader (TTSContract.model(for:) via SidebarItem.requiredModel) has no callers, and Studio resolves variants in ModelManagerViewModel.activeVariant(for:) without it; 8 GB Macs already default to Speed, so the impact is on larger Macs. Save As removes the destination then copies with no same-file check, and the Studio player discards the result. The script editor sets only an identifier. Progress 2026-09-22: MAC-08 fixed (editor labels) and MAC-03 fixed (MacFileSaveCopy: same-file no-op, staged replace; MacFileSaveCopyTests). Open: MAC-02. Planned fix: a pure MacModelVariantResolution (stored per-mode choice, then Speed when the preference is on, then the hardware recommendation; same order for the installed fallback) owned by ModelManagerViewModel, Settings binds to it with the same identifier, explicit picks are kept, and the dead SidebarItem.requiredModel/TTSContract.model(for:) path is deleted.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },
@@ -1508,7 +1482,7 @@
       "sourceOfTruth": [
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
       ],
-      "notes": "External audit ENG-02, confirmed 2026-09-22: decodeChunk trims with a > 0 test although code 0 is a legal token (only the top 1,024 ids are suppressed), and the ICL cut uses the already-trimmed length. Every CLI batch take is quality-first, and so is any non-streaming request. The fix intentionally changes affected output: truncated takes get their tail back, and ICL clone takes can shift by one sample.",
+      "notes": "External audit ENG-02, confirmed 2026-09-22: decodeChunk trims with a > 0 test although code 0 is a legal token (only the top 1,024 ids are suppressed), and the ICL cut uses the already-trimmed length. Every CLI batch take is quality-first, and so is any non-streaming request. The fix intentionally changes affected output: truncated takes get their tail back, and ICL clone takes can shift by one sample. Planned fix (2026-09-22 design): internal qualityFirstSampleRange(referenceFrameCount:generatedFrameCount:decodedSampleCount:upsampleRate:) used by decodeChunk, the ICL cut and replayCodecTrace; integer start, no > 0 counting; tokenizer untouched. Test Qwen3QualityFirstDecodeWindowTests (tiny decoder from Qwen3DecoderPartitionTests). Governance: DECODE-002 delta in SEMANTIC_DELTAS.json, RUNTIME_CAPABILITIES bounded-streaming, CURRENT_INVENTORY rebuild, qwen3_core_contract.py validate.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },
@@ -1522,7 +1496,7 @@
         "Sources/QwenVoiceCore/NativeEngineRuntime.swift",
         "Sources/QwenVoiceCore/MLXTTSEngine.swift"
       ],
-      "notes": "External audit CORE-02 and CORE-03 plus ENG-05, confirmed 2026-09-22. write(_:) and readData(ofLength:) remain in HuggingFaceDownloader, ModelAssets, SharedModelComponentStore and SamplingEvidence; the only free-space check is on iOS. Cancellation and the one allocation retry are classified by matching error text (NativeEngineRuntime.swift:132-169), and with no MLX error handler installed a real Metal OOM probably reaches fatalError before any Swift error exists. The file-API half is phone-free; typed errors and MLX capture are a separate change.",
+      "notes": "External audit CORE-02 and CORE-03 plus ENG-05, confirmed 2026-09-22. write(_:) and readData(ofLength:) remain in HuggingFaceDownloader, ModelAssets, SharedModelComponentStore and SamplingEvidence; the only free-space check is on iOS. Cancellation and the one allocation retry are classified by matching error text (NativeEngineRuntime.swift:132-169), and with no MLX error handler installed a real Metal OOM probably reaches fatalError before any Swift error exists. The file-API half is phone-free; typed errors and MLX capture are a separate change. Planned first slice (2026-09-22 design): Sources/QwenVoiceCore/FileStreamIO.swift (throwing read(upToCount:)/write(contentsOf:) digest and copy) for HuggingFaceDownloader, ModelAssets, SharedModelComponentStore and SamplingEvidence; POSIX errors stay terminal, not retried. Test FileStreamIOTests.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },
@@ -1535,7 +1509,7 @@
         "Sources/iOS/QVoiceiOSApp.swift",
         "Sources/iOS/TTSEngineStore.swift"
       ],
-      "notes": "External audit IOS-01 (High) and IOS-02, confirmed 2026-09-22 and stronger than written: beginBackgroundTask appears nowhere in Sources, isIdleTimerDisabled only in the diagnostics runner, and the .active handler never clears RuntimeReleaseCoordinator's pending background release. Maintainer decision 2026-09-22: cancel, keep finished long-form segments, notify on return. Alternative to record: BGContinuedProcessingTask with GPU background use could let long-form finish.",
+      "notes": "External audit IOS-01 (High) and IOS-02, confirmed 2026-09-22 and stronger than written: beginBackgroundTask appears nowhere in Sources, isIdleTimerDisabled only in the diagnostics runner, and the .active handler never clears RuntimeReleaseCoordinator's pending background release. Maintainer decision 2026-09-22: cancel, keep finished long-form segments, notify on return. Alternative to record: BGContinuedProcessingTask with GPU background use could let long-form finish. Planned fix (2026-09-22 design): IOSBackgroundGenerationPolicy value types in iOSSupport (both test targets, macOS target, promotionRouting memory-runtime); on .background beginBackgroundTask then cancelActiveGeneration(.shutdown) then the deferred release; idle timer follows hasActiveGeneration; .active calls RuntimeReleaseCoordinator.cancelPendingRelease for the background reason; StudioGenerationCoordinator shows a notice (two new keys in all 10 locales).",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },

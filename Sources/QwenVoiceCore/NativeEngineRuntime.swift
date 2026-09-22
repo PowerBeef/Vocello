@@ -283,13 +283,7 @@ actor NativeEngineRuntime {
     /// cache isn't thread-safe and trips an MLX assertion. See crash
     /// report `~/Library/Logs/DiagnosticReports/QwenVoiceEngineService-2026-05-15-162429.ips`
     /// for the failing call stacks.
-    private struct PrewarmWaiter {
-        let id: UUID
-        let continuation: CheckedContinuation<Void, Error>
-    }
-
-    private var prewarmInFlight = false
-    private var prewarmWaiters: [PrewarmWaiter] = []
+    private let prewarmSlot = PrewarmSlotGate()
 
     init(
         loadCoordinator: any MLXModelCoordinating,
@@ -431,7 +425,7 @@ actor NativeEngineRuntime {
         // the release when the slot was actually acquired: on a throw
         // (cancellation) `acquirePrewarmSlot()` does NOT hold the slot, so an
         // unconditional `defer { releasePrewarmSlot() }` would release a slot
-        // owned by another task — flipping `prewarmInFlight` or waking a
+        // owned by another task — freeing the gate or waking a
         // waiter while a real holder is still inside MLX prewarm, which
         // reintroduces the concurrent KV-cache assertion crash this gate
         // exists to prevent.
@@ -1553,9 +1547,11 @@ actor NativeEngineRuntime {
         }
     }
 
-    /// Wait until no other prewarm body is running, then mark the slot
-    /// taken. Pair with `releasePrewarmSlot()` — typically via `defer`
-    /// at the top of the prewarm body.
+    /// Wait until no other prewarm body is running, then take the slot.
+    /// Returns the time (ms) spent queued behind an in-flight prewarm, or `0`
+    /// when the slot was free. Pair with `releasePrewarmSlot()` via `defer`
+    /// registered after this returns; when it throws, the caller does not
+    /// hold the slot (see `PrewarmSlotGate`).
     ///
     /// The actor mutex by itself isn't enough: prewarm bodies suspend
     /// while waiting on `model.prewarm*(...)` (which calls into MLX
@@ -1564,70 +1560,13 @@ actor NativeEngineRuntime {
     /// callers can both end up inside MLX's KV cache slice updates and
     /// trip the C++-side assertion that crashed the bench cycle at
     /// sample #38 (Voice Design / Quality cold 3).
-    /// Wait until no other prewarm body is running, then mark the slot
-    /// taken. Returns the time (ms) spent queued behind an in-flight
-    /// prewarm, or `0` when the slot was free immediately. Pair with
-    /// `releasePrewarmSlot()` — typically via `defer` at the top of the
-    /// prewarm body.
     private func acquirePrewarmSlot() async throws -> Int {
-        try Task.checkCancellation()
-        let waitStartedAt = ContinuousClock.now
-
-        guard prewarmInFlight else {
-            prewarmInFlight = true
-            return 0
-        }
-
-        let waiterID = UUID()
-        var slotAcquired = false
-        do {
-            try await withTaskCancellationHandler {
-                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                    guard !Task.isCancelled else {
-                        continuation.resume(throwing: CancellationError())
-                        return
-                    }
-                    prewarmWaiters.append(PrewarmWaiter(id: waiterID, continuation: continuation))
-                }
-                // If we reach this point the continuation was resumed normally by
-                // releasePrewarmSlot(), so the slot has been transferred to us.
-                slotAcquired = true
-            } onCancel: {
-                Task { await self.cancelPrewarmWaiter(id: waiterID) }
-            }
-        } catch {
-            // Only release the slot if it was actually transferred to us. If we
-            // were cancelled while still queued, cancelPrewarmWaiter removed us
-            // and the slot is still owned by the current prewarm body.
-            if slotAcquired {
-                releasePrewarmSlot()
-            }
-            throw error
-        }
-
-        try Task.checkCancellation()
-        return waitStartedAt.elapsedMilliseconds
+        try await prewarmSlot.acquire()
     }
 
-    private func cancelPrewarmWaiter(id: UUID) {
-        guard let index = prewarmWaiters.firstIndex(where: { $0.id == id }) else {
-            return
-        }
-        let waiter = prewarmWaiters.remove(at: index)
-        waiter.continuation.resume(throwing: CancellationError())
-    }
-
-    /// Release the prewarm slot and wake exactly one queued waiter. When a
-    /// waiter is resumed, the slot remains logically held by that task so no
-    /// second caller can enter MLX prewarm work during actor reentrancy.
+    /// Release the prewarm slot, handing it to the oldest queued waiter.
     private func releasePrewarmSlot() {
-        if prewarmWaiters.isEmpty {
-            prewarmInFlight = false
-        } else {
-            let waiter = prewarmWaiters.removeFirst()
-            prewarmInFlight = true
-            waiter.continuation.resume()
-        }
+        prewarmSlot.release()
     }
 
     private func shouldSkipDedicatedCustomPrewarm(

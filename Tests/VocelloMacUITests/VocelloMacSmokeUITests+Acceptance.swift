@@ -64,7 +64,8 @@ extension VocelloMacSmokeUITests {
             replaceScript(with: "The harbor is quiet. Le port est tranquille.")
             selectSpeechLanguage(speech, picker: "voiceDesign_languagePicker")
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studioChip_voiceBrief"), timeout: 20))
-            selectStudioMenuItem(startingWith: [starterPrefix], picker: "voiceDesign_briefStarters")
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("voiceDesign_briefStarters"), timeout: 20))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("voiceDesign_briefStarter_0", type: .menuItem), timeout: 10))
             let brief = element("voiceDesign_voiceDescriptionField")
             XCTAssertTrue(VocelloUIWait.value(brief, contains: starterPrefix, timeout: 10))
             let authoredBrief = "Une voix grave et posée; keep this exact custom brief."

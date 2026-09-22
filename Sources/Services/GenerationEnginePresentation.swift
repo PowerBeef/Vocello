@@ -61,9 +61,11 @@ enum GenerationEnginePresentation {
         guard snapshot.isReady, isModelAvailable, hasScriptContent else { return false }
 
         switch modelWarmPath(snapshot: snapshot, activeModelID: activeModelID) {
-        case .engineUnavailable, .engineBusy, .failed:
+        case .engineUnavailable, .engineBusy:
             return false
-        case .modelCold, .modelWarming, .modelActivePrep, .modelReady, .modelMismatch:
+        case .modelCold, .modelWarming, .modelActivePrep, .modelReady, .modelMismatch, .failed:
+            // A failed attempt does not disconnect the engine. A new request
+            // must be able to recover after the user corrects its cause.
             return true
         }
     }

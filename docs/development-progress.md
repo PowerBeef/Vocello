@@ -36,6 +36,11 @@ accessibility label and an English-width assertion that rejected a readable 22 p
 The launch-only isolation, redundant-label removal and locale-aware fixture widths address these;
 the corrected complete journey is pending. Run `macos-xcui-localization-20260921-232214-16021619`
 completed EN/FR/ES/DE/IT/pt-BR before the Chinese badge assertion, but remains a failed run.
+Implementation `4ed9d357` passed [CI](https://github.com/PowerBeef/Vocello/actions/runs/35669981154),
+including TSan. Run `macos-xcui-localization-20260921-235914-d88393d2` completed Chinese and
+Japanese before the same fixture assumption rejected a readable 19.5 pt Korean badge. Captured
+screens confirm both glyphs fit. The localized check now uses the rendered line height as its
+glyph-width floor, retaining the original English/pseudo width minima and all height/bounds checks.
 The expanded Mac journey checks all ten locales; the iOS equivalent
 is prepared but phone execution remains deferred. [Localization guidance](reference/localization.md)
 separates catalog coverage from visual, VoiceOver and signed-candidate acceptance (ASR-12/ISU-4).

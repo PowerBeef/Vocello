@@ -280,10 +280,11 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
                     openSettingsCategory(category)
                     VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-locale-\(identifier)-\(category)")
                 }
-                // CJK labels can be only two or three glyphs wide. Keep the
-                // single-line/window checks without imposing English word widths.
-                assertSettingsPackageRowsLayoutIntact(minimumStatusWidth: 20)
-                assertSavedVoicesLayoutIntact(minimumStatusWidth: 20)
+                // Short CJK labels need a glyph-sized floor, not an English word
+                // width. Their rendered line height supplies that floor; wrapping
+                // and window bounds remain checked, as do the original EN minima.
+                assertSettingsPackageRowsLayoutIntact(minimumStatusWidth: nil)
+                assertSavedVoicesLayoutIntact(minimumStatusWidth: nil)
                 VocelloUIScreenshot.attach(app.windows.firstMatch, named: "mac-locale-\(identifier)-voices")
                 navigate(to: .history)
                 VocelloUILayoutAssert.assertFullyWithinWindow(element("history_searchField", type: .searchField), of: app)

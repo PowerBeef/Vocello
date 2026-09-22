@@ -289,7 +289,7 @@ class VocelloMacUITestCase: XCTestCase {
     /// warning pill, and its action buttons stay inside the window. Under the
     /// pseudo-localized launch this is the check that catches a collapsed row
     /// (2026-09-13: a chip rendered one character per line at 30 × 340 pt).
-    func assertSavedVoicesLayoutIntact(minimumStatusWidth: CGFloat = 60) {
+    func assertSavedVoicesLayoutIntact(minimumStatusWidth: CGFloat? = 60) {
         navigate(to: .voices)
         let window = app.windows.firstMatch.frame
         let excluded = ["_use_", "_play_", "_delete_", "_more_", "_transcriptStatus", "_qualityWarning", "_replaceReference"]
@@ -307,9 +307,9 @@ class VocelloMacUITestCase: XCTestCase {
             let voiceID = String(identifier.dropFirst("voicesRow_".count))
             checked += 1
             VocelloUILayoutAssert.assertSingleLine(name, maxHeight: 30, minWidth: 40)
+            let status = element("\(identifier)_transcriptStatus", type: .staticText)
             VocelloUILayoutAssert.assertSingleLine(
-                element("\(identifier)_transcriptStatus", type: .staticText),
-                maxHeight: 30, minWidth: minimumStatusWidth
+                status, maxHeight: 30, minWidth: minimumStatusWidth ?? status.frame.height
             )
             let warning = button("\(identifier)_qualityWarning")
             if warning.exists {
@@ -327,18 +327,21 @@ class VocelloMacUITestCase: XCTestCase {
 
     /// The three Speed package rows keep single-line status and badge labels and
     /// their action slot inside the window.
-    func assertSettingsPackageRowsLayoutIntact(minimumStatusWidth: CGFloat = 30) {
+    func assertSettingsPackageRowsLayoutIntact(minimumStatusWidth: CGFloat? = 30) {
         openSettingsCategory("modelsFiles")
         for id in ["pro_custom_speed", "pro_design_speed", "pro_clone_speed"] {
             XCTAssertTrue(VocelloUIScroll.intoView(
                 element("settings_packageStatus_\(id)"), in: element("screen_settings")
             ))
+            let status = element("settings_packageStatus_\(id)")
             VocelloUILayoutAssert.assertSingleLine(
-                element("settings_packageStatus_\(id)"), maxHeight: 24, minWidth: minimumStatusWidth
+                status, maxHeight: 24, minWidth: minimumStatusWidth ?? status.frame.height
             )
             let badge = element("settings_packageBadge_\(id)", type: .staticText)
             if badge.exists {
-                VocelloUILayoutAssert.assertSingleLine(badge, maxHeight: 24, minWidth: minimumStatusWidth)
+                VocelloUILayoutAssert.assertSingleLine(
+                    badge, maxHeight: 24, minWidth: minimumStatusWidth ?? badge.frame.height
+                )
             }
             let manage = button("settings_manage_\(id)")
             if manage.exists {

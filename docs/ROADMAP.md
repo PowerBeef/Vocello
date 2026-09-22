@@ -21,7 +21,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-control-audit-2026-08` | active | ios | 17/21 (81%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
-| `macos-ui-fidelity-2026-09` | active | backend-and-platform | 6/8 (75%) |
+| `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -433,13 +433,9 @@ Narrative authority: [`docs/reference/macos-ios-ui-reset-2026-09.md`](reference/
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `UIF-07` | in-flight | Verify the adapted screens at supported window sizes | — |
 | `UIF-08` | in-flight | Native acceptance of the iOS-derived screens on current source | — |
 
 ### Open items in detail
-
-- **`UIF-07`** (in-flight) — Verify the adapted screens at supported window sizes.
-  gate: Each converted screen fits its actual minimum/default/wide window bounds, including completion, long labels and error states. Long scripts scroll inside the editor. Any changed window minimum or additional scrolling behavior is explicitly reviewed and proven by genuine window-frame and control-geometry assertions.
 
 - **`UIF-08`** (in-flight) — Native acceptance of the iOS-derived screens on current source.
   gate: On one committed source identity after the September 19 Studio changes: consented macOS localization, smoke and perf lanes pass; the error, missing-model and wide-window states of all three Studio modes, the Cmd+, Settings window and the Studio model links are exercised through genuine controls; the iOS scroll helper's delta-dependent anchor-size limit is corrected with a captured-bounds regression test and one complete consented iOS localization lane passes including Pseudo-AX-XXXL. Runner PASS requires diagnostics, crash deltas and restoration; no retries, no hidden state.

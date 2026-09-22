@@ -157,3 +157,74 @@ the application change also passed generic iOS compilation. Application source `
 Final test source `d7058ea6` passed [CI including Mac tests and TSan](https://github.com/PowerBeef/Vocello/actions/runs/35686046774).
 Local Xcode 27/Swift 6.4 evidence remains distinct from pinned CI. No phone, release or website lane
 was run for this Mac follow-up. Raw screenshots, logs and audio remain untracked.
+
+
+## Remaining Mac acceptance (September 22)
+
+Baseline `1b275857`. The failure journey exposed a real recovery dead end: Built-in and Design
+blocked a new request whenever the connected engine retained a failed load state. `137ecee4` allows
+retry while preserving installed-model, valid-input and no-active-generation guards. `e1ed0ed2`
+uses one error/retry capsule instead of an error plus a second Generate row, disables it for invalid
+input, and exposes the full error through help/accessibility. No engine or persistence contract changed.
+Project regeneration also synchronizes known regions with the existing ten-language catalogs; no
+translation content changed.
+
+| Focused repository journey | Source | Run suffix (`macos-xcui-smoke-20260922-…`) | Result |
+| --- | --- | --- | --- |
+| `--scenario generation-errors` | `137ecee4` | `064658-0775af9b` | PASS: real output-write failure and successful retry in Built-in, Design and Clone; empty-input guard; zero failed History entries and one entry after each recovery; error/completed size matrix. |
+| `--scenario studio-content` | `37c77c1e` | `070809-9f60d365` | PASS: English UI/French speech and inverse; localized starters/presets; exact custom delivery and brief preservation across speech/interface changes. |
+| `--scenario layout` | `37c77c1e` | `071752-a3ac3e43` | PASS: long scripts in all three modes, Voices, History, all Settings categories and Cmd+, across minimum/default-width/wide cases. |
+
+Each run passed required steps, crash delta and preference restoration. Failure injection changed
+permissions only on run-owned disposable output subfolders selected through the genuine folder picker;
+permissions and the original output preference were restored. No installed model was changed.
+Representative minimum error/recovered players, language popovers, Settings and wide History captures
+were reviewed. Raw evidence stays under the untracked run directories.
+
+Actual outer bounds are **780×612**, **1040×678**, and **1268×678**. The 52-point toolbar leaves
+560/626 points of content height. The helper now positions the window inside the display's usable
+frame before resizing. No product minimum, scaling or scrolling behavior changed. The configured
+680-point default content height exceeds this display's available height and remains untested here.
+UIF-07 is complete for actual supported bounds on this host; this is not an unlimited-display claim.
+
+Earlier attempts remain separate failures: `061630-291b0efc` (Settings category navigation),
+`062520-1725e4c4` (Touch Bar Open matched instead of the folder dialog), `063146-2905a0a3`
+(folder value read as a label; offscreen Back), `063823-31b5b168` (empty-string containment assertion),
+`064228-15bd02fc` (the confirmed disabled-Retry product defect), `065638-46e5b543` (AppKit toggle
+menu identifiers not exposed), and `070322-97957672` (starter accessible title includes a prefix).
+Their corrections use existing controls, exact text assertions and bounded native navigation.
+Interrupted interface preferences were restored through the real picker; no defaults were rewritten.
+
+### History attribution and performance
+
+`macos-xcui-perf-20260922-072938-4dfa8717` on `37c77c1e` passed 9/9 scenarios and all required
+steps with 100% probe coverage. Its qualified record is **passedWithWarnings**, not warning-free:
+idle max gap 61.21 ms exceeded 50 ms, and Settings max gap 67.84 ms exceeded 40 ms. Both maxima
+belong to final probe blocks straddling teardown; fully enclosed blocks have a 16.667 ms maximum.
+The unchanged checker intentionally retains boundary-block maxima. No thresholds were relaxed.
+See the [compact record](../../benchmarks/runs/ui-perf/macos-xcui-perf-20260922-072938-4dfa8717.json).
+
+Read-only 10 ms stack sampling was limited to the two exploratory History app processes. Across the
+whole sampled scenarios, main-thread XCTest query-dispatch frames accounted for 926/6867 samples
+(scrolling) and 961/8289 (filtering); filtering and grouping functions together appeared in fewer than
+0.3% of samples. Snapshot construction and accessibility attribute traversal are substantial callers.
+These aggregate samples include setup/teardown and do not timestamp an individual stall.
+
+History scroll max gap was 176.56 ms. Filter max gap was 8600.56 ms in a block beginning 260 ms
+before the measured window ended and ending 8678 ms afterward; fully enclosed filter blocks peaked
+at 217.77 ms. This supports the existing combined app/XCUITest classification, not an 8.6-second
+in-window product-stall claim or proof of perfectly smooth interaction. Sampling changes timing, so
+these History numbers are not a clean performance comparison with the earlier unsampled run.
+No History product rewrite is justified by this evidence. Cleanup subsequently drops its unnecessary
+full-tree menu-existence query and sends the same Escape directly; that cleanup-only simplification
+is compiled by the routed check, with no new timing-improvement claim.
+
+These focused runs supplement the earlier 11/11 full smoke pass; they are not a new full-suite pass
+on one source identity. UIF-08 retains its consolidated source-bound acceptance gate and iPhone
+requirements. No phone, release or website lane was run. Local Xcode 27/Swift 6.4 results remain
+separate from pinned CI. Source `137ecee4` passed [CI](https://github.com/PowerBeef/Vocello/actions/runs/35696425533),
+and `37c77c1e` passed [CI](https://github.com/PowerBeef/Vocello/actions/runs/35699106198).
+
+Final scoped `scripts/dev.sh check --paths …` passed: contracts/privacy/lint, 691 Python tests plus
+382 subtests, 712 core tests, 122 runtime tests with three existing private-fixture skips, generic iOS
+app/logic compilation, and the Mac UI bundle. The unrelated marketing-test edit remains unstaged.

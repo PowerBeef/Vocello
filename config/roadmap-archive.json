@@ -3514,6 +3514,28 @@
         "file:Sources/SharedSupport/Views/VocelloCapsuleSelector.swift",
         "file:Sources/SharedSupport/Views/VocelloStudioLayout.swift"
       ]
+    },
+    {
+      "id": "UIF-07",
+      "title": "Verify the adapted screens at supported window sizes",
+      "status": "done",
+      "gate": "Each converted screen fits its actual minimum/default/wide window bounds, including completion, long labels and error states. Long scripts scroll inside the editor. Any changed window minimum or additional scrolling behavior is explicitly reviewed and proven by genuine window-frame and control-geometry assertions.",
+      "sourceOfTruth": [
+        "Sources/Views/Shell/MacShellMetrics.swift",
+        "Sources/Views/Studio/MacStudioCanvas.swift",
+        "Tests/VocelloMacUITests/VocelloUIWindowFrame.swift"
+      ],
+      "notes": "Closed September 22: focused layout run 071752-a3ac3e43 on 37c77c1e and real error/recovery run 064658-0775af9b on 137ecee4 passed required steps, crash checks and restoration. Studio long scripts, error/completed players, Voices, History and four Settings categories fit actual 780x612, 1040x678 and 1268x678 outer bounds. Toolbar is 52 pt; this display cannot reach the configured 680 pt default content height. No product minimum/scaling change. Prior ten-language acceptance covers long labels. See docs/reference/macos-ios-ui-reset-2026-09.md for source identities, visual review, limitations and separate failures.",
+      "plan": "macos-ui-fidelity-2026-09",
+      "blockedBy": [],
+      "updated": "2026-09-22",
+      "evidence": [
+        "commit:137ecee4",
+        "commit:37c77c1e",
+        "run:macos-xcui-smoke-20260922-064658-0775af9b",
+        "run:macos-xcui-smoke-20260922-071752-a3ac3e43",
+        "file:docs/reference/macos-ios-ui-reset-2026-09.md"
+      ]
     }
   ]
 }

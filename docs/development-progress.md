@@ -17,6 +17,29 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Remaining Mac UI work (September 22)
+
+Baseline `1b275857`. Fixed the duplicate idle error/Generate controls and the connected-engine
+failure state that disabled Retry for Built-in/Design. Real failure/recovery in all three modes
+passed (`064658-0775af9b`, source `137ecee4`), including empty input, History ownership and
+error/completed window geometry. Cross-language starters/presets/custom text passed
+(`070809-9f60d365`), as did the expanded Studio/library/Settings size matrix (`071752-a3ac3e43`),
+both on `37c77c1e`. Actual outer bounds: 780x612, 1040x678 and 1268x678; configured 680-point
+content height remains beyond this display. UIF-07 is archived with that explicit limit.
+
+Performance run `072938-4dfa8717` passed 9/9 with complete coverage, **with warnings** for idle
+61.21 ms and Settings 67.84 ms boundary-block maxima. Bounded History sampling attributes substantial
+work to XCTest snapshots/queries; its 8.60 s filtering maximum also straddles teardown. No History
+product rewrite or threshold adjustment. The final cleanup removes an unnecessary full-tree menu
+query; no measured speedup is claimed. Source `37c77c1e` passed
+[CI](https://github.com/PowerBeef/Vocello/actions/runs/35699106198).
+
+UIF-08 remains open for its consolidated source-bound acceptance gate and iPhone scroll/localization
+work. The focused runs supplement, rather than replace, the earlier full smoke. No phone was used.
+The paused marketing edit is untouched. The final routed check passed: contracts, 691 Python tests
+plus 382 subtests, 712 core/122 runtime tests (three existing skips), generic iOS compilation and
+the Mac UI bundle. See [full evidence and limitations](reference/macos-ios-ui-reset-2026-09.md#remaining-mac-acceptance-september-22).
+
 ### Mac window and playback acceptance (September 22)
 
 Baseline `2e161aad`; final tested source `d7058ea6`. Added the standard sidebar commands so

@@ -7,10 +7,10 @@ import XCTest
 /// interaction inside a marked wall-clock window, and terminates. The in-app
 /// probe streams 500 ms frame-health rows continuously; the marker line this
 /// class prints is what scopes each scenario's measured window
-/// (`scripts/check_macos_ui_perf.py` does the join). Scenarios 01-07 are
-/// confirmatory-designated; 08 (window resize) and 09 (generation-active)
-/// are exploratory by design — resize drags are the flakiest XCUITest
-/// surface, and generation duration is model-dependent.
+/// (`scripts/check_macos_ui_perf.py` does the join). The thresholds contract
+/// owns scenario designation: History, resizing and active generation remain
+/// exploratory. Accessibility work runs on the app's main thread, and probe
+/// blocks touching a measured window can include setup or teardown work.
 ///
 /// Method names carry numeric prefixes because XCTest runs alphabetically;
 /// generation-active runs last so its thermal load cannot color the pure-UI
@@ -97,8 +97,8 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
         // checked across the 400-row accessibility tree) executes on the
         // app's MAIN thread — a Time Profiler sample (2026-08-05) showed it
         // was the entire "3.1 s History stall" the first baseline reported.
-        // The window query is shallow, so the measured window now contains
-        // only the app's own scroll work.
+        // The shallow window query reduces this cost; it does not eliminate
+        // accessibility work or boundary-block contamination from the report.
         let window = app.windows.firstMatch
         XCTAssertTrue(VocelloUIWait.exists(window, timeout: 10))
         let listPoint = window.coordinate(withNormalizedOffset: CGVector(dx: 0.62, dy: 0.5))

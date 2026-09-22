@@ -1311,21 +1311,6 @@
       "unparkWhen": "the paired iPhone is available and unlocked for a consented lane (CONV-20)"
     },
     {
-      "id": "UIF-07",
-      "title": "Verify the adapted screens at supported window sizes",
-      "status": "in-flight",
-      "gate": "Each converted screen fits its actual minimum/default/wide window bounds, including completion, long labels and error states. Long scripts scroll inside the editor. Any changed window minimum or additional scrolling behavior is explicitly reviewed and proven by genuine window-frame and control-geometry assertions.",
-      "sourceOfTruth": [
-        "Sources/Views/Shell/MacShellMetrics.swift",
-        "Sources/Views/Studio/MacStudioCanvas.swift",
-        "Tests/VocelloMacUITests/VocelloUIWindowFrame.swift"
-      ],
-      "notes": "September 22 on d7058ea6: smoke macos-xcui-smoke-20260922-041322-1258c968 passed 11/11. Strict Studio assertions cover long scripts, completed players and missing models in all three modes. The earlier discrepancy compared outer and content sizes: 780x612 outer includes a 52 pt toolbar, leaving the declared 780x560 content. No minimum or scaling change. Default-width and wide cases reached 1040x690 and 1072x690 outer; at the tested window placement, runs did not reach the full 680 pt default content height or larger widths. Completed-player and collapsed-sidebar screenshots were reviewed. Error-only cards and fuller window-size coverage remain unverified, so this item stays open. Details and separate failed attempts: docs/reference/macos-ios-ui-reset-2026-09.md.",
-      "plan": "macos-ui-fidelity-2026-09",
-      "blockedBy": [],
-      "updated": "2026-09-22"
-    },
-    {
       "id": "UIF-08",
       "plan": "macos-ui-fidelity-2026-09",
       "title": "Native acceptance of the iOS-derived screens on current source",
@@ -1337,7 +1322,7 @@
         "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift",
         "Sources/Views/Settings/MacSettingsScreen.swift"
       ],
-      "notes": "September 22: smoke macos-xcui-smoke-20260922-041322-1258c968 (11/11, including all ten languages) and perf macos-xcui-perf-20260922-052539-af73c69c (9/9) PASS on d7058ea6 plus the unchanged paused marketing-test edit. Required steps/crash deltas pass. Covered all three Speed modes, completed players, Settings/model links, streaming dismissal/cancellation, clip switching, sidebar collapse, long-form join and line batch. Added standard sidebar commands; corrected stale test language and window measurement assumptions. Perf coverage 100%, no configured-threshold warnings; exploratory History max gaps 4.08 s/3.32 s are a combined app/XCUITest proxy and need attribution before a product fix. Remaining: error-only layouts, fuller size coverage, French-output/English-UI and inverse preset/custom-text cases, and iPhone acceptance. Evidence and limitations: docs/reference/macos-ios-ui-reset-2026-09.md; current checkpoint: docs/development-progress.md.",
+      "notes": "September 22 follow-up: genuine error/recovery in all three modes PASS (064658-0775af9b, 137ecee4); bilingual preset/starter/custom-text acceptance PASS (070809-9f60d365, 37c77c1e); expanded layout PASS (071752-a3ac3e43, 37c77c1e). Fixed duplicate idle error/Generate controls and disabled retry after a connected-engine failure. Perf 072938-4dfa8717 on 37c77c1e passed 9/9 with 100% coverage and two boundary-block max-gap warnings. Bounded History samples show substantial XCTest snapshot/query work; no product rewrite or threshold change. Detailed attribution and retained failures: docs/reference/macos-ios-ui-reset-2026-09.md. These targeted runs supplement the prior 11/11 smoke on d7058ea6, not a new consolidated full-suite pass on one source. The existing source-bound gate and iPhone scroll/localization acceptance remain open; no phone was used.",
       "updated": "2026-09-22"
     }
   ]

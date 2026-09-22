@@ -60,7 +60,9 @@ class VocelloMacUITestCase: XCTestCase {
     }
 
     func cleanUpPerTest() {
-        if session != nil, app.menus.firstMatch.exists {
+        if session != nil {
+            // Escape dismisses an open menu and is harmless otherwise. Avoid
+            // enumerating the entire History accessibility tree just to ask.
             app.typeKey(.escape, modifierFlags: [])
         }
         if let original = pendingInterfaceLanguageRestore, session != nil {

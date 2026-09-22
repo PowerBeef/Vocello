@@ -162,7 +162,7 @@ class VocelloMacUITestCase: XCTestCase {
     var generationAction: XCUIElement {
         app.buttons.matching(NSPredicate(
             format: "identifier IN %@",
-            ["textInput_generateButton", "studio_inlinePlayer_retry"]
+            ["textInput_generateButton", "studio_inlinePlayer_retry", "textInput_generationError"]
         )).firstMatch
     }
 
@@ -410,7 +410,7 @@ class VocelloMacUITestCase: XCTestCase {
         return height
     }
 
-    func assertStudioSizeMatrix(_ name: String, completed: Bool = false) {
+    func assertStudioSizeMatrix(_ name: String, completed: Bool = false, failed: Bool = false) {
         for (size, width, height) in [
             ("minimum", VocelloUIWindowFrame.Width.minimum, VocelloUIWindowFrame.Height.minimum),
             ("default", VocelloUIWindowFrame.Width.standard, VocelloUIWindowFrame.Height.standard),
@@ -420,10 +420,15 @@ class VocelloMacUITestCase: XCTestCase {
             if size == "minimum" {
                 frame = pinToNarrowestWindow()
             } else {
-                frame = VocelloUIWindowFrame.require(app, width: width, height: height + windowChromeHeight())
+                let available = VocelloUIWindowFrame.availableFrame(for: app)
+                let outerHeight = height + windowChromeHeight()
+                frame = VocelloUIWindowFrame.require(app, width: width, height: outerHeight)
+                XCTAssertEqual(frame.height, min(outerHeight, available.height), accuracy: 6,
+                               "Reach the requested height or the display's actual usable limit")
                 if size == "default" {
                     XCTAssertEqual(frame.width, width, accuracy: 6)
                 } else {
+                    XCTAssertEqual(frame.width, available.width, accuracy: 6)
                     XCTAssertGreaterThan(frame.width, VocelloUIWindowFrame.Width.standard,
                                          "Wide acceptance requires a display wider than the default window")
                 }
@@ -439,6 +444,10 @@ class VocelloMacUITestCase: XCTestCase {
                                      "Script must scroll inside its editor without covering setup")
             if completed {
                 VocelloUILayoutAssert.assertFullyWithinWindow(button("studio_inlinePlayer_playPause"), of: app)
+            }
+            if failed {
+                VocelloUILayoutAssert.assertFullyWithinWindow(button("textInput_generationError"), of: app)
+                XCTAssertTrue(button("textInput_generationError").isHittable)
             }
             VocelloUIScreenshot.attach(app.windows.firstMatch,
                 named: "mac-\(name)-\(size)-\(Int(frame.width))x\(Int(frame.height))")

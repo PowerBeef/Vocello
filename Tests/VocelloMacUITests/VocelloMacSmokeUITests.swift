@@ -7,6 +7,19 @@ import AVFoundation
 /// never poisons the journeys after it and the suite passes back-to-back.
 @MainActor
 final class VocelloMacSmokeUITests: VocelloMacUITestCase {
+    var acceptanceOutputRestore: (original: String?, folders: [URL])?
+
+    override func cleanUpPerTest() {
+        if let restore = acceptanceOutputRestore {
+            acceptanceOutputRestore = nil
+            for folder in restore.folders {
+                XCTAssertNoThrow(try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path))
+            }
+            restoreOutputFolder(restore.original)
+        }
+        super.cleanUpPerTest()
+    }
+
     /// The 12 s fixture clears the 10 s minimum duration so the virtual
     /// capture auto-stops into the review stage. It lives in shared `/tmp`
     /// (like the benchmark take-manifest handshake) because the app reading
@@ -34,6 +47,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
     func test00_WindowSizesAndSettingsScene() {
         beginSession()
         defer { endSession() }
+        relaunchApp(additionalEnvironment: ["QWENVOICE_UIPERF_SEED_HISTORY": "1"])
         for screen in [VocelloMacScreen.customVoice, .voiceDesign, .voiceCloning] {
             navigate(to: screen)
             replaceScript(with: String(repeating: "The morning light rests on the quiet harbor. ", count: 35))
@@ -49,6 +63,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         app.typeKey("w", modifierFlags: .command)
         XCTAssertTrue(VocelloUIWait.condition("Settings window to close", timeout: 10) { !settings.exists })
         XCTAssertTrue(element("screen_voiceCloning").exists, "Closing Settings must preserve Studio")
+        assertLibrarySizeMatrix()
     }
 
     func test10_MissingModelsAndStudioLinks() {
@@ -139,7 +154,7 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
     /// reading as one spoken token. Hex/UUID nonces are spelled out character
     /// by character with pauses that can trip the punctuation-budget dropout
     /// QC rule on real generations.
-    private static func pronounceableNonce() -> String {
+    static func pronounceableNonce() -> String {
         let letters = Array("abcdefghijklmnopqrstuvwxyz")
         return String((0..<8).map { _ in letters.randomElement()! })
     }

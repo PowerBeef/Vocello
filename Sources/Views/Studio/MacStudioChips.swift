@@ -117,6 +117,7 @@ struct MacStudioDeliveryChip: View {
                         }
                     )
                 )
+                .accessibilityIdentifier("delivery_customOption")
             }
         }
     }
@@ -137,6 +138,7 @@ struct MacStudioDeliveryChip: View {
         )
         .help(StudioPromptContent.delivery(preset, in: contentLanguage).detail)
         .accessibilityHint(StudioPromptContent.delivery(preset, in: contentLanguage).detail)
+        .accessibilityIdentifier("delivery_preset_\(preset.id)")
     }
 }
 
@@ -246,6 +248,7 @@ struct MacStudioLanguageChip: View {
                 set: { _ in selectedLanguage = language }
             )
         )
+        .accessibilityIdentifier("studio_languageOption_\(language.rawValue)")
     }
 }
 

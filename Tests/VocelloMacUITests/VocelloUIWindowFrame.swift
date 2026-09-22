@@ -144,7 +144,10 @@ enum VocelloUIWindowFrame {
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> CGRect {
-        if let frame = set(app, width: width, height: height) {
+        let available = availableFrame(for: app)
+        let targetWidth = min(width, available.width)
+        let targetHeight = min(height, available.height)
+        if let frame = set(app, width: targetWidth, height: targetHeight, origin: available.origin) {
             // Never wider than requested, rather than exactly the width
             // requested. Both callers are served by the weaker statement and
             // the stronger one is false for one of them: `Width.wide` asks for
@@ -167,13 +170,24 @@ enum VocelloUIWindowFrame {
         // Both edges, because a window pinned only in width is not pinned to
         // the minimum, and a height assertion run at whatever height the scene
         // restored to would pass while measuring nothing.
-        _ = drag(app, edge: .right, toward: width)
-        var frame = drag(app, edge: .bottom, toward: height)
+        // A restored x-position used to leave most of the display unused.
+        // Move by the genuine title bar before growing, so "wide" measures
+        // the available display rather than the space to the window's right.
+        let window = app.windows.firstMatch
+        let before = window.frame
+        let title = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
+            .withOffset(CGVector(dx: 0, dy: 14))
+        title.click(forDuration: 0.3, thenDragTo: title.withOffset(CGVector(
+            dx: available.minX - before.minX, dy: available.minY - before.minY
+        )))
+        VocelloUICursor.park()
+        _ = drag(app, edge: .right, toward: targetWidth)
+        var frame = drag(app, edge: .bottom, toward: targetHeight)
         // At the display's bottom edge the Dock can intercept the grab. The
         // opposite window edge remains reachable; it resizes the same genuine
         // window and the caller still verifies the resulting content bounds.
-        if abs(frame.height - height) > 6 {
-            frame = drag(app, edge: .top, toward: height)
+        if abs(frame.height - targetHeight) > 6 {
+            frame = drag(app, edge: .top, toward: targetHeight)
         }
         print("WINDOW_FRAME mechanism=\(Mechanism.edgeDrag.rawValue) "
             + "requested=\(Int(width))x\(Int(height)) "
@@ -188,6 +202,23 @@ enum VocelloUIWindowFrame {
             return .zero
         }
         return frame
+    }
+
+    /// AppKit uses bottom-left desktop coordinates, XCTest uses top-left.
+    /// Leave six points for reachable resize edges. Never change display settings.
+    static func availableFrame(for app: XCUIApplication) -> CGRect {
+        let desktopTop = NSScreen.screens.first?.frame.maxY ?? 0
+        let window = app.windows.firstMatch.frame
+        let frames = NSScreen.screens.map { screen in
+            let visible = screen.visibleFrame
+            return CGRect(x: visible.minX, y: desktopTop - visible.maxY,
+                          width: visible.width, height: visible.height).insetBy(dx: 6, dy: 6)
+        }
+        return frames.max { lhs, rhs in
+            let left = lhs.intersection(window)
+            let right = rhs.intersection(window)
+            return left.width * left.height < right.width * right.height
+        } ?? window
     }
 
     /// Which edge a drag grabs. The two are the same gesture on different

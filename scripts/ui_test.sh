@@ -27,7 +27,7 @@ usage() {
 Usage:
   scripts/ui_test.sh macos marketing [--scenario all|models]
   scripts/ui_test.sh macos localization
-  scripts/ui_test.sh macos smoke [--long-form-segments N]
+  scripts/ui_test.sh macos smoke [--scenario layout|studio-content|generation-errors] [--long-form-segments N]
   scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
   scripts/ui_test.sh macos perf
   scripts/ui_test.sh ios localization
@@ -181,6 +181,9 @@ elif [[ "$platform" == "ios" && "$lane" == "smoke" && -n "$scenario_argument" ]]
     || die "development iOS smoke --scenario accepts only history-transcript"
   [[ "$history_row_id" =~ ^generation-[0-9]+$ ]] \
     || die "history-transcript requires an exact --history-row-id generation-N"
+elif [[ "$platform" == "macos" && "$lane" == "smoke" && -n "$scenario_argument" ]]; then
+  [[ "$scenario_argument" == "layout" || "$scenario_argument" == "studio-content" || "$scenario_argument" == "generation-errors" ]] \
+    || die "macos smoke --scenario must be layout, studio-content, or generation-errors"
 elif [[ "$platform" == "ios" && "$lane" == "purchase" ]]; then
   scenario_argument="${scenario_argument:-lifecycle}"
   [[ "$scenario_argument" == "lifecycle" || "$scenario_argument" == "exports" ]] \
@@ -371,6 +374,9 @@ if payload["lane"] == "marketing":
     payload["scenario"] = sys.argv[20]
     payload["warm"] = 0
     payload["lengths"] = []
+if payload["platform"] == "macos" and payload["lane"] == "smoke" and sys.argv[20]:
+    payload["scenario"] = sys.argv[20]
+    payload["evidenceClass"] = "focused-smoke"
 if sys.argv[13]:
     payload["treeFingerprint"] = sys.argv[13]
     payload["controlAuditScenario"] = sys.argv[14]
@@ -1371,6 +1377,11 @@ elif [[ "$platform" == "macos" ]]; then
     # recording, library surfaces, long-form project, line batch, Design brief/player) in
     # method-name order.
     only_test="VocelloMacUITests/VocelloMacSmokeUITests"
+    case "$scenario_argument" in
+      layout) only_test+="/test00_WindowSizesAndSettingsScene" ;;
+      studio-content) only_test+="/test12_CrossLanguageStudioContent" ;;
+      generation-errors) only_test+="/test11_GenerationErrorAndRecovery" ;;
+    esac
     if [[ -n "$long_form_segments" ]]; then
       export TEST_RUNNER_QVOICE_MAC_LONGFORM_SEGMENTS="$long_form_segments"
     fi

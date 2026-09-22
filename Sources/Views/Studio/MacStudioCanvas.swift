@@ -374,10 +374,11 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             case .complete:
                 if let errorMessage { errorBar(errorMessage) }
             case .idle:
-                if let errorMessage {
+                if let errorMessage, modelInstalled {
                     errorBar(errorMessage)
+                } else {
+                    actionRow
                 }
-                actionRow
             }
         }
     }
@@ -446,6 +447,8 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             .contentShape(VocelloShape.pill())
         }
         .buttonStyle(.plain)
+        .disabled(!canGenerate)
+        .help(message)
         .accessibilityLabel(MacInterfaceText.studioGenerationFailed)
         .accessibilityValue(message)
         .accessibilityIdentifier("textInput_generationError")

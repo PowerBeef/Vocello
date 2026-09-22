@@ -26,6 +26,7 @@ paths = (
     Path('.github/workflows/ci.yml'),
     Path('.github/workflows/release.yml'),
     Path('.github/workflows/promote-release.yml'),
+    Path('.github/workflows/release-rehearsal.yml'),
 )
 patterns = {
     r'\btest-without-building\b': 'executes XCUITest',

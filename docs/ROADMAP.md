@@ -455,12 +455,12 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-02` | planned | P2 — make the owned package's diagnostics gate require the internal build capability | — |
 | `PA-03` | planned | P3 — compile-gate the iOS diagnostics runners | — |
 | `PA-04` | planned | Harness isolation: UI bundle compiles and fixed temporary paths | — |
-| `PA-05` | planned | Release path works end to end and is rehearsed | — |
+| `PA-05` | in-flight | Release path works end to end and is rehearsed | — |
 | `PA-06` | planned | Routing cost and derived-artifact gaps | — |
 | `PA-07` | planned | Remove dead engine, downloader and XPC-era code | — |
 | `PA-08` | planned | Consolidate duplicated platform logic and misleading names | — |
-| `PA-09` | planned | Scheduled workflows report their failures | — |
-| `PA-10` | planned | Release signing is isolated from dispatch and build inputs | — |
+| `PA-09` | in-flight | Scheduled workflows report their failures | — |
+| `PA-10` | in-flight | Release signing is isolated from dispatch and build inputs | — |
 | `PA-11` | planned | macOS launch never hashes models on the main thread | — |
 | `PA-12` | planned | macOS settings and file actions do what they say | — |
 | `PA-13` | planned | Quality-first decoding keeps every generated frame | — |
@@ -492,7 +492,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-04`** (planned) — Harness isolation: UI bundle compiles and fixed temporary paths.
   gate: build_ui_test_bundles.sh runs through the shared xcb_run lock and QVOICE_* policy paths into the arena its lane uses; probe and bench manifests use run-unique paths under the build-output policy.
 
-- **`PA-05`** (planned) — Release path works end to end and is rehearsed.
+- **`PA-05`** (in-flight) — Release path works end to end and is rehearsed.
   gate: release.yml selects Xcode and installs every pinned tool (numpy, pytest, pytest-xdist, asc, gh) through .github/actions/native-toolchain, a secrets-free ad-hoc release rehearsal workflow runs release.sh and the packaged-DMG verification on a schedule and on release-input changes and is green, and the TestFlight upload command is confirmed supported by the pinned Xcode.
 
 - **`PA-06`** (planned) — Routing cost and derived-artifact gaps.
@@ -504,10 +504,10 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-08`** (planned) — Consolidate duplicated platform logic and misleading names.
   gate: Each consolidation lands separately with unchanged identifiers and behavior: one download driver seam, one observation model for the model managers, one Mac player card, root models constructed once, generateVoiceDesign renamed for the all-mode loop, OWNERSHIP.json lists MLXAudioMark, and the Cmd-6 menu title matches its destination.
 
-- **`PA-09`** (planned) — Scheduled workflows report their failures.
+- **`PA-09`** (in-flight) — Scheduled workflows report their failures.
   gate: The nightly failure reporter files or updates its issue (logic in a tested scripts/ci module, not inline workflow Python), and swift-dependency-watch reads Dependabot alerts or reports the feed as unavailable instead of failing.
 
-- **`PA-10`** (planned) — Release signing is isolated from dispatch and build inputs.
+- **`PA-10`** (in-flight) — Release signing is isolated from dispatch and build inputs.
   gate: Signing jobs use a tag-restricted release environment, a dispatched release runs only from its own tag ref with a validated output name, the keychain grants codesign only, no Actions cache is restored after secrets exist, checkouts do not persist credentials, and signing material is removed right after release.sh.
 
 - **`PA-11`** (planned) — macOS launch never hashes models on the main thread.

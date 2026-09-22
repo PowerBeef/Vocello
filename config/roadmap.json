@@ -1389,7 +1389,7 @@
     {
       "id": "PA-05",
       "title": "Release path works end to end and is rehearsed",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "release.yml selects Xcode and installs every pinned tool (numpy, pytest, pytest-xdist, asc, gh) through .github/actions/native-toolchain, a secrets-free ad-hoc release rehearsal workflow runs release.sh and the packaged-DMG verification on a schedule and on release-input changes and is green, and the TestFlight upload command is confirmed supported by the pinned Xcode.",
       "sourceOfTruth": [
         ".github/workflows/release.yml",
@@ -1397,7 +1397,7 @@
         "config/toolchain.json",
         "scripts/supply_chain_contract.py"
       ],
-      "notes": "External audit CI-01, verified worse on 2026-09-22: three stacked release blockers. The package, compile-ios and archive-ios jobs install numpy but run supply_chain_contract --installed native, which also checks pytest and pytest-xdist (pinned since 25a895ed); package also runs --installed release, whose asc only archive-ios installs; and the macos-26 image now ships gh 2.100.0 against the exact 2.96.0 pin (7261bfbc hit the same drift). release.yml hard-codes Xcode_26.6 three times and duplicates the tool install; a comment says timeout-minutes is 90 while the job allows 150. The archive job uploads with xcrun altool. Nothing exercised the release path between the v2.4.0 tag (Aug 1) and this audit.",
+      "notes": "External audit CI-01, verified worse on 2026-09-22: three stacked release blockers. The package, compile-ios and archive-ios jobs install numpy but run supply_chain_contract --installed native, which also checks pytest and pytest-xdist (pinned since 25a895ed); package also runs --installed release, whose asc only archive-ios installs; and the macos-26 image now ships gh 2.100.0 against the exact 2.96.0 pin (7261bfbc hit the same drift). release.yml hard-codes Xcode_26.6 three times and duplicates the tool install; a comment says timeout-minutes is 90 while the job allows 150. The archive job uploads with xcrun altool. Nothing exercised the release path between the v2.4.0 tag (Aug 1) and this audit. 2026-09-22: release jobs moved onto the composite action with a release-tools input (asc and a SHA-pinned gh 2.96.0 artifact), and release-rehearsal.yml added; closes when the first rehearsal is green and the altool check is done.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },
@@ -1448,28 +1448,28 @@
     {
       "id": "PA-09",
       "title": "Scheduled workflows report their failures",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "The nightly failure reporter files or updates its issue (logic in a tested scripts/ci module, not inline workflow Python), and swift-dependency-watch reads Dependabot alerts or reports the feed as unavailable instead of failing.",
       "sourceOfTruth": [
         ".github/workflows/nightly.yml",
         ".github/workflows/swift-dependency-watch.yml",
         "scripts/swift_dependency_updates.py"
       ],
-      "notes": "External audit CI-02 and CI-03, confirmed 2026-09-22. nightly.yml's report job has an inline-Python SyntaxError (run 35585214770) and has never filed an issue. swift-dependency-watch failed 4 of 4 runs with HTTP 403 on /dependabot/alerts: GITHUB_TOKEN needs the vulnerability-alerts: read permission, not security-events. Latent: GitHub names Swift packages github.com/<owner>/<repo>, so advisories would never match the bare package identities.",
+      "notes": "External audit CI-02 and CI-03, confirmed 2026-09-22. nightly.yml's report job has an inline-Python SyntaxError (run 35585214770) and has never filed an issue. swift-dependency-watch failed 4 of 4 runs with HTTP 403 on /dependabot/alerts: GITHUB_TOKEN needs the vulnerability-alerts: read permission, not security-events. Latent: GitHub names Swift packages github.com/<owner>/<repo>, so advisories would never match the bare package identities. 2026-09-22: reporter moved to scripts/ci/failure_issue.py with tests; dependency watch uses vulnerability-alerts: read and matches github.com/<owner>/<repo> advisory names; closes after a green dispatch of the watch.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },
     {
       "id": "PA-10",
       "title": "Release signing is isolated from dispatch and build inputs",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Signing jobs use a tag-restricted release environment, a dispatched release runs only from its own tag ref with a validated output name, the keychain grants codesign only, no Actions cache is restored after secrets exist, checkouts do not persist credentials, and signing material is removed right after release.sh.",
       "sourceOfTruth": [
         ".github/workflows/release.yml",
         ".github/workflows/promote-release.yml",
         "scripts/release_source_authority.py"
       ],
-      "notes": "External audit SEC-01 (Medium: single admin collaborator), SEC-02 and SEC-07, confirmed 2026-09-22. No environment: on any job; 13 repository secrets; workflow_dispatch runs the dispatched ref's copy of the workflow with a free-text tag; keychain uses -A and a 6 h unlock; a prefix-keyed SwiftPM cache is restored after secrets; inputs.output_name is interpolated into run scripts; no checkout sets persist-credentials: false. Maintainer steps: create the release environment (deployment tags v*, reviewer), move the secrets, add a v* tag ruleset. Remaining: a separate build and sign job split, and signer pinning.",
+      "notes": "External audit SEC-01 (Medium: single admin collaborator), SEC-02 and SEC-07, confirmed 2026-09-22. No environment: on any job; 13 repository secrets; workflow_dispatch runs the dispatched ref's copy of the workflow with a free-text tag; keychain uses -A and a 6 h unlock; a prefix-keyed SwiftPM cache is restored after secrets; inputs.output_name is interpolated into run scripts; no checkout sets persist-credentials: false. Maintainer steps: create the release environment (deployment tags v*, reviewer), move the secrets, add a v* tag ruleset. Remaining: a separate build and sign job split, and signer pinning. 2026-09-22 workflow side: release-trigger job (tag ref only, contract-shaped output_name), environment: release on package and archive-ios, keychain -T /usr/bin/codesign with a 9000 s lock, no Actions cache in signing jobs, persist-credentials false, signing cleanup right after release.sh. Open: the maintainer's environment, secrets move and tag ruleset; build/sign split; signer pinning.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },

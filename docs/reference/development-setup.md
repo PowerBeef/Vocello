@@ -47,7 +47,8 @@ cd Vocello
 
 `./scripts/install_pinned_tools.sh` downloads xcodegen, ripgrep, xcbeautify and shellcheck from the
 release artifacts pinned in `config/toolchain.json`, verifies each SHA-256 and installs them into
-`~/.qwenvoice-pinned-tools/bin` (CI runs the same script). Put that directory first on `PATH`:
+`~/.qwenvoice-pinned-tools/bin` (CI runs the same script; name other pinned tools, such as `gh`, to
+install them instead). Put that directory first on `PATH`:
 
 ```sh
 ./scripts/install_pinned_tools.sh

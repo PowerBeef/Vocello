@@ -32,6 +32,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ inputs.tag }}
+          persist-credentials: false
 
       - name: Verify tag and draft state
         env:

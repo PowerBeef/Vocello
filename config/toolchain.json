@@ -98,6 +98,12 @@
       "url": "https://github.com/rorkai/App-Store-Connect-CLI/releases/download/4.11.0/asc_4.11.0_macOS_arm64",
       "sha256": "b928a12dec6be975271a2d374ba811717447a211089c6c89d3318d32c61c8202",
       "archivePath": "asc"
+    },
+    "gh": {
+      "version": "2.96.0",
+      "url": "https://github.com/cli/cli/releases/download/v2.96.0/gh_2.96.0_macOS_arm64.zip",
+      "sha256": "f23a0c37d963aacc3bed703ccbd59b41c5ca22101fab7f00eb2b7cad23aba463",
+      "archivePath": "gh_2.96.0_macOS_arm64/bin/gh"
     }
   },
   "release": {

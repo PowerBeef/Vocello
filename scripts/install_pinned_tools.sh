@@ -10,8 +10,10 @@
 # `artifactPins`, verifies the pinned SHA-256, and installs the binary into
 # an install prefix ahead of the image's copies on PATH.
 #
-# Usage: scripts/install_pinned_tools.sh [--prefix DIR]
+# Usage: scripts/install_pinned_tools.sh [--prefix DIR] [TOOL...]
 #   Default prefix: $HOME/.qwenvoice-pinned-tools/bin
+#   Default tools: xcodegen ripgrep xcbeautify shellcheck. Name other
+#   `artifactPins` entries (for example gh, which release jobs need) to install them.
 #   In GitHub Actions the prefix is appended to $GITHUB_PATH so subsequent
 #   steps resolve the pinned binaries first.
 
@@ -23,6 +25,14 @@ MANIFEST="$ROOT_DIR/config/toolchain.json"
 PREFIX="$HOME/.qwenvoice-pinned-tools/bin"
 if [[ "${1:-}" == "--prefix" ]]; then
     PREFIX="${2:?--prefix requires a directory}"
+    shift 2
+fi
+# Bash 3.2 (macOS) treats "${array[@]}" of an empty array as unset under set -u,
+# so the default list is assigned rather than left empty.
+if [[ $# -gt 0 ]]; then
+    TOOLS=("$@")
+else
+    TOOLS=(xcodegen ripgrep xcbeautify shellcheck)
 fi
 mkdir -p "$PREFIX"
 
@@ -79,16 +89,15 @@ install_pin() {
     echo "installed $tool $version -> $wrapper"
 }
 
-install_pin xcodegen
-install_pin ripgrep
-install_pin xcbeautify
-install_pin shellcheck
+for tool in "${TOOLS[@]}"; do
+    install_pin "$tool"
+done
 
 if [[ -n "${GITHUB_PATH:-}" ]]; then
     echo "$PREFIX" >> "$GITHUB_PATH"
 fi
 
-PATH="$PREFIX:$PATH" xcodegen --version
-PATH="$PREFIX:$PATH" rg --version | head -1
-PATH="$PREFIX:$PATH" xcbeautify --version
-PATH="$PREFIX:$PATH" shellcheck --version | head -2
+for tool in "${TOOLS[@]}"; do
+    binary="$(python3 -c "import json,os;print(os.path.basename(json.load(open('$MANIFEST'))['artifactPins']['$tool']['archivePath']))")"
+    PATH="$PREFIX:$PATH" "$binary" --version | head -2
+done

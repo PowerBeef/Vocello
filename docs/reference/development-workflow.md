@@ -127,8 +127,12 @@ Xcode's task signatures hit. Dispatch with `cold: true` to skip the restore. `ni
 subset (`tsan`), the complete Python suite (`python-full`) and cold compiles of both platforms
 (`foundation-cold`, which also compiles the macOS app optimized with warnings as errors); a failure
 keeps one open issue labelled `nightly`, titled "Nightly lane failing", commenting on it rather than
-filing a second. `security.yml` (CodeQL, npm audit) runs weekly, on dispatch and inside `release.yml`
-on the tagged commit.
+filing a second (`scripts/ci/failure_issue.py`). `release-rehearsal.yml` runs weekly, on dispatch and
+on pushes that touch release inputs: without secrets it installs the release toolchain through
+`.github/actions/native-toolchain`, runs the ledgered `release.sh` (ad-hoc signed, not notarized) and
+the packaged-DMG verification, and validates the release evidence locally; a failure keeps one issue
+labelled `release-rehearsal`. `security.yml` (CodeQL, npm audit) runs weekly, on dispatch and inside
+`release.yml` on the tagged commit.
 
 ## Cache and generation policy
 

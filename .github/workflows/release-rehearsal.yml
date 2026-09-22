@@ -1,0 +1,201 @@
+name: Release rehearsal
+
+# Exercises the release path without secrets so it cannot rot between tags.
+# The v2.4.0 tag (August 1) was the last run of release.yml; three separate
+# toolchain pins broke it afterwards without anything noticing.
+#
+# The macOS job runs the same ledgered commands release.yml's package job runs
+# (release.sh with its release-readiness gate, then the packaged-DMG and CLI
+# verification) with ad-hoc signing and no notarization, then builds and
+# validates the release evidence locally. Nothing is uploaded except logs on
+# failure. Keychain import, notarization, stapling, attestation and the draft
+# Release steps stay covered by ReleaseCredentialHygieneTests and the next tag.
+on:
+  schedule:
+    - cron: '17 6 * * 3'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/release.yml
+      - .github/workflows/release-rehearsal.yml
+      - .github/actions/**
+      - scripts/release.sh
+      - scripts/build*.sh
+      - scripts/create_dmg.sh
+      - scripts/verify_packaged_dmg.sh
+      - scripts/verify_packaged_cli.sh
+      - scripts/verify_release_bundle.sh
+      - scripts/cli_package.py
+      - scripts/release_evidence.py
+      - scripts/release_sbom.py
+      - scripts/required_step_ledger.py
+      - scripts/install_pinned_*.sh
+      - scripts/supply_chain_contract.py
+      - scripts/lib/build_*.sh
+      - config/toolchain.json
+      - config/orchestration-contract.json
+      - config/release-evidence-contract.json
+      - config/build-output-policy.json
+      - project.yml
+      - ExportOptions*.plist
+      - Sources/QwenVoice.entitlements
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-rehearsal-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-package:
+    name: Rehearse macOS package (ad-hoc, not notarized)
+    runs-on: macos-26
+    timeout-minutes: 150
+    env:
+      QWENVOICE_SIGNING_MODE: ad-hoc
+      QWENVOICE_NOTARIZE: "0"
+      RELEASE_SOURCE_IDENTITY: build/artifacts/macos/release/source-identity.json
+      RELEASE_STEP_LEDGER: build/artifacts/macos/release/required-steps.json
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Roadmap and evidence validation read history.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install and validate pinned release toolchain
+        uses: ./.github/actions/native-toolchain
+        with:
+          metal: "true"
+          release-tools: "true"
+
+      - name: Bind rehearsal source and initialize required steps
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse HEAD)"
+          version="$(python3 - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, "scripts")
+          import release_evidence
+          print(release_evidence.project_version(Path("."))[0])
+          PY
+          )"
+          python3 scripts/release_evidence.py capture-source-identity \
+            --commit "$commit" --output "$RELEASE_SOURCE_IDENTITY"
+          python3 scripts/required_step_ledger.py init \
+            --ledger "$RELEASE_STEP_LEDGER" \
+            --workflow release-macos-candidate \
+            --run-id "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --source-identity "$RELEASE_SOURCE_IDENTITY"
+          echo "REHEARSAL_TAG=v$version" >> "$GITHUB_ENV"
+          echo "RELEASE_COMMIT=$commit" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct "$commit")" >> "$GITHUB_ENV"
+
+      - name: Run scripts/release.sh (ad-hoc rehearsal)
+        run: |
+          python3 scripts/required_step_ledger.py run \
+            --ledger "$RELEASE_STEP_LEDGER" --step release-build \
+            --timeout-seconds 7800 -- ./scripts/release.sh --preflight none
+
+      - name: Verify packaged DMG and CLI
+        run: |
+          python3 scripts/required_step_ledger.py run \
+            --ledger "$RELEASE_STEP_LEDGER" --step artifact-verification \
+            --timeout-seconds 900 -- \
+            ./scripts/verify_packaged_dmg.sh \
+              build/dist/macos/Vocello-macos26.dmg \
+              build/dist/macos/release-metadata.txt --include-cli
+
+      - name: Build and validate release evidence (not published)
+        run: |
+          set -euo pipefail
+          python3 scripts/required_step_ledger.py finalize --ledger "$RELEASE_STEP_LEDGER"
+          python3 scripts/release_evidence.py create \
+            --allow-missing-tag-ref \
+            --tag "$REHEARSAL_TAG" \
+            --commit "$RELEASE_COMMIT" \
+            --platform macos \
+            --source-date-epoch "$SOURCE_DATE_EPOCH" \
+            --output-dir build/dist/macos \
+            --artifact build/dist/macos/Vocello-macos26.dmg \
+            --artifact build/dist/macos/Vocello-macos26-cli.dmg \
+            --artifact build/dist/macos/cli-package-verification.json \
+            --metadata build/dist/macos/release-metadata.txt \
+            --source-identity "$RELEASE_SOURCE_IDENTITY" \
+            --step-ledger "$RELEASE_STEP_LEDGER"
+          python3 scripts/release_evidence.py validate --output-dir build/dist/macos
+
+      - name: Upload rehearsal logs on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-rehearsal-logs
+          path: |
+            build/artifacts/macos/release/
+            build/artifacts/macos/release-readiness/
+            build/artifacts/macos/tests/
+          if-no-files-found: warn
+          retention-days: 7
+
+  ios-release-prerequisites:
+    name: Rehearse iOS archive prerequisites
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install and validate pinned release toolchain
+        uses: ./.github/actions/native-toolchain
+        with:
+          metal: "true"
+          release-tools: "true"
+
+      - name: Regenerate Xcode project
+        run: ./scripts/regenerate_project.sh
+
+      - name: Resolve SwiftPM dependencies the way archive-ios does
+        run: |
+          set -euo pipefail
+          python3 scripts/lib/ios_platform_preflight.py check
+          mkdir -p build/cache/xcode/source-packages build/scratch/derived-data/ci/ios-archive
+          xcodebuild -resolvePackageDependencies \
+            -project QwenVoice.xcodeproj \
+            -scheme VocelloiOS \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -clonedSourcePackagesDirPath build/cache/xcode/source-packages \
+            -derivedDataPath build/scratch/derived-data/ci/ios-archive \
+            -disableAutomaticPackageResolution \
+            -onlyUsePackageVersionsFromResolvedFile
+
+      - name: Validate the bundled iOS model catalog
+        run: ./scripts/check_ios_catalog.sh
+
+  report:
+    name: Open or refresh the rehearsal issue
+    needs: [macos-package, ios-release-prerequisites]
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: File one issue per open rehearsal failure
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULTS: ${{ toJSON(needs) }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 scripts/ci/failure_issue.py --label release-rehearsal --title "Release rehearsal failing" --heading "Release rehearsal failed"

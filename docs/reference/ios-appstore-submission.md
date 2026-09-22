@@ -316,8 +316,11 @@ Add these repo **Secrets** (Settings → Secrets and variables → Actions):
 | `QWENVOICE_DEVELOPMENT_TEAM` | the 10-char Apple team id |
 | `ASC_API_KEY_ID` / `ASC_API_ISSUER_ID` / `ASC_API_KEY_P8` | App Store Connect API key (id, issuer, base64 of `.p8`) |
 
-Then run the **Release** workflow from the Actions tab with the exact existing version `tag`,
-`archive_ios = true`, and optionally `upload_to_testflight = true` to push straight to TestFlight.
+Then run the **Release** workflow from the Actions tab, choosing the version tag itself under
+"Use workflow from" and entering the same `tag`, with `archive_ios = true` and optionally
+`upload_to_testflight = true` to push straight to TestFlight (from the CLI:
+`gh workflow run release.yml --ref <tag> -f tag=<tag> -f archive_ios=true`). A dispatch from any
+other ref is refused by the `release-trigger` job.
 This job is gated to manual dispatch only, so it never affects the macOS DMG release. The workflow
 first executes `scripts/macos_test.sh gate` plus the generic iOS device-SDK compile as one
 contract-bound `platform-readiness` subprocess. Only then does it archive `VocelloiOS`, assert the

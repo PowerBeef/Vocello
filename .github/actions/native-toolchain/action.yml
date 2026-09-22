@@ -1,11 +1,16 @@
 name: Native toolchain
 description: >-
   Select the pinned Xcode, install the SHA-pinned xcodegen/ripgrep/xcbeautify/shellcheck
-  release artifacts and the pinned numpy, put them on PATH and verify every version
-  against config/toolchain.json.
+  release artifacts and the pinned numpy, pytest and pytest-xdist (optionally the pinned
+  release tools asc and gh), put them on PATH and verify every version against
+  config/toolchain.json.
 inputs:
   metal:
-    description: Install Xcode's optional Metal toolchain when it is absent (CodeQL, TSan)
+    description: Install Xcode's optional Metal toolchain when it is absent (CodeQL, TSan, release builds)
+    required: false
+    default: "false"
+  release-tools:
+    description: Also install the pinned release tools (asc, gh) and verify the release group
     required: false
     default: "false"
 runs:
@@ -15,6 +20,7 @@ runs:
       shell: bash
       env:
         INSTALL_METAL: ${{ inputs.metal }}
+        INSTALL_RELEASE_TOOLS: ${{ inputs.release-tools }}
       run: |
         set -euo pipefail
         XCODE_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
@@ -38,3 +44,10 @@ runs:
           xcodebuild -downloadComponent metalToolchain
         fi
         python3 scripts/supply_chain_contract.py --installed native
+        if [[ "$INSTALL_RELEASE_TOOLS" == "true" ]]; then
+          # The runner image's own gh drifts (2.100.0 against the 2.96.0 pin
+          # broke the release group), so release jobs use SHA-pinned copies.
+          ./scripts/install_pinned_asc.sh --prefix "$HOME/.qwenvoice-pinned-tools/bin"
+          ./scripts/install_pinned_tools.sh gh
+          python3 scripts/supply_chain_contract.py --installed release
+        fi

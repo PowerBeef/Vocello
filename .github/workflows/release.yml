@@ -6,7 +6,9 @@ name: Release
 # Triggers:
 #   - protected v* tag push: verify the tag/source/version identity, build and
 #     verify all assets, create a draft Release, and verify uploaded bytes.
-#   - workflow_dispatch: explicit existing tag, with the same draft-candidate result.
+#   - workflow_dispatch: explicit existing tag, dispatched from that tag's ref
+#     (`gh workflow run release.yml --ref <tag> -f tag=<tag>`) so the tag's own
+#     workflow runs; release-trigger refuses any other ref.
 #
 # Public publication is deliberately separate: promote-release.yml requires a
 # source-bound quality-promotion manifest before changing the verified draft to public.
@@ -20,14 +22,17 @@ name: Release
 #     independent explicit frontend-QA lane and is not required before dispatch.
 #
 # Toolchain pinning is validated against config/toolchain.json:
-#   - Xcode 26.6 (project.yml keeps its Xcode 26.0 compatibility declaration)
+#   - Xcode `native.xcode` through .github/actions/native-toolchain (project.yml keeps
+#     its Xcode 26.0 compatibility declaration)
 #   - macOS 26.0 deployment target, Apple Silicon (`arch=arm64`)
 #   - SPM versions inherited from Package.resolved (committed)
 #   - exact native-build, release-publication, action, Node, and npm tool versions
 #   - Developer ID signing + Apple notarization (App Store Connect API
 #     key flow — no Apple ID password footprint on CI)
 #
-# Required repo secrets (Settings → Secrets and variables → Actions):
+# Required secrets, held by the tag-restricted `release` environment on the
+# signing jobs (Settings → Environments → release; repository secrets of the same
+# name are the fallback until they move):
 #
 #   APPLE_DEV_ID_APP_P12_BASE64
 #       The "Developer ID Application" certificate AND its private key,
@@ -86,10 +91,32 @@ env:
   RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
 
 jobs:
+  # Refuse, within seconds, a run that is not the tag's own workflow (a
+  # dispatch executes the workflow file of the ref it was dispatched from) or
+  # whose DMG basename is not contract-shaped. Nothing downstream starts first.
+  release-trigger:
+    name: Validate release trigger
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require the tag's own workflow and a contract-safe output name
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_REF: ${{ github.ref }}
+          OUTPUT_NAME: ${{ inputs.output_name }}
+        run: python3 scripts/ci/release_trigger.py --event "$EVENT_NAME" --ref "$WORKFLOW_REF" --tag "$RELEASE_TAG" --output-name "$OUTPUT_NAME"
+
   # Security analysis (CodeQL, npm audit) runs on the exact tagged commit before
   # any candidate is built; it no longer runs on every trunk push.
   security:
     name: Security
+    needs: release-trigger
     uses: ./.github/workflows/security.yml
     permissions:
       contents: read
@@ -110,6 +137,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event_name == 'push' && github.ref || inputs.tag }}
+          persist-credentials: false
 
       - name: Require signed tag and exact-SHA CI verdict
         env:
@@ -156,6 +184,9 @@ jobs:
     needs: source-authority
     runs-on: macos-26
     timeout-minutes: 150
+    # Signing secrets belong to the tag-restricted `release` environment; a job
+    # that references it before it exists runs with repository secrets.
+    environment: release
     # contents:write is needed only when we attach the DMG to a GitHub
     # Release. Scoped to this job so a hypothetical forked-PR run can't
     # inherit write access at the workflow level.
@@ -195,6 +226,7 @@ jobs:
           # resolves a real commit SHA for release-metadata.txt.
           fetch-depth: 0
           ref: ${{ github.event_name == 'push' && github.ref || inputs.tag }}
+          persist-credentials: false
 
       # Fail before any build work if the curated notes for this tag are
       # missing or unfinished — the GitHub Release body is sourced verbatim
@@ -203,32 +235,14 @@ jobs:
       - name: Validate release notes quality gate
         run: python3 scripts/check_release_notes.py "$RELEASE_TAG"
 
-      - name: Select Xcode 26.6
-        run: |
-          sudo xcode-select -s /Applications/Xcode_26.6.app
-          xcodebuild -version
-          swift --version
-
-      - name: Install and validate pinned release tooling
-        run: |
-          # xcodegen, ripgrep, xcbeautify, and shellcheck are SHA-pinned
-          # release artifacts (mixed runner image pools make brew's formula
-          # index nondeterministic mid-roll, and `brew install` never
-          # upgrades an image-preinstalled formula); numpy pip-pins to the
-          # config/toolchain.json version for the same reason.
-          NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
-          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" \
-            || python3 -m pip install --quiet "numpy==${NUMPY_PIN}"
-          ./scripts/install_pinned_tools.sh
-          export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
-          xcodegen --version
-          xcbeautify --version
-          rg --version
-          shellcheck --version
-          python3 -c 'import numpy; print(numpy.__version__)'
-          gh --version
-          python3 scripts/supply_chain_contract.py --installed native
-          python3 scripts/supply_chain_contract.py --installed release
+      # Xcode, the SHA-pinned tools, the Python test pins and the release
+      # tools (asc, gh) all come from config/toolchain.json through the same
+      # composite action push CI uses, so a new pin cannot miss this job.
+      - name: Install and validate pinned release toolchain
+        uses: ./.github/actions/native-toolchain
+        with:
+          metal: "true"
+          release-tools: "true"
 
       - name: Verify release tag and source identity
         run: |
@@ -290,12 +304,13 @@ jobs:
           echo "$CERT_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          # Lock after the job's 150-minute ceiling; raise with timeout-minutes.
+          security set-keychain-settings -lut 9000 "$KEYCHAIN_PATH"
           security unlock-keychain  -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
           security import "$RUNNER_TEMP/cert.p12" \
             -P "$CERT_PASSWORD" \
-            -A -t cert -f pkcs12 \
+            -T /usr/bin/codesign -t cert -f pkcs12 \
             -k "$KEYCHAIN_PATH"
           rm "$RUNNER_TEMP/cert.p12"
 
@@ -348,20 +363,9 @@ jobs:
           head -1 "$KEY_PATH" | grep -q "BEGIN PRIVATE KEY" \
             || { echo "::error::APPLE_NOTARY_PRIVATE_KEY_P8 does not look like a PKCS#8 private key (first line is not 'BEGIN PRIVATE KEY')" >&2; exit 1; }
 
-      - name: Compute SwiftPM cache prefix
-        id: spm_key
-        run: |
-          xcode="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
-          echo "prefix=spm-${{ runner.os }}-xcode${xcode}-" >> "$GITHUB_OUTPUT"
-
-      - name: Cache SwiftPM dependencies
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: build/cache/xcode/source-packages
-          key: ${{ steps.spm_key.outputs.prefix }}${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
-          restore-keys: |
-            ${{ steps.spm_key.outputs.prefix }}
-
+      # No Actions cache is restored in this job: a prefix-keyed cache written
+      # by another ref must not feed sources into a Developer ID-signed build.
+      # release.sh resolves packages cold from Package.resolved.
       - name: Run scripts/release.sh (Developer ID + notarized DMG)
         # QWENVOICE_SIGNING_MODE / SIGNING_IDENTITY / DEVELOPMENT_TEAM /
         # NOTARIZE / EXPECT_SIGNED_RELEASE /
@@ -369,24 +373,46 @@ jobs:
         # plus the two previous steps' $GITHUB_ENV exports.
         # APPLE_API_KEY_PATH + APPLE_API_KEY_ID + APPLE_API_ISSUER_ID
         # are consumed by `xcrun notarytool submit --wait` inside
-        # release.sh. Wall-clock ~30-45 min (build + sign + notarize);
-        # timeout-minutes is 90 to absorb Apple notarization queue spikes.
+        # release.sh. Wall-clock ~30-45 min (build + sign + notarize); the
+        # job's 150-minute ceiling absorbs Apple notarization queue spikes.
+        # output_name arrives through env (validated by release-trigger),
+        # never interpolated into the script.
+        env:
+          OUTPUT_NAME: ${{ inputs.output_name }}
         run: |
           set -euo pipefail
           command=(./scripts/release.sh --preflight none)
-          if [ -n "${{ inputs.output_name }}" ]; then
-            command+=(--output-name "${{ inputs.output_name }}")
+          if [ -n "$OUTPUT_NAME" ]; then
+            command+=(--output-name "$OUTPUT_NAME")
           fi
           python3 scripts/required_step_ledger.py run \
             --ledger "$RELEASE_STEP_LEDGER" --step release-build \
             --timeout-seconds 7800 -- "${command[@]}"
 
+      - name: Cleanup signing material
+        # Runs right after release.sh, its only consumer, and always, even on
+        # failure: no later step (attestation, uploads, gh) runs while the
+        # signing keychain or the notary key exists.
+        if: always()
+        run: |
+          set +x
+          set +e
+          cleanup_result=0
+          if [ -n "${QWENVOICE_CODESIGN_KEYCHAIN:-}" ] && [ -f "$QWENVOICE_CODESIGN_KEYCHAIN" ]; then
+            security delete-keychain "$QWENVOICE_CODESIGN_KEYCHAIN" || cleanup_result=1
+          fi
+          if [ -n "${APPLE_API_KEY_PATH:-}" ] && [ -f "$APPLE_API_KEY_PATH" ]; then
+            rm -f "$APPLE_API_KEY_PATH" || cleanup_result=1
+          fi
+          exit "$cleanup_result"
+
       - name: Resolve produced artifact paths
         id: artifacts
+        env:
+          OUTPUT_NAME: ${{ inputs.output_name }}
         run: |
           # release.sh owns distribution outputs under build/dist/macos.
-          output_name="${{ inputs.output_name }}"
-          [ -z "$output_name" ] && output_name="Vocello-macos26"
+          output_name="${OUTPUT_NAME:-Vocello-macos26}"
           dmg="build/dist/macos/${output_name}.dmg"
           cli_dmg="build/dist/macos/${output_name}-cli.dmg"
           metadata="build/dist/macos/release-metadata.txt"
@@ -560,23 +586,6 @@ jobs:
           gh release download "$RELEASE_TAG" --dir "$remote"
           python3 scripts/release_evidence.py validate --output-dir "$remote"
 
-      - name: Cleanup signing material
-        # Always run, even on prior-step failure, so the signing
-        # keychain + private key are not left on the runner image.
-        # (The runner is ephemeral, but matches macOS-CI best practice.)
-        if: always()
-        run: |
-          set +x
-          set +e
-          cleanup_result=0
-          if [ -n "${QWENVOICE_CODESIGN_KEYCHAIN:-}" ] && [ -f "$QWENVOICE_CODESIGN_KEYCHAIN" ]; then
-            security delete-keychain "$QWENVOICE_CODESIGN_KEYCHAIN" || cleanup_result=1
-          fi
-          if [ -n "${APPLE_API_KEY_PATH:-}" ] && [ -f "$APPLE_API_KEY_PATH" ]; then
-            rm -f "$APPLE_API_KEY_PATH" || cleanup_result=1
-          fi
-          exit "$cleanup_result"
-
   compile-ios:
     # iOS compile-safety check. Runs in parallel with the macOS package
     # job and is intentionally NOT a `needs:` dependency — if iOS source
@@ -606,31 +615,12 @@ jobs:
           # Project-input validation verifies historical evidence commits.
           fetch-depth: 0
           ref: ${{ github.event_name == 'push' && github.ref || inputs.tag }}
+          persist-credentials: false
 
-      - name: Select Xcode 26.6
-        run: |
-          sudo xcode-select -s /Applications/Xcode_26.6.app
-          xcodebuild -version
-          swift --version
-
-      - name: Install and validate pinned tooling
-        run: |
-          # xcodegen, ripgrep, xcbeautify, and shellcheck are SHA-pinned
-          # release artifacts (mixed runner image pools make brew's formula
-          # index nondeterministic mid-roll, and `brew install` never
-          # upgrades an image-preinstalled formula); numpy pip-pins to the
-          # config/toolchain.json version for the same reason.
-          NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
-          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" \
-            || python3 -m pip install --quiet "numpy==${NUMPY_PIN}"
-          ./scripts/install_pinned_tools.sh
-          export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
-          xcodegen --version
-          xcbeautify --version
-          rg --version
-          shellcheck --version
-          python3 -c 'import numpy; print(numpy.__version__)'
-          python3 scripts/supply_chain_contract.py --installed native
+      - name: Install and validate pinned toolchain
+        uses: ./.github/actions/native-toolchain
+        with:
+          metal: "true"
 
       - name: Compute SwiftPM cache prefix
         id: spm_key
@@ -690,6 +680,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.archive_ios }}
     runs-on: macos-26
     timeout-minutes: 60
+    environment: release
     permissions:
       contents: read
       id-token: write
@@ -704,29 +695,13 @@ jobs:
           # Project-input validation verifies historical evidence commits.
           fetch-depth: 0
           ref: ${{ inputs.tag }}
+          persist-credentials: false
 
-      - name: Select Xcode 26.6
-        run: |
-          sudo xcode-select -s /Applications/Xcode_26.6.app
-          xcodebuild -version
-          swift --version
-
-      - name: Install and validate pinned tooling
-        run: |
-          # xcodegen, ripgrep, xcbeautify, and shellcheck are SHA-pinned
-          # release artifacts (mixed runner image pools make brew's formula
-          # index nondeterministic mid-roll, and `brew install` never
-          # upgrades an image-preinstalled formula); numpy pip-pins to the
-          # config/toolchain.json version for the same reason.
-          NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
-          python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}" \
-            || python3 -m pip install --quiet "numpy==${NUMPY_PIN}"
-          ./scripts/install_pinned_tools.sh
-          export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
-          ./scripts/install_pinned_asc.sh --prefix "$HOME/.qwenvoice-pinned-tools/bin"
-          python3 -c 'import numpy; print(numpy.__version__)'
-          asc version
-          python3 scripts/supply_chain_contract.py --installed native
+      - name: Install and validate pinned release toolchain
+        uses: ./.github/actions/native-toolchain
+        with:
+          metal: "true"
+          release-tools: "true"
 
       - name: Bind iOS release source and initialize required steps
         run: |
@@ -741,20 +716,8 @@ jobs:
             --run-id "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             --source-identity "$RELEASE_SOURCE_IDENTITY"
 
-      - name: Compute SwiftPM cache prefix
-        id: spm_key
-        run: |
-          xcode="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
-          echo "prefix=spm-ios-archive-${{ runner.os }}-xcode${xcode}-" >> "$GITHUB_OUTPUT"
-
-      - name: Cache SwiftPM dependencies
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: build/cache/xcode/source-packages
-          key: ${{ steps.spm_key.outputs.prefix }}${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
-          restore-keys: |
-            ${{ steps.spm_key.outputs.prefix }}
-
+      # No Actions cache: the signed archive resolves packages cold from
+      # Package.resolved rather than from a cache another ref could have written.
       - name: Regenerate Xcode project
         env:
           QWENVOICE_DEVELOPMENT_TEAM: ${{ secrets.QWENVOICE_DEVELOPMENT_TEAM }}

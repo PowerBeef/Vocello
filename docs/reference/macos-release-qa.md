@@ -118,8 +118,10 @@ release-readiness and artifact checks.
 7. **Atomic Release candidate**: first push the release commit to `main` and wait for its latest
    `CI required` check run to complete successfully (Security runs inside `release.yml`). Create an annotated,
    cryptographically signed version tag at that exact commit (for example
-   `git tag -s vX.Y.Z <commit>`), push the tag, or dispatch `release.yml` with that exact existing
-   tag. GitHub must report the annotated tag object's signature as verified with reason `valid`;
+   `git tag -s vX.Y.Z <commit>`), push the tag, or dispatch the tag's own workflow with
+   `gh workflow run release.yml --ref vX.Y.Z -f tag=vX.Y.Z` (the `release-trigger` job refuses a
+   dispatch from any other ref, because a dispatch runs the workflow file of the ref it came from).
+   The signing jobs use the tag-restricted `release` environment. GitHub must report the annotated tag object's signature as verified with reason `valid`;
    a lightweight, unsigned, invalid, or differently targeted tag cannot build a candidate. The
    source-authority job also proves that the tag commit is contained in `origin/main` and that both
    required checks belong to that exact SHA before any platform job starts. CI then verifies

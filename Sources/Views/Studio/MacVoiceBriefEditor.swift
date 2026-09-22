@@ -38,6 +38,7 @@ struct MacVoiceBriefEditor: View {
                 font: .systemFont(ofSize: MacType.style(.body).size, weight: .medium),
                 isFocused: $isEditorFocused,
                 accessibilityIdentifier: "voiceDesign_voiceDescriptionField",
+                accessibilityLabel: MacInterfaceText.designVoiceBriefLabel,
                 idealHeight: 160
             )
             .frame(height: 160)

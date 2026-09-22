@@ -15,6 +15,10 @@ struct MacScriptTextEditor: NSViewRepresentable {
     /// for the brief and batch editors, which use the system default.
     var tracking: CGFloat = 0
     var accessibilityIdentifier: String = "textInput_textEditor"
+    /// Spoken name of the editor. Nil uses the placeholder, which is the only
+    /// visible description of an empty editor; an explicit label moves the
+    /// placeholder to the accessibility placeholder value instead.
+    var accessibilityLabel: String? = nil
     var textColor: NSColor = MacTheme.textPrimaryNSColor
     var placeholderColor: NSColor = MacTheme.textTertiaryNSColor
     /// Height reported when the layout asks for the ideal size; callers bound
@@ -56,6 +60,7 @@ struct MacScriptTextEditor: NSViewRepresentable {
         textView.identifier = NSUserInterfaceItemIdentifier(accessibilityIdentifier)
         textView.setAccessibilityIdentifier(accessibilityIdentifier)
         textView.setAccessibilityEnabled(true)
+        applyAccessibilityDescription(to: textView)
         textView.onFocusChange = { focused in
             DispatchQueue.main.async { isFocused = focused }
         }
@@ -105,11 +110,23 @@ struct MacScriptTextEditor: NSViewRepresentable {
             textView.placeholderString = placeholder
             textView.needsDisplay = true
         }
+        applyAccessibilityDescription(to: textView)
         if context.coordinator.textState.recordExternalEdit(text) {
             let selectedRanges = textView.selectedRanges
             textView.string = context.coordinator.textState.text
             textView.applyTracking()
             textView.selectedRanges = selectedRanges
+        }
+    }
+
+    private func applyAccessibilityDescription(to textView: NSTextView) {
+        let label = accessibilityLabel ?? placeholder
+        if textView.accessibilityLabel() != label {
+            textView.setAccessibilityLabel(label)
+        }
+        let placeholderValue = accessibilityLabel == nil ? nil : placeholder
+        if textView.accessibilityPlaceholderValue() != placeholderValue {
+            textView.setAccessibilityPlaceholderValue(placeholderValue)
         }
     }
 

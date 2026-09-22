@@ -54,7 +54,8 @@ globs with the evidence ids and capabilities they add (`model-catalog-and-delive
 needs (the `ui-benchmark` matrix), and `validate-contract` fails a v3 contract whose routing names an
 undefined evidence id or capability. `python3 scripts/quality_promotion.py classify --base <tag>
 [--platform macos|ios]` runs the same classification over the paths changed since the previous
-release commit, and `create` embeds that result in the manifest, so the lanes it demands can be
+release commit (committed `<base>..HEAD` only: the base must be a distinct ancestor and uncommitted
+edits are invisible, so commit first), and `create` embeds that result in the manifest, so the lanes it demands can be
 audited from the contract and the diff alone.
 
 Every platform requires its canonical 29-take Speed `ui-generation` matrix. Capability-sensitive

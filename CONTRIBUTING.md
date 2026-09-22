@@ -6,9 +6,12 @@ the repository's coding agent, follows [`CLAUDE.md`](CLAUDE.md) and the
 
 ## Before starting
 
-- Use an Apple Silicon Mac with Xcode 26. The selected Xcode must expose usable iOS Platform
-  Support and a compatible iOS runtime component for the no-phone `-destination generic/platform=iOS` compile;
-  this toolchain prerequisite does not authorize Simulator testing.
+- Use an Apple Silicon Mac with full Xcode (CI pins the version in `config/toolchain.json`) and set
+  it up with [`docs/reference/development-setup.md`](docs/reference/development-setup.md): Xcode
+  components, the pinned command-line tools, Python and Node. The selected Xcode must expose usable
+  iOS Platform Support and a compatible iOS runtime component for the no-phone
+  `-destination generic/platform=iOS` compile; this toolchain prerequisite does not authorize
+  Simulator testing.
 - Read the current checkpoint in [`docs/development-progress.md`](docs/development-progress.md).
 - Check existing [issues](https://github.com/PowerBeef/Vocello/issues) and pull requests before starting overlapping work.
 - Keep changes focused. Do not mix unrelated refactors into a bug fix or feature.

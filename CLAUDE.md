@@ -29,6 +29,9 @@ demonstrated product or workflow risk.
 
 ## Start here
 
+On a fresh clone or a new machine, set up the toolchain first with
+`docs/reference/development-setup.md`.
+
 1. Read `git status --short --branch`, `git rev-parse HEAD`, `python3 scripts/roadmap.py status`,
    and the current **Resume now** section of `docs/development-progress.md` (the session hook prints
    a bounded summary). Preserve existing edits; reconcile unexpected changes before touching
@@ -90,7 +93,8 @@ After a push, follow the run with `gh run list` / `gh run watch` until `CI requi
 - **One native UI driver:** repository XCUITest through `scripts/ui_test.sh`; no computer-use,
   coordinate, browser or MCP native UI routes. Genuine controls only; no hidden shippable test UI.
 - **Explicit consent:** device/UI/model/benchmark runs, releases and publication need an explicit
-  request. Tool or skill availability grants no consent. Never retry a failed evidence run silently.
+  request. Consent covers that request only; none carries over. Lanes run one at a time on committed
+  source. Tool or skill availability grants no consent. Never retry a failed evidence run silently.
 - **Generated project:** edit `project.yml`, never `project.pbxproj`; run
   `./scripts/regenerate_project.sh --fast` after project inputs change.
 - **Release-only:** no Debug configuration or generic `DEBUG` symbol. Production overrides require
@@ -136,9 +140,12 @@ Repository scripts are authoritative; everything below assists them and never re
   GitHub MCP for CI and releases; Claude in Chrome or chrome-devtools for the website only; Hugging
   Face tools read-only, with no implied download or pin change. Missing optional tools never block
   the script workflow, and CI never depends on personal plugins or credentials.
-- **Guard literals:** hooks match raw Bash command text. Keep commit messages in heredocs, and build
-  strings that name Simulator routes, private home paths or the commit command from fragments in
-  commands and fixtures.
+- **Guard literals:** hooks match raw Bash command text. Commit with a literal `git commit -F -`
+  heredoc so the commit lint runs (a quote-split command would run the commit and skip the lint);
+  build strings that merely *mention* Simulator routes, private home paths or the commit command from
+  fragments in commands and fixtures.
+- **Maintainer-run actions:** Hugging Face Hub commits, model installs and upload, deploy or repin
+  commands are run by the maintainer (the `!` prefix in the prompt); prepare them, do not run them.
 
 Detailed routing, permissions rationale and fresh-session verification:
 `docs/reference/development-workflow.md#claude-code-setup-and-tool-routing`.

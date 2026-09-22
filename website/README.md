@@ -8,6 +8,7 @@ Run these from the QwenVoice repo root:
 
 ```sh
 npm --prefix website ci
+npx --prefix website playwright install chromium   # once per machine, for the browser tests
 npm --prefix website run dev
 npm --prefix website run lint
 npm --prefix website test

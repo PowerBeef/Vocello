@@ -86,7 +86,8 @@ pytest with `pytest-xdist` (`-n auto`), both pinned in `config/toolchain.json`. 
 about 90 seconds on an M2. `scripts/tests/conftest.py` marks modules by name: `research` (audio,
 delivery, prosody and device-analysis tooling) runs when those paths change and nightly; `darwin_only`
 runs inside the macOS gate. Every run prints its slowest tests; a test that outgrows its lane moves,
-it does not slow every push.
+it does not slow every push. `pytest.ini` already passes `-q`; adding another `-q` drops the summary
+line, so judge a run by pytest's exit code.
 
 ## CI
 
@@ -223,8 +224,10 @@ destructive command as a hook test.
 | CI and release evidence | Exact-commit GitHub checks and repository release scripts | `gh` or the GitHub MCP; release tools require explicit publication authority |
 | Model/dependency research | Receipts, exact pins and maintenance contracts | Hugging Face tools read-only and Context7 for library docs; no implied download or pin-change permission |
 
-Use tools callable in the current session, with script/primary-documentation fallbacks. Do not
-install plugins, duplicate servers or change global settings just to satisfy this table. Personal
+Use tools callable in the current session, with script/primary-documentation fallbacks. The
+install commands for the optional plugins and MCP servers are in
+[development setup](development-setup.md#8-claude-code). Do not install plugins, duplicate servers
+or change global settings just to satisfy this table. Personal
 plugins, accounts and skill caches are not CI dependencies. Generic plugin advice never overrides
 physical-iPhone-only, script-owned native UI, cache ownership or consent requirements.
 

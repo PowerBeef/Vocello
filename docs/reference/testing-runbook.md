@@ -60,6 +60,9 @@ Claude reads the artifacts directly, or hands the run directory to the read-only
 subagent, and stops when the deciding evidence is clear:
 
 1. Read `run.json`, the required-step ledger and aggregate result. A missing required step is not PASS.
+   The lane's own verdict (`verdict.txt`, or its `test verdict:` / `<platform> <lane> PASS` line)
+   decides, never a wrapper's or pipe's exit code; when a lane runs in the background, capture its
+   exit status directly.
 2. Inspect the failed test and xcresult summary, then nearby log context. Use the existing bootstrap
    and external-interruption classifiers when applicable; zero launched cases can be infrastructure.
 3. Check the crash delta and attachment manifest for relevant screenshots or control observations.

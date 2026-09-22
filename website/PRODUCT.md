@@ -21,6 +21,8 @@ Warm, clear, confident, and human. Vocello explains local AI generation plainly.
 - Use sentence case. Reserve all caps for tiny labels only when they are truly needed.
 - Do not use em dashes in visible copy.
 - Keep public model messaging on the active 1.7B surface: Speed is 1.7B 4-bit, Quality is 1.7B 8-bit. The 0.6B variant is ruled out (2026-07-02 maintainer decision — Voice Design requires 1.7B); never mention it in public copy.
+- Express speed as RTF (synthesis wall time ÷ audio duration, lower is faster); "× realtime" may
+  appear only as a companion figure, never as the headline number or under the RTF name.
 - Do not publish third-party Vocello timing or clone-prompt performance claims unless they have been reproduced locally with the maintained QwenVoice benchmark harness.
 - Describe Voice Cloning as strongest when a Saved Voice is transcript-backed and can reuse a prepared Qwen3 clone prompt. Transcriptless or audio-only references are supported as lower-guidance fallbacks, not errors.
 - For transcript auto-fill, say "transcribe locally" or "local transcription," following the local-not-on-device rule. Avoid bare "speech recognition" (too broad) and avoid naming Siri in copy (an Apple system detail; the app handles setup guidance in context).

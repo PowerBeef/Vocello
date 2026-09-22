@@ -29,7 +29,10 @@ lane. The edit and policy guards were confirmed live in the migrating session; f
 (`/memory`, `/hooks`, `/permissions`, skill menu) is for the maintainer to confirm. The audit also
 fixed three harness defects (a TSan failure could leave the swift base advanced, `git -c`/`-C` commit
 forms bypassed the lint, dry-run "none"). Findings and follow-ups:
-[project audit](reference/project-audit-2026-09-22.md). The paused marketing-test edit is untouched.
+[project audit](reference/project-audit-2026-09-22.md). For the move to a new Mac, the paused
+marketing-test edit was committed after its UI bundle compiled, a fresh-clone
+[setup guide](reference/development-setup.md) documents the toolchain and Claude tooling, and the
+assistant's durable engineering lessons now live in the rules and guides instead of private memory.
 
 ### Consolidated Mac acceptance (September 22)
 

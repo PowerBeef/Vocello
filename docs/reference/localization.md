@@ -85,7 +85,8 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
 - `VocelloPresentationText` owns dynamic errors and statuses that would otherwise concatenate
   independently translated fragments. Callers pass substitutions into complete localized format
   strings.
-- `MacInterfaceText` (`Sources/Services/MacInterfaceText.swift`, macOS target only) owns the macOS
+- `MacInterfaceText` (`Sources/Services/MacInterfaceText.swift`; the macOS app, and also compiled
+  into `VocelloCoreTests`, so it must not reference app-only types) owns the macOS
   interface copy: sidebar, menus, Settings, Saved Voices, History, the generation surfaces and their
   sheets read plain `String`s from `vocello.mac.*` entries with all ten locales and translator context.
   Since 2026-09-14 no direct presentation literal remains under `Sources/Views` except the empty
@@ -96,6 +97,9 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
   `qualityWarningShortLabel` and `activityLabel` helpers, so `GenerationMode.displayName` and
   `EngineActivityLabels` stay English identities for the engine, CLI and telemetry. The validator
   binds every `vocello.mac.` key to exactly one default there, like the iOS and shared prefixes.
+  Numeric-only displays (timers, counts, seeds) use `Text(verbatim:)` so they never become catalog
+  keys. During a macOS UI lane, doubled or UPPERCASE text is the pseudo-localization diagnostic, not
+  a bug (see [macOS testing](macos-testing.md)).
 - `project.yml` enables String Catalog symbol generation, emitted localization strings, and catalog
   preference globally. The macOS app receives the catalog through its existing Resources bundle;
   the iOS app lists it explicitly in `sources:` with `buildPhase: resources`, as required by the

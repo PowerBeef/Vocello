@@ -220,7 +220,10 @@ available to the CLI (TCC). Spoken content is instead verified after every CLI p
 (`config/delivery-evaluator-v2-candidates.json`, `whisper-small-mlx`) is loaded once in a supervised
 subprocess, decodes each take with the language locked to the expected language, detects the language
 from the first 30 s, and the publisher re-scores every transcript against the corpus with the same
-15 % edit-rate gate. The record is `focused` with `languageVerification.families: ["whisper"]`: one
+15 % edit-rate gate (whisper-small's character error rate on Chinese and Japanese sits close to that
+gate, so treat those verdicts as real evidence, not noise; recognizer or metric changes go into
+`scripts/lib/language_metrics.py`, never its consumers). The recognizer never runs while the engine
+is resident. The record is `focused` with `languageVerification.families: ["whisper"]`: one
 independent witness, explicitly not a two-family consensus. The recognizer is prepared from the local
 Hugging Face cache by `scripts/prepare_delivery_compact_model_config.py whisper-small-mlx`; nothing
 downloads automatically. `scripts/lib/language_metrics.py` also accepts `sensevoice` as a family

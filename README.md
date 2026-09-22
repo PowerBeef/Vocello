@@ -194,13 +194,15 @@ Vocello is built by a solo developer with heavy use of coding agents. Every perf
 
 ## Build from source
 
-Building requires **full Xcode 26** on an Apple Silicon Mac running macOS 26 or newer; the
-Command Line Tools alone are not enough, even for the CLI, because every product (app and
-`vocello`) is a target of the generated Xcode project. If `xcodebuild` reports the active
-developer directory is a Command Line Tools instance, point it at Xcode:
-`sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`. Validation scripts run with
-the system `python3`; the Python suite additionally needs `pytest`, `pytest-xdist` and `numpy` at the
-versions pinned in `config/toolchain.json` (`python3 -m pip install pytest==<pin> pytest-xdist==<pin> numpy==<pin>`).
+Building requires **full Xcode** (CI pins the version in `config/toolchain.json`) on an Apple
+Silicon Mac running macOS 26 or newer; the Command Line Tools alone are not enough, even for the
+CLI, because every product (app and `vocello`) is a target of the generated Xcode project. If
+`xcodebuild` reports the active developer directory is a Command Line Tools instance, point it at
+Xcode: `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`. The scripts also need the
+pinned xcodegen and ripgrep, Python 3.11 or newer as `python3` (Apple's `/usr/bin/python3` is too
+old) with the pinned `numpy`, `pytest` and `pytest-xdist`, and the Metal toolchain component. Setting
+up a new Mac from a fresh clone, step by step, is in
+[`docs/reference/development-setup.md`](docs/reference/development-setup.md).
 
 ```sh
 git clone https://github.com/PowerBeef/Vocello.git

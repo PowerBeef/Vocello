@@ -1411,7 +1411,7 @@
         "scripts/refresh_derived_artifacts.py",
         "config/toolchain.json"
       ],
-      "notes": "UI-test sources route to the swift lane although neither macos-tests nor macos-tsan compiles UI bundles (local check already compiles them separately). A clean-tree check routes every lane. validate_all omits the README-charts check its registry lists. SwiftLint is unpinned and silently skipped when missing, unlike shellcheck. nightly.yml's header and the macos-tsan cache owner still say TSan is scheduled-only although it is blocking on push since 2026-09-14.",
+      "notes": "UI-test sources route to the swift lane although neither macos-tests nor macos-tsan compiles UI bundles (local check already compiles them separately). A clean-tree check routes every lane. validate_all omits the README-charts check its registry lists. SwiftLint is unpinned and silently skipped when missing, unlike shellcheck. nightly.yml's header and the macos-tsan cache owner still say TSan is scheduled-only although it is blocking on push since 2026-09-14. Also: Sources/Resources/third_party_attributions.json (attribution_manifest.py rebuild) is neither registered in refresh_derived_artifacts.py (dev.sh regen) nor refused by the generated-file guard; only the contract gate catches a stale copy.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },

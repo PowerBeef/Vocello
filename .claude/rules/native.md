@@ -166,3 +166,23 @@ XCUITest lanes only when explicitly requested.
 - Using the saved-reference language as Clone output language; assembling requests in a view.
 - Treating `.cancelled` as failure or releasing ownership before the terminal barrier.
 - Using raw `ScrollView` on iOS; making color the only indicator; reintroducing a separate engine process.
+- Adding, moving or deleting a file under a globbed `Sources/`, `Tests/` or resource path without
+  `./scripts/regenerate_project.sh --fast` and the regenerated `project.pbxproj` in the same commit. The
+  reminder hook and `dev.sh check` react only to `project.yml`, and CI regenerates before building, so
+  CI can pass while local builds fail with "Build input file cannot be found".
+- Relying on a class-level `@MainActor` to isolate XCTest `setUp`/`tearDown`; the pinned CI Xcode does
+  not, so hop with `await MainActor.run`. CI compile failures are in the run's
+  `macos-deterministic-test-artifacts` artifact, not the job log.
+- AppKit/SwiftUI traps: an `NSScrollView` representable without `sizeThatFits` (it must answer an
+  infinite proposal); two same-named files in one target (they collide on `.stringsdata`, which is why
+  the macOS `AppPaths.swift`/`AppDefaults` cannot join `VocelloCoreTests`, which compiles the iOS copy);
+  capturing a non-Sendable closure across a `Task { @MainActor }` hop (precompute it first); forgetting
+  that a parent's `accessibilityIdentifier` reaches every descendant outside an
+  `.accessibilityElement(children: .contain)` container.
+- In UI tests: probing an optional element with `VocelloUIWait` (it records `XCTFail` on timeout; use
+  `XCTWaiter.wait(for: [XCTNSPredicateExpectation])`); matching visible labels instead of identifiers
+  (find Saved Voices rows by `identifier BEGINSWITH "voicesRow_"`); killing a UI lane mid-build.
+- Testing order or state owned by an app-only `@MainActor` iOS type in place: extract it into a value
+  type under `Sources/iOSSupport/Services`, list the file under both `VocelloCoreTests` and
+  `VocelloiOSLogicTests` in `project.yml`, and add it to the matching `promotionRouting` class in
+  `config/quality-promotion-contract.json`.

@@ -28,7 +28,8 @@ GENERATION_STAMP="$GENERATION_CACHE_DIR/project.yml.sha256"
 
 if ! command -v xcodegen >/dev/null 2>&1; then
     echo "error: xcodegen is required to regenerate the project." >&2
-    echo "Install it with: brew install xcodegen" >&2
+    echo "Install the pinned version with ./scripts/install_pinned_tools.sh and put" >&2
+    echo "\$HOME/.qwenvoice-pinned-tools/bin on PATH (docs/reference/development-setup.md)." >&2
     exit 1
 fi
 

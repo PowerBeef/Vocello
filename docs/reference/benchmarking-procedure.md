@@ -792,9 +792,11 @@ compares against — the gate runs three warm takes and compares their medians (
 warm`; the cold take is informational), uses an isolated runtime directory, rejects rows outside
 its collision-resistant run ID, freezes the exact ordered generation
 selection in `benchmark-evidence.json` before comparing, and reports a loaded or throttled host as
-inconclusive rather than pass or fail. The committed baseline predates the cutover (one take, decode
-speedup, no host identity); the comparer says so on every run until it is re-saved from a
-three-take gate run.
+inconclusive rather than pass or fail. The committed baseline was re-saved from a three-take gate
+run (warm cell n = 3, standard `wall/audio` RTF, host OS and Xcode identity). With
+`--require-baseline-identity` (the gate passes it) an identity mismatch exits 1 and the gate reports
+BASELINE INVALID: re-save it with `summarize_generation_telemetry.py <run-diag> --engine-only
+--save-baseline`.
 Markdown snapshots (`benchmarks/baseline-*.md`) remain the human-readable full-matrix references;
 diff them with `git diff`, not `--compare-baseline`.
 

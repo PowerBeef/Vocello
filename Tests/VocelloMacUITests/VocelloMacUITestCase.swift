@@ -631,13 +631,9 @@ class VocelloMacUITestCase: XCTestCase {
         if (editor.value as? String) != text {
             XCTAssertTrue(VocelloUITextEntry.replace(in: editor, with: text, timeout: 20))
         }
-        XCTAssertTrue(
-            VocelloUIWait.value(
-                editor,
-                contains: text,
-                timeout: 10
-            )
-        )
+        XCTAssertTrue(VocelloUIWait.condition("script to match entered text", timeout: 10) {
+            editor.value as? String == text
+        })
     }
 
     func assertReadyToGenerate(mode: VocelloUIBenchMatrix.Mode) {

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Codex PreToolUse hook (matcher: Bash): the commit lint.
 #
-# Fired for every Bash tool call; exits instantly unless the command contains
-# `git commit`. For commits it requires the symbolic branch to be exactly `main`,
+# Fired for every Bash tool call; exits instantly unless the command runs
+# `git [global options] commit` (for example `git -c k=v commit` or
+# `git -C dir commit`). For commits it requires the symbolic branch to be exactly `main`,
 # clean whitespace in the staged diff, and no private path or credential in the
 # staged files. It finishes in seconds and never builds or tests anything: CI on
 # push is the gate.
@@ -12,10 +13,9 @@ set -euo pipefail
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 command_text="$(python3 "$HOOK_DIR/agent_hook_input.py" command)"
 
-case "$command_text" in
-  *"git commit"*) ;;
-  *) exit 0 ;;
-esac
+# Global options may sit between `git` and the subcommand; `-c` and `-C` take a value.
+commit_pattern='(^|[^[:alnum:]_./-])git([[:space:]]+(-[cC][[:space:]]+[^[:space:]]+|--[[:alnum:]-]+(=[^[:space:]]+)?|-[[:alpha:]]))*[[:space:]]+commit([[:space:]]|$)'
+[[ "$command_text" =~ $commit_pattern ]] || exit 0
 
 ROOT_DIR="$(cd "$HOOK_DIR/../.." && pwd)"
 cd "$ROOT_DIR"

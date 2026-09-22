@@ -156,6 +156,7 @@ class CommandRunnerTests(unittest.TestCase):
             self.assertEqual(MODULE.main(["check", "--dry-run", "--paths", "docs/reference/cli.md"]), 0)
         run.assert_not_called()
         self.assertIn("git diff --check", buffer.getvalue())
+        self.assertIn("lanes: none", buffer.getvalue())
 
 
 if __name__ == "__main__":

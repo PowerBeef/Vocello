@@ -287,6 +287,21 @@ class CommitLintTests(unittest.TestCase):
             self.assertEqual(result.returncode, 2, result.stderr)
             self.assertIn("main", result.stderr)
 
+    def test_global_git_options_before_the_commit_do_not_bypass_the_lint(self):
+        commit = "com" "mit"
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.repo(root, branch="topic")
+            for command in (f"git -c core.hooksPath=/dev/null {commit} -q -F -",
+                            f"git -C . {commit} -m x", f"git --no-pager {commit} -m x",
+                            f"cd . && git {commit} -m x"):
+                with self.subTest(command=command):
+                    self.assertEqual(self.lint(root, command).returncode, 2)
+            for command in ("git -c color.ui=never status", f"git log --grep={commit}",
+                            f"git {commit}-tree HEAD^{{tree}}"):
+                with self.subTest(command=command):
+                    self.assertEqual(self.lint(root, command).returncode, 0)
+
     def test_staged_private_path_or_trailing_whitespace_is_blocked_and_clean_staging_passes(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

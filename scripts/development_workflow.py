@@ -301,8 +301,8 @@ def main(argv: list[str] | None = None) -> int:
         elif command == "check":
             plan = check_plan(args.paths or changed_paths())
             if args.dry_run:
-                print(f"Changed paths: {len(plan['changedPaths'])}; lanes: "
-                      + ", ".join(k for k, v in plan["lanes"].items() if v) or "none")
+                lanes = ", ".join(k for k, v in plan["lanes"].items() if v) or "none"
+                print(f"Changed paths: {len(plan['changedPaths'])}; lanes: {lanes}")
                 for entry in plan["commands"]:
                     print(f"  {_display(entry)}")
             else:

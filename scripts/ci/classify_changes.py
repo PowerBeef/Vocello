@@ -36,6 +36,13 @@ LANE_JOBS = {
     "research": "Python tests (linux)",
     "website": "Website deterministic checks",
 }
+# Jobs that route with a lane and must also have passed before its base
+# advances. Without the TSan job here, a run whose deterministic tests passed
+# but whose sanitizer failed would let the next unrelated push skip TSan.
+# A companion absent from a run (an older workflow) does not block.
+LANE_COMPANION_JOBS = {
+    "swift": ("macOS ThreadSanitizer subset",),
+}
 
 # Owned sources that no iOS target compiles. Anything else under Sources/ or
 # Tests/ can change the device build.
@@ -221,11 +228,16 @@ def lane_bases(history: list[dict], head: str, cwd: str | None = None) -> dict[s
         if not isinstance(jobs, dict) or sha == head:
             continue
         run_passed = run.get("conclusion") == "success"
-        for lane, job in LANE_JOBS.items():
-            conclusion = jobs.get(job)
+        def job_proven(conclusion: object) -> bool:
             # A job routing skipped inside a run that passed is proven at that
             # head too; a skip inside a failed or cancelled run proves nothing.
-            proven = conclusion == "success" or (conclusion == "skipped" and run_passed)
+            return conclusion == "success" or (conclusion == "skipped" and run_passed)
+
+        for lane, job in LANE_JOBS.items():
+            proven = job_proven(jobs.get(job)) and all(
+                companion not in jobs or job_proven(jobs[companion])
+                for companion in LANE_COMPANION_JOBS.get(lane, ())
+            )
             if bases[lane] is None and proven and is_ancestor_commit(sha, head, cwd):
                 bases[lane] = sha
     return bases

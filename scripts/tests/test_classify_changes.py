@@ -130,6 +130,24 @@ class RoutingTests(unittest.TestCase):
         self.assertIsNone(MODULE.lane_bases(skipped_cancelled, self.head, cwd=str(self.repo))["website"])
 
 
+    def test_a_failed_sanitizer_keeps_the_swift_lane_owed(self) -> None:
+        # c2's deterministic tests passed but its TSan job failed; swift last
+        # fully passed at c0, so a docs-only push at c3 must still run it.
+        tsan = MODULE.LANE_COMPANION_JOBS["swift"][0]
+        history = [
+            {"headSha": self.shas["c2"], "conclusion": "failure",
+             "jobs": {MODULE.LANE_JOBS["swift"]: "success", tsan: "failure",
+                      MODULE.LANE_JOBS["python"]: "success"}},
+            {"headSha": self.shas["c0"], "conclusion": "success",
+             "jobs": {MODULE.LANE_JOBS["swift"]: "success", tsan: "success"}},
+        ]
+        bases = MODULE.lane_bases(history, self.head, cwd=str(self.repo))
+        self.assertEqual(bases["swift"], self.shas["c0"])
+        self.assertEqual(bases["python"], self.shas["c2"])
+        lanes, reason = MODULE.route_push(self.head, self.shas["c2"], history, cwd=str(self.repo))
+        self.assertTrue(lanes["swift"], reason)
+
+
 class ClassificationTests(unittest.TestCase):
     def lanes(self, path: str) -> set[str]:
         return {lane for lane, on in MODULE.classify([path]).items() if on}

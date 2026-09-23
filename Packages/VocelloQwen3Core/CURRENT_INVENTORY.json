@@ -133,7 +133,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/AudioMarking.swift",
-      "sha256": "a83095a099274f6cc6389346fe4574c648288f955835de3882af88b81cf499e8",
+      "sha256": "6528b667a9acbef1ee92e76c5bf48bf92857dd0ce3bc790b2c6efeec8fb3aa30",
       "upstreamStatus": "added"
     },
     {
@@ -153,7 +153,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",
-      "sha256": "163f3a01836f7db3f0071de98d0876dc6b063d5ef44f48142506dc8ee86b2324",
+      "sha256": "0c612902b7e9985ba5314b19faa878bc4e57f289d7f53637e9c24d4a3a0484cd",
       "upstreamStatus": "added"
     },
     {
@@ -173,7 +173,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Runtime.swift",
-      "sha256": "cc32cccf9afa0c2d7c27f7870004e7749db1ac4c5d49b6fc79677b0516c0d15e",
+      "sha256": "248b3547cb969df4f70e7038c4778a386bcb91aade5f640f96b636252abdd717",
       "upstreamStatus": "added"
     },
     {
@@ -239,6 +239,11 @@
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3TalkerReplayDiagnosticTests.swift",
       "sha256": "3316594f888e4c2902281def60dd2901aa20afff5390a7134a97cb33e3d36742",
+      "upstreamStatus": "added"
+    },
+    {
+      "path": "Tests/Qwen3RuntimeTests/RuntimeFailureCaptureTests.swift",
+      "sha256": "759abe68b9f2c7812cd915e53ac1a9703034bdb2f2b01ed2fc46163e26ee693b",
       "upstreamStatus": "added"
     },
     {

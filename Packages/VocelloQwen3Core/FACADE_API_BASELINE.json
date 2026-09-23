@@ -396,13 +396,17 @@
     "Sources/VocelloQwen3Core/Runtime.swift::public enum VocelloQwen3Runtime",
     "Sources/VocelloQwen3Core/Runtime.swift::public static func prepareModelBundle(_ bundle: VocelloQwen3PreparedModelBundle) throws",
     "Sources/VocelloQwen3Core/Runtime.swift::public static func prepareModelDirectory( at directory: URL, repositoryID: String, modelType: String? ) throws",
-    "Sources/VocelloQwen3Core/Runtime.swift::public static func clearRuntimeCaches( isolation: isolated (any Actor)? = #isolation ) async"
+    "Sources/VocelloQwen3Core/Runtime.swift::public static func clearRuntimeCaches( isolation: isolated (any Actor)? = #isolation ) async",
+    "Sources/VocelloQwen3Core/Runtime.swift::public enum VocelloQwen3RuntimeFailure: Error, Equatable, Sendable",
+    "Sources/VocelloQwen3Core/Runtime.swift::public var failureCode: VocelloQwen3FailureCode",
+    "Sources/VocelloQwen3Core/Runtime.swift::public init?(mlxError error: any Error)",
+    "Sources/VocelloQwen3Core/Runtime.swift::public static func classifying(mlxMessage message: String) -> VocelloQwen3RuntimeFailure"
   ],
   "schemaVersion": 1,
   "sourceFiles": [
     {
       "path": "Sources/VocelloQwen3Core/AudioMarking.swift",
-      "sha256": "a83095a099274f6cc6389346fe4574c648288f955835de3882af88b81cf499e8"
+      "sha256": "6528b667a9acbef1ee92e76c5bf48bf92857dd0ce3bc790b2c6efeec8fb3aa30"
     },
     {
       "path": "Sources/VocelloQwen3Core/ClassifiedGenerationSession.swift",
@@ -418,7 +422,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",
-      "sha256": "163f3a01836f7db3f0071de98d0876dc6b063d5ef44f48142506dc8ee86b2324"
+      "sha256": "0c612902b7e9985ba5314b19faa878bc4e57f289d7f53637e9c24d4a3a0484cd"
     },
     {
       "path": "Sources/VocelloQwen3Core/GenerationSession.swift",
@@ -434,7 +438,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Runtime.swift",
-      "sha256": "cc32cccf9afa0c2d7c27f7870004e7749db1ac4c5d49b6fc79677b0516c0d15e"
+      "sha256": "248b3547cb969df4f70e7038c4778a386bcb91aade5f640f96b636252abdd717"
     }
   ],
   "sourceRoot": "Sources/VocelloQwen3Core"

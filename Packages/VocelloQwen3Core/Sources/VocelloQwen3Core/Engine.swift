@@ -428,6 +428,8 @@ public actor VocelloQwen3Engine {
         }
     }
 
+    /// An MLX error raised while the weights load surfaces as a thrown
+    /// `VocelloQwen3RuntimeFailure` and the model is not committed.
     @discardableResult
     public func load(
         _ bundle: VocelloQwen3PreparedModelBundle,
@@ -435,6 +437,27 @@ public actor VocelloQwen3Engine {
         cachePolicy: VocelloQwen3CachePolicy = .systemDefault,
         diagnosticSink: VocelloQwen3DiagnosticSink? = nil,
         verboseDiagnosticSink: VocelloQwen3VerboseLoadDiagnosticSink? = nil
+    ) async throws -> VocelloQwen3ModelIdentity {
+        let mlxErrors = VocelloQwen3MLXErrorScope()
+        return try await mlxErrors.captureAsync { @Sendable in
+            try await self.performLoad(
+                bundle,
+                behavior: behavior,
+                cachePolicy: cachePolicy,
+                diagnosticSink: diagnosticSink,
+                verboseDiagnosticSink: verboseDiagnosticSink,
+                mlxErrors: mlxErrors
+            )
+        }
+    }
+
+    private func performLoad(
+        _ bundle: VocelloQwen3PreparedModelBundle,
+        behavior: VocelloQwen3LoadBehavior?,
+        cachePolicy: VocelloQwen3CachePolicy,
+        diagnosticSink: VocelloQwen3DiagnosticSink?,
+        verboseDiagnosticSink: VocelloQwen3VerboseLoadDiagnosticSink?,
+        mlxErrors: VocelloQwen3MLXErrorScope
     ) async throws -> VocelloQwen3ModelIdentity {
         let lease = try beginOperation(kind: .load, generationID: nil, phase: .loading)
         do {
@@ -446,6 +469,8 @@ public actor VocelloQwen3Engine {
                 verboseDiagnosticSink: verboseDiagnosticSink,
                 isolation: self
             )
+            // Weights that raised an MLX error never evaluated; never commit them.
+            try mlxErrors.check()
             try revalidate(lease)
             // Once the loader has returned, the multi-second load is complete
             // and committing it is the only non-wasteful outcome. A late task
@@ -491,11 +516,13 @@ public actor VocelloQwen3Engine {
         )
         do {
             try Task.checkCancellation()
-            let prompt = try model.makeClonePrompt(
-                referenceSamples: referenceSamples,
-                referenceText: referenceText,
-                xVectorOnlyMode: xVectorOnlyMode
-            )
+            let prompt = try VocelloQwen3MLXErrorScope().capture {
+                try model.makeClonePrompt(
+                    referenceSamples: referenceSamples,
+                    referenceText: referenceText,
+                    xVectorOnlyMode: xVectorOnlyMode
+                )
+            }
             guard prompt.xVectorOnlyMode == xVectorOnlyMode,
                   prompt.inContextLearningMode == !xVectorOnlyMode else {
                 throw VocelloQwen3EngineError.cloneConditioningIdentityMismatch
@@ -620,10 +647,29 @@ public actor VocelloQwen3Engine {
     }
 
     /// Prepares the currently loaded model without exposing its mutable facade.
+    /// An MLX error raised while warming surfaces as a thrown
+    /// `VocelloQwen3RuntimeFailure`.
     public func prewarm(
         request: VocelloQwen3SynthesisRequest,
         cloneHandle: VocelloQwen3CloneHandle? = nil,
         customDepth: String? = nil
+    ) async throws {
+        let mlxErrors = VocelloQwen3MLXErrorScope()
+        try await mlxErrors.captureAsync { @Sendable in
+            try await self.performPrewarm(
+                request: request,
+                cloneHandle: cloneHandle,
+                customDepth: customDepth,
+                mlxErrors: mlxErrors
+            )
+        }
+    }
+
+    private func performPrewarm(
+        request: VocelloQwen3SynthesisRequest,
+        cloneHandle: VocelloQwen3CloneHandle?,
+        customDepth: String?,
+        mlxErrors: VocelloQwen3MLXErrorScope
     ) async throws {
         guard let model = loadedModel else {
             throw VocelloQwen3EngineError.noLoadedModel
@@ -666,6 +712,7 @@ public actor VocelloQwen3Engine {
                     isolation: self
                 )
             }
+            try mlxErrors.check()
             try revalidate(lease)
             try Task.checkCancellation()
             activeOperation = nil
@@ -683,6 +730,21 @@ public actor VocelloQwen3Engine {
     public func prime(
         request: VocelloQwen3SynthesisRequest,
         cloneHandle: VocelloQwen3CloneHandle? = nil
+    ) async throws -> VocelloQwen3PrimeResult {
+        let mlxErrors = VocelloQwen3MLXErrorScope()
+        return try await mlxErrors.captureAsync { @Sendable in
+            try await self.performPrime(
+                request: request,
+                cloneHandle: cloneHandle,
+                mlxErrors: mlxErrors
+            )
+        }
+    }
+
+    private func performPrime(
+        request: VocelloQwen3SynthesisRequest,
+        cloneHandle: VocelloQwen3CloneHandle?,
+        mlxErrors: VocelloQwen3MLXErrorScope
     ) async throws -> VocelloQwen3PrimeResult {
         guard let model = loadedModel else {
             throw VocelloQwen3EngineError.noLoadedModel
@@ -722,6 +784,7 @@ public actor VocelloQwen3Engine {
                     memory: request.memory
                 )
             }
+            try mlxErrors.check()
             try revalidate(lease)
             try Task.checkCancellation()
             activeOperation = nil
@@ -903,8 +966,14 @@ public actor VocelloQwen3Engine {
 
         current.lifecycle = .generating
         phase = .generating
+        // The MLX error scope is task-local, so the model's producer tasks
+        // started inside `runGeneration` inherit it; an MLX error ends the take
+        // through the typed failure path instead of mlx-swift's `fatalError`.
+        let mlxErrors = VocelloQwen3MLXErrorScope()
         let task = Task { [self] in
-            await runGeneration(reservationID: reservationID)
+            await mlxErrors.scope { @Sendable in
+                await self.runGeneration(reservationID: reservationID, mlxErrors: mlxErrors)
+            }
         }
         current.task = task
         current.session.cancellation.installCancelAction { task.cancel() }
@@ -1232,7 +1301,10 @@ public actor VocelloQwen3Engine {
         }
     }
 
-    private func runGeneration(reservationID: UUID) async {
+    private func runGeneration(
+        reservationID: UUID,
+        mlxErrors: VocelloQwen3MLXErrorScope
+    ) async {
         guard let pending = pendingGeneration,
               pending.reservationID == reservationID,
               pending.lifecycle == .generating,
@@ -1247,6 +1319,9 @@ public actor VocelloQwen3Engine {
 
             let sink: @Sendable (VocelloQwen3GenerationSignal) async throws -> Void = {
                 [self] signal in
+                // MLX keeps returning after an error without evaluating; stop
+                // the producer at its next signal instead of streaming garbage.
+                try mlxErrors.check()
                 try await consumeGenerationSignal(
                     signal,
                     reservationID: reservationID,
@@ -1272,6 +1347,7 @@ public actor VocelloQwen3Engine {
                     isolation: self
                 )
             }
+            try mlxErrors.check()
             try revalidate(pending.lease)
             guard let completed = pendingGeneration,
                   completed.reservationID == reservationID else {
@@ -1349,9 +1425,15 @@ public actor VocelloQwen3Engine {
                 )
                 await pending.session.cancelModelTerminal(terminal, reason: reason)
             } else {
+                // A captured MLX failure is the cause even when the producer
+                // later threw something else. It carries the typed failure
+                // code (allocation is memory pressure) and reaches the audio
+                // consumer as `VocelloQwen3RuntimeFailure`.
+                let mlxFailure = mlxErrors.failure
+                    ?? VocelloQwen3RuntimeFailure(mlxError: error)
                 let terminal = VocelloQwen3TerminalEvent(
                     generationID: pending.request.generationID,
-                    outcome: .failed(.runtime),
+                    outcome: .failed(mlxFailure?.failureCode ?? .runtime),
                     generatedTokenCount: tokenCount,
                     emittedAudioFrameCount: frameCount,
                     elapsedMilliseconds: startedAt.elapsedMilliseconds,
@@ -1359,10 +1441,13 @@ public actor VocelloQwen3Engine {
                     diagnostics: model.finalizedGenerationDiagnostics,
                     codecTrace: current?.codecTrace
                 )
-                await pending.session.failModelTerminal(
-                    terminal,
-                    error: VocelloQwen3EngineRuntimeFailure()
-                )
+                let terminalError: any Error & Sendable
+                if let mlxFailure {
+                    terminalError = mlxFailure
+                } else {
+                    terminalError = VocelloQwen3EngineRuntimeFailure()
+                }
+                await pending.session.failModelTerminal(terminal, error: terminalError)
             }
         }
     }

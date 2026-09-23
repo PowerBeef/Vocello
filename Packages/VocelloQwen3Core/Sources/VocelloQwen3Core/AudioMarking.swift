@@ -35,9 +35,13 @@ public enum VocelloQwen3AudioMarking {
         // publication never drains its implicit pool, and anything left in
         // it reads as permanently retained memory to the peak-equality lane.
         defer { Memory.clearCache() }
-        return try autoreleasepool {
-            let generator = try AudioSealGenerator(weightsURL: weightsURL)
-            return generator.watermark(pcm: pcm)
+        // An MLX error (for example a failed Metal allocation) throws a typed
+        // `VocelloQwen3RuntimeFailure` instead of reaching `fatalError`.
+        return try VocelloQwen3MLXErrorScope().capture {
+            try autoreleasepool {
+                let generator = try AudioSealGenerator(weightsURL: weightsURL)
+                return generator.watermark(pcm: pcm)
+            }
         }
     }
 }

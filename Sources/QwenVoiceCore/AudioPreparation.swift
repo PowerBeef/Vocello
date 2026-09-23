@@ -564,7 +564,9 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         case .failed:
             throw AudioPreparationError.conversionFailed(reader.error?.localizedDescription ?? "Native audio decoding failed.")
         case .cancelled:
-            throw AudioPreparationError.conversionFailed("Native audio decoding was cancelled before completion.")
+            // A cancelled reader is a cancellation, typed at its origin so the
+            // generation terminal classifier never has to read this text.
+            throw AudioPreparationError.cancelled
         case .unknown:
             throw AudioPreparationError.conversionFailed("Native audio decoding ended in an unknown state.")
         @unknown default:

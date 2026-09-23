@@ -324,7 +324,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
         }
     }
 
-    private static func productError(
+    static func productError(
         for outcome: VocelloQwen3TerminalOutcome
     ) -> Error {
         switch outcome {
@@ -332,6 +332,10 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
             return CancellationError()
         case .completed(.maximumTokens):
             return NativeRuntimeError.maximumTokenLimit()
+        case .failed(.memoryPressure):
+            // The owned runtime reports a captured MLX allocation failure as
+            // memory pressure; keep it typed so the one allocation retry runs.
+            return VocelloQwen3RuntimeFailure.allocation
         case .failed, .completed:
             return MLXTTSEngineError.generationFailed(
                 "Qwen3-TTS failed before product finalization."
@@ -1740,6 +1744,11 @@ struct StreamingExecutionContext: Sendable {
             case .cancelled:
                 modelOutcomeV9 = .cancelled
                 throw CancellationError()
+            case .failed(.memoryPressure):
+                // A captured MLX allocation failure stays typed so the engine
+                // runs its single allocation retry.
+                modelOutcomeV9 = .failed
+                throw VocelloQwen3RuntimeFailure.allocation
             case .failed:
                 modelOutcomeV9 = .failed
                 throw MLXTTSEngineError.generationFailed(

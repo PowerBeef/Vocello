@@ -1,5 +1,6 @@
 import Foundation
 @testable import QwenVoiceCore
+import VocelloQwen3Core
 import XCTest
 
 final class GenerationTelemetrySchemaTests: XCTestCase {
@@ -826,11 +827,7 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
     }
 
     func testTerminalClassifierDefersOnlyFirstRetryableAllocationFailure() {
-        let allocation = NSError(
-            domain: "MLX",
-            code: 1,
-            userInfo: [NSLocalizedDescriptionKey: "Metal failed to allocate GPU memory"]
-        )
+        let allocation = VocelloQwen3RuntimeFailure.allocation
         XCTAssertTrue(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(allocation))
         XCTAssertFalse(
             NativeGenerationTerminalClassifier.shouldPublish(
@@ -854,6 +851,109 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
                 policy: .deferRetryableAllocationFailure
             )
         )
+    }
+
+    func testTerminalClassifierRecognizesEveryTypedCancellation() {
+        let cancellations: [Error] = [
+            CancellationError(),
+            VocelloQwen3SessionError.audioChannelCancelled(.memoryPressure),
+            AudioPreparationError.cancelled,
+            HuggingFaceDownloader.DownloadError.cancelled,
+            URLError(.cancelled),
+            CocoaError(.userCancelled),
+            RemoteErrorPayload.make(for: CancellationError()),
+            NativeRuntimeError.wrapping(
+                CancellationError(),
+                stage: .clonePreparation,
+                message: "The native runtime could not prepare the clone reference"
+            ),
+            NativeRuntimeError.wrapping(
+                VocelloQwen3SessionError.audioChannelCancelled(.user),
+                stage: .streamStartup,
+                message: "The native runtime could not start audio generation."
+            ),
+        ]
+        for error in cancellations {
+            XCTAssertEqual(
+                NativeGenerationTerminalClassifier.reason(for: error),
+                .cancelled,
+                "\(error)"
+            )
+            XCTAssertFalse(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(error))
+            XCTAssertEqual(NativeTelemetryTerminalBoundary.name(for: error), "terminal_cancelled")
+        }
+    }
+
+    func testTerminalClassifierIgnoresErrorText() {
+        // Text that the retired string matcher treated as a cancellation or as a
+        // retryable Metal allocation failure is an ordinary failure unless the
+        // error's type says otherwise.
+        let cancelledText = NSError(
+            domain: "Vocello",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "The request was cancelled"]
+        )
+        let allocationText = NSError(
+            domain: "MLX",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Metal failed to allocate GPU memory"]
+        )
+        let reworded = MLXTTSEngineError.generationFailed("Out of memory on the GPU (cancelled).")
+        for error in [cancelledText, allocationText, reworded] as [Error] {
+            XCTAssertEqual(NativeGenerationTerminalClassifier.reason(for: error), .failed, "\(error)")
+            XCTAssertFalse(
+                NativeGenerationTerminalClassifier.isRetryableAllocationFailure(error),
+                "\(error)"
+            )
+        }
+    }
+
+    func testTypedAllocationFailureSurvivesWrappingAndDrivesTheSingleRetry() {
+        let wrappedAllocation = NativeRuntimeError.wrapping(
+            VocelloQwen3RuntimeFailure.allocation,
+            stage: .upstreamModelLoad,
+            message: "The native runtime could not load model 'pro_custom'"
+        )
+        XCTAssertEqual(wrappedAllocation.underlyingDisposition, .allocationFailure)
+        XCTAssertTrue(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(wrappedAllocation))
+        XCTAssertEqual(NativeGenerationTerminalClassifier.reason(for: wrappedAllocation), .failed)
+        XCTAssertFalse(
+            NativeGenerationTerminalClassifier.shouldPublish(
+                error: wrappedAllocation,
+                policy: .deferRetryableAllocationFailure
+            )
+        )
+
+        // A non-allocation MLX error fails the take without the retry.
+        let mlxFailure = VocelloQwen3RuntimeFailure.mlx
+        XCTAssertFalse(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(mlxFailure))
+        XCTAssertEqual(NativeGenerationTerminalClassifier.reason(for: mlxFailure), .failed)
+        XCTAssertTrue(
+            NativeGenerationTerminalClassifier.shouldPublish(
+                error: mlxFailure,
+                policy: .deferRetryableAllocationFailure
+            )
+        )
+
+        // The surfaced error after the retry keeps the typed disposition too.
+        let surfaced = MLXTTSEngine.surfacedGenerationError(
+            VocelloQwen3RuntimeFailure.allocation,
+            allocationRetryAttempted: true
+        )
+        XCTAssertEqual(surfaced.underlyingDisposition, .allocationFailure)
+    }
+
+    func testMemoryPressureTerminalOutcomeMapsToTypedAllocationFailure() {
+        let allocation = GenerationOutputAdapter.productError(for: .failed(.memoryPressure))
+        XCTAssertEqual(allocation as? VocelloQwen3RuntimeFailure, .allocation)
+        XCTAssertTrue(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(allocation))
+
+        let runtime = GenerationOutputAdapter.productError(for: .failed(.runtime))
+        XCTAssertFalse(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(runtime))
+        XCTAssertEqual(NativeGenerationTerminalClassifier.reason(for: runtime), .failed)
+
+        let cancelled = GenerationOutputAdapter.productError(for: .cancelled(.superseded))
+        XCTAssertEqual(NativeGenerationTerminalClassifier.reason(for: cancelled), .cancelled)
     }
 
     func testStreamingPostLoopClassifiesCancellationBeforeEmptyOutput() {

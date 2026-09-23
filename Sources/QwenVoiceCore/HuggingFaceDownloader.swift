@@ -1024,7 +1024,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         /// Validates that the number of bytes written matches the temp file's size so a
         /// truncated or corrupted chunk doesn't silently leave a hole in the partial.
         func writeChunk(tempURL: URL, offset: Int64) throws {
-            guard let writeHandle else { return }
+            guard let writeHandle else {
+                throw DownloadError.chunkAssemblyFailed(
+                    path: tempURL.path,
+                    reason: "the partial file is not open"
+                )
+            }
             let attributes = try FileManager.default.attributesOfItem(atPath: tempURL.path)
             let expectedBytes = Int64(attributes[.size] as? Int64 ?? 0)
             try writeHandle.seek(toOffset: UInt64(offset))
@@ -1039,10 +1044,24 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             }
         }
 
-        func close() {
-            try? writeHandle?.synchronize()
-            try? writeHandle?.close()
+        /// Flushes and closes the partial. A failed flush is a terminal I/O
+        /// error (a full disk or a failing device), never retried and never
+        /// discarded: the partial's bytes are not known to be durable, so the
+        /// file must not be verified or published. The handle is closed and
+        /// released either way; closing twice is a no-op.
+        func close() throws {
+            guard let handle = writeHandle else { return }
             writeHandle = nil
+            var synchronizeError: Error?
+            do {
+                try handle.synchronize()
+            } catch {
+                synchronizeError = error
+            }
+            try? handle.close()
+            if let synchronizeError {
+                throw synchronizeError
+            }
         }
     }
 
@@ -2253,9 +2272,11 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                     relativePath: relativePath,
                     assembly: assembly
                 )
-                await assembly.close()
+                try await assembly.close()
             } catch {
-                await assembly.close()
+                // The transfer (or flush) error is the one to report; a flush
+                // failure while already failing adds nothing.
+                try? await assembly.close()
                 throw error
             }
         }
@@ -2452,8 +2473,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             throw DownloadError.cancelled
         }
 
-        try await assembly.writeChunk(tempURL: downloaded.url, offset: range.start)
-        try? fileManager.removeItem(at: downloaded.url)
+        try await Self.assembleDownloadedChunk(
+            tempURL: downloaded.url,
+            offset: range.start,
+            into: assembly,
+            fileManager: fileManager
+        )
         // Bytes are in the partial before the sidecar records them; a crash between
         // the two only re-fetches this range (idempotent rewrite).
         await assembly.recordCompleted(range: range)
@@ -2463,6 +2488,20 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             identity: ModelDownloadTaskIdentity.decode(taskDescription: task.taskDescription),
             transferredBytes: range.end - range.start + 1
         ))
+    }
+
+    /// Writes one downloaded range into the partial and removes the downloaded
+    /// temp chunk on every exit, including a throwing write (a full disk, a
+    /// short write or a closed partial), so a failed range never strands a
+    /// range-sized file in the temporary directory.
+    static func assembleDownloadedChunk(
+        tempURL: URL,
+        offset: Int64,
+        into assembly: ChunkAssemblyCoordinator,
+        fileManager: FileManager
+    ) async throws {
+        defer { try? fileManager.removeItem(at: tempURL) }
+        try await assembly.writeChunk(tempURL: tempURL, offset: offset)
     }
 
     /// Partition `[0, total)` into uniform `chunkSize` ranges, except the final
@@ -2677,7 +2716,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             let writeHandle = try FileHandle(forWritingTo: partialURL)
             defer { try? writeHandle.close() }
             try FileStreamIO.append(contentsOf: downloaded.url, to: writeHandle)
-            try? writeHandle.synchronize()
+            // A failed flush means the appended bytes are not known to be on
+            // disk: a terminal I/O error (not a network error, so not retried),
+            // never silently discarded.
+            try writeHandle.synchronize()
             return
         }
 

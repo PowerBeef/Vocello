@@ -391,9 +391,91 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
             try chunk.bytes.write(to: temp)
             try await assembly.writeChunk(tempURL: temp, offset: chunk.offset)
         }
-        await assembly.close()
+        try await assembly.close()
 
         XCTAssertEqual(try Data(contentsOf: partial), payload)
+    }
+
+    func testAssembledChunkTempFileIsRemovedAfterItsBytesLand() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("chunk-temp-cleanup-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let partial = root.appendingPathComponent("partial.bin")
+        let assembly = HuggingFaceDownloader.ChunkAssemblyCoordinator(partialURL: partial)
+        try await assembly.open()
+        let temp = root.appendingPathComponent("chunk.tmp")
+        try Data("WXYZ".utf8).write(to: temp)
+
+        try await HuggingFaceDownloader.assembleDownloadedChunk(
+            tempURL: temp,
+            offset: 2,
+            into: assembly,
+            fileManager: .default
+        )
+        try await assembly.close()
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: temp.path))
+        XCTAssertEqual(try Data(contentsOf: partial), Data([0, 0]) + Data("WXYZ".utf8))
+    }
+
+    func testAssembledChunkTempFileIsRemovedWhenTheWriteThrows() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("chunk-temp-failure-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let partial = root.appendingPathComponent("partial.bin")
+        let assembly = HuggingFaceDownloader.ChunkAssemblyCoordinator(partialURL: partial)
+        try await assembly.open()
+        // A closed partial rejects the write, standing in for a full disk or a
+        // short write: the chunk must fail loudly and its temp file must not leak.
+        try await assembly.close()
+        try await assembly.close()
+        let temp = root.appendingPathComponent("chunk.tmp")
+        try Data(repeating: 9, count: 32).write(to: temp)
+
+        do {
+            try await HuggingFaceDownloader.assembleDownloadedChunk(
+                tempURL: temp,
+                offset: 0,
+                into: assembly,
+                fileManager: .default
+            )
+            XCTFail("writing into a closed partial must throw")
+        } catch let error as HuggingFaceDownloader.DownloadError {
+            guard case .chunkAssemblyFailed = error else {
+                return XCTFail("unexpected download error: \(error)")
+            }
+        }
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: temp.path))
+        XCTAssertEqual(try Data(contentsOf: partial), Data())
+    }
+
+    func testFlushFailureIsATerminalIOErrorNotRetried() {
+        // A failed synchronize() on the resume-append or chunk-assembly close path
+        // now propagates its POSIX/Cocoa error; the retry policy treats it as
+        // terminal instead of re-fetching the file.
+        let flushFailure = NSError(domain: NSPOSIXErrorDomain, code: Int(EIO))
+        XCTAssertEqual(
+            ModelDownloadRetryPolicy.disposition(
+                error: flushFailure,
+                retryNumber: 1,
+                integrityRetryAlreadyUsed: false
+            ),
+            .fail
+        )
+        let diskFull = CocoaError(.fileWriteOutOfSpace)
+        XCTAssertEqual(
+            ModelDownloadRetryPolicy.disposition(
+                error: diskFull,
+                retryNumber: 1,
+                integrityRetryAlreadyUsed: false
+            ),
+            .fail
+        )
     }
 
     // MARK: - Range-qualified task identity (schema v2, iOS background chunking)
@@ -567,7 +649,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         try Data(repeating: 7, count: 16).write(to: temp)
         try await assembly.writeChunk(tempURL: temp, offset: 16)
         await assembly.recordCompleted(range: ChunkRange(start: 16, end: 31))
-        await assembly.close()
+        try await assembly.close()
 
         // The recovered record merges the pre-existing and newly recorded ranges, so a
         // relaunch re-fetches only the genuinely missing bytes.

@@ -61,6 +61,10 @@ struct NativeRuntimeError: LocalizedError, Sendable {
     let stage: NativeRuntimeStage
     let message: String
     let underlyingDescription: String?
+    /// Typed disposition of the wrapped error, captured when the error is
+    /// wrapped so terminal and allocation-retry decisions never read the
+    /// wrapped error's text.
+    let underlyingDisposition: NativeGenerationErrorDisposition
     let failureCode: NativeRuntimeFailureCode
     let diagnosticDetail: String?
 
@@ -74,6 +78,9 @@ struct NativeRuntimeError: LocalizedError, Sendable {
         self.stage = stage
         self.message = message
         self.underlyingDescription = underlying.map { String(reflecting: $0) }
+        self.underlyingDisposition = underlying.map(
+            NativeGenerationTerminalClassifier.disposition(of:)
+        ) ?? .failure
         self.failureCode = failureCode
         self.diagnosticDetail = diagnosticDetail
     }
@@ -129,43 +136,68 @@ enum NativeTelemetryTerminalPolicy: Sendable {
     case deferRetryableAllocationFailure
 }
 
+/// How a generation error ends the take, decided from the error's type only.
+enum NativeGenerationErrorDisposition: Sendable, Equatable {
+    /// A typed cancellation: the take emits `.cancelled`, never `.failed`.
+    case cancellation
+    /// MLX or Metal could not allocate memory; eligible for the single
+    /// allocation retry.
+    case allocationFailure
+    /// Any other failure.
+    case failure
+}
+
+/// Typed terminal classification for generation errors. Every decision reads
+/// the error's type (or the typed disposition a `NativeRuntimeError` captured
+/// when it wrapped one), never its message, so rewording an error can neither
+/// turn a failure into a cancellation nor trigger or suppress the allocation
+/// retry.
 enum NativeGenerationTerminalClassifier {
-    static func reason(for error: Error) -> GenerationTerminalReason {
-        if error is CancellationError { return .cancelled }
-        let description = [error.localizedDescription, String(reflecting: error)]
-            .joined(separator: "\n")
-            .lowercased()
-        if description.contains("cancellationerror")
-            || description.contains("cancelled")
-            || description.contains("canceled") {
-            return .cancelled
+    static func disposition(of error: Error) -> NativeGenerationErrorDisposition {
+        if error is CancellationError {
+            return .cancellation
         }
-        return .failed
+        if let runtimeError = error as? NativeRuntimeError {
+            return runtimeError.underlyingDisposition
+        }
+        if let runtimeFailure = error as? VocelloQwen3RuntimeFailure {
+            switch runtimeFailure {
+            case .allocation:
+                return .allocationFailure
+            case .mlx:
+                return .failure
+            }
+        }
+        if let sessionError = error as? VocelloQwen3SessionError,
+           case .audioChannelCancelled = sessionError {
+            return .cancellation
+        }
+        if let preparationError = error as? AudioPreparationError,
+           case .cancelled = preparationError {
+            return .cancellation
+        }
+        if let downloadError = error as? HuggingFaceDownloader.DownloadError,
+           case .cancelled = downloadError {
+            return .cancellation
+        }
+        if let remoteError = error as? RemoteErrorPayload, remoteError.code == .cancelled {
+            return .cancellation
+        }
+        if let urlError = error as? URLError, urlError.code == .cancelled {
+            return .cancellation
+        }
+        if let cocoaError = error as? CocoaError, cocoaError.code == .userCancelled {
+            return .cancellation
+        }
+        return .failure
+    }
+
+    static func reason(for error: Error) -> GenerationTerminalReason {
+        disposition(of: error) == .cancellation ? .cancelled : .failed
     }
 
     static func isRetryableAllocationFailure(_ error: Error) -> Bool {
-        guard reason(for: error) != .cancelled else { return false }
-        let lowercased = [
-            error.localizedDescription,
-            String(reflecting: error),
-        ]
-            .joined(separator: "\n")
-            .lowercased()
-
-        if lowercased.contains("out of memory")
-            || lowercased.contains("resource exhausted")
-            || lowercased.contains("failed to allocate") {
-            return true
-        }
-
-        let allocationLike = lowercased.contains("allocation")
-            || lowercased.contains("allocate")
-            || lowercased.contains("memory")
-        let mlxOrMetal = lowercased.contains("mlx")
-            || lowercased.contains("metal")
-            || lowercased.contains("mps")
-            || lowercased.contains("gpu")
-        return allocationLike && mlxOrMetal
+        disposition(of: error) == .allocationFailure
     }
 
     static func shouldPublish(

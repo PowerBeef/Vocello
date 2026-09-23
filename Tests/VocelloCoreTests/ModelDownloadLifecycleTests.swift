@@ -1251,7 +1251,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
 
         await delivery.downloader.cancel()
         do {
-            try await transfer.value
+            _ = try await transfer.value
             XCTFail("a cancelled delivery must not complete")
         } catch let error as HuggingFaceDownloader.DownloadError {
             guard case .cancelled = error else { return XCTFail("unexpected error: \(error)") }

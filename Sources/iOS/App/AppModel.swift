@@ -189,7 +189,8 @@ final class AppModel {
     /// What the Studio owns right now, for `IOSBackgroundGenerationPolicy`.
     var activeStudioWork: IOSBackgroundGenerationWork {
         if runningStudioCoordinator != nil {
-            return longForm.isProcessing ? .longForm : .singleTake
+            guard longForm.isProcessing else { return .singleTake }
+            return longForm.isRegeneratingSegment ? .segmentRegeneration : .longForm
         }
         if longForm.isProcessing || studioCoordinators.contains(where: { $0.isGenerating }) {
             return .cancelling
@@ -198,39 +199,39 @@ final class AppModel {
     }
 
     /// Cancels the running Studio attempt through its typed barrier (the same
-    /// path as the Stop button, with `reason`) and records the notice shown once
-    /// the user is back. A single take is discarded; a long-form project keeps
-    /// its completed segments for Resume.
-    @discardableResult
+    /// path as the Stop button, with `reason`), records the notice shown once
+    /// the user is back, and returns after the barrier has made the attempt
+    /// terminal. A single take is discarded; a long-form project keeps its
+    /// completed segments for Resume. Returns `false` when no attempt accepted it.
     func interruptStudioGeneration(
         _ interruption: IOSBackgroundInterruption,
         reason: GenerationCancellationReason,
         ttsEngine: TTSEngineStore,
         audioPlayer: AudioPlayerViewModel
-    ) -> Bool {
+    ) async -> Bool {
         guard let studioCoordinator = runningStudioCoordinator else { return false }
-        switch interruption {
-        case .longFormStopped:
-            guard longForm.cancel(
+        // Route by what is running, not by the notice: a segment regeneration is
+        // a long-form operation but is announced as a discarded take.
+        let barrier: Task<Void, Never>?
+        if longForm.isProcessing {
+            barrier = longForm.startCancellation(
                 ttsEngine: ttsEngine,
                 audioPlayer: audioPlayer,
                 studioCoordinator: studioCoordinator,
                 reason: reason
-            ) else { return false }
-            studioCoordinator.recordBackgroundInterruption(interruption)
-            return true
-        case .singleTakeDiscarded:
-            IOSStudioGenerationActions.cancelGeneration(
+            )
+        } else {
+            barrier = IOSStudioGenerationActions.startCancellation(
                 coordinator: studioCoordinator,
                 ttsEngine: ttsEngine,
                 audioPlayer: audioPlayer,
                 reason: reason
             )
-            // The request moved the attempt to its cancellation barrier.
-            guard !studioCoordinator.isAttemptRunning else { return false }
-            studioCoordinator.recordBackgroundInterruption(interruption)
-            return true
         }
+        guard let barrier else { return false }
+        studioCoordinator.recordBackgroundInterruption(interruption)
+        await barrier.value
+        return true
     }
 
     /// The scene is active again: surface every recorded foreground-exit notice.

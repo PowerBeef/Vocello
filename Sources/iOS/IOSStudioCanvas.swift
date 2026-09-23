@@ -432,7 +432,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                 Text(verbatim: backgroundNotice ?? "")
                     .font(.caption)
                     .foregroundStyle(Theme.Text.primary)
-                    .lineLimit(3)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
 

@@ -110,12 +110,22 @@ final class StudioGenerationCoordinator {
 
     /// Requests cancellation and returns the token owned by the engine barrier.
     /// The coordinator deliberately remains nonterminal until that barrier reports.
+    /// Pass `cancelsTask: false` when a typed non-user reason must reach the
+    /// engine barrier before the Swift task is cancelled (`IOSStudioCancellationOrder`);
+    /// the caller then calls `cancelGenerationTask()` once the barrier returns.
     @discardableResult
-    func requestCancellation() -> StudioGenerationAttemptToken? {
+    func requestCancellation(cancelsTask: Bool = true) -> StudioGenerationAttemptToken? {
         guard let attempt = attemptAuthority.currentToken,
               attemptAuthority.requestCancellation(attempt) else { return nil }
-        generationTask?.cancel()
+        if cancelsTask {
+            generationTask?.cancel()
+        }
         return attempt
+    }
+
+    /// Cancels the retained Swift generation task (see `requestCancellation(cancelsTask:)`).
+    func cancelGenerationTask() {
+        generationTask?.cancel()
     }
 
     /// Marks a normally finishing in-flight attempt as terminal. Generation task

@@ -99,8 +99,14 @@ struct QVoiceiOSApp: App {
                             }
                             .onReceive(engine.$hasActiveGeneration) { hasActiveGeneration in
                                 guard !hasActiveGeneration else { return }
-                                executeDeferredMemoryPressureReliefIfNeeded()
-                                executeDeferredRuntimeReleaseIfNeeded()
+                                // `@Published` emits before the property is written, so
+                                // pass the emitted value instead of re-reading the store.
+                                executeDeferredMemoryPressureReliefIfNeeded(
+                                    hasActiveGeneration: hasActiveGeneration
+                                )
+                                executeDeferredRuntimeReleaseIfNeeded(
+                                    hasActiveGeneration: hasActiveGeneration
+                                )
                             }
                             .onReceive(NotificationCenter.default.publisher(for: .ttsEngineMemoryContextDidChange)) { _ in
                                 if engine.currentMemoryContext().pressureBand == .critical {
@@ -173,13 +179,14 @@ struct QVoiceiOSApp: App {
                     await engine.refreshMemoryContext(reason: "scene_active", source: "app")
                 }
             }
-            // PA-15: the user is back, so a release still deferred for the
-            // foreground exit must never fire, and background time is no
-            // longer needed. Tell the user what the exit stopped.
+            // PA-15: the user is back, so an in-flight foreground exit never
+            // requests its release, a release still deferred for it must never
+            // fire, and background time is no longer needed. Tell the user what
+            // the exit stopped.
+            backgroundGeneration.returnToForeground()
             runtimeReleaseCoordinator.cancelPendingRelease(
                 reason: IOSBackgroundGenerationPolicy.releaseReason
             )
-            backgroundGeneration.endBackgroundTime()
             backgroundGeneration.presentNoticesOnReturn()
             executeDeferredMemoryPressureReliefIfNeeded()
             executeDeferredRuntimeReleaseIfNeeded()
@@ -197,40 +204,51 @@ struct QVoiceiOSApp: App {
     }
 
     /// PA-15: iOS refuses GPU work once the app is suspended, so an active
-    /// generation is cancelled before that happens. Ordered: request background
-    /// time, cancel through the typed barrier (`.shutdown`; a single take is
-    /// discarded, a long-form project keeps its completed segments), then
-    /// request the runtime release. With a generation still active the release
-    /// defers and runs from the `hasActiveGeneration` sink once the barrier has
-    /// returned; background time ends when that release completes or expires.
+    /// generation is cancelled before that happens. Ordered: open the exit and
+    /// request background time, cancel through the typed barrier (`.shutdown`;
+    /// a single take is discarded, a long-form project keeps its completed
+    /// segments), await that barrier, then request the runtime release
+    /// explicitly, unless the user came back meanwhile. Background time ends
+    /// when the last release of the exit completes, on return, or on expiry.
     private func handleForegroundExit() {
         let plan = IOSBackgroundGenerationPolicy.backgroundPlan(
             hasActiveGeneration: deps.engine?.hasActiveGeneration ?? false,
             studioWork: backgroundGeneration.studioWork
         )
-        if plan.requestsBackgroundTime {
-            backgroundGeneration.beginBackgroundTime()
+        let exitEpoch = backgroundGeneration.beginForegroundExit(
+            requestsBackgroundTime: plan.requestsBackgroundTime
+        )
+        guard let engine = deps.engine else {
+            _ = backgroundGeneration.foregroundExitBarrierReturned(exitEpoch)
+            return
         }
-        if let engine = deps.engine {
+        Task { @MainActor in
+            var studioCancelled = false
             if let interruption = plan.studioInterruption {
-                backgroundGeneration.interruptStudio(
+                studioCancelled = await backgroundGeneration.interruptStudio(
                     interruption,
                     reason: plan.cancellationReason,
                     ttsEngine: engine,
                     audioPlayer: audioPlayer
                 )
-            } else if plan.cancelsUnownedEngineGeneration {
-                let reason = plan.cancellationReason
-                Task { @MainActor in
-                    do {
-                        try await engine.cancelActiveGeneration(reason: reason)
-                    } catch {
-                        engine.clearVisibleError()
-                    }
+            }
+            // Engine work no Studio attempt owns, or a Studio attempt that did
+            // not accept the cancellation, still has to stop before suspension.
+            let needsEngineCancellation = plan.cancelsUnownedEngineGeneration
+                || (plan.studioInterruption != nil && !studioCancelled)
+            if needsEngineCancellation, engine.hasActiveGeneration {
+                do {
+                    try await engine.cancelActiveGeneration(reason: plan.cancellationReason)
+                } catch {
+                    engine.clearVisibleError()
                 }
             }
+            guard backgroundGeneration.foregroundExitBarrierReturned(exitEpoch) else { return }
+            releaseRuntime(
+                reason: plan.releaseReason,
+                hasActiveGeneration: engine.hasActiveGeneration
+            )
         }
-        releaseRuntime(reason: plan.releaseReason)
     }
 
     private func setPlaybackSessionActive(_ active: Bool) {
@@ -249,10 +267,10 @@ struct QVoiceiOSApp: App {
         }
     }
 
-    private func releaseRuntime(reason: String) {
+    private func releaseRuntime(reason: String, hasActiveGeneration: Bool) {
         let action = runtimeReleaseCoordinator.requestRelease(
             reason: reason,
-            hasActiveGeneration: deps.engine?.hasActiveGeneration ?? false
+            hasActiveGeneration: hasActiveGeneration
         )
 
         switch action {
@@ -265,9 +283,9 @@ struct QVoiceiOSApp: App {
         }
     }
 
-    private func executeDeferredRuntimeReleaseIfNeeded() {
+    private func executeDeferredRuntimeReleaseIfNeeded(hasActiveGeneration: Bool? = nil) {
         let action = runtimeReleaseCoordinator.executeDeferredReleaseIfReady(
-            hasActiveGeneration: deps.engine?.hasActiveGeneration ?? false
+            hasActiveGeneration: hasActiveGeneration ?? deps.engine?.hasActiveGeneration ?? false
         )
 
         guard case .execute(let reason, let wasDeferred) = action else {
@@ -309,9 +327,9 @@ struct QVoiceiOSApp: App {
         }
     }
 
-    private func executeDeferredMemoryPressureReliefIfNeeded() {
+    private func executeDeferredMemoryPressureReliefIfNeeded(hasActiveGeneration: Bool? = nil) {
         let action = runtimeReleaseCoordinator.executeDeferredCacheReliefIfReady(
-            hasActiveGeneration: deps.engine?.hasActiveGeneration ?? false
+            hasActiveGeneration: hasActiveGeneration ?? deps.engine?.hasActiveGeneration ?? false
         )
 
         guard case .execute(let reason, _) = action else {
@@ -403,9 +421,17 @@ struct QVoiceiOSApp: App {
                 let followUpAction = runtimeReleaseCoordinator.completeRelease(
                     hasActiveGeneration: engine.hasActiveGeneration
                 )
+                var followUpReleaseExecutes = false
                 if case .execute(let nextReason, let nextWasDeferred) = followUpAction {
+                    followUpReleaseExecutes = true
                     performRuntimeRelease(reason: nextReason, wasDeferred: nextWasDeferred)
                 }
+                // Only the last release of the foreground exit ends its grant;
+                // an earlier release must not end a newer one.
+                backgroundGeneration.runtimeReleaseCompleted(
+                    followUpReleaseExecutes: followUpReleaseExecutes,
+                    pendingReleaseReason: runtimeReleaseCoordinator.pendingReason
+                )
             }
 
             await engine.cancelClonePreparationIfNeeded()
@@ -425,9 +451,6 @@ struct QVoiceiOSApp: App {
             engine.clearGenerationActivity()
             if TelemetryGate.resolvedEnabled {
                 print("[QVoiceiOSApp] Released runtime due to \(reason)")
-            }
-            if reason == IOSBackgroundGenerationPolicy.releaseReason {
-                backgroundGeneration.endBackgroundTime()
             }
         }
     }

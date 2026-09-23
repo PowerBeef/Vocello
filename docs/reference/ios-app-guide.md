@@ -182,12 +182,15 @@ cancellation barrier returns; a barrier failure is shown to the user, and a repe
 start a second barrier for the same attempt.
 
 Leaving the foreground (PA-15) cannot keep generating, because iOS refuses GPU work from a suspended
-app. On `.background` the app requests finite background time, cancels the running Studio attempt
-through the same barrier with the typed `shutdown` reason (a single take is discarded and never
-reaches History; a long-form project keeps its completed segments for Resume project), and then
-requests the runtime release, which defers until the barrier returns. Returning to `.active` drops
-a still-deferred background release and shows the notice above. The screen stays awake while a
-generation or long-form run is active. The decisions live in `IOSBackgroundGenerationPolicy`.
+app. On `.background` the app requests finite background time and cancels the running Studio attempt
+through the same barrier with the typed `shutdown` reason (a single take, or a segment regeneration,
+is discarded and never reaches History; a long-form project keeps its completed segments for Resume
+project). A non-user reason reaches the engine barrier before the Swift task is cancelled, so the
+engine records `shutdown` rather than `user`. Once the barrier returns, and only while the app is
+still in the background, the runtime release is requested explicitly; the grant ends when the last
+release of that exit completes, on return or on expiry. Returning to `.active` drops a still-deferred
+background release and shows the notice above. The screen stays awake while a generation or
+long-form run is active. The decisions live in `IOSBackgroundGenerationPolicy`.
 
 Short-form Built-in, Design, and Clone takes share one execution boundary in
 `IOSSingleTakeGenerationExecutor`. Views construct the exact mode request and perform any

@@ -264,6 +264,9 @@ final class IOSLongFormCoordinator {
     }
 
     private(set) var isProcessing = false
+    /// True while the running operation regenerates one segment of a completed
+    /// project (cancelling it keeps the completed project; there is no Resume).
+    private(set) var isRegeneratingSegment = false
     private(set) var progress = IOSLongFormProgressSnapshot()
     private(set) var segments: [IOSLongFormSegmentState] = []
     private(set) var outcome: IOSLongFormOutcome?
@@ -356,6 +359,7 @@ final class IOSLongFormCoordinator {
         #endif
         let acceptedOutcome = outcome
         isProcessing = true
+        isRegeneratingSegment = true
         // A new operation owns a new cancellation token. An asynchronously
         // scheduled reset could otherwise erase an immediately requested cancel.
         cancellationState = IOSLongFormCancellationState()
@@ -385,6 +389,7 @@ final class IOSLongFormCoordinator {
                 studioAttempt: attempt
             )
             self.isProcessing = false
+            self.isRegeneratingSegment = false
             self.runTask = nil
             self.replacements = result.replacements
             if case .completed = result.outcome {
@@ -416,23 +421,48 @@ final class IOSLongFormCoordinator {
         studioCoordinator: StudioGenerationCoordinator,
         reason: GenerationCancellationReason = .user
     ) -> Bool {
-        guard isProcessing else { return false }
-        guard let attempt = studioCoordinator.requestCancellation() else { return false }
+        startCancellation(
+            ttsEngine: ttsEngine,
+            audioPlayer: audioPlayer,
+            studioCoordinator: studioCoordinator,
+            reason: reason
+        ) != nil
+    }
+
+    /// Starts the cancellation and returns its barrier task, which finishes once
+    /// the attempt is terminal; `nil` when it was not accepted. A typed non-user
+    /// reason reaches the engine barrier before the run task is cancelled
+    /// (`IOSStudioCancellationOrder`), so the engine records that reason.
+    func startCancellation(
+        ttsEngine: TTSEngineStore,
+        audioPlayer: AudioPlayerViewModel,
+        studioCoordinator: StudioGenerationCoordinator,
+        reason: GenerationCancellationReason
+    ) -> Task<Void, Never>? {
+        guard isProcessing else { return nil }
+        let order = IOSStudioCancellationOrder.forReason(reason)
+        guard let attempt = studioCoordinator.requestCancellation(
+            cancelsTask: order == .taskThenBarrier
+        ) else { return nil }
         let state = cancellationState
-        runTask?.cancel()
+        let runTask = self.runTask
+        if order == .taskThenBarrier {
+            runTask?.cancel()
+        }
         audioPlayer.abortLivePreviewIfNeeded()
-        Task {
+        return Task {
             await state.request()
             do {
                 try await ttsEngine.cancelActiveGeneration(reason: reason)
+                runTask?.cancel()
                 studioCoordinator.completeCancellation(attempt: attempt)
             } catch {
+                runTask?.cancel()
                 if studioCoordinator.failCancellation(error, attempt: attempt) {
                     hooks.notifyWarning()
                 }
             }
         }
-        return true
     }
 
     private func begin(
@@ -454,6 +484,7 @@ final class IOSLongFormCoordinator {
         lastMode = request.mode
         outcome = nil
         isProcessing = true
+        isRegeneratingSegment = false
         cancellationState = IOSLongFormCancellationState()
         let runner = IOSLongFormProjectRunner(
             ttsEngine: ttsEngine,

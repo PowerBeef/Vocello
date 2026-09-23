@@ -14,6 +14,9 @@ enum IOSBackgroundGenerationWork: Equatable, Sendable {
     case singleTake
     /// A long-form project is running; cancelling keeps its completed segments for Resume.
     case longForm
+    /// One segment of a completed long-form project is being regenerated;
+    /// cancelling discards the new take and keeps the completed project as it was.
+    case segmentRegeneration
     /// A Studio cancellation barrier is already pending; it only has to finish.
     case cancelling
 }
@@ -26,8 +29,8 @@ enum IOSBackgroundInterruption: Equatable, Sendable {
 
 /// The ordered foreground-exit sequence for one `.background` transition:
 /// request finite background time, cancel through the typed barrier with the
-/// shutdown reason, then run the (deferred) runtime release, which executes
-/// only after the barrier has returned.
+/// shutdown reason, and request the runtime release only after that barrier
+/// has returned (see `IOSForegroundExitState`).
 struct IOSBackgroundTransitionPlan: Equatable, Sendable {
     /// Ask the system for background time so the barrier and release can
     /// finish before suspension. Ended when the release completes or expires.
@@ -56,7 +59,7 @@ enum IOSBackgroundGenerationPolicy {
     ) -> IOSBackgroundTransitionPlan {
         let studioInterruption: IOSBackgroundInterruption?
         switch studioWork {
-        case .singleTake:
+        case .singleTake, .segmentRegeneration:
             studioInterruption = .singleTakeDiscarded
         case .longForm:
             studioInterruption = .longFormStopped
@@ -70,6 +73,71 @@ enum IOSBackgroundGenerationPolicy {
             cancellationReason: cancellationReason,
             releaseReason: releaseReason
         )
+    }
+}
+
+/// Order of the two halves of a Studio cancellation.
+///
+/// The engine keeps the first typed reason it receives, and cancelling the
+/// Swift task that awaits the engine reports `.user` from its cancellation
+/// handler. A non-user reason (the foreground exit's `.shutdown`) therefore
+/// goes through the engine barrier first; the Swift task is cancelled once the
+/// barrier returns, which still stops work that had not reached the engine.
+enum IOSStudioCancellationOrder: Equatable, Sendable {
+    /// User Stop: cancel the Swift task immediately, then await the barrier.
+    case taskThenBarrier
+    /// Typed non-user reason: await the barrier, then cancel the Swift task.
+    case barrierThenTask
+
+    static func forReason(_ reason: GenerationCancellationReason) -> IOSStudioCancellationOrder {
+        reason == .user ? .taskThenBarrier : .barrierThenTask
+    }
+}
+
+/// Sequencing of one foreground exit and its background-time grant.
+///
+/// Each `.background` transition opens an exit epoch. The runtime release is
+/// requested only after that exit's cancellation barrier returned while the app
+/// is still in the background, and the grant ends only when no exit is still
+/// waiting on its barrier and no release is running, queued or pending for the
+/// foreground exit, so an earlier release can never end a newer grant.
+struct IOSForegroundExitState: Equatable, Sendable {
+    private(set) var epoch: UInt64 = 0
+    private(set) var isBackgrounded = false
+    /// The current exit's barrier has not returned, so its release is not requested yet.
+    private(set) var awaitsBarrier = false
+
+    /// Starts an exit and returns its epoch.
+    mutating func enterBackground() -> UInt64 {
+        epoch &+= 1
+        isBackgrounded = true
+        awaitsBarrier = true
+        return epoch
+    }
+
+    /// The exit's cancellation barrier returned. `true` when the release must be
+    /// requested now; `false` when the user came back (or a newer exit began).
+    mutating func barrierReturned(for exitEpoch: UInt64) -> Bool {
+        guard isBackgrounded, exitEpoch == epoch else { return false }
+        awaitsBarrier = false
+        return true
+    }
+
+    /// The scene is active again; any in-flight exit is superseded.
+    mutating func returnToForeground() {
+        epoch &+= 1
+        isBackgrounded = false
+        awaitsBarrier = false
+    }
+
+    /// A runtime release finished. `true` when the background-time grant may end.
+    func endsBackgroundTime(
+        followUpReleaseExecutes: Bool,
+        pendingReleaseReason: String?
+    ) -> Bool {
+        !awaitsBarrier
+            && !followUpReleaseExecutes
+            && pendingReleaseReason != IOSBackgroundGenerationPolicy.releaseReason
     }
 }
 

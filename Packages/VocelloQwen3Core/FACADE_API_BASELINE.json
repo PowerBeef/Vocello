@@ -422,7 +422,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",
-      "sha256": "56ef98718d74b7af773d5a0514a8f61c22d60c2b95d556b833aec5092843518e"
+      "sha256": "bc6989fec29025d8e732b9995b0891cd80f72e5921c99fe8f61cae78cf3ce142"
     },
     {
       "path": "Sources/VocelloQwen3Core/GenerationSession.swift",

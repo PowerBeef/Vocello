@@ -472,6 +472,10 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         XCTAssertTrue(VocelloUIWait.exists(element("history_noMatchesState"), timeout: 30))
         XCTAssertEqual(historyRows().count, 0,
                        "A take cancelled by leaving the foreground must never reach History")
+        // The search keyboard covers the tab dock that session teardown uses.
+        replaceHistorySearch(with: "")
+        dismissHistorySearchKeyboardIfNeeded()
+        select(tab: .studio)
     }
 
     /// Maintenance on the paired iPhone, on explicit request only

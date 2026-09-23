@@ -47,10 +47,20 @@ def _git(*args: str) -> bytes:
     return completed.stdout
 
 
-def changed_paths() -> list[str]:
+# `check --since REF` exports this so the contract gate's Python selection (a
+# child process) plans for the same committed-plus-dirty path set.
+SINCE_ENV = "QVOICE_CHANGED_SINCE"
+
+
+def changed_paths(since: str | None = None) -> list[str]:
+    """Dirty paths, plus every path changed between `since` (or $QVOICE_CHANGED_SINCE) and HEAD."""
+    since = since or os.environ.get(SINCE_ENV) or None
+    queries = [("diff", "--name-only", "-z"), ("diff", "--cached", "--name-only", "-z"),
+               ("ls-files", "--others", "--exclude-standard", "-z")]
+    if since:
+        queries.append(("diff", "--name-only", "-z", f"{since}...HEAD"))
     paths: set[str] = set()
-    for args in (("diff", "--name-only", "-z"), ("diff", "--cached", "--name-only", "-z"),
-                 ("ls-files", "--others", "--exclude-standard", "-z")):
+    for args in queries:
         paths.update(part.decode("utf-8", errors="surrogateescape") for part in _git(*args).split(b"\0") if part)
     return sorted(paths)
 
@@ -135,8 +145,9 @@ def changed_swift_test_classes(paths: list[str]) -> list[str]:
 
 def lint_commands(paths: list[str]) -> list[list[str]]:
     commands: list[list[str]] = [["git", "diff", "--check"]]
-    if paths:
-        commands.append(["python3", "scripts/privacy_scan.py", "--paths", *paths])
+    present = [p for p in paths if (ROOT / p).exists()]  # a committed range can include deletions
+    if present:
+        commands.append(["python3", "scripts/privacy_scan.py", "--paths", *present])
     shell = [p for p in paths if p.endswith(".sh") and (ROOT / p).is_file()]
     if shell and _which("shellcheck"):
         commands.append(["shellcheck", "-x", "-S", "warning", *shell])
@@ -277,6 +288,9 @@ def main(argv: list[str] | None = None) -> int:
     check = sub.add_parser("check", help="lint, contracts, selected tests and the native lanes the dirty tree touches")
     check.add_argument("--dry-run", action="store_true", help="print the commands without running them")
     check.add_argument("--paths", nargs="+", help="plan for these paths instead of the dirty tree")
+    check.add_argument("--since", metavar="REF",
+                       help="also plan for everything committed since REF (for example origin/main): "
+                            "verifies an unpushed batch after its commits leave the tree clean")
     sub.add_parser("lint", help="git diff --check, privacy scan, shellcheck on changed shell")
     sub.add_parser("contracts", help="product and repository contracts (check_project_inputs.sh --local)")
     py = sub.add_parser("py", help="Python tests: changed consumers (default), --all, --lane, or explicit modules")
@@ -299,7 +313,10 @@ def main(argv: list[str] | None = None) -> int:
         if command == "status":
             print_status()
         elif command == "check":
-            plan = check_plan(args.paths or changed_paths())
+            if args.since:
+                _git("rev-parse", "--verify", "--quiet", f"{args.since}^{{commit}}")
+                os.environ[SINCE_ENV] = args.since
+            plan = check_plan(args.paths or changed_paths(args.since))
             if args.dry_run:
                 lanes = ", ".join(k for k, v in plan["lanes"].items() if v) or "none"
                 print(f"Changed paths: {len(plan['changedPaths'])}; lanes: {lanes}")

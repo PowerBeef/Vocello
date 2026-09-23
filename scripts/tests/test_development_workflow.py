@@ -149,6 +149,26 @@ class CommandRunnerTests(unittest.TestCase):
             self.assertIn(expected, joined)
         self.assertNotIn("checkpoint", " ".join(joined))
 
+    def test_since_adds_committed_paths_and_reaches_child_selection(self) -> None:
+        # A batch verified after its commits: the tree is clean, but `--since`
+        # still plans for what the unpushed commits changed.
+        responses = {
+            ("diff", "--name-only", "-z"): b"",
+            ("diff", "--cached", "--name-only", "-z"): b"",
+            ("ls-files", "--others", "--exclude-standard", "-z"): b"",
+            ("diff", "--name-only", "-z", "base...HEAD"): b"Sources/iOS/A.swift\0scripts/roadmap.py\0",
+        }
+        environment = {k: v for k, v in MODULE.os.environ.items() if k != MODULE.SINCE_ENV}
+        with mock.patch.object(MODULE, "_git", side_effect=lambda *args: responses[args]), \
+                mock.patch.dict(MODULE.os.environ, environment, clear=True):
+            self.assertEqual(MODULE.changed_paths(), [])
+            self.assertEqual(MODULE.changed_paths("base"), ["Sources/iOS/A.swift", "scripts/roadmap.py"])
+            with mock.patch.dict(MODULE.os.environ, {MODULE.SINCE_ENV: "base"}):
+                self.assertEqual(MODULE.changed_paths(), ["Sources/iOS/A.swift", "scripts/roadmap.py"])
+        plan = MODULE.check_plan(["Sources/iOS/A.swift", "Sources/iOS/Deleted.swift"])
+        privacy = [c for c in plan["commands"] if "privacy_scan.py" in " ".join(c)]
+        self.assertTrue(all("Sources/iOS/Deleted.swift" not in c for c in privacy))
+
     def test_dry_run_prints_the_plan_without_running(self) -> None:
         buffer = io.StringIO()
         with mock.patch.object(MODULE, "run_commands") as run, redirect_stdout(buffer):

@@ -3615,6 +3615,44 @@
         "run:35806533959",
         "file:scripts/tests/test_native_lock.py"
       ]
+    },
+    {
+      "id": "PA-12",
+      "title": "macOS settings and file actions do what they say",
+      "status": "done",
+      "gate": "Prefer lower-memory models changes the default variant for every mode without overriding explicit choices; Save As never deletes its own source and never removes an existing destination on a failed copy; the script editors expose an accessibility label.",
+      "sourceOfTruth": [
+        "Sources/Views/Settings/MacSettingsScreen.swift",
+        "Sources/Views/History/MacHistoryFileActions.swift",
+        "Sources/Views/Primitives/MacScriptTextEditor.swift"
+      ],
+      "notes": "Closed 2026-09-22 (external audit MAC-02, MAC-03, MAC-08). MAC-08 editor labels and MAC-03 safe Save As (MacFileSaveCopy) landed earlier; MAC-02: a pure MacModelVariantResolution in Sources/Services orders each mode's variant as explicit choice, then Speed when Prefer lower-memory models is on, then the hardware recommendation; turning the preference on clears stored per-mode choices so it takes effect; a fallback is persisted only when it replaces a known but uninstalled explicit choice; the dead SidebarItem.requiredModel path is gone (MacModelVariantResolutionTests). Open follow-up: the recommended badges and recommended-setup downloads still follow only the hardware recommendation.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22",
+      "evidence": [
+        "commit:ce093bb4",
+        "file:Tests/VocelloCoreTests/MacModelVariantResolutionTests.swift"
+      ]
+    },
+    {
+      "id": "F-25",
+      "plan": "engineering-review-remediation-2026-08",
+      "title": "P1 — a busy Saved Voice store must not be fatal to engine initialization",
+      "status": "done",
+      "gate": "Engine initialization (Sources/QwenVoiceCore/MLXTTSEngine.swift:703 awaits reconcile() with no retry) treats PreparedVoiceRepository.storeBusy from the F-22 flock as a fatal, untyped failure: the typed error is flattened to generationFailed(text) at MLXTTSEngine.swift:1746-1751, no production caller handles .storeBusy (Sources/ViewModels/SavedVoicesViewModel.swift:76-81, Sources/iOS/IOSVoicesView.swift:540), and the messages in Sources/QwenVoiceCore/PreparedVoiceRepository.swift:15-35 are unlocalized English. The app and the CLI share one support root, so this is the app+CLI coexistence F-22 exists for. Closure: bounded retry or explicit typed surfacing of storeBusy at initialization and in the saved-voice view models, localized presentation through the typed presentation layer, a two-process test in which B initializes while A holds the lock and B recovers once the lock clears, and no change to the lock itself.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
+        "Sources/iOSSupport/ViewModels/SavedVoicesViewModel.swift",
+        "Sources/iOS/IOSVoicesView.swift",
+        "Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift"
+      ],
+      "updated": "2026-09-22",
+      "notes": "Closed 2026-09-22. Engine start records a typed, path-free Saved Voice startup issue instead of failing when another process holds the store lock or the store is untidy; the first successful operation clears it (identity-guarded). Reconcile skips hidden, non-directory and symlink entries, quarantines uninterpretable journals to voice-transactions-quarantine/ (a registered, backup-included iOS storage class; never deleted) and leaves newer-schema journals in place. TTSEngineError.savedVoiceStoreBusy is typed end to end with localized copy; SavedVoicesBusyRetryPolicy retries 1/2/4 s (tested). A two-process test proves recovery. Gaps left: no promotionRouting class covers Saved Voices, and newer-build journals are only reported through the gated diagnostic count.",
+      "evidence": [
+        "commit:cca65851",
+        "file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift"
+      ]
     }
   ]
 }

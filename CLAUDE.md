@@ -71,6 +71,7 @@ facts come from `config/public-product-facts.json` and `project.yml`.
 scripts/dev.sh status
 scripts/dev.sh check --dry-run       # inspect routed work
 scripts/dev.sh check                 # lint, contracts, affected tests/builds
+scripts/dev.sh check --since origin/main  # the same for an unpushed batch of commits
 scripts/dev.sh test --only ClassName # targeted native inner loop
 scripts/dev.sh py                    # selected Python consumers
 scripts/dev.sh contracts
@@ -82,7 +83,11 @@ npm --prefix website run check       # independent website acceptance
 ```
 
 Use targeted checks while editing, then the routed check before committing. Broaden only for new
-changes, failures or unresolved risk. Use `check --paths <assigned paths...>` when unrelated dirty
+changes, failures or unresolved risk. Fast path: `test --only` and incremental `build`/`ios` on the
+warm cache while editing; one routed check per batch (`--since origin/main` once commits have
+landed); push once per batch; CI is the gate. Quality checks go where they pay: `swift-review` on
+every Swift diff (in parallel with verification), an adversarial reviewer for hooks, security,
+release and data-loss paths, and consent-bound lanes only on request. Use `check --paths <assigned paths...>` when unrelated dirty
 work must remain paused; its contract gate still considers dirty tooling inputs. Native commands
 are serialized host-wide by the native lock (`~/Library/Caches/Vocello/native-build.lock`, across
 every checkout and worktree) and reuse owned caches. Website-only work never launches native builds or
@@ -146,8 +151,10 @@ Repository scripts are authoritative; everything below assists them and never re
 - **Subagents:** `xcresult-triage` reads a finished UI run as the testing runbook describes and never
   reruns it; `swift-review` reviews Swift diffs against `.claude/rules/native.md`; Explore/Plan and the
   Axiom auditors research and audit. These stay read-only. Editing agents are general-purpose agents
-  given `isolation: "worktree"`; they never push, touch `main`, edit `config/roadmap.json` or the
-  progress log, or run consent-bound lanes.
+  given `isolation: "worktree"`; they author code and tests without native builds (a worktree build is
+  cold), and the lead verifies each branch incrementally on the warm `main` cache while `swift-review`
+  reads the diff. They never push, touch `main`, edit `config/roadmap.json` or the progress log, or
+  run consent-bound lanes.
 - **Tool routing:** XcodeBuildMCP (profiles `macos` and `ios-device` in `.xcodebuildmcp/config.yaml`)
   for discovery, scratch builds and device debugging only, never Simulator or UI automation and never
   as evidence; swift-lsp through `buildServer.json` (needs a warm `build/cache/xcode/macos`); Axiom

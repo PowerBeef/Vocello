@@ -16,13 +16,13 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `audit-remediation-2026-09` | active | backend-and-platform | 0/12 (0%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/17 (59%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
-| `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
+| `engineering-review-remediation-2026-08` | active | backend-and-platform | 16/26 (62%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
 | `ios-control-audit-2026-08` | active | ios | 17/21 (81%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 4/28 (14%) |
+| `project-audit-2026-09` | active | backend-and-platform | 5/28 (18%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -247,7 +247,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `F-20` | parked | P2 — make CLI signal cancellation graceful and bounded | `RF-10` |
 | `F-21` | parked | P1 — restore CLI batch admission and preserve partial outcomes | `RF-10` |
 | `F-23` | parked | P2 — preserve explicit Play intent across live-to-file finalization | `RF-10` |
-| `F-25` | planned | P1 — a busy Saved Voice store must not be fatal to engine initialization | — |
 | `F-26` | planned | P2 — CLI: playback children, the pre-supervisor signal window and signal-coincident failure classification | — |
 
 ### Open items in detail
@@ -286,9 +285,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 - **`F-23`** (parked) — P2 — preserve explicit Play intent across live-to-file finalization.
   gate: Explicit Play after finalization resumes heard currentTime (or restarts at end), independently of Auto-play and buffered duration. Deterministic fixtures pass; a source-bound long-clip UI pilot and applicable packaged macOS playback prove play/pause/scrub/History. Preserve failed pilots; unavailable controls never count as exercised.
   unparkWhen: RF-10 unparks (a signed macOS candidate is authorized).
-
-- **`F-25`** (planned) — P1 — a busy Saved Voice store must not be fatal to engine initialization.
-  gate: Engine initialization (Sources/QwenVoiceCore/MLXTTSEngine.swift:703 awaits reconcile() with no retry) treats PreparedVoiceRepository.storeBusy from the F-22 flock as a fatal, untyped failure: the typed error is flattened to generationFailed(text) at MLXTTSEngine.swift:1746-1751, no production caller handles .storeBusy (Sources/ViewModels/SavedVoicesViewModel.swift:76-81, Sources/iOS/IOSVoicesView.swift:540), and the messages in Sources/QwenVoiceCore/PreparedVoiceRepository.swift:15-35 are unlocalized English. The app and the CLI share one support root, so this is the app+CLI coexistence F-22 exists for. Closure: bounded retry or explicit typed surfacing of storeBusy at initialization and in the saved-voice view models, localized presentation through the typed presentation layer, a two-process test in which B initializes while A holds the lock and B recovers once the lock clears, and no change to the lock itself.
 
 - **`F-26`** (planned) — P2 — CLI: playback children, the pre-supervisor signal window and signal-coincident failure classification.
   gate: Three bounded CLI gaps outside the F-20 fixtures: (1) afplay children outlive a signalled CLI because playback uses try? run() then waitUntilExit() with no termination on forced exit (Sources/VocelloCLI/GenerateCommand.swift:244-249, Sources/VocelloCLI/BatchCommand.swift:123-130); (2) the Dispatch signal sources are installed after the command task starts, leaving a window in which SIGINT/SIGTERM kill the process without owned cleanup (Sources/VocelloCLI/CLIProcessSupervisor.swift:16-19,57-60); (3) a genuine generation failure that coincides with a signal is reported as cancelled (Sources/VocelloCLI/CLIBatchExecution.swift:69-71). Closure: terminate owned playback children on cancellation and forced exit, install signal sources before the task starts or buffer early signals, classify failure-then-signal as failed with the cancellation noted, and cover each with deterministic fixtures; documented exit codes unchanged.
@@ -465,7 +461,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-08` | planned | Consolidate duplicated platform logic and misleading names | — |
 | `PA-10` | in-flight | Release signing is isolated from dispatch and build inputs | — |
 | `PA-11` | planned | macOS launch never hashes models on the main thread | — |
-| `PA-12` | in-flight | macOS settings and file actions do what they say | — |
 | `PA-13` | planned | Quality-first decoding keeps every generated frame | — |
 | `PA-14` | in-flight | File I/O and error classification fail safely | — |
 | `PA-15` | planned | iOS stops generation safely when the app leaves the foreground | — |
@@ -509,9 +504,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-11`** (planned) — macOS launch never hashes models on the main thread.
   gate: App launch and model-manager status on the main actor check manifests and sizes only; content digests are verified in the background, and a freshly downloaded file is not hashed a second time; a unit test proves the shallow path does not hash.
-
-- **`PA-12`** (in-flight) — macOS settings and file actions do what they say.
-  gate: Prefer lower-memory models changes the default variant for every mode without overriding explicit choices; Save As never deletes its own source and never removes an existing destination on a failed copy; the script editors expose an accessibility label.
 
 - **`PA-13`** (planned) — Quality-first decoding keeps every generated frame.
   gate: Quality-first decode, replay and the in-context clone cut derive their sample window from explicit reference and generated frame counts, not from counting non-zero codes; a runtime unit test covers the window and a tiny decoder emits exactly frames times upsample.

@@ -31,7 +31,12 @@ was proven live the same evening: two worktree agents ran in parallel and were i
 fast-forward, one cherry-pick) — the rorkai `asc` CLI and its App Store Connect probes are gone
 (build-number and account checks are now manual, read-only), and the Mac mini M6 16 GB is the
 canonical macOS benchmark host (M2 records stay history; the first M6 baseline is AV-17, consent-bound).
-Next: the queue below.
+A second batch of three parallel agents closed PA-12 (MAC-02 lower-memory preference) and F-25 (busy or
+untidy Saved Voice store no longer fails engine start) and landed PA-14 slice 1 (throwing file I/O).
+Lesson recorded in the workflow: agents author without native builds (a worktree build is cold); the
+lead verifies each branch incrementally on the warm cache (about 1-3 minutes) while `swift-review`
+reads the diff, then runs one `scripts/dev.sh check --since origin/main` per batch. Next: PA-11
+(launch hashing), PA-14 slice 2, PA-13, PA-15.
 
 ### Machine transition and next steps (September 22)
 

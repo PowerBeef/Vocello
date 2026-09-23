@@ -197,16 +197,32 @@ first. One task per agent, with a file set that does not overlap another agent's
 an agent may edit, commit on its branch (the commit lint runs there), run targeted
 `python3 -m pytest`, `scripts/dev.sh py|contracts|lint|check --dry-run` and
 `python3 scripts/roadmap.py validate`, and run `npm --prefix website run check` after
-`npm --prefix website ci` in that worktree. Native commands in a worktree are allowed only when the
-lead asks: they wait for the host lock, build a cold ~5 GB `build/` of their own, and belong in a
-background task. Agents never push, touch `main`, run consent-bound lanes or XcodeBuildMCP builds
+`npm --prefix website ci` in that worktree. **Agents do not build natively by default.** A worktree
+starts with an empty `build/`, so its first native command is a cold MLX compile for each platform
+(about 9 GB and many minutes), serialized behind every other build; on one Mac that erases the gain
+from parallel authoring. Agents author code and tests, run only non-native checks, and hand back a
+commit; the lead verifies natively once on the warm `main` cache (below). Native commands in a
+worktree are an explicit exception for work that cannot be written without compiler feedback (for
+example a long debugging loop); they belong in a background task. Agents never push, touch `main`, run consent-bound lanes or XcodeBuildMCP builds
 (which bypass the lock), regenerate shared generated artifacts, or edit `config/roadmap.json` and
 `docs/development-progress.md`; the lead owns those.
 
+**Agent brief.** Every editing-agent prompt carries the task's roadmap entry and design, the files it
+owns, and the checklist that `swift-review` otherwise finds after the fact: Mac-only value types live
+in `Sources/Services` and are listed by path under `VocelloCoreTests`; logic in an app-only
+`@MainActor` type is extracted into a tested value type (`Sources/iOSSupport/Services`, listed under
+both test targets); new persistent directories are registered in the iOS storage-protection policy;
+user-facing copy goes through the typed catalog; engine state stays actor-owned; new files under
+globbed paths mean `./scripts/regenerate_project.sh --fast`.
+
 **Integration** happens in the lead session, in the main checkout on `main`: review
 `git log main..worktree-<name>` and the diff, then `git merge --ff-only worktree-<name>` (or
-`git cherry-pick <sha>...` when `main` moved; no merge commits without a stated reason), run the
-routed `scripts/dev.sh check` on `main`, push, and clean up with
+`git cherry-pick <sha>...` when `main` moved; no merge commits without a stated reason), verify on
+the warm cache — `scripts/dev.sh build` and `scripts/dev.sh test --only <the agent's test classes>`,
+`scripts/dev.sh ios` when shared or iOS sources changed — while `swift-review` reads the same diff in
+parallel; fix small compile or review findings directly, send larger ones back to the agent. After
+the batch, run one `scripts/dev.sh check --since origin/main` (it routes on everything the unpushed
+commits changed plus the dirty tree, including the gate's Python selection), push once, and clean up with
 `git worktree remove .claude/worktrees/<name>` and `git branch -d worktree-<name>` (a cherry-picked
 branch is not an ancestor of `main`, so it needs `git branch -D`, which asks first; Claude Code
 locks a worktree while its agent runs and unlocks it when the agent finishes; a worktree left locked

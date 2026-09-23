@@ -1074,22 +1074,6 @@
       ]
     },
     {
-      "id": "F-25",
-      "plan": "engineering-review-remediation-2026-08",
-      "title": "P1 — a busy Saved Voice store must not be fatal to engine initialization",
-      "status": "planned",
-      "gate": "Engine initialization (Sources/QwenVoiceCore/MLXTTSEngine.swift:703 awaits reconcile() with no retry) treats PreparedVoiceRepository.storeBusy from the F-22 flock as a fatal, untyped failure: the typed error is flattened to generationFailed(text) at MLXTTSEngine.swift:1746-1751, no production caller handles .storeBusy (Sources/ViewModels/SavedVoicesViewModel.swift:76-81, Sources/iOS/IOSVoicesView.swift:540), and the messages in Sources/QwenVoiceCore/PreparedVoiceRepository.swift:15-35 are unlocalized English. The app and the CLI share one support root, so this is the app+CLI coexistence F-22 exists for. Closure: bounded retry or explicit typed surfacing of storeBusy at initialization and in the saved-voice view models, localized presentation through the typed presentation layer, a two-process test in which B initializes while A holds the lock and B recovers once the lock clears, and no change to the lock itself.",
-      "sourceOfTruth": [
-        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
-        "Sources/QwenVoiceCore/PreparedVoiceRepository.swift",
-        "Sources/iOSSupport/ViewModels/SavedVoicesViewModel.swift",
-        "Sources/iOS/IOSVoicesView.swift",
-        "Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift"
-      ],
-      "updated": "2026-09-22",
-      "notes": "Filed 2026-09-11 from the roadmap reconciliation review of F-22; not fixed in that pass. Reproduction shape: start the macOS app, run any vocello command that touches Saved Voices in the same support root during a prepare or delete, and observe the second process fail initialization with an English generation error instead of waiting or reporting a typed busy state. Cross-reference F-22 (lock is correct), RF-10 (packaged coexistence). Widened 2026-09-22 (external audit IOS-05, CORE-09): a malformed or unknown voice transaction and a stray or hidden file such as .DS_Store in voice-transactions also make reconcile throw, which is fatal to engine init on both platforms (MLXTTSEngine.swift:702). Planned fix (2026-09-22 design): reconcile skips hidden and non-directory root entries and quarantines uninterpretable transactions to voice-transactions-quarantine/ (never deletes); MLXTTSEngine.initialize records a typed startup issue instead of failing."
-    },
-    {
       "id": "F-26",
       "plan": "engineering-review-remediation-2026-08",
       "title": "P2 — CLI: playback children, the pre-supervisor signal window and signal-coincident failure classification",
@@ -1469,20 +1453,6 @@
         "Sources/QwenVoiceCore/ModelAssets.swift"
       ],
       "notes": "External audit MAC-01 (High), confirmed 2026-09-22: QwenVoiceApp creates ModelManagerViewModel, whose init calls localModelInfo for all six variants and deepIntegrity SHA-256s every installed file (about 6.2 GB for the three Speed variants, 14.65 GB for all six) on the main actor before the first window; the hash cache is per-process, so every cold launch re-hashes; the post-download path hashes again on the main actor although the downloader already verified the files. Planned fix (2026-09-22 design): LocalModelAssetStore.deepIntegrity(for:depth:) with .manifestSizes (manifest, identity, regular file, size, no SHA) and .contentDigest; every main-actor ModelManagerViewModel path uses .manifestSizes, only the detached performRefresh hashes, one background pass starts after launch; seed IntegrityHashCache from the downloader's same-process receipts (size, mtime, inode) so a fresh download is not hashed twice. Test: LocalModelAssetStoreIntegrityTests.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
-    },
-    {
-      "id": "PA-12",
-      "title": "macOS settings and file actions do what they say",
-      "status": "in-flight",
-      "gate": "Prefer lower-memory models changes the default variant for every mode without overriding explicit choices; Save As never deletes its own source and never removes an existing destination on a failed copy; the script editors expose an accessibility label.",
-      "sourceOfTruth": [
-        "Sources/Views/Settings/MacSettingsScreen.swift",
-        "Sources/Views/History/MacHistoryFileActions.swift",
-        "Sources/Views/Primitives/MacScriptTextEditor.swift"
-      ],
-      "notes": "External audit MAC-02, MAC-03 and MAC-08, confirmed 2026-09-22. The lower-memory toggle's only reader (TTSContract.model(for:) via SidebarItem.requiredModel) has no callers, and Studio resolves variants in ModelManagerViewModel.activeVariant(for:) without it; 8 GB Macs already default to Speed, so the impact is on larger Macs. Save As removes the destination then copies with no same-file check, and the Studio player discards the result. The script editor sets only an identifier. Progress 2026-09-22: MAC-08 fixed (editor labels) and MAC-03 fixed (MacFileSaveCopy: same-file no-op, staged replace; MacFileSaveCopyTests). Open: MAC-02. Planned fix: a pure MacModelVariantResolution (stored per-mode choice, then Speed when the preference is on, then the hardware recommendation; same order for the installed fallback) owned by ModelManagerViewModel, Settings binds to it with the same identifier, explicit picks are kept, and the dead SidebarItem.requiredModel/TTSContract.model(for:) path is deleted.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },

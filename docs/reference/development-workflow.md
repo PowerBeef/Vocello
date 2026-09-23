@@ -147,7 +147,9 @@ inside `release.yml` on the tagged commit.
   `build/cache/xcode/ios-device` DerivedData and matches physical-device Release optimization.
 - macOS builds keep one arena per optimization level: `build/cache/xcode/macos` for the `-Onone`
   development app, CLI and deterministic test bundles, `build/cache/xcode/macos-optimized` for
-  `scripts/build.sh cli-optimized` and every macOS XCUITest lane (compiled at `-O`). An optimized build
+  `scripts/build.sh cli-optimized`, every macOS XCUITest lane (compiled at `-O`) and the
+  `build_ui_test_bundles.sh` compile check, which uses the lane's exact settings and the shared package
+  checkout so it warms the lane's cache (about 10 s warm). An optimized build
   therefore never recompiles the `-Onone` arena; `build/vocello` points at whichever CLI built last.
   `scripts/macos_test.sh test` prints how many `SwiftCompile` tasks its build ran, the number that
   proves a warm cache locally and in CI.

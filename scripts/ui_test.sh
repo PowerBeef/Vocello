@@ -17,6 +17,9 @@ PROJECT="$ROOT_DIR/QwenVoice.xcodeproj"
 MAC_DERIVED="$QVOICE_XCODE_MACOS_OPTIMIZED_DERIVED"
 IOS_DERIVED="$QVOICE_XCODE_IOS_DERIVED"
 BUNDLE_ID_IOS="com.patricedery.vocello"
+# Fixed rendezvous shared with the app (BenchRunContext.currentTakeFileURL) and the
+# UI-test runner. Deliberately not run-unique: evidence lanes run alone on a quiet
+# host (require_quiet_host refuses while another native build or agent is active).
 MAC_TAKE_MANIFEST="/tmp/vocello-bench-current-take.json"
 MAC_APP_EXECUTABLE="$MAC_DERIVED/Build/Products/Release/Vocello.app/Contents/MacOS/Vocello"
 . "$ROOT_DIR/scripts/lib/test_models.sh"

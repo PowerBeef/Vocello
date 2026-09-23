@@ -3669,6 +3669,24 @@
       "evidence": [
         "file:Tests/VocelloCoreTests/LocalModelAssetStoreIntegrityTests.swift"
       ]
+    },
+    {
+      "id": "PA-04",
+      "title": "Harness isolation: UI bundle compiles and fixed temporary paths",
+      "status": "done",
+      "gate": "build_ui_test_bundles.sh runs through the shared xcb_run lock and QVOICE_* policy paths into the arena its lane uses; probe and bench manifests use run-unique paths under the build-output policy.",
+      "sourceOfTruth": [
+        "scripts/build_ui_test_bundles.sh",
+        "scripts/lib/ios_coredevice_probe.py",
+        "scripts/ui_test.sh"
+      ],
+      "notes": "Closed 2026-09-22. build_ui_test_bundles.sh compiles through xcb_run under the host-wide native lock, resolves once into the shared cloned-packages path, writes logs under the policy's ui-bundles artifacts, and builds VocelloMacUI into macos-optimized with the macOS UI lane's exact settings and VocelloiOSUI unsigned into the device arena (the compile check fell from about 256 s to 10 s warm). ios_coredevice_probe.py writes devicectl output to run-unique files under QVOICE_SCRATCH_TRANSIENT. Kept deliberately: the macOS bench take manifest is a fixed rendezvous with the app and runner, safe because evidence lanes now run alone (require_quiet_host), like the documented virtual-microphone file.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22",
+      "evidence": [
+        "file:scripts/build_ui_test_bundles.sh",
+        "file:scripts/lib/ios_coredevice_probe.py"
+      ]
     }
   ]
 }

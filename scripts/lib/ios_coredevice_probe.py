@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -26,13 +27,25 @@ def _run_devicectl(args: list[str], timeout: int = 30) -> tuple[int, str, str]:
         return 124, "", "devicectl timed out"
 
 
+def _json_output_path(kind: str) -> Path:
+    """A run-unique devicectl output file, so concurrent probes never share one (PA-04)."""
+    scratch = os.environ.get("QVOICE_SCRATCH_TRANSIENT")
+    directory = Path(scratch) if scratch and Path(scratch).is_absolute() else Path(tempfile.gettempdir())
+    directory.mkdir(parents=True, exist_ok=True)
+    handle, name = tempfile.mkstemp(prefix=f"devicectl-{kind}-", suffix=".json", dir=directory)
+    os.close(handle)
+    path = Path(name)
+    path.unlink()  # devicectl creates the file; only the unique name is reserved
+    return path
+
+
 def _load_json_output(path: Path) -> dict[str, Any]:
     with path.open(encoding="utf-8") as fh:
         return json.load(fh)
 
 
 def list_devices_json() -> dict[str, Any]:
-    tmp = Path("/tmp") / f"devicectl-list-{Path(__file__).stem}.json"
+    tmp = _json_output_path("list")
     code, _, err = _run_devicectl(["list", "devices", "--json-output", str(tmp)])
     if code != 0 or not tmp.is_file():
         return {"error": err.strip() or f"devicectl list failed (exit {code})"}
@@ -110,7 +123,7 @@ def summarize_device(d: dict[str, Any]) -> dict[str, Any]:
 
 
 def query_lock_state(device_id: str) -> dict[str, Any]:
-    tmp = Path("/tmp") / f"devicectl-lock-{Path(__file__).stem}.json"
+    tmp = _json_output_path("lock")
     code, _, err = _run_devicectl(
         ["device", "info", "lockState", "--device", device_id, "--json-output", str(tmp)]
     )

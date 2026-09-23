@@ -22,7 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 6/28 (21%) |
+| `project-audit-2026-09` | active | backend-and-platform | 7/28 (25%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -454,7 +454,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | --- | --- | --- | --- |
 | `PA-02` | planned | P2 — make the owned package's diagnostics gate require the internal build capability | — |
 | `PA-03` | planned | P3 — compile-gate the iOS diagnostics runners | — |
-| `PA-04` | planned | Harness isolation: UI bundle compiles and fixed temporary paths | — |
 | `PA-05` | in-flight | Release path works end to end and is rehearsed | — |
 | `PA-06` | planned | Routing cost and derived-artifact gaps | — |
 | `PA-07` | planned | Remove dead engine, downloader and XPC-era code | — |
@@ -482,9 +481,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-03`** (planned) — P3 — compile-gate the iOS diagnostics runners.
   gate: IOSStartupReliabilityRunner and IOSDeviceDiagnosticsRunner request detection compile only under QVOICE_DEVICE_DIAGNOSTICS, matching the knob registry; the generic iOS compile and device diagnostics routes still build.
-
-- **`PA-04`** (planned) — Harness isolation: UI bundle compiles and fixed temporary paths.
-  gate: build_ui_test_bundles.sh runs through the shared xcb_run lock and QVOICE_* policy paths into the arena its lane uses; probe and bench manifests use run-unique paths under the build-output policy.
 
 - **`PA-05`** (in-flight) — Release path works end to end and is rehearsed.
   gate: release.yml selects Xcode and installs every pinned tool (numpy, pytest, pytest-xdist, gh) through .github/actions/native-toolchain, a secrets-free ad-hoc release rehearsal workflow runs release.sh and the packaged-DMG verification on a schedule and on release-input changes and is green, and the TestFlight upload command is confirmed supported by the pinned Xcode.

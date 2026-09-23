@@ -1357,20 +1357,6 @@
       "updated": "2026-09-22"
     },
     {
-      "id": "PA-04",
-      "title": "Harness isolation: UI bundle compiles and fixed temporary paths",
-      "status": "planned",
-      "gate": "build_ui_test_bundles.sh runs through the shared xcb_run lock and QVOICE_* policy paths into the arena its lane uses; probe and bench manifests use run-unique paths under the build-output policy.",
-      "sourceOfTruth": [
-        "scripts/build_ui_test_bundles.sh",
-        "scripts/lib/ios_coredevice_probe.py",
-        "scripts/ui_test.sh"
-      ],
-      "notes": "The lock half landed with PA-27 on 2026-09-22: build_ui_test_bundles.sh now compiles through xcb_run under the host-wide native lock. Still open: it resolves packages into its own DerivedData instead of the shared cloned-packages path, keeps hard-coded build/cache paths, and compiles VocelloMacUI into the -Onone arena while every macOS UI lane builds in macos-optimized. ios_coredevice_probe.py writes a fixed /tmp devicectl file that concurrent probes can race, and ui_test.sh MAC_TAKE_MANIFEST is a fixed /tmp path. The virtual-microphone temporary file is deliberate and documented.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
-    },
-    {
       "id": "PA-05",
       "title": "Release path works end to end and is rehearsed",
       "status": "in-flight",

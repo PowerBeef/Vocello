@@ -22,7 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 15/30 (50%) |
+| `project-audit-2026-09` | active | backend-and-platform | 16/30 (53%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -465,8 +465,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-22` | planned | Core storage and memory lifecycle is bounded | — |
 | `PA-25` | planned | Docs and tooling stay proportional | — |
 | `PA-26` | planned | Low-severity backlog from the external audit | — |
-| `PA-28` | in-flight | Chunked model downloads retry a failed range, never the whole file | — |
-| `PA-29` | parked | Measure iOS background chunk fan-out against bounded in-flight ranges | `PA-28` |
+| `PA-29` | parked | Measure iOS background chunk fan-out against bounded in-flight ranges | — |
 
 ### Open items in detail
 
@@ -509,12 +508,9 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-26`** (planned) — Low-severity backlog from the external audit.
   gate: Every Low and Info finding in the external audit that no other item covers is fixed or declined with a reason, section by section.
 
-- **`PA-28`** (in-flight) — Chunked model downloads retry a failed range, never the whole file.
-  gate: A short 206 body, a transport error or a 5xx/429 on one byte range retries that range only (bounded, with backoff) and keeps every completed range; only a genuine Range-ignored response (HTTP 200 or a foreign Content-Range) falls back to a single stream and clears the partial; a range is never recorded complete unless its body length matches; the file-level retry reason and each range retry are persisted in the download diagnostics; unit tests cover each path.
-
 - **`PA-29`** (parked) — Measure iOS background chunk fan-out against bounded in-flight ranges.
   gate: A controlled on-device comparison (scripts/ui_test.sh ios model-download with the registered QVOICE_DOWNLOAD_ENGINE_PROFILE arms, plus a bounded in-flight-range arm) on the paired iPhone decides whether background downloads keep fanning every range out to the daemon up front or bound in-flight ranges per file; the 2026-08-11 chunking default changes only with that evidence and a maintainer decision recorded in docs/reference/model-delivery.md.
-  unparkWhen: PA-28 has landed and the maintainer explicitly requests the model-download comparison runs on the iPhone.
+  unparkWhen: The maintainer explicitly requests the model-download comparison runs on the iPhone.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

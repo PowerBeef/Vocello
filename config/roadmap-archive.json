@@ -3838,6 +3838,28 @@
         "run:ios-xcui-smoke-20260923-055425-5fb4b68a",
         "file:Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift"
       ]
+    },
+    {
+      "id": "PA-28",
+      "plan": "project-audit-2026-09",
+      "title": "Chunked model downloads retry a failed range, never the whole file",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "A short 206 body, a transport error or a 5xx/429 on one byte range retries that range only (bounded, with backoff) and keeps every completed range; only a genuine Range-ignored response (HTTP 200 or a foreign Content-Range) falls back to a single stream and clears the partial; a range is never recorded complete unless its body length matches; the file-level retry reason and each range retry are persisted in the download diagnostics; unit tests cover each path.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "Sources/QwenVoiceCore/ModelDownloadDiagnosticsStore.swift"
+      ],
+      "notes": "Closed 2026-09-23. A byte range that fails transiently (a 206 whose body or Content-Range end is short or long, a transport error, HTTP 408/429/5xx with Retry-After honored) retries alone up to maxRangeRetries (3) under its range-qualified identity; a range is never written or recorded unless its body length matches. When range retries run out, in-flight siblings finish into the sidecar and the file-level retry keeps the partial and fetches only the gaps. Only a genuine range refusal (HTTP 200 or a foreign Content-Range), a chunk-assembly fault, or a short range on the last file-level attempt (the effective budget: the lower of the engine's and the policy's) falls back to a single stream and clears the partial. Diagnostics persist the typed retry reason, range-retry records and rangeRetryCount; the iOS acceptance allowance counts the actual re-fetched range lengths and fails above 4 range retries. Reuse counts only sidecar ranges present at a run's first attempt. On-device measurement is PA-29.",
+      "updated": "2026-09-23",
+      "evidence": [
+        "commit:fe743da2",
+        "commit:a4ffcf6b",
+        "commit:6c8ce07e",
+        "commit:bf335281",
+        "file:Tests/VocelloCoreTests/ModelDownloadLifecycleTests.swift",
+        "file:scripts/tests/test_check_ios_model_management.py"
+      ]
     }
   ]
 }

@@ -22,7 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 8/28 (29%) |
+| `project-audit-2026-09` | active | backend-and-platform | 10/28 (36%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -453,13 +453,11 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `PA-02` | planned | P2 — make the owned package's diagnostics gate require the internal build capability | — |
-| `PA-03` | planned | P3 — compile-gate the iOS diagnostics runners | — |
 | `PA-05` | in-flight | Release path works end to end and is rehearsed | — |
 | `PA-06` | planned | Routing cost and derived-artifact gaps | — |
 | `PA-07` | planned | Remove dead engine, downloader and XPC-era code | — |
 | `PA-08` | planned | Consolidate duplicated platform logic and misleading names | — |
 | `PA-10` | in-flight | Release signing is isolated from dispatch and build inputs | — |
-| `PA-14` | in-flight | File I/O and error classification fail safely | — |
 | `PA-15` | in-flight | iOS stops generation safely when the app leaves the foreground | — |
 | `PA-16` | planned | Speech-tokenizer attention honors the model's sliding windows | — |
 | `PA-17` | planned | Clone consent is enforced below the views | — |
@@ -478,9 +476,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-02`** (planned) — P2 — make the owned package's diagnostics gate require the internal build capability.
   gate: QVOICE_TALKER_KV_QUANT, QWENVOICE_SAMPLER_COMPILE and QWENVOICE_TOKENIZER_RESIDENCY have no effect in a distribution app or CLI even with QWENVOICE_DEBUG set; runtime_security_contract.py and a unit test prove it.
 
-- **`PA-03`** (planned) — P3 — compile-gate the iOS diagnostics runners.
-  gate: IOSStartupReliabilityRunner and IOSDeviceDiagnosticsRunner request detection compile only under QVOICE_DEVICE_DIAGNOSTICS, matching the knob registry; the generic iOS compile and device diagnostics routes still build.
-
 - **`PA-05`** (in-flight) — Release path works end to end and is rehearsed.
   gate: release.yml selects Xcode and installs every pinned tool (numpy, pytest, pytest-xdist, gh) through .github/actions/native-toolchain, a secrets-free ad-hoc release rehearsal workflow runs release.sh and the packaged-DMG verification on a schedule and on release-input changes and is green, and the TestFlight upload command is confirmed supported by the pinned Xcode.
 
@@ -495,9 +490,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-10`** (in-flight) — Release signing is isolated from dispatch and build inputs.
   gate: Signing jobs use a tag-restricted release environment, a dispatched release runs only from its own tag ref with a validated output name, the keychain grants codesign only, no Actions cache is restored after secrets exist, checkouts do not persist credentials, and signing material is removed right after release.sh.
-
-- **`PA-14`** (in-flight) — File I/O and error classification fail safely.
-  gate: No legacy FileHandle write or readData remains on model, download or evidence paths (they raise Objective-C exceptions on a full disk); cancellation and allocation-retry decisions use typed errors, and MLX errors are captured instead of reaching fatalError.
 
 - **`PA-15`** (in-flight) — iOS stops generation safely when the app leaves the foreground.
   gate: On background with an active generation the app requests background time and cancels through the typed barrier (a single take is discarded, long-form keeps its completed segments), the screen stays awake while generating, the user is told on return, and a deferred background release never fires after returning; logic tests cover the policy and a physical-device run proves the cancel lands before GPU work is refused.

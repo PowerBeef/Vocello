@@ -3703,6 +3703,44 @@
         "commit:f5380c77",
         "file:Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests.swift"
       ]
+    },
+    {
+      "id": "PA-14",
+      "title": "File I/O and error classification fail safely",
+      "status": "done",
+      "gate": "No legacy FileHandle write or readData remains on model, download or evidence paths (they raise Objective-C exceptions on a full disk); cancellation and allocation-retry decisions use typed errors, and MLX errors are captured instead of reaching fatalError.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "Sources/QwenVoiceCore/NativeEngineRuntime.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift"
+      ],
+      "notes": "Closed 2026-09-23 (external audit CORE-02, CORE-03, ENG-05). Slice 1: FileStreamIO replaces every legacy FileHandle read/write on the downloader, ModelAssets, SharedModelComponentStore and SamplingEvidence paths (throwing, digests byte-identical, I/O errors terminal). Slice 2: typed cancellation and allocation classification instead of error text; the owned package installs an MLX error handler per operation (VocelloQwen3MLXErrorScope) so a Metal allocation failure becomes a typed VocelloQwen3RuntimeFailure, not fatalError; the one allocation retry runs only before any frame was published; cancellation wins every terminal and is never retried; after a captured runtime failure (including one that ends cancelled, or during prewarm, prime or clone-handle build) the model is unloaded before the next admission and the load state follows. Moved to PA-20: the engine's English memory-pressure and runtime-failure copy (NativeEngineRuntime) should reach the UI through the typed catalog.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-23",
+      "evidence": [
+        "commit:b2469496",
+        "commit:b81a15d8",
+        "commit:bb2865cd",
+        "commit:a06b5992",
+        "file:Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/RuntimeFailureCaptureTests.swift",
+        "file:Tests/VocelloCoreTests/GenerationTelemetrySchemaTests.swift"
+      ]
+    },
+    {
+      "id": "PA-03",
+      "title": "P3 — compile-gate the iOS diagnostics runners",
+      "status": "done",
+      "gate": "IOSStartupReliabilityRunner and IOSDeviceDiagnosticsRunner request detection compile only under QVOICE_DEVICE_DIAGNOSTICS, matching the knob registry; the generic iOS compile and device diagnostics routes still build.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSDeviceDiagnosticsRunner.swift",
+        "config/runtime-debug-knobs.json"
+      ],
+      "notes": "Closed 2026-09-23 (external audit IOS-15). IOSStartupReliabilityRunner and IOSDeviceDiagnosticsRunner read their launch keys only under QVOICE_DEVICE_DIAGNOSTICS, matching the device-diagnostics-harness group in config/runtime-debug-knobs.json; distribution builds never read them. Every scripts/ios_device.sh build now compiles the harness (all its lanes are driven by it); VOCELLO_INTERNAL_DIAGNOSTICS stays opt-in through --device-diagnostics. Proof: the generic iOS compile (scripts/dev.sh ios) and a generic Release compile with the flag both build.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-23",
+      "evidence": [
+        "commit:d4bef3e2"
+      ]
     }
   ]
 }

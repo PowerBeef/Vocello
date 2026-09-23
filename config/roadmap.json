@@ -1344,19 +1344,6 @@
       "updated": "2026-09-22"
     },
     {
-      "id": "PA-03",
-      "title": "P3 — compile-gate the iOS diagnostics runners",
-      "status": "planned",
-      "gate": "IOSStartupReliabilityRunner and IOSDeviceDiagnosticsRunner request detection compile only under QVOICE_DEVICE_DIAGNOSTICS, matching the knob registry; the generic iOS compile and device diagnostics routes still build.",
-      "sourceOfTruth": [
-        "Sources/iOS/IOSDeviceDiagnosticsRunner.swift",
-        "config/runtime-debug-knobs.json"
-      ],
-      "notes": "The startup-reliability runner and part of IOSDeviceDiagnosticsRunner.isRequested sit outside #if QVOICE_DEVICE_DIAGNOSTICS and depend only on TelemetryGate, while the registry says unavailable-without-diagnostics-compilation-condition. Practical risk on iOS is low (environment keys need a debugger or diagnostics launch). Needs ios_device.sh builds to keep working; phone-free proof is the generic compile. External audit IOS-15 (partly inside the compile gate already).",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
-    },
-    {
       "id": "PA-05",
       "title": "Release path works end to end and is rehearsed",
       "status": "in-flight",
@@ -1426,20 +1413,6 @@
         "scripts/release_source_authority.py"
       ],
       "notes": "External audit SEC-01 (Medium: single admin collaborator), SEC-02 and SEC-07, confirmed 2026-09-22. No environment: on any job; 13 repository secrets; workflow_dispatch runs the dispatched ref's copy of the workflow with a free-text tag; keychain uses -A and a 6 h unlock; a prefix-keyed SwiftPM cache is restored after secrets; inputs.output_name is interpolated into run scripts; no checkout sets persist-credentials: false. Maintainer steps: create the release environment (deployment tags v*, reviewer), move the secrets, add a v* tag ruleset. Remaining: a separate build and sign job split, and signer pinning. 2026-09-22 workflow side: release-trigger job (tag ref only, contract-shaped output_name), environment: release on package and archive-ios, keychain -T /usr/bin/codesign with a 9000 s lock, no Actions cache in signing jobs, persist-credentials false, signing cleanup right after release.sh. Open: the maintainer's environment, secrets move and tag ruleset; build/sign split; signer pinning.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
-    },
-    {
-      "id": "PA-14",
-      "title": "File I/O and error classification fail safely",
-      "status": "in-flight",
-      "gate": "No legacy FileHandle write or readData remains on model, download or evidence paths (they raise Objective-C exceptions on a full disk); cancellation and allocation-retry decisions use typed errors, and MLX errors are captured instead of reaching fatalError.",
-      "sourceOfTruth": [
-        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
-        "Sources/QwenVoiceCore/NativeEngineRuntime.swift",
-        "Sources/QwenVoiceCore/MLXTTSEngine.swift"
-      ],
-      "notes": "External audit CORE-02 and CORE-03 plus ENG-05, confirmed 2026-09-22. Slice 1 done 2026-09-22: Sources/QwenVoiceCore/FileStreamIO.swift (throwing read(upToCount:)/write(contentsOf:)/seekToEnd digest, copy and append) replaces every legacy FileHandle read/write on the downloader, ModelAssets, SharedModelComponentStore and SamplingEvidence paths; digests byte-identical; I/O errors are terminal, not retried (FileStreamIOTests). Open slice 2: cancellation and the one allocation retry are still classified by error text (NativeEngineRuntime.swift:132-169), and with no MLX error handler a real Metal OOM probably reaches fatalError; also remove the temp chunk when writeChunk throws (HuggingFaceDownloader defer) and stop discarding synchronize() errors on the resume-append and chunk-assembly close paths.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },
@@ -1522,9 +1495,9 @@
         "Sources/iOS/IOSGenerationModeViews.swift",
         "website/src/tokens.css"
       ],
-      "notes": "External audit MAC-06, MAC-07, MAC-10, MAC-11, IOS-12, IOS-13, IOS-14 and WEB-03, confirmed 2026-09-22: engine display strings and localizedDescription reach Mac UI in English; formatters follow the system locale; no macOS InfoPlist catalog; 0 VoiceOver announcements and a 6 s action banner on iOS; fixed-size fonts in the player and sheets; website secondary text at about 3.8:1. AUD-06 (modal exclusion) stays its own item.",
+      "notes": "External audit MAC-06, MAC-07, MAC-10, MAC-11, IOS-12, IOS-13, IOS-14 and WEB-03, confirmed 2026-09-22: engine display strings and localizedDescription reach Mac UI in English; formatters follow the system locale; no macOS InfoPlist catalog; 0 VoiceOver announcements and a 6 s action banner on iOS; fixed-size fonts in the player and sheets; website secondary text at about 3.8:1. AUD-06 (modal exclusion) stays its own item. From PA-14 (2026-09-23): route the engine's English memory-pressure and runtime-failure copy (NativeEngineRuntime.swift, with maximumTokenLimit) through VocelloPresentationText / MacInterfaceText keyed on the typed failure code; Sources/QwenVoiceCore is outside localization_contract.py's scan roots.",
       "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
+      "updated": "2026-09-23"
     },
     {
       "id": "PA-21",

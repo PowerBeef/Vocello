@@ -55,6 +55,9 @@ enum NativeRuntimeFailureCode: String, Sendable {
     case runtimeFailed = "runtime.failed"
     case audioQualityRejected = "audio.quality_rejected"
     case generationIncomplete = "generation.incomplete"
+    /// MLX or Metal could not allocate memory (a captured
+    /// `VocelloQwen3RuntimeFailure.allocation`), retryable or not.
+    case memoryPressure = "runtime.memory_pressure"
 }
 
 struct NativeRuntimeError: LocalizedError, Sendable {
@@ -65,22 +68,32 @@ struct NativeRuntimeError: LocalizedError, Sendable {
     /// wrapped so terminal and allocation-retry decisions never read the
     /// wrapped error's text.
     let underlyingDisposition: NativeGenerationErrorDisposition
+    /// The owned runtime's typed MLX failure behind this error, if any. The
+    /// engine unloads the model after one, because MLX stopped mid-evaluation.
+    let runtimeFailure: VocelloQwen3RuntimeFailure?
     let failureCode: NativeRuntimeFailureCode
     let diagnosticDetail: String?
 
+    /// `disposition` overrides the one derived from `underlying`; it is set
+    /// only where the product knows more than the wrapped error (an allocation
+    /// failure after audio was published is not retryable).
     init(
         stage: NativeRuntimeStage,
         message: String,
         underlying: Error? = nil,
         failureCode: NativeRuntimeFailureCode = .runtimeFailed,
-        diagnosticDetail: String? = nil
+        diagnosticDetail: String? = nil,
+        disposition: NativeGenerationErrorDisposition? = nil
     ) {
         self.stage = stage
         self.message = message
         self.underlyingDescription = underlying.map { String(reflecting: $0) }
-        self.underlyingDisposition = underlying.map(
-            NativeGenerationTerminalClassifier.disposition(of:)
-        ) ?? .failure
+        self.underlyingDisposition = disposition
+            ?? underlying.map(NativeGenerationTerminalClassifier.disposition(of:))
+            ?? .failure
+        self.runtimeFailure = underlying.flatMap(
+            NativeGenerationTerminalClassifier.capturedRuntimeFailure(in:)
+        )
         self.failureCode = failureCode
         self.diagnosticDetail = diagnosticDetail
     }
@@ -97,11 +110,62 @@ struct NativeRuntimeError: LocalizedError, Sendable {
         if let runtimeError = error as? NativeRuntimeError {
             return runtimeError
         }
+        if let runtimeFailure = error as? VocelloQwen3RuntimeFailure {
+            // Reached before any audio was published (load, prewarm, clone
+            // conditioning, generation startup); post-publication failures are
+            // mapped where the product knows audio already reached the listener.
+            return capturedRuntimeFailure(runtimeFailure, stage: stage, audioPublished: false)
+        }
         return NativeRuntimeError(
             stage: stage,
             message: "\(message) (\(stage.description)). \(error.localizedDescription)",
             underlying: error
         )
+    }
+
+    /// Product error for an MLX failure the owned runtime captured, with
+    /// user-facing copy instead of the facade type's generic description.
+    ///
+    /// Only an allocation failure before any audio reached the listener is
+    /// eligible for the single allocation retry: the retry re-runs the take
+    /// under the same generation ID and would restart transport sequencing and
+    /// frame offsets over preview audio the listener already heard. After
+    /// publication the failure stays typed (`memoryPressure`) for telemetry but
+    /// ends the take.
+    static func capturedRuntimeFailure(
+        _ runtimeFailure: VocelloQwen3RuntimeFailure,
+        stage: NativeRuntimeStage,
+        audioPublished: Bool
+    ) -> NativeRuntimeError {
+        switch runtimeFailure {
+        case .allocation:
+            return NativeRuntimeError(
+                stage: stage,
+                message: "There was not enough memory to finish this take, so it was not saved. Close other apps, then retry to generate a new take.",
+                underlying: runtimeFailure,
+                failureCode: .memoryPressure,
+                disposition: audioPublished ? .failure : .allocationFailure
+            )
+        case .mlx:
+            return NativeRuntimeError(
+                stage: stage,
+                message: "The on-device voice engine hit an internal error, so this take was not saved. Retry to generate a new take.",
+                underlying: runtimeFailure,
+                failureCode: .runtimeFailed,
+                disposition: .failure
+            )
+        }
+    }
+
+    /// Maps a captured `VocelloQwen3RuntimeFailure` to its product error;
+    /// any other error is returned unchanged.
+    static func mappingCapturedRuntimeFailure(
+        _ error: Error,
+        stage: NativeRuntimeStage,
+        audioPublished: Bool
+    ) -> Error {
+        guard let runtimeFailure = error as? VocelloQwen3RuntimeFailure else { return error }
+        return capturedRuntimeFailure(runtimeFailure, stage: stage, audioPublished: audioPublished)
     }
 
     var telemetryNotes: [String: String] {
@@ -194,6 +258,14 @@ enum NativeGenerationTerminalClassifier {
 
     static func reason(for error: Error) -> GenerationTerminalReason {
         disposition(of: error) == .cancellation ? .cancelled : .failed
+    }
+
+    /// The owned runtime's typed MLX failure behind `error`, if any.
+    static func capturedRuntimeFailure(in error: Error) -> VocelloQwen3RuntimeFailure? {
+        if let runtimeFailure = error as? VocelloQwen3RuntimeFailure {
+            return runtimeFailure
+        }
+        return (error as? NativeRuntimeError)?.runtimeFailure
     }
 
     static func isRetryableAllocationFailure(_ error: Error) -> Bool {

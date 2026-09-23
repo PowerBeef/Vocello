@@ -248,7 +248,10 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
                     )
                     let terminal = await currentReservation.session.waitForModelTermination()
                     guard case .completed(.endOfSequence) = terminal.outcome else {
-                        throw Self.productError(for: terminal.outcome)
+                        throw Self.productError(
+                            for: terminal.outcome,
+                            emittedAudioFrameCount: terminal.emittedAudioFrameCount
+                        )
                     }
 
                     // Product completion belongs to the operation lease. Do not
@@ -325,7 +328,8 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
     }
 
     static func productError(
-        for outcome: VocelloQwen3TerminalOutcome
+        for outcome: VocelloQwen3TerminalOutcome,
+        emittedAudioFrameCount: Int
     ) -> Error {
         switch outcome {
         case .cancelled:
@@ -334,8 +338,13 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
             return NativeRuntimeError.maximumTokenLimit()
         case .failed(.memoryPressure):
             // The owned runtime reports a captured MLX allocation failure as
-            // memory pressure; keep it typed so the one allocation retry runs.
-            return VocelloQwen3RuntimeFailure.allocation
+            // memory pressure. It stays typed; it is retryable only when no
+            // audio was emitted.
+            return NativeRuntimeError.capturedRuntimeFailure(
+                .allocation,
+                stage: .streamFailed,
+                audioPublished: emittedAudioFrameCount > 0
+            )
         case .failed, .completed:
             return MLXTTSEngineError.generationFailed(
                 "Qwen3-TTS failed before product finalization."
@@ -1745,8 +1754,8 @@ struct StreamingExecutionContext: Sendable {
                 modelOutcomeV9 = .cancelled
                 throw CancellationError()
             case .failed(.memoryPressure):
-                // A captured MLX allocation failure stays typed so the engine
-                // runs its single allocation retry.
+                // A captured MLX allocation failure stays typed; the catch
+                // below decides whether audio was already published.
                 modelOutcomeV9 = .failed
                 throw VocelloQwen3RuntimeFailure.allocation
             case .failed:
@@ -1765,7 +1774,11 @@ struct StreamingExecutionContext: Sendable {
                     cancellationWakeups: channelStats.cancellationWakeupCount
                 )
             }
-        } catch {
+        } catch let streamError {
+            let error = Self.streamFailureError(
+                streamError,
+                totalFramesWritten: totalFramesWritten
+            )
             signpostTimingsMS["native_generation_stream_ms"] = generationStreamStartedAt.elapsedMilliseconds
             GenerationFailureDiagnosticLogger.shared.log(
                 surfacedMessage: "Streaming execution failed",
@@ -1895,10 +1908,14 @@ struct StreamingExecutionContext: Sendable {
                 // after — the resident peak must never stack marking on top
                 // of generation's still-cached working set.
                 Memory.clearCache()
-                try AudioPublicationMarker.markStagedWAV(
-                    at: stagingURL,
-                    configuration: markingConfiguration
-                )
+                do {
+                    try AudioPublicationMarker.markStagedWAV(
+                        at: stagingURL,
+                        configuration: markingConfiguration
+                    )
+                } catch {
+                    throw Self.publicationMarkingError(error)
+                }
                 Memory.clearCache()
                 await telemetrySampler?.captureBoundary("after_marking")
             }
@@ -2168,6 +2185,32 @@ struct StreamingExecutionContext: Sendable {
     /// interpreting an empty stream as an engine failure so memory-pressure
     /// cancellation retains its typed terminal reason and never surfaces a
     /// false "no audio chunks" error in the frontend.
+    /// Maps a failure of the streaming loop. A captured MLX allocation failure
+    /// is retryable only while no frame was written: every written frame was
+    /// also offered to the listener as preview, and the retry would replay the
+    /// take from frame zero under the same generation ID.
+    static func streamFailureError(
+        _ error: Error,
+        totalFramesWritten: Int64
+    ) -> Error {
+        NativeRuntimeError.mappingCapturedRuntimeFailure(
+            error,
+            stage: .streamFailed,
+            audioPublished: totalFramesWritten > 0
+        )
+    }
+
+    /// Marking runs on the finalized take after its audio reached the
+    /// listener, so a marking failure (including a captured MLX allocation
+    /// failure) is never retried.
+    static func publicationMarkingError(_ error: Error) -> Error {
+        NativeRuntimeError.mappingCapturedRuntimeFailure(
+            error,
+            stage: .streamCompleted,
+            audioPublished: true
+        )
+    }
+
     static func postStreamTerminalError(
         totalFramesWritten: Int64,
         isTaskCancelled: Bool

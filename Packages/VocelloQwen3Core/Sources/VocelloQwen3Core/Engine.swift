@@ -712,9 +712,10 @@ public actor VocelloQwen3Engine {
                     isolation: self
                 )
             }
-            try mlxErrors.check()
             try revalidate(lease)
+            // Cancellation wins over an MLX failure recorded while warming.
             try Task.checkCancellation()
+            try mlxErrors.check()
             activeOperation = nil
             phase = .ready
         } catch {
@@ -784,9 +785,10 @@ public actor VocelloQwen3Engine {
                     memory: request.memory
                 )
             }
-            try mlxErrors.check()
             try revalidate(lease)
+            // Cancellation wins over an MLX failure recorded while priming.
             try Task.checkCancellation()
+            try mlxErrors.check()
             activeOperation = nil
             phase = .ready
             return VocelloQwen3PrimeResult(

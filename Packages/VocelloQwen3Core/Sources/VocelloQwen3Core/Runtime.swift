@@ -141,9 +141,22 @@ public enum VocelloQwen3Runtime {
 /// MLX reports C++ errors through one process-wide callback that carries only a
 /// message, and mlx-swift answers an error raised outside a scoped handler with
 /// `fatalError`. The facade scopes a handler around model load, prewarm,
-/// priming, clone conditioning, audio marking and generation, classifies the
-/// message once at this boundary and surfaces only this typed value; the raw
-/// message never crosses the facade.
+/// priming, clone conditioning (`makeCloneHandle`), audio marking and
+/// generation, classifies the message once at this boundary and surfaces only
+/// this typed value; the raw message never crosses the facade.
+///
+/// Real coverage is narrower than "every MLX error":
+/// - Only errors MLX raises synchronously on a task inside the scope are
+///   captured. A Metal command-buffer failure reported from the completion
+///   handler (`kIOGPUCommandBufferCallbackErrorOutOfMemory` after an
+///   asynchronous evaluation) is thrown on a Metal thread outside any task and
+///   is not captured; neither is MLX work on a detached task or on MLX's CPU
+///   scheduler thread.
+/// - After a captured error MLX returns without evaluating. Reading an array
+///   back (`asArray`, `item`) before the next scope check can still trap in
+///   Swift, which the scope cannot intercept.
+/// - `adoptCloneArtifact`, `persistCloneArtifact` and `replayCodecTrace` are not
+///   wrapped; their MLX errors still reach mlx-swift's fallback.
 public enum VocelloQwen3RuntimeFailure: Error, Equatable, Sendable {
     /// MLX or Metal could not allocate memory: a buffer larger than the device
     /// allows, an exhausted resource limit, or a failed buffer allocation.
@@ -175,7 +188,7 @@ public enum VocelloQwen3RuntimeFailure: Error, Equatable, Sendable {
     /// Classifies an MLX error message. The message is the only information MLX
     /// provides, so this is the single place it is interpreted; everything
     /// downstream decides on the typed value.
-    public static func classifying(mlxMessage message: String) -> VocelloQwen3RuntimeFailure {
+    static func classifying(mlxMessage message: String) -> VocelloQwen3RuntimeFailure {
         let lowercased = message.lowercased()
         let allocationMarkers = [
             "malloc",
@@ -226,14 +239,17 @@ final class VocelloQwen3MLXErrorScope: Sendable {
         }
     }
 
-    /// The error a failed operation reports. Cancellation always wins so a
-    /// cancelled operation stays a cancellation; otherwise a recorded MLX
-    /// failure replaces whatever the operation threw after MLX stopped
-    /// evaluating, and an `MLXError` thrown by mlx-swift is mapped to its typed
-    /// failure.
+    /// The error a failed operation reports. Cancellation always wins, whether
+    /// the operation threw it or only observed it, so a cancelled operation
+    /// stays a cancellation; otherwise a recorded MLX failure replaces whatever
+    /// the operation threw after MLX stopped evaluating, and an `MLXError`
+    /// thrown by mlx-swift is mapped to its typed failure.
     func resolvedError(for error: any Error) -> any Error {
         if error is CancellationError {
             return error
+        }
+        if Task.isCancelled {
+            return CancellationError()
         }
         if let failure {
             return failure

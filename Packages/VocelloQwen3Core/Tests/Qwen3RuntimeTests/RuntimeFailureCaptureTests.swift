@@ -12,8 +12,6 @@ final class RuntimeFailureCaptureTests: XCTestCase {
                 + "the maximum allowed buffer size of 17179869184 bytes.",
             "[metal::malloc] Resource limit (499000) exceeded.",
             "[malloc] Unable to allocate 1073741824 bytes.",
-            "[METAL] Command buffer execution failed: Insufficient Memory "
-                + "(00000008:kIOGPUCommandBufferCallbackErrorOutOfMemory)",
         ]
         for message in allocationMessages {
             XCTAssertEqual(
@@ -41,6 +39,25 @@ final class RuntimeFailureCaptureTests: XCTestCase {
             .mlx
         )
         XCTAssertNil(VocelloQwen3RuntimeFailure(mlxError: CancellationError()))
+    }
+
+    func testObservedCancellationWinsOverARecordedMLXFailure() async {
+        let scope = VocelloQwen3MLXErrorScope()
+        let task = Task { () -> Error? in
+            do {
+                _ = try await scope.captureAsync { @Sendable () async throws -> Int in
+                    withUnsafeCurrentTask { $0?.cancel() }
+                    scope.record(mlxMessage: "[malloc] Unable to allocate 64 bytes.")
+                    // The operation noticed nothing and returned normally.
+                    return 1
+                }
+                return nil
+            } catch {
+                return error
+            }
+        }
+        let error = await task.value
+        XCTAssertTrue(error is CancellationError, "\(String(describing: error))")
     }
 
     func testScopeKeepsTheFirstRecordedFailure() throws {

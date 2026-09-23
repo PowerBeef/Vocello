@@ -262,6 +262,8 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
                 return ErrorMetadata(code: runtimeError.failureCode.rawValue, classification: .model)
             case .runtimeFailed:
                 return ErrorMetadata(code: runtimeError.failureCode.rawValue, classification: .runtime)
+            case .memoryPressure:
+                return ErrorMetadata(code: runtimeError.failureCode.rawValue, classification: .memory)
             }
         }
 

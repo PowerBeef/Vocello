@@ -943,17 +943,145 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
         XCTAssertEqual(surfaced.underlyingDisposition, .allocationFailure)
     }
 
-    func testMemoryPressureTerminalOutcomeMapsToTypedAllocationFailure() {
-        let allocation = GenerationOutputAdapter.productError(for: .failed(.memoryPressure))
-        XCTAssertEqual(allocation as? VocelloQwen3RuntimeFailure, .allocation)
-        XCTAssertTrue(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(allocation))
+    func testMemoryPressureTerminalOutcomeIsRetryableOnlyBeforeAudioWasEmitted() {
+        let beforeAudio = GenerationOutputAdapter.productError(
+            for: .failed(.memoryPressure),
+            emittedAudioFrameCount: 0
+        )
+        XCTAssertTrue(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(beforeAudio))
+        XCTAssertEqual((beforeAudio as? NativeRuntimeError)?.failureCode, .memoryPressure)
 
-        let runtime = GenerationOutputAdapter.productError(for: .failed(.runtime))
+        let afterAudio = GenerationOutputAdapter.productError(
+            for: .failed(.memoryPressure),
+            emittedAudioFrameCount: 1_920
+        )
+        XCTAssertFalse(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(afterAudio))
+        XCTAssertEqual(NativeGenerationTerminalClassifier.reason(for: afterAudio), .failed)
+        XCTAssertEqual((afterAudio as? NativeRuntimeError)?.failureCode, .memoryPressure)
+
+        let runtime = GenerationOutputAdapter.productError(
+            for: .failed(.runtime),
+            emittedAudioFrameCount: 0
+        )
         XCTAssertFalse(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(runtime))
         XCTAssertEqual(NativeGenerationTerminalClassifier.reason(for: runtime), .failed)
 
-        let cancelled = GenerationOutputAdapter.productError(for: .cancelled(.superseded))
+        let cancelled = GenerationOutputAdapter.productError(
+            for: .cancelled(.superseded),
+            emittedAudioFrameCount: 0
+        )
         XCTAssertEqual(NativeGenerationTerminalClassifier.reason(for: cancelled), .cancelled)
+    }
+
+    func testStreamAllocationFailureRetriesOnlyBeforeAnyFrameWasPublished() {
+        let beforeAudio = StreamingExecutionContext.streamFailureError(
+            VocelloQwen3RuntimeFailure.allocation,
+            totalFramesWritten: 0
+        )
+        XCTAssertTrue(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(beforeAudio))
+
+        // A mid-stream talker allocation failure after preview audio was
+        // published must not re-run the take under the same generation ID.
+        let midStream = StreamingExecutionContext.streamFailureError(
+            VocelloQwen3RuntimeFailure.allocation,
+            totalFramesWritten: 24_000
+        )
+        XCTAssertFalse(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(midStream))
+        XCTAssertEqual(NativeGenerationTerminalClassifier.reason(for: midStream), .failed)
+        let midStreamError = midStream as? NativeRuntimeError
+        XCTAssertEqual(midStreamError?.failureCode, .memoryPressure)
+        XCTAssertEqual(
+            midStreamError?.telemetryNotes["nativeRuntimeFailureCode"],
+            "runtime.memory_pressure"
+        )
+        XCTAssertFalse(
+            NativeGenerationTerminalClassifier.shouldPublish(
+                error: beforeAudio,
+                policy: .deferRetryableAllocationFailure
+            )
+        )
+        XCTAssertTrue(
+            NativeGenerationTerminalClassifier.shouldPublish(
+                error: midStream,
+                policy: .deferRetryableAllocationFailure
+            )
+        )
+
+        let mlxFailure = StreamingExecutionContext.streamFailureError(
+            VocelloQwen3RuntimeFailure.mlx,
+            totalFramesWritten: 0
+        )
+        XCTAssertFalse(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(mlxFailure))
+
+        // Other errors pass through untouched, cancellation included.
+        let cancellation = StreamingExecutionContext.streamFailureError(
+            CancellationError(),
+            totalFramesWritten: 24_000
+        )
+        XCTAssertTrue(cancellation is CancellationError)
+    }
+
+    func testPublicationMarkingFailureIsNeverRetried() {
+        let marking = StreamingExecutionContext.publicationMarkingError(
+            VocelloQwen3RuntimeFailure.allocation
+        )
+        XCTAssertFalse(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(marking))
+        XCTAssertEqual(NativeGenerationTerminalClassifier.reason(for: marking), .failed)
+        XCTAssertEqual((marking as? NativeRuntimeError)?.failureCode, .memoryPressure)
+
+        let sampleCount = MLXTTSEngineError.generationFailed("Audio marking changed the sample count.")
+        let passthrough = StreamingExecutionContext.publicationMarkingError(sampleCount)
+        XCTAssertEqual(passthrough as? MLXTTSEngineError, sampleCount)
+        XCTAssertFalse(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(passthrough))
+    }
+
+    func testCapturedRuntimeFailureHasProductCopyAndMemoryClassification() {
+        for failure in [VocelloQwen3RuntimeFailure.allocation, .mlx] {
+            let surfaced = MLXTTSEngine.surfacedGenerationError(
+                failure,
+                allocationRetryAttempted: false
+            )
+            let message = surfaced.localizedDescription
+            XCTAssertFalse(message.contains("VocelloQwen3RuntimeFailure"), message)
+            XCTAssertFalse(message.contains("error 0"), message)
+            XCTAssertFalse(message.isEmpty)
+        }
+        let allocation = NativeRuntimeError.capturedRuntimeFailure(
+            .allocation,
+            stage: .streamFailed,
+            audioPublished: true
+        )
+        let metadata = GenerationFailureDiagnosticLogger.errorMetadata(for: allocation)
+        XCTAssertEqual(metadata.code, "runtime.memory_pressure")
+        XCTAssertEqual(metadata.classification, .memory)
+    }
+
+    func testCapturedRuntimeFailureRequiresModelUnload() {
+        XCTAssertTrue(MLXTTSEngine.requiresUnloadAfterFailure(VocelloQwen3RuntimeFailure.allocation))
+        XCTAssertTrue(MLXTTSEngine.requiresUnloadAfterFailure(VocelloQwen3RuntimeFailure.mlx))
+        XCTAssertTrue(
+            MLXTTSEngine.requiresUnloadAfterFailure(
+                StreamingExecutionContext.streamFailureError(
+                    VocelloQwen3RuntimeFailure.allocation,
+                    totalFramesWritten: 24_000
+                )
+            )
+        )
+        XCTAssertTrue(
+            MLXTTSEngine.requiresUnloadAfterFailure(
+                MLXTTSEngine.surfacedGenerationError(
+                    VocelloQwen3RuntimeFailure.mlx,
+                    allocationRetryAttempted: true
+                )
+            )
+        )
+        XCTAssertFalse(MLXTTSEngine.requiresUnloadAfterFailure(CancellationError()))
+        XCTAssertFalse(MLXTTSEngine.requiresUnloadAfterFailure(NativeRuntimeError.maximumTokenLimit()))
+        XCTAssertFalse(
+            MLXTTSEngine.requiresUnloadAfterFailure(
+                MLXTTSEngineError.generationFailed("The native engine did not emit any audio chunks.")
+            )
+        )
     }
 
     func testStreamingPostLoopClassifiesCancellationBeforeEmptyOutput() {

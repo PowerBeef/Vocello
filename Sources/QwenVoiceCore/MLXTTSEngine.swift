@@ -1358,6 +1358,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                         await recordEventDeliveryLossIfNeeded(delivery, request: request)
                         throw CancellationError()
                     }
+                    await unloadAfterCapturedRuntimeFailureIfNeeded(error)
                     let surfacedError = Self.surfacedGenerationError(
                         error,
                         allocationRetryAttempted: true
@@ -1386,6 +1387,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                     throw surfacedError
                 }
             }
+            await unloadAfterCapturedRuntimeFailureIfNeeded(error)
             let surfacedError = Self.surfacedGenerationError(
                 error,
                 allocationRetryAttempted: false
@@ -1506,6 +1508,24 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             retryAttempt: retryAttempt,
             operationGeneration: operationGeneration
         )
+    }
+
+    /// After MLX raised an error mid-generation the loaded model may hold
+    /// half-evaluated state, so it is unloaded before the next admission, as a
+    /// failed load or prewarm already is. The caller still holds the
+    /// generation's model-operation lease and the runtime's generation lease
+    /// was released by product finalization, exactly as for the allocation
+    /// retry's cleanup.
+    private func unloadAfterCapturedRuntimeFailureIfNeeded(_ error: Error) async {
+        guard Self.requiresUnloadAfterFailure(error) else { return }
+        Memory.clearCache()
+        await runtime.unloadModel()
+        clonePreparationState = .idle
+    }
+
+    /// Whether a generation failure left MLX state that must not be reused.
+    nonisolated static func requiresUnloadAfterFailure(_ error: Error) -> Bool {
+        NativeGenerationTerminalClassifier.capturedRuntimeFailure(in: error) != nil
     }
 
     nonisolated static func surfacedGenerationError(

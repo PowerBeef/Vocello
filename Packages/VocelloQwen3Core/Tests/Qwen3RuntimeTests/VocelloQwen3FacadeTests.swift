@@ -1156,6 +1156,192 @@ final class VocelloQwen3FacadeTests: XCTestCase {
         XCTAssertNil(snapshot.activeOperation)
     }
 
+    func testEngineFailedLoadDoesNotCommitAndReleasesTheLease() async throws {
+        let engine = VocelloQwen3Engine(
+            loadedModel: try makeLoadedFixture(compatibilityModel: FacadeCompatibilityModel())
+        )
+        let before = await engine.snapshot()
+        let bundle = VocelloQwen3PreparedModelBundle(
+            identity: VocelloQwen3ModelIdentity(
+                modelID: "fixture-replacement",
+                repositoryID: "fixture/replacement",
+                revision: "fixture-revision",
+                artifactVersion: "fixture-v2"
+            ),
+            preparedDirectory: FileManager.default.temporaryDirectory
+                .appendingPathComponent("absent-\(UUID().uuidString)", isDirectory: true),
+            modelType: "unsupported_fixture",
+            trustedPreparedCheckpoint: false,
+            capabilities: VocelloQwen3CapabilitySet([.streaming, .customVoice])
+        )
+
+        do {
+            _ = try await engine.load(bundle)
+            XCTFail("an unloadable bundle must not load")
+        } catch {}
+
+        let after = await engine.snapshot()
+        XCTAssertEqual(after.loadedModel, before.loadedModel)
+        XCTAssertEqual(after.modelEpoch, before.modelEpoch)
+        XCTAssertNil(after.activeOperation)
+        XCTAssertEqual(after.phase, .failed)
+    }
+
+    func testEngineFailedPrewarmReportsTypedFailureAndReleasesTheLease() async throws {
+        let engine = VocelloQwen3Engine(
+            loadedModel: try makeLoadedFixture(
+                compatibilityModel: FacadeCompatibilityModel(
+                    prewarmError: MLXError.caught("[malloc] Unable to allocate 64 bytes.")
+                )
+            )
+        )
+
+        do {
+            try await engine.prewarm(request: makeCustomRequest(generationID: UUID()))
+            XCTFail("a prewarm that raised an MLX error must throw")
+        } catch {
+            XCTAssertEqual(error as? VocelloQwen3RuntimeFailure, .allocation)
+        }
+
+        let snapshot = await engine.snapshot()
+        XCTAssertNil(snapshot.activeOperation)
+        XCTAssertEqual(snapshot.phase, .failed)
+    }
+
+    func testEngineRecordedMLXErrorFailsPrewarmInsteadOfFatalError() async throws {
+        let engine = VocelloQwen3Engine(
+            loadedModel: try makeLoadedFixture(
+                compatibilityModel: FacadeCompatibilityModel(prewarmRaisesMLXError: true)
+            )
+        )
+
+        do {
+            try await engine.prewarm(request: makeCustomRequest(generationID: UUID()))
+            XCTFail("an MLX error raised while warming must fail the prewarm")
+        } catch {
+            XCTAssertEqual(error as? VocelloQwen3RuntimeFailure, .mlx)
+        }
+
+        let snapshot = await engine.snapshot()
+        XCTAssertNil(snapshot.activeOperation)
+        XCTAssertEqual(snapshot.phase, .failed)
+    }
+
+    func testEngineFailedPrimeReportsTypedFailureAndReleasesTheLease() async throws {
+        let engine = VocelloQwen3Engine(
+            loadedModel: try makeLoadedFixture(
+                compatibilityModel: FacadeCompatibilityModel(
+                    primeError: MLXError.caught("[metal::malloc] Resource limit (499000) exceeded.")
+                )
+            )
+        )
+
+        do {
+            _ = try await engine.prime(request: makeCustomRequest(generationID: UUID()))
+            XCTFail("a prime that raised an MLX error must throw")
+        } catch {
+            XCTAssertEqual(error as? VocelloQwen3RuntimeFailure, .allocation)
+        }
+
+        let snapshot = await engine.snapshot()
+        XCTAssertNil(snapshot.activeOperation)
+        XCTAssertEqual(snapshot.phase, .failed)
+    }
+
+    func testCancellationWinsOverAnMLXFailureDuringPrewarm() async throws {
+        let prewarmGate = SuspendedEngineOperationGate()
+        let engine = VocelloQwen3Engine(
+            loadedModel: try makeLoadedFixture(
+                compatibilityModel: FacadeCompatibilityModel(
+                    prewarmGate: prewarmGate,
+                    prewarmRaisesMLXError: true
+                )
+            )
+        )
+        let prewarmRequest = makeCustomRequest(generationID: UUID())
+        let prewarm = Task {
+            try await engine.prewarm(request: prewarmRequest)
+        }
+
+        await prewarmGate.waitUntilEntered()
+        prewarm.cancel()
+        await prewarmGate.release()
+
+        do {
+            try await prewarm.value
+            XCTFail("a cancelled prewarm must not complete")
+        } catch {
+            XCTAssertTrue(error is CancellationError, "\(error)")
+        }
+        let snapshot = await engine.snapshot()
+        XCTAssertNil(snapshot.activeOperation)
+    }
+
+    func testEngineProducerAllocationFailureEndsWithMemoryPressure() async throws {
+        let engine = VocelloQwen3Engine(
+            loadedModel: try makeLoadedFixture(
+                compatibilityModel: FacadeCompatibilityModel(
+                    producerError: MLXError.caught("[malloc] Unable to allocate 1073741824 bytes.")
+                )
+            )
+        )
+        let reservation = try await engine.reserveGeneration(
+            request: makeCustomRequest(generationID: UUID()),
+            audioCapacityFrames: 24_000
+        )
+        let audio = try await reservation.session.claimAudioConsumer()
+        let drain = Task { () -> Error? in
+            do {
+                for try await _ in audio {}
+                return nil
+            } catch {
+                return error
+            }
+        }
+
+        try await engine.open(reservation.id)
+        let terminal = await reservation.session.waitForModelTermination()
+        XCTAssertEqual(terminal.outcome, .failed(.memoryPressure))
+        // The facade reports what was emitted; the product decides whether the
+        // one allocation retry is still safe.
+        XCTAssertGreaterThan(terminal.emittedAudioFrameCount, 0)
+        let consumerError = await drain.value
+        XCTAssertEqual(consumerError as? VocelloQwen3RuntimeFailure, .allocation)
+
+        _ = try await engine.acknowledgeProductFinalization(
+            generationID: reservation.session.generationID,
+            leaseID: reservation.lease.id,
+            token: reservation.session.finalizationToken,
+            disposition: .aborted(.memoryPressure)
+        )
+    }
+
+    func testEngineRecordedMLXErrorStopsTheProducerAsRuntimeFailure() async throws {
+        let engine = VocelloQwen3Engine(
+            loadedModel: try makeLoadedFixture(
+                compatibilityModel: FacadeCompatibilityModel(producerRaisesMLXError: true)
+            )
+        )
+        let reservation = try await engine.reserveGeneration(
+            request: makeCustomRequest(generationID: UUID()),
+            audioCapacityFrames: 24_000
+        )
+        _ = try await reservation.session.claimAudioConsumer()
+
+        try await engine.open(reservation.id)
+        let terminal = await reservation.session.waitForModelTermination()
+        XCTAssertEqual(terminal.outcome, .failed(.runtime))
+        // The scope stops the producer at its next signal after the MLX error.
+        XCTAssertEqual(terminal.emittedAudioFrameCount, 0)
+
+        _ = try await engine.acknowledgeProductFinalization(
+            generationID: reservation.session.generationID,
+            leaseID: reservation.lease.id,
+            token: reservation.session.finalizationToken,
+            disposition: .aborted(.runtime)
+        )
+    }
+
     func testSuspendedPrewarmRejectsReentrantGenerationReservation() async throws {
         let prewarmGate = SuspendedEngineOperationGate()
         let engine = VocelloQwen3Engine(
@@ -2030,6 +2216,11 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
     private let emitsInfo: Bool
     private let emitsChunkTimings: Bool
     private let qualityFirstAudio: [Float]
+    private let prewarmError: (any Error & Sendable)?
+    private let primeError: (any Error & Sendable)?
+    private let producerError: (any Error & Sendable)?
+    private let prewarmRaisesMLXError: Bool
+    private let producerRaisesMLXError: Bool
     private let captureLock = NSLock()
     private var _capturedGenerationParameters: GenerateParameters?
     private var _capturedSamplingPolicy: Qwen3RequestSamplingPolicy?
@@ -2045,7 +2236,12 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         emitsAudio: Bool = true,
         emitsInfo: Bool = false,
         emitsChunkTimings: Bool = false,
-        qualityFirstAudio: [Float] = [0.1]
+        qualityFirstAudio: [Float] = [0.1],
+        prewarmError: (any Error & Sendable)? = nil,
+        primeError: (any Error & Sendable)? = nil,
+        producerError: (any Error & Sendable)? = nil,
+        prewarmRaisesMLXError: Bool = false,
+        producerRaisesMLXError: Bool = false
     ) {
         self.eventCount = eventCount
         self.generationEndReason = generationEndReason
@@ -2056,6 +2252,17 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         self.emitsInfo = emitsInfo
         self.emitsChunkTimings = emitsChunkTimings
         self.qualityFirstAudio = qualityFirstAudio
+        self.prewarmError = prewarmError
+        self.primeError = primeError
+        self.producerError = producerError
+        self.prewarmRaisesMLXError = prewarmRaisesMLXError
+        self.producerRaisesMLXError = producerRaisesMLXError
+    }
+
+    /// Raises a real MLX error (incompatible shapes) through MLX's error
+    /// handler, the way a failed evaluation reports inside the runtime.
+    private static func raiseMLXError() {
+        _ = MLXArray(0 ..< 10, [2, 5]) + MLXArray(0 ..< 15, [3, 5])
     }
 
     var capturedGenerationParameters: GenerateParameters? {
@@ -2144,6 +2351,12 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         if let prewarmGate {
             await prewarmGate.suspend()
         }
+        if prewarmRaisesMLXError {
+            Self.raiseMLXError()
+        }
+        if let prewarmError {
+            throw prewarmError
+        }
     }
 
     func generateCustomVoiceStream(
@@ -2184,6 +2397,9 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
             samplingPolicy: samplingPolicy,
             memoryPolicy: memoryPolicy
         )
+        if let primeError {
+            throw primeError
+        }
         return fixtureCompletion()
     }
 
@@ -2239,7 +2455,13 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
             await producerGate.suspend()
         }
         try await sink(.prepared)
+        if producerRaisesMLXError {
+            Self.raiseMLXError()
+        }
         try await emitFixtureEvents(to: sink)
+        if let producerError {
+            throw producerError
+        }
         switch generationEndReason {
         case "eos": return .eos
         case "token_cap", "max_tokens": return .maxTokens

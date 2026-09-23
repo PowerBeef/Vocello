@@ -3591,6 +3591,30 @@
         "commit:ebcacd75",
         "run:35779389994"
       ]
+    },
+    {
+      "id": "PA-27",
+      "title": "Parallel agents on the 16 GB development host",
+      "status": "done",
+      "gate": "Worktree-isolated editing agents commit only on worktree-* branches under .claude/worktrees/, only main is pushed, and the lead integrates with merge --ff-only or cherry-pick (test_agent_hooks.py); every Xcode/SwiftPM build and test holds the host-wide native lock across checkouts (test_native_lock.py); evidence lanes refuse to start while the lock is held elsewhere or an agent worktree is locked (test_host_preflight.py); and one live isolated-agent change is integrated and cleaned up.",
+      "sourceOfTruth": [
+        "CLAUDE.md",
+        ".claude/settings.json",
+        "scripts/hooks/commit_lint.sh",
+        "scripts/hooks/policy_guard.sh",
+        "scripts/lib/build_cache.sh",
+        "docs/reference/development-workflow.md"
+      ],
+      "notes": "Closed 2026-09-22. Development moved to a Mac mini M6 (16 GB, 12 cores) and the maintainer allowed multi-agent work where it pays off: a lead session on main that alone pushes, read-only subagents, and editing agents in Claude Code worktrees on worktree-* branches. Every Xcode/SwiftPM build and test holds the host-wide native lock; git_commands.py tokenizes git commands for both Bash guards (two adversarial reviews, ~370 spellings); the commit lint and generated-file guard now judge the worktree they act on. Proven live: two parallel worktree agents (asc removal, M6 canonical host) integrated by fast-forward and cherry-pick, then cleaned up. Native git hooks (reference-transaction/pre-push) remain an optional hardening, not adopted.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22",
+      "evidence": [
+        "commit:fe50f658",
+        "commit:15eaa1e3",
+        "commit:91998582",
+        "run:35806533959",
+        "file:scripts/tests/test_native_lock.py"
+      ]
     }
   ]
 }

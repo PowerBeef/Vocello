@@ -207,7 +207,8 @@ background task. Agents never push, touch `main`, run consent-bound lanes or Xco
 `git log main..worktree-<name>` and the diff, then `git merge --ff-only worktree-<name>` (or
 `git cherry-pick <sha>...` when `main` moved; no merge commits without a stated reason), run the
 routed `scripts/dev.sh check` on `main`, push, and clean up with
-`git worktree remove .claude/worktrees/<name>` and `git branch -d worktree-<name>` (Claude Code
+`git worktree remove .claude/worktrees/<name>` and `git branch -d worktree-<name>` (a cherry-picked
+branch is not an ancestor of `main`, so it needs `git branch -D`, which asks first; Claude Code
 locks a worktree while its agent runs and unlocks it when the agent finishes; a worktree left locked
 by an interrupted session needs `git worktree unlock .claude/worktrees/<name>` first). Discarding unintegrated work (`git branch -D`,
 `git worktree remove --force`) asks first. The SessionStart banner

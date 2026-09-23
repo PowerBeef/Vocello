@@ -26,8 +26,12 @@ Claude Code worktrees (`.claude/worktrees/<name>`, `worktree-*`) that the lead i
 `merge --ff-only` or `cherry-pick`. Every Xcode/SwiftPM command now holds the host-wide native lock
 (`~/Library/Caches/Vocello/native-build.lock`), and evidence lanes refuse to start while an agent or
 another native build is active. Rules and the 16 GB budget:
-[development workflow](reference/development-workflow.md#parallel-agents-and-worktrees). Next: the
-rorkai `asc` removal and the M6 canonical-benchmark switch, then the queue below.
+[development workflow](reference/development-workflow.md#parallel-agents-and-worktrees). The workflow
+was proven live the same evening: two worktree agents ran in parallel and were integrated (one
+fast-forward, one cherry-pick) — the rorkai `asc` CLI and its App Store Connect probes are gone
+(build-number and account checks are now manual, read-only), and the Mac mini M6 16 GB is the
+canonical macOS benchmark host (M2 records stay history; the first M6 baseline is AV-17, consent-bound).
+Next: the queue below.
 
 ### Machine transition and next steps (September 22)
 

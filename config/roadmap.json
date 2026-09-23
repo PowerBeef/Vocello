@@ -1673,23 +1673,6 @@
       "notes": "External audit 2026-09-22, sections 5 to 12: the Low and Info rows not grouped into PA-01 to PA-25 or existing items (for example ENG-07 to ENG-17, CORE-10 to CORE-22, MAC-09 to MAC-26, IOS-16 to IOS-25, SEC-08 to SEC-16, CI-09 to CI-21, WEB-02, WEB-06 to WEB-08, UX-01, REPO-01 to REPO-04). Work them in batches by area; the report's verification addendum lists the rows that are wrong or already fixed.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
-    },
-    {
-      "id": "PA-27",
-      "title": "Parallel agents on the 16 GB development host",
-      "status": "in-flight",
-      "gate": "Worktree-isolated editing agents commit only on worktree-* branches under .claude/worktrees/, only main is pushed, and the lead integrates with merge --ff-only or cherry-pick (test_agent_hooks.py); every Xcode/SwiftPM build and test holds the host-wide native lock across checkouts (test_native_lock.py); evidence lanes refuse to start while the lock is held elsewhere or an agent worktree is locked (test_host_preflight.py); and one live isolated-agent change is integrated and cleaned up.",
-      "sourceOfTruth": [
-        "CLAUDE.md",
-        ".claude/settings.json",
-        "scripts/hooks/commit_lint.sh",
-        "scripts/hooks/policy_guard.sh",
-        "scripts/lib/build_cache.sh",
-        "docs/reference/development-workflow.md"
-      ],
-      "notes": "Opened 2026-09-22 when development moved to a Mac mini M6 (16 GB, 12 cores) and the maintainer allowed multi-agent work where it makes sense. Replaces the single-editor, main-only agreement with a lead session plus Claude Code worktree agents; the per-checkout package-store lock became the host-wide native lock (~/Library/Caches/Vocello/native-build.lock). Also fixes two latent hook defects (the commit lint judged the main checkout instead of the worktree; the generated-file guard missed worktree paths) and denies the XcodeBuildMCP Simulator tools (audit CI-20, partly). Budget and rules: development-workflow.md#parallel-agents-and-worktrees.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
     }
   ]
 }

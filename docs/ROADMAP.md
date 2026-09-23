@@ -22,7 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 3/28 (11%) |
+| `project-audit-2026-09` | active | backend-and-platform | 4/28 (14%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -480,7 +480,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-24` | planned | Push CI compiles the XCUITest bundles | — |
 | `PA-25` | planned | Docs and tooling stay proportional | — |
 | `PA-26` | planned | Low-severity backlog from the external audit | — |
-| `PA-27` | in-flight | Parallel agents on the 16 GB development host | — |
 
 ### Open items in detail
 
@@ -555,9 +554,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-26`** (planned) — Low-severity backlog from the external audit.
   gate: Every Low and Info finding in the external audit that no other item covers is fixed or declined with a reason, section by section.
-
-- **`PA-27`** (in-flight) — Parallel agents on the 16 GB development host.
-  gate: Worktree-isolated editing agents commit only on worktree-* branches under .claude/worktrees/, only main is pushed, and the lead integrates with merge --ff-only or cherry-pick (test_agent_hooks.py); every Xcode/SwiftPM build and test holds the host-wide native lock across checkouts (test_native_lock.py); evidence lanes refuse to start while the lock is held elsewhere or an agent worktree is locked (test_host_preflight.py); and one live isolated-agent change is integrated and cleaned up.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

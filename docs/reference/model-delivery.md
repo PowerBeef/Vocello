@@ -229,7 +229,12 @@ CLI A/B knob is `QVOICE_DOWNLOAD_ENGINE_PROFILE` (`legacy` | `chunked` |
 `chunked-multisession`, registered, and available only in an internal diagnostics build with
 `QWENVOICE_DEBUG`). The iOS app also accepts `chunked-bounded` (PA-29): on the background
 session it keeps at most four ranges per file in flight instead of submitting every range to the
-daemon up front.
+daemon up front. The 2026-09-23 on-device comparison (one acceptance run per arm, back to back on
+the maintainer's iPhone over Wi-Fi, no retries or duplicate bytes in any arm; the uninterrupted
+Design and Clone deliveries, 1.37 GB each on the wire) measured the up-front `chunked` default at
+39 s and 45 s (35.0 and 30.6 MB/s), `legacy` single streams at 76 s and 42 s (18.0 and 33.0 MB/s)
+and `chunked-bounded` at 100 s and 63 s (13.7 and 22.0 MB/s). Decision: keep the up-front fan-out;
+`chunked-bounded` stays a diagnostic arm only.
 Since 2026-08-11 a chunked partial is crash-resumable: each landed range is recorded in a
 completed-range sidecar beside the partial (written atomically, after the bytes are in the
 partial), so a process death re-fetches only missing ranges; a missing or invalid sidecar

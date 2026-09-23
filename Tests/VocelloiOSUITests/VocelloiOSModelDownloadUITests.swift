@@ -622,9 +622,29 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         return snapshot.label.isEmpty ? nil : snapshot.label
     }
 
+    /// The value is formatted in the interface locale, which groups digits
+    /// (`2,049,696,897`, `2 049 696 897`, `2.049.696.897`): a grouping separator
+    /// between two digits joins one number instead of splitting it.
     private func parseByteAccessibilityValue(_ value: String?) -> (raw: Int64?, total: Int64?) {
         guard let value else { return (nil, nil) }
-        let numbers = value.split(whereSeparator: { !$0.isNumber }).compactMap { Int64($0) }
+        let groupingSeparators: Set<Character> = [",", ".", "'", " ", "\u{00A0}", "\u{202F}"]
+        let characters = Array(value)
+        var numbers: [Int64] = []
+        var digits = ""
+        for (index, character) in characters.enumerated() {
+            if character.isASCII, character.isNumber {
+                digits.append(character)
+                continue
+            }
+            if groupingSeparators.contains(character), !digits.isEmpty,
+               index + 1 < characters.count,
+               characters[index + 1].isASCII, characters[index + 1].isNumber {
+                continue
+            }
+            if let number = Int64(digits) { numbers.append(number) }
+            digits = ""
+        }
+        if let number = Int64(digits) { numbers.append(number) }
         guard numbers.count >= 3 else { return (nil, nil) }
         return (numbers[numbers.count - 2], numbers[numbers.count - 1])
     }

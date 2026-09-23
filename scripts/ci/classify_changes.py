@@ -13,6 +13,11 @@ push, and a docs-only push on top of it must still run the lanes the cancelled
 run owed. A lane routing skipped inside a green run counts as proven at that
 head. Only push CI's own inputs (ci.yml, its actions, this file) force every
 native lane. Without history the diff falls back to $BEFORE_SHA..$HEAD_SHA.
+Pull-request runs never count as history: they skip every native job, so a
+skip inside one proves nothing about main.
+
+A pull request (PA-23) is diffed against its base ($BASE_SHA..$HEAD_SHA, the
+merge commit); the workflow runs only its Linux lanes whatever this reports.
 
 Usage:
   classify_changes.py                      # route the push (GitHub push event)
@@ -230,7 +235,7 @@ def lane_bases(history: list[dict], head: str, cwd: str | None = None) -> dict[s
     for run in history:
         sha = str(run.get("headSha") or "")
         jobs = run.get("jobs") or {}
-        if not isinstance(jobs, dict) or sha == head:
+        if not isinstance(jobs, dict) or sha == head or run.get("event") == "pull_request":
             continue
         run_passed = run.get("conclusion") == "success"
         def job_proven(conclusion: object) -> bool:
@@ -276,6 +281,14 @@ def route_push(head: str, before: str, history: list[dict] | None, cwd: str | No
     return classify([]), "empty or unknowable diff, every lane runs"
 
 
+def route_pull_request(head: str, base: str, cwd: str | None = None) -> tuple[dict[str, bool], str]:
+    """Lanes for a pull request: its merge commit against the base it targets."""
+    if is_ancestor_commit(base, head, cwd):
+        paths = diff_paths(base, head, cwd)
+        return classify(paths), f"{len(paths)} changed path(s) against the pull request base"
+    return classify([]), "pull request base unknown, every lane runs"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--paths", nargs="*", help="classify these paths instead of the push diff")
@@ -288,6 +301,8 @@ def main(argv: list[str] | None = None) -> int:
             os.environ["HEAD_SHA"], os.environ.get("BEFORE_SHA", ""),
             load_history(os.environ.get("CI_HISTORY_PATH")),
         )
+    elif os.environ.get("EVENT_NAME") == "pull_request" and os.environ.get("HEAD_SHA"):
+        lanes, reason = route_pull_request(os.environ["HEAD_SHA"], os.environ.get("BASE_SHA", ""))
     else:
         lanes, reason = classify([]), "not a push, every lane runs"
     lines = [f"{lane}={'true' if on else 'false'}" for lane, on in lanes.items()]

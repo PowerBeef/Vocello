@@ -26,7 +26,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   CI; `--python all|darwin-only|selected|none` picks the lane; `QVOICE_GATES=quick` skips the full suite
   locally while `scripts/` and `config/` are clean. Add a check only when it protects a product
   invariant; never a check that asserts the wording of another script or workflow.
-- `ci.yml`: `scripts/ci/classify_changes.py` routes pushes into lanes, diffing each lane against the last
+- `ci.yml`: pushes to `main` gate; `pull_request` (never `pull_request_target`) runs only the Linux jobs
+  for Dependabot and outside PRs with a read-only token, and their runs never become a lane's green base.
+  `scripts/ci/classify_changes.py` routes pushes into lanes, diffing each lane against the last
   run in which that lane's job passed (a cancelled superseded run cannot leave a lane unrun); `macos-tests` and `ios-compile`
   restore the persistent DerivedData caches from `config/build-output-policy.json`
   (`scripts/ci/restore_mtimes.py` first); `contracts` and `python` run on ubuntu; `CI required` is the
@@ -64,7 +66,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
 - **Action and toolchain identities are pinned.** Every action uses the full SHA in
   `config/toolchain.json`; xcodegen, ripgrep, xcbeautify and shellcheck install from SHA-pinned release
   artifacts; numpy, pytest and pytest-xdist pip-pin to the manifest; the website's Node and npm pin
-  only their major version (24 / 11). Dependabot proposes, the manifest and comment change together.
+  only their major version (24 / 11). Dependabot proposes, the manifest and comment change together:
+  on a Dependabot action PR run `python3 scripts/supply_chain_contract.py --sync-actions` and push the
+  manifest to its branch; CI never writes back.
 - **Exact-source releases.** `release_source_authority.py` proves a GitHub-verified annotated `v*` tag on
   the checked-out commit, containment in `origin/main` and a successful latest `CI required` run; the
   release workflow runs Security on that commit first. Lightweight tags, cross-SHA checks and incomplete

@@ -98,19 +98,29 @@ tests; a test that outgrows its lane moves, it does not slow every push. `pytest
 | Job | Runner | Runs when | Warm / cold |
 | --- | --- | --- | --- |
 | `changes` | ubuntu | always | seconds |
-| `contracts` | ubuntu | always | about 1 min: the complete deterministic contract gate (`check_project_inputs.sh --python none`: product contracts, invariants, privacy scan, work authority, benchmark history) |
+| `contracts` | ubuntu | always | about 1 min: the action-pin check (`supply_chain_contract.py`) first, then the complete deterministic contract gate (`check_project_inputs.sh --python none`: product contracts, invariants, privacy scan, work authority, benchmark history) |
 | `python` | ubuntu | Python paths, contracts, workflow files | 3 to 4 min: product and tooling tests; research tests when routed |
-| `macos-tests` | macos-26 | Swift compile inputs, the lane's own scripts, build configs and benchmark evidence | cached DerivedData; darwin-only Python modules, macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s), then `build_ui_test_bundles.sh macos --gate` compiles the macOS XCUITest bundle in the same arena (build only) |
-| `macos-tsan` | macos-26 | Swift compile inputs (same routing as `macos-tests`) | cached `macos-tsan` DerivedData; `scripts/macos_test.sh tsan`, the deterministic core bundles under ThreadSanitizer, blocking since 2026-09-14 (`config/tsan-policy.json`); 5 to 11 min on a second runner |
-| `ios-compile` | macos-26 | iOS compile inputs | cached DerivedData; `build_foundation_targets.sh ios --incremental` at `-Onone` (`QVOICE_FOUNDATION_SWIFT_OPTIMIZATION`), then `build_ui_test_bundles.sh ios --gate` compiles the iOS XCUITest bundle unsigned in the same arena (build only) |
+| `macos-tests` | macos-26 | never on a pull request; Swift compile inputs, the lane's own scripts, build configs and benchmark evidence | cached DerivedData; darwin-only Python modules, macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s), then `build_ui_test_bundles.sh macos --gate` compiles the macOS XCUITest bundle in the same arena (build only) |
+| `macos-tsan` | macos-26 | never on a pull request; Swift compile inputs (same routing as `macos-tests`) | cached `macos-tsan` DerivedData; `scripts/macos_test.sh tsan`, the deterministic core bundles under ThreadSanitizer, blocking since 2026-09-14 (`config/tsan-policy.json`); 5 to 11 min on a second runner |
+| `ios-compile` | macos-26 | never on a pull request; iOS compile inputs | cached DerivedData; `build_foundation_targets.sh ios --incremental` at `-Onone` (`QVOICE_FOUNDATION_SWIFT_OPTIMIZATION`), then `build_ui_test_bundles.sh ios --gate` compiles the iOS XCUITest bundle unsigned in the same arena (build only) |
 | `website` | ubuntu | `website/` | about 1 min |
-| `dependency-submission` | ubuntu | push only (skipped on dispatch) | seconds: `scripts/swift_dependency_snapshot.py` submitted to the GitHub dependency graph; needed by `CI required` |
+| `dependency-submission` | ubuntu | push only (skipped on dispatch and pull requests) | seconds: `scripts/swift_dependency_snapshot.py` submitted to the GitHub dependency graph; needed by `CI required` |
 | `CI required` | ubuntu | always | the branch-protection context; skipped lanes count as passed |
 
-`ci.yml` triggers on `push` to `main` and on `workflow_dispatch` only; it has no `pull_request`
-trigger, so `CI required` is always produced by a maintainer's push to `main`. Concurrency is keyed
-on the event name and the ref, so a newer push cancels the previous push run while a manual
-measurement dispatch never cancels the gate run for a commit. `scripts/dev.sh ci` replays that job
+`ci.yml` triggers on `push` to `main`, on `workflow_dispatch` and on `pull_request` against `main`.
+Own work still goes straight to `main`; the pull-request lane (PA-23) exists for Dependabot and outside
+contributors. It is `pull_request`, never `pull_request_target`: the PR's code runs with the
+workflow's read-only token and no secrets, routed on its diff against the base, and only the Linux
+jobs (`contracts`, `python`, `website`) can run; every macOS job and the dependency submission skip
+by event, so `CI required` on a PR aggregates the Linux lanes and the push to `main` after merging
+runs the Mac lanes. Pull-request runs never count as a lane's green base. A Dependabot action bump
+moves the workflow SHAs but not `config/toolchain.json`, so its PR fails the first `contracts` step
+with the fix: on the Dependabot branch run `python3 scripts/supply_chain_contract.py --sync-actions`
+(it copies each action's SHA and `# vX.Y.Z` comment into the manifest) and push the result there. CI
+never writes back: a write-token job on PR code, or a sync commit pushed with the workflow token (which
+triggers no new run), would cost more than the one command. Concurrency is keyed on the event name
+and the ref, so a newer push cancels the previous push run, a PR update cancels only that PR's run,
+and a manual measurement dispatch never cancels the gate run for a commit. `scripts/dev.sh ci` replays that job
 graph serially: project regeneration, the complete `check_project_inputs.sh` (the Linux `contracts`
 job runs it with `--python none`), `scripts/macos_test.sh test`, `scripts/macos_test.sh tsan`, the
 CLI version identity, `build_foundation_targets.sh ios --incremental`, `build_ui_test_bundles.sh all

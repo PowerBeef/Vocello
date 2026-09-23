@@ -130,6 +130,23 @@ class RoutingTests(unittest.TestCase):
                               "jobs": {MODULE.LANE_JOBS["website"]: "skipped"}}]
         self.assertIsNone(MODULE.lane_bases(skipped_cancelled, self.head, cwd=str(self.repo))["website"])
 
+    def test_a_pull_request_run_never_advances_a_lane_base(self) -> None:
+        # PA-23: a PR run skips every native job inside a green run; merged, its
+        # head becomes an ancestor of main, but it proves nothing about the Mac lanes.
+        pr_run = [{"headSha": self.shas["c2"], "conclusion": "success", "event": "pull_request",
+                   "jobs": {MODULE.LANE_JOBS["swift"]: "skipped", MODULE.LANE_JOBS["python"]: "success"}}]
+        bases = MODULE.lane_bases(pr_run, self.head, cwd=str(self.repo))
+        self.assertEqual(set(bases.values()), {None})
+        push_run = [{**pr_run[0], "event": "push"}]
+        self.assertEqual(MODULE.lane_bases(push_run, self.head, cwd=str(self.repo))["swift"], self.shas["c2"])
+
+    def test_a_pull_request_routes_on_its_diff_against_the_base(self) -> None:
+        self.commit("c4", "website/src/App.tsx")
+        lanes, reason = MODULE.route_pull_request(self.shas["c4"], self.shas["c3"], cwd=str(self.repo))
+        self.assertEqual({lane for lane, on in lanes.items() if on}, {"website"}, reason)
+        lanes, reason = MODULE.route_pull_request(self.shas["c4"], "", cwd=str(self.repo))
+        self.assertTrue(all(lanes.values()), reason)
+
 
     def test_a_failed_sanitizer_keeps_the_swift_lane_owed(self) -> None:
         # c2's deterministic tests passed but its TSan job failed; swift last

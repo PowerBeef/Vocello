@@ -123,6 +123,38 @@ class SupplyChainContractTests(unittest.TestCase):
         finally:
             module._tool_output = original
 
+    def bump_checkout(self, sha: str, version: str) -> None:
+        """What a Dependabot action bump does: the workflow SHA and comment move, the manifest does not."""
+        path = self.root / ".github/workflows/ci.yml"
+        path.write_text(path.read_text().replace(f"actions/checkout@{self.sha} # v4", f"actions/checkout@{sha} # {version}"))
+
+    def test_dependabot_bump_fails_with_the_sync_command_until_synced(self) -> None:
+        new = "c" * 40
+        self.bump_checkout(new, "v5.0.1")
+        errors = module.validate(self.root)
+        self.assertTrue(any("SHA differs" in e and "--sync-actions" in e for e in errors), errors)
+        changes, sync_errors = module.sync_actions(self.root)
+        self.assertEqual(sync_errors, [])
+        self.assertEqual(len(changes), 1)
+        manifest = json.loads((self.root / "config/toolchain.json").read_text())
+        self.assertEqual(manifest["actions"]["actions/checkout"], {"version": "v5.0.1", "sha": new})
+        self.assertEqual(manifest["actions"]["actions/upload-artifact"], {"version": "v4", "sha": self.sha})
+        self.assertEqual(module.validate(self.root), [])
+        self.assertEqual(module.sync_actions(self.root), ([], []))
+
+    def test_sync_refuses_inconsistent_or_mutable_pins_and_writes_nothing(self) -> None:
+        before = (self.root / "config/toolchain.json").read_text()
+        path = self.root / ".github/workflows/ci.yml"
+        path.write_text(path.read_text() + f"      - uses: actions/checkout@{'d' * 40} # v5\n")
+        changes, errors = module.sync_actions(self.root)
+        self.assertTrue(any("inconsistently" in e for e in errors), errors)
+        path.write_text(path.read_text().replace(f"actions/checkout@{'d' * 40} # v5", "actions/checkout@v5"))
+        changes, errors = module.sync_actions(self.root)
+        self.assertTrue(any("not a full SHA" in e for e in errors), errors)
+        self.assertEqual((self.root / "config/toolchain.json").read_text(), before)
+        # A `- uses:` step (no `name:` first) is held to the same pin contract.
+        self.assertTrue(any("not pinned to a full SHA" in e for e in module.validate(self.root)))
+
 
 class ReleaseCredentialHygieneTests(unittest.TestCase):
     """Execute real workflow blocks with dummy bytes; never call Apple/ASC tools.

@@ -3,6 +3,12 @@ name: CI
 # Push CI for Vocello (QwenVoice). Trunk-based: every push to main runs here and
 # `CI required` is the single branch-protection context (skipped counts as pass).
 #
+# Pull requests (Dependabot and outside contributors; own work goes straight to
+# main) run only the Linux lanes, contracts, Python and website, with the
+# workflow's read-only token and no secrets (PA-23). `pull_request`, never
+# `pull_request_target`: the PR's code never runs with a write token. Every
+# macOS job is skipped on a PR; the push to main after merging runs them.
+#
 # Lanes are routed by scripts/ci/classify_changes.py; an unknowable diff runs
 # everything. Native jobs restore the persistent DerivedData caches the local
 # scripts already use (config/build-output-policy.json), so a warm push
@@ -14,6 +20,8 @@ name: CI
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -28,6 +36,8 @@ permissions:
 # One group per event and ref: a superseded push cancels the previous push run,
 # but a manual measurement dispatch never cancels the gate run for a commit
 # (MV-03: run 34773187624 was cancelled by a dispatch and CI required went red).
+# A pull request's ref is refs/pull/<n>/merge, so a new PR push cancels only
+# that PR's previous run.
 concurrency:
   group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
@@ -64,14 +74,17 @@ jobs:
         run: |
           set -euo pipefail
           : > ci-history.json
+          # Pull-request runs skip every native job, so they never prove a lane
+          # (a fork PR's head branch may itself be named main).
           ids="$(gh run list --workflow ci.yml --branch "$GITHUB_REF_NAME" --limit 15 \
-            --json databaseId,status --jq '.[] | select(.status == "completed") | .databaseId' || true)"
+            --json databaseId,status,event \
+            --jq '.[] | select(.status == "completed" and .event != "pull_request") | .databaseId' || true)"
           python3 - $ids <<'PY' > ci-history.json
           import json, subprocess, sys
           runs = []
           for run_id in sys.argv[1:]:
               view = subprocess.run(
-                  ["gh", "run", "view", run_id, "--json", "headSha,conclusion,jobs"],
+                  ["gh", "run", "view", run_id, "--json", "headSha,conclusion,event,jobs"],
                   capture_output=True, text=True, check=False,
               )
               if view.returncode:
@@ -80,6 +93,7 @@ jobs:
               runs.append({
                   "headSha": payload.get("headSha"),
                   "conclusion": payload.get("conclusion"),
+                  "event": payload.get("event"),
                   "jobs": {job.get("name"): job.get("conclusion") for job in payload.get("jobs", [])},
               })
           json.dump(runs, sys.stdout)
@@ -91,6 +105,8 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           BEFORE_SHA: ${{ github.event.before }}
+          # Pull requests only: the base the merge commit (HEAD_SHA) is diffed against.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.sha }}
           CI_HISTORY_PATH: ci-history.json
         run: python3 scripts/ci/classify_changes.py
@@ -112,6 +128,12 @@ jobs:
           sudo apt-get install -y --no-install-recommends ripgrep
           NUMPY_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['numpy']['version'])")"
           python3 -m pip install --quiet --break-system-packages "numpy==${NUMPY_PIN}"
+
+      # First and on its own, so a Dependabot action bump names its fix in the
+      # failing step: the workflow SHAs moved and config/toolchain.json must move
+      # in the same PR (`supply_chain_contract.py --sync-actions` on its branch).
+      - name: Action pins match config/toolchain.json
+        run: python3 scripts/supply_chain_contract.py
 
       # The complete deterministic contract gate runs here on every push (MV-04):
       # product contracts, invariants, privacy scan, work authority and benchmark
@@ -158,7 +180,8 @@ jobs:
   macos-tests:
     name: macOS deterministic tests
     needs: changes
-    if: needs.changes.outputs.swift == 'true'
+    # Never on a pull request (PA-23): the Linux lanes gate PRs, main gates the Mac.
+    if: github.event_name != 'pull_request' && needs.changes.outputs.swift == 'true'
     runs-on: macos-26
     timeout-minutes: 45
     steps:
@@ -274,7 +297,7 @@ jobs:
     # its cold run of the same lane.
     name: macOS ThreadSanitizer subset
     needs: changes
-    if: needs.changes.outputs.swift == 'true'
+    if: github.event_name != 'pull_request' && needs.changes.outputs.swift == 'true'
     runs-on: macos-26
     timeout-minutes: 45
     steps:
@@ -354,7 +377,7 @@ jobs:
   ios-compile:
     name: iOS compile check (device SDK)
     needs: changes
-    if: needs.changes.outputs.ios == 'true'
+    if: github.event_name != 'pull_request' && needs.changes.outputs.ios == 'true'
     runs-on: macos-26
     timeout-minutes: 30
     steps:
@@ -525,12 +548,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # On a pull request the macOS jobs and the dependency submission are
+      # skipped by event, so this aggregates the Linux lanes only.
       - name: Aggregate required results
         env:
           RESULTS: ${{ toJSON(needs) }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
           echo "$RESULTS"
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            echo "pull request: Linux lanes only; the macOS lanes run on the push to main"
+          fi
           if printf '%s' "$RESULTS" | grep -Eq '"result": *"(failure|cancelled)"'; then
             echo "::error::a required CI job failed or was cancelled"
             exit 1

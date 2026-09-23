@@ -634,6 +634,9 @@ final class IOSModelDownloadCoordinator {
                     taskID: event.taskID
                 )
             },
+            rangeRetryHandler: { [diagnosticsStore] event in
+                diagnosticsStore.record(rangeRetry: event)
+            },
             backgroundSessionCompletionHandler: { identifier in
                 Task { @MainActor in
                     guard identifier == backgroundSessionIdentifier else { return }
@@ -708,7 +711,7 @@ final class IOSModelDownloadCoordinator {
                 totalBytes: visibleTotalBytes,
                 verifiedFileCount: progress.completedFiles,
                 errorClassification: phase == .retrying
-                    ? diagnosticRetryClassification(progress.statusMessage)
+                    ? (progress.retryReason?.rawValue ?? "unknown")
                     : nil
             )
         }
@@ -749,17 +752,6 @@ final class IOSModelDownloadCoordinator {
             lastDiagnosticProgressTrace[modelID] = (now, phase, bytes)
         }
         return shouldRecord
-    }
-
-    private func diagnosticRetryClassification(_ reason: String?) -> String {
-        switch reason {
-        case "Integrity verification": return "integrity"
-        case "Range response": return "range-response"
-        case "Chunk assembly": return "chunk-assembly"
-        case "Network transfer": return "network-transfer"
-        case let value? where value.hasPrefix("HTTP "): return "http"
-        default: return "unknown"
-        }
     }
 
     private func resolveFiles(entry: IOSModelCatalogEntry) -> [HuggingFaceDownloader.RepoFile] {

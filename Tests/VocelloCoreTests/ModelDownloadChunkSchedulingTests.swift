@@ -139,6 +139,190 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
             for: .httpError(statusCode: 503, path: "p"))
         XCTAssertFalse(transient.avoidChunking)
         XCTAssertFalse(transient.clearPartial)
+
+        // A short range that exhausted its own retries escalates without discarding
+        // the partial or the sidecar, and keeps chunking.
+        let short = HuggingFaceDownloader.chunkFallbackAdjustment(
+            for: .shortRange(path: "p", expectedBytes: 100, receivedBytes: 90))
+        XCTAssertFalse(short.avoidChunking)
+        XCTAssertFalse(short.clearPartial)
+        XCTAssertEqual(
+            ModelDownloadRetryPolicy.disposition(
+                error: HuggingFaceDownloader.DownloadError.shortRange(
+                    path: "p", expectedBytes: 100, receivedBytes: 90),
+                retryNumber: 1,
+                integrityRetryAlreadyUsed: false
+            ),
+            .retry(afterSeconds: 1),
+            "a short range is a plain retry, never retryClean"
+        )
+    }
+
+    // MARK: - Range response validation and per-range retry policy
+
+    func testRangeResponseVerdictSeparatesShortBodiesFromIgnoredRanges() {
+        let range = ChunkRange(start: 100, end: 199)
+        func verdict(
+            _ status: Int?,
+            _ contentRange: String?,
+            body: Int64 = 100
+        ) -> HuggingFaceDownloader.RangeResponseVerdict {
+            HuggingFaceDownloader.rangeResponseVerdict(
+                statusCode: status,
+                contentRange: contentRange,
+                bodyBytes: body,
+                range: range
+            )
+        }
+
+        XCTAssertEqual(verdict(206, "bytes 100-199/1000"), .complete)
+        // The server honored Range for this range but the body ended early (the
+        // 2026-09-23 device incident: 125.6 of 134.2 MB), or was oversized.
+        XCTAssertEqual(verdict(206, "bytes 100-199/1000", body: 93), .short(receivedBytes: 93))
+        XCTAssertEqual(verdict(206, "bytes 100-199/1000", body: 101), .short(receivedBytes: 101))
+        // A Content-Range truncated to a prefix of the request is short, not a
+        // different range.
+        XCTAssertEqual(verdict(206, "bytes 100-150/1000", body: 51), .short(receivedBytes: 51))
+        // Genuinely unsupported: Range ignored, missing/malformed header, other range.
+        XCTAssertEqual(verdict(200, nil, body: 1000), .unsupported)
+        XCTAssertEqual(verdict(200, "bytes 100-199/1000"), .unsupported)
+        XCTAssertEqual(verdict(206, nil), .unsupported)
+        XCTAssertEqual(verdict(206, "bytes 100-*/1000"), .unsupported)
+        XCTAssertEqual(verdict(206, "bytes 0-99/1000"), .unsupported)
+        XCTAssertEqual(verdict(206, "bytes 100-299/1000", body: 200), .unsupported)
+        XCTAssertEqual(verdict(nil, "bytes 100-199/1000"), .unsupported)
+    }
+
+    func testShortRangeIsRejectedBeforeAnyByteLandsOrIsRecorded() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("chunk-short-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let partial = root.appendingPathComponent("file.partial")
+        let sidecar = HuggingFaceDownloader.chunkSidecarURL(forPartial: partial)
+        let assembly = HuggingFaceDownloader.ChunkAssemblyCoordinator(
+            partialURL: partial,
+            sidecarURL: sidecar,
+            expectedSize: 64
+        )
+        try await assembly.open()
+        let temp = root.appendingPathComponent("chunk.tmp")
+        try Data(repeating: 7, count: 10).write(to: temp)
+
+        do {
+            try await HuggingFaceDownloader.assembleDownloadedChunk(
+                tempURL: temp,
+                range: ChunkRange(start: 16, end: 31),
+                into: assembly,
+                fileManager: .default
+            )
+            XCTFail("a body shorter than its range must throw")
+        } catch let error as HuggingFaceDownloader.DownloadError {
+            guard case .shortRange(_, let expected, let received) = error else {
+                return XCTFail("unexpected download error: \(error)")
+            }
+            XCTAssertEqual(expected, 16)
+            XCTAssertEqual(received, 10)
+        }
+        try await assembly.close()
+
+        XCTAssertEqual(try Data(contentsOf: partial), Data(), "no byte of a short range may land")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: temp.path))
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: sidecar.path),
+            "a short range is never recorded complete"
+        )
+    }
+
+    func testRangeRetryDelayCoversOnlyTransientRangeFailures() {
+        typealias DownloadError = HuggingFaceDownloader.DownloadError
+        XCTAssertEqual(
+            HuggingFaceDownloader.rangeRetryDelay(
+                for: DownloadError.shortRange(path: "p", expectedBytes: 2, receivedBytes: 1),
+                retryNumber: 1
+            ),
+            1
+        )
+        XCTAssertEqual(
+            HuggingFaceDownloader.rangeRetryDelay(
+                for: DownloadError.shortRange(path: "p", expectedBytes: 2, receivedBytes: 1),
+                retryNumber: 3
+            ),
+            4
+        )
+        XCTAssertEqual(
+            HuggingFaceDownloader.rangeRetryDelay(
+                for: DownloadError.httpError(statusCode: 429, path: "p", retryAfterSeconds: 7),
+                retryNumber: 1
+            ),
+            7,
+            "Retry-After is honored per range"
+        )
+        XCTAssertNotNil(HuggingFaceDownloader.rangeRetryDelay(
+            for: DownloadError.httpError(statusCode: 503, path: "p"),
+            retryNumber: 1
+        ))
+        XCTAssertNotNil(HuggingFaceDownloader.rangeRetryDelay(
+            for: DownloadError.fileDownloadFailed(
+                path: "p",
+                underlying: NSError(domain: NSURLErrorDomain, code: NSURLErrorNetworkConnectionLost)
+            ),
+            retryNumber: 1
+        ))
+
+        // Not transient for a range: these escalate straight to the file-level policy.
+        let escalating: [Error] = [
+            DownloadError.rangeUnsupported(path: "p"),
+            DownloadError.chunkAssemblyFailed(path: "p", reason: "r"),
+            DownloadError.integrityCheckFailed(path: "p", reason: "r"),
+            DownloadError.cancelled,
+            DownloadError.httpError(statusCode: 404, path: "p"),
+            DownloadError.fileDownloadFailed(
+                path: "p",
+                underlying: NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled)
+            ),
+            DownloadError.fileDownloadFailed(
+                path: "p",
+                underlying: NSError(domain: NSURLErrorDomain, code: NSURLErrorServerCertificateUntrusted)
+            ),
+            CancellationError(),
+            CocoaError(.fileWriteOutOfSpace),
+        ]
+        for error in escalating {
+            XCTAssertNil(
+                HuggingFaceDownloader.rangeRetryDelay(for: error, retryNumber: 1),
+                "\(error) must not retry at range level"
+            )
+            XCTAssertFalse(HuggingFaceDownloader.isTransientRangeFailure(error))
+        }
+    }
+
+    func testRetryReasonTokensAreTypedAndPrivacySafe() {
+        typealias DownloadError = HuggingFaceDownloader.DownloadError
+        typealias Reason = HuggingFaceDownloader.RetryReason
+        XCTAssertEqual(Reason(classifying: DownloadError.rangeUnsupported(path: "p")), .rangeResponse)
+        XCTAssertEqual(
+            Reason(classifying: DownloadError.shortRange(path: "p", expectedBytes: 2, receivedBytes: 1)),
+            .shortRange
+        )
+        XCTAssertEqual(Reason(classifying: DownloadError.chunkAssemblyFailed(path: "p", reason: "r")), .chunkAssembly)
+        XCTAssertEqual(Reason(classifying: DownloadError.integrityCheckFailed(path: "p", reason: "r")), .integrity)
+        XCTAssertEqual(Reason(classifying: DownloadError.httpError(statusCode: 429, path: "p")), .http429)
+        XCTAssertEqual(Reason(classifying: DownloadError.httpError(statusCode: 502, path: "p")), .http5xx)
+        XCTAssertEqual(Reason(classifying: DownloadError.httpError(statusCode: 408, path: "p")), .httpOther)
+        XCTAssertEqual(
+            Reason(classifying: DownloadError.fileDownloadFailed(path: "p", underlying: URLError(.timedOut))),
+            .network
+        )
+        XCTAssertEqual(Reason(classifying: URLError(.networkConnectionLost)), .network)
+        XCTAssertEqual(Reason(classifying: DownloadError.cancelled), .cancelled)
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-")
+        for reason in Reason.allCases {
+            XCTAssertTrue(
+                reason.rawValue.unicodeScalars.allSatisfy { allowed.contains($0) },
+                "\(reason.rawValue) must stay a sanitized token"
+            )
+        }
     }
 
     // MARK: - Registry: multi-task aggregation and speed-sample exclusion
@@ -389,7 +573,10 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         for (index, chunk) in chunks.enumerated() {
             let temp = root.appendingPathComponent("chunk-\(index).tmp")
             try chunk.bytes.write(to: temp)
-            try await assembly.writeChunk(tempURL: temp, offset: chunk.offset)
+            try await assembly.writeChunk(
+                tempURL: temp,
+                range: ChunkRange(start: chunk.offset, end: chunk.offset + Int64(chunk.bytes.count) - 1)
+            )
         }
         try await assembly.close()
 
@@ -410,7 +597,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
 
         try await HuggingFaceDownloader.assembleDownloadedChunk(
             tempURL: temp,
-            offset: 2,
+            range: ChunkRange(start: 2, end: 5),
             into: assembly,
             fileManager: .default
         )
@@ -439,7 +626,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         do {
             try await HuggingFaceDownloader.assembleDownloadedChunk(
                 tempURL: temp,
-                offset: 0,
+                range: ChunkRange(start: 0, end: 31),
                 into: assembly,
                 fileManager: .default
             )
@@ -647,7 +834,7 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         try await assembly.open()
         let temp = root.appendingPathComponent("chunk.tmp")
         try Data(repeating: 7, count: 16).write(to: temp)
-        try await assembly.writeChunk(tempURL: temp, offset: 16)
+        try await assembly.writeChunk(tempURL: temp, range: ChunkRange(start: 16, end: 31))
         await assembly.recordCompleted(range: ChunkRange(start: 16, end: 31))
         try await assembly.close()
 

@@ -487,6 +487,11 @@ public enum ModelDownloadRetryPolicy {
                 return retryNumber <= 3
                     ? .retryClean(afterSeconds: boundedDelay(backoff(retryNumber)))
                     : .fail
+            case .shortRange:
+                // Transient: the length-validated partial and its sidecar stay usable.
+                return retryNumber <= 3
+                    ? .retry(afterSeconds: boundedDelay(backoff(retryNumber)))
+                    : .fail
             case .fileDownloadFailed(_, let underlying):
                 return dispositionForFoundationError(underlying, retryNumber: retryNumber)
             case .invalidRemotePath, .invalidLocalDestination, .apiError:

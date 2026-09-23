@@ -1,5 +1,7 @@
+import CryptoKit
 import Foundation
 @testable import QwenVoiceCore
+import Synchronization
 import XCTest
 
 final class ModelDownloadLifecycleTests: XCTestCase {
@@ -864,5 +866,489 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         XCTAssertEqual(success["protocols"] as? [String], ["h3"])
         XCTAssertEqual(success["finalIntegrity"] as? Bool, true)
         XCTAssertNotNil(success["thermalState"] as? String)
+    }
+
+    // MARK: - Typed retry reasons and per-range retry diagnostics
+
+    private func diagnosticObjects(in root: URL) throws -> [[String: Any]] {
+        try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "json" }
+            .compactMap { file -> [String: Any]? in
+                try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any]
+            }
+    }
+
+    func testDiagnosticsPersistTypedRetryReasonAndRangeRetryEvents() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ModelDownloadDiagnosticsStore(directory: root)
+
+        func progress(
+            _ phase: HuggingFaceDownloader.DownloadPhase,
+            reason: HuggingFaceDownloader.RetryReason? = nil
+        ) -> HuggingFaceDownloader.RepositoryProgress {
+            HuggingFaceDownloader.RepositoryProgress(
+                downloadedBytes: 20,
+                totalBytes: 100,
+                completedFiles: 0,
+                totalFiles: 1,
+                bytesPerSecond: nil,
+                isStalled: false,
+                estimatedSecondsRemaining: nil,
+                retryCount: phase == .retrying ? 1 : 0,
+                statusMessage: nil,
+                phase: phase,
+                retryReason: reason
+            )
+        }
+
+        store.record(progress: progress(.downloading))
+        store.record(rangeRetry: HuggingFaceDownloader.RangeRetryEvent(
+            relativePath: "weights/model.safetensors",
+            rangeStart: 134_217_728,
+            rangeLength: 134_217_728,
+            attempt: 1,
+            reason: .shortRange,
+            delaySeconds: 1
+        ))
+        store.record(rangeRetry: HuggingFaceDownloader.RangeRetryEvent(
+            relativePath: "/private/var/mobile/fixture/model.safetensors",
+            rangeStart: 0,
+            rangeLength: 33_554_432,
+            attempt: 2,
+            reason: .http5xx,
+            delaySeconds: 2
+        ))
+        store.record(progress: progress(.retrying, reason: .shortRange))
+        store.record(progress: progress(.downloading))
+        store.recordSuccess(expectedBytes: 100)
+
+        let objects = try diagnosticObjects(in: root)
+        let phases = objects.filter { $0["kind"] as? String == "phase" }
+        let retrying = try XCTUnwrap(phases.first { $0["phase"] as? String == "retrying" })
+        XCTAssertEqual(retrying["retryReason"] as? String, "short-range")
+        XCTAssertEqual(retrying["retryCount"] as? Int, 1)
+        XCTAssertTrue(
+            phases.filter { $0["phase"] as? String == "downloading" }
+                .allSatisfy { $0["retryReason"] == nil },
+            "only a retrying phase carries a retry reason"
+        )
+
+        let rangeRetries = objects
+            .filter { $0["kind"] as? String == "range-retry" }
+            .sorted { ($0["attempt"] as? Int ?? 0) < ($1["attempt"] as? Int ?? 0) }
+        XCTAssertEqual(rangeRetries.count, 2)
+        XCTAssertEqual(rangeRetries.first?["relativePath"] as? String, "weights/model.safetensors")
+        XCTAssertEqual(rangeRetries.first?["attempt"] as? Int, 1)
+        XCTAssertEqual(rangeRetries.first?["retryReason"] as? String, "short-range")
+        XCTAssertEqual(rangeRetries.first?["rangeStart"] as? Int, 134_217_728)
+        XCTAssertEqual(rangeRetries.first?["rangeLength"] as? Int, 134_217_728)
+        XCTAssertEqual(rangeRetries.first?["retryDelaySeconds"] as? Double, 1)
+        XCTAssertNil(rangeRetries.last?["relativePath"], "an absolute path is never persisted")
+        XCTAssertEqual(rangeRetries.last?["retryReason"] as? String, "http-5xx")
+
+        let success = try XCTUnwrap(objects.first { $0["kind"] as? String == "success" })
+        XCTAssertEqual(success["retryCount"] as? Int, 1)
+        XCTAssertEqual(success["rangeRetryCount"] as? Int, 2)
+
+        let payload = try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+            .map { try String(contentsOf: $0, encoding: .utf8) }
+            .joined()
+        XCTAssertFalse(payload.contains("/private/var"))
+    }
+
+    func testRangeRetryRecordsAreCappedPerRunButFullyCounted() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ModelDownloadDiagnosticsStore(directory: root)
+        let cap = ModelDownloadDiagnosticsStore.maxRangeRetryRecordsPerRun
+        XCTAssertLessThan(cap, ModelDownloadDiagnosticsStore.maxRetainedRecords / 4)
+        for index in 0..<(cap + 6) {
+            store.record(rangeRetry: HuggingFaceDownloader.RangeRetryEvent(
+                relativePath: "weights/model.safetensors",
+                rangeStart: Int64(index) * 1_024,
+                rangeLength: 1_024,
+                attempt: 1,
+                reason: .network,
+                delaySeconds: 1
+            ))
+        }
+        store.recordSuccess(expectedBytes: 100)
+
+        let objects = try diagnosticObjects(in: root)
+        XCTAssertEqual(objects.filter { $0["kind"] as? String == "range-retry" }.count, cap)
+        let success = try XCTUnwrap(objects.first { $0["kind"] as? String == "success" })
+        XCTAssertEqual(success["rangeRetryCount"] as? Int, cap + 6)
+    }
+
+    // MARK: - Range-level retry through a stubbed foreground session
+    //
+    // These drive the real chunked path (`downloadFiles` -> chunk workers -> assembly ->
+    // sidecar -> verification -> install) over a foreground URLSession whose only
+    // protocol is an in-process stub, so they are network-free. One worker keeps the
+    // range order deterministic.
+
+    fileprivate static let stubRelativePath = "weights/model.safetensors"
+
+    private struct StubbedDelivery {
+        let host: String
+        let root: URL
+        let payload: Data
+        let ranges: [HuggingFaceDownloader.ChunkRange]
+        let downloader: HuggingFaceDownloader
+        let retries: RangeRetryStubSink<HuggingFaceDownloader.RangeRetryEvent>
+        let progress: RangeRetryStubSink<HuggingFaceDownloader.RepositoryProgress>
+
+        var targetDir: URL { root.appendingPathComponent("models/stub-model", isDirectory: true) }
+
+        func header(_ index: Int) -> String {
+            "bytes=\(ranges[index].start)-\(ranges[index].end)"
+        }
+
+        func run() async throws {
+            let digest = SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
+            let file = HuggingFaceDownloader.RepoFile(
+                path: ModelDownloadLifecycleTests.stubRelativePath,
+                size: Int64(payload.count),
+                sha256: digest,
+                absoluteURL: URL(string: "https://\(host)/\(ModelDownloadLifecycleTests.stubRelativePath)")
+            )
+            try await downloader.downloadFiles(
+                [file],
+                repo: "stub/model",
+                revision: String(repeating: "a", count: 40),
+                to: targetDir,
+                stagingRoot: root.appendingPathComponent("staging", isDirectory: true)
+            )
+        }
+
+        func installedPayload() throws -> Data {
+            try Data(contentsOf: targetDir.appendingPathComponent(
+                ModelDownloadLifecycleTests.stubRelativePath
+            ))
+        }
+
+        var requests: [String] { RangeStubURLProtocol.requests(host: host) }
+
+        func requestCount(_ header: String) -> Int {
+            requests.filter { $0 == header }.count
+        }
+    }
+
+    private func makeStubbedDelivery(
+        faults: [Int: [RangeStubURLProtocol.Fault]] = [:],
+        ignoreRange: Bool = false,
+        maxRangeRetries: Int = 3
+    ) throws -> StubbedDelivery {
+        let host = "\(UUID().uuidString.lowercased()).range-stub.invalid"
+        let payload = Data((0..<8_192).map { UInt8(truncatingIfNeeded: $0 &* 31 &+ 7) })
+        var configuration = HuggingFaceDownloader.Configuration()
+        configuration.maxConcurrentFiles = 1
+        configuration.chunkLargeFiles = true
+        configuration.chunkedDownloadThreshold = 1_024
+        configuration.chunkTargetSize = 1_024
+        configuration.chunkWorkerCount = 1
+        configuration.maxRangeRetries = maxRangeRetries
+        let ranges = HuggingFaceDownloader.chunkRanges(
+            total: Int64(payload.count),
+            chunkSize: configuration.chunkTargetSize,
+            tailWorkerCount: configuration.chunkWorkerCount
+        )
+        var faultsByHeader: [String: [RangeStubURLProtocol.Fault]] = [:]
+        for (index, queue) in faults {
+            faultsByHeader["bytes=\(ranges[index].start)-\(ranges[index].end)"] = queue
+        }
+        RangeStubURLProtocol.install(
+            host: host,
+            payload: payload,
+            faults: faultsByHeader,
+            ignoreRange: ignoreRange
+        )
+
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("range-retry-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.protocolClasses = [RangeStubURLProtocol.self]
+        let retries = RangeRetryStubSink<HuggingFaceDownloader.RangeRetryEvent>()
+        let progress = RangeRetryStubSink<HuggingFaceDownloader.RepositoryProgress>()
+        let downloader = HuggingFaceDownloader(
+            progressHandler: { progress.append($0) },
+            sessionConfiguration: sessionConfiguration,
+            engineConfiguration: configuration,
+            durableTemporaryDirectory: root.appendingPathComponent("delegate", isDirectory: true),
+            rangeRetryHandler: { retries.append($0) }
+        )
+        return StubbedDelivery(
+            host: host,
+            root: root,
+            payload: payload,
+            ranges: ranges,
+            downloader: downloader,
+            retries: retries,
+            progress: progress
+        )
+    }
+
+    private func tearDownStubbedDelivery(_ delivery: StubbedDelivery) {
+        RangeStubURLProtocol.uninstall(host: delivery.host)
+        try? FileManager.default.removeItem(at: delivery.root)
+    }
+
+    func testShortRangeBodyRetriesOnlyThatRangeAndKeepsEveryOtherRange() async throws {
+        let delivery = try makeStubbedDelivery(faults: [2: [.shortBody(900)]])
+        defer { tearDownStubbedDelivery(delivery) }
+
+        try await delivery.run()
+
+        XCTAssertEqual(try delivery.installedPayload(), delivery.payload)
+        XCTAssertEqual(delivery.requestCount(delivery.header(2)), 2, "only the short range is re-requested")
+        for index in delivery.ranges.indices where index != 2 {
+            XCTAssertEqual(delivery.requestCount(delivery.header(index)), 1, "range \(index) is untouched")
+        }
+        XCTAssertFalse(delivery.requests.contains(""), "no whole-file fetch")
+        let retries = delivery.retries.values
+        XCTAssertEqual(retries.count, 1)
+        XCTAssertEqual(retries.first?.reason, .shortRange)
+        XCTAssertEqual(retries.first?.attempt, 1)
+        XCTAssertEqual(retries.first?.rangeStart, delivery.ranges[2].start)
+        XCTAssertEqual(retries.first?.rangeLength, 1_024)
+        XCTAssertEqual(retries.first?.relativePath, Self.stubRelativePath)
+        XCTAssertFalse(
+            delivery.progress.values.contains { $0.phase == .retrying },
+            "a recovered range never reaches the file-level retry"
+        )
+    }
+
+    func testTransientNetworkErrorOnOneRangeRetriesThatRange() async throws {
+        let delivery = try makeStubbedDelivery(
+            faults: [1: [.transportError(NSURLErrorNetworkConnectionLost)]]
+        )
+        defer { tearDownStubbedDelivery(delivery) }
+
+        try await delivery.run()
+
+        XCTAssertEqual(try delivery.installedPayload(), delivery.payload)
+        XCTAssertEqual(delivery.requestCount(delivery.header(1)), 2)
+        for index in delivery.ranges.indices where index != 1 {
+            XCTAssertEqual(delivery.requestCount(delivery.header(index)), 1)
+        }
+        XCTAssertFalse(delivery.requests.contains(""))
+        XCTAssertEqual(delivery.retries.values.map(\.reason), [.network])
+        XCTAssertFalse(delivery.progress.values.contains { $0.phase == .retrying })
+    }
+
+    func testIgnoredRangeStillFallsBackToOneCleanSingleStream() async throws {
+        let delivery = try makeStubbedDelivery(ignoreRange: true)
+        defer { tearDownStubbedDelivery(delivery) }
+
+        try await delivery.run()
+
+        XCTAssertEqual(try delivery.installedPayload(), delivery.payload)
+        // The first range got HTTP 200: no range retry; the file-level retry clears the
+        // partial and re-fetches once as a single stream with no Range header.
+        XCTAssertEqual(delivery.requests, [delivery.header(0), ""])
+        XCTAssertTrue(delivery.retries.values.isEmpty)
+        let retrying = delivery.progress.values.filter { $0.phase == .retrying }
+        XCTAssertFalse(retrying.isEmpty)
+        XCTAssertTrue(retrying.allSatisfy { $0.retryReason == .rangeResponse })
+    }
+
+    func testExhaustedRangeRetriesEscalateWithoutClearingTheSidecar() async throws {
+        let last = HuggingFaceDownloader.chunkRanges(
+            total: 8_192,
+            chunkSize: 1_024,
+            tailWorkerCount: 1
+        ).count - 1
+        let delivery = try makeStubbedDelivery(
+            faults: [last: [.shortBody(10), .shortBody(10)]],
+            maxRangeRetries: 1
+        )
+        defer { tearDownStubbedDelivery(delivery) }
+
+        try await delivery.run()
+
+        XCTAssertEqual(try delivery.installedPayload(), delivery.payload)
+        // The initial request and its one range retry come back short; the file-level
+        // retry then resumes from the sidecar and fetches only the missing range.
+        XCTAssertEqual(delivery.requestCount(delivery.header(last)), 3)
+        for index in delivery.ranges.indices where index != last {
+            XCTAssertEqual(
+                delivery.requestCount(delivery.header(index)),
+                1,
+                "completed range \(index) survives the file-level retry"
+            )
+        }
+        XCTAssertFalse(delivery.requests.contains(""), "no single-stream fallback")
+        XCTAssertEqual(delivery.retries.values.map(\.attempt), [1])
+        let retrying = delivery.progress.values.filter { $0.phase == .retrying }
+        XCTAssertFalse(retrying.isEmpty)
+        XCTAssertTrue(retrying.allSatisfy { $0.retryReason == .shortRange && $0.retryCount == 1 })
+    }
+
+    func testCancellationDuringRangeRetryBackoffNeverRetries() async throws {
+        let delivery = try makeStubbedDelivery(
+            faults: [0: [.status(503, retryAfter: "30")]]
+        )
+        defer { tearDownStubbedDelivery(delivery) }
+
+        let started = ContinuousClock.now
+        let transfer = Task { try await delivery.run() }
+        let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+        while delivery.retries.values.isEmpty, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertEqual(delivery.retries.values.map(\.reason), [.http5xx])
+        XCTAssertEqual(delivery.retries.values.first?.delaySeconds, 30, "Retry-After is honored")
+
+        await delivery.downloader.cancel()
+        do {
+            try await transfer.value
+            XCTFail("a cancelled delivery must not complete")
+        } catch let error as HuggingFaceDownloader.DownloadError {
+            guard case .cancelled = error else { return XCTFail("unexpected error: \(error)") }
+        }
+        XCTAssertLessThan(
+            ContinuousClock.now - started,
+            .seconds(15),
+            "cancellation interrupts the Retry-After backoff"
+        )
+        XCTAssertEqual(delivery.requests, [delivery.header(0)], "the cancelled range is never re-requested")
+    }
+}
+
+/// Lock-protected collector for downloader callbacks in the stubbed range-retry tests.
+private final class RangeRetryStubSink<Value: Sendable>: Sendable {
+    private let storage = Mutex<[Value]>([])
+
+    func append(_ value: Value) {
+        storage.withLock { $0.append(value) }
+    }
+
+    var values: [Value] {
+        storage.withLock { $0 }
+    }
+}
+
+/// In-process HTTP stub for `*.range-stub.invalid` hosts: serves one in-memory payload,
+/// honors `Range: bytes=start-end` (and `bytes=start-`) with 206 + Content-Range, and
+/// consumes a per-host, per-Range-header queue of injected faults. It records every
+/// request's Range header ("" for none) so tests can prove which ranges were fetched.
+private final class RangeStubURLProtocol: URLProtocol {
+    enum Fault: Sendable {
+        /// 206 with the full Content-Range but only this many body bytes.
+        case shortBody(Int)
+        case transportError(Int)
+        case status(Int, retryAfter: String?)
+    }
+
+    private struct Scenario: Sendable {
+        var payload: Data
+        var faults: [String: [Fault]]
+        var ignoreRange: Bool
+        var requests: [String] = []
+    }
+
+    private struct Plan: Sendable {
+        let payload: Data
+        let fault: Fault?
+        let ignoreRange: Bool
+    }
+
+    private static let scenarios = Mutex<[String: Scenario]>([:])
+
+    static func install(host: String, payload: Data, faults: [String: [Fault]], ignoreRange: Bool) {
+        scenarios.withLock {
+            $0[host] = Scenario(payload: payload, faults: faults, ignoreRange: ignoreRange)
+        }
+    }
+
+    static func uninstall(host: String) {
+        _ = scenarios.withLock { $0.removeValue(forKey: host) }
+    }
+
+    static func requests(host: String) -> [String] {
+        scenarios.withLock { $0[host]?.requests ?? [] }
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        request.url?.host?.hasSuffix(".range-stub.invalid") ?? false
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let host = request.url?.host else { return }
+        let rangeHeader = request.value(forHTTPHeaderField: "Range") ?? ""
+        let plan: Plan? = Self.scenarios.withLock { all in
+            guard var scenario = all[host] else { return nil }
+            scenario.requests.append(rangeHeader)
+            var fault: Fault?
+            if var queue = scenario.faults[rangeHeader], !queue.isEmpty {
+                fault = queue.removeFirst()
+                scenario.faults[rangeHeader] = queue
+            }
+            all[host] = scenario
+            return Plan(payload: scenario.payload, fault: fault, ignoreRange: scenario.ignoreRange)
+        }
+        guard let plan else {
+            client?.urlProtocol(self, didFailWithError: URLError(.cannotFindHost))
+            return
+        }
+        switch plan.fault {
+        case .transportError(let code):
+            client?.urlProtocol(self, didFailWithError: NSError(domain: NSURLErrorDomain, code: code))
+            return
+        case .status(let statusCode, let retryAfter):
+            var headers: [String: String] = [:]
+            if let retryAfter { headers["Retry-After"] = retryAfter }
+            respond(statusCode: statusCode, headers: headers, body: Data("unavailable".utf8))
+            return
+        case .shortBody, nil:
+            break
+        }
+        let total = Int64(plan.payload.count)
+        guard !plan.ignoreRange, let bounds = Self.bounds(of: rangeHeader, total: total) else {
+            respond(statusCode: 200, headers: [:], body: plan.payload)
+            return
+        }
+        var body = plan.payload.subdata(in: Int(bounds.start)..<Int(bounds.end + 1))
+        if case .shortBody(let count) = plan.fault {
+            body = body.prefix(count)
+        }
+        respond(
+            statusCode: 206,
+            headers: ["Content-Range": "bytes \(bounds.start)-\(bounds.end)/\(total)"],
+            body: body
+        )
+    }
+
+    override func stopLoading() {}
+
+    private func respond(statusCode: Int, headers: [String: String], body: Data) {
+        guard let url = request.url,
+              let response = HTTPURLResponse(
+                url: url,
+                statusCode: statusCode,
+                httpVersion: "HTTP/1.1",
+                headerFields: headers
+              ) else { return }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    private static func bounds(of header: String, total: Int64) -> (start: Int64, end: Int64)? {
+        guard header.hasPrefix("bytes=") else { return nil }
+        let parts = header.dropFirst("bytes=".count)
+            .split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 2, let start = Int64(parts[0]), start < total else { return nil }
+        let end = parts[1].isEmpty ? total - 1 : min(Int64(parts[1]) ?? (total - 1), total - 1)
+        guard start <= end else { return nil }
+        return (start, end)
     }
 }

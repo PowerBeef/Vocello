@@ -234,6 +234,20 @@ partial), so a process death re-fetches only missing ranges; a missing or invali
 fails closed to a clean restart of that file, and single-stream attempts invalidate any
 sidecar so the two resume schemes can never disagree about the bytes on disk.
 
+Since 2026-09-23 every range is length-validated and retried on its own. A 206 whose body length
+differs from the range (or whose `Content-Range` is truncated to a prefix of it) is a transient
+`shortRange`: it is never written into the partial or recorded in the sidecar, and only that range
+is re-requested under the same range-qualified identity. A network or transport error and HTTP
+408, 429, or 5xx (honoring `Retry-After`) are transient too. A range gets `maxRangeRetries`
+(default 3) backoff retries; only then does the failure escalate to the file-level retry, after
+in-flight sibling ranges finish (no new ranges are dispatched), and that escalation keeps the
+partial and the completed-range sidecar, so the next attempt fetches only the gaps. Only a
+genuine range refusal (HTTP 200, or a `Content-Range` naming another range) or a chunk-assembly
+fault still clears the partial and falls back to a single stream, and those failures cancel
+their siblings immediately. The trigger was a 2026-09-23 iPhone update in which one short
+128 MiB range made the file-level retry discard 1.2 GB of completed ranges (4.07 GB on the wire
+for a 2.05 GB file).
+
 ## States, cancellation, and retry
 
 Visible states are: queued, waiting for connectivity, downloading, retrying, verifying, installing,
@@ -263,7 +277,9 @@ terminal counters remain available for diagnosis but can never seed the next pro
 Transient connection failures and HTTP 408, 429, and 5xx responses retry up to three times. A
 `Retry-After` value is honored up to five minutes. One integrity mismatch receives one clean retry.
 Cancellation, disk exhaustion, local filesystem errors, TLS trust failures, configuration errors,
-and permanent 4xx responses do not retry.
+and permanent 4xx responses do not retry. Chunked files first retry the failing range alone (see
+above). Every backoff wakes within a quarter second of a cancel, so a cancelled delivery never
+waits out a `Retry-After` and never retries.
 
 ## Diagnostics and acceptance
 
@@ -271,7 +287,13 @@ Local diagnostic summaries retain at most 200 records and 5 MB (sized so one thr
 shared-component lifecycle keeps every per-range and per-file record). Their allowlisted fields cover
 timing, protocol, redirect/reuse and constrained/expensive-network flags, transferred bytes, and a
 sanitized failure class. A successful attempt also records expected and wire bytes, duplicate bytes,
-retry count, protocol set, thermal state, phase timings, and final-integrity status. Task completion
+retry count, range-retry count, protocol set, thermal state, phase timings, and final-integrity
+status. A `retrying` phase record carries the typed retry reason (`range-response`, `short-range`,
+`chunk-assembly`, `integrity`, `network`, `http-429`, `http-5xx`, `http-other`), and each
+scheduled per-range retry writes a `range-retry` record with its attempt, reason, backoff, the
+range's first byte offset and length, and the sanitized relative path (at most 24 per run; the
+success summary counts all of them). The acceptance validator allows one range of duplicate
+wire bytes per file-level or range-level retry. Task completion
 waits for URLSession's terminal callback so the success summary cannot overtake final task metrics.
 Foreground delegate callbacks are serialized, durable staging is sequenced before terminal
 completion, and high-frequency byte callbacks are reduced to bounded cumulative progress updates

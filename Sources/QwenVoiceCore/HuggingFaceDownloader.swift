@@ -26,6 +26,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         public let retryCount: Int
         public let statusMessage: String?
         public let phase: DownloadPhase
+        /// Typed reason of the file-level retry; set only while `phase == .retrying`.
+        public var retryReason: RetryReason?
     }
 
     public struct TransferMetrics: Codable, Equatable, Sendable {
@@ -95,7 +97,65 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         public var maxConnectionsPerHost = 6
         public var chunkSessionStrategy: ChunkSessionStrategy = .shared
         public var maxDownloadRetries = 3
+        /// Bounded retries of one byte range after a transient failure (a network or
+        /// transport error, a short or mismatched 206 body, HTTP 408/429/5xx) before the
+        /// failure escalates to the file-level retry. Each retry re-requests only that
+        /// range under the same range-qualified identity; the partial and the
+        /// completed-range sidecar are kept.
+        public var maxRangeRetries = 3
         public init() {}
+    }
+
+    /// Typed, privacy-safe reason for a retry. The raw value is the sanitized token the
+    /// diagnostics store persists on `retrying` phase records and `range-retry` events.
+    public enum RetryReason: String, Equatable, Sendable, CaseIterable {
+        /// HTTP 200 on a range request, or a Content-Range naming a different range.
+        case rangeResponse = "range-response"
+        /// A 206 whose body length (or truncated Content-Range) does not cover the range.
+        case shortRange = "short-range"
+        case chunkAssembly = "chunk-assembly"
+        case integrity
+        case network
+        case http429 = "http-429"
+        case http5xx = "http-5xx"
+        case httpOther = "http-other"
+        case cancelled
+        case configuration
+
+        public init(classifying error: Error) {
+            guard let downloadError = error as? DownloadError else {
+                self = error is CancellationError ? .cancelled : .network
+                return
+            }
+            switch downloadError {
+            case .cancelled: self = .cancelled
+            case .httpError(let statusCode, _, _):
+                if statusCode == 429 {
+                    self = .http429
+                } else if (500...599).contains(statusCode) {
+                    self = .http5xx
+                } else {
+                    self = .httpOther
+                }
+            case .fileDownloadFailed: self = .network
+            case .integrityCheckFailed: self = .integrity
+            case .rangeUnsupported: self = .rangeResponse
+            case .shortRange: self = .shortRange
+            case .chunkAssemblyFailed: self = .chunkAssembly
+            case .invalidRemotePath, .invalidLocalDestination, .apiError: self = .configuration
+            }
+        }
+    }
+
+    /// One scheduled per-range retry, for privacy-safe delivery diagnostics. The relative
+    /// path is the catalog's repository-relative path; no URL or filesystem path is carried.
+    public struct RangeRetryEvent: Equatable, Sendable {
+        public let relativePath: String
+        public let rangeStart: Int64
+        public let rangeLength: Int64
+        public let attempt: Int
+        public let reason: RetryReason
+        public let delaySeconds: Double
     }
 
     public enum DownloadError: LocalizedError {
@@ -104,6 +164,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         case fileDownloadFailed(path: String, underlying: Error)
         case integrityCheckFailed(path: String, reason: String)
         case rangeUnsupported(path: String)
+        /// A 206 for the requested range whose body is shorter than (or otherwise differs
+        /// from) the range length, or whose Content-Range was truncated to a prefix of it.
+        /// Transient: the range is retried on its own and is never written or recorded.
+        case shortRange(path: String, expectedBytes: Int64, receivedBytes: Int64)
         case chunkAssemblyFailed(path: String, reason: String)
         case invalidRemotePath(String)
         case invalidLocalDestination(String)
@@ -121,6 +185,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 return "Downloaded file failed integrity checks for \(path): \(reason)"
             case .rangeUnsupported(let path):
                 return "Server did not honor the byte-range request for \(path); retrying as a single stream"
+            case .shortRange(let path, let expectedBytes, let receivedBytes):
+                return "Byte range for \(path) returned \(receivedBytes) of \(expectedBytes) bytes"
             case .chunkAssemblyFailed(let path, let reason):
                 return "Failed to assemble byte-range chunk for \(path): \(reason)"
             case .invalidRemotePath(let path):
@@ -225,6 +291,14 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
     }
 
+    final class RangeRetryHandlerBox: Sendable {
+        let handler: @Sendable (RangeRetryEvent) -> Void
+
+        init(_ handler: @escaping @Sendable (RangeRetryEvent) -> Void) {
+            self.handler = handler
+        }
+    }
+
     /// Foundation has not annotated FileManager as Sendable. Confine that compatibility gap to
     /// one immutable adapter instead of making the downloader broadly unchecked.
     final class FileManagerBox: @unchecked Sendable {
@@ -300,6 +374,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         private var heartbeatTask: Task<Void, Never>?
         private var retryCount = 0
         private var statusMessage: String?
+        private var retryReason: RetryReason?
         private var verifyingFileCount = 0
         // A download file callback precedes task metrics and the terminal task callback.
         // Keep the durable file staged until didCompleteWithError so callers cannot publish
@@ -364,6 +439,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             phase = .downloading
             retryCount = 0
             statusMessage = nil
+            retryReason = nil
             if !preserveUnclaimedCompletions {
                 for (_, staged) in stagedSuccessfulDownloads.values {
                     try? FileManager.default.removeItem(at: staged.url)
@@ -493,6 +569,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             isCancelled = true
             phase = .cancelling
             statusMessage = nil
+            retryReason = nil
             emitRepositoryProgress(isStalled: false, force: true)
             let cancellations = Array(activeCancellations)
             await withTaskGroup(of: Void.self) { group in
@@ -547,13 +624,17 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
         func setPhase(_ phase: DownloadPhase) {
             self.phase = phase
-            if phase != .retrying { statusMessage = nil }
+            if phase != .retrying {
+                statusMessage = nil
+                retryReason = nil
+            }
             emitRepositoryProgress(isStalled: false, force: true)
         }
 
-        func setRetry(number: Int, reason: String) {
+        func setRetry(number: Int, reason: RetryReason, message: String) {
             retryCount = number
-            statusMessage = reason
+            statusMessage = message
+            retryReason = reason
             phase = .retrying
             emitRepositoryProgress(isStalled: false, force: true)
         }
@@ -949,7 +1030,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                     estimatedSecondsRemaining: eta,
                     retryCount: retryCount,
                     statusMessage: statusMessage,
-                    phase: phase
+                    phase: phase,
+                    retryReason: phase == .retrying ? retryReason : nil
                 )
             )
             lastProgressPublicationTime = now
@@ -1020,26 +1102,36 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             writeHandle = try FileHandle(forWritingTo: partialURL)
         }
 
-        /// Stream the contents of `tempURL` into the partial at absolute byte `offset`.
-        /// Validates that the number of bytes written matches the temp file's size so a
-        /// truncated or corrupted chunk doesn't silently leave a hole in the partial.
-        func writeChunk(tempURL: URL, offset: Int64) throws {
+        /// Stream the contents of `tempURL` into the partial at `range.start`. The temp
+        /// file must hold exactly the range's length: a short or oversized body throws
+        /// the transient `shortRange` before a single byte is written, so a mismatched
+        /// range can never land in the partial or be recorded complete. The bytes written
+        /// are then checked against the same length, so a short write (an I/O fault, not
+        /// a network one) fails as `chunkAssemblyFailed`.
+        func writeChunk(tempURL: URL, range: ChunkRange) throws {
             guard let writeHandle else {
                 throw DownloadError.chunkAssemblyFailed(
-                    path: tempURL.path,
+                    path: tempURL.lastPathComponent,
                     reason: "the partial file is not open"
                 )
             }
-            let attributes = try FileManager.default.attributesOfItem(atPath: tempURL.path)
-            let expectedBytes = Int64(attributes[.size] as? Int64 ?? 0)
-            try writeHandle.seek(toOffset: UInt64(offset))
+            let rangeLength = range.end - range.start + 1
+            let bodyBytes = try HuggingFaceDownloader.authoritativeFileSize(at: tempURL)
+            guard bodyBytes == rangeLength else {
+                throw DownloadError.shortRange(
+                    path: tempURL.lastPathComponent,
+                    expectedBytes: rangeLength,
+                    receivedBytes: bodyBytes
+                )
+            }
+            try writeHandle.seek(toOffset: UInt64(range.start))
             // A full disk or I/O error throws here (terminal, not retried) instead
             // of raising an uncatchable Objective-C exception.
             let bytesWritten = try FileStreamIO.copy(contentsOf: tempURL, to: writeHandle)
-            guard bytesWritten == expectedBytes else {
+            guard bytesWritten == rangeLength else {
                 throw DownloadError.chunkAssemblyFailed(
-                    path: tempURL.path,
-                    reason: "expected \(expectedBytes) bytes, wrote \(bytesWritten)"
+                    path: tempURL.lastPathComponent,
+                    reason: "expected \(rangeLength) bytes, wrote \(bytesWritten)"
                 )
             }
         }
@@ -1106,6 +1198,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     private let transferMetricsHandler: TransferMetricsHandlerBox?
     private let verifiedArtifactHandler: VerifiedArtifactHandlerBox?
     private let lifecycleEventHandler: LifecycleEventHandlerBox?
+    private let rangeRetryHandler: RangeRetryHandlerBox?
     private let artifactURLPolicy: ModelArtifactURLPolicy?
 
     // MARK: - Transfer sessions and task keys
@@ -1324,6 +1417,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         transferMetricsHandler: (@Sendable (TransferMetrics) -> Void)? = nil,
         verifiedArtifactHandler: (@Sendable (VerifiedArtifactReceipt) async -> Void)? = nil,
         lifecycleEventHandler: (@Sendable (LifecycleEvent) -> Void)? = nil,
+        rangeRetryHandler: (@Sendable (RangeRetryEvent) -> Void)? = nil,
         backgroundSessionCompletionHandler: (@Sendable (String) -> Void)? = nil,
         artifactURLPolicy: ModelArtifactURLPolicy? = nil
     ) {
@@ -1341,6 +1435,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         self.transferMetricsHandler = transferMetricsHandler.map(TransferMetricsHandlerBox.init)
         self.verifiedArtifactHandler = verifiedArtifactHandler.map(VerifiedArtifactHandlerBox.init)
         self.lifecycleEventHandler = lifecycleBox
+        self.rangeRetryHandler = rangeRetryHandler.map(RangeRetryHandlerBox.init)
         self.artifactURLPolicy = artifactURLPolicy
         self.isBackgroundSession = sessionConfiguration.identifier != nil
         self.durableTemporaryDirectory = durableTemporaryDirectory ?? fileManager.temporaryDirectory
@@ -1647,6 +1742,23 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         if await state.cancellationRequested() {
             throw DownloadError.cancelled
         }
+    }
+
+    /// Retry backoff that observes both task cancellation and the downloader's own
+    /// cancellation request within a quarter second, so a user cancel never waits out a
+    /// multi-second backoff or a server's `Retry-After`. A cancelled wait never retries.
+    private func sleepBeforeRetry(seconds: Double) async throws {
+        var remaining = max(0, seconds)
+        repeat {
+            let slice = min(remaining, 0.25)
+            do {
+                try await Task.sleep(for: .seconds(slice))
+            } catch {
+                throw DownloadError.cancelled
+            }
+            remaining -= slice
+            try await throwIfCancellationRequested()
+        } while remaining > 0
     }
 
     /// Remove orphan or stale tasks when no durable request is eligible for adoption.
@@ -2019,20 +2131,13 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 }
 
                 guard retryNumber <= engineConfiguration.maxDownloadRetries else { throw error }
-                guard !Task.isCancelled,
-                      !(await state.cancellationRequested()) else {
-                    throw DownloadError.cancelled
-                }
-                await state.setRetry(number: retryNumber, reason: retryReason(for: error))
-                do {
-                    try await Task.sleep(for: .seconds(delay))
-                } catch {
-                    throw DownloadError.cancelled
-                }
-                guard !Task.isCancelled,
-                      !(await state.cancellationRequested()) else {
-                    throw DownloadError.cancelled
-                }
+                try await throwIfCancellationRequested()
+                await state.setRetry(
+                    number: retryNumber,
+                    reason: RetryReason(classifying: error),
+                    message: retryReason(for: error)
+                )
+                try await sleepBeforeRetry(seconds: delay)
                 await state.setPhase(.downloading)
             }
         }
@@ -2136,7 +2241,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// byte-range request, an integrity mismatch, or a chunk-assembly error all force
     /// the remaining attempts onto the single-stream path instead of thrashing on
     /// chunks; range/assembly failures may also have left a sparse or holey partial
-    /// that must be cleared before the next attempt.
+    /// that must be cleared before the next attempt. A transient range failure that
+    /// exhausted its own retries (`shortRange`, a network error, HTTP 408/429/5xx)
+    /// keeps chunking and keeps the partial: the completed-range sidecar only ever
+    /// records length-validated ranges, so the next attempt fetches just the gaps.
     static func chunkFallbackAdjustment(
         for error: DownloadError
     ) -> (avoidChunking: Bool, clearPartial: Bool) {
@@ -2156,6 +2264,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             case .httpError(let statusCode, _, _): return "HTTP \(statusCode)"
             case .integrityCheckFailed: return "Integrity verification"
             case .rangeUnsupported: return "Range response"
+            case .shortRange: return "Network transfer"
             case .chunkAssemblyFailed: return "Chunk assembly"
             case .fileDownloadFailed: return "Network transfer"
             case .cancelled: return "Cancelled"
@@ -2298,9 +2407,15 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// wire). Background sessions submit every range to the daemon up front instead:
     /// queued-but-unsubmitted work would die with the process, while a submitted task
     /// keeps transferring after termination and is adopted on relaunch — the OS
-    /// background scheduler owns concurrency there (per-host caps are inert). In both
-    /// shapes a chunk failure cancels every sibling's URLSession task via the group's
-    /// cancellation handlers, so a file-level retry never overlaps stale chunk transfers.
+    /// background scheduler owns concurrency there (per-host caps are inert).
+    ///
+    /// Failure handling: a non-transient chunk failure (the server ignored Range, an
+    /// assembly or I/O fault, cancellation) cancels every sibling's URLSession task via
+    /// the group's cancellation handlers, so a file-level retry never overlaps stale
+    /// chunk transfers. A transient failure that exhausted its range retries instead
+    /// stops dispatching new ranges and lets in-flight siblings finish (their ranges
+    /// land in the sidecar) before it escalates, so the file-level retry fetches only
+    /// the gaps rather than discarding every partially transferred sibling.
     private func runChunkTransfers(
         missing: [ChunkRange],
         url: URL,
@@ -2309,20 +2424,30 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         assembly: ChunkAssemblyCoordinator
     ) async throws {
         if isBackgroundSession {
-            try await withThrowingTaskGroup(of: Void.self) { group in
+            try await withThrowingTaskGroup(of: (any Error)?.self) { group in
                 for range in missing {
                     group.addTask { [self] in
-                        try await self.downloadOneChunkWithRetry(
-                            url: url,
-                            range: range,
-                            fileIndex: fileIndex,
-                            relativePath: relativePath,
-                            assembly: assembly,
-                            transferSession: session
-                        )
+                        do {
+                            try await self.downloadOneChunkWithRetry(
+                                url: url,
+                                range: range,
+                                fileIndex: fileIndex,
+                                relativePath: relativePath,
+                                assembly: assembly,
+                                transferSession: session
+                            )
+                            return nil
+                        } catch {
+                            guard Self.isTransientRangeFailure(error) else { throw error }
+                            return error
+                        }
                     }
                 }
-                try await group.waitForAll()
+                var escalation: (any Error)?
+                for try await rangeEscalation in group where escalation == nil {
+                    escalation = rangeEscalation
+                }
+                if let escalation { throw escalation }
             }
             return
         }
@@ -2330,24 +2455,36 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         let queue = ChunkWorkQueue(ranges: missing)
         let workerCount = max(1, min(engineConfiguration.chunkWorkerCount, missing.count))
         do {
-            try await withThrowingTaskGroup(of: Void.self) { group in
+            try await withThrowingTaskGroup(of: (any Error)?.self) { group in
                 for workerIndex in 0..<workerCount {
                     let workerSession = chunkTransferSession(forWorker: workerIndex)
                     group.addTask { [self] in
                         while let range = await queue.next() {
                             try Task.checkCancellation()
-                            try await self.downloadOneChunkWithRetry(
-                                url: url,
-                                range: range,
-                                fileIndex: fileIndex,
-                                relativePath: relativePath,
-                                assembly: assembly,
-                                transferSession: workerSession
-                            )
+                            do {
+                                try await self.downloadOneChunkWithRetry(
+                                    url: url,
+                                    range: range,
+                                    fileIndex: fileIndex,
+                                    relativePath: relativePath,
+                                    assembly: assembly,
+                                    transferSession: workerSession
+                                )
+                            } catch {
+                                guard Self.isTransientRangeFailure(error) else { throw error }
+                                // Stop dispatching; siblings finish their current range.
+                                await queue.abort()
+                                return error
+                            }
                         }
+                        return nil
                     }
                 }
-                try await group.waitForAll()
+                var escalation: (any Error)?
+                for try await workerEscalation in group where escalation == nil {
+                    escalation = workerEscalation
+                }
+                if let escalation { throw escalation }
             }
         } catch {
             await queue.abort()
@@ -2355,10 +2492,39 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
     }
 
-    /// One range with a bounded transient-retry loop, so a single 5xx/429/network hiccup
-    /// re-fetches 16-64 MiB instead of restarting a multi-gigabyte file. Non-transient
-    /// dispositions (range ignored, integrity, assembly) throw immediately to the
-    /// file-level fallback.
+    /// Whether a range failure is transient, and if so how long to back off before
+    /// re-requesting that range: a short or mismatched 206 body, a network or transport
+    /// error, or HTTP 408/429/5xx (honoring `Retry-After`). Everything else — the server
+    /// ignoring Range, an assembly or I/O fault, cancellation — returns nil and goes
+    /// straight to the file-level policy. `ModelDownloadRetryPolicy` stops retrying
+    /// after its third retry, so the query clamps there; `maxRangeRetries` bounds the
+    /// range loop itself.
+    static func rangeRetryDelay(for error: Error, retryNumber: Int) -> Double? {
+        guard let downloadError = error as? DownloadError else { return nil }
+        switch downloadError {
+        case .shortRange, .httpError, .fileDownloadFailed:
+            break
+        default:
+            return nil
+        }
+        guard case .retry(let afterSeconds) = ModelDownloadRetryPolicy.disposition(
+            error: error,
+            retryNumber: min(max(1, retryNumber), 3),
+            integrityRetryAlreadyUsed: true
+        ) else { return nil }
+        return afterSeconds
+    }
+
+    static func isTransientRangeFailure(_ error: Error) -> Bool {
+        rangeRetryDelay(for: error, retryNumber: 1) != nil
+    }
+
+    /// One range with a bounded transient-retry loop (`Configuration.maxRangeRetries`),
+    /// so a short body or a single 5xx/429/network hiccup re-fetches that one range
+    /// instead of restarting a multi-gigabyte file. The retried task carries the same
+    /// range-qualified identity, so background relaunch adoption and logical-slot
+    /// progress accounting stay exact. Non-transient failures throw immediately to the
+    /// file-level fallback; a cancelled task or downloader never retries.
     private func downloadOneChunkWithRetry(
         url: URL,
         range: ChunkRange,
@@ -2367,7 +2533,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         assembly: ChunkAssemblyCoordinator,
         transferSession: URLSession
     ) async throws {
-        var attempt = 0
+        var retryNumber = 0
         while true {
             do {
                 try await downloadOneChunk(
@@ -2380,19 +2546,35 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 )
                 return
             } catch {
-                attempt += 1
-                guard attempt <= 2, !Task.isCancelled,
-                      !(await state.cancellationRequested()) else { throw error }
-                guard case .retry(let afterSeconds) = ModelDownloadRetryPolicy.disposition(
-                    error: error,
-                    retryNumber: attempt,
-                    integrityRetryAlreadyUsed: true
-                ) else { throw error }
-                do {
-                    try await Task.sleep(for: .seconds(afterSeconds))
-                } catch {
-                    throw DownloadError.cancelled
+                guard retryNumber < max(0, engineConfiguration.maxRangeRetries),
+                      let delay = Self.rangeRetryDelay(for: error, retryNumber: retryNumber + 1)
+                else { throw error }
+                // A cancellation that raced the failure wins: never schedule a retry.
+                try await throwIfCancellationRequested()
+                retryNumber += 1
+                let reason = RetryReason(classifying: error)
+                rangeRetryHandler?.handler(RangeRetryEvent(
+                    relativePath: relativePath,
+                    rangeStart: range.start,
+                    rangeLength: range.end - range.start + 1,
+                    attempt: retryNumber,
+                    reason: reason,
+                    delaySeconds: delay
+                ))
+                if let lifecycleEventHandler {
+                    let identity = await state.expectedEntry(
+                        forKey: ModelDownloadTaskIdentity.chunkReconciliationKey(
+                            relativePath: relativePath,
+                            start: range.start,
+                            end: range.end
+                        )
+                    )?.identity
+                    lifecycleEventHandler.handler(.init(
+                        event: "range-retry-scheduled",
+                        identity: identity
+                    ))
                 }
+                try await sleepBeforeRetry(seconds: delay)
             }
         }
     }
@@ -2459,23 +2641,39 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             task.cancel()
         }
 
-        // The delegate treats 200 and 206 as success; for a range request 200 means the
-        // server ignored Range and returned the whole file — throw a dedicated error so the
-        // file-level retry falls back to a single stream instead of thrashing on chunks.
-        guard downloaded.statusCode == 206,
-              Self.contentRange(downloaded.contentRange, matchesStart: range.start, end: range.end) else {
-            try? fileManager.removeItem(at: downloaded.url)
-            throw DownloadError.rangeUnsupported(path: url.path)
-        }
-
         if await state.cancellationRequested() {
             try? fileManager.removeItem(at: downloaded.url)
             throw DownloadError.cancelled
         }
 
+        // The delegate treats 200 and 206 as success. For a range request, 200 means the
+        // server ignored Range (or a Content-Range names another range): a dedicated error
+        // sends the file-level retry to a single stream instead of thrashing on chunks. A
+        // 206 for this range with a short or mismatched body is transient: the range is
+        // retried on its own and is never written or recorded complete.
+        switch Self.rangeResponseVerdict(
+            statusCode: downloaded.statusCode,
+            contentRange: downloaded.contentRange,
+            bodyBytes: Self.fileSizeIfPresent(at: downloaded.url),
+            range: range
+        ) {
+        case .complete:
+            break
+        case .unsupported:
+            try? fileManager.removeItem(at: downloaded.url)
+            throw DownloadError.rangeUnsupported(path: url.path)
+        case .short(let receivedBytes):
+            try? fileManager.removeItem(at: downloaded.url)
+            throw DownloadError.shortRange(
+                path: relativePath,
+                expectedBytes: range.end - range.start + 1,
+                receivedBytes: receivedBytes
+            )
+        }
+
         try await Self.assembleDownloadedChunk(
             tempURL: downloaded.url,
-            offset: range.start,
+            range: range,
             into: assembly,
             fileManager: fileManager
         )
@@ -2496,12 +2694,45 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// range-sized file in the temporary directory.
     static func assembleDownloadedChunk(
         tempURL: URL,
-        offset: Int64,
+        range: ChunkRange,
         into assembly: ChunkAssemblyCoordinator,
         fileManager: FileManager
     ) async throws {
         defer { try? fileManager.removeItem(at: tempURL) }
-        try await assembly.writeChunk(tempURL: tempURL, offset: offset)
+        try await assembly.writeChunk(tempURL: tempURL, range: range)
+    }
+
+    enum RangeResponseVerdict: Equatable, Sendable {
+        case complete
+        /// The server honored Range for this range but delivered fewer (or different)
+        /// bytes than it spans: transient, retry the range.
+        case short(receivedBytes: Int64)
+        /// HTTP 200, a missing or malformed Content-Range, or one naming a different
+        /// range: the server does not serve this range, fall back to a single stream.
+        case unsupported
+    }
+
+    /// Classifies one range response. Only a 206 whose Content-Range starts at the
+    /// requested byte can be `complete` or `short`; a Content-Range that ends early (a
+    /// truncated prefix of the request) is short, one that starts elsewhere or runs past
+    /// the requested end is a different range.
+    static func rangeResponseVerdict(
+        statusCode: Int?,
+        contentRange: String?,
+        bodyBytes: Int64,
+        range: ChunkRange
+    ) -> RangeResponseVerdict {
+        guard statusCode == 206,
+              let bounds = contentRangeBounds(contentRange),
+              bounds.start == range.start,
+              bounds.end <= range.end else {
+            return .unsupported
+        }
+        let rangeLength = range.end - range.start + 1
+        guard bounds.end == range.end, bodyBytes == rangeLength else {
+            return .short(receivedBytes: max(0, bodyBytes))
+        }
+        return .complete
     }
 
     /// Partition `[0, total)` into uniform `chunkSize` ranges, except the final
@@ -2592,29 +2823,31 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         try? data.write(to: url, options: .atomic)
     }
 
-    static func contentRange(_ value: String?, startsAt expectedStart: Int64) -> Bool {
+    /// The inclusive byte bounds of a `bytes start-end/total` Content-Range value, or nil
+    /// when the header is missing, malformed, or names an inverted range.
+    static func contentRangeBounds(_ value: String?) -> (start: Int64, end: Int64)? {
         guard let value,
-              let match = value.range(
+              value.range(
                 of: #"^bytes\s+([0-9]+)-([0-9]+)/(?:[0-9]+|\*)$"#,
                 options: [.regularExpression, .caseInsensitive]
-              ) else { return false }
-        let matched = String(value[match])
-        guard let rangePart = matched.split(separator: " ").last?.split(separator: "/").first,
-              let start = rangePart.split(separator: "-").first.flatMap({ Int64($0) }) else {
-            return false
-        }
-        return start == expectedStart
+              ) != nil,
+              let rangePart = value.split(whereSeparator: { $0.isWhitespace }).last?
+                .split(separator: "/").first else { return nil }
+        let bounds = rangePart.split(separator: "-")
+        guard bounds.count == 2,
+              let start = Int64(bounds[0]),
+              let end = Int64(bounds[1]),
+              start <= end else { return nil }
+        return (start, end)
+    }
+
+    static func contentRange(_ value: String?, startsAt expectedStart: Int64) -> Bool {
+        contentRangeBounds(value)?.start == expectedStart
     }
 
     static func contentRange(_ value: String?, matchesStart expectedStart: Int64, end expectedEnd: Int64) -> Bool {
-        guard contentRange(value, startsAt: expectedStart),
-              let value,
-              let rangePart = value.split(separator: " ").last?.split(separator: "/").first else {
-            return false
-        }
-        let bounds = rangePart.split(separator: "-")
-        guard bounds.count == 2, let end = Int64(bounds[1]) else { return false }
-        return end == expectedEnd
+        guard let bounds = contentRangeBounds(value) else { return false }
+        return bounds.start == expectedStart && bounds.end == expectedEnd
     }
 
     private func downloadTemporaryFile(

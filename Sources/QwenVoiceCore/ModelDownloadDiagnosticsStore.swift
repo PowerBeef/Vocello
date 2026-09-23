@@ -55,6 +55,18 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         let bytesPerSecond: Int64?
         let etaSeconds: Double?
         let retryCount: Int?
+        /// Typed retry reason token (`HuggingFaceDownloader.RetryReason`): set on
+        /// `retrying` phase records and `range-retry` records.
+        let retryReason: String?
+        /// `range-retry` records: 1-based retry attempt of that range, its first byte
+        /// offset and its length. No URL or filesystem path.
+        let attempt: Int?
+        let rangeStart: Int64?
+        let rangeLength: Int64?
+        let retryDelaySeconds: Double?
+        /// `success` records: every range-level retry scheduled during the run (a range
+        /// retry re-fetches at most one range of duplicate wire bytes).
+        let rangeRetryCount: Int?
         let networkSeconds: Double?
         let verificationSeconds: Double?
         let installationSeconds: Double?
@@ -87,6 +99,12 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
             bytesPerSecond: Int64? = nil,
             etaSeconds: Double? = nil,
             retryCount: Int? = nil,
+            retryReason: String? = nil,
+            attempt: Int? = nil,
+            rangeStart: Int64? = nil,
+            rangeLength: Int64? = nil,
+            retryDelaySeconds: Double? = nil,
+            rangeRetryCount: Int? = nil,
             networkSeconds: Double? = nil,
             verificationSeconds: Double? = nil,
             installationSeconds: Double? = nil,
@@ -119,6 +137,12 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
             self.bytesPerSecond = bytesPerSecond
             self.etaSeconds = etaSeconds
             self.retryCount = retryCount
+            self.retryReason = retryReason
+            self.attempt = attempt
+            self.rangeStart = rangeStart
+            self.rangeLength = rangeLength
+            self.retryDelaySeconds = retryDelaySeconds
+            self.rangeRetryCount = rangeRetryCount
             self.networkSeconds = networkSeconds
             self.verificationSeconds = verificationSeconds
             self.installationSeconds = installationSeconds
@@ -145,6 +169,7 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     private var installationStartedAt: Date?
     private var lastPhase: String?
     private var maximumRetryCount = 0
+    private var rangeRetryCount = 0
     private var accumulatedWireBytes: Int64 = 0
     private var accumulatedControlBytes: Int64 = 0
     private var observedProtocols: Set<String> = []
@@ -303,7 +328,38 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
             totalBytes: progress.totalBytes,
             bytesPerSecond: progress.bytesPerSecond,
             etaSeconds: progress.estimatedSecondsRemaining,
-            retryCount: progress.retryCount
+            retryCount: progress.retryCount,
+            retryReason: progress.phase == .retrying
+                ? sanitizeToken(progress.retryReason?.rawValue)
+                : nil
+        ))
+    }
+
+    /// Persists one scheduled per-range retry: the sanitized relative path, the range's
+    /// first byte offset and length, the attempt number, the backoff and the typed
+    /// reason token.
+    /// Every retry is counted for the run's success summary; only the first
+    /// `maxRangeRetryRecordsPerRun` are written so a flapping network cannot evict the
+    /// run's task-metrics records from the bounded store.
+    public func record(rangeRetry event: HuggingFaceDownloader.RangeRetryEvent) {
+        lock.lock()
+        if terminalRecorded {
+            resetRunStateLocked()
+        }
+        rangeRetryCount += 1
+        let shouldPersist = rangeRetryCount <= Self.maxRangeRetryRecordsPerRun
+        lock.unlock()
+        guard shouldPersist else { return }
+
+        persist(Record(
+            capturedAtUTC: ISO8601DateFormatter().string(from: Date()),
+            kind: "range-retry",
+            relativePath: sanitizeRelativePath(event.relativePath),
+            retryReason: sanitizeToken(event.reason.rawValue),
+            attempt: max(0, event.attempt),
+            rangeStart: max(0, event.rangeStart),
+            rangeLength: max(0, event.rangeLength),
+            retryDelaySeconds: max(0, event.delaySeconds)
         ))
     }
 
@@ -321,6 +377,7 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         let reusedBytes = max(0, reusedBytes)
         let controlBytes = accumulatedControlBytes
         let retryCount = maximumRetryCount
+        let rangeRetries = rangeRetryCount
         let protocols = observedProtocols.sorted()
         terminalRecorded = true
         lock.unlock()
@@ -329,6 +386,7 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
             capturedAtUTC: ISO8601DateFormatter().string(from: now),
             kind: "success",
             retryCount: retryCount,
+            rangeRetryCount: rangeRetries,
             networkSeconds: networkSeconds,
             verificationSeconds: verificationSeconds,
             installationSeconds: installationSeconds,
@@ -461,6 +519,9 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     /// accounting. The paired validator bound lives in scripts/ui_test.sh and must move
     /// with this constant.
     static let maxRetainedRecords = 200
+    /// Per-run cap on persisted `range-retry` records (the success summary still counts
+    /// every retry), keeping them well inside `maxRetainedRecords`.
+    static let maxRangeRetryRecordsPerRun = 24
     /// One worst-case one-hour diagnostic transfer persists the durable ledger twice per second,
     /// plus five-second heartbeats and bounded task events. Retain that complete causality chain
     /// without allowing repeated failed runs to grow without limit.
@@ -513,6 +574,7 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         installationStartedAt = nil
         lastPhase = nil
         maximumRetryCount = 0
+        rangeRetryCount = 0
         accumulatedWireBytes = 0
         accumulatedControlBytes = 0
         observedProtocols.removeAll()

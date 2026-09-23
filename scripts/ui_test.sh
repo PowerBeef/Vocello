@@ -930,18 +930,21 @@ for success in successes[-3:]:
     # The downloader reports all durable preexisting bytes explicitly: shared
     # component files, already-verified staging, and recovered chunk ranges. The
     # equality is therefore exact even after cancel/relaunch recovery. A retry may
-    # meter duplicate network bytes, but only within one 128 MiB range per retry.
+    # meter duplicate network bytes, but only within one 128 MiB range per retry;
+    # range-level retries (rangeRetryCount) each re-fetch at most one range.
     retry_count = int(success.get("retryCount", 0) or 0)
+    range_retry_count = int(success.get("rangeRetryCount", 0) or 0)
     if wire + reused != expected + duplicate:
         raise SystemExit(
             "catalog byte accounting is not exact: "
             f"wire={wire} reused={reused} expected={expected} duplicate={duplicate}"
         )
-    max_overage = retry_count * 128 * 1024 * 1024
+    max_overage = (retry_count + range_retry_count) * 128 * 1024 * 1024
     if duplicate > max_overage:
         raise SystemExit(
             "duplicate wire bytes exceed the recorded retry allowance: "
-            f"duplicate={duplicate} retryCount={retry_count}"
+            f"duplicate={duplicate} retryCount={retry_count} "
+            f"rangeRetryCount={range_retry_count}"
         )
     validated.append({
         "capturedAtUTC": success_time,

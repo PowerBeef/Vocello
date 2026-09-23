@@ -719,6 +719,7 @@ final class ModelManagerViewModel {
                 }
             },
             transferMetricsHandler: { diagnostics.record(metrics: $0) },
+            rangeRetryHandler: { diagnostics.record(rangeRetry: $0) },
             artifactURLPolicy: downloadPlan.catalog.downloadURLPolicy
         )
         downloaders[modelID] = downloader

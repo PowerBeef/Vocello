@@ -199,6 +199,7 @@ enum ModelsCommand {
             },
             engineConfiguration: engineConfiguration,
             transferMetricsHandler: { diagnostics.record(metrics: $0) },
+            rangeRetryHandler: { diagnostics.record(rangeRetry: $0) },
             artifactURLPolicy: catalog.downloadURLPolicy
         )
 

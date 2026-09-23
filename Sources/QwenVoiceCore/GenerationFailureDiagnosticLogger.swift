@@ -240,7 +240,7 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
                 return ErrorMetadata(code: "download.integrity_failed", classification: .integrity)
             case .invalidRemotePath, .invalidLocalDestination:
                 return ErrorMetadata(code: "download.invalid_path", classification: .invalidRequest)
-            case .httpError, .fileDownloadFailed, .rangeUnsupported, .apiError:
+            case .httpError, .fileDownloadFailed, .rangeUnsupported, .shortRange, .apiError:
                 return ErrorMetadata(code: "download.transfer_failed", classification: .network)
             case .chunkAssemblyFailed:
                 return ErrorMetadata(code: "download.assembly_failed", classification: .storage)

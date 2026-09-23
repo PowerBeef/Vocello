@@ -1,12 +1,15 @@
 # Vocello development guide
 
-Claude Code is the primary software engineer and sole coding agent, responsible for delivering
-working changes from the user's objective through implementation, verification and completion. Work
-directly on the existing local `main` checkout: no branches or worktrees, one editor and one native
-command at a time. Read-only subagents may research, triage finished runs and review; they never
-edit, commit, or run native, device, UI, model or benchmark commands. Keep tooling proportional to
-product work: reuse scripts and tests, load guidance only when relevant, and add a check only for a
-demonstrated product or workflow risk.
+Claude Code is the primary software engineer, responsible for delivering working changes from the
+user's objective through implementation, verification and completion. The lead session works on the
+existing local `main` checkout, owns integration and is the only one that pushes. Parallel agents are
+allowed when they save time on the 16 GB development Mac: read-only subagents research, review, audit
+and triage; editing agents work only in Claude Code worktrees (`.claude/worktrees/<name>`, branch
+`worktree-<name>`) that the lead integrates into `main`. Native builds are serialized machine-wide by
+the host lock; device, UI, model and benchmark lanes stay with the lead on a quiet host. Keep tooling
+proportional to product work: reuse scripts and tests, load guidance only when relevant, and add a
+check only for a demonstrated product or workflow risk. Parallel rules and budget:
+`docs/reference/development-workflow.md#parallel-agents-and-worktrees`.
 
 ## Engineering ownership and autonomy
 
@@ -42,7 +45,8 @@ On a fresh clone or a new machine, set up the toolchain first with
    - Scripts, contracts, CI, packaging, evidence or Claude configuration: `.claude/rules/release.md`.
    - Website: `website/CLAUDE.md`; read `website/PRODUCT.md` and `website/DESIGN.md` for visual/copy work.
 3. Implement the smallest coherent change, verify affected behavior, review the actual diff, then
-   commit the assigned files on `main` and push. CI on the pushed commit is the gate.
+   commit the assigned files on `main` and push. Split independent work across agents only when the
+   file sets do not overlap. CI on the pushed commit is the gate.
 4. Report changed behavior, checks and limitations, commit/CI evidence and remaining work. Update the
    existing roadmap and checkpoint when work status changes; do not introduce another task ledger.
 
@@ -80,21 +84,26 @@ npm --prefix website run check       # independent website acceptance
 Use targeted checks while editing, then the routed check before committing. Broaden only for new
 changes, failures or unresolved risk. Use `check --paths <assigned paths...>` when unrelated dirty
 work must remain paused; its contract gate still considers dirty tooling inputs. Native commands
-are serialized and reuse owned caches. Website-only work never launches native builds or devices.
+are serialized host-wide by the native lock (`~/Library/Caches/Vocello/native-build.lock`, across
+every checkout and worktree) and reuse owned caches. Website-only work never launches native builds or
+devices.
 `scripts/dev.sh ci` is the full serial CI replay when needed, not the default inner loop.
 UI-test source changes compile their affected bundles locally; ordinary CI never runs native UI.
 After a push, follow the run with `gh run list` / `gh run watch` until `CI required` settles.
 
 ## Hard boundaries
 
-- **Main only:** develop and commit on local `main`; no branches, worktrees or worktree-isolated
-  agents. Never force-push; stage explicit paths, never the whole tree.
+- **Main is the only published branch:** the lead commits on local `main` and pushes only `main`.
+  Agents commit only in Claude Code worktrees on their `worktree-*` branch; the lead integrates with
+  `git merge --ff-only` or `git cherry-pick`, then removes the worktree and branch. No hand-made
+  branches or worktrees, never push another ref, never force-push; stage explicit paths.
 - **Physical iPhone only:** no Simulator build, launch or test. Generic iOS compilation is phone-free.
 - **One native UI driver:** repository XCUITest through `scripts/ui_test.sh`; no computer-use,
   coordinate, browser or MCP native UI routes. Genuine controls only; no hidden shippable test UI.
 - **Explicit consent:** device/UI/model/benchmark runs, releases and publication need an explicit
   request. Consent covers that request only; none carries over. Lanes run one at a time on committed
-  source. Tool or skill availability grants no consent. Never retry a failed evidence run silently.
+  source, in the lead session, with no agent or native build running alongside. Tool or skill
+  availability grants no consent. Never retry a failed evidence run silently.
 - **Generated project:** edit `project.yml`, never `project.pbxproj`; run
   `./scripts/regenerate_project.sh --fast` after project inputs change.
 - **Release-only:** no Debug configuration or generic `DEBUG` symbol. Production overrides require
@@ -118,28 +127,36 @@ After a push, follow the run with `gh run list` / `gh run watch` until `CI requi
 Repository scripts are authoritative; everything below assists them and never replaces a gate.
 
 - **`.claude/settings.json`** wires the repository guards through `scripts/hooks/`:
-  `session_start.sh` (bounded local context), `commit_lint.sh` (commits on `main`, clean staged
-  whitespace, staged privacy scan), `policy_guard.sh` (Simulator routes, whole-cache deletion,
-  force pushes, branches/worktrees, `project.pbxproj` writes), `generated_file_guard.sh` (generated
-  or frozen files, naming their generator) and `project_yml_reminder.sh`. Its permissions allow the
-  routine loop, including scoped commits and pushes to `main`, ask before consent-bound lanes and
-  cache cleanup, and deny force pushes, branching, worktrees, broad staging, stashing, releases and
-  `.xcodeproj` edits. Hooks and permissions are guardrails, not proof of authorization.
+  `session_start.sh` (bounded local context, open worktrees), `commit_lint.sh` (commits on `main`
+  or an agent's `worktree-*` branch, pushes only from `main`, clean staged whitespace, staged privacy
+  scan, all judged in the checkout the command acts on), `policy_guard.sh` (Simulator routes,
+  whole-cache deletion, force pushes, pushes of any ref but `main`, hand-made branches/worktrees,
+  `update-ref`, `project.pbxproj` writes), `generated_file_guard.sh` (generated or frozen files, also
+  inside worktrees) and `project_yml_reminder.sh`. Its permissions allow the routine loop, including
+  scoped commits, pushes to `main` and worktree integration (`merge --ff-only`, `cherry-pick`,
+  `worktree remove`), ask before consent-bound lanes, cache cleanup and discarding agent work, and
+  deny force pushes, pushes of other refs, hand-made branches, broad staging, stashing, releases,
+  Simulator MCP tools and `.xcodeproj` edits. `worktree.baseRef: head` bases agent worktrees on local
+  `main`. Hooks and permissions are guardrails, not proof of authorization.
   `scripts/tests/test_agent_hooks.py` pins the wiring; personal overrides belong in the untracked
   `.claude/settings.local.json`.
 - **Skills** (user-invoked only; the invocation is the explicit request for that lane):
   `/ios-lane <lane>`, `/macos-ui-lane <lane>`, `/device-diagnostics <verb>` and
   `/release-evidence <tag>` (read-only). They call the existing scripts and add no gate.
-- **Subagents** (read-only): `xcresult-triage` reads a finished UI run as the testing runbook
-  describes and never reruns it; `swift-review` reviews Swift diffs against `.claude/rules/native.md`.
-  Built-in Explore/Plan agents may search and plan. None edits, commits or runs native commands.
+- **Subagents:** `xcresult-triage` reads a finished UI run as the testing runbook describes and never
+  reruns it; `swift-review` reviews Swift diffs against `.claude/rules/native.md`; Explore/Plan and the
+  Axiom auditors research and audit. These stay read-only. Editing agents are general-purpose agents
+  given `isolation: "worktree"`; they never push, touch `main`, edit `config/roadmap.json` or the
+  progress log, or run consent-bound lanes.
 - **Tool routing:** XcodeBuildMCP (profiles `macos` and `ios-device` in `.xcodebuildmcp/config.yaml`)
   for discovery, scratch builds and device debugging only, never Simulator or UI automation and never
   as evidence; swift-lsp through `buildServer.json` (needs a warm `build/cache/xcode/macos`); Axiom
-  skills and Apple documentation for platform APIs; Context7 for library documentation; `gh` or the
-  GitHub MCP for CI and releases; Claude in Chrome or chrome-devtools for the website only; Hugging
-  Face tools read-only, with no implied download or pin change. Missing optional tools never block
-  the script workflow, and CI never depends on personal plugins or credentials.
+  skills, Axiom auditor subagents, the mlx-swift skills and Apple documentation (sosumi) for platform
+  and MLX APIs; Context7 for library documentation; `gh`, the GitHub connector and Monitor for CI and
+  releases; Claude in Chrome or chrome-devtools for the website (and portal chores only on explicit
+  request); the asc-* skills (tddworks `asc`) for App Store Connect, writes only on explicit request;
+  Hugging Face tools read-only, with no implied download or pin change. Missing optional tools never
+  block the script workflow, and CI never depends on personal plugins or credentials.
 - **Guard literals:** hooks match raw Bash command text. Commit with a literal `git commit -F -`
   heredoc so the commit lint runs (a quote-split command would run the commit and skip the lint);
   build strings that merely *mention* Simulator routes, private home paths or the commit command from

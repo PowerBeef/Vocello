@@ -7,12 +7,15 @@
 #
 #   * Simulator destinations and simulator lifecycle commands (Physical iPhone only)
 #   * whole build-cache deletion outside scripts/clean_build_caches.sh (Owned output)
-#   * force pushes, new branches and worktrees (Main only)
+#   * force pushes, pushes of any ref but main, hand-made branches and
+#     worktrees, and ref rewrites (Main is the only published branch; agent
+#     worktrees come only from Claude Code's Agent isolation or EnterWorktree)
 #   * shell writes to QwenVoice.xcodeproj/project.pbxproj (Generated project)
 #
-# Everything else exits 0 immediately. The guard is pure bash pattern matching
-# (patterns live in variables so macOS bash 3.2 parses them) and finishes in
-# milliseconds; it never runs git, xcodebuild or python beyond parsing stdin.
+# Everything else exits 0 immediately. The Simulator, cache and pbxproj checks
+# are bash pattern matching (patterns live in variables so macOS bash 3.2 parses
+# them); git commands are tokenized by git_commands.py. It finishes in
+# milliseconds and never runs git, xcodebuild or python beyond parsing stdin.
 #
 # The unsupported-destination words are assembled from fragments so this file
 # never contains the literal strings that scripts/repo_invariants.sh
@@ -24,7 +27,8 @@ set -euo pipefail
 # merely mentions a guarded pattern must not trip the guard. They are stripped
 # before matching; everything else in the command line is inspected verbatim.
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-command_text="$(python3 "$HOOK_DIR/agent_hook_input.py" policy-command)"
+payload="$(cat)"
+command_text="$(printf '%s' "$payload" | python3 "$HOOK_DIR/agent_hook_input.py" policy-command)"
 
 [[ -n "$command_text" ]] || exit 0
 
@@ -58,17 +62,24 @@ if [[ "$command_text" =~ $re_rm_cache ]] || [[ "$command_text" =~ $re_rm_build ]
     "Use scripts/clean_build_caches.sh with one selective --cache target, or the retention pruning it owns."
 fi
 
-# 3. Main only.
-re_force_push='git[[:space:]]+push[^|;&]*([[:space:]]--force|[[:space:]]-f([[:space:]]|$)|[[:space:]]\+)'
-re_new_branch='git[[:space:]]+(checkout[[:space:]]+-b|switch[[:space:]]+(-c|--create)|worktree[[:space:]]+add)'
-re_branch_create='git[[:space:]]+branch[[:space:]]+[A-Za-z0-9._/][A-Za-z0-9._/-]*([[:space:]]|$)'
-if [[ "$command_text" =~ $re_force_push ]]; then
-  block "force pushes are never allowed (CLAUDE.md: Main only, Git/release)." \
-    "Push fast-forward commits only; CI required protects main."
-fi
-if [[ "$command_text" =~ $re_new_branch ]] || [[ "$command_text" =~ $re_branch_create ]]; then
-  block "development happens on local main only; no branches or worktrees (CLAUDE.md: Main only)." \
-    "Keep working on main. Preserve unrelated edits and commit only an assigned coherent checkpoint."
+# 3. Main is the only published branch. Git commands are judged on their tokens
+# (global options, quoted -C paths, chains, subshells, bash -c) by git_commands.py.
+git_violation="$(printf '%s' "$payload" | python3 "$HOOK_DIR/agent_hook_input.py" git-policy)"
+if [[ -n "$git_violation" ]]; then
+  tab=$'\t'
+  category="${git_violation%%"$tab"*}"
+  reason="${git_violation#*"$tab"}"
+  case "$category" in
+    force)
+      block "$reason (CLAUDE.md: Main only, Git/release)." \
+        "Push fast-forward commits only; CI required protects main." ;;
+    push|config)
+      block "$reason; only main is ever pushed (CLAUDE.md: Main only)." \
+        "Integrate agent branches into main locally, then push main; release tags are maintainer-run." ;;
+    *)
+      block "$reason (CLAUDE.md: Main only)." \
+        "Work on main, or spawn an agent with Agent isolation \"worktree\" / EnterWorktree; the lead integrates its worktree-* branch." ;;
+  esac
 fi
 
 # 4. Generated project.

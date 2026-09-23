@@ -91,6 +91,24 @@ class EditGuardTests(unittest.TestCase):
                                     tool_name="Write", root=root, cwd=root / "website")
                     self.assertEqual(result.returncode, 2, result.stderr)
 
+    def test_generated_files_stay_guarded_inside_agent_worktrees(self):
+        worktree = ROOT / ".claude/worktrees/agent-1"
+        for path, cwd in ((str(worktree / "docs/ROADMAP.md"), ROOT),
+                          ("docs/ROADMAP.md", worktree),
+                          (str(worktree / "benchmarks/runs/x.json"), ROOT)):
+            with self.subTest(path=path, cwd=cwd):
+                payload = json.dumps({"hook_event_name": "PreToolUse", "tool_name": "Edit",
+                                      "tool_input": {"file_path": path}, "cwd": str(cwd)})
+                result = subprocess.run([str(HOOKS / "generated_file_guard.sh")], input=payload, text=True,
+                                        capture_output=True, timeout=20,
+                                        env=dict(os.environ, CLAUDE_PROJECT_DIR=str(ROOT)))
+                self.assertEqual(result.returncode, 2, result.stderr)
+        payload = json.dumps({"hook_event_name": "PostToolUse", "tool_name": "Edit",
+                              "tool_input": {"file_path": str(worktree / "project.yml")}, "cwd": str(ROOT)})
+        result = subprocess.run([str(HOOKS / "project_yml_reminder.sh")], input=payload, text=True,
+                                capture_output=True, timeout=20, env=dict(os.environ, CLAUDE_PROJECT_DIR=str(ROOT)))
+        self.assertIn("regenerate_project.sh --fast", result.stdout)
+
     def test_ordinary_files_are_allowed(self):
         for path in ("CLAUDE.md", ".claude/rules/native.md", "docs/ordinary file.md",
                      "scripts/tool.py", "benchmarks/README.md"):
@@ -177,6 +195,7 @@ class SettingsWiringTests(unittest.TestCase):
         for cwd in (ROOT, ROOT / "website"):
             prefix = "../" if cwd.name == "website" else ""
             cases = [("Bash", {"command": "git push --force origin main"}, True),
+                     ("Bash", {"command": "git push origin worktree-agent-1"}, True),
                      ("Bash", {"command": "git status --short"}, False),
                      ("Edit", {"file_path": f"{prefix}docs/ROADMAP.md"}, True),
                      ("Write", {"file_path": f"{prefix}docs/note.md"}, False),
@@ -205,8 +224,33 @@ class SettingsWiringTests(unittest.TestCase):
         self.assertTrue(any("scripts/ui_test.sh" in rule for rule in permissions["ask"]))
         self.assertTrue(any("scripts/ios_device.sh" in rule for rule in permissions["ask"]))
         for boundary in ("Bash(git push --force*)", "Bash(git worktree add*)", "Bash(git stash*)",
-                         "Edit(QwenVoice.xcodeproj/**)", "EnterWorktree"):
+                         "Edit(QwenVoice.xcodeproj/**)"):
             self.assertIn(boundary, permissions["deny"])
+
+    def test_agent_worktrees_are_allowed_but_only_main_is_pushed(self):
+        permissions = self.settings["permissions"]
+        # Worktree-isolated agents are allowed and branch from local main.
+        for tool in ("EnterWorktree", "Agent(isolation:*)", "Agent(isolation:worktree)"):
+            self.assertNotIn(tool, permissions["deny"])
+        self.assertEqual(self.settings["worktree"]["baseRef"], "head")
+        for boundary in ("Bash(git push --all*)", "Bash(git push --mirror*)", "Bash(git push --tags*)",
+                         "Bash(git push --delete*)", "Bash(git push -u*)", "Bash(git push origin HEAD*)",
+                         "Bash(git push origin worktree-*)", "Bash(git update-ref*)",
+                         "Bash(git checkout -B*)", "Bash(git switch -C*)"):
+            self.assertIn(boundary, permissions["deny"])
+        self.assertEqual({rule for rule in permissions["allow"] if rule.startswith("Bash(git push")},
+                         {"Bash(git push)", "Bash(git push origin main)"})
+        for rule in ("Bash(git branch -D*)", "Bash(git worktree remove --force*)"):
+            self.assertIn(rule, permissions["ask"])
+
+    def test_xcodebuildmcp_simulator_tools_are_denied_and_never_allowed(self):
+        permissions = self.settings["permissions"]
+        suffix = "_" "sim"
+        for name in ("build" + suffix, "build_run" + suffix, "test" + suffix, "boot" + suffix,
+                     "install_app" + suffix, "launch_app" + suffix, "debug_attach" + suffix):
+            self.assertIn(f"mcp__XcodeBuildMCP__{name}", permissions["deny"])
+        for rule in permissions["allow"] + permissions["ask"]:
+            self.assertFalse(rule.endswith(suffix), rule)
 
 
 SIM = "Sim" + "ulator"
@@ -259,12 +303,83 @@ class PolicyGuardTests(unittest.TestCase):
             "git switch -c topic",
             "git switch --create topic",
             "git worktree add ../wt",
+            "git worktree add .claude/worktrees/x -b worktree-x",
             "git branch feature/x",
+            "git checkout -B experiment",
+            "git switch -C topic",
+            "git switch --force-create topic",
+            "git update-ref refs/heads/main HEAD",
         ):
             with self.subTest(command=command):
                 result = self.guard(command)
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertIn("Main only", result.stderr)
+
+    def test_only_main_is_pushed(self):
+        for command in ("git push origin worktree-agent-1", "git push origin HEAD", "git push origin HEAD:main",
+                        "git push --all", "git push --mirror", "git push --tags", "git push origin --delete main",
+                        "git push origin :main", "git push -u origin topic", "git push origin main topic",
+                        "git push origin v3.0.0", "git -C .claude/worktrees/a push origin worktree-a",
+                        "git status && git push origin topic"):
+            with self.subTest(command=command):
+                result = self.guard(command)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("only main is ever pushed", result.stderr)
+        for command in ("git push", "git push origin", "git push origin main", "git push -q origin main",
+                        "git push origin main:main"):
+            with self.subTest(command=command):
+                self.assertEqual(self.guard(command).returncode, 0)
+
+    def test_git_spellings_do_not_bypass_the_main_only_rules(self):
+        push = "pu" "sh"
+        for command in (
+            f"git -C . {push} --force origin main", f"git -c x=y {push} -f origin main",
+            f"git {push} origin main -vf", f"git {push} -qf origin main",
+            f"git --git-dir .git {push} origin topic", f"git -c alias.p={push} p origin topic",
+            f"git -c remote.origin.{push}=refs/heads/topic:refs/heads/topic {push}",
+            f"bash -c 'git {push} origin topic'", f"echo `git {push} origin topic`",
+            f"echo $(git {push} origin topic)", f"(cd .. && git {push} origin topic)",
+            "git -C . checkout -b topic", "git -c a=b switch -c topic",
+            "git -C . update-ref refs/heads/main HEAD", "git branch -f main abc1234",
+            "git branch -m topic main", "git checkout --orphan x", "git switch --orphan x",
+            "git worktree move .claude/worktrees/a ../a",
+            "git worktree remove .claude/worktrees/x --force", "git branch -d worktree-x --force",
+            # abbreviated long options, flag clusters and --track
+            f"git {push} --mirr origin", f"git {push} --al origin", f"git {push} --ta origin",
+            f"git {push} --set-up origin main", "git checkout -qb x", "git checkout --track origin/topic",
+            "git switch --cre x", "git branch --sort=refname x",
+            # a command after a heredoc opener, wrappers, shells and substitutions
+            f"cat <<EOF && git {push} origin topic\nbody\nEOF", f"timeout 60 git {push} origin topic",
+            f"if true; then git {push} origin topic; fi", f"{{ git {push} origin topic; }}",
+            f"bash -lc 'git {push} origin topic'", f"sh <<EOF\ngit {push} origin topic\nEOF",
+            f"git status \"$(git {push} origin topic)\"", f"git \\\n {push} origin topic",
+            # configuration that changes what git runs or publishes, and other ref writers
+            f"git config remote.origin.mirror true && git {push}", "git config alias.x status",
+            "git -calias.x=status x", "git --config-env alias.x=VAR x",
+            f"GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.x GIT_CONFIG_VALUE_0={push} git x origin topic",
+            "git send-pack https://example.invalid/r.git topic", "git fetch . main:x", "git tag v9",
+        ):
+            with self.subTest(command=command):
+                result = self.guard(command)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("Main only", result.stderr)
+        for command in (f"git {push} origin main 2>&1 | tail -5", f"git {push} origin main >/dev/null",
+                        f"git {push} 2>&1", "git branch --list 'worktree-*'", "git branch -D worktree-x",
+                        "git worktree remove --force .claude/worktrees/x", "git branch --contains abc1234",
+                        f"git {push} origin main && git status", "git -C website status",
+                        "git fetch origin", "git fetch origin main:refs/remotes/origin/main", "git tag -l",
+                        "git config --get alias.x", "git branch --sort=refname", f"grep -rn {push} scripts",
+                        f"git commit -F - <<'EOF'\nmention git {push} origin topic\nEOF"):
+            with self.subTest(command=command):
+                self.assertEqual(self.guard(command).returncode, 0, self.guard(command).stderr)
+
+    def test_lead_integration_commands_are_allowed(self):
+        for command in ("git merge --ff-only worktree-agent-1", "git cherry-pick abc1234",
+                        "git branch -d worktree-agent-1", "git worktree remove .claude/worktrees/agent-1",
+                        "git worktree list --porcelain", "git worktree prune"):
+            with self.subTest(command=command):
+                result = self.guard(command)
+                self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_shell_writes_to_pbxproj_are_blocked(self):
         for command in (
@@ -343,6 +458,107 @@ class CommitLintTests(unittest.TestCase):
             subprocess.run(["git", "-C", str(root), "add", "notes.md"], check=True)
             result = self.lint(root)
             self.assertEqual(result.returncode, 0, result.stderr)
+
+
+class WorktreeCommitLintTests(unittest.TestCase):
+    """Commits and pushes are judged in the checkout they act on, not the hook's."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name).resolve() / "repo"
+        subprocess.run(["git", "init", "-q", "-b", "main", str(self.root)], check=True)
+        for key, value in (("user.email", "fixture@example.invalid"), ("user.name", "Fixture")):
+            subprocess.run(["git", "-C", str(self.root), "config", key, value], check=True)
+        subprocess.run(["git", "-C", str(self.root), "commit", "-q", "--allow-empty", "-m", "init"], check=True)
+
+    def worktree(self, relative: str, branch: str) -> Path:
+        path = self.root / relative
+        subprocess.run(["git", "-C", str(self.root), "worktree", "add", "-q", "-b", branch, str(path)],
+                       check=True)
+        return path
+
+    def stage(self, checkout: Path, text: str = "ok\n") -> None:
+        (checkout / "notes.md").write_text(text)
+        subprocess.run(["git", "-C", str(checkout), "add", "notes.md"], check=True)
+
+    def lint(self, command: str, cwd: Path):
+        return invoke("commit_lint.sh", {"command": command}, tool_name="Bash", root=self.root, cwd=cwd)
+
+    commit = "git com" "mit -m x"
+
+    def test_agent_worktree_on_its_branch_may_commit(self):
+        agent = self.worktree(".claude/worktrees/agent-1", "worktree-agent-1")
+        self.stage(agent)
+        result = self.lint(self.commit, agent)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = self.lint("git -C .claude/worktrees/agent-1 com" "mit -m x", self.root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_misplaced_or_misnamed_worktrees_and_main_checkout_branches_are_blocked(self):
+        cases = (
+            (self.worktree("wt/agent-2", "worktree-agent-2"), "outside .claude/worktrees"),
+            (self.worktree(".claude/worktrees/agent-3", "topic"), "worktree-* branch"),
+        )
+        for checkout, reason in cases:
+            with self.subTest(checkout=checkout.name):
+                result = self.lint(self.commit, checkout)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(reason, result.stderr)
+        subprocess.run(["git", "-C", str(self.root), "switch", "-q", "-c", "worktree-z"], check=True)
+        result = self.lint(self.commit, self.root)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("directly on main", result.stderr)
+
+    def test_the_worktree_index_is_scanned_not_the_main_checkout(self):
+        agent = self.worktree(".claude/worktrees/agent-4", "worktree-agent-4")
+        self.stage(agent, "logs live in " + "/Users/" + "someone/Library\n")
+        result = self.lint(self.commit, agent)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("private path", result.stderr)
+
+    def test_quoted_paths_with_spaces_chains_and_unresolvable_targets_are_judged(self):
+        spaced = self.root.parent / "agent work"
+        subprocess.run(["git", "-C", str(self.root), "worktree", "add", "-q", "-b", "topic", str(spaced)],
+                       check=True)
+        commit = "com" "mit"
+        result = self.lint(f'git -C "{spaced}" {commit} -m x', self.root)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("outside .claude/worktrees", result.stderr)
+        # Every commit in a chain is judged in its own checkout: the second one
+        # scans the main index, which holds a private path.
+        agent = self.worktree(".claude/worktrees/agent-6", "worktree-agent-6")
+        self.stage(self.root, "logs live in " + "/Users/" + "someone/Library\n")
+        result = self.lint(f"git -C .claude/worktrees/agent-6 {commit} --dry-run -m z; git {commit} -m x",
+                           self.root)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("private path", result.stderr)
+        subprocess.run(["git", "-C", str(self.root), "reset", "-q"], check=True)
+        result = self.lint(f"git {commit} -m x && git -C .claude/worktrees/agent-6 pu" "sh", self.root)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("only main is pushed", result.stderr)
+        for command in (f'cd "$SOMEWHERE" && git {commit} -m x', f"GIT_DIR=/tmp/x git {commit} -m x",
+                        f"git --work-tree=. {commit} -m x", f"pushd /tmp && git {commit} -m x"):
+            with self.subTest(command=command):
+                result = self.lint(command, agent)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("cannot tell which checkout", result.stderr)
+        result = self.lint(f"git checkout worktree-agent-6 && git {commit} -m x", self.root)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("may change the branch", result.stderr)
+        result = self.lint(f"git checkout -- notes.md && git {commit} -m x", self.root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = self.lint("git pu" "sh origin main 2>&1 | tail -5", self.root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_pushes_leave_only_the_main_checkout_on_main(self):
+        agent = self.worktree(".claude/worktrees/agent-5", "worktree-agent-5")
+        for command in ("git push", "git push origin main"):
+            with self.subTest(command=command):
+                result = self.lint(command, agent)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("only main is pushed", result.stderr)
+                self.assertEqual(self.lint(command, self.root).returncode, 0)
 
 
 class DevStatusTests(unittest.TestCase):

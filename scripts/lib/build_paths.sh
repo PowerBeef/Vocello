@@ -73,6 +73,16 @@ for _qvoice_build_paths_name in "${_qvoice_build_paths_required[@]}"; do
     export "${_qvoice_build_paths_name?}"
 done
 
+# The host-wide native lock deliberately lives outside the checkout so every
+# worktree and clone on this Mac shares it.
+case "${QVOICE_NATIVE_LOCK:-}" in
+    /*) export QVOICE_NATIVE_LOCK ;;
+    *)
+        echo "error: build-output policy did not export an absolute QVOICE_NATIVE_LOCK" >&2
+        return 1
+        ;;
+esac
+
 if [[ "$QVOICE_BUILD_ROOT" != "$_qvoice_build_paths_root/build" ]]; then
     echo "error: build-output policy root mismatch: $QVOICE_BUILD_ROOT" >&2
     return 1

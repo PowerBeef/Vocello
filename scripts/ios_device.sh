@@ -2020,7 +2020,7 @@ cmd_crashes() {
     if command -v xcsym >/dev/null 2>&1; then
       xcsym crash "$f" --dsym "$dsym" 2>&1 || warn "xcsym failed on $(basename "$f")"
     else
-      warn "xcsym not on PATH — use Xcode Organizer, or consult \$axiom-tools before installing xcsym:"
+      warn "xcsym not on PATH — use Xcode Organizer, or consult the axiom:axiom-tools skill before installing xcsym:"
       warn "  xcsym crash \"$f\" --dsym \"$dsym\""
     fi
   done

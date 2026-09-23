@@ -19,6 +19,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT_DIR/scripts/lib/shared.sh"
 # shellcheck source=lib/build_paths.sh
 . "$ROOT_DIR/scripts/lib/build_paths.sh"
+# shellcheck source=lib/build_cache.sh
+. "$ROOT_DIR/scripts/lib/build_cache.sh"
 
 MODE="${1:-all}"
 case "$MODE" in
@@ -32,13 +34,13 @@ build() {
   note "compiling $scheme (build only, never run)"
   # `build-for-testing`, not `test`: this produces the bundle and stops. The
   # runner is never launched, no app is installed, no device is touched.
-  xcodebuild build-for-testing \
+  # xcb_run holds the host-wide native lock for the whole compile.
+  QVOICE_NATIVE_LOCK_LABEL="ui-bundles:$scheme" xcb_run build-for-testing \
     -project "$ROOT_DIR/QwenVoice.xcodeproj" \
     -scheme "$scheme" \
     -configuration Release \
     -destination "$destination" \
     -derivedDataPath "$derived" \
-    -skipPackagePluginValidation \
     "$@" >"$LOG_DIR/$scheme.log" 2>&1 \
     || die "$scheme failed to compile (see build/artifacts/ui-bundles/$scheme.log)"
 }

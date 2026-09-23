@@ -44,11 +44,12 @@ selection, `website` runs `npm --prefix website run check`. A change to shared t
 
 ## The commit lint
 
-`scripts/hooks/commit_lint.sh` (a Claude Code `PreToolUse` hook) requires
-branch `main`, a whitespace-clean staged diff (`git diff --cached --check`) and a clean
-`scripts/privacy_scan.py --staged` (no developer home path, no credential-shaped token, no key file).
-It never builds or tests. Two more guards block Simulator destinations, whole-cache deletion, force
-pushes, new branches, `project.pbxproj` writes and hand edits of generated files;
+`scripts/hooks/commit_lint.sh` (a Claude Code `PreToolUse` hook) requires branch `main` in the main
+checkout or a `worktree-*` branch in an agent worktree, pushes only from `main`, a whitespace-clean
+staged diff (`git diff --cached --check`) and a clean `scripts/privacy_scan.py --staged` (no developer
+home path, no credential-shaped token, no key file). It never builds or tests. Two more guards block
+Simulator destinations, whole-cache deletion, force pushes, pushes of any ref but `main`, hand-made
+branches, `project.pbxproj` writes and hand edits of generated files;
 `scripts/tests/test_agent_hooks.py` pins all of them.
 
 ## The contract gate
@@ -150,8 +151,11 @@ labelled `release-rehearsal`. `security.yml` (CodeQL, npm audit) runs weekly, on
 - Internal diagnostic flags are target settings, so diagnostics never rebuild MLX and the other
   dependencies. `scripts/macos_test.sh test --coverage` is an opt-in llvm-cov export and forces a full
   rebuild of the shared cache.
-- Serialize native Xcode commands (one SwiftPM lock spans XCTest); never clear caches to evade
-  contention. `config/build-output-policy.json` owns every path under `build/`.
+- Native Xcode/SwiftPM commands are serialized host-wide: `xcb_run`, SwiftPM resolution, the UI-bundle
+  compile, the macOS XCTest bundle runs and the runtime `swift build`/`swift test` hold the native lock
+  (`hostNativeLock` in `config/build-output-policy.json`, `~/Library/Caches/Vocello/native-build.lock`)
+  across every checkout and worktree, and a waiter prints the holder each minute. Never clear caches to
+  evade contention. `config/build-output-policy.json` owns every path under `build/`.
 
 ## What never runs from here
 
@@ -160,10 +164,10 @@ releases run only when the task explicitly asks for that evidence, through their
 
 ## Claude Code development workflow
 
-Claude Code is the sole development agent; `CLAUDE.md` owns the working agreement and
-`.claude/rules/` holds the path-scoped domain rules. Work on the existing local `main` checkout with
-one editor. Before editing, record HEAD, dirty files and the relevant roadmap item or user
-assignment. Preserve unrelated work; reconcile an unexpected change before editing or staging
+Claude Code is the development agent; `CLAUDE.md` owns the working agreement and `.claude/rules/`
+holds the path-scoped domain rules. The lead session works on the existing local `main` checkout and
+may delegate to parallel agents as described below. Before editing, record HEAD, dirty files and the
+relevant roadmap item or user assignment. Preserve unrelated work; reconcile an unexpected change before editing or staging
 overlapping files. Implement, run affected checks, review the diff, commit only the assignment
 (explicit paths) and push. Report the behavior change, checks and limitations, commit/CI evidence and
 next action. Update the existing checkpoint or roadmap only when status changes; no transcripts or
@@ -175,10 +179,55 @@ build/lint plan when unrelated work is paused; its contract gate still selects P
 actual dirty tooling. A skipped CI lane is not a new test run. Do not add validators for prose,
 plugin inventories, or tool availability. Existing product and release gates remain authoritative.
 
-Read-only subagents keep large reads out of the main context: the built-in Explore and Plan agents
-for search and design, `xcresult-triage` for a finished UI run and `swift-review` for a Swift diff.
-They never edit, stage, commit, push or start native, device, UI, model or benchmark work, and they
-never run in a worktree; the main session owns every write and every native command.
+## Parallel agents and worktrees
+
+The development Mac is a Mac mini M6 with 16 GB of memory and 12 cores. Parallel agents are allowed
+when they save wall-clock time without contending for memory or files.
+
+**Read-only agents** keep large reads out of the lead's context and may run alongside anything: the
+built-in Explore and Plan agents, `xcresult-triage` for a finished UI run, `swift-review` for a Swift
+diff, and the Axiom auditor subagents (concurrency, memory, SwiftUI performance, build, test failure,
+crash, security/privacy, accessibility). They never edit, stage, commit, push or start native,
+device, UI, model or benchmark work.
+
+**Editing agents** are general-purpose agents started with `isolation: "worktree"` (or a session in
+`EnterWorktree` / `claude --worktree <name>`). Claude Code creates `.claude/worktrees/<name>` on branch
+`worktree-<name>` from local `HEAD` (`worktree.baseRef: head`), so commit the lead's pending work
+first. One task per agent, with a file set that does not overlap another agent's. Inside its worktree
+an agent may edit, commit on its branch (the commit lint runs there), run targeted
+`python3 -m pytest`, `scripts/dev.sh py|contracts|lint|check --dry-run` and
+`python3 scripts/roadmap.py validate`, and run `npm --prefix website run check` after
+`npm --prefix website ci` in that worktree. Native commands in a worktree are allowed only when the
+lead asks: they wait for the host lock, build a cold ~5 GB `build/` of their own, and belong in a
+background task. Agents never push, touch `main`, run consent-bound lanes or XcodeBuildMCP builds
+(which bypass the lock), regenerate shared generated artifacts, or edit `config/roadmap.json` and
+`docs/development-progress.md`; the lead owns those.
+
+**Integration** happens in the lead session, in the main checkout on `main`: review
+`git log main..worktree-<name>` and the diff, then `git merge --ff-only worktree-<name>` (or
+`git cherry-pick <sha>...` when `main` moved; no merge commits without a stated reason), run the
+routed `scripts/dev.sh check` on `main`, push, and clean up with
+`git worktree remove .claude/worktrees/<name>` and `git branch -d worktree-<name>`. Discarding
+unintegrated work (`git branch -D`, `git worktree remove --force`) asks first. The SessionStart banner
+lists open worktrees until they are integrated or removed.
+
+**Budget on 16 GB.** One native build or test at a time (the host lock enforces it). At most three
+editing agents plus the lead, at most four read-only subagents, and at most five active agents in
+total, including agents inside an opted-in Workflow script. One full `pytest -n auto` and one
+Playwright website check at a time; parallel agents use module-targeted pytest. While a native build
+holds the lock, keep other work light.
+
+**When parallelism fits:** independent roadmap items with disjoint files, research, review, audits and
+triage, and non-native checks next to a native build. **When it does not:** small or single-file
+changes, overlapping files or shared generated inputs (`project.yml`, `Package.resolved`,
+`config/roadmap.json`, the model catalog, inventories), native-heavy work, and anything that feeds an
+evidence lane.
+
+**Evidence lanes run alone.** Device, UI, model, memory, benchmark and release lanes run in the lead
+session only, on explicit request, one at a time, with no agent worktree active, no other holder of
+the native lock and no edits or integration during the run. `require_quiet_host` refuses to start
+while another process holds the native lock or an agent worktree is locked
+(`QVOICE_ALLOW_BUSY_HOST=1` records the reason and continues for an exploratory run).
 
 ## Claude Code setup and tool routing
 
@@ -187,45 +236,60 @@ tools, builds, probes a phone or starts an app.
 
 | Hook | Matcher | Script | Effect |
 | --- | --- | --- | --- |
-| `SessionStart` | `startup\|resume\|clear\|compact` | `session_start.sh` | Bounded local Git, `dev.sh status` and "Resume now" context |
-| `PreToolUse` | `^Bash$` | `commit_lint.sh` | Commits (including `git -c`/`-C` forms) need `main`, clean staged whitespace and a clean staged privacy scan |
-| `PreToolUse` | `^Bash$` | `policy_guard.sh` | Blocks Simulator routes, whole-cache deletion, force pushes, branches/worktrees and `project.pbxproj` writes; heredoc bodies are data |
-| `PreToolUse` | `^(Edit\|Write\|MultiEdit\|NotebookEdit)$` | `generated_file_guard.sh` | Refuses hand edits of generated or frozen files and names the generator |
-| `PostToolUse` | `^(Edit\|Write\|MultiEdit)$` | `project_yml_reminder.sh` | Reminds to run `./scripts/regenerate_project.sh --fast` after a root `project.yml` edit |
+| `SessionStart` | `startup\|resume\|clear\|compact` | `session_start.sh` | Bounded local Git, open agent worktrees, `dev.sh status` and "Resume now" context |
+| `PreToolUse` | `^Bash$` | `commit_lint.sh` | In the checkout the command acts on: commits (including `git -c`/`-C` forms) need `main` in the main checkout or `worktree-*` in `.claude/worktrees/<name>`; pushes only from `main`; clean staged whitespace and a clean staged privacy scan |
+| `PreToolUse` | `^Bash$` | `policy_guard.sh` | Blocks Simulator routes, whole-cache deletion, force pushes, pushes of any ref but `main`, hand-made branches/worktrees, `update-ref` and `project.pbxproj` writes; heredoc bodies are data |
+| `PreToolUse` | `^(Edit\|Write\|MultiEdit\|NotebookEdit)$` | `generated_file_guard.sh` | Refuses hand edits of generated or frozen files, also inside agent worktrees, and names the generator |
+| `PostToolUse` | `^(Edit\|Write\|MultiEdit)$` | `project_yml_reminder.sh` | Reminds to run `./scripts/regenerate_project.sh --fast` after a root or worktree `project.yml` edit |
 
 `scripts/hooks/agent_hook_input.py` normalizes Claude Code hook input: Bash text from
 `tool_input.command`, edit targets from `tool_input.file_path` (`notebook_path` for NotebookEdit),
-resolved against the payload's `cwd`. Unreadable input, a missing path or an unexpected tool fails
-closed for the file guards. Hooks resolve through `$CLAUDE_PROJECT_DIR`.
+resolved against the payload's `cwd`. `scripts/hooks/git_commands.py` tokenizes git commands for the
+two Bash guards: every invocation (after wrappers such as `timeout` or `xargs`, inside `bash -c`,
+shell heredocs and command substitutions, with abbreviated long options) and the checkout each
+`git commit`/`git push` acts on (payload `cwd`, `cd`, subshells, `git -C`); a target it cannot resolve,
+or one an earlier `git checkout`/`switch`/`rebase` in the same command may move, fails closed. It is a
+guardrail for cooperative agents, not a sandbox: interpreter indirection (`python3 -c`, piped shells)
+and hand-written `.git` files stay out of reach, and GitHub's branch protection remains the backstop. Unreadable input, a missing path or an unexpected tool fails closed
+for the file guards. Hooks resolve through `$CLAUDE_PROJECT_DIR`, which stays on the main checkout
+while the payload `cwd` follows an agent into its worktree.
 `scripts/tests/test_agent_hooks.py` pins the exact matcher-to-script matrix, the guard behavior, the
 skill and subagent metadata and the rule path scopes; changes under `.claude/` select it locally and
 in CI.
 
 Permissions encode the same boundaries. `allow` covers the routine loop: Git inspection, explicit-path
 staging, commits and fast-forward pushes to `main` (the maintainer's standing authorization; the
-commit lint still runs), `scripts/dev.sh`, the contract gate, pytest, the roadmap, `gh run` and the
-deterministic native lanes. `ask` covers the consent-bound lanes (`scripts/ui_test.sh`,
-`scripts/ios_device.sh`, the `scripts/macos_test.sh` model, memory, benchmark and release-readiness
-lanes, model installs), cache cleanup, workflow dispatch, destructive Git resets and the XcodeBuildMCP
-device and test tools. `deny` covers force pushes, branches, worktrees and worktree-isolated agents,
-stashing, broad staging, whole-cache deletion, releases and `.xcodeproj` edits. Hooks and permissions
+commit lint still runs), worktree integration (`git merge --ff-only worktree-*`, `git cherry-pick`,
+`git branch -d worktree-*`, `git worktree list|prune|remove .claude/worktrees/*`), `scripts/dev.sh`,
+the contract gate, pytest, the roadmap, `gh run` and the deterministic native lanes. `ask` covers the
+consent-bound lanes (`scripts/ui_test.sh`, `scripts/ios_device.sh`, the `scripts/macos_test.sh` model,
+memory, benchmark and release-readiness lanes, model installs), cache cleanup, workflow dispatch,
+destructive Git resets, discarding agent work (`git branch -D`, `git worktree remove --force`,
+`git worktree unlock`) and the XcodeBuildMCP device and test tools. `deny` covers force pushes, pushes
+of any ref but `main`, hand-made branches and worktrees, `update-ref`, stashing, broad staging,
+whole-cache deletion, releases, the XcodeBuildMCP Simulator tools and `.xcodeproj` edits. Agent
+worktrees (`EnterWorktree`, `Agent` with `isolation: "worktree"`) are allowed. Hooks and permissions
 are guardrails, not a sandbox or proof of authorization; programs and tools outside their coverage
 still follow `CLAUDE.md`. Personal overrides belong in the ignored `.claude/settings.local.json`,
 where deny rules from the tracked file still win.
 
 After changing instructions, rules, skills or hooks, check a fresh session: the SessionStart banner
 names `CLAUDE.md`, `/memory` lists `CLAUDE.md`, `/hooks` shows the five hooks, `/permissions` shows
-the three lists, the four skills appear in the `/` menu, and a harmless blocked fixture (an Edit of
-`docs/ROADMAP.md`) is refused. Report runtime activation as unverified until then. Never try a real
+the three lists, the four repository skills appear in the `/` menu (among any user-scope plugin
+skills), and a harmless blocked fixture (an Edit of `docs/ROADMAP.md`) is refused. For the worktree
+rules, start one isolated agent on a one-line docs change: its commit on `worktree-*` passes, its push
+is refused, and the lead integrates it with `git merge --ff-only` and removes the worktree. Report runtime activation as unverified until then. Never try a real
 destructive command as a hook test.
 
 | Work | Authoritative route | Relevant optional assistance |
 | --- | --- | --- |
-| Native build/test/UI evidence | Repository scripts, owned caches and XCUITest | XcodeBuildMCP discovery, scratch builds and device debugging with the `macos`/`ios-device` profiles; swift-lsp through `buildServer.json`; no alternative native UI driver |
-| Apple code and diagnostics | Source, Apple documentation and test artifacts | Axiom skills and auditors, Apple documentation tools, `swift-review`; select the relevant specialty only |
+| Native build/test/UI evidence | Repository scripts, owned caches and XCUITest | XcodeBuildMCP discovery, scratch builds and device debugging with the `macos`/`ios-device` profiles (its Simulator tools are denied); swift-lsp through `buildServer.json`; no alternative native UI driver |
+| Apple code and diagnostics | Source, Apple documentation and test artifacts | Axiom skills (for example `axiom:axiom-tools`, `axiom:axiom-concurrency`) and auditor subagents (`axiom:concurrency-auditor`, `axiom:memory-auditor`, `axiom:swiftui-performance-analyzer`, `axiom:build-fixer`, `axiom:test-failure-analyzer`, `axiom:crash-analyzer`, `axiom:security-privacy-scanner`, `axiom:accessibility-auditor`), Apple documentation (sosumi), `swift-review`; select the relevant specialty only |
+| MLX runtime | `Packages/VocelloQwen3Core`, [MLX guide](mlx-guide.md) and exact pins | `mlx-swift` and `mlx-swift-lm` skills; no implied dependency move |
 | Finished UI runs | [Testing runbook](testing-runbook.md#read-a-finished-run) | `xcresult-triage` subagent |
 | Website | `npm --prefix website run check` with Playwright | Claude in Chrome or chrome-devtools for visual/interactive checks; Impeccable and relevant Vercel/library guidance under `website/CLAUDE.md` |
-| CI and release evidence | Exact-commit GitHub checks and repository release scripts | `gh` or the GitHub MCP; release tools require explicit publication authority |
+| CI and release evidence | Exact-commit GitHub checks and repository release scripts | `gh`, the GitHub connector (claude.ai, no personal token) and Monitor for long runs; release tools require explicit publication authority |
+| App Store Connect | The web portal and the release workflow's `xcodebuild`/`altool` steps | asc-* skills (they drive the tddworks `asc` CLI); reads freely, writes such as uploads, submissions or metadata edits only on explicit request |
 | Model/dependency research | Receipts, exact pins and maintenance contracts | Hugging Face tools read-only and Context7 for library docs; no implied download or pin-change permission |
 
 Use tools callable in the current session, with script/primary-documentation fallbacks. The

@@ -186,7 +186,20 @@ build_mac_test_bundles() {
   fi
 }
 
+# Test execution holds the host-wide native lock too: an MLX test run next to
+# another native build would contend for the 16 GB host's memory.
 run_mac_test_bundle() {
+  local status=0
+  if ! acquire_native_lock "macos-test:xctest:$1"; then
+    echo "could not acquire the host native lock ($QVOICE_NATIVE_LOCK)" > "$2"
+    return 1
+  fi
+  _run_mac_test_bundle "$@" || status=$?
+  release_native_lock
+  return "$status"
+}
+
+_run_mac_test_bundle() {
   local bundle_name="$1" log_path="$2" tsan="${3:-0}" test_filter="${4:-}"
   local derived_data="$QVOICE_XCODE_MACOS_DERIVED"
   [[ "$tsan" != "1" ]] || derived_data="$QVOICE_XCODE_MACOS_TSAN_DERIVED"
@@ -350,7 +363,7 @@ cmd_crashes() {
     if command -v xcsym >/dev/null 2>&1; then
       xcsym crash "$f" --dsym-dir "$DSYM_DIR" 2>&1 || warn "xcsym failed on $(basename "$f")"
     else
-      warn "xcsym not on PATH — use Xcode Organizer, or consult \$axiom-tools before installing xcsym:"
+      warn "xcsym not on PATH — use Xcode Organizer, or consult the axiom:axiom-tools skill before installing xcsym:"
       warn "  xcsym crash \"$f\" --dsym-dir \"$DSYM_DIR\""
     fi
   done
@@ -1076,7 +1089,16 @@ cmd_test() {
     swiftpm_engine=(--build-system native)
   fi
   local mlx_bundle="$QVOICE_XCODE_MACOS_DERIVED/Build/Products/Release/mlx-swift_Cmlx.bundle"
-  if ensure_swiftpm_scratch_location "$runtime_package" "$QVOICE_SWIFTPM_RUNTIME_CACHE" \
+  # The SwiftPM build and test compile MLX too, so they hold the host-wide
+  # native lock like every xcodebuild does.
+  local runtime_locked=0
+  if acquire_native_lock "macos-test:swiftpm-runtime"; then
+    runtime_locked=1
+  else
+    echo "could not acquire the host native lock ($QVOICE_NATIVE_LOCK)" > "$artifacts/runtime.log"
+  fi
+  if (( runtime_locked )) \
+      && ensure_swiftpm_scratch_location "$runtime_package" "$QVOICE_SWIFTPM_RUNTIME_CACHE" \
       && swift build --package-path "$runtime_package" \
       --scratch-path "$QVOICE_SWIFTPM_RUNTIME_CACHE" --configuration debug \
       --force-resolved-versions ${swiftpm_engine[@]+"${swiftpm_engine[@]}"} \
@@ -1138,6 +1160,9 @@ cmd_test() {
     fi
   else
     runtime_st=1
+  fi
+  if (( runtime_locked )); then
+    release_native_lock
   fi
 
   set -e

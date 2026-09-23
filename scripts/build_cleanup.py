@@ -18,6 +18,7 @@ from pathlib import Path
 import plistlib
 import shutil
 import subprocess
+import time
 import sys
 import tempfile
 from typing import Any, Iterable
@@ -827,30 +828,79 @@ def validated_public_links(
     return result
 
 
-def assert_no_active_build(policy: dict[str, Any]) -> None:
-    entries = {entry.get("id"): entry for entry in policy_entries(policy)}
-    packages = entries.get("xcode-source-packages")
-    if not packages:
-        raise CleanupError("build-output policy is missing the package-store lock owner")
-    lock = managed_path(packages) / ".qwenvoice-package-store.lock"
+def _live_lock_owner(lock: Path, label: str) -> int | None:
+    """Return the PID of a live lock owner, or None for an absent or stale lock."""
     if not lock.exists():
-        return
+        return None
     if lock.is_symlink() or not lock.is_dir():
-        raise CleanupError(f"shared package-store lock is malformed: {lock}")
+        raise CleanupError(f"{label} is malformed: {lock}")
     try:
-        pid_text = (lock / "pid").read_text(encoding="utf-8").strip()
-        pid = int(pid_text)
+        pid = int((lock / "pid").read_text(encoding="utf-8").strip())
     except (OSError, ValueError) as error:
-        raise CleanupError(f"shared package-store lock has no valid owner PID: {lock}") from error
+        try:
+            age = time.time() - lock.stat().st_mtime
+        except OSError:
+            return None
+        if age > 30:
+            return None  # abandoned mid-creation; the next build reclaims it
+        raise CleanupError(f"{label} is being created: {lock}; retry cleanup") from error
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
-        return
+        return None
     except PermissionError:
         pass
-    raise CleanupError(
-        f"a repository build still owns the shared package store (pid {pid}); retry cleanup later"
-    )
+    try:
+        recorded = (lock / "started").read_text(encoding="utf-8").strip()
+    except OSError:
+        recorded = ""
+    if recorded:
+        current = subprocess.run(
+            ["ps", "-o", "lstart=", "-p", str(pid)],
+            capture_output=True, text=True, check=False,
+            env={**os.environ, "LC_ALL": "C", "TZ": "UTC0"},
+        ).stdout.strip()
+        if recorded != current:
+            return None  # the PID was recycled; the recorded owner is gone
+    return pid
+
+
+def host_native_lock(policy: dict[str, Any]) -> Path:
+    contract = policy.get("hostNativeLock")
+    if not isinstance(contract, dict) or not isinstance(contract.get("defaultPath"), str):
+        raise CleanupError("build-output policy is missing the host native lock")
+    override = os.environ.get(str(contract.get("env", "")), "")
+    if override and Path(override).is_absolute():
+        return Path(override)
+    return Path(contract["defaultPath"]).expanduser()
+
+
+def assert_no_active_build(policy: dict[str, Any]) -> None:
+    lock = host_native_lock(policy)
+    try:
+        owner = Path((lock / "checkout").read_text(encoding="utf-8").strip())
+    except OSError:
+        owner = REPO_ROOT
+    # Another checkout or worktree may build while this one is cleaned.
+    same_checkout = owner.resolve(strict=False) == REPO_ROOT.resolve(strict=False)
+    pid = _live_lock_owner(lock, "host native lock") if same_checkout else None
+    if pid is not None:
+        if same_checkout:
+            raise CleanupError(
+                f"a repository build still owns the native lock (pid {pid}); retry cleanup later"
+            )
+    entries = {entry.get("id"): entry for entry in policy_entries(policy)}
+    packages = entries.get("xcode-source-packages")
+    if not packages:
+        raise CleanupError("build-output policy is missing the package-store owner")
+    # Transition: a build started before the host-wide lock still holds the
+    # legacy per-checkout lock.
+    legacy = managed_path(packages) / ".qwenvoice-package-store.lock"
+    pid = _live_lock_owner(legacy, "shared package-store lock")
+    if pid is not None:
+        raise CleanupError(
+            f"a repository build still owns the shared package store (pid {pid}); retry cleanup later"
+        )
 
 
 def assert_paths_idle(paths: Iterable[Path]) -> None:

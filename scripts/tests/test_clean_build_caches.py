@@ -63,6 +63,8 @@ raise SystemExit(0 if payload.get("_fixtureValid") is True else 1)
     ) -> subprocess.CompletedProcess[str]:
         environment = os.environ.copy()
         environment["HOME"] = str(self.home)
+        # The host lock resolves under the fixture HOME, never the real one.
+        environment.pop("QVOICE_NATIVE_LOCK", None)
         result = subprocess.run(
             [str(self.root / "scripts" / SHELL.name), *arguments],
             cwd=self.root,
@@ -431,6 +433,33 @@ raise SystemExit(0 if payload.get("_fixtureValid") is True else 1)
 
         self.assertIn("still owns the shared package store", result.stderr)
         self.assertTrue(cache.exists())
+
+    def write_host_lock(self, checkout: Path) -> Path:
+        lock = self.home / "Library" / "Caches" / "Vocello" / "native-build.lock"
+        self.write(lock / "pid", str(os.getpid()))
+        self.write(lock / "checkout", str(checkout))
+        return lock
+
+    def test_cache_cleanup_refuses_a_live_host_lock_owned_by_this_checkout(self) -> None:
+        cache = self.write(
+            self.root / "build" / "cache" / "xcode" / "ios-device" / "cache"
+        )
+        self.write_host_lock(self.root)
+
+        result = self.run_clean("--cache", "ios", expected=1)
+
+        self.assertIn("still owns the native lock", result.stderr)
+        self.assertTrue(cache.exists())
+
+    def test_cache_cleanup_ignores_a_host_lock_owned_by_another_checkout(self) -> None:
+        cache = self.write(
+            self.root / "build" / "cache" / "xcode" / "ios-device" / "cache"
+        )
+        self.write_host_lock(self.root.parent / "other-worktree")
+
+        self.run_clean("--cache", "ios")
+
+        self.assertFalse(cache.exists())
 
     def test_aggressive_removes_persistent_caches_and_links_but_preserves_dist_and_symbols(self) -> None:
         caches = [

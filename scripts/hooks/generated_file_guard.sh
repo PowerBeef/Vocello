@@ -4,7 +4,9 @@
 # Reads the normalized edit path and refuses (exit 2) direct edits of files the
 # repository generates or freezes, naming the generator so the fix is one
 # command away. Path checks are plain `case` globs on the repository-relative
-# path; the hook never reads git state and finishes in milliseconds.
+# path; an agent worktree's `.claude/worktrees/<name>/` prefix is stripped first,
+# so the same files stay guarded inside worktrees. The hook never reads git
+# state and finishes in milliseconds.
 
 set -euo pipefail
 
@@ -22,6 +24,9 @@ block() {
 
 while IFS= read -r file_path; do
   relative="${file_path#"$root"/}"
+  if [[ "$relative" == .claude/worktrees/*/* ]]; then
+    relative="${relative#.claude/worktrees/*/}"
+  fi
   case "$relative" in
   docs/ROADMAP.md)
     block "edit config/roadmap.json, then python3 scripts/roadmap.py render" ;;

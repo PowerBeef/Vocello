@@ -53,6 +53,9 @@
       }
     ]
   },
+  "worktree": {
+    "baseRef": "head"
+  },
   "permissions": {
     "allow": [
       "Bash(git status *)",
@@ -67,6 +70,12 @@
       "Bash(git commit *)",
       "Bash(git push)",
       "Bash(git push origin main)",
+      "Bash(git worktree list*)",
+      "Bash(git worktree prune*)",
+      "Bash(git worktree remove .claude/worktrees/*)",
+      "Bash(git merge --ff-only worktree-*)",
+      "Bash(git cherry-pick *)",
+      "Bash(git branch -d worktree-*)",
       "Bash(scripts/dev.sh *)",
       "Bash(./scripts/dev.sh *)",
       "Bash(python3 scripts/roadmap.py *)",
@@ -111,6 +120,9 @@
       "Bash(git restore *)",
       "Bash(git checkout -- *)",
       "Bash(git clean *)",
+      "Bash(git branch -D*)",
+      "Bash(git worktree remove --force*)",
+      "Bash(git worktree unlock*)",
       "mcp__XcodeBuildMCP__test_device",
       "mcp__XcodeBuildMCP__build_run_device",
       "mcp__XcodeBuildMCP__install_app_device",
@@ -123,6 +135,20 @@
       "Bash(git checkout -b*)",
       "Bash(git switch -c*)",
       "Bash(git switch --create*)",
+      "Bash(git checkout -B*)",
+      "Bash(git switch -C*)",
+      "Bash(git update-ref*)",
+      "Bash(git push --all*)",
+      "Bash(git push --mirror*)",
+      "Bash(git push --tags*)",
+      "Bash(git push --delete*)",
+      "Bash(git push -d *)",
+      "Bash(git push -u*)",
+      "Bash(git push --set-upstream*)",
+      "Bash(git push origin :*)",
+      "Bash(git push origin --delete*)",
+      "Bash(git push origin HEAD*)",
+      "Bash(git push origin worktree-*)",
       "Bash(git worktree add*)",
       "Bash(git stash*)",
       "Bash(git add -A*)",
@@ -141,9 +167,16 @@
       "Bash(gh release edit*)",
       "Bash(gh release delete*)",
       "Edit(QwenVoice.xcodeproj/**)",
-      "EnterWorktree",
-      "Agent(isolation:*)",
-      "mcp__XcodeBuildMCP__debug_attach_sim"
+      "mcp__XcodeBuildMCP__debug_attach_sim",
+      "mcp__XcodeBuildMCP__build_sim",
+      "mcp__XcodeBuildMCP__build_run_sim",
+      "mcp__XcodeBuildMCP__test_sim",
+      "mcp__XcodeBuildMCP__boot_sim",
+      "mcp__XcodeBuildMCP__install_app_sim",
+      "mcp__XcodeBuildMCP__launch_app_sim",
+      "mcp__XcodeBuildMCP__open_sim",
+      "mcp__XcodeBuildMCP__record_sim_video",
+      "mcp__XcodeBuildMCP__stop_app_sim"
     ]
   }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Code SessionStart hook: branch and dirty state, dev.sh status, the "Resume now"
+# Claude Code SessionStart hook: branch and dirty state, open agent worktrees, dev.sh status, the "Resume now"
 # head of docs/development-progress.md. Local-only, bounded, never fails.
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -14,6 +14,12 @@ echo "== Vocello session start (CLAUDE.md: Start here) =="
 echo
 echo "-- git --"
 with_deadline 3 git status --short --branch | head -n 20 || echo "(git unavailable)"
+worktrees="$(with_deadline 3 git worktree list 2>/dev/null | tail -n +2 | head -n 8)"
+if [[ -n "$worktrees" ]]; then
+  echo
+  echo "-- agent worktrees (integrate into main or remove) --"
+  printf '%s\n' "$worktrees"
+fi
 echo
 echo "-- scripts/dev.sh status --"
 with_deadline 6 scripts/dev.sh status 2>&1 | head -n 12 || echo "(status unavailable)"

@@ -138,6 +138,9 @@ Never copy `build/` from another machine; rebuild it.
   ensure` on explicit request; copying that folder from the old Mac also works.
 - **iPhone.** Device lanes need an Apple Development identity with its key, an iPhone paired with and
   trusting this Mac, and Developer Mode enabled on the phone ([`ios-device-testing.md`](ios-device-testing.md)).
+  Pair once over USB; afterwards CoreDevice reaches the unlocked phone over the local network
+  (`scripts/ios_device.sh device-state`). With the Apple ID signed in under Xcode → Settings →
+  Accounts, the first `scripts/ios_device.sh build` creates the team development provisioning profile.
 
 ## 8. Claude Code
 
@@ -154,19 +157,23 @@ claude plugin marketplace add CharlesWiltgen/Axiom
 claude plugin install axiom@axiom-marketplace
 claude plugin marketplace add pbakaus/impeccable
 claude plugin install impeccable@impeccable
-for p in swift-lsp pyright-lsp chrome-devtools-mcp huggingface-skills vercel; do
+for p in swift-lsp pyright-lsp chrome-devtools-mcp huggingface-skills vercel claude-md-management; do
   claude plugin install "$p@claude-plugins-official"
 done
 
-brew tap getsentry/xcodebuildmcp && brew install xcodebuildmcp
-claude mcp add -s user XcodeBuildMCP -- xcodebuildmcp mcp
+claude mcp add -s user XcodeBuildMCP -- npx -y xcodebuildmcp@latest mcp
 claude mcp add -s user --transport http context7 https://mcp.context7.com/mcp
 claude mcp add -s user --transport http sosumi https://sosumi.ai/mcp
+
+brew install asccli   # tddworks asc CLI behind the asc-* App Store Connect skills
 ```
 
-XcodeBuildMCP reads its workflows and the `macos`/`ios-device` profiles from the tracked
-`.xcodebuildmcp/config.yaml`; do not enable its Simulator workflow. The GitHub MCP server needs a
-personal token and is optional; `gh` covers the workflow.
+XcodeBuildMCP runs through `npx` (Node from section 2) and reads its workflows and the
+`macos`/`ios-device` profiles from the tracked `.xcodebuildmcp/config.yaml`; do not enable its
+Simulator workflow (the project settings deny its Simulator tools). The GitHub connector comes from
+the claude.ai account and needs no personal token; `gh` covers the same workflow. Claude in Chrome is
+the Chrome extension; use it for the website and, on explicit request, portal chores. The asc-*
+skills drive the tddworks `asc`; the repository itself pins no App Store Connect CLI.
 
 swift-lsp resolves symbols through a `buildServer.json` at the repository root. It is ignored because
 it holds machine paths; create it after the first build:

@@ -402,7 +402,7 @@ friction, use the headless §4.7 `ios_device.sh bench` lane.
 | UI failure | `.xcresult` activities, failure diagnostics, and screenshot attachments |
 | Crash post-mortem | Xcode Organizer; optional `xcsym` on `PATH` |
 
-The optional `axiom-tools` plugin skill can help choose an Instruments workflow; the procedure in
+The optional `axiom:axiom-tools` plugin skill can help choose an Instruments workflow; the procedure in
 [`ios-device-testing.md`](ios-device-testing.md) is authoritative, including physical-device setup.
 
 The iOS profile command resolves Instruments' UDID independently from CoreDevice's device ID and

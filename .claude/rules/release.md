@@ -98,10 +98,11 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   the ongoing control.
   Prompt comparisons use a run-time frozen holdout judged by `scripts/delivery_promotion_decision.py`.
 - **Consent-bound lanes.** `scripts/ui_test.sh`, `scripts/ios_device.sh`, `scripts/macos_test.sh
-  memory|lang-bench` and `release.yml` run only on explicit request. Timing lanes refuse to start on a
-  busy host (`require_quiet_host` in `scripts/lib/host_preflight.sh`: a 1-minute load above twice the
-  core count or a kernel memory-pressure level above 1 refuses; `QVOICE_ALLOW_BUSY_HOST=1` records the
-  numbers and continues; the gate summarizer then reports a loaded or throttled host as inconclusive,
+  memory|lang-bench` and `release.yml` run only on explicit request, in the lead session, with no
+  parallel agent active. Timing lanes refuse to start on a busy host (`require_quiet_host` in
+  `scripts/lib/host_preflight.sh`: a 1-minute load above twice the core count, a kernel memory-pressure
+  level above 1, another holder of the host-wide native lock or a locked agent worktree refuses;
+  `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues; the gate summarizer then reports a loaded or throttled host as inconclusive,
   exit 3, from the run's own load sample, and the record keeps `loadAverage1M`). Runner PASS
   requires diagnostics, crash deltas and restoration; no retries; a failed run keeps its artifacts;
   changed source needs new run IDs. XCUITest is never a packaging, notarization or upload prerequisite.
@@ -118,9 +119,10 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
 - Adding a validator that greps another script's text, or a Python test of a Python gate.
 - Committing raw telemetry, editing `benchmarks/HISTORY.md` or `docs/ROADMAP.md` by hand.
 - Running iOS UI work in the Simulator or making ordinary CI wait for a phone, a model or XCUITest.
-- Clearing caches to evade SwiftPM lock contention instead of serializing native commands.
-- Editing or committing while a UI or benchmark lane runs: publication compares the pre- and post-run
-  tree fingerprints, and a mismatch demotes the record to exploratory.
+- Clearing caches to evade native-lock contention instead of serializing native commands, or running
+  native builds outside the host-wide lock (XcodeBuildMCP builds bypass it).
+- Editing, committing or integrating agent work while a UI or benchmark lane runs: publication compares
+  the pre- and post-run tree fingerprints, and a mismatch demotes the record to exploratory.
 - Publishing a canonical macOS UI benchmark record without, in the same commit, repinning
   `RTF_RECORD`, running `generate_readme_charts.py` and updating the website medians and record id;
   the chart check fails otherwise. New records store `comparison.deltaMetrics: trend-v1` to stay under

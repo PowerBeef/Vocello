@@ -129,6 +129,12 @@
       }
     }
   },
+  "hostNativeLock": {
+    "schemaVersion": 1,
+    "defaultPath": "~/Library/Caches/Vocello/native-build.lock",
+    "env": "QVOICE_NATIVE_LOCK",
+    "purpose": "Host-wide lock that serializes every Xcode/SwiftPM build and test across all checkouts and agent worktrees on the development Mac."
+  },
   "entries": [
     {
       "id": "xcode-macos-derived-data",

@@ -100,11 +100,13 @@ never an implicit smoke/benchmark bootstrap. Restart the affected lane after rep
 `config/build-output-policy.json` owns free-space floors, caches, artifact lifetimes and cleanup.
 Use `scripts/clean_build_caches.sh --routine --dry-run` before bounded cleanup; never assume all
 artifacts or caches are disposable. Multi-run evidence is pinned before launch.
-Serialize native Xcode commands under the existing shared lock. On the 8 GB Mac, generation and
-heavy analyzers also run serially; timing lanes refuse to start on a busy host, and neural
-evaluators start only after the TTS process exits. The busy-host rule is `require_quiet_host` in
-`scripts/lib/host_preflight.sh`: a one-minute load above twice the core count or a kernel
-memory-pressure level above normal refuses the lane before any model loads.
+Native Xcode/SwiftPM commands are serialized by the host-wide native lock across every checkout and
+agent worktree. Generation and heavy analyzers run serially in the lead session (the 8 GB support
+floor sets the budget even on the 16 GB development Mac); timing lanes refuse to start on a busy host,
+and neural evaluators start only after the TTS process exits. The busy-host rule is
+`require_quiet_host` in `scripts/lib/host_preflight.sh`: a one-minute load above twice the core
+count, a kernel memory-pressure level above normal, another holder of the native lock or a running
+agent worktree refuses the lane before any model loads.
 `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues for an explicitly exploratory run, which
 the publisher then classifies from the run's own load sample.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Host posture preflight for timing- and memory-sensitive lanes on the 8 GB host.
+# Host posture preflight for timing- and memory-sensitive lanes on the development host.
 #
 # A benchmark, language, memory or UI benchmark run started on a loaded or
 # memory-pressured machine produces numbers that the gate summarizer later
@@ -12,7 +12,10 @@
 # Refuses (exit 1) when the 1-minute load average exceeds twice the core count
 # or the kernel reports memory pressure above normal
 # (`kern.memorystatus_vm_pressure_level` > 1: 2 = warning, 4 = critical), and
-# prints the numbers either way. `QVOICE_ALLOW_BUSY_HOST=1` records the numbers
+# prints the numbers either way. It also refuses while parallel work is active:
+# another process holds the host-wide native lock ($QVOICE_NATIVE_LOCK), or a
+# Claude Code agent worktree is locked (an agent is still running). Evidence
+# lanes run alone. `QVOICE_ALLOW_BUSY_HOST=1` records the numbers
 # and continues, for an explicitly exploratory run the publisher will classify
 # from the run's own load sample. No dependency on the caller's note/warn/die.
 
@@ -30,14 +33,41 @@ require_quiet_host() {
     case "$level" in ''|*[!0-9]*) level=1 ;; esac
     load_hundredths="$(awk -v value="${load:-0}" 'BEGIN { printf "%d", value * 100 }')"
     limit=$(( cores * 2 ))
-    local busy=0
+    local busy=0 parallel=""
     if [ "$load_hundredths" -gt $(( limit * 100 )) ] || [ "$level" -gt 1 ]; then
         busy=1
     fi
+    local lock_owner=""
+    if [ -n "${QVOICE_NATIVE_LOCK:-}" ] && [ -d "$QVOICE_NATIVE_LOCK" ]; then
+        lock_owner="$(cat "$QVOICE_NATIVE_LOCK/pid" 2>/dev/null || true)"
+        case "$lock_owner" in
+            ''|*[!0-9]*) ;;
+            *)
+                local lock_started recorded_started
+                recorded_started="$(cat "$QVOICE_NATIVE_LOCK/started" 2>/dev/null || true)"
+                lock_started="$(LC_ALL=C TZ=UTC0 ps -o lstart= -p "$lock_owner" 2>/dev/null | sed 's/^ *//;s/ *$//')"
+                if [ "$lock_owner" != "$$" ] && kill -0 "$lock_owner" 2>/dev/null \
+                    && { [ -z "$recorded_started" ] || [ "$recorded_started" = "$lock_started" ]; }; then
+                    busy=1
+                    parallel="$parallel native-lock(pid $lock_owner)"
+                fi
+                ;;
+        esac
+    fi
+    local locked_worktrees
+    locked_worktrees="$(git -C "${ROOT_DIR:-$PWD}" worktree list --porcelain 2>/dev/null | grep -c '^locked' || true)"
+    case "$locked_worktrees" in ''|*[!0-9]*) locked_worktrees=0 ;; esac
+    if [ "$locked_worktrees" -gt 0 ]; then
+        busy=1
+        parallel="$parallel active-agent-worktrees($locked_worktrees)"
+    fi
     if [ "$busy" -eq 1 ]; then
         if [ "${QVOICE_ALLOW_BUSY_HOST:-0}" = "1" ]; then
-            echo "==> [host] $lane: continuing on a busy host by request (load1m=${load:-?} limit=$limit cores=$cores memoryPressureLevel=$level)" >&2
+            echo "==> [host] $lane: continuing on a busy host by request (load1m=${load:-?} limit=$limit cores=$cores memoryPressureLevel=$level${parallel:+ parallel:$parallel})" >&2
             return 0
+        fi
+        if [ -n "$parallel" ]; then
+            echo "error: $lane must run alone; parallel work is active:$parallel. Wait for it to finish (evidence lanes never share the host)." >&2
         fi
         echo "error: $lane needs a quiet host: load1m=${load:-?} (limit $limit for $cores cores), memoryPressureLevel=$level (limit 1)." >&2
         echo "error: wait for the load to settle or close other work; QVOICE_ALLOW_BUSY_HOST=1 runs anyway and the run's own load sample decides its classification." >&2

@@ -17,6 +17,18 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### New Mac mini M6 and parallel agents (September 22)
+
+Development now runs on a Mac mini M6 (16 GB, 12 cores) with Xcode 27; the setup guide was followed
+and the website Node pin moved to the 24.x line. The working agreement now allows parallel agents
+(PA-27): a lead session on `main` that alone pushes, read-only subagents, and editing agents in
+Claude Code worktrees (`.claude/worktrees/<name>`, `worktree-*`) that the lead integrates with
+`merge --ff-only` or `cherry-pick`. Every Xcode/SwiftPM command now holds the host-wide native lock
+(`~/Library/Caches/Vocello/native-build.lock`), and evidence lanes refuse to start while an agent or
+another native build is active. Rules and the 16 GB budget:
+[development workflow](reference/development-workflow.md#parallel-agents-and-worktrees). Next: the
+rorkai `asc` removal and the M6 canonical-benchmark switch, then the queue below.
+
 ### Machine transition and next steps (September 22)
 
 Work pauses here for the maintainer's move to a new Mac; everything is committed and pushed. Set the

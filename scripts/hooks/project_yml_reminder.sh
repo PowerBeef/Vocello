@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Claude Code PostToolUse hook (matcher: Edit|Write|MultiEdit).
 #
-# After project.yml changes, remind the session that the Xcode project is
+# After project.yml changes (in the checkout or an agent worktree), remind the session that the Xcode project is
 # generated and the generation stamp must be refreshed before a checkpoint.
 # Advisory only: exit 0, context returned through hookSpecificOutput.
 
@@ -12,7 +12,11 @@ file_paths="$(python3 "$HOOK_DIR/agent_hook_input.py" paths)"
 root="$(cd "$HOOK_DIR/../.." && pwd)"
 root="$(cd "$root" && pwd -P)"
 while IFS= read -r file_path; do
-  if [[ "$file_path" == "$root/project.yml" ]]; then
+  relative="${file_path#"$root"/}"
+  if [[ "$relative" == .claude/worktrees/*/project.yml && "$relative" != .claude/worktrees/*/*/* ]]; then
+    relative="project.yml"
+  fi
+  if [[ "$relative" == "project.yml" ]]; then
     python3 - <<'PY'
 import json
 print(json.dumps({

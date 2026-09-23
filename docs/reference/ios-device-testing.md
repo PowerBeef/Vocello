@@ -219,9 +219,9 @@ as PASS. Collection ordering is owned by `scripts/ui_test.sh` itself; the 2026-0
 that reproduced the missing-collection failure was a source-text test and was removed on
 2026-09-12.
 
-Serialize macOS and iOS `xcodebuild` commands: the governed shared SwiftPM-store lock is held
-throughout XCTest, not just build/package resolution. Concurrent native commands can time out
-waiting for that lock. Run read-only analysis or Python fixtures alongside a device lane instead;
+Serialize macOS and iOS `xcodebuild` commands: the host-wide native lock is held throughout XCTest,
+not just build/package resolution, across every checkout and agent worktree. A concurrent native
+command waits for it (and names the holder each minute). Run read-only analysis or Python fixtures alongside a device lane instead;
 do not bypass the lock or clear a cache to resolve legitimate contention.
 
 After adding, moving or deleting files under a globbed Xcode target, regenerate the project with

@@ -833,8 +833,9 @@ plus `QWENVOICE_DEBUG`); `scripts/runtime_security_contract.py` rejects any pers
 `config/build-output-policy.json` is the machine-readable owner and lifetime contract for native
 repository output under `build/`. Local development has three persistent Xcode caches —
 `build/cache/xcode/macos/`, `build/cache/xcode/macos-tsan/` (nightly TSan) and
-`build/cache/xcode/ios-device/` — plus one serialized shared package checkout at
-`build/cache/xcode/source-packages/`. The owned Qwen3 Core runtime uses its separate
+`build/cache/xcode/ios-device/` — plus one shared package checkout at
+`build/cache/xcode/source-packages/`; every Xcode/SwiftPM command is serialized by the host-wide
+native lock (`hostNativeLock`, outside the checkout so agent worktrees share it). The owned Qwen3 Core runtime uses its separate
 policy-owned SwiftPM scratch cache and must not leave `.build` state in the source tree.
 
 Release, XcodeBuildMCP, package-resolution, CI, and compile-safety DerivedData are isolated below

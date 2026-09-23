@@ -14,7 +14,10 @@ ROOT = Path(__file__).resolve().parents[2]
 LIB = ROOT / "scripts/lib/host_preflight.sh"
 
 
-def run_preflight(*, load: str, cores: str, level: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+def run_preflight(
+    *, load: str, cores: str, level: str, env: dict[str, str] | None = None,
+    cwd: Path | None = None,
+) -> subprocess.CompletedProcess:
     """Run `require_quiet_host` against a fake `sysctl` that answers with the given values."""
     with tempfile.TemporaryDirectory() as temporary:
         shim = Path(temporary) / "sysctl"
@@ -31,10 +34,14 @@ def run_preflight(*, load: str, cores: str, level: str, env: dict[str, str] | No
         environment = dict(os.environ)
         environment["PATH"] = f"{temporary}:{environment['PATH']}"
         environment.pop("QVOICE_ALLOW_BUSY_HOST", None)
+        # Isolate from the real host lock and from this checkout's worktrees.
+        environment.pop("QVOICE_NATIVE_LOCK", None)
+        environment.pop("ROOT_DIR", None)
         environment.update(env or {})
         return subprocess.run(
             ["bash", "-c", f". '{LIB}'; require_quiet_host fixture-lane"],
             capture_output=True, text=True, env=environment, check=False,
+            cwd=cwd or temporary,
         )
 
 
@@ -62,6 +69,44 @@ class HostPreflightTests(unittest.TestCase):
         result = run_preflight(load="20.00", cores="8", level="4", env={"QVOICE_ALLOW_BUSY_HOST": "1"})
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("busy host by request", result.stderr)
+
+    def test_a_live_native_lock_holder_refuses(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            lock = Path(temporary) / "native-build.lock"
+            lock.mkdir()
+            holder = subprocess.Popen(["sleep", "30"])
+            try:
+                (lock / "pid").write_text(f"{holder.pid}\n")
+                result = run_preflight(load="0.50", cores="8", level="1",
+                                       env={"QVOICE_NATIVE_LOCK": str(lock)})
+            finally:
+                holder.kill()
+                holder.wait()
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(f"native-lock(pid {holder.pid})", result.stderr)
+            # A dead holder's lock is stale and does not block.
+            stale = run_preflight(load="0.50", cores="8", level="1",
+                                  env={"QVOICE_NATIVE_LOCK": str(lock)})
+            self.assertEqual(stale.returncode, 0, stale.stderr)
+
+    def test_a_locked_agent_worktree_refuses(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary) / "repo"
+            git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+            subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+            subprocess.run([*git, "-C", str(repo), "commit", "-q", "--allow-empty", "-m", "i"], check=True)
+            worktree = repo / ".claude" / "worktrees" / "agent"
+            subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "worktree-agent",
+                            str(worktree)], check=True)
+            idle = run_preflight(load="0.50", cores="8", level="1", cwd=repo)
+            self.assertEqual(idle.returncode, 0, idle.stderr)
+            subprocess.run(["git", "-C", str(repo), "worktree", "lock", str(worktree)], check=True)
+            busy = run_preflight(load="0.50", cores="8", level="1", cwd=repo)
+            self.assertEqual(busy.returncode, 1)
+            self.assertIn("active-agent-worktrees(1)", busy.stderr)
+            allowed = run_preflight(load="0.50", cores="8", level="1", cwd=repo,
+                                    env={"QVOICE_ALLOW_BUSY_HOST": "1"})
+            self.assertEqual(allowed.returncode, 0, allowed.stderr)
 
     def test_lane_identifier_is_required(self) -> None:
         result = subprocess.run(

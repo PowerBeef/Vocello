@@ -404,7 +404,29 @@ def _validate_policy_document(document: Any) -> tuple[tuple[dict[str, Any], ...]
                 f"heavyLanePreflight.lanes.{lane}.cleanupHint must be one bounded cleanup command"
             )
 
+    host_lock = document.get("hostNativeLock")
+    if not isinstance(host_lock, dict) or host_lock.get("schemaVersion") != 1:
+        raise PolicyError("hostNativeLock must be a schema-v1 object")
+    if host_lock.get("env") != "QVOICE_NATIVE_LOCK":
+        raise PolicyError("hostNativeLock.env must be QVOICE_NATIVE_LOCK")
+    default_lock = host_lock.get("defaultPath")
+    if (
+        not isinstance(default_lock, str)
+        or not default_lock.startswith("~/Library/Caches/")
+        or ".." in PurePosixPath(default_lock).parts
+    ):
+        raise PolicyError("hostNativeLock.defaultPath must stay under ~/Library/Caches/")
+
     return tuple(entries), entries_by_id
+
+
+def host_native_lock_path(document: dict[str, Any]) -> Path:
+    """The host-wide native lock; an absolute QVOICE_NATIVE_LOCK overrides it."""
+    contract = document["hostNativeLock"]
+    override = os.environ.get(contract["env"], "")
+    if override and Path(override).is_absolute():
+        return Path(override)
+    return Path(contract["defaultPath"]).expanduser()
 
 
 def load_policy(repo_root: Path, manifest_path: Path | None = None) -> LoadedPolicy:
@@ -1403,6 +1425,9 @@ def shell_environment(policy: LoadedPolicy) -> list[tuple[str, str]]:
     values.extend(
         (entry["env"], str(policy.repo_root / entry["path"]))
         for entry in policy.entries
+    )
+    values.append(
+        (policy.document["hostNativeLock"]["env"], str(host_native_lock_path(policy.document)))
     )
     return values
 

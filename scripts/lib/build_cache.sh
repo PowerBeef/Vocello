@@ -45,32 +45,105 @@ require_ios_xcode_platform() {
     QVOICE_IOS_PLATFORM_PREFLIGHT_COMPLETE=1
 }
 
-acquire_package_store_lock() {
-    local source_packages="$1" lock_dir="$1/.qwenvoice-package-store.lock"
-    local lock_owner="" _
-    [[ -z "$QVOICE_ACTIVE_PACKAGE_LOCK" ]] || {
-        echo "error: nested shared SwiftPM store lock is not supported" >&2
+# Host-wide native lock. One Xcode/SwiftPM build or test runs at a time on
+# this Mac, across every checkout and agent worktree: the 16 GB development
+# host cannot afford parallel MLX compiles, and every lane shares the
+# package store. The path comes from config/build-output-policy.json
+# (hostNativeLock; QVOICE_NATIVE_LOCK overrides it for tests).
+QVOICE_NATIVE_LOCK_WAIT_SECONDS="${QVOICE_NATIVE_LOCK_WAIT_SECONDS:-3600}"
+
+_native_lock_started() {
+    # Fixed locale and zone: every waiter must read the same start time.
+    LC_ALL=C TZ=UTC0 ps -o lstart= -p "$1" 2>/dev/null | sed 's/^ *//;s/ *$//'
+}
+
+# Seconds since the lock directory was created (0 when unknown).
+_native_lock_age() {
+    perl -e '@s = stat shift or exit; print time - $s[9]' "$1" 2>/dev/null || echo 0
+}
+
+# Succeeds when the lock directory names a live owner (same PID and same start
+# time, so a reused PID after a reboot does not count).
+native_lock_is_live() {
+    local lock_dir="$1" owner="" started=""
+    owner="$(cat "$lock_dir/pid" 2>/dev/null || true)"
+    [[ "$owner" =~ ^[1-9][0-9]*$ ]] || return 1
+    kill -0 "$owner" 2>/dev/null || return 1
+    started="$(cat "$lock_dir/started" 2>/dev/null || true)"
+    [[ -z "$started" || "$started" == "$(_native_lock_started "$owner")" ]]
+}
+
+# Remove a lock judged stale, atomically: rename it aside, confirm the renamed
+# directory is the one that was judged (another waiter may have replaced it
+# meanwhile), and put a fresh lock back if it is not.
+_native_lock_reclaim() {
+    local lock_dir="$1" judged_owner="$2" aside="$1.stale.$$"
+    mv "$lock_dir" "$aside" 2>/dev/null || return 0
+    if [[ "$(cat "$aside/pid" 2>/dev/null || true)" != "$judged_owner" ]] && [[ ! -e "$lock_dir" ]]; then
+        mv "$aside" "$lock_dir" 2>/dev/null || rm -rf "$aside"
+        return 0
+    fi
+    rm -rf "$aside"
+}
+
+acquire_native_lock() {
+    local label="${1:-native}" lock_dir="${QVOICE_NATIVE_LOCK:-}"
+    local waited=0 owner="" holder_label="" holder_checkout=""
+    [[ -n "$lock_dir" ]] || {
+        echo "error: QVOICE_NATIVE_LOCK is not set (build-output policy not loaded)" >&2
         return 1
     }
-    mkdir -p "$source_packages"
-    for _ in {1..1500}; do
+    [[ -z "$QVOICE_ACTIVE_PACKAGE_LOCK" ]] || {
+        echo "error: nested native lock is not supported" >&2
+        return 1
+    }
+    mkdir -p "$(dirname "$lock_dir")" || {
+        echo "error: cannot create the native lock directory: $(dirname "$lock_dir")" >&2
+        return 1
+    }
+    while :; do
         if mkdir "$lock_dir" 2>/dev/null; then
-            printf '%s\n' "$$" > "$lock_dir/pid"
+            _native_lock_started "$$" > "$lock_dir/started"
+            printf '%s\n' "$label" > "$lock_dir/label"
+            printf '%s\n' "$ROOT_DIR" > "$lock_dir/checkout"
+            # The pid file appears last and atomically: its presence means the
+            # lock is complete.
+            printf '%s\n' "$$" > "$lock_dir/pid.$$" && mv "$lock_dir/pid.$$" "$lock_dir/pid"
             QVOICE_ACTIVE_PACKAGE_LOCK="$lock_dir"
             return 0
         fi
-        lock_owner="$(cat "$lock_dir/pid" 2>/dev/null || true)"
-        if [[ "$lock_owner" =~ ^[1-9][0-9]*$ ]] && ! kill -0 "$lock_owner" 2>/dev/null; then
-            rm -rf "$lock_dir"
+        if [[ ! -d "$lock_dir" ]]; then
+            if [[ -e "$lock_dir" ]] || ! mkdir -p "$(dirname "$lock_dir")" 2>/dev/null; then
+                echo "error: cannot create the native lock: $lock_dir" >&2
+                return 1
+            fi
+            continue  # released between our mkdir and this check; try again
+        fi
+        owner="$(cat "$lock_dir/pid" 2>/dev/null || true)"
+        if [[ -n "$owner" ]] && ! native_lock_is_live "$lock_dir"; then
+            _native_lock_reclaim "$lock_dir" "$owner"
             continue
         fi
-        sleep 0.2
+        if [[ -z "$owner" ]] && (( $(_native_lock_age "$lock_dir") > 30 )); then
+            # A lock without an owner for 30 s was abandoned mid-creation.
+            _native_lock_reclaim "$lock_dir" ""
+            continue
+        fi
+        if (( waited >= QVOICE_NATIVE_LOCK_WAIT_SECONDS )); then
+            echo "error: timed out after ${waited}s waiting for the native lock: $lock_dir" >&2
+            return 1
+        fi
+        if (( waited % 60 == 0 )); then
+            holder_label="$(cat "$lock_dir/label" 2>/dev/null || echo '?')"
+            holder_checkout="$(basename "$(cat "$lock_dir/checkout" 2>/dev/null || echo '?')")"
+            echo "==> waiting for the native lock held by pid ${owner:-?} ($holder_label, $holder_checkout)" >&2
+        fi
+        sleep 1
+        waited=$((waited + 1))
     done
-    echo "error: timed out waiting for shared SwiftPM store lock: $lock_dir" >&2
-    return 1
 }
 
-release_package_store_lock() {
+release_native_lock() {
     [[ -z "$QVOICE_ACTIVE_PACKAGE_LOCK" ]] || rm -rf "$QVOICE_ACTIVE_PACKAGE_LOCK"
     QVOICE_ACTIVE_PACKAGE_LOCK=""
 }
@@ -203,7 +276,7 @@ PY
         return 0
     fi
 
-    acquire_package_store_lock "$source_packages" || return 1
+    acquire_native_lock "spm-resolve:$context" || return 1
 
     # Another waiter may have completed the same resolve while this process was
     # blocked. Recheck under the lock before invoking Xcode.
@@ -224,7 +297,7 @@ except (OSError, ValueError):
 raise SystemExit(0 if payload.get("fingerprint") == sys.argv[2] else 1)
 PY
     then
-        release_package_store_lock
+        release_native_lock
         echo "==> Shared Swift packages were resolved by another process ($context)"
         write_build_provenance "$source_packages/last-build.json" \
             "SwiftPM resolution ($context)" "$scheme" "$configuration" "$destination" arm64 \
@@ -245,14 +318,14 @@ PY
         -resolvePackageDependencies
     )
     if ! xcodebuild "${args[@]}"; then
-        release_package_store_lock
+        release_native_lock
         return 1
     fi
     if [ ! -d "$source_packages/checkouts" ] \
         || ! find "$source_packages/checkouts" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null \
             | grep -q .; then
         echo "error: Xcode reported a successful resolve but the shared checkout store is empty" >&2
-        release_package_store_lock
+        release_native_lock
         return 1
     fi
 
@@ -286,15 +359,15 @@ with open(path, "w", encoding="utf-8") as handle:
 PY
     then
         rm -f "$temp_cache"
-        release_package_store_lock
+        release_native_lock
         return 1
     fi
     if ! mv "$temp_cache" "$cache_file"; then
         rm -f "$temp_cache"
-        release_package_store_lock
+        release_native_lock
         return 1
     fi
-    release_package_store_lock
+    release_native_lock
     write_build_provenance "$source_packages/last-build.json" \
         "SwiftPM resolution ($context)" "$scheme" "$configuration" "$destination" arm64 \
         none unsigned "$derived_data" "$source_packages"
@@ -578,7 +651,7 @@ warn_if_storage_bloated() {
 # Actions/tools use SHA pins per config/toolchain.json. Revisit if a pinned
 # dependency ever ships a plugin that must execute on Darwin.
 xcb_run() {
-    acquire_package_store_lock "$QVOICE_XCODE_SOURCE_PACKAGES" || return 1
+    acquire_native_lock "xcodebuild:${QVOICE_NATIVE_LOCK_LABEL:-$(basename "$0")}" || return 1
     local status=0
     local -a extra_args=(-skipPackagePluginValidation)
     if command -v xcbeautify >/dev/null 2>&1 && [ -t 1 ]; then
@@ -588,6 +661,6 @@ xcb_run() {
     else
         xcodebuild "$@" "${extra_args[@]}" || status=$?
     fi
-    release_package_store_lock
+    release_native_lock
     return "$status"
 }

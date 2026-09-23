@@ -57,6 +57,7 @@ REQUIRED_EXPORTS = {
     "QVOICE_ARTIFACTS_FOUNDATION",
     "QVOICE_DIST_MACOS",
     "QVOICE_DIST_IOS",
+    "QVOICE_NATIVE_LOCK",
 }
 
 
@@ -181,6 +182,24 @@ class BuildOutputPolicyTests(unittest.TestCase):
             self.assertTrue(Path(value).is_absolute())
         self.assertEqual(set(exports), REQUIRED_EXPORTS)
         self.assertEqual(exports["QVOICE_BUILD_ROOT"], str(self.root / "build"))
+
+    def test_host_native_lock_is_host_wide_and_overridable(self) -> None:
+        policy = POLICY.load_policy(self.root, self.manifest)
+        home = self.root / "fake-home"
+        with mock.patch.dict(os.environ, {"HOME": str(home)}, clear=False):
+            os.environ.pop("QVOICE_NATIVE_LOCK", None)
+            default = POLICY.host_native_lock_path(policy.document)
+        # Outside every checkout, so all worktrees and clones share one lock.
+        self.assertEqual(default, home / "Library/Caches/Vocello/native-build.lock")
+        with mock.patch.dict(os.environ, {"QVOICE_NATIVE_LOCK": "/tmp/fixture.lock"}):
+            self.assertEqual(POLICY.host_native_lock_path(policy.document), Path("/tmp/fixture.lock"))
+        for bad in ({"schemaVersion": 1, "env": "QVOICE_NATIVE_LOCK", "defaultPath": "build/lock"},
+                    {"schemaVersion": 1, "env": "OTHER", "defaultPath": "~/Library/Caches/x.lock"}):
+            invalid = copy.deepcopy(self.document)
+            invalid["hostNativeLock"] = bad
+            self.write_manifest(invalid)
+            with self.assertRaises(POLICY.PolicyError):
+                POLICY.load_policy(self.root, self.manifest)
 
     def test_status_counts_allocated_bytes_without_following_symlinks(self) -> None:
         managed = self.root / "build/cache/xcode/macos"

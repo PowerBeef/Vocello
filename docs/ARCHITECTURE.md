@@ -40,7 +40,8 @@ One engine core (`QwenVoiceCore` / `MLXTTSEngine`) is hosted three ways:
 | **iOS app** | Engine runs **in-process** (`MLXTTSEngine` via `NativeRuntimeFactory`) | `Sources/iOS/TTSEngineStore.swift` | `VocelloiOS` |
 | **CLI** | Engine runs **in-process** | `VocelloCLI` (`CLIRuntime`) | `vocello` binary |
 
-Platforms: macOS 26+, iOS 26+, Apple Silicon (`arm64`), Xcode 26, Swift 6. Minimum
+Platforms: macOS 26+, iOS 26+, Apple Silicon (`arm64`), Swift 6; CI pins Xcode 26.6 / Swift 6.3.3
+and local Xcode 27 also builds (roadmap CONV-21). Minimum
 hardware support is an Apple Silicon Mac with 8 GB or iPhone 15 Pro or newer; canonical benchmark
 hardware is separately defined as Mac mini M6 16 GB (since 2026-09-22; the retired Mac mini M2
 8 GB records stay history) and iPhone 17 Pro.
@@ -131,13 +132,15 @@ platform-specific and is created only when explicitly requested.
 
 The loop around this table is short. `scripts/dev.sh check` runs lint, contracts, the selected
 tests and the native lanes the dirty tree touches, and is advisory; the only local block is
-`scripts/hooks/commit_lint.sh` (branch `main`, clean whitespace, no private path or credential).
-Push CI on `main` is the gate — `scripts/ci/classify_changes.py` routes each push into the
-`contracts`, `python`, `macos-tests`, `ios-compile` and `website` jobs and `CI required` is the
+`scripts/hooks/commit_lint.sh` (commits on `main` or an agent's `worktree-*` branch, pushes only
+from `main`, clean whitespace, no private path or credential). Push CI on `main` is the gate —
+`scripts/ci/classify_changes.py` routes each push into the `contracts`, `python`, `macos-tests`,
+`macos-tsan`, `ios-compile`, `website` and `dependency-submission` jobs and `CI required` is the
 single aggregate — and `scripts/dev.sh ci` reproduces that list serially. The timing lanes
 (`scripts/macos_test.sh gate|lang-bench|memory`, `scripts/ios_device.sh bench|lang-bench|memory|gate`
 and the XCUITest benchmark lanes) refuse to start on a busy host through `require_quiet_host`
-(load within twice the cores, no kernel memory pressure; `QVOICE_ALLOW_BUSY_HOST=1` records the
+(load within twice the cores, no kernel memory pressure, no other holder of the host-wide native
+lock, no running agent worktree; `QVOICE_ALLOW_BUSY_HOST=1` records the
 numbers and continues). A public promotion is routed separately: `promotionRouting` in
 `config/quality-promotion-contract.json` maps the paths changed since the previous release to the
 capability lanes it must prove, and `python3 scripts/quality_promotion.py classify --base <tag>`
@@ -833,8 +836,9 @@ plus `QWENVOICE_DEBUG`); `scripts/runtime_security_contract.py` rejects any pers
 ### Repository-local generated output
 
 `config/build-output-policy.json` is the machine-readable owner and lifetime contract for native
-repository output under `build/`. Local development has three persistent Xcode caches —
-`build/cache/xcode/macos/`, `build/cache/xcode/macos-tsan/` (nightly TSan) and
+repository output under `build/`. Local development has four persistent Xcode caches —
+`build/cache/xcode/macos/` (`-Onone`), `build/cache/xcode/macos-optimized/` (optimized CLI and
+XCUITest lanes), `build/cache/xcode/macos-tsan/` (the TSan subset, blocking in push CI) and
 `build/cache/xcode/ios-device/` — plus one shared package checkout at
 `build/cache/xcode/source-packages/`; every Xcode/SwiftPM command is serialized by the host-wide
 native lock (`hostNativeLock`, outside the checkout so agent worktrees share it). The owned Qwen3 Core runtime uses its separate

@@ -458,7 +458,7 @@ class DeliveryAnalysisCache:
 
 
 def prune(root: Path, *, keep_newest: int) -> dict[str, int]:
-    """Bound the cache on the 8 GB host: keep the newest canonical derivatives.
+    """Bound the cache for the 8 GB support floor: keep the newest canonical derivatives.
 
     Derivatives (16 kHz PCM plus their metadata) are ordered by modification
     time; the newest `keep_newest` stay together with every layer record bound

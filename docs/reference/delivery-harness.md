@@ -413,7 +413,7 @@ and completes deterministic checks for both paired files before starting a neura
 
 The cascade derives its input from the runner's retained plan, execution state, acoustic layer,
 source identities and exact WAV digests after the generator has exited, then reuses neutral
-controls through `build/cache/delivery-analysis` (bounded on the 8 GB host with
+controls through `build/cache/delivery-analysis` (bounded for the 8 GB support floor with
 `python3 scripts/delivery_analysis_cache.py prune --keep-newest N`; a pruned entry is recomputed
 on its next use). The default root is overridable with `QVOICE_DELIVERY_ANALYSIS_CACHE`; the
 cascade and `independent_asr.py transcribe` also take `--cache-root` and `--lock-root`. All heavy

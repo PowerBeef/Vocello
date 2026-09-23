@@ -162,7 +162,7 @@ prints read-only status); bare `xcodebuild` performs no such check.
 
 | Check | Action |
 |-------|--------|
-| Quiet machine | Timing lanes refuse to start on a busy host (`require_quiet_host` in `scripts/lib/host_preflight.sh`: a 1-minute load average above 2× the core count or kernel memory pressure above normal exits 1 before any model loads; it guards `macos_test.sh gate|memory|lang-bench|telemetry-overhead`, `ios_device.sh bench|lang-bench|memory|gate` and the `ui_test.sh` benchmark and perf lanes). `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues, and the run's own load sample then classifies it. Quit heavy apps and watch thermals (see §6.4). |
+| Quiet machine | Timing lanes refuse to start on a busy host (`require_quiet_host` in `scripts/lib/host_preflight.sh`: a 1-minute load average above 2× the core count, kernel memory pressure above normal, another holder of the host-wide native lock or a locked agent worktree exits 1 before any model loads; it guards `macos_test.sh gate|memory|lang-bench|telemetry-overhead`, `ios_device.sh bench|lang-bench|memory|gate` and the `ui_test.sh` benchmark and perf lanes). `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues, and the run's own load sample then classifies it. Quit heavy apps and watch thermals (see §6.4). |
 | Free disk | Heavy lanes check the floors in `config/build-output-policy.json` before building or launching (`require_build_free_space`, `scripts/lib/storage_preflight.py`): 15 GiB for `ui_test.sh … benchmark`, macOS/iOS `memory`, `lang-bench` and iOS `bench`/`gate`; 12 GiB for `telemetry-overhead` and `ui_test.sh … perf`; 8 GiB for `macos_test.sh gate`. A shortfall stops the lane before any work starts. |
 | Single Vocello session | Quit any separately installed Vocello first. The XCUITest runner verifies exact executable paths and signals only its own Release products. |
 | Debug data dir | `QWENVOICE_DEBUG=1` → `~/Library/Application Support/QwenVoice-Debug/` |
@@ -804,7 +804,9 @@ inconclusive rather than pass or fail. The committed baseline was re-saved from 
 run (warm cell n = 3, standard `wall/audio` RTF, host OS and Xcode identity). With
 `--require-baseline-identity` (the gate passes it) an identity mismatch exits 1 and the gate reports
 BASELINE INVALID: re-save it with `summarize_generation_telemetry.py <run-diag> --engine-only
---save-baseline`.
+--save-baseline`. The committed baseline is still bound to the retired `mac-mini-m2-8gb` host (macOS
+26.6.2, Xcode 26.6), so a gate bench on the canonical Mac mini M6 reports BASELINE INVALID until
+roadmap item AV-17 re-saves it from a three-take M6 run.
 Markdown snapshots (`benchmarks/baseline-*.md`) remain the human-readable full-matrix references;
 diff them with `git diff`, not `--compare-baseline`.
 

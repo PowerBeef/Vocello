@@ -2,7 +2,7 @@
 
 Describe the user-visible or maintainer-visible outcome.
 
-Development is main-only: `ci.yml` has no pull-request trigger, so the `CI required` verdict is produced by a maintainer's push to `main`.
+`main` is the only published branch: `ci.yml` has no pull-request trigger, so the `CI required` verdict is produced by a maintainer's push to `main`; agent worktree branches are integrated into `main` locally.
 
 ## Verification
 

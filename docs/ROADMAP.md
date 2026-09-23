@@ -232,7 +232,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 
 `engineering-review-remediation-2026-08` · **active** · backend-and-platform · adopted 2026-08-19
 
-Resolve the code-grounded findings from VOCELLO_ENGINEERING_REVIEW_2026-08-19.md without weakening Vocello's local-first architecture, physical-device policy, deterministic gates, or main-only development workflow. The external report is descriptive; this roadmap is the status authority. The September 4 current-source audit extends this existing defect authority under primary release-first-3-0-2026-09; it does not schedule another programme.
+Resolve the code-grounded findings from VOCELLO_ENGINEERING_REVIEW_2026-08-19.md without weakening Vocello's local-first architecture, physical-device policy, deterministic gates, or main-as-the-only-published-branch development workflow. The external report is descriptive; this roadmap is the status authority. The September 4 current-source audit extends this existing defect authority under primary release-first-3-0-2026-09; it does not schedule another programme.
 
 Narrative authority: [`docs/development-progress.md`](development-progress.md)
 

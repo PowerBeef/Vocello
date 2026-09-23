@@ -30,7 +30,8 @@ verification addendum from `0beb6331` that marks what is fixed, overstated or wr
 findings are grouped into the same plan as PA-09 to PA-26, and PA-05 widens to the whole release
 path. This document remains the plan's authority; the report holds the line-level evidence.
 
-The same change returned development to Claude Code as the sole coding agent (see
+The same change returned development to Claude Code as the coding agent (at the time the sole one;
+since PA-27 a lead session with optional worktree agents, see
 [the development workflow](development-workflow.md#claude-code-development-workflow)): `CLAUDE.md`,
 path-scoped `.claude/rules/`, user-invoked `.claude/skills/`, read-only subagents and
 `.claude/settings.json` hooks and permissions replace `AGENTS.md`, `.agents/` and `.codex/`.
@@ -95,8 +96,9 @@ empty.
 - **Local loop.** `scripts/dev.sh` routes through `scripts/development_workflow.py`, which classifies
   changed paths with the same `classify()` CI uses. `check` runs lint, the contract gate
   (`check_project_inputs.sh --local`: about 38 validators, `repo_invariants.sh`, the privacy scan, the
-  roadmap validator and selected pytest), then the native lanes the paths touch. The only native
-  serialization is the `mkdir` lock on the shared SwiftPM store, held per `xcodebuild`.
+  roadmap validator and selected pytest), then the native lanes the paths touch. At the audit the
+  only native serialization was the per-checkout `mkdir` lock on the shared SwiftPM store; since
+  PA-27 every Xcode/SwiftPM build and test holds the host-wide native lock (`hostNativeLock`).
 - **CI.** `ci.yml` runs on pushes to `main`: `changes`, `contracts`, `python`, `macos-tests`, the
   blocking `macos-tsan` subset, `ios-compile`, `website`, `dependency-submission`, and the
   `CI required` aggregate. Each lane diffs against its own last proven run. `nightly.yml` (cold TSan,
@@ -140,8 +142,9 @@ empty.
 - **PA-03 (P3) iOS diagnostics runners are reachable by environment alone.**
   `IOSStartupReliabilityRunner` and part of `IOSDeviceDiagnosticsRunner.isRequested` sit outside
   `#if QVOICE_DEVICE_DIAGNOSTICS` and depend only on `TelemetryGate`.
-- **PA-04 Harness isolation.** `scripts/build_ui_test_bundles.sh` calls `xcodebuild` directly,
-  bypassing the `xcb_run` package-store lock, the shared cloned-packages path and the `QVOICE_*` paths,
+- **PA-04 Harness isolation.** At the audit `scripts/build_ui_test_bundles.sh` called `xcodebuild`
+  directly (it now runs through `xcb_run` and the host-wide native lock), bypassing the shared
+  cloned-packages path and the `QVOICE_*` paths,
   and compiles `VocelloMacUI` into the `-Onone` arena while the UI lanes use `macos-optimized`.
   `scripts/lib/ios_coredevice_probe.py` writes fixed-name temporary files that concurrent probes can
   race, and `MAC_TAKE_MANIFEST` uses a fixed temporary path. The virtual-microphone temporary file in

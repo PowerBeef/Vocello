@@ -71,13 +71,13 @@ if [[ -n "$git_violation" ]]; then
   reason="${git_violation#*"$tab"}"
   case "$category" in
     force)
-      block "$reason (CLAUDE.md: Main only, Git/release)." \
+      block "$reason (CLAUDE.md: Main is the only published branch, Git/release)." \
         "Push fast-forward commits only; CI required protects main." ;;
     push|config)
-      block "$reason; only main is ever pushed (CLAUDE.md: Main only)." \
+      block "$reason; only main is ever pushed (CLAUDE.md: Main is the only published branch)." \
         "Integrate agent branches into main locally, then push main; release tags are maintainer-run." ;;
     *)
-      block "$reason (CLAUDE.md: Main only)." \
+      block "$reason (CLAUDE.md: Main is the only published branch)." \
         "Work on main, or spawn an agent with Agent isolation \"worktree\" / EnterWorktree; the lead integrates its worktree-* branch." ;;
   esac
 fi

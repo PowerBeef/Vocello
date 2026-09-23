@@ -27,16 +27,17 @@ interaction acceptance remains the explicitly requested XCUITest lane below.
 
 ```sh
 scripts/dev.sh check        # lint, contracts, selected tests, native lanes the dirty tree touches
-scripts/macos_test.sh test  # the three deterministic macOS bundles when you want them all
+scripts/macos_test.sh test  # the deterministic macOS core and runtime tests
 scripts/dev.sh ci           # exactly what push CI runs, serially
 ```
 
-These are advisory; the commit lint is the only local block and CI on `main` is the gate
-(development is main-only, so there is no pull-request or merge step). None of them needs UI
+These are advisory; the commit lint is the only local block and CI on `main` is the gate (`main` is
+the only published branch; agent worktree branches are integrated into it by the lead, with no pull
+request). None of them needs UI
 execution, installed generation models, or release evidence.
 
 `scripts/macos_test.sh test` writes each bundle's raw log plus a structured summary next to it
-(`core.test-results.json`, `transport.test-results.json`, `runtime.test-results.json`, produced by
+(`core.test-results.json`, `runtime.test-results.json`, produced by
 `scripts/lib/xctest_summary.py`, the same writer the XCUITest lanes use) and `verdict.txt` under
 `build/artifacts/macos/tests/<run>/`. The bundles run through the direct `xcrun xctest` runner on
 purpose: Xcode 26.6 can compile and then wait indefinitely before spawning `xctest` for these
@@ -65,7 +66,7 @@ The gate is release tooling, not the daily loop: `.github/workflows/release.yml`
 `archive-ios` job as the `platform-readiness` step (`scripts/macos_test.sh gate &&
 ./scripts/build_foundation_targets.sh ios`). Its five ledgered required steps are `project-inputs`
 (`check_project_inputs.sh`, step 0), `foundation-build` (`build_foundation_targets.sh macos`), `core-tests`
-(`VocelloCoreTests`), `deterministic-tests` (the same three bundles as `test`) and the gate-fatal
+(`VocelloCoreTests`), `deterministic-tests` (the same bundles as `test`) and the gate-fatal
 `crash-delta` over `.ips` files newer than the run's marker. Every step lands in a
 required-step ledger with the verdict under `build/artifacts/macos/gates/`, and
 `QWENVOICE_GATE_BENCH=1` appends a fifth bounded `vocello bench` step whose PASS publishes one
@@ -74,7 +75,8 @@ before signing; it needs no model fixture and no UI evidence.
 
 `gate`, `telemetry-overhead`, `lang-bench` and `memory` refuse to start on a busy host:
 `require_quiet_host` in `scripts/lib/host_preflight.sh` rejects a one-minute load above twice the
-core count or a kernel memory-pressure level above normal before any model loads, and
+core count, a kernel memory-pressure level above normal, another holder of the host-wide native lock
+or a locked agent worktree before any model loads, and
 `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues only for an explicitly exploratory run.
 `memory` and `lang-bench` are consent-bound (`ask` rules in `.claude/settings.json`; explicit
 request required) and are never run unasked; the storage floors every lane checks first are listed under Instruments profiles below.
@@ -172,7 +174,8 @@ Registry posture (UI-7): the structural gate is unchanged (every scenario
 present once, probe coverage ≥90% of each window, monotonic blocks, sane
 refresh interval). On a PASS the checker evaluates the **warn-only** ceilings
 in [`config/ui-perf-thresholds.json`](../../config/ui-perf-thresholds.json)
-(derived from the baseline-v2 medians; a breach marks the run
+(calibrated on the retired Mac mini M2 8 GB and provisional on the canonical Mac mini M6 until
+roadmap item AV-17 re-derives them; a breach marks the run
 `passedWithWarnings`, never fails it) and — on the canonical hardware profile
 only — emits `benchmark-evidence.json`, which the lane publishes as a
 PASS-only `ui-perf` registry record (one take per scenario, no

@@ -27,7 +27,7 @@ check only for a demonstrated product or workflow risk. Parallel rules and budge
   step, routine check, or already-authorized action. When consent is genuinely missing, finish the
   independent work first and request only the blocked action, explaining the applicable boundary.
 - Keep the workflow proportional: use the smallest meaningful checks, fix their failures, review
-  the diff, commit and push the scoped change, and verify CI. Report the outcome and real limitations;
+  the diff, commit the scoped change, push (once per batch when several land together) and verify CI. Report the outcome and real limitations;
   do not turn ordinary product work into a tooling project or an approval checklist.
 
 ## Start here
@@ -45,8 +45,8 @@ On a fresh clone or a new machine, set up the toolchain first with
    - Scripts, contracts, CI, packaging, evidence or Claude configuration: `.claude/rules/release.md`.
    - Website: `website/CLAUDE.md`; read `website/PRODUCT.md` and `website/DESIGN.md` for visual/copy work.
 3. Implement the smallest coherent change, verify affected behavior, review the actual diff, then
-   commit the assigned files on `main` and push. Split independent work across agents only when the
-   file sets do not overlap. CI on the pushed commit is the gate.
+   commit the assigned files on `main`; push once the change or batch is verified. Split independent
+   work across agents only when the file sets do not overlap. CI on the pushed commit is the gate.
 4. Report changed behavior, checks and limitations, commit/CI evidence and remaining work. Update the
    existing roadmap and checkpoint when work status changes; do not introduce another task ledger.
 
@@ -82,19 +82,20 @@ scripts/dev.sh regen                 # registered generated artifacts
 npm --prefix website run check       # independent website acceptance
 ```
 
-Use targeted checks while editing, then the routed check before committing. Broaden only for new
-changes, failures or unresolved risk. Fast path: `test --only` and incremental `build`/`ios` on the
-warm cache while editing; one routed check per batch (`--since origin/main` once commits have
-landed); push once per batch; CI is the gate. Quality checks go where they pay: `swift-review` on
-every Swift diff (in parallel with verification), an adversarial reviewer for hooks, security,
-release and data-loss paths, and consent-bound lanes only on request. Use `check --paths <assigned paths...>` when unrelated dirty
-work must remain paused; its contract gate still considers dirty tooling inputs. Native commands
-are serialized host-wide by the native lock (`~/Library/Caches/Vocello/native-build.lock`, across
-every checkout and worktree) and reuse owned caches. Website-only work never launches native builds or
-devices.
-`scripts/dev.sh ci` is the full serial CI replay when needed, not the default inner loop.
-UI-test source changes compile their affected bundles locally; ordinary CI never runs native UI.
-After a push, follow the run with `gh run list` / `gh run watch` until `CI required` settles.
+- **Fast path:** `test --only` and incremental `build`/`ios` on the warm cache while editing; one
+  routed `check` before committing (or `check --since origin/main` once a batch of commits has
+  landed); push once per batch; CI on the pushed commit is the gate. Broaden only for new changes,
+  failures or unresolved risk. `scripts/dev.sh ci` is the full serial CI replay, not the inner loop.
+- **Quality checks where they pay:** `swift-review` on every Swift diff, in parallel with
+  verification; an adversarial reviewer for hooks, security, release and data-loss paths;
+  consent-bound lanes only on request.
+- **Scoping:** `check --paths <assigned paths...>` when unrelated dirty work must stay paused (its
+  contract gate still considers dirty tooling inputs). Website-only work never launches native builds
+  or devices. UI-test source changes compile their bundles locally; ordinary CI never runs native UI.
+- **Native lock:** every Xcode/SwiftPM build and test is serialized host-wide
+  (`~/Library/Caches/Vocello/native-build.lock`, across every checkout and worktree) and reuses owned
+  caches.
+- After a push, follow the run with `gh run watch` (in the background) until `CI required` settles.
 
 ## Hard boundaries
 
@@ -139,7 +140,7 @@ Repository scripts are authoritative; everything below assists them and never re
   `update-ref`, `project.pbxproj` writes), `generated_file_guard.sh` (generated or frozen files, also
   inside worktrees) and `project_yml_reminder.sh`. Its permissions allow the routine loop, including
   scoped commits, pushes to `main` and worktree integration (`merge --ff-only`, `cherry-pick`,
-  `worktree remove`), ask before consent-bound lanes, cache cleanup and discarding agent work, and
+  `worktree unlock`/`remove`), ask before consent-bound lanes, cache cleanup and discarding agent work, and
   deny force pushes, pushes of other refs, hand-made branches, broad staging, stashing, releases,
   Simulator MCP tools and `.xcodeproj` edits. `worktree.baseRef: head` bases agent worktrees on local
   `main`. Hooks and permissions are guardrails, not proof of authorization.
@@ -157,17 +158,19 @@ Repository scripts are authoritative; everything below assists them and never re
   run consent-bound lanes.
 - **Tool routing:** XcodeBuildMCP (profiles `macos` and `ios-device` in `.xcodebuildmcp/config.yaml`)
   for discovery, scratch builds and device debugging only, never Simulator or UI automation and never
-  as evidence; swift-lsp through `buildServer.json` (needs a warm `build/cache/xcode/macos`); Axiom
+  as evidence (its builds bypass the host lock: never while another native build or an evidence lane
+  runs, and never from editing agents); swift-lsp through `buildServer.json` (needs a warm `build/cache/xcode/macos`); Axiom
   skills, Axiom auditor subagents, the mlx-swift skills and Apple documentation (sosumi) for platform
   and MLX APIs; Context7 for library documentation; `gh`, the GitHub connector and Monitor for CI and
   releases; Claude in Chrome or chrome-devtools for the website (and portal chores only on explicit
   request); the asc-* skills (tddworks `asc`) for App Store Connect, writes only on explicit request;
   Hugging Face tools read-only, with no implied download or pin change. Missing optional tools never
   block the script workflow, and CI never depends on personal plugins or credentials.
-- **Guard literals:** hooks match raw Bash command text. Commit with a literal `git commit -F -`
-  heredoc so the commit lint runs (a quote-split command would run the commit and skip the lint);
-  build strings that merely *mention* Simulator routes, private home paths or the commit command from
-  fragments in commands and fixtures.
+- **Guard literals:** git commands are tokenized (`scripts/hooks/git_commands.py`), so quoting or
+  global options do not hide a commit or push from the lint; commit with a `git commit -F -` heredoc.
+  The Simulator, cache and `project.pbxproj` guards still match raw command text, so build strings
+  that merely *mention* Simulator routes or private home paths from fragments in commands and
+  fixtures.
 - **Maintainer-run actions:** Hugging Face Hub commits, model installs and upload, deploy or repin
   commands are run by the maintainer (the `!` prefix in the prompt); prepare them, do not run them.
 

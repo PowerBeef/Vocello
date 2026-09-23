@@ -69,8 +69,8 @@ subagent, and stops when the deciding evidence is clear:
 4. Report run id, verdict (product failure, infrastructure, interruption, restoration gap or PASS),
    deciding step and artifact paths. Never turn a failed run into a pass or silently rerun it.
 
-For Swift review, use the native domain rules and relevant installed specialist guidance; the
-read-only `swift-review` subagent is available but optional, and there is no extra review gate.
+For Swift review, the read-only `swift-review` subagent reads every Swift diff against the native
+domain rules, in parallel with the lead's verification; it adds no CI gate.
 
 ## Model readiness
 
@@ -113,9 +113,9 @@ the publisher then classifies from the run's own load sample.
 ## CI and release
 
 Ordinary CI and `scripts/dev.sh check` are deterministic. Models, a phone and UI tests never block
-commits, pushes or candidate packaging. Neither compiles the XCUITest bundles, so an edit under
-`Tests/*UITests` or `Tests/UIAutomationSupport` is proven by `xcodebuild build-for-testing` for
-`VocelloMacUI` and `VocelloiOSUI` before it is committed. Public promotion separately requires all applicable
+commits, pushes or candidate packaging. `scripts/dev.sh check` compiles the affected XCUITest bundles
+(`scripts/build_ui_test_bundles.sh`, build only) when `Tests/*UITests`, `Tests/UIAutomationSupport`
+or `project.yml` change; push CI never compiles or runs them. Public promotion separately requires all applicable
 exact-source acceptance lanes. Consult the platform release guide for command-bound evidence, signing
 and artifact verification; a development build is not a processed distribution candidate.
 

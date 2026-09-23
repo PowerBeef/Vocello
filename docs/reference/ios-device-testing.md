@@ -39,14 +39,15 @@ never run unasked; only an explicit QA or device request
 authorizes them. The timing verbs (`ios_device.sh gate`, `bench`, `lang-bench`, `memory`, and
 `ui_test.sh ios benchmark|perf`) additionally refuse to start on a busy Mac host:
 `require_quiet_host` in `scripts/lib/host_preflight.sh` rejects a one-minute load above twice the
-core count or a kernel memory-pressure level above normal before the phone is touched, and
+core count, a kernel memory-pressure level above normal, another holder of the host-wide native lock
+or a locked agent worktree before the phone is touched, and
 `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues only for an explicitly exploratory run.
 Claude Code can use the explicit `/ios-lane` and `/device-diagnostics` shortcuts and triage the
 artifacts with the testing runbook or the read-only `xcresult-triage` subagent. These optional skills add no gate or evidence rule.
 
 ### Host toolchain prerequisite
 
-`-destination 'generic/platform=iOS'` does not launch or execute a Simulator. Current Xcode 26 toolchains still
+`-destination 'generic/platform=iOS'` does not launch or execute a Simulator. Current Xcode toolchains (26.6 in CI, 27 locally) still
 require the selected Xcode installation to expose usable iOS Platform Support and a compatible iOS
 runtime component before that physical-device SDK destination becomes eligible. An `iphoneos`
 entry in `xcodebuild -showsdks` is not sufficient proof. Repository build routes run this read-only
@@ -65,7 +66,7 @@ toolchain repair; it does not authorize Simulator builds, launches, tests, or UI
 
 Those shared sources and assertions cover catalog and delivery-ledger validation, memory policy,
 cancellation semantics, app-support path gating, and privacy-safe diagnostics. Xcode
-26 reports tool-hosted testing as unavailable for physical-device destinations, so the repository
+26 (the pinned CI toolchain) reports tool-hosted testing as unavailable for physical-device destinations, so the repository
 does not expose a device execution command for this target. Physical runtime assurance remains in
 the existing headless diagnostics and genuine XCUITest lanes; no Simulator substitute is used.
 

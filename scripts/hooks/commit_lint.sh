@@ -78,7 +78,7 @@ while IFS= read -r line; do
       "agent worktrees commit only on their worktree-* branch (current: ${branch:-detached HEAD})." \
       "Create worktrees through Agent isolation or EnterWorktree; never check out main or another branch there."
   else
-    block "commits happen on main or in a Claude Code agent worktree under .claude/worktrees/ (Main only)." \
+    block "commits happen on main or in a Claude Code agent worktree under .claude/worktrees/ (CLAUDE.md: Main is the only published branch)." \
       "This checkout is a linked worktree outside .claude/worktrees/; move the work to main or an agent worktree."
   fi
 

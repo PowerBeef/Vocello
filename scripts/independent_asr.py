@@ -7,7 +7,7 @@ app, so this producer supplies the second family on the Mac: a pinned
 `whisper-small` MLX model, decoded greedily with the language locked to the
 expected language, detecting the language separately from the first 30 seconds.
 
-Design rules for the 8 GB host:
+Design rules for the 8 GB support floor:
   * Nothing here loads a model while the Qwen3 engine may be resident. The
     manifest must declare `generationProcessExited: true`; the lanes build it
     after their generation loop.

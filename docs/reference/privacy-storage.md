@@ -303,7 +303,7 @@ block byte-for-byte, so a manifest change cannot silently leave documentation st
 Repository inventory and cleanup own only the paths declared by
 `config/build-output-policy.json`. They never delete, download, install, or manage Xcode Platform
 Support, CoreSimulator runtime components, or global Xcode DerivedData. Removing all compatible iOS
-runtime components can make the `-destination generic/platform=iOS` build destination unavailable on current Xcode 26 toolchains even
+runtime components can make the `-destination generic/platform=iOS` build destination unavailable on current Xcode toolchains even
 while `xcodebuild -showsdks` still lists `iphoneos`. That state is an external toolchain issue, not
 reclaimable repository output. Use `scripts/lib/ios_platform_preflight.py check`, then make any
 multi-gigabyte component installation explicitly through Xcode Settings.

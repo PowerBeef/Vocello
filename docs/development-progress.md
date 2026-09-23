@@ -17,30 +17,22 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### New Mac mini M6 and parallel agents (September 22)
+### Current state (September 22, evening)
 
-Development now runs on a Mac mini M6 (16 GB, 12 cores) with Xcode 27; the setup guide was followed
-and the website Node pin moved to the 24.x line. The working agreement now allows parallel agents
-(PA-27): a lead session on `main` that alone pushes, read-only subagents, and editing agents in
-Claude Code worktrees (`.claude/worktrees/<name>`, `worktree-*`) that the lead integrates with
-`merge --ff-only` or `cherry-pick`. Every Xcode/SwiftPM command now holds the host-wide native lock
-(`~/Library/Caches/Vocello/native-build.lock`), and evidence lanes refuse to start while an agent or
-another native build is active. Rules and the 16 GB budget:
-[development workflow](reference/development-workflow.md#parallel-agents-and-worktrees). The workflow
-was proven live the same evening: two worktree agents ran in parallel and were integrated (one
-fast-forward, one cherry-pick) — the rorkai `asc` CLI and its App Store Connect probes are gone
-(build-number and account checks are now manual, read-only), and the Mac mini M6 16 GB is the
-canonical macOS benchmark host (M2 records stay history; the first M6 baseline is AV-17, consent-bound).
-A second batch of three parallel agents closed PA-12 (MAC-02 lower-memory preference) and F-25 (busy or
-untidy Saved Voice store no longer fails engine start) and landed PA-14 slice 1 (throwing file I/O).
-Lesson recorded in the workflow: agents author without native builds (a worktree build is cold); the
-lead verifies each branch incrementally on the warm cache (about 1-3 minutes) while `swift-review`
-reads the diff, then runs one `scripts/dev.sh check --since origin/main` per batch. Next: PA-11
-(launch hashing), PA-14 slice 2, PA-13, PA-15.
+Mac mini M6 (16 GB, Xcode 27; CI stays on Xcode 26.6). The lead session on `main` integrates and
+alone pushes; editing agents author in `.claude/worktrees/` without native builds, the lead verifies
+each branch on the warm cache while `swift-review` reads it, then one `scripts/dev.sh check --since
+origin/main` and one push per batch ([workflow](reference/development-workflow.md#parallel-agents-and-worktrees)).
+Every Xcode/SwiftPM command holds the host-wide native lock. The M6 is the canonical benchmark host
+(first baseline: AV-17, consent-bound); the rorkai `asc` is gone (App Store Connect checks are
+manual). Done today: PA-27 workflow, PA-12, F-25, PA-11, PA-14 slice 1; all pushed, CI green.
+Next: PA-14 slice 2 (typed errors, MLX error capture), PA-13, PA-15 (device proof consent-bound),
+PA-04. Maintainer steps: PA-10 `release` environment and `v*` tag ruleset; PA-05 still needs the
+altool upload check on the pinned Xcode.
 
-### Machine transition and next steps (September 22)
+### Machine transition (September 22, superseded by the current state above)
 
-Work pauses here for the maintainer's move to a new Mac; everything is committed and pushed. Set the
+Work paused here for the maintainer's move to a new Mac; everything was committed and pushed. Set the
 new machine up with [development setup](reference/development-setup.md) (Homebrew plus the pinned
 installer), then run the fresh-session check it describes. Done today from the verified external
 audit ([report](audits/2026-09-22-project-audit.md), plan `project-audit-2026-09`): the release path
@@ -52,9 +44,9 @@ hashing, F-25, PA-13, then PA-15 (its device proof is consent-bound). Maintainer
 create the `release` environment (deployment tags `v*`, reviewer), move the release secrets into it,
 add a `v*` tag ruleset. Check the first green `release-rehearsal.yml` run before closing PA-05.
 
-### Claude Code takeover (September 22)
+### Claude Code takeover (September 22, superseded: PA-27 replaced the single-agent agreement)
 
-Baseline `7e26f94b`. At the maintainer's request Claude Code is the sole coding agent again; Codex is
+Baseline `7e26f94b`. At the maintainer's request Claude Code became the sole coding agent again; Codex is
 retired. `AGENTS.md` became `CLAUDE.md` (every rule kept, plus a **Main only** boundary), the domain
 rules moved to path-scoped `.claude/rules/`, the four QA skills to `.claude/skills/` (user-invoked),
 and `.claude/settings.json` wires the five guards with allow/ask/deny permissions. Read-only subagents

@@ -36,7 +36,7 @@
       "status": "active",
       "owner": "backend-and-platform",
       "adopted": "2026-08-19",
-      "goal": "Resolve the code-grounded findings from VOCELLO_ENGINEERING_REVIEW_2026-08-19.md without weakening Vocello's local-first architecture, physical-device policy, deterministic gates, or main-only development workflow. The external report is descriptive; this roadmap is the status authority. The September 4 current-source audit extends this existing defect authority under primary release-first-3-0-2026-09; it does not schedule another programme.",
+      "goal": "Resolve the code-grounded findings from VOCELLO_ENGINEERING_REVIEW_2026-08-19.md without weakening Vocello's local-first architecture, physical-device policy, deterministic gates, or main-as-the-only-published-branch development workflow. The external report is descriptive; this roadmap is the status authority. The September 4 current-source audit extends this existing defect authority under primary release-first-3-0-2026-09; it does not schedule another programme.",
       "authority": "docs/development-progress.md"
     },
     {
@@ -849,7 +849,7 @@
         "commit:87636935"
       ],
       "updated": "2026-09-22",
-      "notes": "September 5 read-only collision preflight: zero 3.0.0/build 24 matches; not reserved. No matching 3.0 account version; reconciliation requires explicit authorization. RF-02/RF-09 schedule this dependency. The existing workflow uses digest-pinned asc 4.11.0, ephemeral Keychain authentication and exact bundle/version/build collision preflight; ambiguity/pagination/timeout/cleanup fixtures remain required. September 2 authentication timeouts and September 4 rejection of used 2.4.0/build 23 remain historical evidence. Source project.yml now selects 3.0.0/build 24 and the regenerated project agrees. A fresh September 4 read-only check found zero matching builds with complete pagination. This is not a reservation; closure still requires the exact candidate workflow preflight/readback. No account metadata or build was changed. 2026-09-22: the rorkai asc CLI, its read-only collision preflight (app_store_build_preflight.py) and readiness inventory (app_store_connect_readiness.py) were removed by maintainer decision; App Store Connect checks are now manual (web portal or the asc-* skills, read-only), and Apple rejects a reused build number at the altool upload.",
+      "notes": "September 5 read-only collision preflight: zero 3.0.0/build 24 matches; not reserved. No matching 3.0 account version; reconciliation requires explicit authorization. RF-02/RF-09 schedule this dependency. September 2 authentication timeouts and September 4 rejection of used 2.4.0/build 23 remain historical evidence. Source project.yml now selects 3.0.0/build 24 and the regenerated project agrees. A fresh September 4 read-only check found zero matching builds with complete pagination. This is not a reservation; closure needs a fresh manual read-only check before archiving. No account metadata or build was changed. 2026-09-22: the rorkai asc CLI, its read-only collision preflight (app_store_build_preflight.py) and readiness inventory (app_store_connect_readiness.py) were removed by maintainer decision; App Store Connect checks are now manual (web portal or the asc-* skills, read-only), and Apple rejects a reused build number at the altool upload.",
       "unparkWhen": "The maintainer authorizes the 3.0 App Store Connect version reconciliation and the build-24 reservation (RF-02); a fresh read-only preflight then runs."
     },
     {

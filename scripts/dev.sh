@@ -22,8 +22,9 @@ case "${1:-}" in
     cat >&2 <<'EOF'
 usage: scripts/dev.sh <command>
 
-  check [--dry-run] [--paths P...]
+  check [--dry-run] [--paths P...] [--since REF]
                            lint, contracts, selected tests, native lanes the dirty tree touches
+                           (--since: also everything committed since REF, e.g. origin/main)
   lint                     git diff --check, privacy scan, shellcheck on changed shell
   contracts                product and repository contracts
   py [--all | --lane product|research|darwin | tests...]

@@ -2,8 +2,9 @@
 """Serial resource supervisor for operator-local delivery analyzers.
 
 It enforces one governed child at a time and records a compact, privacy-safe
-resource envelope. The 5 GiB ceiling is provisional until two clean runs on
-the canonical M2/8 GB host qualify a final policy.
+resource envelope. The 5 GiB ceiling is sized for the 8 GB support floor and is
+provisional until two clean runs on the canonical benchmark host (the Mac mini M6,
+roadmap AV-17) qualify a final policy.
 """
 
 from __future__ import annotations

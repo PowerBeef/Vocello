@@ -19,8 +19,9 @@ Local verification is fast and advisory; CI on `main` is the gate. Nothing block
 ```sh
 scripts/dev.sh check --dry-run       # what the dirty tree needs
 scripts/dev.sh check                 # lint, contracts, selected Python tests, native lanes touched
+scripts/dev.sh check --since origin/main  # the same over an unpushed batch of commits
 scripts/dev.sh test --only FooTests  # one XCTest class on the incremental test build
-scripts/dev.sh py                    # Python tests that consume the changed tooling (default selection; --all, --lane product|research|darwin, or module paths)
+scripts/dev.sh py                    # Python consumers of the changed tooling (--all, --lane, or modules)
 scripts/dev.sh contracts             # the contract gate alone (check_project_inputs.sh --local)
 scripts/dev.sh ios                   # generic device-SDK compile (incremental, no phone)
 scripts/dev.sh regen                 # regenerate roadmap render, catalog, inventories, charts
@@ -30,17 +31,18 @@ git commit
 git push
 ```
 
-Routing is `scripts/ci/classify_changes.py`, the same file CI uses, so the local plan and the CI lanes
-agree. `scripts/dev.sh check` compiles the affected XCUITest bundles through
+Routing is `scripts/ci/classify_changes.py`, the same file CI uses, so the local plan and the CI
+lanes agree. `scripts/dev.sh check` compiles the affected XCUITest bundles through
 `scripts/build_ui_test_bundles.sh` when UI-test sources or `project.yml` change; it never runs them.
-Push CI does not compile those bundles. On a push, CI diffs each lane against the last run on the branch in which that lane's job
-passed (not against the previous push), because `cancel-in-progress` can drop a superseded push's run
-and the lanes it owed must still run on the next push; a lane with no prior green run always runs.
-Locally the lanes come from the dirty tree: `swift` runs the macOS test bundles (`scripts/macos_test.sh test`, or `core-test --only` when
-only test classes changed), `ios` runs the generic compile, `python` runs the reverse-dependency Python
-selection, `website` runs `npm --prefix website run check`. A change to shared tooling
-(`scripts/lib/`, `scripts/development_workflow.py`, `config/toolchain.json`,
-`config/build-output-policy.json`) runs the whole Python suite.
+Push CI does not compile those bundles. On a push, CI diffs each lane against the last run on the
+branch in which that lane's job passed (not against the previous push), because `cancel-in-progress`
+can drop a superseded push's run and the lanes it owed must still run on the next push; a lane with
+no prior green run always runs. Locally the lanes come from the dirty tree: `swift` runs the macOS
+test bundles (`scripts/macos_test.sh test`, or `core-test --only` when only test classes changed),
+`ios` runs the generic compile, `python` runs the reverse-dependency Python selection, `website`
+runs `npm --prefix website run check`. A change to shared tooling (`scripts/lib/`,
+`scripts/development_workflow.py`, `config/toolchain.json`, `config/build-output-policy.json`) runs
+the whole Python suite.
 
 ## The commit lint
 
@@ -58,7 +60,7 @@ branches, `project.pbxproj` writes and hand edits of generated files;
 schemes, CLI identity, localization, saved-voice lifecycle, entitlements, support contact, public facts
 (`scripts/public_facts_contract.py`: release identity, README and website copy), attribution, runtime
 security (debug knobs, concurrency registry, TSan policy), owned-runtime inventory, backend wiring,
-model catalog and host availability, App Store readiness, supply chain, release steps, benchmark
+model catalog and host availability, iOS storage protection, supply chain, release steps, benchmark
 history, README charts, the text-level delivery and prosody contracts, the roadmap, the exact
 product-invariant greps in `scripts/repo_invariants.sh`, the privacy scan, and the Python suite.
 
@@ -83,12 +85,12 @@ and `scripts/repo_invariants.sh` fails once an entry is 30 days old.
 
 ## Python tests
 
-pytest with `pytest-xdist` (`-n auto`), both pinned in `config/toolchain.json`. The whole suite runs in
-about 90 seconds on an M2. `scripts/tests/conftest.py` marks modules by name: `research` (audio,
-delivery, prosody and device-analysis tooling) runs when those paths change and nightly; `darwin_only`
-runs inside the macOS gate. Every run prints its slowest tests; a test that outgrows its lane moves,
-it does not slow every push. `pytest.ini` already passes `-q`; adding another `-q` drops the summary
-line, so judge a run by pytest's exit code.
+pytest with `pytest-xdist` (`-n auto`), both pinned in `config/toolchain.json`. The whole suite runs
+in about 65 to 90 seconds on the development Mac (Mac mini M6). `scripts/tests/conftest.py` marks
+modules by name: `research` (audio, delivery, prosody and device-analysis tooling) runs when those
+paths change and nightly; `darwin_only` runs inside the macOS gate. Every run prints its slowest
+tests; a test that outgrows its lane moves, it does not slow every push. `pytest.ini` already passes
+`-q`; adding another `-q` drops the summary line, so judge a run by pytest's exit code.
 
 ## CI
 
@@ -100,40 +102,41 @@ line, so judge a run by pytest's exit code.
 | `macos-tests` | macos-26 | Swift compile inputs, the lane's own scripts, build configs and benchmark evidence | cached DerivedData; darwin-only Python modules, macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s) |
 | `macos-tsan` | macos-26 | Swift compile inputs (same routing as `macos-tests`) | cached `macos-tsan` DerivedData; `scripts/macos_test.sh tsan`, the deterministic core bundles under ThreadSanitizer, blocking since 2026-09-14 (`config/tsan-policy.json`); 5 to 11 min on a second runner |
 | `ios-compile` | macos-26 | iOS compile inputs | cached DerivedData; `build_foundation_targets.sh ios --incremental` at `-Onone` (`QVOICE_FOUNDATION_SWIFT_OPTIMIZATION`) |
-| `website` | ubuntu | `website/` | about 4 min |
+| `website` | ubuntu | `website/` | about 1 min |
 | `dependency-submission` | ubuntu | push only (skipped on dispatch) | seconds: `scripts/swift_dependency_snapshot.py` submitted to the GitHub dependency graph; needed by `CI required` |
 | `CI required` | ubuntu | always | the branch-protection context; skipped lanes count as passed |
 
 `ci.yml` triggers on `push` to `main` and on `workflow_dispatch` only; it has no `pull_request`
 trigger, so `CI required` is always produced by a maintainer's push to `main`. Concurrency is keyed
 on the event name and the ref, so a newer push cancels the previous push run while a manual
-measurement dispatch never cancels the gate run for a commit. `scripts/dev.sh ci`
-replays that job graph serially: project regeneration, the complete `check_project_inputs.sh`
-(the Linux `contracts` job runs it with `--python none`), `scripts/macos_test.sh test`,
-`scripts/macos_test.sh tsan`, the CLI version identity, `build_foundation_targets.sh ios --incremental`, the website supply-chain check
-and `npm --prefix website run check`. It is a superset rather than a byte-identical replay: it skips
-no lane by routing, and it runs the whole Python suite inside the gate in one process where CI splits
-it into `-m "not research and not darwin_only"` plus an optional `-m research` on Linux and
+measurement dispatch never cancels the gate run for a commit. `scripts/dev.sh ci` replays that job
+graph serially: project regeneration, the complete `check_project_inputs.sh` (the Linux `contracts`
+job runs it with `--python none`), `scripts/macos_test.sh test`, `scripts/macos_test.sh tsan`, the
+CLI version identity, `build_foundation_targets.sh ios --incremental`, the website supply-chain
+check and `npm --prefix website run check`. It is a superset rather than a byte-identical replay: it
+skips no lane by routing, and it runs the whole Python suite inside the gate in one process where CI
+splits it into `-m "not research and not darwin_only"` plus an optional `-m research` on Linux and
 `-m darwin_only` in the macOS job.
 
 Only push CI's own inputs (`.github/workflows/ci.yml`, `.github/actions/**`,
-`scripts/ci/classify_changes.py`) force the three native lanes; the other workflow files route to the
-Python lane, whose supply-chain tests check their pins. A lane skipped inside a green run advances
-that lane's base, so a rarely-run lane never drags the others back. Caches are keyed
+`scripts/ci/classify_changes.py`) force the three native lanes; the other workflow files route to
+the Python lane, whose supply-chain tests check their pins. A lane skipped inside a green run
+advances that lane's base, so a rarely-run lane never drags the others back. Caches are keyed
 `<platform>-xcode<version>-<dependency graph>-<ISO week>` and saved only on an exact miss, so the
 first run of each week (or of a new dependency graph) pays one save and the store holds at most a
 couple of generations per platform; the shared package checkout has its own cache keyed on the two
-`Package.resolved` digests. `scripts/ci/restore_mtimes.py` gives tracked files their commit mtimes so
-Xcode's task signatures hit. Dispatch with `cold: true` to skip the restore. `nightly.yml` (04:00 UTC and on dispatch) runs a cold pass of the TSan
-subset (`tsan`), the complete Python suite (`python-full`) and cold compiles of both platforms
-(`foundation-cold`, which also compiles the macOS app optimized with warnings as errors); a failure
-keeps one open issue labelled `nightly`, titled "Nightly lane failing", commenting on it rather than
-filing a second (`scripts/ci/failure_issue.py`). `release-rehearsal.yml` runs weekly, on dispatch and
-on pushes that touch release inputs: without secrets it installs the release toolchain through
-`.github/actions/native-toolchain`, runs the ledgered `release.sh` (ad-hoc signed, not notarized) and
-the packaged-DMG verification, and validates the release evidence locally; a failure keeps one issue
-labelled `release-rehearsal`. `security.yml` (CodeQL, npm audit) runs weekly, on dispatch and inside
-`release.yml` on the tagged commit.
+`Package.resolved` digests. `scripts/ci/restore_mtimes.py` gives tracked files their commit mtimes
+so Xcode's task signatures hit. Dispatch with `cold: true` to skip the restore. `nightly.yml` (04:00
+UTC and on dispatch) runs a cold pass of the TSan subset (`tsan`), the complete Python suite
+(`python-full`) and cold compiles of both platforms (`foundation-cold`, which also compiles the
+macOS app optimized with warnings as errors); a failure keeps one open issue labelled `nightly`,
+titled "Nightly lane failing", commenting on it rather than filing a second
+(`scripts/ci/failure_issue.py`). `release-rehearsal.yml` runs weekly, on dispatch and on pushes that
+touch release inputs: without secrets it installs the release toolchain through
+`.github/actions/native-toolchain`, runs the ledgered `release.sh` (ad-hoc signed, not notarized)
+and the packaged-DMG verification, and validates the release evidence locally; a failure keeps one
+issue labelled `release-rehearsal`. `security.yml` (CodeQL, npm audit) runs weekly, on dispatch and
+inside `release.yml` on the tagged commit.
 
 ## Cache and generation policy
 
@@ -167,14 +170,15 @@ releases run only when the task explicitly asks for that evidence, through their
 Claude Code is the development agent; `CLAUDE.md` owns the working agreement and `.claude/rules/`
 holds the path-scoped domain rules. The lead session works on the existing local `main` checkout and
 may delegate to parallel agents as described below. Before editing, record HEAD, dirty files and the
-relevant roadmap item or user assignment. Preserve unrelated work; reconcile an unexpected change before editing or staging
-overlapping files. Implement, run affected checks, review the diff, commit only the assignment
-(explicit paths) and push. Report the behavior change, checks and limitations, commit/CI evidence and
-next action. Update the existing checkpoint or roadmap only when status changes; no transcripts or
-second work ledger.
+relevant roadmap item or user assignment. Preserve unrelated work; reconcile an unexpected change
+before editing or staging overlapping files. Implement, run affected checks, review the diff, commit
+only the assignment (explicit paths) and push. Report the behavior change, checks and limitations,
+commit/CI evidence and next action. Update the existing checkpoint or roadmap only when status
+changes; no transcripts or second work ledger.
 
-Keep the loop small: focused tests while editing, one routed check before completion, broader checks
-only for new changes or unresolved failures. `check --paths <assigned paths...>` scopes the outer
+Keep the loop small: focused tests while editing, one routed check before completion (`--since
+origin/main` for a batch of landed commits), broader checks only for new changes or unresolved
+failures. `check --paths <assigned paths...>` scopes the outer
 build/lint plan when unrelated work is paused; its contract gate still selects Python tests from the
 actual dirty tooling. A skipped CI lane is not a new test run. Do not add validators for prose,
 plugin inventories, or tool availability. Existing product and release gates remain authoritative.
@@ -203,9 +207,9 @@ starts with an empty `build/`, so its first native command is a cold MLX compile
 from parallel authoring. Agents author code and tests, run only non-native checks, and hand back a
 commit; the lead verifies natively once on the warm `main` cache (below). Native commands in a
 worktree are an explicit exception for work that cannot be written without compiler feedback (for
-example a long debugging loop); they belong in a background task. Agents never push, touch `main`, run consent-bound lanes or XcodeBuildMCP builds
-(which bypass the lock), regenerate shared generated artifacts, or edit `config/roadmap.json` and
-`docs/development-progress.md`; the lead owns those.
+example a long debugging loop); they belong in a background task. Agents never push, touch `main`,
+run consent-bound lanes or XcodeBuildMCP builds (which bypass the lock), regenerate shared generated
+artifacts, or edit `config/roadmap.json` and `docs/development-progress.md`; the lead owns those.
 
 **Agent brief.** Every editing-agent prompt carries the task's roadmap entry and design, the files it
 owns, and the checklist that `swift-review` otherwise finds after the fact: Mac-only value types live
@@ -222,13 +226,14 @@ the warm cache — `scripts/dev.sh build` and `scripts/dev.sh test --only <the a
 `scripts/dev.sh ios` when shared or iOS sources changed — while `swift-review` reads the same diff in
 parallel; fix small compile or review findings directly, send larger ones back to the agent. After
 the batch, run one `scripts/dev.sh check --since origin/main` (it routes on everything the unpushed
-commits changed plus the dirty tree, including the gate's Python selection), push once, and clean up with
-`git worktree remove .claude/worktrees/<name>` and `git branch -d worktree-<name>` (a cherry-picked
-branch is not an ancestor of `main`, so it needs `git branch -D`, which asks first; Claude Code
-locks a worktree while its agent runs and unlocks it when the agent finishes; a worktree left locked
-by an interrupted session needs `git worktree unlock .claude/worktrees/<name>` first). Discarding unintegrated work (`git branch -D`,
-`git worktree remove --force`) asks first. The SessionStart banner
-lists open worktrees until they are integrated or removed.
+commits changed plus the dirty tree, including the gate's Python selection) and push once.
+
+**Cleanup:** `git worktree remove .claude/worktrees/<name>`, then `git branch -d worktree-<name>`
+for a fast-forwarded branch or `git branch -D` (asks first) for a cherry-picked one, which is not an
+ancestor of `main`. Claude Code locks a worktree while its agent runs, and again while a resumed
+agent works; if removal reports a lock, `git worktree unlock .claude/worktrees/<name>` first.
+Discarding unintegrated work (`git branch -D`, `git worktree remove --force`) asks first. The
+SessionStart banner lists open worktrees until they are integrated or removed.
 
 **Budget on 16 GB.** One native build or test at a time (the host lock enforces it). At most three
 editing agents plus the lead, at most four read-only subagents, and at most five active agents in
@@ -265,40 +270,41 @@ tools, builds, probes a phone or starts an app.
 `tool_input.command`, edit targets from `tool_input.file_path` (`notebook_path` for NotebookEdit),
 resolved against the payload's `cwd`. `scripts/hooks/git_commands.py` tokenizes git commands for the
 two Bash guards: every invocation (after wrappers such as `timeout` or `xargs`, inside `bash -c`,
-shell heredocs and command substitutions, with abbreviated long options) and the checkout each
-`git commit`/`git push` acts on (payload `cwd`, `cd`, subshells, `git -C`); a target it cannot resolve,
-or one an earlier `git checkout`/`switch`/`rebase` in the same command may move, fails closed. It is a
-guardrail for cooperative agents, not a sandbox: interpreter indirection (`python3 -c`, piped shells)
-and hand-written `.git` files stay out of reach, and GitHub's branch protection remains the backstop. Unreadable input, a missing path or an unexpected tool fails closed
-for the file guards. Hooks resolve through `$CLAUDE_PROJECT_DIR`, which stays on the main checkout
-while the payload `cwd` follows an agent into its worktree.
-`scripts/tests/test_agent_hooks.py` pins the exact matcher-to-script matrix, the guard behavior, the
-skill and subagent metadata and the rule path scopes; changes under `.claude/` select it locally and
-in CI.
+shell heredocs and command substitutions, with abbreviated long options) and the checkout each `git
+commit`/`git push` acts on (payload `cwd`, `cd`, subshells, `git -C`); a target it cannot resolve,
+or one an earlier `git checkout`/`switch`/`rebase` in the same command may move, fails closed. It is
+a guardrail for cooperative agents, not a sandbox: interpreter indirection (`python3 -c`, piped
+shells) and hand-written `.git` files stay out of reach, and GitHub's branch protection remains the
+backstop. Unreadable input, a missing path or an unexpected tool fails closed for the file guards.
+Hooks resolve through `$CLAUDE_PROJECT_DIR`, which stays on the main checkout while the payload
+`cwd` follows an agent into its worktree. `scripts/tests/test_agent_hooks.py` pins the exact
+matcher-to-script matrix, the guard behavior, the skill and subagent metadata and the rule path
+scopes; changes under `.claude/` select it locally and in CI.
 
-Permissions encode the same boundaries. `allow` covers the routine loop: Git inspection, explicit-path
-staging, commits and fast-forward pushes to `main` (the maintainer's standing authorization; the
-commit lint still runs), worktree integration (`git merge --ff-only worktree-*`, `git cherry-pick`,
-`git branch -d worktree-*`, `git worktree list|prune|unlock|remove .claude/worktrees/*`), `scripts/dev.sh`,
-the contract gate, pytest, the roadmap, `gh run` and the deterministic native lanes. `ask` covers the
-consent-bound lanes (`scripts/ui_test.sh`, `scripts/ios_device.sh`, the `scripts/macos_test.sh` model,
-memory, benchmark and release-readiness lanes, model installs), cache cleanup, workflow dispatch,
-destructive Git resets, discarding agent work (`git branch -D`, `git worktree remove --force`) and
-the XcodeBuildMCP device and test tools. `deny` covers force pushes, pushes
-of any ref but `main`, hand-made branches and worktrees, `update-ref`, stashing, broad staging,
-whole-cache deletion, releases, the XcodeBuildMCP Simulator tools and `.xcodeproj` edits. Agent
-worktrees (`EnterWorktree`, `Agent` with `isolation: "worktree"`) are allowed. Hooks and permissions
-are guardrails, not a sandbox or proof of authorization; programs and tools outside their coverage
-still follow `CLAUDE.md`. Personal overrides belong in the ignored `.claude/settings.local.json`,
-where deny rules from the tracked file still win.
+Permissions encode the same boundaries. `allow` covers the routine loop: Git inspection,
+explicit-path staging, commits and fast-forward pushes to `main` (the maintainer's standing
+authorization; the commit lint still runs), worktree integration (`git merge --ff-only worktree-*`,
+`git cherry-pick`, `git branch -d worktree-*`, `git worktree list|prune|unlock|remove
+.claude/worktrees/*`), `scripts/dev.sh`, the contract gate, pytest, the roadmap, `gh run` and the
+deterministic native lanes. `ask` covers the consent-bound lanes (`scripts/ui_test.sh`,
+`scripts/ios_device.sh`, the `scripts/macos_test.sh` model, memory, benchmark and release-readiness
+lanes, model installs), cache cleanup, workflow dispatch, destructive Git resets, discarding agent
+work (`git branch -D`, `git worktree remove --force`) and the XcodeBuildMCP device and test tools.
+`deny` covers force pushes, pushes of any ref but `main`, hand-made branches and worktrees,
+`update-ref`, stashing, broad staging, whole-cache deletion, releases, the XcodeBuildMCP Simulator
+tools and `.xcodeproj` edits. Agent worktrees (`EnterWorktree`, `Agent` with `isolation:
+"worktree"`) are allowed. Hooks and permissions are guardrails, not a sandbox or proof of
+authorization; programs and tools outside their coverage still follow `CLAUDE.md`. Personal
+overrides belong in the ignored `.claude/settings.local.json`, where deny rules from the tracked
+file still win.
 
 After changing instructions, rules, skills or hooks, check a fresh session: the SessionStart banner
 names `CLAUDE.md`, `/memory` lists `CLAUDE.md`, `/hooks` shows the five hooks, `/permissions` shows
 the three lists, the four repository skills appear in the `/` menu (among any user-scope plugin
 skills), and a harmless blocked fixture (an Edit of `docs/ROADMAP.md`) is refused. For the worktree
 rules, start one isolated agent on a one-line docs change: its commit on `worktree-*` passes, its push
-is refused, and the lead integrates it with `git merge --ff-only` and removes the worktree. Report runtime activation as unverified until then. Never try a real
-destructive command as a hook test.
+is refused, and the lead integrates it with `git merge --ff-only` and removes the worktree. Report
+runtime activation as unverified until then. Never try a real destructive command as a hook test.
 
 | Work | Authoritative route | Relevant optional assistance |
 | --- | --- | --- |

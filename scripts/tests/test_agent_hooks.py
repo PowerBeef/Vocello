@@ -313,7 +313,7 @@ class PolicyGuardTests(unittest.TestCase):
             with self.subTest(command=command):
                 result = self.guard(command)
                 self.assertEqual(result.returncode, 2, result.stderr)
-                self.assertIn("Main only", result.stderr)
+                self.assertIn("only published branch", result.stderr)
 
     def test_only_main_is_pushed(self):
         for command in ("git push origin worktree-agent-1", "git push origin HEAD", "git push origin HEAD:main",
@@ -362,7 +362,7 @@ class PolicyGuardTests(unittest.TestCase):
             with self.subTest(command=command):
                 result = self.guard(command)
                 self.assertEqual(result.returncode, 2, result.stderr)
-                self.assertIn("Main only", result.stderr)
+                self.assertIn("only published branch", result.stderr)
         for command in (f"git {push} origin main 2>&1 | tail -5", f"git {push} origin main >/dev/null",
                         f"git {push} 2>&1", "git branch --list 'worktree-*'", "git branch -D worktree-x",
                         "git worktree remove --force .claude/worktrees/x", "git branch --contains abc1234",

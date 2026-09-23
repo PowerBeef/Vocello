@@ -71,6 +71,19 @@ final class Qwen3QualityFirstDecodeWindowTests: XCTestCase {
         )
     }
 
+    /// The window assumes the tokenizer's decode stride equals the decoder's real
+    /// upsample product; production checks only the stride (1_920), so pin the
+    /// default decoder product to it here.
+    func testDefaultDecoderUpsampleProductMatchesTheTokenizerStride() throws {
+        let decoder = try JSONDecoder().decode(
+            Qwen3TTSTokenizerDecoderConfig.self, from: Data("{}".utf8)
+        )
+        let product = (decoder.upsampleRates + decoder.upsamplingRatios).reduce(1, *)
+        let config = try JSONDecoder().decode(Qwen3TTSTokenizerConfig.self, from: Data("{}".utf8))
+        XCTAssertEqual(product, 1_920)
+        XCTAssertEqual(product, config.decodeUpsampleRate)
+    }
+
     // MARK: - Tiny decoder
 
     func testTinyDecoderEmitsExactlyFramesTimesUpsample() throws {
@@ -126,6 +139,7 @@ final class Qwen3QualityFirstDecodeWindowTests: XCTestCase {
         XCTAssertEqual(generated.count, generatedFrames * rate)
         let expectedTail = Array(full[(referenceFrames * rate)...])
         XCTAssertEqual(generated.count, expectedTail.count)
+        XCTAssertTrue(generated.allSatisfy(\.isFinite), "decoded window must be finite")
         let maxAbsolute = zip(generated, expectedTail)
             .map { abs($0 - $1) }
             .max() ?? 0

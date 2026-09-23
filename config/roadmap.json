@@ -1430,18 +1430,6 @@
       "updated": "2026-09-22"
     },
     {
-      "id": "PA-13",
-      "title": "Quality-first decoding keeps every generated frame",
-      "status": "planned",
-      "gate": "Quality-first decode, replay and the in-context clone cut derive their sample window from explicit reference and generated frame counts, not from counting non-zero codes; a runtime unit test covers the window and a tiny decoder emits exactly frames times upsample.",
-      "sourceOfTruth": [
-        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
-      ],
-      "notes": "External audit ENG-02, confirmed 2026-09-22: decodeChunk trims with a > 0 test although code 0 is a legal token (only the top 1,024 ids are suppressed), and the ICL cut uses the already-trimmed length. Every CLI batch take is quality-first, and so is any non-streaming request. The fix intentionally changes affected output: truncated takes get their tail back, and ICL clone takes can shift by one sample. Planned fix (2026-09-22 design): internal qualityFirstSampleRange(referenceFrameCount:generatedFrameCount:decodedSampleCount:upsampleRate:) used by decodeChunk, the ICL cut and replayCodecTrace; integer start, no > 0 counting; tokenizer untouched. Test Qwen3QualityFirstDecodeWindowTests (tiny decoder from Qwen3DecoderPartitionTests). Governance: DECODE-002 delta in SEMANTIC_DELTAS.json, RUNTIME_CAPABILITIES bounded-streaming, CURRENT_INVENTORY rebuild, qwen3_core_contract.py validate.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
-    },
-    {
       "id": "PA-14",
       "title": "File I/O and error classification fail safely",
       "status": "in-flight",

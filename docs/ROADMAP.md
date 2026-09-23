@@ -22,7 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 7/28 (25%) |
+| `project-audit-2026-09` | active | backend-and-platform | 8/28 (29%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -459,7 +459,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-07` | planned | Remove dead engine, downloader and XPC-era code | — |
 | `PA-08` | planned | Consolidate duplicated platform logic and misleading names | — |
 | `PA-10` | in-flight | Release signing is isolated from dispatch and build inputs | — |
-| `PA-13` | planned | Quality-first decoding keeps every generated frame | — |
 | `PA-14` | in-flight | File I/O and error classification fail safely | — |
 | `PA-15` | planned | iOS stops generation safely when the app leaves the foreground | — |
 | `PA-16` | planned | Speech-tokenizer attention honors the model's sliding windows | — |
@@ -496,9 +495,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-10`** (in-flight) — Release signing is isolated from dispatch and build inputs.
   gate: Signing jobs use a tag-restricted release environment, a dispatched release runs only from its own tag ref with a validated output name, the keychain grants codesign only, no Actions cache is restored after secrets exist, checkouts do not persist credentials, and signing material is removed right after release.sh.
-
-- **`PA-13`** (planned) — Quality-first decoding keeps every generated frame.
-  gate: Quality-first decode, replay and the in-context clone cut derive their sample window from explicit reference and generated frame counts, not from counting non-zero codes; a runtime unit test covers the window and a tiny decoder emits exactly frames times upsample.
 
 - **`PA-14`** (in-flight) — File I/O and error classification fail safely.
   gate: No legacy FileHandle write or readData remains on model, download or evidence paths (they raise Objective-C exceptions on a full disk); cancellation and allocation-retry decisions use typed errors, and MLX errors are captured instead of reaching fatalError.

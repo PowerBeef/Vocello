@@ -337,7 +337,8 @@ engine but does not apply generation's host cache policy. Replay now applies
 `NativeMemoryPolicyResolver` before loading and carries its immutable chunk-clear setting into both
 decoder arms. Temporary GPU output arrays are released after CPU materialization, with cache clears
 at policy-owned boundaries; live decoder context remains intact. The original recorded ranges and
-the full arm's 25-frame schedule/valid-length semantics are unchanged. Each arm resets on success,
+the full arm's 25-frame schedule was unchanged by that work (its valid length was later superseded by
+DECODE-002: the full arm now keeps every generated frame). Each arm resets on success,
 cancellation, or observation failure. No attention-mask, model, precision or production decoder
 change is included.
 

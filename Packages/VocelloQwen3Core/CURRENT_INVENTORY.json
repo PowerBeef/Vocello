@@ -208,7 +208,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests.swift",
-      "sha256": "9f4883211fcec1bfdec01cd540d894661b39f959e3fcacdc3d706d032846c441",
+      "sha256": "3e25f3ed7f906de56df9a76b7a68f74f6381c6310846b16a48b023bbdc0e4b7f",
       "upstreamStatus": "added"
     },
     {

@@ -1028,16 +1028,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             let attributes = try FileManager.default.attributesOfItem(atPath: tempURL.path)
             let expectedBytes = Int64(attributes[.size] as? Int64 ?? 0)
             try writeHandle.seek(toOffset: UInt64(offset))
-            let readHandle = try FileHandle(forReadingFrom: tempURL)
-            defer { try? readHandle.close() }
-            var bytesWritten: Int64 = 0
-            while autoreleasepool(invoking: {
-                let data = readHandle.readData(ofLength: 1_048_576)
-                guard !data.isEmpty else { return false }
-                writeHandle.write(data)
-                bytesWritten += Int64(data.count)
-                return true
-            }) {}
+            // A full disk or I/O error throws here (terminal, not retried) instead
+            // of raising an uncatchable Objective-C exception.
+            let bytesWritten = try FileStreamIO.copy(contentsOf: tempURL, to: writeHandle)
             guard bytesWritten == expectedBytes else {
                 throw DownloadError.chunkAssemblyFailed(
                     path: tempURL.path,
@@ -1279,18 +1272,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     }
 
     static func sha256Hex(for url: URL) throws -> String {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
-
-        var hasher = SHA256()
-        while autoreleasepool(invoking: {
-            let data = handle.readData(ofLength: 1_048_576)
-            guard !data.isEmpty else { return false }
-            hasher.update(data: data)
-            return true
-        }) {}
-
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        try FileStreamIO.sha256Hex(of: url)
     }
 
     static func normalizedSHA256(_ value: String?) -> String? {
@@ -2683,17 +2665,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         defer { try? fileManager.removeItem(at: downloaded.url) }
 
         if existingBytes > 0, downloaded.statusCode == 206 {
-            let readHandle = try FileHandle(forReadingFrom: downloaded.url)
-            defer { try? readHandle.close() }
             let writeHandle = try FileHandle(forWritingTo: partialURL)
             defer { try? writeHandle.close() }
-            try writeHandle.seekToEnd()
-            while autoreleasepool(invoking: {
-                let data = readHandle.readData(ofLength: 1_048_576)
-                guard !data.isEmpty else { return false }
-                writeHandle.write(data)
-                return true
-            }) {}
+            try FileStreamIO.append(contentsOf: downloaded.url, to: writeHandle)
             try? writeHandle.synchronize()
             return
         }

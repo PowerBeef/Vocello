@@ -114,16 +114,7 @@ public struct SamplingTakeEvidence: Codable, Hashable, Sendable {
     }
 
     public static func sha256FileDigest(at url: URL) throws -> String {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
-        var hasher = SHA256()
-        while autoreleasepool(invoking: {
-            let chunk = handle.readData(ofLength: 1024 * 1024)
-            guard !chunk.isEmpty else { return false }
-            hasher.update(data: chunk)
-            return true
-        }) {}
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        try FileStreamIO.sha256Hex(of: url)
     }
 }
 

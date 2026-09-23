@@ -455,18 +455,7 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
     }
 
     private static func sha256Hex(for url: URL) throws -> String {
-        let handle = try FileHandle(forReadingFrom: url)
-        defer { try? handle.close() }
-
-        var hasher = SHA256()
-        while autoreleasepool(invoking: {
-            let data = handle.readData(ofLength: 1_048_576)
-            guard !data.isEmpty else { return false }
-            hasher.update(data: data)
-            return true
-        }) {}
-
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        try FileStreamIO.sha256Hex(of: url)
     }
 
     private static func cleanupLegacyInstallFolders(

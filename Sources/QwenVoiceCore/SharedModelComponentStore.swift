@@ -1268,14 +1268,7 @@ private enum SharedComponentFileSystem {
             throw SharedModelComponentStoreError.missingFile(relativePath: relativePath)
         }
         defer { try? handle.close() }
-        var hasher = SHA256()
-        while autoreleasepool(invoking: {
-            let data = handle.readData(ofLength: 1_048_576)
-            guard !data.isEmpty else { return false }
-            hasher.update(data: data)
-            return true
-        }) {}
-        return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        return try FileStreamIO.sha256Hex(reading: handle)
     }
 
     static func snapshotIfPresent(_ url: URL) throws -> FileSnapshot? {

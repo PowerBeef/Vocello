@@ -28,8 +28,10 @@ Every Xcode/SwiftPM command holds the host-wide native lock. The M6 is the canon
 the XCUITest bundles (never runs them) and pull requests get the Linux checks only.
 Done September 22–23: PA-27, PA-12, F-25, PA-11, PA-13, PA-04, PA-14, PA-03, PA-02, PA-23, PA-24,
 PA-17 (clone consent enforced in core and the CLI via `--confirm-consent`; saving any voice needs
-consent; device clone lanes need the phone's consent on); PA-15 code complete (device proof
-consent-bound). Next: PA-16 (tokenizer sliding windows, consent-bound
+consent; device clone lanes need the phone's consent on), PA-15 (device proof PASS on the iPhone,
+`smoke --scenario foreground-exit`); the phone's models were updated (`smoke --scenario
+update-models`). In flight: PA-28 (a failed download range retries alone instead of discarding
+the file; PA-29 measures the background fan-out afterwards). Next: PA-16 (tokenizer sliding windows, consent-bound
 model runs), PA-19, PA-21, PA-22, PA-07/08 cleanup. Maintainer steps: PA-10 `release` environment
 and `v*` tag ruleset; PA-05 still needs the altool upload check on the pinned Xcode.
 

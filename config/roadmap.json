@@ -1404,21 +1404,6 @@
       "updated": "2026-09-22"
     },
     {
-      "id": "PA-15",
-      "title": "iOS stops generation safely when the app leaves the foreground",
-      "status": "in-flight",
-      "gate": "On background with an active generation the app requests background time and cancels through the typed barrier (a single take is discarded, long-form keeps its completed segments), the screen stays awake while generating, the user is told on return, and a deferred background release never fires after returning; logic tests cover the policy and a physical-device run proves the cancel lands before GPU work is refused.",
-      "sourceOfTruth": [
-        "Sources/iOS/QVoiceiOSApp.swift",
-        "Sources/iOS/TTSEngineStore.swift",
-        "Sources/iOSSupport/Services/IOSBackgroundGenerationPolicy.swift",
-        "Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift"
-      ],
-      "notes": "External audit IOS-01 (High) and IOS-02, confirmed 2026-09-22. Maintainer decision 2026-09-22: cancel, keep finished long-form segments, notify on return. Code done 2026-09-23 (83552028, b79f5ae7, ad685eac): IOSBackgroundGenerationPolicy value types; on .background the app takes a background-task grant, runs the engine barrier with the shutdown reason, then cancels the take's task and runs the deferred release; the idle timer follows hasActiveGeneration; .active cancels the pending background release; Studio shows a notice on return. The single-take executor honours the attempt owner's accepted cancellation, so a take the barrier cancelled before its task is never completed, persisted or recorded as failed. Logic tests: IOSBackgroundGenerationPolicyTests, IOSSingleTakeGenerationExecutorTests. Open: the physical-device proof that the cancel lands before GPU work is refused (consent-bound). Alternative to record: BGContinuedProcessingTask with GPU background use could let long-form finish.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-23"
-    },
-    {
       "id": "PA-16",
       "title": "Speech-tokenizer attention honors the model's sliding windows",
       "status": "planned",
@@ -1525,6 +1510,38 @@
       "notes": "External audit 2026-09-22, sections 5 to 12: the Low and Info rows not grouped into PA-01 to PA-25 or existing items (for example ENG-07 to ENG-17, CORE-10 to CORE-22, MAC-09 to MAC-26, IOS-16 to IOS-25, SEC-08 to SEC-16, CI-09 to CI-21, WEB-02, WEB-06 to WEB-08, UX-01, REPO-01 to REPO-04). Work them in batches by area; the report's verification addendum lists the rows that are wrong or already fixed.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-28",
+      "plan": "project-audit-2026-09",
+      "title": "Chunked model downloads retry a failed range, never the whole file",
+      "status": "in-flight",
+      "blockedBy": [],
+      "gate": "A short 206 body, a transport error or a 5xx/429 on one byte range retries that range only (bounded, with backoff) and keeps every completed range; only a genuine Range-ignored response (HTTP 200 or a foreign Content-Range) falls back to a single stream and clears the partial; a range is never recorded complete unless its body length matches; the file-level retry reason and each range retry are persisted in the download diagnostics; unit tests cover each path.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "Sources/QwenVoiceCore/ModelDownloadDiagnosticsStore.swift"
+      ],
+      "notes": "Found 2026-09-23 updating the maintainer's iPhone models. Pulled download diagnostics: the Built-in update fanned out about 40 range tasks on one h2 connection (about 0.14 MB/s each, 5.5 MB/s aggregate); one 128 MiB range came back at 125.6 of 134.2 MB, the file-level retry then deleted the partial and its completed-range sidecar and restarted as a single stream: 4.07 GB on the wire for a 2.05 GB file, 438 s. Design and Clone (no retry) took 78 s and 51 s. The retry reason was not persisted, so the exact trigger is unknown; the fix records it.",
+      "updated": "2026-09-23"
+    },
+    {
+      "id": "PA-29",
+      "plan": "project-audit-2026-09",
+      "title": "Measure iOS background chunk fan-out against bounded in-flight ranges",
+      "status": "parked",
+      "blockedBy": [
+        "PA-28"
+      ],
+      "gate": "A controlled on-device comparison (scripts/ui_test.sh ios model-download with the registered QVOICE_DOWNLOAD_ENGINE_PROFILE arms, plus a bounded in-flight-range arm) on the paired iPhone decides whether background downloads keep fanning every range out to the daemon up front or bound in-flight ranges per file; the 2026-08-11 chunking default changes only with that evidence and a maintainer decision recorded in docs/reference/model-delivery.md.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSModelDownloadCoordinator.swift",
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "docs/reference/model-delivery.md"
+      ],
+      "unparkWhen": "PA-28 has landed and the maintainer explicitly requests the model-download comparison runs on the iPhone.",
+      "notes": "2026-09-23 diagnostics: on a background URLSession every range task multiplexed onto one reused h2 connection (0 new connections across 24 large tasks), so per-connection CDN shaping capped the aggregate at about 5.5 MB/s while about 40 ranges were in flight; single-stream fallbacks on their own connections reached 9.5-12 MB/s; Design and Clone updates with fewer concurrent ranges reached 17.6 and 27.4 MB/s. Evidence is one observation, not a controlled comparison.",
+      "updated": "2026-09-23"
     }
   ]
 }

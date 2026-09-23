@@ -22,7 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 14/28 (50%) |
+| `project-audit-2026-09` | active | backend-and-platform | 15/30 (50%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -457,7 +457,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-07` | planned | Remove dead engine, downloader and XPC-era code | — |
 | `PA-08` | planned | Consolidate duplicated platform logic and misleading names | — |
 | `PA-10` | in-flight | Release signing is isolated from dispatch and build inputs | — |
-| `PA-15` | in-flight | iOS stops generation safely when the app leaves the foreground | — |
 | `PA-16` | planned | Speech-tokenizer attention honors the model's sliding windows | — |
 | `PA-18` | planned | Public claims match what each download ships | — |
 | `PA-19` | planned | Orchestrators and the generate loop have unit coverage | — |
@@ -466,6 +465,8 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-22` | planned | Core storage and memory lifecycle is bounded | — |
 | `PA-25` | planned | Docs and tooling stay proportional | — |
 | `PA-26` | planned | Low-severity backlog from the external audit | — |
+| `PA-28` | in-flight | Chunked model downloads retry a failed range, never the whole file | — |
+| `PA-29` | parked | Measure iOS background chunk fan-out against bounded in-flight ranges | `PA-28` |
 
 ### Open items in detail
 
@@ -483,9 +484,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-10`** (in-flight) — Release signing is isolated from dispatch and build inputs.
   gate: Signing jobs use a tag-restricted release environment, a dispatched release runs only from its own tag ref with a validated output name, the keychain grants codesign only, no Actions cache is restored after secrets exist, checkouts do not persist credentials, and signing material is removed right after release.sh.
-
-- **`PA-15`** (in-flight) — iOS stops generation safely when the app leaves the foreground.
-  gate: On background with an active generation the app requests background time and cancels through the typed barrier (a single take is discarded, long-form keeps its completed segments), the screen stays awake while generating, the user is told on return, and a deferred background release never fires after returning; logic tests cover the policy and a physical-device run proves the cancel lands before GPU work is refused.
 
 - **`PA-16`** (planned) — Speech-tokenizer attention honors the model's sliding windows.
   gate: The decoder transformer applies its 72-frame sliding window with a bounded KV cache and the encoder its 250-frame window; a reference-parity fixture against the upstream tokenizer passes, and the fixed-seed QC battery and gate bench show no regression.
@@ -510,6 +508,13 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-26`** (planned) — Low-severity backlog from the external audit.
   gate: Every Low and Info finding in the external audit that no other item covers is fixed or declined with a reason, section by section.
+
+- **`PA-28`** (in-flight) — Chunked model downloads retry a failed range, never the whole file.
+  gate: A short 206 body, a transport error or a 5xx/429 on one byte range retries that range only (bounded, with backoff) and keeps every completed range; only a genuine Range-ignored response (HTTP 200 or a foreign Content-Range) falls back to a single stream and clears the partial; a range is never recorded complete unless its body length matches; the file-level retry reason and each range retry are persisted in the download diagnostics; unit tests cover each path.
+
+- **`PA-29`** (parked) — Measure iOS background chunk fan-out against bounded in-flight ranges.
+  gate: A controlled on-device comparison (scripts/ui_test.sh ios model-download with the registered QVOICE_DOWNLOAD_ENGINE_PROFILE arms, plus a bounded in-flight-range arm) on the paired iPhone decides whether background downloads keep fanning every range out to the daemon up front or bound in-flight ranges per file; the 2026-08-11 chunking default changes only with that evidence and a maintainer decision recorded in docs/reference/model-delivery.md.
+  unparkWhen: PA-28 has landed and the maintainer explicitly requests the model-download comparison runs on the iPhone.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

@@ -3815,6 +3815,29 @@
         "commit:4ea36806",
         "file:Tests/VocelloCoreTests/VoiceCloningConsentPolicyTests.swift"
       ]
+    },
+    {
+      "id": "PA-15",
+      "title": "iOS stops generation safely when the app leaves the foreground",
+      "status": "done",
+      "gate": "On background with an active generation the app requests background time and cancels through the typed barrier (a single take is discarded, long-form keeps its completed segments), the screen stays awake while generating, the user is told on return, and a deferred background release never fires after returning; logic tests cover the policy and a physical-device run proves the cancel lands before GPU work is refused.",
+      "sourceOfTruth": [
+        "Sources/iOS/QVoiceiOSApp.swift",
+        "Sources/iOS/TTSEngineStore.swift",
+        "Sources/iOSSupport/Services/IOSBackgroundGenerationPolicy.swift",
+        "Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift"
+      ],
+      "notes": "Closed 2026-09-23 (external audit IOS-01 High, IOS-02). On .background the app takes a background-task grant, runs the engine barrier with the typed shutdown reason, cancels the take's task, and only then runs the deferred runtime release; the single-take executor honours the owner's accepted cancellation so the take is never completed, persisted or recorded as failed; long-form keeps completed segments; the idle timer follows active generation; .active drops a still-deferred release and shows the return notice (it holds the action slot until dismissed, like the error bar). Device proof: scripts/ui_test.sh ios smoke --scenario foreground-exit on the paired iPhone PASS (run ios-xcui-smoke-20260923-055425-5fb4b68a): one shutdown barrier recorded before the background unload, no failed cancellation or generation, the take absent from History, a new take completed after return, clean crash delta. Alternative still open: BGContinuedProcessingTask could let long-form finish.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-23",
+      "evidence": [
+        "commit:83552028",
+        "commit:b79f5ae7",
+        "commit:ad685eac",
+        "commit:56da9f27",
+        "run:ios-xcui-smoke-20260923-055425-5fb4b68a",
+        "file:Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift"
+      ]
     }
   ]
 }

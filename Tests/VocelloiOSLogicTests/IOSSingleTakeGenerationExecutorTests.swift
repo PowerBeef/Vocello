@@ -120,6 +120,45 @@ final class IOSSingleTakeGenerationExecutorTests: XCTestCase {
         }
     }
 
+    func testRequestedCancellationBeforeTaskCancelDiscardsMaterializedResult() async throws {
+        let plan = try makePlan()
+        let hooks = Hooks()
+
+        do {
+            _ = try await IOSSingleTakeGenerationExecutor.run(
+                plan: plan,
+                hooks: hooks,
+                isCancellationRequested: { true }
+            )
+            XCTFail("Expected cancellation")
+        } catch is CancellationError {
+            XCTAssertEqual(
+                hooks.events,
+                [.submitted, .generated, .cancelled(materialized: true)]
+            )
+        }
+    }
+
+    func testRequestedCancellationBeforeTaskCancelTurnsEngineFailureIntoCancellation() async throws {
+        let plan = try makePlan()
+        let hooks = Hooks()
+        hooks.generationError = TestError.failed
+
+        do {
+            _ = try await IOSSingleTakeGenerationExecutor.run(
+                plan: plan,
+                hooks: hooks,
+                isCancellationRequested: { true }
+            )
+            XCTFail("Expected cancellation")
+        } catch is CancellationError {
+            XCTAssertEqual(
+                hooks.events,
+                [.submitted, .generated, .cancelled(materialized: false)]
+            )
+        }
+    }
+
     func testOrdinaryFailureRecordsFailureAndPropagates() async throws {
         let plan = try makePlan()
         let hooks = Hooks()

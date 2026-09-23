@@ -98,16 +98,22 @@ protocol IOSSingleTakeGenerationExecutionHooks: AnyObject {
 /// therefore must not drift among three view implementations.
 @MainActor
 enum IOSSingleTakeGenerationExecutor {
+    /// `isCancellationRequested` reports a cancellation the attempt owner accepted
+    /// before it cancelled this Swift task. The foreground-exit path (PA-15) calls
+    /// the engine barrier first and cancels the task afterwards, so the take must
+    /// honour the accepted cancellation even when `Task.isCancelled` is still
+    /// false: it is discarded, never completed, persisted or reported as failed.
     static func run(
         plan: IOSSingleTakeGenerationPlan,
-        hooks: any IOSSingleTakeGenerationExecutionHooks
+        hooks: any IOSSingleTakeGenerationExecutionHooks,
+        isCancellationRequested: @MainActor () -> Bool = { false }
     ) async throws -> GenerationResult {
         await hooks.generationSubmitted(plan)
         var cancellationWasHandled = false
 
         do {
             let result = try await hooks.generate(plan.request)
-            if Task.isCancelled {
+            if Task.isCancelled || isCancellationRequested() {
                 cancellationWasHandled = true
                 await hooks.generationCancelled(
                     materializedResult: result,
@@ -129,7 +135,7 @@ enum IOSSingleTakeGenerationExecutor {
         } catch {
             // Engine cancellation can arrive wrapped in a backend error. Task
             // ownership, not error-string parsing, determines the terminal.
-            if Task.isCancelled {
+            if Task.isCancelled || isCancellationRequested() {
                 await hooks.generationCancelled(
                     materializedResult: nil,
                     plan: plan

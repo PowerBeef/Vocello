@@ -232,10 +232,12 @@ struct QVoiceiOSApp: App {
                     audioPlayer: audioPlayer
                 )
             }
-            // Engine work no Studio attempt owns, or a Studio attempt that did
-            // not accept the cancellation, still has to stop before suspension.
+            // Engine work no Studio attempt owns, a Studio attempt that did not
+            // accept the cancellation, or one whose barrier failed and left the
+            // engine running, still has to stop before suspension.
             let needsEngineCancellation = plan.cancelsUnownedEngineGeneration
                 || (plan.studioInterruption != nil && !studioCancelled)
+                || engine.hasActiveGeneration
             if needsEngineCancellation, engine.hasActiveGeneration {
                 do {
                     try await engine.cancelActiveGeneration(reason: plan.cancellationReason)
@@ -437,7 +439,10 @@ struct QVoiceiOSApp: App {
             await engine.cancelClonePreparationIfNeeded()
             if engine.hasActiveGeneration {
                 do {
-                    try await engine.cancelActiveGeneration()
+                    // A generation that began after the foreground exit is a shutdown too.
+                    try await engine.cancelActiveGeneration(
+                        reason: reason == IOSBackgroundGenerationPolicy.releaseReason ? .shutdown : .user
+                    )
                 } catch {
                     engine.clearVisibleError()
                 }

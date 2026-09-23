@@ -53,6 +53,11 @@ final class StudioGenerationCoordinator {
         attemptAuthority.currentToken
     }
 
+    /// Whether `attempt` has an accepted cancellation, before or after its task is cancelled.
+    func isCancellationRequested(for attempt: StudioGenerationAttemptToken) -> Bool {
+        attemptAuthority.isCancelling(attempt)
+    }
+
     /// `true` while the current attempt runs and no cancellation barrier is pending.
     var isAttemptRunning: Bool {
         guard let attempt = attemptAuthority.currentToken else { return false }
@@ -148,7 +153,7 @@ final class StudioGenerationCoordinator {
         return true
     }
 
-    /// Completes the user-requested cancellation after the engine terminal barrier.
+    /// Completes a requested cancellation (user or foreground exit) after the engine terminal barrier.
     @discardableResult
     func completeCancellation(attempt: StudioGenerationAttemptToken) -> Bool {
         guard attemptAuthority.completeCancellation(attempt) else { return false }

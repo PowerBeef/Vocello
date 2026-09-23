@@ -30,7 +30,7 @@ final class IOSBackgroundGenerationPolicyTests: XCTestCase {
         XCTAssertEqual(plan.studioInterruption, .singleTakeDiscarded)
         XCTAssertFalse(
             plan.cancelsUnownedEngineGeneration,
-            "The Studio attempt owns the cancel, so its task is cancelled first and reports .cancelled"
+            "The Studio attempt owns the cancel, so the engine barrier runs first, then its task is cancelled and reports .cancelled"
         )
         XCTAssertEqual(plan.cancellationReason, .shutdown)
         XCTAssertEqual(plan.releaseReason, IOSBackgroundGenerationPolicy.releaseReason)

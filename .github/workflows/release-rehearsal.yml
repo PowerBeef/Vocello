@@ -156,7 +156,7 @@ jobs:
         uses: ./.github/actions/native-toolchain
         with:
           metal: "true"
-          release-tools: "true"
+          release-tools: "false"
 
       - name: Regenerate Xcode project
         run: ./scripts/regenerate_project.sh

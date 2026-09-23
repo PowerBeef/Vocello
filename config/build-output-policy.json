@@ -320,7 +320,7 @@
       "id": "artifacts-app-store",
       "path": "build/artifacts/app-store",
       "class": "artifact",
-      "owner": "Redacted App Store Connect, build-collision, and model-host readiness probes",
+      "owner": "Redacted model-host readiness probes",
       "cleanup": "preserve",
       "retention": "Preserve the current candidate readiness summaries until closure or explicit candidate retirement",
       "env": "QVOICE_ARTIFACTS_APP_STORE"

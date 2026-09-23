@@ -191,21 +191,15 @@ configured 2.4.0 version is unavailable, and App Privacy publication, agreements
 and regional fields still require owner/web or qualified review. Empty accessibility and encryption
 declaration lists are observations, not completed questionnaires.
 
-The guarded inventory command is read-only, paginated where applicable, and retains only response
-digests, resource counts, and safe state tokens:
-
-```sh
-python3 scripts/app_store_connect_readiness.py validate
-python3 scripts/app_store_connect_readiness.py inventory \
-  --profile primary \
-  --output build/artifacts/app-store/app-store-connect-readiness.json
-```
-
-The public API cannot establish App Privacy publication, agreement/tax/banking readiness, DSA
-trader status, or every regional-compliance field. The inventory marks those checks pending owner
-or web review rather than converting absence into PASS. On 2026-09-01 the unattended `primary`
-profile read timed out at its first authenticated request; the shared runner killed the complete
-CLI process group, no account data was retained, and ASR-11 remains open.
+App Store Connect readiness is a manual, read-only pass: review the live app identity, platforms,
+category, pricing/availability, metadata, localizations and URLs, screenshots, review contact,
+content rights, age rating and version state in the App Store Connect web portal, or through the
+maintainer's asc-* skills (they drive the tddworks `asc` CLI; reads only, any write needs an explicit
+request). The repository pins no App Store Connect CLI and keeps no automated inventory. App Privacy
+publication, agreement/tax/banking readiness, DSA trader status and regional-compliance fields are
+owner/web checks; record an unavailable answer as pending, never as PASS. Keep only redacted outcomes
+(states and counts), never credentials or account identifiers. ASR-11 remains open until that pass
+is complete.
 
 - [ ] **Privacy Policy URL** = `https://vocello.vercel.app/privacy` (hosted by this repo's website; the in-app
       Settings → About → Privacy Policy row links to the same URL).
@@ -343,25 +337,18 @@ submitting it for App Review, or releasing it publicly, produce and validate the
 `quality-promotion.json` against this exact release evidence. This preserves TestFlight as a useful
 validation environment without allowing a source-stale phone verdict to authorize public promotion.
 
-Before archiving, the workflow installs the digest-pinned `asc` binary and performs a
-least-privilege read-only collision check for the exact bundle/version/build identity. Any existing
-App Store Connect build with that identity blocks the archive. The workflow never invents or
-increments a build number. To advance it, edit `CURRENT_PROJECT_VERSION` in `project.yml`,
-regenerate the project, review the diff, and rerun deterministic validation.
+The workflow does not query App Store Connect for an existing build, and it never invents or
+increments a build number. Before archiving, on CI or locally, confirm read-only in App Store Connect
+(the web portal or the asc-* skills) that the exact bundle/version/build identity
+(`com.patricedery.vocello` with `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` from `project.yml`)
+is unused. When it is not, bump `CURRENT_PROJECT_VERSION` in `project.yml`, run
+`./scripts/regenerate_project.sh --fast`, review the diff and rerun deterministic validation. Apple
+rejects a reused build number at the altool upload, so a missed check fails the upload; it cannot
+replace an existing build.
 
 ### B. Local (Xcode-logged-in maintainer)
 
-Run the same collision check before resolving or archiving:
-
-```sh
-python3 scripts/app_store_build_preflight.py identity
-python3 scripts/app_store_build_preflight.py check \
-  --profile primary \
-  --output build/artifacts/app-store/build-collision-preflight.json
-```
-
-The second command performs no mutation and must PASS. A Keychain/authentication timeout is not
-permission to archive; restore the least-privilege profile and rerun it.
+Do the same manual build-identity check in App Store Connect before resolving or archiving.
 
 ```sh
 export QWENVOICE_DEVELOPMENT_TEAM=<your-team-id>

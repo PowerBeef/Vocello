@@ -176,7 +176,6 @@ cp() {
 fixture_plistbuddy() { printf '%s\n' 'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE'; }
 openssl() { printf '%s\n' 'fixture-random-password'; }
 uuidgen() { printf '%s\n' 'fixture-random-password'; }
-asc() { return 0; }
 '''
 
     def setUp(self):

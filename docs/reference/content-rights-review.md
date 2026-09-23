@@ -97,16 +97,17 @@ accessibility, privacy, financial, and regional account fields.
 ## Consolidated RF-02 decision checkpoint
 
 The September 5 read-only inventory again confirms `USES_THIRD_PARTY_CONTENT`, the configured
-Support URL, and no collision for source 3.0.0/build 24. The current iOS version record does not
-match 3.0.0; pricing/availability and configured-version readiness remain unavailable. This packet
-groups the outstanding decisions without creating another status ledger or authorizing account
-changes. Retained summaries live in the ignored `rf02-20260905-readonly` artifact directory.
+Support URL, and no existing App Store build for source 3.0.0/build 24. The current iOS version
+record does not match 3.0.0; pricing/availability and configured-version readiness remain
+unavailable. This packet groups the outstanding decisions without creating another status ledger
+or authorizing account changes. Retained summaries live in the ignored `rf02-20260905-readonly`
+artifact directory.
 
 | Decision and authority | Owner class | Evidence needed to close |
 | --- | --- | --- |
 | Download-provider processing and privacy labels — ASR-02 | Privacy counsel, with provider clarification if needed | Establish request metadata retained by Hugging Face/CDN operators, retention periods and purposes, linkage/tracking treatment, relevant territories, and resulting App Store questionnaire answers. Reconcile the signed candidate, policy and live labels; do not infer “Data Not Collected” from local synthesis. |
 | Model redistribution, notices, previews, marketing audio and artwork — ASR-04 | Maintainer/asset owner plus qualified IP/privacy reviewer | Complete every asset row and signed factual attestation above; record allowed uses and restrictions with private-evidence digests. Existing bundled notices do not replace these decisions. |
-| Source/account version and build — ASR-08 | Release maintainer | Authorize reconciliation to 3.0.0, recheck build collision immediately before archive, and verify the processed build. The unused number is not reserved. |
+| Source/account version and build — ASR-08 | Release maintainer | Authorize reconciliation to 3.0.0, confirm read-only in App Store Connect (web portal or the asc-* skills) that the build number is still unused immediately before archive, and verify the processed build. The unused number is not reserved; Apple rejects a reused one at upload. |
 | Distribution profile and entitlements — ASR-10 | Signing/release owner | Decode the exact profile, match private-key identity and entitlements, then verify the command-bound archive/IPA. Local identity availability and earlier remote capability reads are not archive evidence. |
 | Age rating, content declaration and encryption — ASR-11 | Maintainer with qualified reviewer for ambiguous declarations | Review the actual user-content/generation capabilities, current questionnaire and source encryption declaration against the processed candidate. A readable account field is not proof its answers are correct. |
 | Pricing/availability, agreements/financial, DSA and regional obligations — ASR-11 | Account holder; counsel where required | Resolve unavailable account surfaces, document selected territories and applicable obligations, and capture approved readback. The agent cannot accept agreements, select trading status or provide legal clearance. |
@@ -138,7 +139,8 @@ ASR-09 also needs named execution providers in North America, Europe and East As
 operators now, but run the existing full-artifact host proofs only near submission: their freshness
 window is **24 hours**. Local probes cannot stand in for the other regions. Do not purchase hosts,
 send vendor/legal inquiries, edit account fields or accept agreements without separate authority.
-Repeat the build-number collision check immediately before archive, not continuously while waiting.
+Repeat the manual read-only build-number check in App Store Connect immediately before archive, not
+continuously while waiting.
 
 ## Fail-closed release choices
 

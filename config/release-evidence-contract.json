@@ -56,7 +56,6 @@
       "workflow": "release-ios-candidate",
       "requiredSteps": [
         "platform-readiness",
-        "build-collision-preflight",
         "archive",
         "archive-verification",
         "ipa-export",

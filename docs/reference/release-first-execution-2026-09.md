@@ -41,10 +41,11 @@ Prioritize iOS; park Mac/CLI-only packaging and qualification until the iOS crit
 Shared-code regression tests remain required. This changes scheduling, not previous failure results.
 The maintainer-selected next release is **3.0.0**, marking the new phase of Vocello across
 iOS, macOS, and the downloadable CLI. This supersedes the original 2.5.0 planning default.
-Reconcile the App Store Connect version and select an unused build number through the existing
-collision preflight before freezing. The September 4 source-preparation checkpoint sets
-`project.yml` to 3.0.0/build 24 and regenerates the project. A complete read-only account preflight
-found zero matching builds. This is not a reservation; repeat it immediately before archive.
+Reconcile the App Store Connect version and select an unused build number, confirmed read-only in
+App Store Connect (web portal or the asc-* skills), before freezing. The September 4
+source-preparation checkpoint sets `project.yml` to 3.0.0/build 24 and regenerates the project.
+A complete read-only account check found zero matching builds. This is not a reservation; repeat
+it immediately before archive.
 The live App Store version still requires separately authorized reconciliation.
 `candidateRelease` in the public-facts contract is version/tag-matched, explicitly unpublished,
 and strictly newer than `stableMacRelease`; public links and stable-version fact scans do not
@@ -68,7 +69,7 @@ the approved ten-step execution sequence onto existing owners; it is not a secon
 | 3a — accessibility qualification before freeze | ISU-4 / ISU-5: Settings and App Language reachability at AX-XXXL and pseudo-AX-XXXL on post-ISU-5 source | One authorized `scripts/ui_test.sh ios localization` walk in English/French; existing identifiers, strict visibility predicates, no automatic retry |
 | 4 — verification correction before freeze | RF-09 / RF-12: source-validated platform applicability and preinstalled-candidate route | iOS Speed requirements retained, macOS Quality retained, historical compatibility; no target replacement or diagnostics dependence |
 | 4a — monetization before freeze | RF-13: one-time iOS Design/Clone export unlock | Verified StoreKit entitlement and all outward export paths; generation/listening/internal History free in every mode, Built-in export free; focused purchase, restore, offline and refund tests |
-| 5 — freeze | RF-09: coherent deterministic checkpoint, exact-SHA CI/Security, fresh collision check, authorized tag/archive/IPA | Frozen candidate with signing, entitlements, notices, privacy, architecture and UUID proof; no internal diagnostics |
+| 5 — freeze | RF-09: coherent deterministic checkpoint, exact-SHA CI/Security, fresh read-only build-number check, authorized tag/archive/IPA | Frozen candidate with signing, entitlements, notices, privacy, architecture and UUID proof; no internal diagnostics |
 | 6 — implemented, candidate verification | RF-11 / F-01/06/16/18/23 / ICI-4 / VLR-07: targeted correction acceptance | Long-form/regeneration, all modes, enrollment, player, History, export and preservation pass before expansion |
 | 7 — implemented, campaign verification | RF-11 / ICA-04/05 / AV-09 / ASR-12: all 201 takes and applicable remaining lanes | Five-take pilot then up to 20 per invocation, mode boundaries respected; all outcomes and restoration accounted for, no unresolved required failures |
 | 8 — processed candidate verification | RF-12 / ASR-06/07/10/12: separately authorized TestFlight, then black-box upgrade/fresh-install acceptance | Approved identity unchanged; no debug app substitution. Fresh install only after usable encrypted recovery and immediate separate approval; otherwise blocked |

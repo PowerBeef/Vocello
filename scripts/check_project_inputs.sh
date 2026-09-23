@@ -61,7 +61,6 @@ python3 "$SCRIPT_DIR/model_catalog_contract.py" validate
 python3 "$SCRIPT_DIR/model_host_availability.py" validate
 python3 "$SCRIPT_DIR/ios_storage_protection_policy.py" validate
 python3 "$SCRIPT_DIR/ios_device_eligibility.py" validate
-python3 "$SCRIPT_DIR/app_store_connect_readiness.py" validate
 python3 "$SCRIPT_DIR/ios_release_analyzer_warnings.py" validate
 
 # Release evidence, supply chain and benchmark history.

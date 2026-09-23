@@ -365,6 +365,7 @@
       {
         "id": "model-catalog-and-delivery",
         "include": [
+          "Sources/QwenVoiceCore/FileStreamIO.swift",
           "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
           "Sources/QwenVoiceCore/IOSModelDownloadLedger.swift",
           "Sources/QwenVoiceCore/ModelDownloadDiagnosticsStore.swift",

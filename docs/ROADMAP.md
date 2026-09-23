@@ -467,7 +467,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-11` | planned | macOS launch never hashes models on the main thread | — |
 | `PA-12` | in-flight | macOS settings and file actions do what they say | — |
 | `PA-13` | planned | Quality-first decoding keeps every generated frame | — |
-| `PA-14` | planned | File I/O and error classification fail safely | — |
+| `PA-14` | in-flight | File I/O and error classification fail safely | — |
 | `PA-15` | planned | iOS stops generation safely when the app leaves the foreground | — |
 | `PA-16` | planned | Speech-tokenizer attention honors the model's sliding windows | — |
 | `PA-17` | planned | Clone consent is enforced below the views | — |
@@ -516,7 +516,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-13`** (planned) — Quality-first decoding keeps every generated frame.
   gate: Quality-first decode, replay and the in-context clone cut derive their sample window from explicit reference and generated frame counts, not from counting non-zero codes; a runtime unit test covers the window and a tiny decoder emits exactly frames times upsample.
 
-- **`PA-14`** (planned) — File I/O and error classification fail safely.
+- **`PA-14`** (in-flight) — File I/O and error classification fail safely.
   gate: No legacy FileHandle write or readData remains on model, download or evidence paths (they raise Objective-C exceptions on a full disk); cancellation and allocation-retry decisions use typed errors, and MLX errors are captured instead of reaching fatalError.
 
 - **`PA-15`** (planned) — iOS stops generation safely when the app leaves the foreground.

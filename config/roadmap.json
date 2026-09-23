@@ -1501,14 +1501,14 @@
     {
       "id": "PA-14",
       "title": "File I/O and error classification fail safely",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "No legacy FileHandle write or readData remains on model, download or evidence paths (they raise Objective-C exceptions on a full disk); cancellation and allocation-retry decisions use typed errors, and MLX errors are captured instead of reaching fatalError.",
       "sourceOfTruth": [
         "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
         "Sources/QwenVoiceCore/NativeEngineRuntime.swift",
         "Sources/QwenVoiceCore/MLXTTSEngine.swift"
       ],
-      "notes": "External audit CORE-02 and CORE-03 plus ENG-05, confirmed 2026-09-22. write(_:) and readData(ofLength:) remain in HuggingFaceDownloader, ModelAssets, SharedModelComponentStore and SamplingEvidence; the only free-space check is on iOS. Cancellation and the one allocation retry are classified by matching error text (NativeEngineRuntime.swift:132-169), and with no MLX error handler installed a real Metal OOM probably reaches fatalError before any Swift error exists. The file-API half is phone-free; typed errors and MLX capture are a separate change. Planned first slice (2026-09-22 design): Sources/QwenVoiceCore/FileStreamIO.swift (throwing read(upToCount:)/write(contentsOf:) digest and copy) for HuggingFaceDownloader, ModelAssets, SharedModelComponentStore and SamplingEvidence; POSIX errors stay terminal, not retried. Test FileStreamIOTests.",
+      "notes": "External audit CORE-02 and CORE-03 plus ENG-05, confirmed 2026-09-22. Slice 1 done 2026-09-22: Sources/QwenVoiceCore/FileStreamIO.swift (throwing read(upToCount:)/write(contentsOf:)/seekToEnd digest, copy and append) replaces every legacy FileHandle read/write on the downloader, ModelAssets, SharedModelComponentStore and SamplingEvidence paths; digests byte-identical; I/O errors are terminal, not retried (FileStreamIOTests). Open slice 2: cancellation and the one allocation retry are still classified by error text (NativeEngineRuntime.swift:132-169), and with no MLX error handler a real Metal OOM probably reaches fatalError; also remove the temp chunk when writeChunk throws (HuggingFaceDownloader defer) and stop discarding synchronize() errors on the resume-append and chunk-assembly close paths.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },

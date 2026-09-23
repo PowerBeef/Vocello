@@ -14,12 +14,18 @@ enum IOSStartupReliabilityRunner {
     static let environmentKey = "QVOICE_IOS_DEVICE_DELIVERY_RELIABILITY_SPEC"
     static let cleanupEnvironmentKey = "QVOICE_IOS_DEVICE_DELIVERY_RELIABILITY_CLEANUP_RUN_ID"
 
+    /// Request detection compiles only into device-diagnostics builds
+    /// (`scripts/ios_device.sh`); a distribution build never reads these keys.
     static var isRequested: Bool {
+        #if QVOICE_DEVICE_DIAGNOSTICS
         [environmentKey, cleanupEnvironmentKey].contains { key in
             guard let value = ProcessInfo.processInfo.environment[key]?
                 .trimmingCharacters(in: .whitespacesAndNewlines) else { return false }
             return !value.isEmpty
         }
+        #else
+        false
+        #endif
     }
 
     /// Removes already-collected diagnostics without starting the native engine.
@@ -27,6 +33,7 @@ enum IOSStartupReliabilityRunner {
     /// retained runtime or a failed engine bootstrap cannot strand evidence that
     /// the host has already validated and copied.
     static func runCleanupIfRequested() -> Bool {
+        #if QVOICE_DEVICE_DIAGNOSTICS
         guard let cleanupRunID = ProcessInfo.processInfo.environment[cleanupEnvironmentKey]?
             .trimmingCharacters(in: .whitespacesAndNewlines),
               !cleanupRunID.isEmpty else {
@@ -36,9 +43,13 @@ enum IOSStartupReliabilityRunner {
             await cleanCollectedEvidence(runID: cleanupRunID)
         }
         return true
+        #else
+        return false
+        #endif
     }
 
     static func runIfRequested(engine: TTSEngineStore) -> Bool {
+        #if QVOICE_DEVICE_DIAGNOSTICS
         if runCleanupIfRequested() { return true }
         guard let rawSpec = ProcessInfo.processInfo.environment[environmentKey],
               !rawSpec.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -48,6 +59,9 @@ enum IOSStartupReliabilityRunner {
             await run(rawSpec: rawSpec, engine: engine)
         }
         return true
+        #else
+        return false
+        #endif
     }
 
     private static func cleanCollectedEvidence(runID: String) async {

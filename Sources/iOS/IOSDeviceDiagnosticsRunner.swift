@@ -93,25 +93,30 @@ enum IOSDeviceDiagnosticsRunner {
     }
 
     /// True when the launch environment requested a diagnostic generation.
+    /// Request detection compiles only into device-diagnostics builds
+    /// (`scripts/ios_device.sh`), matching the knob registry's
+    /// `device-diagnostics-harness` group; a distribution build never reads these keys.
     static var isRequested: Bool {
+        #if QVOICE_DEVICE_DIAGNOSTICS
         if IOSStartupReliabilityRunner.isRequested { return true }
-        var keys = [
+        let keys = [
             environmentKey,
             memoryQualificationEnvironmentKey,
             speechAssetLocalesEnvironmentKey,
             enrollVoiceNameEnvironmentKey,
+            cloneConditioningAcceptanceEnvironmentKey,
+            voiceReliabilityTranscriptionEnvironmentKey,
+            voiceReliabilityExportEnvironmentKey,
+            voiceReliabilityExportCleanupEnvironmentKey,
         ]
-        #if QVOICE_DEVICE_DIAGNOSTICS
-        keys.append(cloneConditioningAcceptanceEnvironmentKey)
-        keys.append(voiceReliabilityTranscriptionEnvironmentKey)
-        keys.append(voiceReliabilityExportEnvironmentKey)
-        keys.append(voiceReliabilityExportCleanupEnvironmentKey)
-        #endif
         return keys.contains { key in
             guard let raw = ProcessInfo.processInfo.environment[key]?
                 .trimmingCharacters(in: .whitespacesAndNewlines) else { return false }
             return !raw.isEmpty
         }
+        #else
+        false
+        #endif
     }
 
     /// Kick off the diagnostic generation if requested. Safe to call once after engine init;

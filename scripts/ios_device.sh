@@ -478,10 +478,13 @@ cmd_build() {
       -disableAutomaticPackageResolution
       -onlyUsePackageVersionsFromResolvedFile
       "${SIGN_ARGS[@]}"
+      # Every lane on this local route is driven by the device-diagnostics
+      # harness, whose request detection compiles only under this condition
+      # (PA-03); distribution archives never set it.
+      QVOICE_DEVICE_DIAGNOSTICS_SWIFT_FLAG=-DQVOICE_DEVICE_DIAGNOSTICS
     )
     if (( diagnostics_build )); then
       command+=(
-        QVOICE_DEVICE_DIAGNOSTICS_SWIFT_FLAG=-DQVOICE_DEVICE_DIAGNOSTICS
         QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS
       )
     fi

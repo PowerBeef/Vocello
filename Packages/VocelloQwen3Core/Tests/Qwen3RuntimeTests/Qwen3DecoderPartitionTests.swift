@@ -233,6 +233,12 @@ final class Qwen3DecoderPartitionTests: XCTestCase {
     }
 
     private func tinyConfig() throws -> Qwen3TTSTokenizerDecoderConfig {
+        try Self.tinyDecoderConfig()
+    }
+
+    /// Tiny random-weight Mimi decoder (total upsample 2 × 2 = 4), shared with
+    /// `Qwen3QualityFirstDecodeWindowTests`.
+    static func tinyDecoderConfig() throws -> Qwen3TTSTokenizerDecoderConfig {
         let json = """
         {
           "attention_bias": false,

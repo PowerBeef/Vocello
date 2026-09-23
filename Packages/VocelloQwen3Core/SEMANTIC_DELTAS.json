@@ -392,6 +392,27 @@
       "removalCriteria": "Remove only if the streaming loop stops replaying a fixed per-frame code-predictor position sequence (which the pass-indexed traces require) or an upstream compiled equivalent ships."
     },
     {
+      "id": "DECODE-002",
+      "title": "Quality-first decode keeps every generated frame (explicit frame-count sample window)",
+      "category": "decoding",
+      "state": "active",
+      "files": [
+        "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Tests/Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests.swift"
+      ],
+      "tests": [
+        "Tests/Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests.swift"
+      ],
+      "documentation": [
+        "PERFORMANCE.md"
+      ],
+      "evidenceClass": "static",
+      "benchmarkRecordIDs": [],
+      "upstreamDisposition": "upstreamable",
+      "upstreamEquivalentCommit": null,
+      "removalCriteria": "Remove only after upstream quality-first decode, in-context reference cut and codec replay derive their sample window from explicit reference and generated frame counts instead of counting non-zero first-group codes."
+    },
+    {
       "id": "MARK-001",
       "title": "AudioSeal watermark generator port (EU AI Act Article 50 marking)",
       "category": "architecture",

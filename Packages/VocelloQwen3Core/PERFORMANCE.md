@@ -103,6 +103,11 @@ produce the same waveform. The generic `streamingDecode(..., chunkTokens: 100)` 
 about eight seconds of 12.5 Hz codec frames; production Qwen streaming derives much smaller
 first/later chunk sizes from the requested interval and mode profile.
 
+Quality-first (non-streaming) decode, its in-context clone reference cut and codec replay share one
+sample window: `[reference, reference + generated) × decode upsample rate`, clamped to the decoded
+length. The window comes from explicit frame counts with an integer start; it never counts non-zero
+codes, because code 0 is a legal codec token (DECODE-002).
+
 ## Evidence states
 
 - **production**: executed in the shipping runtime.

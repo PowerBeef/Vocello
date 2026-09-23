@@ -2945,37 +2945,77 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
     // MARK: - Decode chunk helper
 
-    /// Decode a chunk of codec codes to audio waveform.
-    /// - Parameters:
-    ///   - codes: Codec codes [1, time, numCodeGroups]
-    ///   - chunkTokens: Tokens per decode chunk (controls decode granularity)
-    /// - Returns: Decoded audio waveform (1D)
     /// Full-text conditioning still decodes through Mimi incrementally. Keep
     /// the decoder partition small enough for constrained unified-memory
     /// devices; decoder partition invariance is covered by
     /// `Qwen3DecoderPartitionTests`.
     static let qualityFirstDecoderChunkFrames = 25
 
-    private func decodeChunk(
-        _ codes: MLXArray,
+    /// Sample window of a quality-first decode, derived from explicit frame
+    /// counts. Every codec frame decodes to exactly `upsampleRate` samples, so
+    /// the generated take is `[reference, reference + generated) × upsampleRate`,
+    /// clamped to what the decoder actually emitted. Code 0 is a legal codec
+    /// token, so the window never counts non-zero codes (PA-13, DECODE-002).
+    static func qualityFirstSampleRange(
+        referenceFrameCount: Int,
+        generatedFrameCount: Int,
+        decodedSampleCount: Int,
+        upsampleRate: Int
+    ) -> Range<Int> {
+        let available = max(0, decodedSampleCount)
+        let rate = max(0, upsampleRate)
+        let referenceFrames = max(0, referenceFrameCount)
+        let generatedFrames = max(0, generatedFrameCount)
+        let start = min(available, referenceFrames * rate)
+        let end = min(available, max(start, (referenceFrames + generatedFrames) * rate))
+        return start ..< end
+    }
+
+    /// Decode `[reference + generated]` codec frames on the bounded
+    /// quality-first partition and return only the generated window.
+    /// - Parameters:
+    ///   - codes: Codec codes `[1, referenceFrameCount + generatedFrames, numCodeGroups]`
+    ///   - referenceFrameCount: Leading in-context reference frames to cut (0 without ICL)
+    ///   - chunkTokens: Tokens per decode chunk (controls decode granularity)
+    /// - Returns: Evaluated generated waveform (1D)
+    static func decodeQualityFirstWindow(
+        _ speechTokenizer: Qwen3TTSSpeechTokenizer,
+        codes: MLXArray,
+        referenceFrameCount: Int,
         chunkTokens: Int = Qwen3TTSModel.qualityFirstDecoderChunkFrames
     ) -> MLXArray {
-        guard let speechTokenizer else { return MLXArray.zeros([1]) }
-
         var audioChunks = [MLXArray]()
         for chunk in speechTokenizer.streamingDecode(codes, chunkTokens: chunkTokens) {
             audioChunks.append(chunk)
         }
         var audio = concatenated(audioChunks, axis: -1)[0]
 
-        let validLen = Int((codes[0..., 0..., 0] .> 0).sum().item(Int32.self))
-            * speechTokenizer.decodeUpsampleRate
-        if validLen > 0, validLen < audio.dim(0) {
-            audio = audio[..<validLen]
+        let window = qualityFirstSampleRange(
+            referenceFrameCount: referenceFrameCount,
+            generatedFrameCount: codes.dim(1) - referenceFrameCount,
+            decodedSampleCount: audio.dim(0),
+            upsampleRate: speechTokenizer.decodeUpsampleRate
+        )
+        if window != 0 ..< audio.dim(0) {
+            audio = audio[window]
         }
 
         eval(audio)
         return audio
+    }
+
+    private func decodeChunk(
+        _ codes: MLXArray,
+        referenceFrameCount: Int,
+        chunkTokens: Int = Qwen3TTSModel.qualityFirstDecoderChunkFrames
+    ) -> MLXArray {
+        guard let speechTokenizer else { return MLXArray.zeros([1]) }
+        return Self.decodeQualityFirstWindow(
+            speechTokenizer,
+            codes: codes,
+            referenceFrameCount: referenceFrameCount,
+            chunkTokens: chunkTokens
+        )
     }
 
     public func replayCodecTrace(
@@ -3021,10 +3061,16 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             speechTokenizer.decoder, codes: codes, ranges: fullRanges,
             arm: .full, memoryPolicy: memoryPolicy
         )
-        // Preserve decodeChunk's existing valid-length semantics exactly.
-        let validLen = frames.filter { $0[0] > 0 }.count * speechTokenizer.decodeUpsampleRate
-        if validLen > 0, validLen < fullAudio.count {
-            fullAudio.removeSubrange(validLen...)
+        // Same sample window as production quality-first decode (a trace
+        // carries generated frames only, so there is no reference cut).
+        let fullWindow = Self.qualityFirstSampleRange(
+            referenceFrameCount: 0,
+            generatedFrameCount: frames.count,
+            decodedSampleCount: fullAudio.count,
+            upsampleRate: speechTokenizer.decodeUpsampleRate
+        )
+        if fullWindow != fullAudio.indices {
+            fullAudio = Array(fullAudio[fullWindow])
         }
 
         return Qwen3CodecReplayResult(
@@ -4136,21 +4182,17 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             .reshaped([1, generatedCodecFrames.count, codeGroupCount])
 
         var decodeCodes = codes
+        var referenceFrameCount = 0
         if let refCodes {
             let refCodesT = refCodes.transposed(0, 2, 1)
             decodeCodes = concatenated([refCodesT, codes], axis: 1)
+            referenceFrameCount = refCodes.dim(2)
         }
 
-        var audio = decodeChunk(decodeCodes)
-
-        if let refCodes {
-            let refLen = refCodes.dim(2)
-            let totalLen = decodeCodes.dim(1)
-            let cut = Int(Double(refLen) / Double(max(totalLen, 1)) * Double(audio.dim(0)))
-            if cut > 0, cut < audio.dim(0) {
-                audio = audio[cut...]
-            }
-        }
+        // The in-context reference cut and the generated tail both come from
+        // explicit frame counts (qualityFirstSampleRange), never from the
+        // decoded length or from counting non-zero codes.
+        let audio = decodeChunk(decodeCodes, referenceFrameCount: referenceFrameCount)
 
         let finalDecodeEvalStartedAt = ContinuousClock.now
         eval(audio)

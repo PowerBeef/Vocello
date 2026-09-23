@@ -460,7 +460,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-08` | planned | Consolidate duplicated platform logic and misleading names | — |
 | `PA-10` | in-flight | Release signing is isolated from dispatch and build inputs | — |
 | `PA-14` | in-flight | File I/O and error classification fail safely | — |
-| `PA-15` | planned | iOS stops generation safely when the app leaves the foreground | — |
+| `PA-15` | in-flight | iOS stops generation safely when the app leaves the foreground | — |
 | `PA-16` | planned | Speech-tokenizer attention honors the model's sliding windows | — |
 | `PA-17` | planned | Clone consent is enforced below the views | — |
 | `PA-18` | planned | Public claims match what each download ships | — |
@@ -499,7 +499,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-14`** (in-flight) — File I/O and error classification fail safely.
   gate: No legacy FileHandle write or readData remains on model, download or evidence paths (they raise Objective-C exceptions on a full disk); cancellation and allocation-retry decisions use typed errors, and MLX errors are captured instead of reaching fatalError.
 
-- **`PA-15`** (planned) — iOS stops generation safely when the app leaves the foreground.
+- **`PA-15`** (in-flight) — iOS stops generation safely when the app leaves the foreground.
   gate: On background with an active generation the app requests background time and cancels through the typed barrier (a single take is discarded, long-form keeps its completed segments), the screen stays awake while generating, the user is told on return, and a deferred background release never fires after returning; logic tests cover the policy and a physical-device run proves the cancel lands before GPU work is refused.
 
 - **`PA-16`** (planned) — Speech-tokenizer attention honors the model's sliding windows.

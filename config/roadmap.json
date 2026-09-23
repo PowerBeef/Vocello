@@ -1446,15 +1446,17 @@
     {
       "id": "PA-15",
       "title": "iOS stops generation safely when the app leaves the foreground",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "On background with an active generation the app requests background time and cancels through the typed barrier (a single take is discarded, long-form keeps its completed segments), the screen stays awake while generating, the user is told on return, and a deferred background release never fires after returning; logic tests cover the policy and a physical-device run proves the cancel lands before GPU work is refused.",
       "sourceOfTruth": [
         "Sources/iOS/QVoiceiOSApp.swift",
-        "Sources/iOS/TTSEngineStore.swift"
+        "Sources/iOS/TTSEngineStore.swift",
+        "Sources/iOSSupport/Services/IOSBackgroundGenerationPolicy.swift",
+        "Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift"
       ],
-      "notes": "External audit IOS-01 (High) and IOS-02, confirmed 2026-09-22 and stronger than written: beginBackgroundTask appears nowhere in Sources, isIdleTimerDisabled only in the diagnostics runner, and the .active handler never clears RuntimeReleaseCoordinator's pending background release. Maintainer decision 2026-09-22: cancel, keep finished long-form segments, notify on return. Alternative to record: BGContinuedProcessingTask with GPU background use could let long-form finish. Planned fix (2026-09-22 design): IOSBackgroundGenerationPolicy value types in iOSSupport (both test targets, macOS target, promotionRouting memory-runtime); on .background beginBackgroundTask then cancelActiveGeneration(.shutdown) then the deferred release; idle timer follows hasActiveGeneration; .active calls RuntimeReleaseCoordinator.cancelPendingRelease for the background reason; StudioGenerationCoordinator shows a notice (two new keys in all 10 locales).",
+      "notes": "External audit IOS-01 (High) and IOS-02, confirmed 2026-09-22. Maintainer decision 2026-09-22: cancel, keep finished long-form segments, notify on return. Code done 2026-09-23 (83552028, b79f5ae7, ad685eac): IOSBackgroundGenerationPolicy value types; on .background the app takes a background-task grant, runs the engine barrier with the shutdown reason, then cancels the take's task and runs the deferred release; the idle timer follows hasActiveGeneration; .active cancels the pending background release; Studio shows a notice on return. The single-take executor honours the attempt owner's accepted cancellation, so a take the barrier cancelled before its task is never completed, persisted or recorded as failed. Logic tests: IOSBackgroundGenerationPolicyTests, IOSSingleTakeGenerationExecutorTests. Open: the physical-device proof that the cancel lands before GPU work is refused (consent-bound). Alternative to record: BGContinuedProcessingTask with GPU background use could let long-form finish.",
       "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
+      "updated": "2026-09-23"
     },
     {
       "id": "PA-16",

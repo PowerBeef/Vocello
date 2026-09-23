@@ -97,6 +97,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         public var maxConnectionsPerHost = 6
         public var chunkSessionStrategy: ChunkSessionStrategy = .shared
         public var maxDownloadRetries = 3
+        /// Background sessions only. `nil` (the default) submits every missing range to
+        /// the daemon up front so each survives process death; a value drains ranges
+        /// through that many in-flight workers instead, like the foreground pool (the
+        /// PA-29 comparison arm: on one multiplexed connection, more in-flight ranges
+        /// add latency, not bandwidth). Unsubmitted ranges then wait for relaunch.
+        public var backgroundInFlightRangeLimit: Int?
         /// Bounded retries of one byte range after a transient failure (a network or
         /// transport error, a short or mismatched 206 body, HTTP 408/429/5xx) before the
         /// failure escalates to the file-level retry. Each retry re-requests only that
@@ -2473,7 +2479,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         relativePath: String,
         assembly: ChunkAssemblyCoordinator
     ) async throws {
-        if isBackgroundSession {
+        if isBackgroundSession, engineConfiguration.backgroundInFlightRangeLimit == nil {
             try await withThrowingTaskGroup(of: (any Error)?.self) { group in
                 for range in missing {
                     group.addTask { [self] in
@@ -2503,7 +2509,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
 
         let queue = ChunkWorkQueue(ranges: missing)
-        let workerCount = max(1, min(engineConfiguration.chunkWorkerCount, missing.count))
+        let poolSize = isBackgroundSession
+            ? engineConfiguration.backgroundInFlightRangeLimit ?? engineConfiguration.chunkWorkerCount
+            : engineConfiguration.chunkWorkerCount
+        let workerCount = max(1, min(poolSize, missing.count))
         do {
             try await withThrowingTaskGroup(of: (any Error)?.self) { group in
                 for workerIndex in 0..<workerCount {

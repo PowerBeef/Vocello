@@ -227,7 +227,9 @@ exact, and an optional per-worker-session mode defeats HTTP/2/3 connection coale
 (measured equivalent to the shared session on this CDN; kept as a diagnostic lever). The
 CLI A/B knob is `QVOICE_DOWNLOAD_ENGINE_PROFILE` (`legacy` | `chunked` |
 `chunked-multisession`, registered, and available only in an internal diagnostics build with
-`QWENVOICE_DEBUG`).
+`QWENVOICE_DEBUG`). The iOS app also accepts `chunked-bounded` (PA-29): on the background
+session it keeps at most four ranges per file in flight instead of submitting every range to the
+daemon up front.
 Since 2026-08-11 a chunked partial is crash-resumable: each landed range is recorded in a
 completed-range sidecar beside the partial (written atomically, after the bytes are in the
 partial), so a process death re-fetches only missing ranges; a missing or invalid sidecar

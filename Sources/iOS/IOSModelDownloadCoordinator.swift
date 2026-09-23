@@ -587,6 +587,10 @@ final class IOSModelDownloadCoordinator {
             // The default; multisession has no meaning on a background session
             // (every chunk task must ride the one persistent session).
             break
+        case "chunked-bounded":
+            // PA-29 comparison arm: at most four ranges per file in flight instead
+            // of submitting every range to the daemon up front.
+            engineConfig.backgroundInFlightRangeLimit = 4
         default:
             break
         }

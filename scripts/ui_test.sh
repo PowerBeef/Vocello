@@ -43,7 +43,7 @@ Usage:
   scripts/ui_test.sh ios perf [--label RUN_ID]
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
   scripts/ui_test.sh ios startup-parity --script-file UNTRACKED.txt
-  scripts/ui_test.sh ios model-download [--scenario diagnose|queue|acceptance|soak|recover] [--iterations 3] [--engine-profile legacy|chunked|chunked-multisession]
+  scripts/ui_test.sh ios model-download [--scenario diagnose|queue|acceptance|soak|recover] [--iterations 3] [--engine-profile legacy|chunked|chunked-multisession|chunked-bounded]
   scripts/ui_test.sh ios control-audit [--scenario inventory|stateful|external|accessibility|generation|all] [--take-limit 5] [--resume RUN_ID]
   scripts/ui_test.sh ios enroll-clone-fixture
   scripts/ui_test.sh ios saved-voice-lifecycle
@@ -237,8 +237,9 @@ elif [[ -n "$startup_parity_script_file" ]]; then
 fi
 if [[ -n "$engine_profile" ]]; then
   [[ "$lane" == "model-download" ]] || die "--engine-profile is accepted only by the model-download lane"
-  [[ "$engine_profile" == "legacy" || "$engine_profile" == "chunked" || "$engine_profile" == "chunked-multisession" ]] \
-    || die "--engine-profile must be legacy, chunked, or chunked-multisession"
+  [[ "$engine_profile" == "legacy" || "$engine_profile" == "chunked" || "$engine_profile" == "chunked-multisession" \
+      || "$engine_profile" == "chunked-bounded" ]] \
+    || die "--engine-profile must be legacy, chunked, chunked-multisession, or chunked-bounded"
 fi
 if [[ "$model_iterations" != 3 ]]; then
   [[ "$lane" == "model-download" ]] || die "--iterations is accepted only by the model-download lane"

@@ -268,7 +268,7 @@ scripts/ui_test.sh ios model-download --scenario queue
 scripts/ui_test.sh ios model-download --scenario acceptance
 scripts/ui_test.sh ios model-download --scenario soak --iterations 3
 scripts/ui_test.sh ios model-download --scenario recover
-scripts/ui_test.sh ios model-download --scenario acceptance --engine-profile legacy|chunked|chunked-multisession
+scripts/ui_test.sh ios model-download --scenario acceptance --engine-profile legacy|chunked|chunked-multisession|chunked-bounded
 
 # Opt-in diagnostic and acceptance lanes that never run in smoke, benchmark, CI, or release:
 scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]

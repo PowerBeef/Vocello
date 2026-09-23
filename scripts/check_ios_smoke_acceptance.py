@@ -264,6 +264,77 @@ def validate(root: Path, run_id: str) -> dict[str, Any]:
     }
 
 
+FOREGROUND_EXIT_EVENT = "generation_cancel_barrier_returned"
+
+
+def validate_foreground_exit(root: Path, run_id: str) -> dict[str, Any]:
+    """PA-15: a take interrupted by leaving the foreground was cancelled with
+    the typed `shutdown` reason, never failed, and the runtime generated again
+    after the barrier returned."""
+    if SAFE_RUN_ID.fullmatch(run_id) is None:
+        raise IOSSmokeAcceptanceError("run ID is not a privacy-safe diagnostic identifier")
+    if root.is_symlink() or not root.is_dir():
+        raise IOSSmokeAcceptanceError("diagnostics root is not one regular directory")
+
+    memory_rows, memory_mirror_count = _select_memory_rows(root, run_id)
+    events = [row.get("event") for row in memory_rows]
+    if any(
+        isinstance(event, str) and (event == "cancel_failed" or event.endswith("_cancel_failed"))
+        for event in events
+    ):
+        raise IOSSmokeAcceptanceError("foreground-exit cancellation reported cancel_failed")
+    barriers = [row for row in memory_rows if row.get("event") == FOREGROUND_EXIT_EVENT]
+    shutdown = [row for row in barriers if row.get("reason") == "shutdown"]
+    if len(shutdown) != 1 or len(barriers) != 1:
+        raise IOSSmokeAcceptanceError(
+            "expected exactly one cancellation barrier, with the shutdown reason"
+        )
+    barrier_at = _safe_timestamp(shutdown[0].get("recordedAt"), "barrier.recordedAt")
+
+    app_rows, app_mirror_count = _select_app_rows(root, run_id)
+    cancelled: list[datetime] = []
+    successful_after: list[tuple[datetime, dict[str, Any]]] = []
+    for row in app_rows:
+        if not isinstance(row.get("schemaVersion"), int) or row["schemaVersion"] < 8:
+            raise IOSSmokeAcceptanceError("app telemetry must use schema v8 or newer")
+        if row.get("layer") != "app":
+            raise IOSSmokeAcceptanceError("selected app telemetry has the wrong layer")
+        recorded_at = _safe_timestamp(row.get("recordedAt"), "app.recordedAt")
+        finish_reason = _normal_finish_reason(row.get("finishReason"))
+        if finish_reason in CANCELLED_FINISH_REASONS:
+            cancelled.append(recorded_at)
+        elif finish_reason in SUCCESS_FINISH_REASONS:
+            if recorded_at > barrier_at:
+                successful_after.append((recorded_at, row))
+        else:
+            raise IOSSmokeAcceptanceError(
+                "a foreground-exit run must record no failed app generation"
+            )
+    if len(cancelled) != 1:
+        raise IOSSmokeAcceptanceError("expected exactly one cancelled app generation")
+    if not successful_after:
+        raise IOSSmokeAcceptanceError(
+            "no successful app generation completed after the foreground-exit barrier"
+        )
+    successful_after.sort(key=lambda item: item[0])
+    completed_at, row = successful_after[0]
+    generation_id = row.get("generationID")
+    if not isinstance(generation_id, str) or not generation_id:
+        raise IOSSmokeAcceptanceError("post-exit app generation ID is missing")
+    return {
+        "schemaVersion": 1,
+        "status": "pass",
+        "scenario": "foreground-exit",
+        "runID": run_id,
+        "cancellationReason": "shutdown",
+        "memoryMirrorCount": memory_mirror_count,
+        "appMirrorCount": app_mirror_count,
+        "cancelledGenerationCount": len(cancelled),
+        "postExitGenerationID": generation_id,
+        "postExitCompletedAt": completed_at.isoformat().replace("+00:00", "Z"),
+    }
+
+
 def validate_history_observation(root: Path, run_id: str, row_id: str) -> dict[str, Any]:
     """Collect one private XCUI value; do not turn observation into audio acceptance."""
     if not SAFE_RUN_ID.fullmatch(run_id) or not re.fullmatch(r"generation-[0-9]+", row_id):
@@ -318,12 +389,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("diagnostics_root", type=Path)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--history-row-id")
+    parser.add_argument("--scenario", choices=("foreground-exit",))
     args = parser.parse_args(argv)
     try:
-        result = (
-            validate_history_observation(args.diagnostics_root, args.run_id, args.history_row_id)
-            if args.history_row_id else validate(args.diagnostics_root, args.run_id)
-        )
+        if args.history_row_id:
+            result = validate_history_observation(
+                args.diagnostics_root, args.run_id, args.history_row_id
+            )
+        elif args.scenario == "foreground-exit":
+            result = validate_foreground_exit(args.diagnostics_root, args.run_id)
+        else:
+            result = validate(args.diagnostics_root, args.run_id)
     except IOSSmokeAcceptanceError as error:
         print(f"iOS smoke acceptance FAIL: {error}", file=sys.stderr)
         return 1

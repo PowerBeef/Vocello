@@ -36,6 +36,7 @@ Usage:
   scripts/ui_test.sh ios localization
   scripts/ui_test.sh ios smoke
   scripts/ui_test.sh ios smoke --scenario history-transcript --history-row-id generation-N [--retain-result]
+  scripts/ui_test.sh ios smoke --scenario foreground-exit
   scripts/ui_test.sh ios smoke --preinstalled-candidate VERIFIED_RELEASE_DIRECTORY [--retain-result]
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
   scripts/ui_test.sh ios perf [--label RUN_ID]
@@ -180,9 +181,10 @@ elif [[ "$lane" == "screen-protection" ]]; then
   [[ "$scenario_argument" == "inspect" || "$scenario_argument" == "enable" ]] \
     || die "screen-protection --scenario must be inspect or enable"
 elif [[ "$platform" == "ios" && "$lane" == "smoke" && -n "$scenario_argument" ]]; then
-  [[ "$scenario_argument" == "history-transcript" && -z "$candidate_evidence" ]] \
-    || die "development iOS smoke --scenario accepts only history-transcript"
-  [[ "$history_row_id" =~ ^generation-[0-9]+$ ]] \
+  [[ ( "$scenario_argument" == "history-transcript" || "$scenario_argument" == "foreground-exit" ) \
+      && -z "$candidate_evidence" ]] \
+    || die "development iOS smoke --scenario accepts only history-transcript or foreground-exit"
+  [[ "$scenario_argument" != "history-transcript" || "$history_row_id" =~ ^generation-[0-9]+$ ]] \
     || die "history-transcript requires an exact --history-row-id generation-N"
 elif [[ "$platform" == "macos" && "$lane" == "smoke" && -n "$scenario_argument" ]]; then
   [[ "$scenario_argument" == "layout" || "$scenario_argument" == "studio-content" || "$scenario_argument" == "generation-errors" ]] \
@@ -385,6 +387,9 @@ if payload["lane"] == "marketing":
     payload["lengths"] = []
 if payload["platform"] == "macos" and payload["lane"] == "smoke" and sys.argv[20]:
     payload["scenario"] = sys.argv[20]
+    payload["evidenceClass"] = "focused-smoke"
+if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "foreground-exit":
+    payload["scenario"] = "foreground-exit"
     payload["evidenceClass"] = "focused-smoke"
 if sys.argv[13]:
     payload["treeFingerprint"] = sys.argv[13]
@@ -1237,8 +1242,10 @@ validate_ios_smoke() {
   local diagnostics="$out/diagnostics"
   pull_ios_run_diagnostics "$device" "$run_id" "$diagnostics" \
     "$out/smoke-diagnostics-pull.log" || return 1
+  local -a scenario_args=()
+  [[ "$scenario_argument" != "foreground-exit" ]] || scenario_args=(--scenario foreground-exit)
   python3 "$ROOT_DIR/scripts/check_ios_smoke_acceptance.py" "$diagnostics" \
-    --run-id "$run_id" | tee "$out/smoke-gate.txt"
+    --run-id "$run_id" ${scenario_args[@]+"${scenario_args[@]}"} | tee "$out/smoke-gate.txt"
 }
 
 validate_ios_ui_perf() {
@@ -1539,6 +1546,9 @@ else
     if [[ "$scenario_argument" == "history-transcript" ]]; then
       only_test="VocelloiOSUITests/VocelloiOSHistoryObservationUITests/testRetainedHistoryTranscript"
       export TEST_RUNNER_QVOICE_IOS_HISTORY_OBSERVATION_ROW_ID="$history_row_id"
+    elif [[ "$scenario_argument" == "foreground-exit" ]]; then
+      # PA-15: leaving the foreground mid-take cancels it with `shutdown`.
+      only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testForegroundExitCancelsGeneration"
     fi
     export TEST_RUNNER_QVOICE_IOS_SMOKE_RUN_ID="$run_id"
   elif [[ "$lane" == "benchmark" ]]; then
@@ -1613,7 +1623,7 @@ else
   fi
 
   test_selection_args=("-only-testing:$only_test")
-  if [[ "$lane" == "smoke" && "$scenario_argument" != "history-transcript" ]]; then
+  if [[ "$lane" == "smoke" && -z "$scenario_argument" ]]; then
     test_selection_args+=("-only-testing:VocelloiOSUITests/VocelloiOSSmokeUITests/testZLongFormProjectJourney")
   fi
   note "physical-iPhone XCUITest $lane on $device → $out"

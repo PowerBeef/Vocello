@@ -105,11 +105,46 @@ class IOSSmokeAcceptanceTests(unittest.TestCase):
             ["ios", "smoke", "--scenario", "history-transcript"],
             ["ios", "smoke", "--history-row-id", "generation-7"],
             ["ios", "smoke", "--scenario", "history-transcript", "--history-row-id", "../private"],
+            ["ios", "smoke", "--scenario", "foreground-exit", "--history-row-id", "generation-7"],
         ):
             result = subprocess.run(["bash", str(ROOT / "scripts/ui_test.sh"), *args],
                                     capture_output=True, text=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertNotIn("xcodebuild completed", result.stderr)
+
+    def run_foreground_exit(self, memory: list[dict], app: list[dict]) -> subprocess.CompletedProcess[str]:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_jsonl(root / "pull" / RUN_ID / "memory-contexts.jsonl", memory)
+            write_jsonl(root / "pull" / "app" / "generations.jsonl", app)
+            return subprocess.run(
+                [sys.executable, str(CHECKER), str(root), "--run-id", RUN_ID,
+                 "--scenario", "foreground-exit"],
+                text=True, capture_output=True, check=False,
+            )
+
+    def test_foreground_exit_requires_one_shutdown_barrier_then_reuse(self) -> None:
+        barrier = memory_row("generation_cancel_barrier_returned", 3, reason="shutdown")
+        cancelled = app_row("interrupted", 2, finish_reason="cancelled")
+        reused = app_row("reused", 9)
+        result = self.run_foreground_exit([barrier], [cancelled, reused])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["cancellationReason"], "shutdown")
+        self.assertEqual(report["postExitGenerationID"], "reused")
+
+        user_barrier = barrier | {"reason": "user"}
+        for memory, app in (
+            ([user_barrier], [cancelled, reused]),
+            ([], [cancelled, reused]),
+            ([barrier, barrier], [cancelled, reused]),
+            ([barrier, memory_row("critical_generation_cancel_failed", 4)], [cancelled, reused]),
+            ([barrier], [reused]),
+            ([barrier], [cancelled]),
+            ([barrier], [cancelled, app_row("before", 1), ]),
+            ([barrier], [cancelled, app_row("failed", 8, finish_reason="failed"), reused]),
+        ):
+            self.assertNotEqual(self.run_foreground_exit(memory, app).returncode, 0)
 
     def run_checker(self, root: Path, run_id: str = RUN_ID) -> subprocess.CompletedProcess[str]:
         return subprocess.run(

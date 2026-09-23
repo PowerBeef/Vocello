@@ -388,6 +388,86 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         VocelloUIScreenshot.attach(app, named: "ios-smoke-history")
     }
 
+    /// PA-15 foreground-exit proof: leaving the app mid-take cancels the
+    /// attempt through the typed barrier with the `shutdown` reason before iOS
+    /// suspends GPU work, the take never reaches History, the return notice
+    /// shows, and the runtime generates again. The typed reason and ordering
+    /// are validated from pulled run-scoped diagnostics by `scripts/ui_test.sh`.
+    func testForegroundExitCancelsGeneration() {
+        let runnerEnvironment = ProcessInfo.processInfo.environment
+        guard let runID = runnerEnvironment["QVOICE_IOS_SMOKE_RUN_ID"],
+              !runID.isEmpty else {
+            XCTFail("Foreground-exit proof requires a run-scoped diagnostics identity")
+            return
+        }
+        beginSession(additionalEnvironment: [
+            "QVOICE_IOS_DEVICE_RUN_ID": runID,
+            "QVOICE_MAC_BENCH_RUN_ID": runID,
+        ])
+        defer { endSession() }
+
+        XCTAssertTrue(VocelloUIWait.exists(element("textInput_textEditor"), timeout: 20))
+        assertVisibleModelReadiness()
+        _ = ensureAutoplayEnabled()
+        prepare(mode: .custom)
+        let nonce = String(
+            UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)
+        ).lowercased()
+        let exitToken = "background\(nonce)"
+        let completionToken = "resume\(nonce)"
+        let exitPrefix = "Background \(exitToken). "
+        let exitPrompt = exitPrefix + String(
+            VocelloUIBenchMatrix.text(for: .long).prefix(150 - exitPrefix.count)
+        )
+
+        replaceScript(with: exitPrompt)
+        startGenerationAndWaitForLivePreview()
+        VocelloUIScreenshot.attach(app, named: "ios-foreground-exit-active")
+
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(
+            VocelloUIWait.condition("app to leave the foreground", timeout: 20) {
+                self.app.state != .runningForeground
+            }
+        )
+        // Long enough for the barrier, the deferred release and suspension.
+        _ = XCTWaiter.wait(for: [XCTestExpectation(description: "background dwell")], timeout: 10)
+        app.activate()
+        XCTAssertTrue(
+            VocelloUIWait.condition("app to return to the foreground", timeout: 30) {
+                self.app.state == .runningForeground
+            }
+        )
+
+        let generate = element("textInput_generateButton")
+        XCTAssertTrue(
+            VocelloUIWait.exists(element("textInput_backgroundNotice"), timeout: 30),
+            "Returning after a foreground exit must show the interruption notice"
+        )
+        XCTAssertFalse(element("studio_livePreview_cancel").exists)
+        XCTAssertFalse(element("studio_inlinePlayer_playPause").exists,
+                       "The interrupted take must be discarded, never published")
+        XCTAssertFalse(element("textInput_generationError").exists,
+                       "A foreground-exit cancellation is not a failure")
+        XCTAssertTrue(VocelloUIWait.enabled(generate, timeout: 60))
+        VocelloUIScreenshot.attach(app, named: "ios-foreground-exit-returned")
+
+        replaceScript(with: "Resume \(completionToken). The train left the station at dawn.")
+        _ = generateAndWaitForCompletedPlayer(timeout: 240)
+        VocelloUIScreenshot.attach(app, named: "ios-foreground-exit-reused")
+
+        replaceHistorySearch(with: completionToken)
+        XCTAssertTrue(
+            VocelloUIWait.condition("completed take to appear exactly once in History", timeout: 30) {
+                self.historyRows().count == 1
+            }
+        )
+        replaceHistorySearch(with: exitToken)
+        XCTAssertTrue(VocelloUIWait.exists(element("history_noMatchesState"), timeout: 30))
+        XCTAssertEqual(historyRows().count, 0,
+                       "A take cancelled by leaving the foreground must never reach History")
+    }
+
     private func assertAccessibilityControl(
         _ control: XCUIElement,
         named name: String,

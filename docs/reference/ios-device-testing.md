@@ -90,6 +90,20 @@ audio-quality, restoration or candidate acceptance. The separate required-step w
 source identity, XCUITest status and crash collection without requiring a fabricated pressure event.
 It is unavailable in preinstalled-candidate mode. Normal smoke remains unchanged.
 
+The PA-15 foreground-exit proof is a second focused smoke scenario:
+
+```sh
+scripts/ui_test.sh ios smoke --scenario foreground-exit
+```
+
+It starts a Built-in take, presses Home once the live preview streams, waits in the background and
+returns. The notice (`textInput_backgroundNotice`) must show, no player or error may remain, a new
+take must complete and appear once in History, and the interrupted take must never appear. The
+pulled run-scoped diagnostics must hold exactly one `generation_cancel_barrier_returned` record with
+reason `shutdown`, no `*_cancel_failed` event, exactly one cancelled app generation and no failed
+one, and a successful generation after the barrier (`check_ios_smoke_acceptance.py --scenario
+foreground-exit`).
+
 The long-form acceptance fixture removes its final separator space before entry so exact joined
 History comparisons use canonical input. Do not normalize the observed player value or ignore
 missing words/punctuation. On mismatch, the shared verifier retains the actual value before dismissal;

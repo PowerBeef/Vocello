@@ -321,6 +321,14 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
 
     func cancelActiveGeneration(reason: GenerationCancellationReason = .user) async throws {
         try await backend.cancelActiveGeneration(reason: reason)
+        // Run-scoped device diagnostics only (inert otherwise): the typed
+        // reason once the barrier has returned, which the foreground-exit
+        // proof reads back.
+        diagnosticsRecorder?.recordAction(
+            event: "generation_cancel_barrier_returned",
+            reason: reason.rawValue,
+            context: nil
+        )
         // The backend call is the terminal barrier. Keep ownership intact if
         // it throws so no observer can mistake a cancellation request for
         // proven compute termination and begin trimming live MLX state.

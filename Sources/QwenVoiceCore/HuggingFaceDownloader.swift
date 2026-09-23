@@ -1577,6 +1577,15 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             // narrow race before it durably records deletion.
             try await throwIfCancellationRequested()
             Self.markExcludedFromBackup(targetDir)
+            // Every file was just verified against its catalog SHA-256; hand those
+            // same-process receipts to the status store so its first content pass
+            // does not hash the fresh install again (PA-11).
+            for (relativePath, receipt) in await state.verifiedReceipts() {
+                guard let installedURL = try? Self.validatedDestinationURL(for: relativePath, in: targetDir) else {
+                    continue
+                }
+                LocalModelAssetStore.recordVerifiedDigest(for: installedURL, receipt: receipt)
+            }
             try? fileManager.removeItem(at: stagingRoot)
             let transferAccounting = await state.repositoryTransferAccounting()
             await state.finishRepositoryDownload()

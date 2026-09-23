@@ -3653,6 +3653,22 @@
         "commit:cca65851",
         "file:Tests/VocelloCoreTests/PreparedVoiceRepositoryTests.swift"
       ]
+    },
+    {
+      "id": "PA-11",
+      "title": "macOS launch never hashes models on the main thread",
+      "status": "done",
+      "gate": "App launch and model-manager status on the main actor check manifests and sizes only; content digests are verified in the background, and a freshly downloaded file is not hashed a second time; a unit test proves the shallow path does not hash.",
+      "sourceOfTruth": [
+        "Sources/ViewModels/ModelManagerViewModel.swift",
+        "Sources/QwenVoiceCore/ModelAssets.swift"
+      ],
+      "notes": "Closed 2026-09-22 (external audit MAC-01). LocalModelAssetStore.deepIntegrity takes an explicit depth: .manifestSizes (manifest, shared identity, regular file, size; never opens contents, proven with an unreadable file) on every main-actor ModelManagerViewModel path, .contentDigest only in the detached refresh that ContentView starts at launch. The downloader seeds the digest cache from its same-process receipts when size, mtime and inode still match, so a fresh model-specific file is not hashed twice. A refresh requested mid-pass reruns, and a pass skips models mutated after it started. Residual, accepted: until the launch pass finishes a same-size corrupted install shows as complete; shared-component files (hard links to verified blobs) are hashed once more; the cache is per process, so each launch re-verifies in the background.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-22",
+      "evidence": [
+        "file:Tests/VocelloCoreTests/LocalModelAssetStoreIntegrityTests.swift"
+      ]
     }
   ]
 }

@@ -148,6 +148,13 @@ final class ModelManagerViewModel {
     private var stateEpochs: [String: Int] = [:]
     private var lastProgressPublishTimes: [String: ContinuousClock.Instant] = [:]
     private var refreshTask: Task<Void, Never>?
+    /// A refresh asked for while one is in flight (a mutation finished during the
+    /// launch content pass): the running task makes one more pass before it ends.
+    private var refreshRequestedDuringFlight = false
+    /// Bumped whenever a model's files change under this view model (download,
+    /// delete, cancel). A refresh pass skips models mutated after it started, so a
+    /// long content-digest pass never overwrites a newer mutation (PA-11).
+    private var mutationGenerations: [String: Int] = [:]
     private var recommendedSetupTask: Task<Void, Never>?
     private var lastFailureMessages: [String: String] = [:]
     /// Maximum number of models downloaded at the same time. Each model runs its own
@@ -178,6 +185,7 @@ final class ModelManagerViewModel {
 
     func refresh() async {
         if let refreshTask {
+            refreshRequestedDuringFlight = true
             await refreshTask.value
             return
         }
@@ -185,7 +193,10 @@ final class ModelManagerViewModel {
         let task = Task { @MainActor in
             let interval = AppPerformanceSignposts.begin("Model Status Refresh")
             let wallStart = DispatchTime.now().uptimeNanoseconds
-            await performRefresh()
+            repeat {
+                refreshRequestedDuringFlight = false
+                await performRefresh()
+            } while refreshRequestedDuringFlight
             AppPerformanceSignposts.end(interval)
             if DebugMode.isEnabled {
                 let elapsedMs = Int((DispatchTime.now().uptimeNanoseconds - wallStart) / 1_000_000)
@@ -667,8 +678,10 @@ final class ModelManagerViewModel {
             downloadPlan = try TTSContract.productionDownloadPlan(for: model)
         } catch {
             lastFailureMessages[modelID] = error.localizedDescription
+            // Reuse the last full snapshot: a fresh main-actor snapshot is size-only
+            // and would hide a digest failure the background pass already found.
             statuses[modelID] = status(
-                for: localModelInfo(for: model),
+                for: modelInfoByID[modelID] ?? localModelInfo(for: model),
                 failureMessage: error.localizedDescription
             )
             startPendingDownloads()
@@ -897,24 +910,30 @@ final class ModelManagerViewModel {
 
     private func performRefresh() async {
         let modelsDirectory = modelsDirectory
+        let startedGenerations = mutationGenerations
         let snapshots = await Task.detached(priority: .utility) {
             Self.fetchSnapshots(in: modelsDirectory)
         }.value
-        applySnapshots(snapshots)
+        applySnapshots(snapshots, startedGenerations: startedGenerations)
     }
 
+    /// The only content-digest pass: detached, off the main actor. The launch
+    /// refresh from ContentView runs it once in the background.
     private nonisolated static func fetchSnapshots(in modelsDirectory: URL) -> [ModelInfo] {
         TTSModel.all.map { model in
-            localModelInfo(for: model, modelsDirectory: modelsDirectory)
+            localModelInfo(for: model, modelsDirectory: modelsDirectory, depth: .contentDigest)
         }
     }
 
-    private func applySnapshots(_ snapshots: [ModelInfo]) {
+    private func applySnapshots(_ snapshots: [ModelInfo], startedGenerations: [String: Int]) {
         let snapshotByID = Dictionary(uniqueKeysWithValues: snapshots.map { ($0.id, $0) })
-        modelInfoByID = snapshotByID
 
         for model in TTSModel.all {
             let id = model.id
+            // A model mutated while this pass ran keeps its newer local snapshot; the
+            // follow-up pass requested by the mutation verifies it.
+            if mutationGenerations[id, default: 0] != startedGenerations[id, default: 0] { continue }
+            if let snapshot = snapshotByID[id] { modelInfoByID[id] = snapshot }
             // A download in flight owns its row status — don't let a disk snapshot refresh
             // overwrite it.
             if case .downloading = statuses[id] { continue }
@@ -947,6 +966,7 @@ final class ModelManagerViewModel {
     }
 
     private func handleMutationCompletion(for modelID: String) async {
+        mutationGenerations[modelID, default: 0] += 1
         downloaders.removeValue(forKey: modelID)
         downloadTasks.removeValue(forKey: modelID)
         lastProgressPublishTimes.removeValue(forKey: modelID)
@@ -961,13 +981,17 @@ final class ModelManagerViewModel {
         scheduleRefreshIfPossible()
     }
 
+    /// Main-actor snapshot: manifest, identity and sizes only, never a content
+    /// digest, so launch and status updates never read gigabytes on the main
+    /// thread (PA-11). The detached refresh verifies digests.
     private func localModelInfo(for model: TTSModel) -> ModelInfo {
-        Self.localModelInfo(for: model, modelsDirectory: modelsDirectory)
+        Self.localModelInfo(for: model, modelsDirectory: modelsDirectory, depth: .manifestSizes)
     }
 
-    private nonisolated static func localModelInfo(
+    nonisolated static func localModelInfo(
         for model: TTSModel,
-        modelsDirectory: URL
+        modelsDirectory: URL,
+        depth: ModelAssetIntegrityDepth
     ) -> ModelInfo {
         let fileManager = FileManager.default
         let modelDirectory = model.installDirectory(in: modelsDirectory)
@@ -1008,7 +1032,7 @@ final class ModelManagerViewModel {
                 descriptors: [descriptor],
                 storeVersionSeed: "status"
             )
-            deepIntegrity = store.deepIntegrity(for: descriptor)
+            deepIntegrity = store.deepIntegrity(for: descriptor, depth: depth)
         } else {
             deepIntegrity = nil
         }

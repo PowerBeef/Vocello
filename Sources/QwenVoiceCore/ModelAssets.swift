@@ -170,6 +170,16 @@ public struct ModelAssetIntegrityManifest: Hashable, Codable, Sendable {
     }
 }
 
+/// How deep `LocalModelAssetStore.deepIntegrity` looks. `.manifestSizes` checks the
+/// integrity manifest, the shared-component identity, that each file is a regular file
+/// and its size, and never reads file contents, so it is safe on the main actor.
+/// `.contentDigest` also verifies each file's SHA-256 (cached per path, size and
+/// modification date), which reads gigabytes and belongs off the main actor.
+public enum ModelAssetIntegrityDepth: Sendable {
+    case manifestSizes
+    case contentDigest
+}
+
 public enum ModelAssetDeepIntegrity: Hashable, Codable, Sendable {
     case unavailable(reason: String)
     case verified(checkedFiles: Int)
@@ -319,7 +329,11 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
         )
     }
 
-    public func deepIntegrity(for descriptor: ModelAssetDescriptor) -> ModelAssetDeepIntegrity {
+    /// The depth is explicit so no main-actor caller can hash model files by accident.
+    public func deepIntegrity(
+        for descriptor: ModelAssetDescriptor,
+        depth: ModelAssetIntegrityDepth
+    ) -> ModelAssetDeepIntegrity {
         let root = localRoot(for: descriptor)
         let manifestURL = root.appendingPathComponent(ModelAssetIntegrityManifest.filename, isDirectory: false)
         guard let manifestData = try? Data(contentsOf: manifestURL) else {
@@ -377,7 +391,7 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
                 failures.append(entry.path)
                 continue
             }
-            if let expectedHash = Self.normalizedSHA256(entry.sha256) {
+            if depth == .contentDigest, let expectedHash = Self.normalizedSHA256(entry.sha256) {
                 guard let actualHash = Self.integrityHashCache.cachedSHA256(for: url),
                       actualHash == expectedHash else {
                     failures.append(entry.path)
@@ -458,6 +472,22 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
         try FileStreamIO.sha256Hex(of: url)
     }
 
+    /// Seeds the digest cache with a SHA-256 this process already verified while
+    /// downloading (a same-process receipt), so the first content pass does not hash a
+    /// freshly installed file again. Recorded only while the installed file is still the
+    /// verified one: same size, modification time and, when known, file identifier.
+    @discardableResult
+    static func recordVerifiedDigest(for url: URL, receipt: VerifiedArtifactReceipt) -> Bool {
+        guard let expected = normalizedSHA256(receipt.expectedSHA256) else { return false }
+        return integrityHashCache.record(
+            sha256: expected,
+            for: url,
+            size: receipt.fileSize,
+            modificationTimeNanoseconds: receipt.modificationTimeNanoseconds,
+            fileIdentifier: receipt.fileIdentifier
+        )
+    }
+
     private static func cleanupLegacyInstallFolders(
         at rootDirectory: URL,
         activeInstallFolders: Set<String>,
@@ -522,6 +552,50 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
             entries[key] = Entry(size: size, modificationDate: modificationDate, sha256: computed)
             lock.unlock()
             return computed
+        }
+
+        /// Stores an already-verified digest when the file on disk still matches the
+        /// verified size, modification time and file identifier; otherwise leaves the
+        /// cache alone so the next content pass hashes the file.
+        func record(
+            sha256: String,
+            for url: URL,
+            size: Int64,
+            modificationTimeNanoseconds: Int64,
+            fileIdentifier: UInt64?
+        ) -> Bool {
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+                  let currentSize = (attributes[.size] as? NSNumber)?.int64Value,
+                  let modificationDate = attributes[.modificationDate] as? Date,
+                  currentSize == size,
+                  Int64(modificationDate.timeIntervalSince1970 * 1_000_000_000) == modificationTimeNanoseconds
+            else {
+                return false
+            }
+            if let fileIdentifier,
+               (attributes[.systemFileNumber] as? NSNumber)?.uint64Value != fileIdentifier {
+                return false
+            }
+            // The lookup side keys on resource values; store the same representation,
+            // and re-check the attributes so a file replaced between the two reads is
+            // never stored under the new file's metadata.
+            guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]),
+                  let fileSize = values.fileSize,
+                  let recheck = try? FileManager.default.attributesOfItem(atPath: url.path),
+                  (recheck[.size] as? NSNumber)?.int64Value == size,
+                  (recheck[.modificationDate] as? Date) == modificationDate,
+                  (recheck[.systemFileNumber] as? NSNumber)?.uint64Value
+                      == (attributes[.systemFileNumber] as? NSNumber)?.uint64Value else {
+                return false
+            }
+            lock.lock()
+            entries[url.path] = Entry(
+                size: Int64(fileSize),
+                modificationDate: values.contentModificationDate ?? .distantPast,
+                sha256: sha256
+            )
+            lock.unlock()
+            return true
         }
     }
 }

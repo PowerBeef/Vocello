@@ -1444,19 +1444,6 @@
       "updated": "2026-09-22"
     },
     {
-      "id": "PA-11",
-      "title": "macOS launch never hashes models on the main thread",
-      "status": "planned",
-      "gate": "App launch and model-manager status on the main actor check manifests and sizes only; content digests are verified in the background, and a freshly downloaded file is not hashed a second time; a unit test proves the shallow path does not hash.",
-      "sourceOfTruth": [
-        "Sources/ViewModels/ModelManagerViewModel.swift",
-        "Sources/QwenVoiceCore/ModelAssets.swift"
-      ],
-      "notes": "External audit MAC-01 (High), confirmed 2026-09-22: QwenVoiceApp creates ModelManagerViewModel, whose init calls localModelInfo for all six variants and deepIntegrity SHA-256s every installed file (about 6.2 GB for the three Speed variants, 14.65 GB for all six) on the main actor before the first window; the hash cache is per-process, so every cold launch re-hashes; the post-download path hashes again on the main actor although the downloader already verified the files. Planned fix (2026-09-22 design): LocalModelAssetStore.deepIntegrity(for:depth:) with .manifestSizes (manifest, identity, regular file, size, no SHA) and .contentDigest; every main-actor ModelManagerViewModel path uses .manifestSizes, only the detached performRefresh hashes, one background pass starts after launch; seed IntegrityHashCache from the downloader's same-process receipts (size, mtime, inode) so a fresh download is not hashed twice. Test: LocalModelAssetStoreIntegrityTests.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
-    },
-    {
       "id": "PA-13",
       "title": "Quality-first decoding keeps every generated frame",
       "status": "planned",

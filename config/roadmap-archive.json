@@ -3741,6 +3741,60 @@
       "evidence": [
         "commit:d4bef3e2"
       ]
+    },
+    {
+      "id": "PA-02",
+      "title": "P2 — make the owned package's diagnostics gate require the internal build capability",
+      "status": "done",
+      "gate": "QVOICE_TALKER_KV_QUANT, QWENVOICE_SAMPLER_COMPILE and QWENVOICE_TOKENIZER_RESIDENCY have no effect in a distribution app or CLI even with QWENVOICE_DEBUG set; runtime_security_contract.py and a unit test prove it.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/RuntimeDebugGate.swift",
+        "config/runtime-debug-knobs.json"
+      ],
+      "notes": "Closed 2026-09-23 (external audit SEC-06). The product tells the owned package on every load whether the build has the internal-diagnostics capability (VocelloQwen3LoadBehavior.internalDiagnosticsAvailable, set only from RuntimeDebugGate.internalDiagnosticsAvailable; defaults to false, so a consumer that passes nothing gets every override disabled). VocelloQwen3ImplementationDebugGate refuses before reading QWENVOICE_DEBUG without it. QVOICE_TALKER_KV_QUANT and QWENVOICE_TOKENIZER_RESIDENCY moved from process-lifetime statics to an immutable per-load Qwen3LoadTimeDiagnosticOverrides value (no new shared state); QWENVOICE_SAMPLER_COMPILE and its never-read samplerCompileEnabled were deleted and deregistered. runtime_security_contract.py checks the gate's structure and every call site; package tests prove the knobs are inert without the capability even with QWENVOICE_DEBUG=1.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-23",
+      "evidence": [
+        "commit:bdeacabc",
+        "commit:abdee0be",
+        "file:Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests/Qwen3SpeechTokenizerResidencyTests.swift"
+      ]
+    },
+    {
+      "id": "PA-23",
+      "title": "Pull requests get the Linux checks",
+      "status": "done",
+      "gate": "A pull_request trigger runs contracts, Python and website for Dependabot and outside PRs while own work stays direct to main, and Dependabot action bumps update config/toolchain.json in the same PR.",
+      "sourceOfTruth": [
+        ".github/workflows/ci.yml",
+        "config/toolchain.json"
+      ],
+      "notes": "Closed 2026-09-23 (external audit CI-04, CI-05, REPO-05, SEC-17). ci.yml gains a pull_request trigger (never pull_request_target) that runs only contracts, Python and website with the read-only token and no secrets; the macOS jobs skip by event and CI required aggregates the Linux lanes. PR runs are routed on their merge commit against the base and never become a lane's green base. A Dependabot action bump fails its own first contracts step with the fix: run python3 scripts/supply_chain_contract.py --sync-actions on the PR branch (CI never writes back, so no write token touches PR code). First PR run still to be observed on the next Dependabot PR.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-23",
+      "evidence": [
+        "commit:6a39e64f",
+        "file:scripts/tests/test_classify_changes.py",
+        "file:scripts/tests/test_supply_chain_contract.py"
+      ]
+    },
+    {
+      "id": "PA-24",
+      "title": "Push CI compiles the XCUITest bundles",
+      "status": "done",
+      "gate": "Push CI builds the macOS and iOS UI-test bundles for testing without running them, and scripts/repo_invariants.sh check 2 plus the native and release rules forbid execution, not compilation.",
+      "sourceOfTruth": [
+        "scripts/repo_invariants.sh",
+        "scripts/build_ui_test_bundles.sh",
+        ".github/workflows/ci.yml"
+      ],
+      "notes": "Closed 2026-09-23 (external audit CI-07). Push CI compiles both XCUITest bundles without running them: macos-tests and ios-compile run scripts/build_ui_test_bundles.sh macos|ios --gate, build-for-testing in the arena the deterministic build just warmed with its exact settings, so only the UI-test target compiles (first run on ff301d4f: 14 and 18 SwiftCompile tasks). repo_invariants.sh check 2 now forbids execution (test-without-building, scripts/ui_test.sh, an xcodebuild/xcb_run test action) instead of naming the schemes; scripts/dev.sh ci replays the gate compile; native and release rules updated.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-23",
+      "evidence": [
+        "commit:ed922fc5",
+        "run:35819551595"
+      ]
     }
   ]
 }

@@ -22,7 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 10/28 (36%) |
+| `project-audit-2026-09` | active | backend-and-platform | 13/28 (46%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -452,7 +452,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `PA-02` | planned | P2 — make the owned package's diagnostics gate require the internal build capability | — |
 | `PA-05` | in-flight | Release path works end to end and is rehearsed | — |
 | `PA-06` | planned | Routing cost and derived-artifact gaps | — |
 | `PA-07` | planned | Remove dead engine, downloader and XPC-era code | — |
@@ -466,15 +465,10 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-20` | planned | Accessibility and localization reach every surface | — |
 | `PA-21` | planned | iOS lifecycle, audio session and startup are recoverable | — |
 | `PA-22` | planned | Core storage and memory lifecycle is bounded | — |
-| `PA-23` | planned | Pull requests get the Linux checks | — |
-| `PA-24` | planned | Push CI compiles the XCUITest bundles | — |
 | `PA-25` | planned | Docs and tooling stay proportional | — |
 | `PA-26` | planned | Low-severity backlog from the external audit | — |
 
 ### Open items in detail
-
-- **`PA-02`** (planned) — P2 — make the owned package's diagnostics gate require the internal build capability.
-  gate: QVOICE_TALKER_KV_QUANT, QWENVOICE_SAMPLER_COMPILE and QWENVOICE_TOKENIZER_RESIDENCY have no effect in a distribution app or CLI even with QWENVOICE_DEBUG set; runtime_security_contract.py and a unit test prove it.
 
 - **`PA-05`** (in-flight) — Release path works end to end and is rehearsed.
   gate: release.yml selects Xcode and installs every pinned tool (numpy, pytest, pytest-xdist, gh) through .github/actions/native-toolchain, a secrets-free ad-hoc release rehearsal workflow runs release.sh and the packaged-DMG verification on a schedule and on release-input changes and is green, and the TestFlight upload command is confirmed supported by the pinned Xcode.
@@ -514,12 +508,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-22`** (planned) — Core storage and memory lifecycle is bounded.
   gate: Clone-reference caching keys on the same fingerprint it stores, derived clone prompts follow their voice's lifecycle and backup class, all memory trims share one admission gate with load epochs, shared components and trash are pruned, and the prepared-model overlay lives outside the model folder.
-
-- **`PA-23`** (planned) — Pull requests get the Linux checks.
-  gate: A pull_request trigger runs contracts, Python and website for Dependabot and outside PRs while own work stays direct to main, and Dependabot action bumps update config/toolchain.json in the same PR.
-
-- **`PA-24`** (planned) — Push CI compiles the XCUITest bundles.
-  gate: Push CI builds the macOS and iOS UI-test bundles for testing without running them, and scripts/repo_invariants.sh check 2 plus the native and release rules forbid execution, not compilation.
 
 - **`PA-25`** (planned) — Docs and tooling stay proportional.
   gate: Resume now keeps only current checkpoints, dated reports move out of docs/reference with an index, research-only scripts run outside the product gate with their own environment, source-text tests are replaced, and a contract lands only when another retires.

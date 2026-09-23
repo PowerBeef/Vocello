@@ -17,18 +17,21 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
-### Current state (September 22, evening)
+### Current state (September 23)
 
 Mac mini M6 (16 GB, Xcode 27; CI stays on Xcode 26.6). The lead session on `main` integrates and
 alone pushes; editing agents author in `.claude/worktrees/` without native builds, the lead verifies
 each branch on the warm cache while `swift-review` reads it, then one `scripts/dev.sh check --since
 origin/main` and one push per batch ([workflow](reference/development-workflow.md#parallel-agents-and-worktrees)).
 Every Xcode/SwiftPM command holds the host-wide native lock. The M6 is the canonical benchmark host
-(first baseline: AV-17, consent-bound); the rorkai `asc` is gone (App Store Connect checks are
-manual). Done today: PA-27 workflow, PA-12, F-25, PA-11, PA-14 slice 1; all pushed, CI green.
-Next: PA-14 slice 2 (typed errors, MLX error capture), PA-13, PA-15 (device proof consent-bound),
-PA-04. Maintainer steps: PA-10 `release` environment and `v*` tag ruleset; PA-05 still needs the
-altool upload check on the pinned Xcode.
+(first baseline: AV-17, consent-bound); App Store Connect checks are manual. Push CI now compiles
+the XCUITest bundles (never runs them) and pull requests get the Linux checks only.
+Done September 22–23: PA-27, PA-12, F-25, PA-11, PA-13, PA-04, PA-14, PA-03, PA-02, PA-23, PA-24;
+PA-15 code complete (device proof consent-bound); PA-17 consent enforced in core and the CLI
+(`--confirm-consent`), review follow-up in flight (Mac copy, save-sheet gating, priming and commit
+gates, device-lane advice, CLI wiring tests). Next: PA-16 (tokenizer sliding windows, consent-bound
+model runs), PA-19, PA-21, PA-22, PA-07/08 cleanup. Maintainer steps: PA-10 `release` environment
+and `v*` tag ruleset; PA-05 still needs the altool upload check on the pinned Xcode.
 
 ### Machine transition (September 22, superseded by the current state above)
 

@@ -1331,19 +1331,6 @@
       "updated": "2026-09-22"
     },
     {
-      "id": "PA-02",
-      "title": "P2 — make the owned package's diagnostics gate require the internal build capability",
-      "status": "planned",
-      "gate": "QVOICE_TALKER_KV_QUANT, QWENVOICE_SAMPLER_COMPILE and QWENVOICE_TOKENIZER_RESIDENCY have no effect in a distribution app or CLI even with QWENVOICE_DEBUG set; runtime_security_contract.py and a unit test prove it.",
-      "sourceOfTruth": [
-        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/RuntimeDebugGate.swift",
-        "config/runtime-debug-knobs.json"
-      ],
-      "notes": "VocelloQwen3ImplementationDebugGate checks QWENVOICE_DEBUG only; the VOCELLO_INTERNAL_DIAGNOSTICS compile condition reaches QwenVoiceCore but never the package, yet the registry classifies these keys unavailable-without-internal-capability. The distributed CLI is the easiest exposure. Options: the facade passes a capability the product gate derives at bootstrap, or the package receives the compile condition. Any new shared state is registered in config/concurrency-safety.json (budget has no headroom). Related to ASR-07's analyzer and logging hygiene. External audit SEC-06.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
-    },
-    {
       "id": "PA-05",
       "title": "Release path works end to end and is rehearsed",
       "status": "in-flight",
@@ -1384,9 +1371,9 @@
         "Sources/QwenVoiceCore/NativeDeviceClassGate.swift",
         "project.yml"
       ],
-      "notes": "No callers: MLXTTSEngine.generateBatch (macOS line batch loops the single-take executor), HuggingFaceDownloader.downloadRepo (also keeps a live repository-enumeration path the catalog rule forbids), NativeDeviceClassGate.applyHandshakeForcedClass (one of the 7 nonisolated(unsafe) declarations). samplerCompileEnabled in Qwen3TTS.swift is never read. About 36 XPC or EngineServiceHost mentions remain in Sources. project.yml links the HuggingFace product to four targets but no owned source imports it. Package edits follow the owned-package inventory contract. External audit SEC-12 and ENG-18 add: fromPretrained/resolveOrDownloadModel still resolve revision main; chunkedDecode, SeanetDecoder and the generate*Stream APIs have no product callers. AnyTTSEngineBackend is live (CORE-20 is wrong about it).",
+      "notes": "No callers: MLXTTSEngine.generateBatch (macOS line batch loops the single-take executor), HuggingFaceDownloader.downloadRepo (also keeps a live repository-enumeration path the catalog rule forbids), NativeDeviceClassGate.applyHandshakeForcedClass (one of the 7 nonisolated(unsafe) declarations). samplerCompileEnabled in Qwen3TTS.swift is never read. About 36 XPC or EngineServiceHost mentions remain in Sources. project.yml links the HuggingFace product to four targets but no owned source imports it. Package edits follow the owned-package inventory contract. External audit SEC-12 and ENG-18 add: fromPretrained/resolveOrDownloadModel still resolve revision main; chunkedDecode, SeanetDecoder and the generate*Stream APIs have no product callers. AnyTTSEngineBackend is live (CORE-20 is wrong about it). 2026-09-23: samplerCompileEnabled was removed with PA-02.",
       "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
+      "updated": "2026-09-23"
     },
     {
       "id": "PA-08",
@@ -1524,33 +1511,6 @@
         "Sources/QwenVoiceCore/MLXModelLoadCoordinator.swift"
       ],
       "notes": "External audit CORE-04 to CORE-08 and ENG-06, confirmed 2026-09-22 with corrections: CORE-08 is reached only for legacy or repairable installs, and the idle-unload half of CORE-06 is guarded. CORE-04 also makes reuse telemetry false. CORE-05's backup classification belongs with ASR-06.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
-    },
-    {
-      "id": "PA-23",
-      "title": "Pull requests get the Linux checks",
-      "status": "planned",
-      "gate": "A pull_request trigger runs contracts, Python and website for Dependabot and outside PRs while own work stays direct to main, and Dependabot action bumps update config/toolchain.json in the same PR.",
-      "sourceOfTruth": [
-        ".github/workflows/ci.yml",
-        "config/toolchain.json"
-      ],
-      "notes": "External audit CI-04 and CI-05 (and REPO-05, SEC-17), confirmed 2026-09-22; maintainer decision the same day to add a Linux-only PR lane. ci.yml runs on push to main and dispatch only since 7db09171; five Dependabot PRs are open (#96, #100, #102, #103, #105). Correction: #100 did receive one CI run.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
-    },
-    {
-      "id": "PA-24",
-      "title": "Push CI compiles the XCUITest bundles",
-      "status": "planned",
-      "gate": "Push CI builds the macOS and iOS UI-test bundles for testing without running them, and scripts/repo_invariants.sh check 2 plus the native and release rules forbid execution, not compilation.",
-      "sourceOfTruth": [
-        "scripts/repo_invariants.sh",
-        "scripts/build_ui_test_bundles.sh",
-        ".github/workflows/ci.yml"
-      ],
-      "notes": "External audit CI-07, confirmed 2026-09-22 (10,399 lines of UI-test Swift compile only locally). Maintainer decision the same day reverses the 2026-09-17 rule that CI never names the UI schemes: compiling is allowed, executing stays forbidden. Pair with PA-04's lock and path fixes.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },

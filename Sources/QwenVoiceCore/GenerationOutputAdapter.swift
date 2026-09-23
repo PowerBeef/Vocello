@@ -1777,7 +1777,8 @@ struct StreamingExecutionContext: Sendable {
         } catch let streamError {
             let error = Self.streamFailureError(
                 streamError,
-                totalFramesWritten: totalFramesWritten
+                totalFramesWritten: totalFramesWritten,
+                isTaskCancelled: Task.isCancelled
             )
             signpostTimingsMS["native_generation_stream_ms"] = generationStreamStartedAt.elapsedMilliseconds
             GenerationFailureDiagnosticLogger.shared.log(
@@ -2180,20 +2181,25 @@ struct StreamingExecutionContext: Sendable {
         }
     }
 
-    /// Async streams may finish normally after their producer task is
-    /// cancelled. Check the task's cooperative cancellation state before
-    /// interpreting an empty stream as an engine failure so memory-pressure
-    /// cancellation retains its typed terminal reason and never surfaces a
-    /// false "no audio chunks" error in the frontend.
-    /// Maps a failure of the streaming loop. A captured MLX allocation failure
-    /// is retryable only while no frame was written: every written frame was
-    /// also offered to the listener as preview, and the retry would replay the
-    /// take from frame zero under the same generation ID.
+    /// Maps a failure of the streaming loop. Cancellation wins: a cancelled
+    /// task ends typed `.cancelled` even when MLX recorded a failure while it
+    /// unwound, so the take is never retried or reported as failed.
+    ///
+    /// A captured MLX allocation failure is retryable only while no frame was
+    /// written, because the retry would replay the take from frame zero under
+    /// the same generation ID. Treating every written frame as offered to the
+    /// listener is exact for streaming takes and conservative for
+    /// non-streaming takes, whose written frames reach no listener before the
+    /// final result.
     static func streamFailureError(
         _ error: Error,
-        totalFramesWritten: Int64
+        totalFramesWritten: Int64,
+        isTaskCancelled: Bool
     ) -> Error {
-        NativeRuntimeError.mappingCapturedRuntimeFailure(
+        if isTaskCancelled {
+            return CancellationError()
+        }
+        return NativeRuntimeError.mappingCapturedRuntimeFailure(
             error,
             stage: .streamFailed,
             audioPublished: totalFramesWritten > 0
@@ -2211,6 +2217,11 @@ struct StreamingExecutionContext: Sendable {
         )
     }
 
+    /// Async streams may finish normally after their producer task is
+    /// cancelled. Check the task's cooperative cancellation state before
+    /// interpreting an empty stream as an engine failure so memory-pressure
+    /// cancellation retains its typed terminal reason and never surfaces a
+    /// false "no audio chunks" error in the frontend.
     static func postStreamTerminalError(
         totalFramesWritten: Int64,
         isTaskCancelled: Bool

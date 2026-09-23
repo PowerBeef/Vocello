@@ -954,13 +954,23 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             loadState = .loaded(modelID: modelID)
             throw CancellationError()
         } catch {
+            // A captured MLX failure gets product copy, and the model it may
+            // have left half-evaluated is unloaded under the priming lease.
+            // The unload resets clone preparation, so the failed state is set
+            // after it.
+            let surfacedError = NativeRuntimeError.mappingCapturedRuntimeFailure(
+                error,
+                stage: .clonePreparation,
+                audioPublished: false
+            )
+            await unloadAfterCapturedRuntimeFailureIfNeeded(error)
             clonePreparationState = ClonePreparationState(
                 phase: .failed,
                 identityKey: uiIdentityKey,
-                message: error.localizedDescription
+                message: surfacedError.localizedDescription
             )
-            handle(error)
-            throw error
+            handle(surfacedError)
+            throw surfacedError
         }
     }
 
@@ -1270,7 +1280,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             // invariants) but surface NO error: no visibleErrorMessage, no
             // .failed event, so the sidebar never flashes "Error" after the
             // user pressed Cancel. Mirrors the clone-preparation catch above.
-            if NativeGenerationTerminalClassifier.reason(for: error) == .cancelled {
+            // Cancellation is checked before the allocation retry, so a
+            // cancelled take is never re-run.
+            if Self.isCancelledGenerationTerminal(
+                error,
+                cancellationReason: cancellationIngress.reason,
+                isTaskCancelled: Task.isCancelled
+            ) {
                 loadState = .loaded(modelID: request.modelID)
                 // Preserve the UI's no-visible-error cancellation contract while
                 // still closing the service-layer transport accumulator.
@@ -1287,6 +1303,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 )
                 let delivery = eventRouter.snapshot(for: deliveryGenerationID)
                 await recordEventDeliveryLossIfNeeded(delivery, request: request)
+                await unloadAfterCapturedRuntimeFailureIfNeeded(error)
                 throw CancellationError()
             }
             if NativeGenerationTerminalClassifier.isRetryableAllocationFailure(error) {
@@ -1341,7 +1358,11 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                     )
                     return annotated
                 } catch {
-                    if NativeGenerationTerminalClassifier.reason(for: error) == .cancelled {
+                    if Self.isCancelledGenerationTerminal(
+                        error,
+                        cancellationReason: cancellationIngress.reason,
+                        isTaskCancelled: Task.isCancelled
+                    ) {
                         loadState = .loaded(modelID: request.modelID)
                         let coordinatorReason = await activeGenerationCoordinator.currentCancellationReason
                         let reason = cancellationIngress.reason ?? coordinatorReason ?? .user
@@ -1356,6 +1377,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                         )
                         let delivery = eventRouter.snapshot(for: deliveryGenerationID)
                         await recordEventDeliveryLossIfNeeded(delivery, request: request)
+                        await unloadAfterCapturedRuntimeFailureIfNeeded(error)
                         throw CancellationError()
                     }
                     await unloadAfterCapturedRuntimeFailureIfNeeded(error)
@@ -1515,9 +1537,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     /// failed load or prewarm already is. The caller still holds the
     /// generation's model-operation lease and the runtime's generation lease
     /// was released by product finalization, exactly as for the allocation
-    /// retry's cleanup.
+    /// retry's cleanup. A take that ended cancelled surfaces no runtime
+    /// failure, so the runtime actor's record of one on the loaded model is
+    /// consulted as well.
     private func unloadAfterCapturedRuntimeFailureIfNeeded(_ error: Error) async {
-        guard Self.requiresUnloadAfterFailure(error) else { return }
+        if !Self.requiresUnloadAfterFailure(error) {
+            guard await runtime.requiresUnloadAfterRuntimeFailure() else { return }
+        }
         Memory.clearCache()
         await runtime.unloadModel()
         clonePreparationState = .idle
@@ -1526,6 +1552,20 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     /// Whether a generation failure left MLX state that must not be reused.
     nonisolated static func requiresUnloadAfterFailure(_ error: Error) -> Bool {
         NativeGenerationTerminalClassifier.capturedRuntimeFailure(in: error) != nil
+    }
+
+    /// Cancellation wins over every other terminal: a typed cancellation
+    /// error, an accepted cancellation reason or a cancelled task ends the
+    /// take `.cancelled`, never `.failed` and never retried, even when MLX
+    /// recorded a failure while the take unwound.
+    nonisolated static func isCancelledGenerationTerminal(
+        _ error: Error,
+        cancellationReason: GenerationCancellationReason?,
+        isTaskCancelled: Bool
+    ) -> Bool {
+        NativeGenerationTerminalClassifier.reason(for: error) == .cancelled
+            || cancellationReason != nil
+            || isTaskCancelled
     }
 
     nonisolated static func surfacedGenerationError(

@@ -26,6 +26,9 @@ protocol MLXModelCoordinating: AnyObject, Sendable {
     /// (preparedCacheValidation / tokenizerPreparation / upstreamModelLoad) land on
     /// the same recorder (and start clock) as the rest of the generation timeline.
     func setTelemetryRecorder(_ recorder: NativeTelemetryRecorder?) async
+    /// Whether the loaded model's runtime actor observed an MLX failure during
+    /// a generation, including one that ended cancelled.
+    func requiresUnloadAfterRuntimeFailure() async -> Bool
 }
 
 actor MLXModelLoadCoordinator: MLXModelCoordinating {
@@ -457,6 +460,11 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
 
     func setTelemetryRecorder(_ recorder: NativeTelemetryRecorder?) async {
         telemetryRecorder = recorder
+    }
+
+    func requiresUnloadAfterRuntimeFailure() async -> Bool {
+        guard let engine = loadedModel?.engine else { return false }
+        return await engine.requiresUnloadAfterRuntimeFailure
     }
 
     /// Returns the id of the currently loaded asset, or `nil` when no model

@@ -976,7 +976,8 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
     func testStreamAllocationFailureRetriesOnlyBeforeAnyFrameWasPublished() {
         let beforeAudio = StreamingExecutionContext.streamFailureError(
             VocelloQwen3RuntimeFailure.allocation,
-            totalFramesWritten: 0
+            totalFramesWritten: 0,
+            isTaskCancelled: false
         )
         XCTAssertTrue(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(beforeAudio))
 
@@ -984,7 +985,8 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
         // published must not re-run the take under the same generation ID.
         let midStream = StreamingExecutionContext.streamFailureError(
             VocelloQwen3RuntimeFailure.allocation,
-            totalFramesWritten: 24_000
+            totalFramesWritten: 24_000,
+            isTaskCancelled: false
         )
         XCTAssertFalse(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(midStream))
         XCTAssertEqual(NativeGenerationTerminalClassifier.reason(for: midStream), .failed)
@@ -1009,16 +1011,70 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
 
         let mlxFailure = StreamingExecutionContext.streamFailureError(
             VocelloQwen3RuntimeFailure.mlx,
-            totalFramesWritten: 0
+            totalFramesWritten: 0,
+            isTaskCancelled: false
         )
         XCTAssertFalse(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(mlxFailure))
 
         // Other errors pass through untouched, cancellation included.
         let cancellation = StreamingExecutionContext.streamFailureError(
             CancellationError(),
-            totalFramesWritten: 24_000
+            totalFramesWritten: 24_000,
+            isTaskCancelled: false
         )
         XCTAssertTrue(cancellation is CancellationError)
+    }
+
+    func testStreamFailureOfCancelledTaskIsCancellationNeverRetried() {
+        for framesWritten: Int64 in [0, 24_000] {
+            let cancelled = StreamingExecutionContext.streamFailureError(
+                VocelloQwen3RuntimeFailure.allocation,
+                totalFramesWritten: framesWritten,
+                isTaskCancelled: true
+            )
+            XCTAssertTrue(cancelled is CancellationError)
+            XCTAssertEqual(NativeGenerationTerminalClassifier.reason(for: cancelled), .cancelled)
+            XCTAssertFalse(NativeGenerationTerminalClassifier.isRetryableAllocationFailure(cancelled))
+        }
+    }
+
+    func testCancellationWinsTheGenerationTerminal() {
+        let allocation = VocelloQwen3RuntimeFailure.allocation
+        XCTAssertTrue(
+            MLXTTSEngine.isCancelledGenerationTerminal(
+                allocation,
+                cancellationReason: .memoryPressure,
+                isTaskCancelled: false
+            )
+        )
+        XCTAssertTrue(
+            MLXTTSEngine.isCancelledGenerationTerminal(
+                allocation,
+                cancellationReason: nil,
+                isTaskCancelled: true
+            )
+        )
+        XCTAssertTrue(
+            MLXTTSEngine.isCancelledGenerationTerminal(
+                CancellationError(),
+                cancellationReason: nil,
+                isTaskCancelled: false
+            )
+        )
+        XCTAssertFalse(
+            MLXTTSEngine.isCancelledGenerationTerminal(
+                allocation,
+                cancellationReason: nil,
+                isTaskCancelled: false
+            )
+        )
+        XCTAssertFalse(
+            MLXTTSEngine.isCancelledGenerationTerminal(
+                MLXTTSEngineError.generationFailed("The native engine did not emit any audio chunks."),
+                cancellationReason: nil,
+                isTaskCancelled: false
+            )
+        )
     }
 
     func testPublicationMarkingFailureIsNeverRetried() {
@@ -1063,7 +1119,8 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
             MLXTTSEngine.requiresUnloadAfterFailure(
                 StreamingExecutionContext.streamFailureError(
                     VocelloQwen3RuntimeFailure.allocation,
-                    totalFramesWritten: 24_000
+                    totalFramesWritten: 24_000,
+                    isTaskCancelled: false
                 )
             )
         )

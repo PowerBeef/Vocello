@@ -1333,6 +1333,8 @@ final class VocelloQwen3FacadeTests: XCTestCase {
         XCTAssertEqual(terminal.outcome, .failed(.runtime))
         // The scope stops the producer at its next signal after the MLX error.
         XCTAssertEqual(terminal.emittedAudioFrameCount, 0)
+        let requiresUnload = await engine.requiresUnloadAfterRuntimeFailure
+        XCTAssertTrue(requiresUnload)
 
         _ = try await engine.acknowledgeProductFinalization(
             generationID: reservation.session.generationID,
@@ -1340,6 +1342,51 @@ final class VocelloQwen3FacadeTests: XCTestCase {
             token: reservation.session.finalizationToken,
             disposition: .aborted(.runtime)
         )
+    }
+
+    func testCancelledGenerationWithRecordedMLXFailureRequiresUnload() async throws {
+        let producerGate = SuspendedEngineOperationGate()
+        let engine = VocelloQwen3Engine(
+            loadedModel: try makeLoadedFixture(
+                compatibilityModel: FacadeCompatibilityModel(
+                    producerGate: producerGate,
+                    producerRaisesMLXError: true
+                )
+            )
+        )
+        var requiresUnload = await engine.requiresUnloadAfterRuntimeFailure
+        XCTAssertFalse(requiresUnload)
+        let reservation = try await engine.reserveGeneration(
+            request: makeCustomRequest(generationID: UUID()),
+            audioCapacityFrames: 24_000
+        )
+        _ = try await reservation.session.claimAudioConsumer()
+        try await engine.open(reservation.id)
+        await producerGate.waitUntilEntered()
+
+        try await engine.cancelGeneration(reservation.id, reason: .user)
+        await producerGate.release()
+        let terminal = await reservation.session.waitForModelTermination()
+        // Cancellation wins the terminal, but the recorded MLX failure still
+        // marks the model for unload so the product does not reuse it.
+        XCTAssertEqual(terminal.outcome, .cancelled(.user))
+        requiresUnload = await engine.requiresUnloadAfterRuntimeFailure
+        XCTAssertTrue(requiresUnload)
+
+        _ = try await engine.acknowledgeProductFinalization(
+            generationID: reservation.session.generationID,
+            leaseID: reservation.lease.id,
+            token: reservation.session.finalizationToken,
+            disposition: .aborted(.runtime)
+        )
+        requiresUnload = await engine.requiresUnloadAfterRuntimeFailure
+        XCTAssertTrue(requiresUnload)
+
+        try await engine.unload()
+        requiresUnload = await engine.requiresUnloadAfterRuntimeFailure
+        XCTAssertFalse(requiresUnload)
+        let snapshot = await engine.snapshot()
+        XCTAssertEqual(snapshot.phase, .unloaded)
     }
 
     func testSuspendedPrewarmRejectsReentrantGenerationReservation() async throws {
@@ -2451,13 +2498,15 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
             memoryPolicy: memoryPolicy,
             streamingInterval: streamingInterval
         )
+        // The MLX error is recorded before the gate so a test can cancel the
+        // take while the failure is already pending.
+        if producerRaisesMLXError {
+            Self.raiseMLXError()
+        }
         if let producerGate {
             await producerGate.suspend()
         }
         try await sink(.prepared)
-        if producerRaisesMLXError {
-            Self.raiseMLXError()
-        }
         try await emitFixtureEvents(to: sink)
         if let producerError {
             throw producerError

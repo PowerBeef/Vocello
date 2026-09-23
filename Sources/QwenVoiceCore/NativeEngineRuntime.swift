@@ -441,6 +441,12 @@ actor NativeEngineRuntime {
         )
     }
 
+    /// Whether the loaded model observed an MLX failure during a generation,
+    /// including one that ended cancelled and therefore surfaced no error.
+    func requiresUnloadAfterRuntimeFailure() async -> Bool {
+        await loadCoordinator.requiresUnloadAfterRuntimeFailure()
+    }
+
     func replayStartupReliabilityCodecTrace(
         request: GenerationRequest,
         frames: [[Int32]],

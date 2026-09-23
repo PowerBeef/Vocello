@@ -311,6 +311,8 @@ public actor VocelloQwen3Engine {
     private var activeOperation: VocelloQwen3RuntimeOperationLease?
     private var pendingGeneration: PendingGeneration?
     private var lastFinalization: LastFinalization?
+    /// Model epoch on which a generation observed an MLX runtime failure.
+    private var runtimeFailureModelEpoch: UInt64?
     private var pressure = VocelloQwen3MemoryPressureSnapshot()
     private var cloneRecords: [UUID: CloneRecord] = [:]
     private var cloneRecordUseOrder: [UUID] = []
@@ -374,6 +376,15 @@ public actor VocelloQwen3Engine {
         self.finalizationReliefClaimHook = finalizationReliefClaimHook
         self.finalizationReliefRollbackHook = finalizationReliefRollbackHook
         phase = .ready
+    }
+
+    /// Whether a generation on the loaded model observed an MLX runtime
+    /// failure, including one that ended `.cancelled` because cancellation
+    /// won. The model may hold half-evaluated MLX state, so the host unloads
+    /// it before the next admission. Load and unload start a new model epoch
+    /// and clear it.
+    public var requiresUnloadAfterRuntimeFailure: Bool {
+        loadedModel != nil && runtimeFailureModelEpoch == modelEpoch
     }
 
     public func snapshot() -> VocelloQwen3EngineSnapshot {
@@ -482,6 +493,7 @@ public actor VocelloQwen3Engine {
             // committed. Only the lease revalidation above may veto commit.
             loadedModel = model
             modelEpoch &+= 1
+            runtimeFailureModelEpoch = nil
             invalidateCloneHandles()
             activeOperation = nil
             phase = .ready
@@ -1407,6 +1419,15 @@ public actor VocelloQwen3Engine {
                 : nil
             let tokenCount = current?.generatedTokenCount ?? 0
             let frameCount = current?.emittedAudioFrameCount ?? 0
+            // A captured MLX failure is the cause even when the producer
+            // later threw something else. Record it for the model epoch before
+            // the terminal resumes the product, so a take that ends cancelled
+            // still has its model unloaded.
+            let mlxFailure = mlxErrors.failure
+                ?? VocelloQwen3RuntimeFailure(mlxError: error)
+            if mlxFailure != nil {
+                runtimeFailureModelEpoch = pending.lease.modelEpoch
+            }
             // Publish the phase before resolving the model terminal. Terminal
             // resolution resumes the product adapter and therefore creates an
             // actor-reentrancy point where finalization may be acknowledged.
@@ -1427,12 +1448,9 @@ public actor VocelloQwen3Engine {
                 )
                 await pending.session.cancelModelTerminal(terminal, reason: reason)
             } else {
-                // A captured MLX failure is the cause even when the producer
-                // later threw something else. It carries the typed failure
-                // code (allocation is memory pressure) and reaches the audio
-                // consumer as `VocelloQwen3RuntimeFailure`.
-                let mlxFailure = mlxErrors.failure
-                    ?? VocelloQwen3RuntimeFailure(mlxError: error)
+                // The MLX failure carries the typed failure code (allocation
+                // is memory pressure) and reaches the audio consumer as
+                // `VocelloQwen3RuntimeFailure`.
                 let terminal = VocelloQwen3TerminalEvent(
                     generationID: pending.request.generationID,
                     outcome: .failed(mlxFailure?.failureCode ?? .runtime),
@@ -1636,6 +1654,7 @@ public actor VocelloQwen3Engine {
         if action == .fullUnload {
             loadedModel = nil
             modelEpoch &+= 1
+            runtimeFailureModelEpoch = nil
         }
         activeOperation = nil
         phase = action == .fullUnload || loadedModel == nil ? .unloaded : .ready

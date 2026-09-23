@@ -207,6 +207,7 @@
     "Sources/VocelloQwen3Core/Engine.swift::public actor VocelloQwen3Engine",
     "Sources/VocelloQwen3Core/Engine.swift::public init()",
     "Sources/VocelloQwen3Core/Engine.swift::public init(cloneHandleCapacity: Int)",
+    "Sources/VocelloQwen3Core/Engine.swift::public var requiresUnloadAfterRuntimeFailure: Bool",
     "Sources/VocelloQwen3Core/Engine.swift::public func snapshot() -> VocelloQwen3EngineSnapshot",
     "Sources/VocelloQwen3Core/Engine.swift::public func loadedModelFacts() -> VocelloQwen3LoadedModelFacts?",
     "Sources/VocelloQwen3Core/Engine.swift::public func preparationDiagnostics() -> VocelloQwen3RuntimeDiagnosticsSnapshot?",
@@ -421,7 +422,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",
-      "sha256": "36eca80f6a30039f74ed31de36353111ef67d5523a293dff5c908487f92e612f"
+      "sha256": "56ef98718d74b7af773d5a0514a8f61c22d60c2b95d556b833aec5092843518e"
     },
     {
       "path": "Sources/VocelloQwen3Core/GenerationSession.swift",

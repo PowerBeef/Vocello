@@ -451,6 +451,7 @@ targets:
       - path: Sources/Services/MacFileSaveCopy.swift
       - path: Sources/Services/MacStudioGenerationRequestFactory.swift
       - path: Sources/Services/MacLineBatchRequest.swift
+      - path: Sources/Services/MacModelVariantResolution.swift
       - path: Sources/Services/LongTextGenerationRouter.swift
       - path: Sources/Models/ScriptTextState.swift
       - path: Sources/Services/MacInterfaceText.swift

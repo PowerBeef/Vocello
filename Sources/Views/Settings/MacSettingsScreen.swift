@@ -18,10 +18,6 @@ struct MacSettingsScreen: View {
     @AppStorage("outputDirectory", store: AppDefaults.store) private var outputDirectory = ""
     @AppStorage(GenerationVariationPreference.key, store: AppDefaults.store)
     private var generationVariation = GenerationVariationPreference.defaultValue
-    /// When ON, every generation mode resolves to the Speed variant
-    /// regardless of per-mode preferences or hardware recommendations.
-    @AppStorage(MacModelVariantPreferences.preferSpeedEverywhereKey, store: AppDefaults.store)
-    private var preferSpeedEverywhere = false
 
     private enum Category: String {
         case audio, appLanguage, modelsFiles, cloning
@@ -265,6 +261,16 @@ struct MacSettingsScreen: View {
         }
     }
 
+    /// When on, a generation mode without an explicit package choice uses its
+    /// Speed package; `ModelManagerViewModel` owns the preference and the
+    /// resolution order.
+    private var prefersLowerMemoryModels: Binding<Bool> {
+        Binding(
+            get: { viewModel.prefersLowerMemoryModels },
+            set: { viewModel.setPrefersLowerMemoryModels($0) }
+        )
+    }
+
     private var performanceSection: some View {
         MacSettingsSection(title: MacInterfaceText.settingsPerformance) {
             MacSettingsToggleRow(
@@ -272,7 +278,7 @@ struct MacSettingsScreen: View {
                 title: MacInterfaceText.settingsPreferLowerMemory,
                 subtitle: MacInterfaceText.settingsPreferLowerMemoryDetail,
                 accessibilityIdentifier: "settings_preferSpeedEverywhere",
-                isOn: $preferSpeedEverywhere
+                isOn: prefersLowerMemoryModels
             )
         }
     }

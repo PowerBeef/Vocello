@@ -132,6 +132,10 @@ final class ModelManagerViewModel {
     private(set) var statuses: [String: ModelStatus] = [:]
     private(set) var modelInfoByID: [String: ModelInfo] = [:]
     private(set) var activeVariantRevision = 0
+    /// "Prefer lower-memory models" in Settings, persisted under the legacy
+    /// `QwenVoice.PreferSpeedEverywhere` key. When on, a mode without an
+    /// explicit package choice resolves to its Speed package.
+    private(set) var prefersLowerMemoryModels: Bool
     private(set) var recommendedSetupProgress: RecommendedSetupProgress?
 
     private let fileManager: FileManager
@@ -163,6 +167,7 @@ final class ModelManagerViewModel {
         self.fileManager = fileManager
         self.modelsDirectory = modelsDirectory
         self.deviceClass = deviceClass
+        self.prefersLowerMemoryModels = MacModelVariantPreferences.preferSpeedEverywhere()
 
         for model in TTSModel.all {
             let info = localModelInfo(for: model)
@@ -235,14 +240,38 @@ final class ModelManagerViewModel {
         return isAvailable(model)
     }
 
+    /// Replaces a known explicit choice whose package is no longer installed
+    /// with the installed fallback (`MacModelVariantResolution`). Otherwise the
+    /// fallback is only returned, not stored, so the default keeps following
+    /// the lower-memory preference and the hardware recommendation once
+    /// packages are installed.
     @discardableResult
     func reconcileGenerationVariantSelectionIfNeeded(for mode: GenerationMode) -> TTSModel? {
         guard let active = activeVariant(for: mode) else { return nil }
         guard !isAvailable(active) else { return active }
-        guard let fallback = installedFallbackVariant(for: mode) else { return active }
+        let modeModels = variants(for: mode)
+        let replacementID = variantResolution(for: mode).fallbackReplacingExplicitChoice { variantID in
+            modeModels.contains { $0.variantID == variantID && isAvailable($0) }
+        }
+        if let replacementID, let replacement = modeModels.first(where: { $0.variantID == replacementID }) {
+            use(replacement)
+            return replacement
+        }
+        return installedFallbackVariant(for: mode) ?? active
+    }
 
-        use(fallback)
-        return fallback
+    /// Turning the preference on clears every stored per-mode choice, so each
+    /// mode resolves to Speed at that moment; picks made afterwards still win.
+    func setPrefersLowerMemoryModels(_ value: Bool) {
+        guard value != prefersLowerMemoryModels else { return }
+        MacModelVariantPreferences.setPreferSpeedEverywhere(value)
+        if value {
+            for mode in GenerationMode.allCases {
+                MacModelVariantPreferences.clearSelectedVariantID(for: mode)
+            }
+        }
+        prefersLowerMemoryModels = value
+        activeVariantRevision += 1
     }
 
     /// Returns all active variants for a generation mode in picker order.
@@ -267,12 +296,27 @@ final class ModelManagerViewModel {
 
     func activeVariant(for mode: GenerationMode) -> TTSModel? {
         let modeModels = variants(for: mode)
-        let recommended = recommendedVariant(for: mode) ?? modeModels.first
-        let selectedVariantID = MacModelVariantPreferences.selectedVariantID(
-            for: mode,
-            defaultVariantID: recommended?.variantID
+        guard let variantID = variantResolution(for: mode).activeVariantID else {
+            return recommendedVariant(for: mode) ?? modeModels.first
+        }
+        return modeModels.first { $0.variantID == variantID }
+    }
+
+    /// The stored explicit per-mode choice, the lower-memory preference and the
+    /// hardware recommendation for `mode`, resolved in that order.
+    func variantResolution(for mode: GenerationMode) -> MacModelVariantResolution {
+        let modeModels = variants(for: mode)
+        return MacModelVariantResolution(
+            variantIDs: modeModels.compactMap(\.variantID),
+            explicitVariantID: explicitVariantID(for: mode),
+            prefersLowerMemory: prefersLowerMemoryModels,
+            lowerMemoryVariantID: modeModels.first { $0.variantKind == .speed }?.variantID,
+            hardwareRecommendedVariantID: recommendedVariant(for: mode)?.variantID
         )
-        return modeModels.first { $0.variantID == selectedVariantID } ?? recommended
+    }
+
+    private func explicitVariantID(for mode: GenerationMode) -> String? {
+        MacModelVariantPreferences.selectedVariantID(for: mode)
     }
 
     func recommendedVariant(for mode: GenerationMode) -> TTSModel? {
@@ -286,11 +330,12 @@ final class ModelManagerViewModel {
     }
 
     private func installedFallbackVariant(for mode: GenerationMode) -> TTSModel? {
-        let candidates = [recommendedVariant(for: mode)].compactMap { $0 } + variants(for: mode)
-        var seen = Set<String>()
-        return candidates.first { candidate in
-            seen.insert(candidate.id).inserted && isAvailable(candidate)
+        let modeModels = variants(for: mode)
+        let fallbackID = variantResolution(for: mode).installedFallbackVariantID { variantID in
+            modeModels.contains { $0.variantID == variantID && isAvailable($0) }
         }
+        guard let fallbackID else { return nil }
+        return modeModels.first { $0.variantID == fallbackID }
     }
 
     func isHardwareRecommended(_ model: TTSModel) -> Bool {
@@ -830,10 +875,7 @@ final class ModelManagerViewModel {
     private func reconcileActiveVariantAfterDeletion(of model: TTSModel) {
         guard let deletedVariantID = model.variantID else { return }
 
-        let preferenceVariantID = MacModelVariantPreferences.selectedVariantID(
-            for: model.mode,
-            defaultVariantID: nil
-        )
+        let preferenceVariantID = MacModelVariantPreferences.selectedVariantID(for: model.mode)
         guard preferenceVariantID == deletedVariantID else { return }
 
         // Find a sibling variant of the same mode that is still

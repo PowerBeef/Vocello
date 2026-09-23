@@ -56,10 +56,6 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         }
     }
 
-    var requiredModel: TTSModel? {
-        generationMode.flatMap(TTSModel.model(for:))
-    }
-
     /// Generation modes use the canonical per-mode glyphs so the sidebar and
     /// the Settings model rows stay matched; the other destinations use the
     /// iOS dock glyphs.

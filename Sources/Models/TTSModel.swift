@@ -111,25 +111,25 @@ struct TTSModel: Identifiable, Hashable, Sendable, Codable {
 
 enum MacModelVariantPreferences {
     private static let keyPrefix = "QwenVoice.MacModelVariantPreference."
-    /// Global override: when set to true, every per-mode variant lookup
-    /// resolves to the active Speed variant regardless of the per-mode
-    /// stored choice or the hardware-recommended default. The legacy key
-    /// name is retained for existing preferences.
+    /// "Prefer lower-memory models": when true, a mode without an explicit
+    /// stored choice resolves to its Speed variant instead of the hardware
+    /// recommendation (`MacModelVariantResolution`). The legacy key name is
+    /// retained for existing preferences.
     static let preferSpeedEverywhereKey = "QwenVoice.PreferSpeedEverywhere"
 
     static func key(for mode: GenerationMode) -> String {
         keyPrefix + mode.rawValue
     }
 
+    /// The stored explicit choice for `mode`, or nil when there is none.
     static func selectedVariantID(
         for mode: GenerationMode,
-        defaultVariantID: String?,
         defaults: UserDefaults = AppDefaults.store
     ) -> String? {
         let stored = defaults.string(forKey: key(for: mode))?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard let stored, !stored.isEmpty else {
-            return defaultVariantID
+            return nil
         }
         return stored
     }
@@ -168,11 +168,6 @@ enum MacModelVariantPreferences {
 
 extension TTSModel {
     static var all: [TTSModel] { TTSContract.models }
-
-    /// Find the model for a given generation mode
-    static func model(for mode: GenerationMode) -> TTSModel? {
-        TTSContract.model(for: mode)
-    }
 
     static func model(id: String) -> TTSModel? {
         TTSContract.model(id: id)

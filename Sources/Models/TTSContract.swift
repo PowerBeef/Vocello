@@ -72,18 +72,6 @@ enum TTSContract {
         allSpeakerDescriptors.first { $0.id == id }
     }
 
-    static func model(for mode: GenerationMode) -> TTSModel? {
-        activeModel(
-            in: loadState.manifest.models,
-            for: mode,
-            defaults: AppDefaults.store
-        )
-    }
-
-    static func recommendedModel(for mode: GenerationMode) -> TTSModel? {
-        recommendedModel(in: loadState.manifest.models, for: mode)
-    }
-
     static func model(id: String) -> TTSModel? {
         if let exact = loadState.manifest.models.first(where: { $0.id == id }) {
             return exact
@@ -197,40 +185,6 @@ enum TTSContract {
             isHardwareRecommended: isHardwareRecommended,
             qwen3Capabilities: descriptor.qwen3Capabilities
         )
-    }
-
-    private static func activeModel(
-        in models: [TTSModel],
-        for mode: GenerationMode,
-        defaults: UserDefaults
-    ) -> TTSModel? {
-        let modeModels = models.filter { $0.mode == mode }
-        guard !modeModels.isEmpty else { return nil }
-        let recommended = recommendedModel(in: models, for: mode) ?? modeModels[0]
-        // Global lower-memory override. Keep the legacy key name, but
-        // pin to the active 1.7B Speed track while 0.6B variants remain
-        // disabled in the contract.
-        if MacModelVariantPreferences.preferSpeedEverywhere(defaults: defaults) {
-            for kind in [TTSModelVariantKind.speed, .quality] {
-                if let lowerMemory = modeModels.first(where: { $0.variantKind == kind }) {
-                    return lowerMemory
-                }
-            }
-        }
-        let selectedVariantID = MacModelVariantPreferences.selectedVariantID(
-            for: mode,
-            defaultVariantID: recommended.variantID,
-            defaults: defaults
-        )
-        return modeModels.first { $0.variantID == selectedVariantID } ?? recommended
-    }
-
-    private static func recommendedModel(
-        in models: [TTSModel],
-        for mode: GenerationMode
-    ) -> TTSModel? {
-        let modeModels = models.filter { $0.mode == mode }
-        return modeModels.first { $0.isHardwareRecommended } ?? modeModels.first
     }
 
     private static func handleLoadFailure(_ error: ContractLoadError) -> TTSContractLoadState {

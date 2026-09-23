@@ -824,7 +824,8 @@ append can replay.
 **`UserDefaults` keys**: `vocello.voiceCloningConsent.v1` (visible Settings-owned clone-consent
 acknowledgment), `vocello.ios.interfaceLanguage` (the interface language, in `AppDefaults.store` on
 macOS through `MacInterfaceLanguage`), per-mode variant choices (`QwenVoice.MacModelVariantPreference.<mode>`) and the
-global `QwenVoice.PreferSpeedEverywhere` override, and UI state
+`QwenVoice.PreferSpeedEverywhere` lower-memory preference (`MacModelVariantResolution`: explicit
+choice, then Speed when the preference is on, then the hardware recommendation), and UI state
 (`QwenVoice.LastSelectedSidebarItem`, `QwenVoice.LastVoiceCloningSavedVoiceID`). Debug mode is not
 persisted — `DebugMode.isEnabled` reads `RuntimeDebugGate.isEnabled()` (internal-build capability
 plus `QWENVOICE_DEBUG`); `scripts/runtime_security_contract.py` rejects any persisted debug toggle.

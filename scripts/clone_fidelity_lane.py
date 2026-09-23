@@ -90,7 +90,8 @@ def generation_command(vocello, item, out_dir):
         "--out", os.path.join(out_dir, item["name"]),
     ]
     if item["kind"] == "clone":
-        command += ["--voice", item["voice"]]
+        # PA-17: clone generation needs the invocation's recorded consent.
+        command += ["--voice", item["voice"], "--confirm-consent"]
     else:
         command += ["--speaker", item["speaker"]]
     return command

@@ -26,9 +26,15 @@ enum VoicesCommand {
         let args = Args(argv)
         CLIOutput.configure(args)
         if args.flag("help") { printHelp(); return }
+        // PA-17: enrollment needs this invocation's recorded consent; refuse before boot.
+        let consent = CLIVoiceCloningConsent.policy(confirmed: args.flag(CLIVoiceCloningConsent.flagName))
+        if action == "enroll" || action == "add" {
+            try consent.admit(.enrollment)
+        }
         let runtime = try await CLIRuntime.bootstrap(
             dataDirectory: CLIPaths.dataDirectory(override: args.string("data-dir")),
-            manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) })
+            manifestOverride: args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) },
+            voiceCloningConsent: consent)
 
         switch action {
         case "list", "ls":
@@ -53,7 +59,7 @@ enum VoicesCommand {
             guard FileManager.default.fileExists(atPath: audioPath) else {
                 throw CLIError("audio not found: \(audioPath)")
             }
-            let voice = try await runtime.engine.enrollPreparedVoice(
+            let voice = try await runtime.enrollPreparedVoice(
                 name: name, audioPath: audioPath, transcript: args.string("transcript"))
             print("enrolled \(voice.name) [\(voice.id)]")
             if !voice.qualityWarnings.isEmpty {
@@ -74,11 +80,13 @@ enum VoicesCommand {
 
         Usage:
           vocello voices list [--json]
-          vocello voices enroll --name <name> --audio <wav> [--transcript "…"]
+          vocello voices enroll --name <name> --audio <wav> [--transcript "…"] --confirm-consent
           vocello voices delete --id <id>
 
         Options:
           --json       (list) emit JSON instead of a table
+          --confirm-consent  (enroll) required: confirms you own or have permission
+                       to clone this voice
           --data-dir   runtime dir (default ~/Library/Application Support/QwenVoice[-Debug])
           --manifest   override path to qwenvoice_contract.json
         """)

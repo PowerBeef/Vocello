@@ -541,7 +541,7 @@ cmd_profile() {
       --modes "$mode" --variants "$variant" \
       --lengths "$profile_length" --warm "$profile_warm" \
       --run-id "$run_id" --label "$profile_label" \
-      --data-dir "$runtime" --no-summary
+      --data-dir "$runtime" --no-summary --confirm-consent
   ) >"$artifacts/target.log" 2>&1 &
   launcher_pid=$!
   PROFILE_TRACE_LAUNCHER_PID="$launcher_pid"
@@ -698,6 +698,7 @@ cmd_memory() {
       --voice "$MAC_TEST_CLONE_VOICE_NAME" --telemetry verbose --seed 19790615 \
       --memory-qualification retained-memory-v1 \
       --run-id "$run_id" --label "$label" --data-dir "$runtime" --no-summary \
+      --confirm-consent \
       >"$artifacts/bench.log" 2>&1 \
     || die "memory qualification generation sequence failed (see $artifacts/bench.log)"
   local results="$runtime/diagnostics/bench-results.json"

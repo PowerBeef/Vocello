@@ -489,6 +489,22 @@ struct VocelloPresentationText: Sendable {
         )
     }
 
+    var cloningConsentRequiredToSaveVoice: String {
+        localization.string(localized: "vocello.error.cloning_consent_required_to_save_voice",
+            defaultValue: "Enable voice-cloning consent in Settings → Privacy before saving a voice.",
+            comment: "Saved-voice error shown when a voice is saved before Voice Cloning consent has been acknowledged."
+        )
+    }
+
+    /// PA-17: the copy the core consent policy raises when it refuses clone
+    /// generation or saved-voice enrollment below the views.
+    var voiceCloningConsentRefusalCopy: VoiceCloningConsentPolicy.RefusalCopy {
+        VoiceCloningConsentPolicy.RefusalCopy(
+            generation: cloningConsentRequired,
+            enrollment: cloningConsentRequiredToSaveVoice
+        )
+    }
+
     var referenceAudioRequired: String {
         localization.string(localized: "vocello.error.reference_audio_required",
             defaultValue: "Select a reference audio file before generating.",

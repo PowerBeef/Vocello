@@ -15073,6 +15073,72 @@
         }
       }
     },
+    "vocello.error.cloning_consent_required_to_save_voice": {
+      "comment": "Saved-voice error shown when a voice is saved before Voice Cloning consent has been acknowledged.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable voice-cloning consent in Settings → Privacy before saving a voice."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activez le consentement au clonage vocal dans Réglages → Confidentialité avant d’enregistrer une voix."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activa el consentimiento de clonación en Ajustes → Privacidad antes de guardar una voz."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktiviere vor dem Sichern einer Stimme die Kloneinwilligung unter Einstellungen → Datenschutz."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attiva il consenso alla clonazione in Impostazioni → Privacy prima di salvare una voce."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ative o consentimento de clonagem em Ajustes → Privacidade antes de salvar uma voz."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存声音前请在“设置 → 隐私”中启用声音克隆授权。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "声を保存する前に「設定 → プライバシー」でクローンの使用同意を有効にしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "음성을 저장하기 전에 설정 → 개인정보에서 음성 복제 동의를 활성화하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перед сохранением голоса включите согласие на клонирование в «Настройки → Конфиденциальность»."
+          }
+        }
+      }
+    },
     "vocello.error.install_model": {
       "comment": "Studio error. The substitution is the display name of a missing voice model.",
       "extractionState": "manual",

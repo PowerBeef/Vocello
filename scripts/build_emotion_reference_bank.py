@@ -304,6 +304,9 @@ def enroll(plan: list[dict[str, Any]], vocello: str) -> list[str]:
             [
                 vocello, "voices", "enroll", "--name", entry["name"],
                 "--audio", entry["audio"], "--transcript", entry["transcript"],
+                # PA-17: enrollment needs the invocation's recorded consent;
+                # the bank's references are repository-generated Voice Design takes.
+                "--confirm-consent",
             ],
             capture_output=True, env=environment, check=False,
         )

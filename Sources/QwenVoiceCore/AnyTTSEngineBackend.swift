@@ -7,6 +7,11 @@ import Foundation
 /// independent of the concrete engine class and of the optional capability
 /// protocols (event streaming, runtime control, memory reporting, cancellation,
 /// startup-reliability replay), which it probes once at construction.
+///
+/// PA-17: it is also the admission layer below both apps' views for voice-cloning
+/// consent. Clone generation and saved-voice enrollment re-read the host's recorded
+/// consent on every call and are refused with `VoiceCloningConsentRequiredError`
+/// before the engine sees them, whichever screen, runner or coordinator asked.
 @MainActor
 public final class AnyTTSEngineBackend {
     public let modelRegistry: any ModelRegistry
@@ -68,13 +73,18 @@ public final class AnyTTSEngineBackend {
     private let trimMemoryBlock: (NativeMemoryTrimLevel, String) async -> Void
     private let captureMemorySnapshotBlock: (IOSMemoryProcessRole) async -> IOSMemorySnapshot?
     private let engineLifecycleStateBlock: () -> EngineLifecycleState
+    private let voiceCloningConsentBlock: @MainActor () -> VoiceCloningConsentPolicy
 
+    /// `voiceCloningConsent` is read at every clone generation and enrollment, so a
+    /// Settings change applies to the next call; there is deliberately no default.
     public init<Engine: TTSEngine & AnyObject>(
         engine: Engine,
         supportsSavedVoiceMutation: Bool,
         supportsModelManagementMutation: Bool,
-        supportedModes: Set<GenerationMode>
+        supportedModes: Set<GenerationMode>,
+        voiceCloningConsent: @escaping @MainActor () -> VoiceCloningConsentPolicy
     ) {
+        self.voiceCloningConsentBlock = voiceCloningConsent
         self.modelRegistry = engine.modelRegistry
         self.supportsSavedVoiceMutation = supportsSavedVoiceMutation
         self.supportsModelManagementMutation = supportsModelManagementMutation
@@ -244,7 +254,21 @@ public final class AnyTTSEngineBackend {
     public func events(for generationID: UUID) -> AsyncStream<GenerationEvent>? {
         eventsBlock(generationID)
     }
-    public func generate(_ request: GenerationRequest) async throws -> GenerationResult { try await generateBlock(request) }
+    /// Refuses a request conditioned on a reference voice unless consent is recorded.
+    /// Built-in Voice and Voice Design requests always pass.
+    public func admitVoiceCloning(for request: GenerationRequest) throws(VoiceCloningConsentRequiredError) {
+        try voiceCloningConsentBlock().admitGeneration(request)
+    }
+
+    /// Refuses saved-voice enrollment unless consent is recorded.
+    public func admitVoiceEnrollment() throws(VoiceCloningConsentRequiredError) {
+        try voiceCloningConsentBlock().admit(.enrollment)
+    }
+
+    public func generate(_ request: GenerationRequest) async throws -> GenerationResult {
+        try admitVoiceCloning(for: request)
+        return try await generateBlock(request)
+    }
     public func replayStartupReliabilityCodecTrace(
         request: GenerationRequest,
         frames: [[Int32]],
@@ -263,7 +287,8 @@ public final class AnyTTSEngineBackend {
         transcript: String?,
         replacingVoiceID: String?
     ) async throws -> PreparedVoiceCandidate {
-        try await preparePreparedVoiceCandidateBlock(name, audioPath, transcript, replacingVoiceID, nil)
+        try admitVoiceEnrollment()
+        return try await preparePreparedVoiceCandidateBlock(name, audioPath, transcript, replacingVoiceID, nil)
     }
     public func preparePreparedVoiceCandidate(
         name: String,
@@ -272,7 +297,8 @@ public final class AnyTTSEngineBackend {
         replacingVoiceID: String?,
         enrollmentMetadata: PreparedVoiceEnrollmentMetadata?
     ) async throws -> PreparedVoiceCandidate {
-        try await preparePreparedVoiceCandidateBlock(
+        try admitVoiceEnrollment()
+        return try await preparePreparedVoiceCandidateBlock(
             name,
             audioPath,
             transcript,
@@ -287,7 +313,8 @@ public final class AnyTTSEngineBackend {
         try await discardPreparedVoiceCandidateBlock(id)
     }
     public func enrollPreparedVoice(name: String, audioPath: String, transcript: String?) async throws -> PreparedVoice {
-        try await enrollPreparedVoiceBlock(name, audioPath, transcript)
+        try admitVoiceEnrollment()
+        return try await enrollPreparedVoiceBlock(name, audioPath, transcript)
     }
     public func deletePreparedVoice(id: String) async throws { try await deletePreparedVoiceBlock(id) }
     public func exportGeneratedAudio(from sourceURL: URL, to destinationURL: URL) throws -> ExportedDocument {

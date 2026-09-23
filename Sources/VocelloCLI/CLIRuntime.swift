@@ -19,8 +19,16 @@ struct CLIRuntime {
     let engine: MLXTTSEngine
     let registry: ContractBackedModelRegistry
     let dataDirectory: URL
+    /// PA-17: the invocation's recorded voice-cloning consent (`--confirm-consent`).
+    /// Generation and enrollment go through `generate(_:)` / `enrollPreparedVoice`
+    /// below, never straight to `engine`, so the core policy refuses them first.
+    let voiceCloningConsent: VoiceCloningConsentPolicy
 
-    static func bootstrap(dataDirectory: URL, manifestOverride: URL?) async throws -> CLIRuntime {
+    static func bootstrap(
+        dataDirectory: URL,
+        manifestOverride: URL?,
+        voiceCloningConsent: VoiceCloningConsentPolicy = CLIVoiceCloningConsent.notConfirmed
+    ) async throws -> CLIRuntime {
         let manifestURL = try manifestOverride ?? locateManifestURL()
         let deviceClass = NativeMemoryPolicyResolver.deviceClass()
         let registry = try ContractBackedModelRegistry(manifestURL: manifestURL)
@@ -36,7 +44,24 @@ struct CLIRuntime {
             customPrewarmPolicy: customPrewarmPolicy
         )
         try await runtime.engine.initialize(appSupportDirectory: dataDirectory)
-        return CLIRuntime(engine: runtime.engine, registry: registry, dataDirectory: dataDirectory)
+        return CLIRuntime(
+            engine: runtime.engine,
+            registry: registry,
+            dataDirectory: dataDirectory,
+            voiceCloningConsent: voiceCloningConsent
+        )
+    }
+
+    /// Every CLI generation: clone requests are refused without recorded consent.
+    func generate(_ request: GenerationRequest) async throws -> GenerationResult {
+        try voiceCloningConsent.admitGeneration(request)
+        return try await engine.generate(request)
+    }
+
+    /// Every CLI saved-voice enrollment: refused without recorded consent.
+    func enrollPreparedVoice(name: String, audioPath: String, transcript: String?) async throws -> PreparedVoice {
+        try voiceCloningConsent.admit(.enrollment)
+        return try await engine.enrollPreparedVoice(name: name, audioPath: audioPath, transcript: transcript)
     }
 
     /// Read-only context for discoverability commands (`speakers`, `models`):

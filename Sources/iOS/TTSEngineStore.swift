@@ -354,6 +354,9 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
         if case .unsupported(let reason) = supportDecision(for: request) {
             throw MLXTTSEngineError.unsupportedRequest(reason)
         }
+        // PA-17: refuse clone generation without recorded consent before any
+        // ownership, memory admission, cold-unload or event subscription work.
+        try backend.admitVoiceCloning(for: request)
         guard generationOwnership.admitsGeneration(hasActiveGeneration: hasActiveGeneration) else {
             throw MLXTTSEngineError.generationFailed(
                 "The engine is already generating audio or releasing memory. Wait for it to finish before starting another generation."
@@ -405,6 +408,12 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
             result = try await backend.generate(request)
             await chunkForwardingTask?.value
         } catch {
+            if error is VoiceCloningConsentRequiredError {
+                // Consent was withdrawn during admission and the backend refused the
+                // request, so the engine never opened this generation's event stream
+                // and it will never deliver a terminal event: stop the drain instead.
+                chunkForwardingTask?.cancel()
+            }
             await chunkForwardingTask?.value
             throw error
         }

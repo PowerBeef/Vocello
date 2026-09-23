@@ -295,6 +295,11 @@ enum BenchCommand {
         if warm == 0, modes.contains("clone") {
             throw CLIError("--warm 0 cannot be used with Clone because Clone has no separate cold cell")
         }
+        // PA-17: a Clone cell needs this invocation's recorded consent; refuse before boot.
+        let consent = CLIVoiceCloningConsent.policy(confirmed: args.flag(CLIVoiceCloningConsent.flagName))
+        for mode in modes.compactMap(GenerationMode.init(rawValue:)) {
+            try consent.admitGeneration(mode: mode)
+        }
         if warm == 0, !deliveryItems.isEmpty {
             throw CLIError("--warm 0 cannot be used with --delivery because delivery analysis requires a neutral warm cell")
         }
@@ -370,7 +375,8 @@ enum BenchCommand {
         note("bench • data: \(resolvedDataDir.path)")
         let runtime = try await CLIRuntime.bootstrap(
             dataDirectory: resolvedDataDir,
-            manifestOverride: manifestOverride
+            manifestOverride: manifestOverride,
+            voiceCloningConsent: consent
         )
 
         let outDir = resolvedDataDir.appendingPathComponent("outputs/bench", isDirectory: true)
@@ -730,7 +736,7 @@ enum BenchCommand {
                 result = genResult
                 firstChunkMS = observedFirstChunkMS
             } else {
-                result = try await runtime.engine.generate(request)
+                result = try await runtime.generate(request)
             }
         } catch {
             throw BenchTakeExecutionFailure(
@@ -1580,7 +1586,7 @@ enum BenchCommand {
         playback-scheduled latency, or the merged app+engine row
         (use the app for those); --ttfc adds an engine-side first-chunk probe.
         Prerequisites: the requested models installed; saved clone voice
-        '\(defaultCloneVoice)' when clone is in --modes.
+        '\(defaultCloneVoice)' and --confirm-consent when clone is in --modes.
 
         Options:
           --modes        strict comma list: custom,design,clone (default all)
@@ -1591,6 +1597,8 @@ enum BenchCommand {
                          allowed for a Custom/Design cold-only diagnostic;
                          Clone and --delivery require at least one warm take.
           --voice        (clone) saved voice name; default \(defaultCloneVoice)
+          --confirm-consent  required when clone is in --modes: confirms you own or
+                         have permission to clone the saved voice
           --speaker      (custom) exact Built-in Voice speaker id; default contract speaker
                          (discover with `vocello speakers list`)
           --voice-brief  (design) brief; default the standard narrator brief

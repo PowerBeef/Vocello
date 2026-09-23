@@ -112,6 +112,7 @@ def main() -> int:
         carry_path, carry_wall = run_vocello(
             [
                 "clone",
+                "--confirm-consent",  # PA-17: recorded consent for a test-owned take
                 "--reference", str(a_local),
                 "--transcript", SEGMENT_A,
                 "--text", SEGMENT_B,

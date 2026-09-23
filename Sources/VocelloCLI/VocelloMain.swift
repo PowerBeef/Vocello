@@ -77,6 +77,8 @@ enum VocelloMain {
           version             print version
 
         Global: --json (machine-readable stdout), --quiet / --verbose (stderr notes).
+        Voice cloning (clone generation, `voices enroll`, clone bench cells) requires
+        --confirm-consent: only clone voices you own or have permission to use.
         """)
     }
 }

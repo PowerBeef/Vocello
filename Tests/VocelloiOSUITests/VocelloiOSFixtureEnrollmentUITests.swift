@@ -16,6 +16,9 @@ final class VocelloiOSFixtureEnrollmentUITests: VocelloiOSUITestCase {
         defer { endSession() }
 
         let voiceName = VocelloUIBenchMatrix.cloneVoiceID
+        // Enrollment is refused below the views without the recorded Settings
+        // consent (PA-17); establish it through the visible control first.
+        ensureCloneConsentEnabled()
         select(tab: .voices)
         let savedVoice = element("voicesRow_saved_\(voiceName)")
         // Idempotency probe: the shared waits record a failure on timeout, so an

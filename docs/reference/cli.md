@@ -151,6 +151,7 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 | `--speaker` | (custom) speaker id; default = contract default (see `vocello speakers list`) |
 | `--voice-brief` | (design) plain-language voice description |
 | `--voice` / `--reference` / `--transcript` | (clone) a saved voice name/id, or a reference `.wav` + optional transcript |
+| `--confirm-consent` | (clone) **required**: confirms you own or have permission to clone this voice; ignored by other modes (see [Voice-cloning consent](#voice-cloning-consent)) |
 | `--delivery` | optional delivery style |
 | `--seed` | deterministic sampling seed — the same request + seed reproduces the same take bit-for-bit |
 | `--variation` | `expressive` (default, official sampling) · `balanced` · `consistent` — trades take-to-take liveliness for repeatability |
@@ -211,9 +212,22 @@ instead of silently ignored (use `generate` or batch `--out-dir`).
 
 ```sh
 vocello voices list [--json]
-vocello voices enroll --name <name> --audio <wav> [--transcript "…"]
+vocello voices enroll --name <name> --audio <wav> [--transcript "…"] --confirm-consent
 vocello voices delete --id <id>
 ```
+
+`enroll` requires `--confirm-consent`; `list` and `delete` do not.
+
+### Voice-cloning consent
+
+The apps record voice-cloning consent once, through the visible Settings acknowledgment. The CLI has
+no Settings screen and does not read the apps' preference, so every invocation that clones or saves a
+voice records consent explicitly with the bare `--confirm-consent` flag: `generate`/`batch` in clone
+mode (including the `vocello clone …` shortcut), `voices enroll`, and `bench` whenever `clone` is in
+`--modes` (the default matrix includes it). Without the flag the command refuses before booting the
+engine, and `CLIRuntime` applies the same `VoiceCloningConsentPolicy` again at the engine call, so no
+clone request or enrollment reaches the engine unconfirmed. The flag is accepted and ignored on other
+runs, so scripts may pass it uniformly. Pass it only for voices you own or have permission to clone.
 
 ### `speakers` — list built-in Built-in Voice speakers
 
@@ -294,6 +308,7 @@ CLI is run from a Vocello checkout (skipped when `--telemetry off` or repository
 | `--modes` / `--variants` / `--lengths` | strict comma-list matrix axes: `custom,design,clone` / `speed,quality` / `short,medium,long`; empty, unknown, or duplicate values fail before runtime bootstrap |
 | `--warm` | warm reps per (cell × length); default 3 |
 | `--voice` / `--voice-brief` | clone voice name / design brief |
+| `--confirm-consent` | required when `clone` is in `--modes`: confirms you own or have permission to clone the saved voice |
 | `--delivery [list]` | add **instruct-bearing delivery cells** (Custom/Design, warm, medium text, 1 take each): comma list of `<preset>[.<intensity>]` values (e.g. `happy.strong,calm.normal`); the bare flag runs `happy.strong,calm.strong,whisper.strong`. Rows are stamped `notes.delivery` and summarized in their own block; the plain warm takes double as the neutral reference for prosody/delivery A/Bs. Prosody analysis selects only WAVs named by the current run manifest and runs before the final summary. Delivery evidence remains inside the parent engine-generation record. |
 | `--label <opaque-id>` | stamp a privacy-safe identifier using only letters, numbers, `.`, `_`, and `-` |
 | `--run-id <id>` | supply a collision-resistant run ID for orchestration; normal invocations mint one automatically |
@@ -322,8 +337,9 @@ warm streaming take per cell, run after the matrix and excluded from its frozen 
 
 **Preflight.** Before running, `bench` fails fast if any requested `(mode × variant)` model isn't
 installed (listing the missing ids), and fails if `clone` is in `--modes` but the saved voice
-(`--voice`, default `A_warm_elderly_woman`) is absent. Prerequisites: the requested models
-installed; a saved clone voice when clone is in the matrix.
+(`--voice`, default `A_warm_elderly_woman`) is absent or `--confirm-consent` is missing.
+Prerequisites: the requested models installed; a saved clone voice and `--confirm-consent` when
+clone is in the matrix.
 
 The deterministic `audioQC` gate runs for every benchmark take. `--delivery` additionally runs the
 paired delivery-prosody analysis before aggregation. The standalone

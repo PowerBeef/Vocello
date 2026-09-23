@@ -81,6 +81,9 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
     }
 
     private func captureDesignRefresh() {
+        // Saving the designed voice below is an enrollment, which the engine store
+        // refuses without the recorded Settings consent (PA-17).
+        ensureCloneConsentEnabled()
         navigate(to: .voiceDesign)
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("studioChip_voiceBrief"), timeout: 20))
         let brief = element("voiceDesign_voiceDescriptionField")

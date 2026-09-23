@@ -311,9 +311,11 @@ ensure_mac_test_clone_fixture() {
   fi
 
   _test_models_note "enrolling clone voice $MAC_TEST_CLONE_VOICE_NAME ..."
+  # PA-17: enrollment needs the invocation's recorded consent; the fixture is a
+  # Voice Design take generated just above.
   if ! QWENVOICE_DEBUG=1 "$TEST_MODELS_VOCELLO" voices enroll \
     --name "$MAC_TEST_CLONE_VOICE_NAME" --audio "$ref_wav" \
-    --transcript "$MAC_TEST_CLONE_REF_TRANSCRIPT" >/dev/null 2>&1; then
+    --transcript "$MAC_TEST_CLONE_REF_TRANSCRIPT" --confirm-consent >/dev/null 2>&1; then
     rm -rf "$ref_dir"
     if (( require == 1 )); then
       _test_models_die "failed to enroll clone voice $MAC_TEST_CLONE_VOICE_NAME"

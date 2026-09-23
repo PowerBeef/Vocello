@@ -147,7 +147,15 @@ extension QVoiceiOSApp {
                 engine: engine,
                 supportsSavedVoiceMutation: true,
                 supportsModelManagementMutation: true,
-                supportedModes: [.custom, .design, .clone]
+                supportedModes: [.custom, .design, .clone],
+                // PA-17: the visible Settings acknowledgment (`@AppStorage` in
+                // `.standard`) is the recorded consent the core enforces.
+                voiceCloningConsent: {
+                    VoiceCloningConsentPolicy(
+                        defaults: .standard,
+                        refusalCopy: IOSAppLanguage.shared.presentation.voiceCloningConsentRefusalCopy
+                    )
+                }
             )
         )
         let modelInstaller = IOSModelInstallerViewModel(

@@ -59,6 +59,9 @@ enum GenerateCommand {
     static func generateObservingFirstChunk(
         _ runtime: CLIRuntime, _ request: GenerationRequest
     ) async throws -> (result: GenerationResult, firstChunkMS: Double?, chunkCount: Int?) {
+        // Refuse before subscribing: a refused request never reaches the engine, so
+        // its event stream would never deliver the terminal event the drain awaits.
+        try runtime.voiceCloningConsent.admitGeneration(request)
         let submitted = ContinuousClock.now
         let wantedID = request.generationID
         let streamTask: Task<StreamObservation, Never>? = request.shouldStream && wantedID != nil ? {
@@ -83,7 +86,7 @@ enum GenerateCommand {
 
         let result: GenerationResult
         do {
-            result = try await runtime.engine.generate(request)
+            result = try await runtime.generate(request)
         } catch {
             if let streamTask { _ = await streamTask.value }
             throw error
@@ -116,6 +119,9 @@ enum GenerateCommand {
         // Mode: explicit --mode wins; else prompt interactively at a terminal; else
         // default to custom (keeps scripted/piped runs unchanged).
         let mode = try resolveModeInteractive(args)
+        // PA-17: clone needs this invocation's recorded consent; refuse before boot.
+        let consent = CLIVoiceCloningConsent.policy(confirmed: args.flag(CLIVoiceCloningConsent.flagName))
+        try consent.admitGeneration(mode: mode)
 
         let dataDir = CLIPaths.dataDirectory(override: args.string("data-dir"))
         let manifestOverride = args.string("manifest").map {
@@ -123,7 +129,8 @@ enum GenerateCommand {
         }
 
         note("booting engine (data: \(dataDir.path))")
-        let runtime = try await CLIRuntime.bootstrap(dataDirectory: dataDir, manifestOverride: manifestOverride)
+        let runtime = try await CLIRuntime.bootstrap(
+            dataDirectory: dataDir, manifestOverride: manifestOverride, voiceCloningConsent: consent)
         let modelID = try runtime.modelID(mode: mode, quality: quality)
         let payload = try await buildPayload(args, mode: mode, runtime: runtime)
         let deliveryInstructionCellID = try resolveDeliveryInstructionCellID(args, mode: mode)
@@ -441,6 +448,8 @@ enum GenerateCommand {
           --voice        (clone) saved voice name or id
           --reference    (clone) path to a reference .wav (alternative to --voice)
           --transcript   (clone) transcript of the --reference clip
+          --confirm-consent  (clone) required: confirms you own or have permission
+                         to clone this voice (ignored by other modes)
           --delivery     optional delivery style
           --delivery-cell  canonical preset cell (<preset>.<intensity>); custom mode only
           --language     Qwen3 language hint (english, french, auto, …); omitted = Auto

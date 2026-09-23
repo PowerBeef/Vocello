@@ -1146,7 +1146,8 @@ def execute_plan(
             command += ["--language", row["targetLanguage"]]
         if row["mode"] == "clone":
             reference = references[row["referenceAlias"]]
-            command += ["--reference", str(bundle_root / reference["audio"])]
+            # PA-17: clone generation needs the invocation's recorded consent.
+            command += ["--reference", str(bundle_root / reference["audio"]), "--confirm-consent"]
             if row["transcriptArm"] != "audio-only":
                 transcript_path = reference["transcripts"].get(row["transcriptArm"])
                 if transcript_path is None:

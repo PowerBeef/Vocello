@@ -826,7 +826,9 @@ then removes outbox entries and requested WAVs; an interrupted cleanup resumes b
 append can replay.
 
 **`UserDefaults` keys**: `vocello.voiceCloningConsent.v1` (visible Settings-owned clone-consent
-acknowledgment), `vocello.ios.interfaceLanguage` (the interface language, in `AppDefaults.store` on
+acknowledgment; below the views `AnyTTSEngineBackend` reads it through `VoiceCloningConsentPolicy`
+on every clone generation and saved-voice enrollment and refuses both without it, while the CLI
+records consent per invocation with `--confirm-consent`), `vocello.ios.interfaceLanguage` (the interface language, in `AppDefaults.store` on
 macOS through `MacInterfaceLanguage`), per-mode variant choices (`QwenVoice.MacModelVariantPreference.<mode>`) and the
 `QwenVoice.PreferSpeedEverywhere` lower-memory preference (`MacModelVariantResolution`: explicit
 choice, then Speed when the preference is on, then the hardware recommendation), and UI state

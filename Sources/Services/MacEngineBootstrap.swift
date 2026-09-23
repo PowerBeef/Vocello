@@ -46,7 +46,15 @@ enum MacEngineBootstrap {
                 engine: runtime.engine,
                 supportsSavedVoiceMutation: true,
                 supportsModelManagementMutation: true,
-                supportedModes: [.custom, .design, .clone]
+                supportedModes: [.custom, .design, .clone],
+                // PA-17: the visible Settings acknowledgment (`@AppStorage` in
+                // `AppDefaults.store`) is the recorded consent the core enforces.
+                voiceCloningConsent: {
+                    VoiceCloningConsentPolicy(
+                        defaults: AppDefaults.store,
+                        refusalCopy: MacInterfaceText.presentation.voiceCloningConsentRefusalCopy
+                    )
+                }
             ),
             memoryBudgetPolicy: MacMemoryBudgetPolicy.policy(for: deviceClass)
         )

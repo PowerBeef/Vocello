@@ -301,7 +301,11 @@ enum IOSDeviceDiagnosticsRunner {
             result.stagedInputsDeleted = true
         } catch {
             result.status = "failed"
-            result.failureReason = "enrollment-error"
+            // PA-17: the store refuses enrollment until the device's visible Settings
+            // consent is recorded; name that precondition instead of a generic error.
+            result.failureReason = error is VoiceCloningConsentRequiredError
+                ? "clone-consent-not-recorded"
+                : "enrollment-error"
             result.failureDescription = String(describing: error).prefix(300).description
         }
     }

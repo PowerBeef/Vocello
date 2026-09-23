@@ -43,6 +43,9 @@ enum BatchCommand {
 
         let mode = try GenerateCommand.resolveMode(args)
         let quality = try GenerateCommand.resolveQuality(args)
+        // PA-17: clone needs this invocation's recorded consent; refuse before boot.
+        let consent = CLIVoiceCloningConsent.policy(confirmed: args.flag(CLIVoiceCloningConsent.flagName))
+        try consent.admitGeneration(mode: mode)
 
         let lines = try readLines(args)
         guard !lines.isEmpty else {
@@ -53,7 +56,8 @@ enum BatchCommand {
         let manifestOverride = args.string("manifest").map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
 
         note("booting engine (data: \(dataDir.path))")
-        let runtime = try await CLIRuntime.bootstrap(dataDirectory: dataDir, manifestOverride: manifestOverride)
+        let runtime = try await CLIRuntime.bootstrap(
+            dataDirectory: dataDir, manifestOverride: manifestOverride, voiceCloningConsent: consent)
         let modelID = try runtime.modelID(mode: mode, quality: quality)
         // One shared payload keeps the loaded model/session reusable while the
         // command owns each item's result, cancellation, and retained receipt.
@@ -89,7 +93,7 @@ enum BatchCommand {
         let outcome = await CLIBatchExecution.run(requests, progress: { index, total in
             noteVerbose("item \(index + 1)/\(total)")
         }) { request in
-            return try await runtime.engine.generate(request)
+            return try await runtime.generate(request)
         }
         let results = outcome.results
         let wall = Date().timeIntervalSince(wallStart)
@@ -175,6 +179,8 @@ enum BatchCommand {
           --voice        (clone) saved voice name or id
           --reference    (clone) path to a reference .wav
           --transcript   (clone) transcript of the --reference clip
+          --confirm-consent  (clone) required: confirms you own or have permission
+                         to clone this voice (ignored by other modes)
           --delivery     optional delivery style (applies to all clips)
           --out-dir      output directory; default → <data>/outputs/cli/batch/
           --seed         deterministic sampling seed, applied to every item

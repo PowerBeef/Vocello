@@ -429,7 +429,9 @@ def qualify(
         raise ValueError("CLI qualification clone reference must be a real file")
     if clone_reference.stat().st_size <= 44 or clone_reference.stat().st_size > 100 * 1024**2:
         raise ValueError("CLI qualification clone reference is outside bounds")
-    clone_arguments = ["--reference", str(clone_reference.resolve())]
+    # PA-17: the CLI refuses clone generation without the invocation's recorded consent;
+    # the operator supplies a test-owned reference they may clone.
+    clone_arguments = ["--reference", str(clone_reference.resolve()), "--confirm-consent"]
     if clone_transcript is not None:
         if clone_transcript.is_symlink() or not clone_transcript.is_file() or clone_transcript.stat().st_size > 65536:
             raise ValueError("CLI qualification transcript must be a bounded real file")

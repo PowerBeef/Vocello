@@ -41,6 +41,28 @@ DEFAULT_LENGTHS = ["short", "medium", "long"]
 DEFAULT_WARM = 3
 THERMAL_RANK = {"unknown": -1, "nominal": 0, "fair": 1, "serious": 2, "critical": 3}
 TRIM_SEVERITY = {"softTrim": 1, "hardTrim": 2, "fullUnload": 3}
+# NativeDeviceMemoryClass Mac tiers. Engine rows stamp `notes.deviceClass` with
+# the raw value (`floor_8gb_mac`); older fixtures and docs use the case name.
+MAC_DEVICE_CLASSES = {
+    "floor8GBMac": "floor8GBMac", "floor_8gb_mac": "floor8GBMac",
+    "mid16GBMac": "mid16GBMac", "mid_16gb_mac": "mid16GBMac",
+    "highMemoryMac": "highMemoryMac", "high_memory_mac": "highMemoryMac",
+}
+
+
+def stall_gate_applies(notes: dict) -> bool:
+    """Whether the 50 ms main-thread stall gate covers one engine row.
+
+    The 8 GB floor tier is always gated, forced or native, as before. Every
+    other Mac tier (the canonical Mac mini M6 runs `mid16GBMac`) is gated when
+    it is the host's native tier; a forced tier is a diagnostic simulation.
+    """
+    device = MAC_DEVICE_CLASSES.get(str(notes.get("deviceClass") or ""))
+    if device is None:
+        return False
+    if device == "floor8GBMac":
+        return True
+    return str(notes.get("deviceClassForced", "false")).lower() != "true"
 
 
 def is_digest(value) -> bool:
@@ -65,12 +87,24 @@ def exact_model_variant(identity: dict, row: dict) -> str | None:
     return None
 
 
-def run_hardware_context(rows: list[dict]) -> dict:
+def canonical_macos_profile_id() -> str:
+    """The registry's canonical macOS profile ID (a registry lookup, no live probe).
+
+    `scripts/ui_test.sh` proves the live host matches this profile through
+    `publish_benchmark_history.py verify-hardware` before a benchmark build,
+    and the recorder fills the remaining hardware fields from the same profile.
+    """
+    import publish_benchmark_history as publisher
+
+    return str(publisher.canonical_hardware_profile("macos")["id"])
+
+
+def run_hardware_context(rows: list[dict], profile_id: str) -> dict:
     environments = [
         (row.get("summary") or {}).get("runEnvironment") or {}
         for row in rows
     ]
-    result: dict = {"profileID": "mac-mini-m2-8gb"}
+    result: dict = {"profileID": profile_id}
     loads = [env.get("loadAverage1Minute") for env in environments if isinstance(env.get("loadAverage1Minute"), (int, float))]
     free = [env.get("freeStorageBytes") for env in environments if isinstance(env.get("freeStorageBytes"), int)]
     uptime = [env.get("uptimeSeconds") for env in environments if isinstance(env.get("uptimeSeconds"), (int, float))]
@@ -652,7 +686,7 @@ def build_manifest(
     status = "passedWithWarnings" if warning_count else "pass"
     scope = matrix_scope(modes, lengths, warm)
     expected = len(cells)
-    hardware = run_hardware_context(engine_rows)
+    hardware = run_hardware_context(engine_rows, canonical_macos_profile_id())
     recorded = sorted(
         row.get("recordedAt") for row in engine_rows
         if isinstance(row.get("recordedAt"), str) and row.get("recordedAt")
@@ -1010,8 +1044,7 @@ def main() -> int:
             )
     for engine_row in engine_rows:
         gid = engine_row.get("generationID")
-        device = (engine_row.get("notes") or {}).get("deviceClass") or ""
-        if device != "floor8GBMac":
+        if not stall_gate_applies(engine_row.get("notes") or {}):
             continue
         app_row = app_by_id.get(gid) or {}
         counters = app_row.get("counters") or {}

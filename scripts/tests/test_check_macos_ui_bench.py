@@ -372,6 +372,51 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         self.assertEqual(manifest["schemaVersion"], 2)
         self.assertEqual(manifest["historyRecord"]["evidence"]["sampleSidecarCount"], 10)
 
+    def test_manifest_hardware_is_the_registry_canonical_macos_profile(self) -> None:
+        registry = json.loads((ROOT / "benchmarks" / "hardware-profiles.json").read_text(encoding="utf-8"))
+        canonical = [
+            profile["id"] for profile in registry["profiles"]
+            if profile["platform"] == "macos" and profile.get("canonical") is True
+        ]
+        self.assertEqual(canonical, ["mac-mini-m6-16gb"])
+        result = self.run_checker(self.expected_order, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.last_manifest["historyRecord"]["hardware"]["profileID"], canonical[0])
+
+    def run_with_stalls(self, device_class: str | None, *, forced: bool = False, stalls: int = 2):
+        def set_device_class(rows: list[dict]) -> None:
+            for row in rows:
+                if device_class is not None:
+                    row["notes"]["deviceClass"] = device_class
+                row["notes"]["deviceClassForced"] = "true" if forced else "false"
+
+        def add_stalls(layers: dict[str, list[dict]]) -> None:
+            layers["app"][0]["frontendMetrics"]["delayedHeartbeatCount50"] = stalls
+
+        return self.run_checker(self.expected_order, set_device_class, add_stalls)
+
+    def test_main_thread_stall_gate_covers_every_native_mac_tier(self) -> None:
+        # Engine rows stamp the raw NativeDeviceMemoryClass value; the case name is accepted too.
+        for device_class in ("mid_16gb_mac", "mid16GBMac", "high_memory_mac", "floor_8gb_mac", "floor8GBMac"):
+            with self.subTest(device_class=device_class):
+                result = self.run_with_stalls(device_class)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("delayedHeartbeatCount50 2 > 0", result.stdout + result.stderr)
+        with self.subTest("mid16GBMac without stalls"):
+            result = self.run_with_stalls("mid_16gb_mac", stalls=0)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_main_thread_stall_gate_skips_forced_non_floor_tiers_only(self) -> None:
+        result = self.run_with_stalls("mid_16gb_mac", forced=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # The floor tier stays gated even when forced, as before.
+        result = self.run_with_stalls("floor8GBMac", forced=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("delayedHeartbeatCount50 2 > 0", result.stdout + result.stderr)
+        # Rows without a Mac tier are not gated.
+        result = self.run_with_stalls(None)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_missing_correlated_layer_row_fails_without_evidence(self) -> None:
         def remove_app_row(layers: dict[str, list[dict]]) -> None:
             layers["app"].pop()

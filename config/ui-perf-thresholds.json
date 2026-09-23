@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
-  "basis": "baseline-v3 medians (2026-09-15: three counted perf sessions on the converged macOS app after the last legacy screen left in CONV-22, Mac mini M2 8 GB, English pinned, runs macos-xcui-perf-20260915-220611-0bb33592, macos-xcui-perf-20260915-221935-636488c2, macos-xcui-perf-20260915-222752-64610737). Ceilings are twice the hitch median and 1.5x the gap median, never below 1.25x the observed maximum, rounded up, with floors of 5 ms/s and 40 ms so a quiet scenario never warns on one frame. Warn-only: a breach marks the scenario and run passedWithWarnings and never blocks publication; promotion to hard ceilings requires repeated sessions showing stable spread. Supersedes the baseline-v2 decision of 2026-08-05 (wave-2 tree).",
+  "basis": "baseline-v3 medians (2026-09-15: three counted perf sessions on the converged macOS app after the last legacy screen left in CONV-22, Mac mini M2 8 GB, English pinned, runs macos-xcui-perf-20260915-220611-0bb33592, macos-xcui-perf-20260915-221935-636488c2, macos-xcui-perf-20260915-222752-64610737). Ceilings are twice the hitch median and 1.5x the gap median, never below 1.25x the observed maximum, rounded up, with floors of 5 ms/s and 40 ms so a quiet scenario never warns on one frame. Warn-only: a breach marks the scenario and run passedWithWarnings and never blocks publication; promotion to hard ceilings requires repeated sessions showing stable spread. Supersedes the baseline-v2 decision of 2026-08-05 (wave-2 tree). Provisional on mac-mini-m6-16gb until re-derived from counted M6 sessions (AV-17).",
+  "calibrationProfile": "mac-mini-m2-8gb",
   "warnOnly": true,
   "confirmatoryScenarios": [
     "idle-baseline",

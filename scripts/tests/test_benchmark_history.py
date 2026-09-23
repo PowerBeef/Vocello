@@ -176,6 +176,48 @@ def record_fixture(
     }
 
 
+M6_HARDWARE = {
+    "profileID": "mac-mini-m6-16gb",
+    "modelIdentifier": "Mac18,5",
+    "marketingName": "Mac mini (M6, 16 GB)",
+    "chip": "Apple M6",
+    "memoryBytes": 17_179_869_184,
+    "cpuCores": 12,
+    "performanceCores": 6,
+    "efficiencyCores": 6,
+}
+
+
+def quality_v3_language_fixture(run_id: str) -> dict:
+    """A schema-v3 language record that satisfies the memory and quality contracts."""
+    record = record_fixture(run_id=run_id, kind="language")
+    record["schemaVersion"] = 3
+    record["evidence"].update({
+        "telemetrySchemaVersion": 8,
+        "memoryContractVersion": 1,
+        "memoryQualified": True,
+        "sampleSidecarCount": 1,
+        "sampleSidecarsDigest": "a" * 64,
+    })
+    take = record["takes"][0]
+    take["memoryStatus"] = "qualified"
+    take["sampleSidecarDigest"] = "b" * 64
+    take["metrics"].update({key: 0.0 for key in history.MEMORY_REQUIRED_METRICS})
+    take["metrics"].update({
+        "samplerCoverage": 1.0,
+        "samplerSampleCount": 10.0,
+        "samplerBoundarySampleCount": 8.0,
+        "samplerPeriodicSampleCount": 1.0,
+        "gpuRecommendedWorkingSetMB": 4096.0,
+        "mlxActivePeakMB": 100.0,
+        "mlxCachePeakMB": 10.0,
+        "mlxPeakMB": 110.0,
+    })
+    take["qualityRegistryOutcome"] = "pass"
+    take["qualityRegistryRequiredGates"] = sorted(history.QUALITY_FAST_GATES)
+    return record
+
+
 def trace_summary(take_count: int = 1) -> dict:
     return {
         "artifact": "build/profiles/fixture.trace",
@@ -770,31 +812,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
                 self.publish(candidate, f"language-memory-v2-{name}")
 
     def test_schema_v3_generation_records_require_the_quality_identity(self) -> None:
-        valid = record_fixture(run_id="language-quality-v3", kind="language")
-        valid["schemaVersion"] = 3
-        valid["evidence"].update({
-            "telemetrySchemaVersion": 8,
-            "memoryContractVersion": 1,
-            "memoryQualified": True,
-            "sampleSidecarCount": 1,
-            "sampleSidecarsDigest": "a" * 64,
-        })
-        take = valid["takes"][0]
-        take["memoryStatus"] = "qualified"
-        take["sampleSidecarDigest"] = "b" * 64
-        take["metrics"].update({key: 0.0 for key in history.MEMORY_REQUIRED_METRICS})
-        take["metrics"].update({
-            "samplerCoverage": 1.0,
-            "samplerSampleCount": 10.0,
-            "samplerBoundarySampleCount": 8.0,
-            "samplerPeriodicSampleCount": 1.0,
-            "gpuRecommendedWorkingSetMB": 4096.0,
-            "mlxActivePeakMB": 100.0,
-            "mlxCachePeakMB": 10.0,
-            "mlxPeakMB": 110.0,
-        })
-        take["qualityRegistryOutcome"] = "pass"
-        take["qualityRegistryRequiredGates"] = sorted(history.QUALITY_FAST_GATES)
+        valid = quality_v3_language_fixture("language-quality-v3")
         path = self.publish(valid, "language-quality-v3")
         published = json.loads(path.read_text())
         self.assertEqual(published["schemaVersion"], 3)
@@ -1786,6 +1804,71 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.schema.write_text(json.dumps(schema), encoding="utf-8")
         with self.assertRaisesRegex(history.HistoryError, "run.label exceeds"):
             history.validate_all()
+
+
+    def test_canonical_m6_record_validates_and_schema_v1_stays_frozen(self) -> None:
+        m6 = quality_v3_language_fixture("language-m6-v3")
+        m6["hardware"].update(M6_HARDWARE)
+        path = self.publish(m6, "language-m6-v3")
+        published = json.loads(path.read_text())
+        self.assertEqual(published["hardware"]["profileID"], "mac-mini-m6-16gb")
+        self.assertEqual(published["hardware"]["memoryBytes"], 17_179_869_184)
+        history.validate_all()
+
+        # schema-v1 predates the M6 and is frozen: it cannot carry an M6 record.
+        legacy = record_fixture(run_id="macos-m6-v1")
+        legacy["hardware"].update(M6_HARDWARE)
+        with self.assertRaises(history.HistoryError):
+            self.publish(legacy, "macos-m6-v1")
+
+        # A record cannot borrow the retired M2 profile ID for M6 hardware.
+        mislabeled = quality_v3_language_fixture("language-m6-mislabeled")
+        mislabeled["hardware"].update(M6_HARDWARE)
+        mislabeled["hardware"]["profileID"] = "mac-mini-m2-8gb"
+        with self.assertRaisesRegex(history.HistoryError, "does not match the canonical profile"):
+            self.publish(mislabeled, "language-m6-mislabeled")
+
+    def test_m2_and_m6_records_never_share_a_comparison_key(self) -> None:
+        m2 = record_fixture()
+        m6 = copy.deepcopy(m2)
+        m6["hardware"].update(M6_HARDWARE)
+        self.assertNotEqual(history.comparison_key(m2), history.comparison_key(m6))
+        self.assertEqual(history.comparison_key(m2), history.comparison_key(copy.deepcopy(m2)))
+
+    def test_registry_names_exactly_one_canonical_profile_per_platform(self) -> None:
+        profiles = history.load_profiles()
+        platforms = {profile["platform"] for profile in profiles.values()}
+        self.assertEqual(platforms, {"macos", "ios"})
+        for platform in sorted(platforms):
+            canonical = [
+                profile["id"] for profile in profiles.values()
+                if profile["platform"] == platform and profile.get("canonical") is True
+            ]
+            self.assertEqual(len(canonical), 1, (platform, canonical))
+        self.assertIs(profiles["mac-mini-m2-8gb"]["canonical"], False)
+        self.assertIs(profiles["mac-mini-m6-16gb"]["canonical"], True)
+
+    def test_schema_v1_profiles_are_a_subset_while_live_schemas_match_exactly(self) -> None:
+        for version in (1, 2, 3):
+            history.load_schema_contract(version)
+
+        schema = json.loads(self.schema.read_text(encoding="utf-8"))
+        schema["$defs"]["hardware"]["properties"]["profileID"]["enum"].append("unregistered-mac")
+        self.schema.write_text(json.dumps(schema), encoding="utf-8")
+        with self.assertRaisesRegex(history.HistoryError, "hardware profiles drifted"):
+            history.load_schema_contract(1)
+
+        for version in (2, 3):
+            live = json.loads(history.SCHEMA_PATHS[version].read_text(encoding="utf-8"))
+            live["$defs"]["hardware"]["properties"]["profileID"]["enum"].remove("mac-mini-m6-16gb")
+            stale = self.root / f"schema-v{version}-stale.json"
+            stale.write_text(json.dumps(live), encoding="utf-8")
+            with (
+                self.subTest(version=version),
+                mock.patch.dict(history.SCHEMA_PATHS, {version: stale}),
+                self.assertRaisesRegex(history.HistoryError, "hardware profiles drifted"),
+            ):
+                history.load_schema_contract(version)
 
 
 if __name__ == "__main__":

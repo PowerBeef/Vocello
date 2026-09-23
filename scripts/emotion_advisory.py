@@ -9,7 +9,7 @@ prerequisite, and never publishes benchmark history. The deterministic
 delivery gate (``delivery_quality_gate.py``) remains the promoted verdict;
 this column adds an independent perceptual cross-check.
 
-Memory rule (Mac mini M2 8 GB dev floor): run strictly AFTER generation
+Memory rule (8 GB Mac support floor): run strictly AFTER generation
 completes — never while the engine is resident. The model is wav2vec2-large
 (~1.3 GB fp32 weights, CPU); the report records the process peak RSS so the
 first run on any machine documents its envelope.

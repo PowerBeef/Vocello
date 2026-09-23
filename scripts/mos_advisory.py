@@ -14,7 +14,7 @@ this engine's audio; treat the column as *relative* signal (take-vs-take,
 instructed-vs-neutral, build-vs-build on fixed seeds), never as an absolute
 quality claim.
 
-Memory rule (Mac mini M2 8 GB dev floor): run strictly AFTER generation
+Memory rule (8 GB Mac support floor): run strictly AFTER generation
 completes — never while the engine is resident. Inference is CPU; the
 report records the process peak RSS so the first run on any machine
 documents its envelope.

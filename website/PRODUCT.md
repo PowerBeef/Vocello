@@ -32,5 +32,5 @@ Warm, clear, confident, and human. Vocello explains local AI generation plainly.
 - The Mac app is the hero. Product screenshots and concrete workflows should carry trust.
 - The page should feel calm, polished, and Apple-native, with quiet motion and no decorative excess.
 - The primary CTA follows `stableMacRelease` in `../config/public-product-facts.json`, never the unpublished `candidateRelease`. Use that same contract for fallback Mac requirements and the separate iPhone distribution entry point; do not hand-maintain release numbers here.
-- Performance claims cite the canonical Mac mini M2 (8 GB) and trace to tracked records in benchmarks/HISTORY.md; never quote a number the repository cannot reproduce.
+- Performance claims name the hardware of the record they quote and trace to tracked records in benchmarks/HISTORY.md; never quote a number the repository cannot reproduce. The published figures were measured on the Mac mini M2 (8 GB), the support floor and the canonical host until 2026-09-22; the Mac mini M6 (16 GB) is the canonical benchmark host since then, and its records are never compared with the M2 history.
 - The site should acknowledge the QwenVoice rebrand quietly (inline "formerly QwenVoice" by the wordmark, the v1.2.3 fallback line, and the GitHub repo name). It is not a hero moment.

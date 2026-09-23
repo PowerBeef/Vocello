@@ -49,6 +49,31 @@ def validate_release_identity(public: dict, project: str) -> list[str]:
     return errors
 
 
+def validate_benchmark_profiles(root: Path, public: dict) -> list[str]:
+    """Published canonical benchmark hosts name the registry's canonical profiles."""
+    path = root / "benchmarks/hardware-profiles.json"
+    if not path.is_file():
+        return []
+    declared = public.get("canonicalBenchmarkProfiles")
+    if not isinstance(declared, dict) or not declared:
+        return ["public-product-facts: canonicalBenchmarkProfiles is missing"]
+    profiles = load_json(path).get("profiles")
+    errors = []
+    for platform, profile_id in sorted(declared.items()):
+        canonical = [
+            profile.get("id") for profile in profiles or []
+            if isinstance(profile, dict)
+            and profile.get("platform") == platform
+            and profile.get("canonical") is True
+        ]
+        if canonical != [profile_id]:
+            errors.append(
+                f"public-product-facts: canonical {platform} benchmark profile {profile_id!r} "
+                "is not the single canonical profile in benchmarks/hardware-profiles.json"
+            )
+    return errors
+
+
 def validate_public_guidance(root: Path, public: dict) -> list[str]:
     path = root / "website/PRODUCT.md"
     if not path.is_file():
@@ -128,6 +153,7 @@ def validate(root: Path) -> list[str]:
     project = (root / "project.yml").read_text(encoding="utf-8") if (root / "project.yml").is_file() else ""
     errors: list[str] = []
     errors.extend(validate_release_identity(public, project))
+    errors.extend(validate_benchmark_profiles(root, public))
     errors.extend(validate_public_guidance(root, public))
     errors.extend(validate_readme(root, public))
     errors.extend(validate_website_copy(root))

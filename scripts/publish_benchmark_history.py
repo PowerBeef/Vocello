@@ -3643,6 +3643,24 @@ def prosody_command(args: argparse.Namespace) -> Path:
     return write_and_record(args.artifact_dir, manifest)
 
 
+def verify_hardware_command(args: argparse.Namespace) -> str:
+    """Profile ID of the live host when it is the canonical benchmark profile.
+
+    `scripts/ui_test.sh` runs this before a macOS benchmark build so a run on
+    any other Mac never produces a record labelled with the canonical profile.
+    """
+    evidence = None
+    if args.platform == "ios":
+        if args.diagnostics is None or not args.run_id:
+            raise PublicationError(
+                "iOS hardware verification requires --diagnostics and --run-id sentinel evidence"
+            )
+        evidence = ios_run_hardware_evidence(args.diagnostics, args.run_id)
+    elif args.diagnostics is not None or args.run_id:
+        raise PublicationError("--diagnostics and --run-id apply to --platform ios only")
+    return verify_canonical_hardware(args.platform, ios_evidence=evidence)["profileID"]
+
+
 def add_snapshot(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--snapshot", type=Path, required=True)
     parser.add_argument("--artifact-dir", type=Path, required=True)
@@ -3754,6 +3772,17 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     ios_profile.add_argument("--summary-artifact", type=Path)
     ios_profile.add_argument("--defer-record", action="store_true")
 
+    verify = subparsers.add_parser(
+        "verify-hardware",
+        help="prove the live host is the canonical benchmark profile and print its ID",
+    )
+    verify.add_argument("--platform", choices=("macos", "ios"), required=True)
+    verify.add_argument(
+        "--diagnostics", type=Path,
+        help="iOS only: diagnostics root holding the run-scoped sentinel manifest",
+    )
+    verify.add_argument("--run-id", help="iOS only: the run whose sentinel manifest to read")
+
     prosody = subparsers.add_parser("prosody", help="publish a successful calibration corpus")
     add_snapshot(prosody)
     prosody.add_argument("--results", type=Path, required=True)
@@ -3783,10 +3812,12 @@ def main(argv: list[str] | None = None) -> int:
             print(ios_profile_command(args))
         elif args.command == "prosody":
             print(prosody_command(args))
+        elif args.command == "verify-hardware":
+            print(verify_hardware_command(args))
         return 0
     except (PublicationError, OSError, ValueError, subprocess.SubprocessError) as error:
         print(f"benchmark publication: FAIL: {error}", file=sys.stderr)
-        if args.command != "snapshot" and "repair:" not in str(error):
+        if args.command not in {"snapshot", "verify-hardware"} and "repair:" not in str(error):
             print(f"repair: {shlex.join([sys.executable, str(Path(__file__).resolve()), *sys.argv[1:]])}", file=sys.stderr)
         return 1
 

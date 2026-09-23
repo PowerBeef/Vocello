@@ -300,6 +300,12 @@ if [[ "$lane" == "benchmark" || "$lane" == "perf" ]]; then
   require_quiet_host "ui-$platform-$lane" \
     || die "$platform $lane needs a quiet host (load within 2x cores, no memory pressure)"
 fi
+if [[ "$platform" == "macos" && "$lane" == "benchmark" ]]; then
+  # The recorder labels macOS benchmark records with the registry's canonical
+  # profile; refuse before the build on any other Mac.
+  python3 "$ROOT_DIR/scripts/publish_benchmark_history.py" verify-hardware --platform macos \
+    || die "non-canonical host; benchmark records are not publishable"
+fi
 
 if [[ "$platform" == "macos" && "$lane" == "benchmark" && ",${modes}," == *",clone,"* ]]; then
   mac_test_clone_fixture_current \

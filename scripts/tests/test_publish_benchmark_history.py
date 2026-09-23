@@ -5,6 +5,7 @@ import copy
 import importlib.util
 import contextlib
 import hashlib
+import io
 import json
 from pathlib import Path
 import plistlib
@@ -414,7 +415,7 @@ class PublisherTests(unittest.TestCase):
             publisher,
             "verify_canonical_hardware",
             side_effect=lambda platform, **_kwargs: {
-                "profileID": "mac-mini-m2-8gb" if platform == "macos" else "iphone-17-pro"
+                "profileID": "mac-mini-m6-16gb" if platform == "macos" else "iphone-17-pro"
             },
         ))
         stack.enter_context(mock.patch.object(
@@ -935,26 +936,78 @@ class PublisherTests(unittest.TestCase):
         simulated["notes"]["simulatedProcessLimitMB"] = "5000"
         self.assertTrue(publisher.uses_forced_memory_profile([simulated]))
 
-    def test_mac_hardware_profile_requires_exact_model_and_ram(self) -> None:
-        values = {
-            ("sysctl", "-n", "hw.model"): "Mac14,3\n",
-            ("sysctl", "-n", "hw.memsize"): "8589934592\n",
-        }
-
+    @staticmethod
+    def sysctl_run(values: dict[tuple[str, ...], str]):
         def run(command, **_kwargs):
             return SimpleNamespace(returncode=0, stdout=values[tuple(command)], stderr="")
 
-        with mock.patch.object(publisher.subprocess, "run", side_effect=run):
+        return run
+
+    def test_mac_hardware_profile_requires_exact_model_and_ram(self) -> None:
+        # Reads the real registry: the Mac mini M6 16 GB is the canonical macOS host.
+        values = {
+            ("sysctl", "-n", "hw.model"): "Mac18,5\n",
+            ("sysctl", "-n", "hw.memsize"): "17179869184\n",
+        }
+        with mock.patch.object(publisher.subprocess, "run", side_effect=self.sysctl_run(values)):
             self.assertEqual(
                 publisher.verify_canonical_hardware("macos"),
-                {"profileID": "mac-mini-m2-8gb"},
+                {"profileID": "mac-mini-m6-16gb"},
             )
-        values[("sysctl", "-n", "hw.memsize")] = "17179869184\n"
-        with (
-            mock.patch.object(publisher.subprocess, "run", side_effect=run),
-            self.assertRaisesRegex(publisher.PublicationError, "does not match"),
+        for model, memory in (
+            ("Mac14,3", "8589934592"),  # the retired canonical Mac mini M2 8 GB
+            ("Mac18,5", "8589934592"),  # right model, wrong memory
         ):
-            publisher.verify_canonical_hardware("macos")
+            values = {
+                ("sysctl", "-n", "hw.model"): f"{model}\n",
+                ("sysctl", "-n", "hw.memsize"): f"{memory}\n",
+            }
+            with (
+                self.subTest(model=model, memory=memory),
+                mock.patch.object(publisher.subprocess, "run", side_effect=self.sysctl_run(values)),
+                self.assertRaisesRegex(publisher.PublicationError, "does not match"),
+            ):
+                publisher.verify_canonical_hardware("macos")
+
+    def test_registry_has_one_canonical_profile_per_platform(self) -> None:
+        self.assertEqual(publisher.canonical_hardware_profile("macos")["id"], "mac-mini-m6-16gb")
+        self.assertEqual(publisher.canonical_hardware_profile("ios")["id"], "iphone-17-pro")
+
+    def test_verify_hardware_command_prints_the_canonical_profile(self) -> None:
+        canonical = {
+            ("sysctl", "-n", "hw.model"): "Mac18,5\n",
+            ("sysctl", "-n", "hw.memsize"): "17179869184\n",
+        }
+        with (
+            mock.patch.object(publisher.subprocess, "run", side_effect=self.sysctl_run(canonical)),
+            mock.patch("sys.stdout", new_callable=io.StringIO) as stdout,
+        ):
+            self.assertEqual(publisher.main(["verify-hardware", "--platform", "macos"]), 0)
+        self.assertEqual(stdout.getvalue().strip(), "mac-mini-m6-16gb")
+
+        retired = {
+            ("sysctl", "-n", "hw.model"): "Mac14,3\n",
+            ("sysctl", "-n", "hw.memsize"): "8589934592\n",
+        }
+        with (
+            mock.patch.object(publisher.subprocess, "run", side_effect=self.sysctl_run(retired)),
+            mock.patch("sys.stdout", new_callable=io.StringIO) as stdout,
+            mock.patch("sys.stderr", new_callable=io.StringIO) as stderr,
+        ):
+            self.assertEqual(publisher.main(["verify-hardware", "--platform", "macos"]), 1)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn("does not match the canonical benchmark profile", stderr.getvalue())
+        self.assertNotIn("repair:", stderr.getvalue())
+
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+            self.assertEqual(publisher.main(["verify-hardware", "--platform", "ios"]), 1)
+        self.assertIn("--diagnostics and --run-id", stderr.getvalue())
+
+    def test_ui_test_macos_benchmark_refuses_a_non_canonical_host_before_building(self) -> None:
+        text = (SCRIPT.parent / "ui_test.sh").read_text(encoding="utf-8")
+        gate = text.index("verify-hardware --platform macos")
+        self.assertIn("non-canonical host; benchmark records are not publishable", text[gate:gate + 300])
+        self.assertLess(gate, text.index("command -v xcodebuild"))
 
     def test_ios_hardware_profile_binds_sentinel_to_one_exact_coredevice(self) -> None:
         product_type = "iPhone18,1"
@@ -2214,13 +2267,16 @@ class PublisherTests(unittest.TestCase):
             self.assertEqual(evidence["maximumRetainedGrowthMB"], 20.0)
             self.assertEqual(len(digest), 64)
 
+            # The threshold is a fraction of the canonical profile's physical memory
+            # (the registry's canonical macOS host), so spikes scale with it.
+            memory_mb = publisher.canonical_hardware_profile("macos")["memoryBytes"] / 1_048_576.0
             excessive = copy.deepcopy(takes)
-            excessive[3]["metrics"]["physicalFootprintEndMB"] = 3500.0
+            excessive[3]["metrics"]["physicalFootprintEndMB"] = 3000.0 + 0.06 * memory_mb
             with self.assertRaisesRegex(publisher.PublicationError, "exceeds policy threshold"):
                 publisher.memory_retention_evidence(results, excessive, "macos")
 
             recovered_spike = copy.deepcopy(takes)
-            recovered_spike[2]["metrics"]["physicalFootprintEndMB"] = 3600.0
+            recovered_spike[2]["metrics"]["physicalFootprintEndMB"] = 3000.0 + 0.075 * memory_mb
             recovered_spike[3]["metrics"]["physicalFootprintEndMB"] = 3010.0
             with self.assertRaisesRegex(publisher.PublicationError, "exceeds policy threshold"):
                 publisher.memory_retention_evidence(results, recovered_spike, "macos")

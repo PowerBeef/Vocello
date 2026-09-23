@@ -220,7 +220,9 @@ repeat runs on an unchanged tree skip the rebuild entirely), and write a per-tes
 
 Benchmark accepts `--modes`, `--lengths`, `--warm`, and `--label`. Filters are explicit diagnostic
 runs; invoking the command without filters is the canonical 29-take matrix on the tracked Mac mini
-`Mac14,3` / Apple M2 / 8 GB profile. Dirty-source successes are exploratory even on that hardware.
+`Mac18,5` / Apple M6 / 16 GB profile (canonical since 2026-09-22; the retired Mac mini M2 8 GB
+records stay history). The lane refuses to build on any other Mac ("non-canonical host; benchmark
+records are not publishable"). Dirty-source successes are exploratory even on that hardware.
 
 ## Model-dependent tests
 

@@ -28,7 +28,7 @@
     "memoryBytes": 8589934592
   },
   "canonicalBenchmarkProfiles": {
-    "macos": "mac-mini-m2-8gb",
+    "macos": "mac-mini-m6-16gb",
     "ios": "iphone-17-pro"
   },
   "authoritativeReferences": {

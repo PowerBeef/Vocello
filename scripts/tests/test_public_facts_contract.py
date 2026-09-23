@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -33,6 +35,27 @@ class ReleaseIdentityTests(unittest.TestCase):
     def test_stable_tag_must_match_version(self) -> None:
         errors = MODULE.validate_release_identity({"stableMacRelease": {"version": "2.4.0", "tag": "v2.4.1"}}, 'MARKETING_VERSION: "2.4.0"\n')
         self.assertTrue(any("tag/version" in e for e in errors), errors)
+
+
+class BenchmarkProfileTests(unittest.TestCase):
+    def write_root(self, root: Path) -> None:
+        (root / "benchmarks").mkdir()
+        (root / "benchmarks/hardware-profiles.json").write_text(json.dumps({"profiles": [
+            {"id": "mac-mini-m2-8gb", "platform": "macos", "canonical": False},
+            {"id": "mac-mini-m6-16gb", "platform": "macos", "canonical": True},
+            {"id": "iphone-17-pro", "platform": "ios", "canonical": True},
+        ]}), encoding="utf-8")
+
+    def test_declared_profiles_must_be_the_registry_canonical_profiles(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_root(root)
+            current = {"canonicalBenchmarkProfiles": {"macos": "mac-mini-m6-16gb", "ios": "iphone-17-pro"}}
+            self.assertEqual(MODULE.validate_benchmark_profiles(root, current), [])
+            retired = {"canonicalBenchmarkProfiles": {"macos": "mac-mini-m2-8gb", "ios": "iphone-17-pro"}}
+            errors = MODULE.validate_benchmark_profiles(root, retired)
+            self.assertEqual(len(errors), 1, errors)
+            self.assertIn("mac-mini-m2-8gb", errors[0])
 
 
 class RepositoryTests(unittest.TestCase):

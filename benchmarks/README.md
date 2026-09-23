@@ -12,7 +12,8 @@ before the raw trace is discarded. `--keep-trace` is an explicit local diagnosti
 - **`HISTORY.md`** — a generated index. Never append to it manually.
 - **`LEGACY_HISTORY.md`** — the former hand-maintained ledger, preserved verbatim as incomplete historical
   context. It is not schema-v1 benchmark evidence.
-- **`hardware-profiles.json`** — the canonical Mac mini M2 8 GB and iPhone 17 Pro profiles.
+- **`hardware-profiles.json`** — the canonical Mac mini M6 16 GB (since 2026-09-22) and iPhone 17 Pro
+  profiles, plus the retired Mac mini M2 8 GB profile that its history records keep.
 - **`schema-v3.json`** — the record shape when every take carries the typed quality-registry identity
   (generation lanes since 2026-07-26); **`schema-v2.json`** is still published for records without it
   (`ui-perf`); **`schema-v1.json`** is read-only; `scripts/benchmark_history.py` is the executable validator.
@@ -62,8 +63,12 @@ If a validated benchmark cannot publish, do not move or rewrite its evidence: re
 
 New native comparisons use the profiles in `hardware-profiles.json`:
 
-- macOS: Mac mini `Mac14,3`, Apple M2, 8 GB (`mac-mini-m2-8gb`)
+- macOS: Mac mini `Mac18,5`, Apple M6, 16 GB (`mac-mini-m6-16gb`), canonical since 2026-09-22
 - iOS: iPhone 17 Pro `iPhone18,1` (`iphone-17-pro`)
+
+The retired canonical Mac, Mac mini `Mac14,3`, Apple M2, 8 GB (`mac-mini-m2-8gb`), keeps its records
+as valid history. They are never rewritten and never compared with M6 records; the M6 series starts
+fresh. The 8 GB Mac stays the product support floor.
 
 Schemas v2 and v3 accept `ui-generation`, `engine-generation`, `language`, `instrument-profile`,
 `memory-qualification`, `prosody-calibration`, and `ui-perf`. Schema-v1 `telemetry-overhead` records remain

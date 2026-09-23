@@ -104,10 +104,18 @@ like (CLI vs CLI, UI vs UI). Use CLI for backend optimization; use the UI lane f
 
 Native history is anchored to [`benchmarks/hardware-profiles.json`](../../benchmarks/hardware-profiles.json):
 
-| Platform | Profile | Hardware |
-|---|---|---|
-| macOS | `mac-mini-m2-8gb` | Mac mini `Mac14,3`, Apple M2, 8 GB |
-| iOS | `iphone-17-pro` | iPhone 17 Pro `iPhone18,1` |
+| Platform | Profile | Hardware | Status |
+|---|---|---|---|
+| macOS | `mac-mini-m6-16gb` | Mac mini `Mac18,5`, Apple M6, 16 GB, 12 cores (2 Super, 4 Performance, 6 Efficiency) | Canonical since 2026-09-22 |
+| macOS | `mac-mini-m2-8gb` | Mac mini `Mac14,3`, Apple M2, 8 GB | Retired canonical, history only |
+| iOS | `iphone-17-pro` | iPhone 17 Pro `iPhone18,1` | Canonical |
+
+The M6 records start a new published series. The M2 records stay valid history under their own
+profile: they are never rewritten, and a profile is part of every comparison key, so M2 and M6
+records are never compared. The 8 GB Mac remains the product support floor; the canonical host is
+the benchmark machine, not the floor. A macOS benchmark run refuses to start unless
+`python3 scripts/publish_benchmark_history.py verify-hardware --platform macos` confirms the live
+host is the canonical profile.
 
 Records also capture current OS build, thermal/low-power state, sanitized transport, toolchain,
 executables, input/model fingerprints, and source state. A dirty success is `exploratory`, not a

@@ -626,7 +626,15 @@ def load_schema_contract(version: int | None = None) -> dict[str, Any]:
     if set(definitions["audioQC"]["properties"]["verdict"].get("enum", [])) != QC_VERDICTS:
         raise HistoryError("benchmark schema audio-QC verdicts drifted from the executable validator")
     profile_ids = set(load_profiles())
-    if set(definitions["hardware"]["properties"]["profileID"].get("enum", [])) != profile_ids:
+    schema_profile_ids = set(definitions["hardware"]["properties"]["profileID"].get("enum", []))
+    # schema-v1 is frozen history: it predates hosts added later (the Mac mini M6
+    # became the canonical macOS host on 2026-09-22), so its enum only has to
+    # name registered profiles. Live schemas must list the registry exactly.
+    if version == 1:
+        profiles_match = bool(schema_profile_ids) and schema_profile_ids <= profile_ids
+    else:
+        profiles_match = schema_profile_ids == profile_ids
+    if not profiles_match:
         raise HistoryError("benchmark schema hardware profiles drifted from hardware-profiles.json")
     return schema
 

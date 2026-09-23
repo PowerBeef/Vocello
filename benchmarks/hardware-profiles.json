@@ -1,7 +1,7 @@
 {
   "profiles": [
     {
-      "canonical": true,
+      "canonical": false,
       "chip": "Apple M2",
       "cpuCores": 8,
       "efficiencyCores": 4,
@@ -10,6 +10,33 @@
       "memoryBytes": 8589934592,
       "modelIdentifier": "Mac14,3",
       "performanceCores": 4,
+      "platform": "macos"
+    },
+    {
+      "canonical": true,
+      "canonicalSince": "2026-09-22",
+      "chip": "Apple M6",
+      "coreClusters": [
+        {
+          "name": "Super",
+          "physicalCores": 2
+        },
+        {
+          "name": "Performance",
+          "physicalCores": 4
+        },
+        {
+          "name": "Efficiency",
+          "physicalCores": 6
+        }
+      ],
+      "cpuCores": 12,
+      "efficiencyCores": 6,
+      "id": "mac-mini-m6-16gb",
+      "marketingName": "Mac mini (M6, 16 GB)",
+      "memoryBytes": 17179869184,
+      "modelIdentifier": "Mac18,5",
+      "performanceCores": 6,
       "platform": "macos"
     },
     {

@@ -3,7 +3,7 @@
   "status": "active-experimental",
   "boundary": "Operator-local research. Automated review requires no human listening; qualified results support only their named measured claims. This contract cannot alter product instructions or become an ordinary CI prerequisite. Optional listener-labelled models retain their original provenance, not a required operational stage.",
   "hostClass": {
-    "canonical": "Mac mini M2 8GB",
+    "canonical": "Mac mini M6 16GB (mac-mini-m6-16gb)",
     "executionPolicy": "strictly-sequential-subprocesses",
     "provisionalMaximumProcessPeakRSSBytes": 5368709120,
     "ceilingIsProvisional": true,

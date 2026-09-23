@@ -888,12 +888,13 @@ ready; AV-07 remains open until an independently labelled real corpus produces a
   schema 1 remains readable for historical listener results; no setup exists for a lane that
   does not exist.
 - **Reference bank**: [`emotion-reference-banks.md`](emotion-reference-banks.md) —
-  generation strictly before scorers on the 8 GB canonical machine; SER + identity +
+  generation strictly before scorers (the 8 GB support-floor rule, on every host); SER + identity +
   prosody scoring; honest refusal when no candidate passes.
 - **SER and MOS advisories**: pinned model/revision, after-generation only, from a local untracked
   `.venv` (`python3 -m venv .venv && .venv/bin/pip install torch transformers`, plus the pinned
   `utmosv2` install named in the `mos_advisory.py` header); never CI, packaging or
   benchmark-history input.
 
-Constraint that governs all of the above: the canonical dev machine is the 8 GB M2 —
-never run analyzer models concurrently with the engine; generate first, score after.
+Constraint that governs all of the above: the 8 GB Mac support floor. Even on the 16 GB
+canonical Mac mini M6, never run analyzer models concurrently with the engine; generate first,
+score after.

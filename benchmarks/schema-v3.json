@@ -433,6 +433,7 @@
         "profileID": {
           "enum": [
             "mac-mini-m2-8gb",
+            "mac-mini-m6-16gb",
             "iphone-17-pro"
           ]
         },

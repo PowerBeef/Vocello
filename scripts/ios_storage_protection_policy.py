@@ -25,13 +25,15 @@ EXPECTED_IDS = {
     "voices",
     "voice-candidates",
     "voice-transactions",
+    "voice-transactions-quarantine",
     "history-outbox",
     "history",
 }
 EXCLUDED_IDS = {
     "models", "downloads", "cache", "diagnostics", "voice-candidates", "voice-transactions"
 }
-INCLUDED_IDS = {"outputs", "voices", "history-outbox", "history"}
+# A quarantined saved-voice journal may hold the only copy of a replaced voice.
+INCLUDED_IDS = {"outputs", "voices", "voice-transactions-quarantine", "history-outbox", "history"}
 
 
 class PolicyError(ValueError):

@@ -704,13 +704,13 @@ struct MacSavedVoiceSheet: View {
                     } catch {
                         await MainActor.run {
                             pendingVoiceForReview = candidate
-                            errorMessage = error.localizedDescription
+                            errorMessage = MacInterfaceText.presentation.savedVoiceErrorMessage(error)
                         }
                     }
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = error.localizedDescription
+                    errorMessage = MacInterfaceText.presentation.savedVoiceErrorMessage(error)
                 }
             }
             await MainActor.run {
@@ -730,7 +730,7 @@ struct MacSavedVoiceSheet: View {
                 onComplete(savedVoice)
                 dismiss()
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = MacInterfaceText.presentation.savedVoiceErrorMessage(error)
                 isReviewDecisionInFlight = false
             }
         }
@@ -744,7 +744,7 @@ struct MacSavedVoiceSheet: View {
                 try await ttsEngineStore.discardPreparedVoiceCandidate(id: candidate.id)
                 pendingVoiceForReview = nil
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = MacInterfaceText.presentation.savedVoiceErrorMessage(error)
             }
             isReviewDecisionInFlight = false
         }

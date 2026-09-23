@@ -1,4 +1,5 @@
 import Foundation
+import QwenVoiceCore
 
 /// Typed presentation vocabulary for user-visible status and dynamic error text.
 ///
@@ -493,6 +494,22 @@ struct VocelloPresentationText: Sendable {
             defaultValue: "Select a reference audio file before generating.",
             comment: "Voice Cloning error shown when no reference clip is selected."
         )
+    }
+
+    var savedVoicesStoreBusy: String {
+        localization.string(localized: "vocello.error.saved_voices_busy",
+            defaultValue: "Another Vocello process is updating Saved Voices. Try again in a moment.",
+            comment: "Saved Voices error. Another Vocello process, such as the command-line tool, holds the shared saved-voice store for a moment; retrying later succeeds and nothing was lost."
+        )
+    }
+
+    /// Saved Voice failures keep the engine's typed busy state distinct from
+    /// other failures, whose existing descriptions are not reverse-translated.
+    func savedVoiceErrorMessage(_ error: Error) -> String {
+        if (error as? TTSEngineError) == .savedVoiceStoreBusy {
+            return savedVoicesStoreBusy
+        }
+        return error.localizedDescription
     }
 
     func cancellationCouldNotFinish(details: String) -> String {

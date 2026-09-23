@@ -10,8 +10,10 @@ import QwenVoiceCore
 enum MacInterfaceText {
     /// The interface language selected in Settings (`MacInterfaceLanguage`).
     private static var localization: VocelloLocalization { MacInterfaceLanguage.current }
+    /// Shared presentation vocabulary, resolved through the Mac language owner.
+    static var presentation: VocelloPresentationText { VocelloPresentationText(localization: localization) }
     /// Shared iOS navigation vocabulary, resolved through the Mac language owner.
-    static var tabVoices: String { VocelloPresentationText(localization: localization).tabVoices }
+    static var tabVoices: String { presentation.tabVoices }
     static func studioModeTitle(_ mode: GenerationMode) -> String {
         let text = VocelloPresentationText(localization: localization)
         return switch mode {

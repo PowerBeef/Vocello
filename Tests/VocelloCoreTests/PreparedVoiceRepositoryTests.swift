@@ -224,7 +224,247 @@ final class PreparedVoiceRepositoryTests: XCTestCase {
         }
         XCTAssertTrue(FileManager.default.fileExists(atPath: partial.path), "must not sweep another process's active staging")
     }
+
+    /// F-25: process A (a real second process holding the F-22 flock, like the
+    /// CLI) owns the store while process B, this test, starts the engine. B's
+    /// initialization must proceed with a typed startup issue, its Saved Voice
+    /// calls must report the typed busy state, and B must recover, including
+    /// A's pending journal, once A releases the lock.
+    @MainActor
+    func testEngineInitializationProceedsWhileAnotherProcessHoldsStoreAndRecovers() async throws {
+        let voices = root.appendingPathComponent("voices", isDirectory: true)
+        try FileManager.default.createDirectory(at: voices, withIntermediateDirectories: true)
+        try Data([1, 2, 3]).write(to: voices.appendingPathComponent("Pending.wav"))
+        let journal = root.appendingPathComponent("voice-transactions/delete-pending", isDirectory: true)
+        try FileManager.default.createDirectory(at: journal, withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: ["schemaVersion": 2, "voiceID": "Pending"])
+            .write(to: journal.appendingPathComponent("transaction.json"))
+
+        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let runtime = try NativeRuntimeFactory.make(
+            manifestURL: source.appendingPathComponent("Sources/Resources/qwenvoice_contract.json"),
+            paths: .rooted(at: root), storeVersionSeed: "saved-voice-store-busy-fixture"
+        )
+        let engine = runtime.engine
+        defer { engine.stop() }
+
+        let holder = try StoreLockHolder(lockURL: root.appendingPathComponent(".voice-store.lock"))
+        defer { holder.release() }
+
+        try await engine.initialize(appSupportDirectory: root)
+        XCTAssertEqual(engine.savedVoiceStoreStartupIssue, .storeBusy)
+        XCTAssertEqual(engine.savedVoiceStoreStartupIssue?.diagnosticCode, "saved_voices.store_busy")
+        XCTAssertNil(engine.savedVoiceStoreStartupSummary)
+        do {
+            _ = try await engine.listPreparedVoices()
+            XCTFail("Saved Voices must report the busy store while another process holds it")
+        } catch {
+            XCTAssertEqual(error as? TTSEngineError, .savedVoiceStoreBusy)
+            XCTAssertEqual(
+                GenerationFailureDiagnosticLogger.errorMetadata(for: error).code,
+                "saved_voices.store_busy"
+            )
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: journal.path), "B must not touch A's store")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: voices.appendingPathComponent("Pending.wav").path))
+
+        holder.release()
+        let recovered = try await engine.listPreparedVoices()
+        XCTAssertEqual(recovered.map(\.id), [])
+        XCTAssertNil(engine.savedVoiceStoreStartupIssue)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: journal.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: voices.appendingPathComponent("Pending.wav").path))
+    }
+
+    /// Holds the store's flock from a separate process, the same way another
+    /// Vocello process does, until `release()`.
+    private final class StoreLockHolder {
+        private let process = Process()
+        private let input = Pipe()
+
+        init(lockURL: URL) throws {
+            let output = Pipe()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+            process.arguments = [
+                "-c",
+                "import fcntl,sys; f=open(sys.argv[1],'a'); fcntl.flock(f,fcntl.LOCK_EX); print('locked',flush=True); sys.stdin.read(1)",
+                lockURL.path,
+            ]
+            process.standardOutput = output
+            process.standardInput = input
+            try process.run()
+            XCTAssertEqual(String(data: output.fileHandleForReading.availableData, encoding: .utf8), "locked\n")
+        }
+
+        func release() {
+            guard process.isRunning else { return }
+            try? input.fileHandleForWriting.close()
+            process.waitUntilExit()
+        }
+    }
     #endif
+
+    func testReconcileSkipsHiddenAndNonDirectoryRootEntries() async throws {
+        let repository = makeRepository()
+        let source = try writeSource(named: "source.wav")
+        let candidate = try await repository.prepare(name: "Kept", audioURL: source, transcript: nil, qualityWarnings: [], replacingVoiceID: nil)
+        _ = try await repository.commit(id: candidate.id)
+
+        let transactions = root.appendingPathComponent("voice-transactions", isDirectory: true)
+        let candidates = root.appendingPathComponent("voice-candidates", isDirectory: true)
+        let outside = root.appendingPathComponent("outside", isDirectory: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        try Data("outside".utf8).write(to: outside.appendingPathComponent("transaction.json"))
+        let hiddenDirectory = transactions.appendingPathComponent(".sync-metadata", isDirectory: true)
+        try FileManager.default.createDirectory(at: hiddenDirectory, withIntermediateDirectories: true)
+        try Data("sync".utf8).write(to: hiddenDirectory.appendingPathComponent("state"))
+        let strays = [
+            transactions.appendingPathComponent(".DS_Store"),
+            transactions.appendingPathComponent("commit-notes.txt"),
+            candidates.appendingPathComponent(".DS_Store"),
+            candidates.appendingPathComponent("stray.txt"),
+        ]
+        for url in strays {
+            try Data("stray".utf8).write(to: url)
+        }
+        let link = transactions.appendingPathComponent("commit-link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+
+        try await repository.reconcile()
+        try await repository.reconcile()
+
+        let listed = try await repository.list()
+        XCTAssertEqual(listed.map(\.id), ["Kept"])
+        for url in strays + [hiddenDirectory.appendingPathComponent("state"), outside.appendingPathComponent("transaction.json")] {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: url.path), "\(url.lastPathComponent) must stay in place")
+        }
+        XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: link.path), outside.path)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("voice-transactions-quarantine").path))
+    }
+
+    func testUninterpretableTransactionsAreQuarantinedNotDeleted() async throws {
+        let repository = makeRepository()
+        let source = try writeSource(named: "source.wav")
+        for name in ["Kept", "Gone"] {
+            let candidate = try await repository.prepare(name: name, audioURL: source, transcript: nil, qualityWarnings: [], replacingVoiceID: nil)
+            _ = try await repository.commit(id: candidate.id)
+        }
+        let transactions = root.appendingPathComponent("voice-transactions", isDirectory: true)
+        let quarantine = root.appendingPathComponent("voice-transactions-quarantine", isDirectory: true)
+
+        func journal(_ name: String, manifest: Data?, asset: [UInt8]) throws {
+            let directory = transactions.appendingPathComponent(name, isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            if let manifest {
+                try manifest.write(to: directory.appendingPathComponent("transaction.json"))
+            }
+            try Data(asset).write(to: directory.appendingPathComponent("Backup.wav"))
+        }
+        let unknown = try JSONSerialization.data(withJSONObject: ["schemaVersion": 2, "voiceID": "Kept"])
+        try journal("rename-legacy", manifest: unknown, asset: [1])
+        try journal("commit-garbage", manifest: Data("not json".utf8), asset: [2])
+        try journal("commit-missing-manifest", manifest: nil, asset: [3])
+        try journal("commit-bad-name", manifest: try JSONSerialization.data(withJSONObject: [
+            "schemaVersion": 2, "candidateID": UUID().uuidString, "newVoiceName": "Kept",
+            "newAudioFileName": "../Kept.wav", "phase": "prepared", "audioDigest": String(repeating: "0", count: 64),
+        ]), asset: [4])
+        try journal("delete-escape", manifest: try JSONSerialization.data(withJSONObject: [
+            "schemaVersion": 2, "voiceID": "../Kept",
+        ]), asset: [5])
+        // Journals a newer build wrote (the app and CLI share this store, and an
+        // older build may run after a newer one) stay exactly where they are.
+        let newer: [String: UInt8] = ["commit-future": 7, "rename-future": 8]
+        try journal("commit-future", manifest: try JSONSerialization.data(withJSONObject: [
+            "schemaVersion": 99, "candidateID": UUID().uuidString, "newVoiceName": "Kept",
+            "newAudioFileName": "Kept.wav",
+        ]), asset: [7])
+        try journal("rename-future", manifest: try JSONSerialization.data(withJSONObject: [
+            "schemaVersion": 3, "shape": "unknown to this build",
+        ]), asset: [8])
+        // A valid journal beside them still completes.
+        let valid = transactions.appendingPathComponent("delete-valid", isDirectory: true)
+        try FileManager.default.createDirectory(at: valid, withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: ["schemaVersion": 2, "voiceID": "Gone"])
+            .write(to: valid.appendingPathComponent("transaction.json"))
+
+        let summary = try await repository.reconcile()
+        XCTAssertEqual(summary, PreparedVoiceReconciliationSummary(quarantinedJournals: 5, skippedNewerJournals: 2))
+        XCTAssertEqual(summary.diagnosticCode, "saved_voices.reconcile.quarantined_5.skipped_newer_2")
+
+        let listed = try await repository.list()
+        XCTAssertEqual(listed.map(\.id), ["Kept"])
+        XCTAssertEqual(Set(try FileManager.default.contentsOfDirectory(atPath: transactions.path)), Set(newer.keys))
+        for (name, byte) in newer {
+            XCTAssertEqual(try Data(contentsOf: transactions.appendingPathComponent("\(name)/Backup.wav")), Data([byte]))
+            XCTAssertTrue(FileManager.default.fileExists(atPath: transactions.appendingPathComponent("\(name)/transaction.json").path))
+        }
+        let expected: [String: UInt8] = [
+            "rename-legacy": 1, "commit-garbage": 2, "commit-missing-manifest": 3,
+            "commit-bad-name": 4, "delete-escape": 5,
+        ]
+        XCTAssertEqual(Set(try FileManager.default.contentsOfDirectory(atPath: quarantine.path)), Set(expected.keys))
+        for (name, byte) in expected {
+            XCTAssertEqual(try Data(contentsOf: quarantine.appendingPathComponent("\(name)/Backup.wav")), Data([byte]))
+        }
+        XCTAssertEqual(
+            try Data(contentsOf: quarantine.appendingPathComponent("rename-legacy/transaction.json")),
+            unknown
+        )
+
+        // A later journal with the same name never overwrites the quarantined one.
+        try journal("rename-legacy", manifest: unknown, asset: [6])
+        let secondPass = try await repository.reconcile()
+        XCTAssertEqual(secondPass, PreparedVoiceReconciliationSummary(quarantinedJournals: 1, skippedNewerJournals: 2))
+        let renamed = try FileManager.default.contentsOfDirectory(atPath: quarantine.path)
+            .filter { $0.hasPrefix("rename-legacy-") }
+        XCTAssertEqual(renamed.count, 1)
+        XCTAssertEqual(try Data(contentsOf: quarantine.appendingPathComponent("rename-legacy/Backup.wav")), Data([1]))
+        XCTAssertEqual(try Data(contentsOf: quarantine.appendingPathComponent("\(try XCTUnwrap(renamed.first))/Backup.wav")), Data([6]))
+        let relisted = try await repository.list()
+        XCTAssertEqual(relisted.map(\.id), ["Kept"])
+    }
+
+    func testBusyStoreStaysTypedAcrossEngineAndPresentation() {
+        let busy = PreparedVoiceRepositoryError.storeBusy
+        XCTAssertEqual(MLXTTSEngine.preparedVoiceEngineError(busy), .savedVoiceStoreBusy)
+        XCTAssertEqual(MLXTTSEngine.savedVoiceStoreStartupIssue(for: busy), .storeBusy)
+        XCTAssertEqual(
+            MLXTTSEngine.preparedVoiceEngineError(PreparedVoiceRepositoryError.recoveryRequired),
+            .generationFailed(PreparedVoiceRepositoryError.recoveryRequired.localizedDescription)
+        )
+        // Startup issues carry a category, never a message that could hold a
+        // path or voice name.
+        let privatePath = root.appendingPathComponent("voices/Private Name.wav").path
+        let cases: [(Error, SavedVoiceStoreStartupIssue)] = [
+            (PreparedVoiceRepositoryError.recoveryRequired, .reconciliationFailed(.recoveryRequired)),
+            (PreparedVoiceRepositoryError.voiceMissing("Private Name"), .reconciliationFailed(.invalidStore)),
+            (CocoaError(.fileWriteNoPermission, userInfo: [NSFilePathErrorKey: privatePath]), .reconciliationFailed(.filesystem)),
+            (POSIXError(.ENOSPC), .reconciliationFailed(.filesystem)),
+            (Injected.filesystem, .reconciliationFailed(.unknown)),
+        ]
+        for (error, expected) in cases {
+            let issue = MLXTTSEngine.savedVoiceStoreStartupIssue(for: error)
+            XCTAssertEqual(issue, expected)
+            XCTAssertFalse(issue.diagnosticCode.contains("/"))
+            XCTAssertFalse(issue.diagnosticCode.contains("Private"))
+        }
+        XCTAssertEqual(
+            MLXTTSEngine.savedVoiceStoreStartupIssue(for: PreparedVoiceRepositoryError.recoveryRequired).diagnosticCode,
+            "saved_voices.reconcile_failed.recovery_required"
+        )
+        // Interface copy for the busy state comes from the typed presentation
+        // layer; any other failure keeps its existing description.
+        let presentation = VocelloPresentationText()
+        XCTAssertEqual(
+            presentation.savedVoiceErrorMessage(TTSEngineError.savedVoiceStoreBusy),
+            presentation.savedVoicesStoreBusy
+        )
+        XCTAssertEqual(
+            presentation.savedVoiceErrorMessage(TTSEngineError.generationFailed("disk full")),
+            "disk full"
+        )
+    }
 
     private var root: URL!
     private let extensions: Set<String> = ["wav", "mp3", "aiff", "m4a"]

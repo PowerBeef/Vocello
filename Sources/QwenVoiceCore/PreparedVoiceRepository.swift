@@ -45,6 +45,19 @@ struct PreparedVoiceStorageRecord: Sendable, Equatable {
     var cleanupPending = false
 }
 
+/// Path-free outcome of one reconciliation pass: counts only, never a journal
+/// name, voice name or filesystem path.
+struct PreparedVoiceReconciliationSummary: Sendable, Equatable {
+    /// Uninterpretable journals moved to `voice-transactions-quarantine/`.
+    var quarantinedJournals = 0
+    /// Journals from a newer schema, left in place for the build that wrote them.
+    var skippedNewerJournals = 0
+
+    var diagnosticCode: String {
+        "saved_voices.reconcile.quarantined_\(quarantinedJournals).skipped_newer_\(skippedNewerJournals)"
+    }
+}
+
 /// Serializes every mutation of the saved-voice store.
 ///
 /// Permanent voices retain the historical flat `voices/` representation.
@@ -90,6 +103,7 @@ actor PreparedVoiceRepository {
     private let voicesDirectory: URL
     private let candidatesDirectory: URL
     private let transactionsDirectory: URL
+    private let quarantineDirectory: URL
     private let supportedAudioExtensions: Set<String>
     private let fileManager: FileManager
     private let now: @Sendable () -> Date
@@ -106,39 +120,57 @@ actor PreparedVoiceRepository {
         voicesDirectory = appSupportDirectory.appendingPathComponent("voices", isDirectory: true)
         candidatesDirectory = appSupportDirectory.appendingPathComponent("voice-candidates", isDirectory: true)
         transactionsDirectory = appSupportDirectory.appendingPathComponent("voice-transactions", isDirectory: true)
+        quarantineDirectory = appSupportDirectory.appendingPathComponent("voice-transactions-quarantine", isDirectory: true)
         self.supportedAudioExtensions = supportedAudioExtensions
         self.fileManager = fileManager
         self.now = now
         self.fault = fault
     }
 
-    func reconcile() throws {
+    @discardableResult
+    func reconcile() throws -> PreparedVoiceReconciliationSummary {
         let lock = try acquireStoreLock()
         defer { releaseStoreLock(lock) }
-        try reconcileLocked()
+        return try reconcileLocked()
     }
 
-    private func reconcileLocked() throws {
+    @discardableResult
+    private func reconcileLocked() throws -> PreparedVoiceReconciliationSummary {
+        var summary = PreparedVoiceReconciliationSummary()
         try createRoots()
         // Transactions can still own expired/partially-cleaned candidates.
         // Recover them before applying ordinary candidate retention.
-        for url in try directoryContents(at: transactionsDirectory) {
+        for url in try reconcilableEntries(at: transactionsDirectory) {
             if try directoryContents(at: url).isEmpty {
                 try fileManager.removeItem(at: url)
                 continue
             }
-            if url.lastPathComponent.hasPrefix("delete-") {
-                try reconcileDeleteTransaction(at: url)
-            } else if url.lastPathComponent.hasPrefix("commit-") {
-                try reconcileCommitTransaction(at: url)
-            } else {
-                // Unknown transaction state is not safe to interpret. Keep it
-                // for diagnosis instead of guessing whether its assets should
-                // be restored or deleted.
-                throw PreparedVoiceRepositoryError.malformedCandidate
+            do {
+                if url.lastPathComponent.hasPrefix("delete-") {
+                    try reconcileDeleteTransaction(at: url)
+                } else if url.lastPathComponent.hasPrefix("commit-") {
+                    try reconcileCommitTransaction(at: url)
+                } else {
+                    // An unknown kind from a newer build is left alone like
+                    // any other newer journal; otherwise it is uninterpretable.
+                    _ = try decodeTransactionManifest(TransactionSchemaProbe.self, in: url)
+                    throw UninterpretableTransaction()
+                }
+            } catch is NewerTransaction {
+                // The app and the CLI share this store, and an older build can
+                // run after a newer one. Only the build that wrote a newer
+                // journal may interpret it.
+                summary.skippedNewerJournals += 1
+            } catch is UninterpretableTransaction {
+                // Unknown or malformed journals are not safe to interpret.
+                // Keep them, and every asset they hold, for diagnosis instead
+                // of guessing whether to restore or delete, and without
+                // blocking every later reconciliation of the store.
+                try quarantineTransaction(at: url)
+                summary.quarantinedJournals += 1
             }
         }
-        for url in try directoryContents(at: candidatesDirectory) {
+        for url in try reconcilableEntries(at: candidatesDirectory, admittingHiddenPrefix: ".partial-") {
             if url.lastPathComponent.hasPrefix(".partial-") {
                 try fileManager.removeItem(at: url)
                 continue
@@ -151,6 +183,7 @@ actor PreparedVoiceRepository {
                 try fileManager.removeItem(at: url)
             }
         }
+        return summary
     }
 
     func list() throws -> [PreparedVoiceStorageRecord] {
@@ -432,6 +465,81 @@ actor PreparedVoiceRepository {
         Darwin.close(fd)
     }
 
+    /// A journal this build cannot interpret: an unknown prefix, a missing or
+    /// undecodable manifest, or values that fail validation. Thrown only before
+    /// the journal's assets are touched, so moving it aside is always safe.
+    private struct UninterpretableTransaction: Error {}
+
+    /// A journal whose manifest declares a schema newer than this build's.
+    private struct NewerTransaction: Error {}
+
+    private struct TransactionSchemaProbe: Decodable {
+        let schemaVersion: Int
+    }
+
+    /// Moves an uninterpretable journal to `voice-transactions-quarantine/`.
+    /// Never deletes: the journal may hold the only copy of a replaced voice.
+    private func quarantineTransaction(at transactionDirectory: URL) throws {
+        if !fileManager.fileExists(atPath: quarantineDirectory.path) {
+            try fileManager.createDirectory(at: quarantineDirectory, withIntermediateDirectories: true)
+            applyQuarantineStoragePolicy(to: quarantineDirectory)
+        }
+        let name = transactionDirectory.lastPathComponent
+        var destination = quarantineDirectory.appendingPathComponent(name, isDirectory: true)
+        if fileManager.fileExists(atPath: destination.path) {
+            destination = quarantineDirectory.appendingPathComponent(
+                "\(name)-\(UUID().uuidString.lowercased())",
+                isDirectory: true
+            )
+        }
+        try fileManager.moveItem(at: transactionDirectory, to: destination)
+        applyQuarantineStoragePolicy(to: destination)
+        if let descendants = fileManager.enumerator(at: destination, includingPropertiesForKeys: nil) {
+            for case let url as URL in descendants {
+                applyQuarantineStoragePolicy(to: url)
+            }
+        }
+    }
+
+    /// Mirrors the iOS storage-protection entry `voice-transactions-quarantine`
+    /// (`IOSStorageProtectionPolicy`, `config/ios-storage-protection-policy.json`):
+    /// backup-eligible, because a quarantined journal may hold the only copy of
+    /// a replaced voice, and a move out of backup-excluded `voice-transactions/`
+    /// would otherwise keep its exclusion until the next launch's bootstrap.
+    /// Best effort: bootstrap reapplies the policy recursively on every launch.
+    private func applyQuarantineStoragePolicy(to url: URL) {
+        #if os(iOS)
+        try? fileManager.setAttributes(
+            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+            ofItemAtPath: url.path
+        )
+        #endif
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = false
+        var mutableURL = url
+        try? mutableURL.setResourceValues(values)
+    }
+
+    /// Store roots can collect Finder metadata (`.DS_Store`), sync droppings or
+    /// stray files. Reconciliation interprets only visible real directories
+    /// (never symbolic links) and leaves everything else where it is.
+    private func reconcilableEntries(at root: URL, admittingHiddenPrefix: String? = nil) throws -> [URL] {
+        try fileManager.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+            options: []
+        ).filter { url in
+            let name = url.lastPathComponent
+            if name.hasPrefix("."), !(admittingHiddenPrefix.map { name.hasPrefix($0) } ?? false) {
+                return false
+            }
+            guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]) else {
+                return false
+            }
+            return values.isDirectory == true && values.isSymbolicLink != true
+        }
+    }
+
     private func removeTransaction(_ directory: URL) throws {
         try fault(.beforeTransactionCleanup)
         // Preserve the witness until every backed-up asset has been removed.
@@ -519,12 +627,35 @@ actor PreparedVoiceRepository {
         )
     }
 
-    private func reconcileCommitTransaction(at transactionDirectory: URL) throws {
-        let manifestURL = transactionDirectory.appendingPathComponent(Self.transactionManifestFileName)
-        var manifest = try JSONDecoder().decode(
-            CommitTransactionManifest.self,
-            from: Data(contentsOf: manifestURL)
-        )
+    /// Reads a transaction manifest. A missing manifest in a non-empty journal
+    /// or one that does not decode is uninterpretable; a manifest declaring a
+    /// newer schema is `NewerTransaction`; any other read failure (permissions,
+    /// I/O) is transient and propagates unchanged.
+    private func decodeTransactionManifest<Manifest: Decodable>(
+        _ type: Manifest.Type,
+        in transactionDirectory: URL
+    ) throws -> Manifest {
+        let data: Data
+        do {
+            data = try Data(contentsOf: transactionDirectory.appendingPathComponent(Self.transactionManifestFileName))
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile || error.code == .fileNoSuchFile {
+            throw UninterpretableTransaction()
+        }
+        guard let probe = try? JSONDecoder().decode(TransactionSchemaProbe.self, from: data) else {
+            throw UninterpretableTransaction()
+        }
+        guard probe.schemaVersion <= Self.transactionSchemaVersion else {
+            throw NewerTransaction()
+        }
+        do {
+            return try JSONDecoder().decode(type, from: data)
+        } catch {
+            throw UninterpretableTransaction()
+        }
+    }
+
+    private func loadCommitTransaction(at transactionDirectory: URL) throws -> CommitTransactionManifest {
+        let manifest = try decodeTransactionManifest(CommitTransactionManifest.self, in: transactionDirectory)
         guard [1, Self.transactionSchemaVersion].contains(manifest.schemaVersion),
               NativeSavedVoiceNaming.normalizedName(manifest.newVoiceName) == manifest.newVoiceName,
               !manifest.newVoiceName.isEmpty,
@@ -535,8 +666,18 @@ actor PreparedVoiceRepository {
               manifest.newMetadataFileName.map({
                   URL(fileURLWithPath: $0).lastPathComponent == $0
               }) ?? true else {
-            throw PreparedVoiceRepositoryError.malformedCandidate
+            throw UninterpretableTransaction()
         }
+        if manifest.schemaVersion == 2, manifest.phase != .rolledBack {
+            guard let digest = manifest.audioDigest, digest.count == 64, manifest.phase != nil else {
+                throw UninterpretableTransaction()
+            }
+        }
+        return manifest
+    }
+
+    private func reconcileCommitTransaction(at transactionDirectory: URL) throws {
+        var manifest = try loadCommitTransaction(at: transactionDirectory)
 
         let candidateDirectory = candidateDirectory(for: manifest.candidateID)
         let publishedAudioURL = voicesDirectory.appendingPathComponent(manifest.newAudioFileName)
@@ -555,9 +696,9 @@ actor PreparedVoiceRepository {
             return
         }
         if manifest.schemaVersion == 2 {
-            guard let digest = manifest.audioDigest, digest.count == 64, manifest.phase != nil else {
-                throw PreparedVoiceRepositoryError.malformedCandidate
-            }
+            // `loadCommitTransaction` validated the digest of every version 2
+            // journal that has not already rolled back.
+            let digest = manifest.audioDigest ?? ""
             if manifest.phase == .backedUp && !stagedAudioExists {
                 // The publication source was consumed. An unreadable, missing,
                 // or changed destination is ambiguous, never rollback authority.
@@ -629,16 +770,11 @@ actor PreparedVoiceRepository {
     }
 
     private func reconcileDeleteTransaction(at transactionDirectory: URL) throws {
-        let manifest = try JSONDecoder().decode(
-            DeleteTransactionManifest.self,
-            from: Data(
-                contentsOf: transactionDirectory.appendingPathComponent(Self.transactionManifestFileName)
-            )
-        )
-        guard [1, Self.transactionSchemaVersion].contains(manifest.schemaVersion) else {
-            throw PreparedVoiceRepositoryError.malformedCandidate
+        let manifest = try decodeTransactionManifest(DeleteTransactionManifest.self, in: transactionDirectory)
+        guard [1, Self.transactionSchemaVersion].contains(manifest.schemaVersion),
+              (try? validateIdentifier(manifest.voiceID)) != nil else {
+            throw UninterpretableTransaction()
         }
-        try validateIdentifier(manifest.voiceID)
 
         // User confirmation is the delete boundary. If the process stopped
         // after journaling but before every move, finish moving any remaining

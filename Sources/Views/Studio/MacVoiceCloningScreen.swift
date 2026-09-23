@@ -68,7 +68,7 @@ struct MacVoiceCloningScreen: View {
     }
 
     private var savedVoicesLoadError: String? {
-        guard let loadError = savedVoicesViewModel.loadError else { return nil }
+        guard let loadError = savedVoicesViewModel.loadErrorMessage(MacInterfaceText.presentation) else { return nil }
         return MacInterfaceText.cloningSavedVoicesLoadError(loadError)
     }
 
@@ -718,7 +718,7 @@ struct MacVoiceCloningScreen: View {
     private func syncSavedVoiceSelectionState() {
         if draft.selectedSavedVoiceID != nil,
            selectedVoice == nil,
-           savedVoicesViewModel.isLoading || savedVoicesViewModel.loadError != nil {
+           savedVoicesViewModel.isLoading || savedVoicesViewModel.loadIssue != nil {
             return
         }
         switch SavedVoiceCloneHydration.action(

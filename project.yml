@@ -175,6 +175,7 @@ targets:
       - path: Sources/iOSSupport/Services/DatabaseService.swift
       - path: Sources/iOSSupport/Models/Voice.swift
       - path: Sources/iOSSupport/ViewModels/SavedVoicesViewModel.swift
+      - path: Sources/iOSSupport/Services/SavedVoicesBusyRetryPolicy.swift
       - path: Sources/iOSSupport/Services/IOSAppLanguage.swift
       - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
@@ -480,6 +481,7 @@ targets:
       - path: Sources/iOSSupport/Services/IOSExportAccessPolicy.swift
       - path: Sources/iOSSupport/Services/IOSExportPurchaseState.swift
       - path: Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift
+      - path: Sources/iOSSupport/Services/SavedVoicesBusyRetryPolicy.swift
     dependencies:
       - target: QwenVoiceCore
       - package: GRDB
@@ -530,6 +532,7 @@ targets:
       - path: Sources/SharedSupport/Services/VocelloLocalization.swift
       - path: Sources/iOSSupport/Services/IOSAppLanguage.swift
       - path: Sources/iOS/Commerce/IOSCommercePresentationText.swift
+      - path: Sources/iOSSupport/Services/SavedVoicesBusyRetryPolicy.swift
     dependencies:
       - target: QwenVoiceCore
     settings:

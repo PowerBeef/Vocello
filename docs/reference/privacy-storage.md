@@ -50,7 +50,7 @@ Maintained macOS subtrees and preferences:
 - `outputs/CustomVoice/`, `outputs/VoiceDesign/`, and `outputs/Clones/` store generated audio unless the user chooses a different output directory. If a user-chosen directory becomes missing or unwritable, new audio falls back to these default folders and Settings shows a warning — a generation is never lost to a vanished folder.
 - `outputs/bench-archive/` (one folder per run ID; debug-store only; created by `vocello bench --delivery`) retains each delivery benchmark run's take WAVs and result/prosody/quality manifests as the durable measurement evidence. Local-only, never tracked or uploaded; unbounded, prune manually ([`delivery-harness.md`](delivery-harness.md) §3).
 - `voices/` stores committed saved-voice reference assets (the source audio format plus an optional `.txt` transcript sidecar). Each voice is individually deletable; deleting a voice-bank member does not delete its siblings.
-- `voice-candidates/` privately stages saved-voice review candidates. Candidates are not listed or usable as saved voices, expire after 24 hours, and are removed on Cancel, Discard, or outside dismissal. `voice-transactions/` holds short-lived commit/replacement/delete journals; startup reconciliation restores a pre-publication replacement, completes a post-publication commit, and completes a user-confirmed delete without resurrecting it.
+- `voice-candidates/` privately stages saved-voice review candidates. Candidates are not listed or usable as saved voices, expire after 24 hours, and are removed on Cancel, Discard, or outside dismissal. `voice-transactions/` holds short-lived commit/replacement/delete journals; startup reconciliation restores a pre-publication replacement, completes a post-publication commit, and completes a user-confirmed delete without resurrecting it. Reconciliation ignores hidden and non-directory entries (such as `.DS_Store`) moves a journal it cannot interpret, with every asset it holds, to `voice-transactions-quarantine/` instead of deleting it, and leaves a journal from a newer Vocello build in place. The store lock is shared with the CLI: a busy or unreconcilable store never fails engine startup, and Saved Voices report the busy state and retry.
 - Reference-clip **recording** (macOS, 2026-06) uses two short-lived directories under the system temporary directory: `voice-clone-references/` holds the in-progress capture and `voice-enroll/` holds a stable copy while the private candidate is prepared. Both are deleted as part of enrollment/cancel; only an explicitly committed candidate moves into `voices/`.
 - `history.sqlite` stores local generation history. Database initialization, migration, read,
   write, or delete failures are typed and fail closed: the UI shows a degraded state and disables
@@ -140,7 +140,7 @@ Maintained iPhone subtrees:
   account-review work. Storage-failure and original-reference recovery remain free. New generated
   Saved Voices retain source mode in enrollment metadata; legacy references are not reclassified.
 - `voices/` stores committed saved-voice reference assets. Each row can delete only its own audio, transcript, and prepared prompt artifacts after an explicit confirmation; other voice-bank members remain intact.
-- `voice-candidates/` privately stages review candidates for at most 24 hours. They are invisible to the saved-voice catalog until Keep/Save commits them; Cancel, Discard, and outside dismissal remove them. `voice-transactions/` is the bounded recovery journal for commit/replacement/delete operations.
+- `voice-candidates/` privately stages review candidates for at most 24 hours. They are invisible to the saved-voice catalog until Keep/Save commits them; Cancel, Discard, and outside dismissal remove them. `voice-transactions/` is the bounded recovery journal for commit/replacement/delete operations. `voice-transactions-quarantine/` keeps journals reconciliation could not interpret, with the assets they hold; nothing is deleted from it automatically. Journals written by a newer Vocello build (a newer schema version) stay in `voice-transactions/` untouched.
 - `cache/imported_references/` stores app-owned materializations of WAV, MP3, AIFF, or M4A files
   selected directly from Studio Clone, selected from Voices, or opened through Files, plus an
   adjacent `.txt` sidecar when supplied. A sidecar is preferred; otherwise on-device recognition
@@ -181,6 +181,9 @@ Backup behavior is intentional rather than inherited:
   and diagnostics are excluded from backup;
 - generated outputs, committed saved voices, History, and its recoverable outbox remain included because they are
   user-created data that cannot necessarily be reconstructed;
+- quarantined saved-voice journals (`voice-transactions-quarantine/`) are included too, because one
+  may hold the only copy of a replaced voice; reconciliation clears the backup exclusion a journal
+  carried from `voice-transactions/` when it moves it aside;
 - the policy is applied to existing descendants during bootstrap, including the SQLite database
   and its WAL/SHM sidecars, so a prior file cannot keep stale attributes indefinitely.
 

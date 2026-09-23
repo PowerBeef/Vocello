@@ -1,16 +1,52 @@
 import Foundation
 import QwenVoiceCore
 
+/// Why the Saved Voices list is not current. The busy state stays typed so each
+/// surface presents it in its interface language instead of as a failure (F-25).
+enum SavedVoicesLoadIssue: Equatable {
+    /// Another Vocello process (the CLI shares the store with the Mac app) holds
+    /// the Saved Voice store lock. Loading retries automatically a few times.
+    case storeBusy
+    case failed(String)
+
+    init(_ error: Error) {
+        if (error as? TTSEngineError) == .savedVoiceStoreBusy {
+            self = .storeBusy
+        } else {
+            self = .failed(error.localizedDescription)
+        }
+    }
+}
+
 @MainActor
 final class SavedVoicesViewModel: ObservableObject {
     @Published private(set) var voices: [Voice] = SavedVoicesSessionCache.voices
     @Published private(set) var isLoading = false
-    @Published private(set) var loadError: String?
+    @Published private(set) var loadIssue: SavedVoicesLoadIssue?
 
     private var hasLoadedOnce = !SavedVoicesSessionCache.voices.isEmpty
     private var pendingRefresh = false
     private var loadTask: Task<Void, Never>?
     private var lastRefreshAction: (() async -> Void)?
+    private var busyRetryPolicy = SavedVoicesBusyRetryPolicy()
+    private var storeBusyRetryTask: Task<Void, Never>?
+
+    /// Stops a pending busy-store retry and restores a fresh schedule. The
+    /// Voices screens call this when they disappear; reappearing loads again.
+    func cancelBusyRetry() {
+        storeBusyRetryTask?.cancel()
+        storeBusyRetryTask = nil
+        busyRetryPolicy.reset()
+    }
+
+    /// `loadIssue` in the caller's interface language.
+    func loadErrorMessage(_ presentation: VocelloPresentationText) -> String? {
+        switch loadIssue {
+        case nil: nil
+        case .storeBusy: presentation.savedVoicesStoreBusy
+        case .failed(let message): message
+        }
+    }
 
     func ensureLoaded(using ttsEngine: some TTSEngine) async {
         guard ttsEngine.isReady else { return }
@@ -35,7 +71,7 @@ final class SavedVoicesViewModel: ObservableObject {
         voices.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         SavedVoicesSessionCache.voices = voices
         hasLoadedOnce = true
-        loadError = nil
+        loadIssue = nil
     }
 
     func removeVoiceFromVisibleState(id: String) {
@@ -55,7 +91,7 @@ final class SavedVoicesViewModel: ObservableObject {
 
         isLoading = true
         if clearsVisibleError {
-            loadError = nil
+            loadIssue = nil
         }
 
         loadTask = Task { [weak self] in
@@ -70,17 +106,32 @@ final class SavedVoicesViewModel: ObservableObject {
                 await MainActor.run {
                     self.voices = loadedVoices
                     SavedVoicesSessionCache.voices = loadedVoices
-                    self.loadError = nil
+                    self.loadIssue = nil
                     self.hasLoadedOnce = true
+                    self.busyRetryPolicy.reset()
                     self.finishLoad(wallStart: wallStart)
                 }
             } catch {
                 guard !Task.isCancelled else { return }
+                let issue = SavedVoicesLoadIssue(error)
                 await MainActor.run {
-                    self.loadError = error.localizedDescription
+                    self.loadIssue = issue
                     self.finishLoad(wallStart: wallStart)
+                    if issue == .storeBusy {
+                        self.scheduleStoreBusyRetry()
+                    }
                 }
             }
+        }
+    }
+
+    private func scheduleStoreBusyRetry() {
+        guard storeBusyRetryTask == nil, let delay = busyRetryPolicy.nextDelay() else { return }
+        storeBusyRetryTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard let self, !Task.isCancelled else { return }
+            self.storeBusyRetryTask = nil
+            await self.lastRefreshAction?()
         }
     }
 

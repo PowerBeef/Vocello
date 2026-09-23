@@ -39,7 +39,7 @@ class IOSStorageProtectionPolicyTests(unittest.TestCase):
     def test_live_policy_passes(self) -> None:
         result = module.validate()
         self.assertEqual(result["status"], "PASS")
-        self.assertEqual(result["pathCount"], 11)
+        self.assertEqual(result["pathCount"], 12)
 
     def test_missing_data_class_fails_closed(self) -> None:
         temporary, root = self.fixture()

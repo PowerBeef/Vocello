@@ -197,6 +197,8 @@ public final class GenerationFailureDiagnosticLogger: @unchecked Sendable {
                 return ErrorMetadata(code: "generation.failed", classification: .runtime)
             case .insufficientMemory:
                 return ErrorMetadata(code: "memory.insufficient", classification: .memory)
+            case .savedVoiceStoreBusy:
+                return ErrorMetadata(code: "saved_voices.store_busy", classification: .storage)
             }
         }
 

@@ -63810,6 +63810,72 @@
           }
         }
       }
+    },
+    "vocello.error.saved_voices_busy": {
+      "comment": "Saved Voices error. Another Vocello process, such as the command-line tool, holds the shared saved-voice store for a moment; retrying later succeeds and nothing was lost.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another Vocello process is updating Saved Voices. Try again in a moment."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un autre processus Vocello met à jour les voix enregistrées. Réessayez dans un instant."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Otro proceso de Vocello está actualizando las voces guardadas. Inténtalo de nuevo en un momento."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ein anderer Vocello-Prozess aktualisiert gerade die gespeicherten Stimmen. Versuche es gleich noch einmal."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un altro processo di Vocello sta aggiornando le voci salvate. Riprova tra un momento."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outro processo do Vocello está atualizando as vozes salvas. Tente novamente em instantes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "另一个 Vocello 进程正在更新已保存的声音。请稍后重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "別の Vocello プロセスが保存済みの声を更新しています。しばらくしてからもう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다른 Vocello 프로세스가 저장된 음성을 업데이트하고 있습니다. 잠시 후 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Другой процесс Vocello обновляет сохранённые голоса. Повторите попытку чуть позже."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -395,6 +395,7 @@ final class VocelloiOSLogicTests: XCTestCase {
                 "voices",
                 "voice-candidates",
                 "voice-transactions",
+                "voice-transactions-quarantine",
                 "history-outbox",
                 "history",
             ])
@@ -407,9 +408,11 @@ final class VocelloiOSLogicTests: XCTestCase {
             XCTAssertEqual(byID[id]?.backup, .excluded)
             XCTAssertEqual(byID[id]?.recursive, true)
         }
-        for id in ["outputs", "voices", "history-outbox", "history"] {
+        for id in ["outputs", "voices", "voice-transactions-quarantine", "history-outbox", "history"] {
             XCTAssertEqual(byID[id]?.backup, .included)
         }
+        XCTAssertEqual(byID["voice-transactions-quarantine"]?.recursive, true)
+        XCTAssertEqual(byID["voice-transactions-quarantine"]?.isDirectory, true)
         XCTAssertEqual(byID["history"]?.pathPrefix, "history.sqlite")
     }
 

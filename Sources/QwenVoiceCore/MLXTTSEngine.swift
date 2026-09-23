@@ -17,11 +17,17 @@ public enum TTSEngineError: LocalizedError, Equatable {
     case unsupportedRequest(String)
     case generationFailed(String)
     case insufficientMemory(String)
+    /// Another Vocello process (the app or the CLI, which share one support
+    /// root) holds the Saved Voice store's cross-process lock. Retryable;
+    /// interface copy comes from `VocelloPresentationText`.
+    case savedVoiceStoreBusy
 
     public var errorDescription: String? {
         switch self {
         case .notInitialized:
             return "The native MLX engine has not been initialized yet."
+        case .savedVoiceStoreBusy:
+            return PreparedVoiceRepositoryError.storeBusy.errorDescription
         case .unknownModel(let modelID):
             return "The native MLX engine could not find model '\(modelID)'."
         case .modelUnavailable(let message),
@@ -38,6 +44,37 @@ public enum TTSEngineError: LocalizedError, Equatable {
 /// they see is now `TTSEngineError`. Retained for the duration of the
 /// typed-throws sweep so individual files can migrate incrementally.
 public typealias MLXTTSEngineError = TTSEngineError
+
+/// Why engine initialization deferred Saved Voice reconciliation (F-25). The store is
+/// shared with other Vocello processes through a non-blocking cross-process
+/// lock, so a busy or unreconcilable store never fails engine start: built-in
+/// and designed voices stay available, every Saved Voice operation reconciles
+/// again under the lock, and the first one that succeeds clears the issue.
+/// Path-free by construction: it carries a category, never an error message,
+/// journal name, voice name or filesystem path.
+enum SavedVoiceStoreStartupIssue: Equatable, Sendable {
+    /// Another process held the store lock during initialization.
+    case storeBusy
+    /// Reconciliation failed for another reason; the store keeps its journals.
+    case reconciliationFailed(SavedVoiceStoreFailureCategory)
+
+    var diagnosticCode: String {
+        switch self {
+        case .storeBusy: "saved_voices.store_busy"
+        case .reconciliationFailed(let category): "saved_voices.reconcile_failed.\(category.rawValue)"
+        }
+    }
+}
+
+enum SavedVoiceStoreFailureCategory: String, Equatable, Sendable {
+    /// An interpretable journal is ambiguous; its files are retained for retry.
+    case recoveryRequired = "recovery_required"
+    /// Store contents failed validation outside a quarantinable journal.
+    case invalidStore = "invalid_store"
+    /// A filesystem operation failed (permissions, space, I/O).
+    case filesystem
+    case unknown
+}
 
 @MainActor
 public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReporting, TTSEngineEventStreaming, ActiveGenerationCancellable, StartupReliabilityCodecReplaying, StartupReliabilityRuntimeOwnershipReporting {
@@ -340,6 +377,12 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     private var appSupportDirectoryURL: URL?
     private var voicesDirectory: URL?
     private var preparedVoiceRepository: PreparedVoiceRepository?
+    /// Set when `initialize` could not reconcile the Saved Voice store; cleared
+    /// by the next successful Saved Voice operation or by `stop()`.
+    private(set) var savedVoiceStoreStartupIssue: SavedVoiceStoreStartupIssue?
+    /// Journals the startup reconciliation quarantined or left for a newer
+    /// build; nil when startup could not reconcile. Counts only.
+    private(set) var savedVoiceStoreStartupSummary: PreparedVoiceReconciliationSummary?
     private var allowsProactiveWarmOperations = true
     private var idleUnloadTask: Task<Void, Never>?
     private var idleUnloadToken: UUID?
@@ -618,6 +661,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         diagnosticAppSupportBox.url = nil
         voicesDirectory = nil
         preparedVoiceRepository = nil
+        savedVoiceStoreStartupIssue = nil
+        savedVoiceStoreStartupSummary = nil
         latestEvent = nil
         loadState = .idle
         visibleErrorMessage = nil
@@ -699,7 +744,30 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             )
         }.value
 
-        try await preparedVoiceRepository.reconcile()
+        // Startup never waits on, or fails because of, the shared Saved Voice
+        // store (F-25): the app and the CLI share it, and another process may
+        // hold its lock or leave journals this build cannot recover yet.
+        var startupDiagnostics: [String: String] = [:]
+        do {
+            let summary = try await preparedVoiceRepository.reconcile()
+            savedVoiceStoreStartupIssue = nil
+            savedVoiceStoreStartupSummary = summary
+            if summary != PreparedVoiceReconciliationSummary() {
+                startupDiagnostics["code"] = summary.diagnosticCode
+            }
+        } catch {
+            let issue = Self.savedVoiceStoreStartupIssue(for: error)
+            savedVoiceStoreStartupIssue = issue
+            savedVoiceStoreStartupSummary = nil
+            startupDiagnostics["code"] = issue.diagnosticCode
+        }
+        if !startupDiagnostics.isEmpty {
+            await Self.recordDiagnosticEvent(
+                "saved_voice_store_startup",
+                details: startupDiagnostics,
+                appSupportDirectoryURL: appSupportDirectory
+            )
+        }
 
         appSupportDirectoryURL = appSupportDirectory
         diagnosticAppSupportBox.url = appSupportDirectory
@@ -1590,6 +1658,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         let repository = try requirePreparedVoiceRepository()
         do {
             let records = try await repository.list()
+            clearSavedVoiceStoreStartupIssue(after: repository)
             return records.map(Self.preparedVoice(from:))
         } catch {
             throw Self.preparedVoiceEngineError(error)
@@ -1658,7 +1727,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         let repository = try requirePreparedVoiceRepository()
         let warnings = Self.savedReferenceQualityWarnings(forAudioAt: sourceURL.path)
         do {
-            return try await repository.prepare(
+            let candidate = try await repository.prepare(
                 name: name,
                 audioURL: sourceURL,
                 transcript: transcript,
@@ -1666,6 +1735,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 enrollmentMetadata: enrollmentMetadata,
                 replacingVoiceID: replacingVoiceID
             )
+            clearSavedVoiceStoreStartupIssue(after: repository)
+            return candidate
         } catch {
             throw Self.preparedVoiceEngineError(error)
         }
@@ -1677,6 +1748,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         let record: PreparedVoiceStorageRecord
         do {
             record = try await repository.commit(id: id)
+            clearSavedVoiceStoreStartupIssue(after: repository)
         } catch {
             throw Self.preparedVoiceEngineError(error)
         }
@@ -1688,7 +1760,9 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     public func discardPreparedVoiceCandidate(id: UUID) async throws {
         try ensureInitialized()
         do {
-            try await requirePreparedVoiceRepository().discard(id: id)
+            let repository = try requirePreparedVoiceRepository()
+            try await repository.discard(id: id)
+            clearSavedVoiceStoreStartupIssue(after: repository)
         } catch {
             throw Self.preparedVoiceEngineError(error)
         }
@@ -1724,8 +1798,12 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         }
         await cancelClonePreparationIfNeeded()
         await runtime.invalidatePreparedVoiceCaches()
+        // Captured with no suspension before the call below resolves the same
+        // repository, so the identity check sees the store that was used.
+        let repository = preparedVoiceRepository
         do {
             try await requirePreparedVoiceRepository().delete(id: id)
+            clearSavedVoiceStoreStartupIssue(after: repository)
         } catch {
             throw Self.preparedVoiceEngineError(error)
         }
@@ -1742,11 +1820,40 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         )
     }
 
-    private static func preparedVoiceEngineError(_ error: Error) -> TTSEngineError {
+    /// Keeps the retryable busy state typed across the engine boundary so
+    /// callers can present it instead of a generic failure.
+    nonisolated static func preparedVoiceEngineError(_ error: Error) -> TTSEngineError {
         if let engineError = error as? TTSEngineError {
             return engineError
         }
+        if (error as? PreparedVoiceRepositoryError) == .storeBusy {
+            return .savedVoiceStoreBusy
+        }
         return .generationFailed(error.localizedDescription)
+    }
+
+    nonisolated static func savedVoiceStoreStartupIssue(for error: Error) -> SavedVoiceStoreStartupIssue {
+        switch error {
+        case PreparedVoiceRepositoryError.storeBusy:
+            return .storeBusy
+        case PreparedVoiceRepositoryError.recoveryRequired:
+            return .reconciliationFailed(.recoveryRequired)
+        case is PreparedVoiceRepositoryError, is DecodingError:
+            return .reconciliationFailed(.invalidStore)
+        case is CocoaError, is POSIXError:
+            return .reconciliationFailed(.filesystem)
+        default:
+            return .reconciliationFailed(.unknown)
+        }
+    }
+
+    /// Clears the startup issue after a successful Saved Voice operation, but
+    /// only when that operation used the current store: a `stop()` or a
+    /// re-initialization during the await replaced it, and a stale success
+    /// must not erase the new store's state.
+    private func clearSavedVoiceStoreStartupIssue(after repository: PreparedVoiceRepository?) {
+        guard let repository, repository === preparedVoiceRepository else { return }
+        savedVoiceStoreStartupIssue = nil
     }
 
     private func prebuildClonePromptIfPossible(for voice: PreparedVoice) {

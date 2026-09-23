@@ -34,6 +34,9 @@ enum IOSStorageProtectionPolicy {
         Entry(id: "voices", relativePath: "voices", pathPrefix: nil, isDirectory: true, backup: .included, recursive: true),
         Entry(id: "voice-candidates", relativePath: "voice-candidates", pathPrefix: nil, isDirectory: true, backup: .excluded, recursive: true),
         Entry(id: "voice-transactions", relativePath: "voice-transactions", pathPrefix: nil, isDirectory: true, backup: .excluded, recursive: true),
+        // Uninterpretable journals set aside by reconciliation (F-25). Backup-eligible: a
+        // quarantined journal may hold the only copy of a replaced voice.
+        Entry(id: "voice-transactions-quarantine", relativePath: "voice-transactions-quarantine", pathPrefix: nil, isDirectory: true, backup: .included, recursive: true),
         Entry(id: "history-outbox", relativePath: "history-outbox", pathPrefix: nil, isDirectory: true, backup: .included, recursive: true),
         Entry(id: "history", relativePath: "history.sqlite", pathPrefix: "history.sqlite", isDirectory: false, backup: .included, recursive: false),
     ]

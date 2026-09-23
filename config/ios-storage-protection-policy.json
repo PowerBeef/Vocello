@@ -85,6 +85,15 @@
       "purpose": "Recoverable enrollment commit, replacement, and deletion journals"
     },
     {
+      "id": "voice-transactions-quarantine",
+      "relativePath": "voice-transactions-quarantine",
+      "kind": "directory",
+      "backup": "included",
+      "protection": "completeUntilFirstUserAuthentication",
+      "recursive": true,
+      "purpose": "Saved-voice journals reconciliation could not interpret, set aside instead of deleted; backup-eligible because a quarantined journal may hold the only copy of a replaced voice"
+    },
+    {
       "id": "history-outbox",
       "relativePath": "history-outbox",
       "kind": "directory",

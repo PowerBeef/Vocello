@@ -146,6 +146,7 @@ struct IOSVoicesView: View {
                 await savedVoicesViewModel.ensureLoaded(using: ttsEngine)
             }
         }
+        .onDisappear { savedVoicesViewModel.cancelBusyRetry() }
         .accessibilityIdentifier("screen_voices")
         .fileImporter(
             isPresented: $isAudioImporterPresented,
@@ -537,7 +538,7 @@ struct IOSVoicesView: View {
                 await savedVoicesViewModel.refresh(using: ttsEngine)
                 IOSHaptics.success()
             } catch {
-                deleteErrorMessage = error.localizedDescription
+                deleteErrorMessage = IOSAppLanguage.shared.presentation.savedVoiceErrorMessage(error)
                 IOSHaptics.warning()
             }
             deletingVoiceID = nil

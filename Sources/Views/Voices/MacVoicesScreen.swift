@@ -42,7 +42,7 @@ struct MacVoicesScreen: View {
     @State private var voiceBeingReplaced: Voice?
     private var voices: [Voice] { savedVoicesViewModel.voices }
     private var isLoading: Bool { savedVoicesViewModel.isLoading }
-    private var loadError: String? { savedVoicesViewModel.loadError }
+    private var loadError: String? { savedVoicesViewModel.loadErrorMessage(MacInterfaceText.presentation) }
 
     private var loadTaskID: String {
         "\(ttsEngineStore.isReady)"
@@ -70,6 +70,7 @@ struct MacVoicesScreen: View {
             .onDisappear {
                 highlightResetTask?.cancel()
                 highlightResetTask = nil
+                savedVoicesViewModel.cancelBusyRetry()
             }
             .sheet(item: $savedVoiceSheetConfiguration) { configuration in
                 MacSavedVoiceSheet(configuration: configuration) { voice in
@@ -312,7 +313,9 @@ private extension MacVoicesScreen {
                 await MainActor.run {
                     presentActionAlert(
                         title: MacInterfaceText.voicesDeleteFailed,
-                        message: MacInterfaceText.voicesDeleteFailedMessage(error.localizedDescription)
+                        message: MacInterfaceText.voicesDeleteFailedMessage(
+                            MacInterfaceText.presentation.savedVoiceErrorMessage(error)
+                        )
                     )
                 }
             }

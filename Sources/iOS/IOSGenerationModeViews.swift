@@ -2086,7 +2086,7 @@ struct IOSVoiceCloningView: View {
     private func syncSavedVoiceSelectionState() {
         if draft.selectedSavedVoiceID != nil,
            selectedVoice == nil,
-           savedVoicesViewModel.isLoading || savedVoicesViewModel.loadError != nil {
+           savedVoicesViewModel.isLoading || savedVoicesViewModel.loadIssue != nil {
             return
         }
 

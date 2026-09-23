@@ -31,7 +31,7 @@ PA-17 (clone consent enforced in core and the CLI via `--confirm-consent`; savin
 consent; device clone lanes need the phone's consent on), PA-15 (device proof PASS on the iPhone,
 `smoke --scenario foreground-exit`); the phone's models were updated (`smoke --scenario
 update-models`). PA-28: a failed download range now retries alone instead of discarding the file
-(PA-29, parked, measures the background fan-out on the phone on request). Next: PA-16 (tokenizer sliding windows, consent-bound
+and PA-29 measured the background fan-out on the phone (the up-front default was fastest; kept). Next: PA-16 (tokenizer sliding windows, consent-bound
 model runs), PA-19, PA-21, PA-22, PA-07/08 cleanup. Maintainer steps: PA-10 `release` environment
 and `v*` tag ruleset; PA-05 still needs the altool upload check on the pinned Xcode.
 

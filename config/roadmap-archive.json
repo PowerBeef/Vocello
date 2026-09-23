@@ -3860,6 +3860,30 @@
         "file:Tests/VocelloCoreTests/ModelDownloadLifecycleTests.swift",
         "file:scripts/tests/test_check_ios_model_management.py"
       ]
+    },
+    {
+      "id": "PA-29",
+      "plan": "project-audit-2026-09",
+      "title": "Measure iOS background chunk fan-out against bounded in-flight ranges",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "A controlled on-device comparison (scripts/ui_test.sh ios model-download with the registered QVOICE_DOWNLOAD_ENGINE_PROFILE arms, plus a bounded in-flight-range arm) on the paired iPhone decides whether background downloads keep fanning every range out to the daemon up front or bound in-flight ranges per file; the 2026-08-11 chunking default changes only with that evidence and a maintainer decision recorded in docs/reference/model-delivery.md.",
+      "sourceOfTruth": [
+        "Sources/iOS/IOSModelDownloadCoordinator.swift",
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "docs/reference/model-delivery.md"
+      ],
+      "unparkWhen": "The maintainer explicitly requests the model-download comparison runs on the iPhone.",
+      "notes": "Closed 2026-09-23 on the maintainer's request. scripts/ui_test.sh ios model-download --scenario acceptance ran once per arm, back to back, on the paired iPhone (isolated model root, canonical models preserved): chunked (default up-front fan-out), legacy (single stream per file) and the new chunked-bounded arm (four in-flight ranges per file on the background session). No arm retried or duplicated bytes. Uninterrupted Design and Clone deliveries (1.37 GB on the wire each): chunked 39 s and 45 s (35.0 and 30.6 MB/s); legacy 76 s and 42 s (18.0 and 33.0 MB/s); chunked-bounded 100 s and 63 s (13.7 and 22.0 MB/s). Decision: keep the up-front fan-out; chunked-bounded stays a diagnostic arm. The morning's 5.5 MB/s delivery (tokenizer and model ranges together plus one short range) was not reproduced; PA-28 removed its 2 GB re-download. One run per arm, so a close future result warrants interleaved repeats. The lanes' failing verdicts came from a test-side parser that split locale-grouped byte counts (fixed).",
+      "updated": "2026-09-23",
+      "evidence": [
+        "commit:94de84ab",
+        "commit:e5dcac78",
+        "run:ios-xcui-model-download-20260923-151338-1615f126",
+        "run:ios-xcui-model-download-20260923-152336-f9b35c06",
+        "run:ios-xcui-model-download-20260923-153238-b9c61ec0",
+        "file:docs/reference/model-delivery.md"
+      ]
     }
   ]
 }

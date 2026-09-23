@@ -22,7 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 16/30 (53%) |
+| `project-audit-2026-09` | active | backend-and-platform | 17/30 (57%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -465,7 +465,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-22` | planned | Core storage and memory lifecycle is bounded | — |
 | `PA-25` | planned | Docs and tooling stay proportional | — |
 | `PA-26` | planned | Low-severity backlog from the external audit | — |
-| `PA-29` | parked | Measure iOS background chunk fan-out against bounded in-flight ranges | — |
 
 ### Open items in detail
 
@@ -507,10 +506,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-26`** (planned) — Low-severity backlog from the external audit.
   gate: Every Low and Info finding in the external audit that no other item covers is fixed or declined with a reason, section by section.
-
-- **`PA-29`** (parked) — Measure iOS background chunk fan-out against bounded in-flight ranges.
-  gate: A controlled on-device comparison (scripts/ui_test.sh ios model-download with the registered QVOICE_DOWNLOAD_ENGINE_PROFILE arms, plus a bounded in-flight-range arm) on the paired iPhone decides whether background downloads keep fanning every range out to the daemon up front or bound in-flight ranges per file; the 2026-08-11 chunking default changes only with that evidence and a maintainer decision recorded in docs/reference/model-delivery.md.
-  unparkWhen: The maintainer explicitly requests the model-download comparison runs on the iPhone.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

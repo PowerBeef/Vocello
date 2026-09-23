@@ -1510,22 +1510,6 @@
       "notes": "External audit 2026-09-22, sections 5 to 12: the Low and Info rows not grouped into PA-01 to PA-25 or existing items (for example ENG-07 to ENG-17, CORE-10 to CORE-22, MAC-09 to MAC-26, IOS-16 to IOS-25, SEC-08 to SEC-16, CI-09 to CI-21, WEB-02, WEB-06 to WEB-08, UX-01, REPO-01 to REPO-04). Work them in batches by area; the report's verification addendum lists the rows that are wrong or already fixed.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
-    },
-    {
-      "id": "PA-29",
-      "plan": "project-audit-2026-09",
-      "title": "Measure iOS background chunk fan-out against bounded in-flight ranges",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "A controlled on-device comparison (scripts/ui_test.sh ios model-download with the registered QVOICE_DOWNLOAD_ENGINE_PROFILE arms, plus a bounded in-flight-range arm) on the paired iPhone decides whether background downloads keep fanning every range out to the daemon up front or bound in-flight ranges per file; the 2026-08-11 chunking default changes only with that evidence and a maintainer decision recorded in docs/reference/model-delivery.md.",
-      "sourceOfTruth": [
-        "Sources/iOS/IOSModelDownloadCoordinator.swift",
-        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
-        "docs/reference/model-delivery.md"
-      ],
-      "unparkWhen": "The maintainer explicitly requests the model-download comparison runs on the iPhone.",
-      "notes": "2026-09-23 diagnostics: on a background URLSession every range task multiplexed onto one reused h2 connection (0 new connections across 24 large tasks), so per-connection CDN shaping capped the aggregate at about 5.5 MB/s while about 40 ranges were in flight; single-stream fallbacks on their own connections reached 9.5-12 MB/s; Design and Clone updates with fewer concurrent ranges reached 17.6 and 27.4 MB/s. Evidence is one observation, not a controlled comparison. PA-28 landed 2026-09-23; this waits only on the maintainer's request.",
-      "updated": "2026-09-23"
     }
   ]
 }

@@ -811,9 +811,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         /// per-file accounting (`resetFileProgress`/`reportFileCompleted`) reconciles
         /// them exactly like live task bytes. Baseline-bumped, not speed-sampled:
         /// recovered bytes are progress, not fresh network throughput.
-        /// `countsAsReuse` is true only on a file's first attempt in this run, when the
-        /// ranges come from a prior process. A later in-process attempt restores ranges
-        /// this run already put on the wire, which `reusedVerifiedBytes` never includes.
+        /// `countsAsReuse` is true only on a file's first attempt in this run: the ranges
+        /// already in the sidecar then, normally a prior process's, but also this
+        /// process's own earlier failed run (an explicit Retry), whose bytes the
+        /// diagnostics store may still count as wire bytes; that over-count fails the
+        /// acceptance allowance closed. A later attempt in the same run restores ranges
+        /// this run already put on the wire and never counts them as reuse.
         func reportPreexistingFileBytes(fileIndex: Int, bytes: Int64, countsAsReuse: Bool = true) {
             guard bytes > 0 else { return }
             if countsAsReuse {
@@ -2113,10 +2116,26 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 )
                 return
             } catch {
+                retryNumber += 1
+                let disposition = ModelDownloadRetryPolicy.disposition(
+                    error: error,
+                    retryNumber: retryNumber,
+                    integrityRetryAlreadyUsed: integrityRetryUsed
+                )
+                // The effective budget is the lower of the engine's and the policy's.
+                let lastRetryNumber = min(
+                    engineConfiguration.maxDownloadRetries,
+                    ModelDownloadRetryPolicy.maxRetryNumber
+                )
+                if case .fail = disposition { throw error }
+                if case .cancelled = disposition { throw error }
+                guard retryNumber <= lastRetryNumber else { throw error }
+                // Only once another attempt is certain does a fallback discard the
+                // resumable partial; a refused retry keeps it for a later resume.
                 if let dlError = error as? DownloadError {
                     let adjustment = Self.chunkFallbackAdjustment(
                         for: dlError,
-                        nextAttemptIsLast: retryNumber + 1 == engineConfiguration.maxDownloadRetries
+                        nextAttemptIsLast: retryNumber == lastRetryNumber
                     )
                     if adjustment.avoidChunking { avoidChunking = true }
                     if adjustment.clearPartial {
@@ -2127,13 +2146,6 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                         await state.resetFileProgress(fileIndex: fileIndex, publishReset: true)
                     }
                 }
-
-                retryNumber += 1
-                let disposition = ModelDownloadRetryPolicy.disposition(
-                    error: error,
-                    retryNumber: retryNumber,
-                    integrityRetryAlreadyUsed: integrityRetryUsed
-                )
                 let delay: Double
                 switch disposition {
                 case .cancelled, .fail:
@@ -2155,7 +2167,6 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                     }
                 }
 
-                guard retryNumber <= engineConfiguration.maxDownloadRetries else { throw error }
                 try await throwIfCancellationRequested()
                 await state.setRetry(
                     number: retryNumber,

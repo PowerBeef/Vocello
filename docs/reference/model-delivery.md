@@ -242,8 +242,12 @@ is re-requested under the same range-qualified identity. A network or transport 
 (default 3) backoff retries; only then does the failure escalate to the file-level retry, after
 in-flight sibling ranges finish (no new ranges are dispatched), and that escalation keeps the
 partial and the completed-range sidecar, so the next attempt fetches only the gaps. The restored
-ranges count as progress but not as reused bytes: `reusedVerifiedBytes` covers only ranges a
-prior process left in the sidecar, found on the file's first attempt. A genuine range refusal
+ranges count as progress but not as reused bytes: `reusedVerifiedBytes` covers only ranges
+already in the sidecar when a run's first attempt starts (normally a prior process's; after an
+explicit Retry in the same process also that process's earlier run, which the diagnostics may
+then over-count as duplicate bytes, failing the acceptance allowance closed). A last-resort single
+stream re-fetches the whole file, so its earlier ranges become duplicate bytes and fail the
+acceptance allowance by design. A genuine range refusal
 (HTTP 200, or a `Content-Range` naming another range) or a chunk-assembly fault still clears the
 partial and falls back to a single stream, and those failures cancel their siblings immediately.
 A `shortRange` escalation before the last file-level attempt is the one last resort that does

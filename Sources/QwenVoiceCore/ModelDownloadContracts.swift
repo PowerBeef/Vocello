@@ -459,6 +459,10 @@ public enum ModelDownloadRetryDisposition: Equatable, Sendable {
 
 /// Pure retry classifier shared by the downloader and deterministic tests.
 public enum ModelDownloadRetryPolicy {
+    /// The highest file-level retry number the policy ever grants; a caller's
+    /// own retry budget can only lower it.
+    public static let maxRetryNumber = 3
+
     public static func disposition(
         error: Error,
         retryNumber: Int,
@@ -478,18 +482,18 @@ public enum ModelDownloadRetryPolicy {
                 return .retryClean(afterSeconds: boundedDelay(retryAfterSeconds ?? backoff(retryNumber)))
             case .httpError(let statusCode, _, let responseRetryAfter):
                 if statusCode == 408 || statusCode == 429 || (500...599).contains(statusCode) {
-                    return retryNumber <= 3
+                    return retryNumber <= maxRetryNumber
                         ? .retry(afterSeconds: boundedDelay(retryAfterSeconds ?? responseRetryAfter ?? backoff(retryNumber)))
                         : .fail
                 }
                 return .fail
             case .rangeUnsupported, .chunkAssemblyFailed:
-                return retryNumber <= 3
+                return retryNumber <= maxRetryNumber
                     ? .retryClean(afterSeconds: boundedDelay(backoff(retryNumber)))
                     : .fail
             case .shortRange:
                 // Transient: the length-validated partial and its sidecar stay usable.
-                return retryNumber <= 3
+                return retryNumber <= maxRetryNumber
                     ? .retry(afterSeconds: boundedDelay(backoff(retryNumber)))
                     : .fail
             case .fileDownloadFailed(_, let underlying):
@@ -523,7 +527,7 @@ public enum ModelDownloadRetryPolicy {
             NSURLErrorFileDoesNotExist,
             NSURLErrorNoPermissionsToReadFile,
         ]
-        guard !permanentCodes.contains(nsError.code), retryNumber <= 3 else { return .fail }
+        guard !permanentCodes.contains(nsError.code), retryNumber <= maxRetryNumber else { return .fail }
 
         let transientCodes: Set<Int> = [
             NSURLErrorTimedOut,

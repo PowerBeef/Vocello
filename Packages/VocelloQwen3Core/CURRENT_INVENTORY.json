@@ -228,7 +228,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3SpeechTokenizerResidencyTests.swift",
-      "sha256": "a20dded2e988b957cd9708b19f2b73e9b39b74df33d1b27d628da48b68ee8bc3",
+      "sha256": "bb7ca78b29aab9bec1b4169ef4bf9b6719a81a5c1bb20d13a93a1b2b5db95056",
       "upstreamStatus": "added"
     },
     {

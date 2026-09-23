@@ -95,6 +95,29 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
             ),
             "a disabled load never stores a resident"
         )
+
+        cache.storeResidentSpeechTokenizer(
+            tokenizer,
+            identityKey: "trust:bbb",
+            includesEncoder: false,
+            residencyOverride: true
+        )
+        XCTAssertNil(
+            cache.residentSpeechTokenizer(
+                identityKey: "trust:bbb",
+                includeEncoder: false,
+                residencyOverride: false
+            ),
+            "a disabled load never adopts an existing resident"
+        )
+        XCTAssertNotNil(
+            cache.residentSpeechTokenizer(
+                identityKey: "trust:bbb",
+                includeEncoder: false,
+                residencyOverride: true
+            ),
+            "an enabled load adopts the stored resident"
+        )
     }
 
     private func makeTinyTokenizer(includeEncoder: Bool = false) throws -> Qwen3TTSSpeechTokenizer {

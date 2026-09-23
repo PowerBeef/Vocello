@@ -202,6 +202,15 @@ final class VocelloQwen3FacadeTests: XCTestCase {
         XCTAssertNil(event.failureCode)
     }
 
+    func testLoadBehaviorCarriesHostCapabilityAndDefaultsToUnavailable() {
+        XCTAssertFalse(VocelloQwen3LoadBehavior().internalDiagnosticsAvailable)
+        XCTAssertFalse(VocelloQwen3LoadBehavior().compatibilityValue.internalDiagnosticsAvailable)
+        XCTAssertTrue(
+            VocelloQwen3LoadBehavior(internalDiagnosticsAvailable: true)
+                .compatibilityValue.internalDiagnosticsAvailable
+        )
+    }
+
     func testOwnedCachePolicyPreservesDefaultAndFixedDirectoryBehavior() {
         XCTAssertEqual(
             VocelloQwen3CachePolicy.systemDefault.compatibilityValue.cacheDirectory,

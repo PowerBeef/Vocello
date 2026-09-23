@@ -309,8 +309,10 @@ final class Qwen3TTSTalkerModel: Module {
         return norm(x)
     }
 
-    func makeCache() -> [any KVCache] {
-        if let bits = Qwen3LoadTimeMemoryTuning.talkerKVQuantBits {
+    /// `kvQuantBits` is the model's gated load-time diagnostic
+    /// (`Qwen3LoadTimeDiagnosticOverrides.talkerKVQuantBits`); nil in production.
+    func makeCache(kvQuantBits: Int? = nil) -> [any KVCache] {
+        if let bits = kvQuantBits {
             latestCreatedCacheType = "quantized"
             return layers.map { _ in QuantizedKVCache(groupSize: 64, bits: bits) }
         }
@@ -371,8 +373,8 @@ final class Qwen3TTSTalkerForConditionalGeneration: Module {
         return (logits, hiddenStates)
     }
 
-    func makeCache() -> [any KVCache] {
-        model.makeCache()
+    func makeCache(kvQuantBits: Int? = nil) -> [any KVCache] {
+        model.makeCache(kvQuantBits: kvQuantBits)
     }
 
     func makeRotatingCache(keep: Int, window: Int) -> [any KVCache] {

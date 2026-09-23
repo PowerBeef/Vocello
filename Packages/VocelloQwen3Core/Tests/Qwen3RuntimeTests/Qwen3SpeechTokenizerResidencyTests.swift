@@ -3,9 +3,100 @@ import Foundation
 import XCTest
 
 /// Phase 9: speech-tokenizer residency semantics — content-exact adoption
-/// with the encoder-superset rule, lifecycle clearing, and the fail-safe
-/// file-identity helper.
+/// with the encoder-superset rule, lifecycle clearing, the fail-safe
+/// file-identity helper, and the capability-gated load-time diagnostic
+/// overrides (residency and talker KV quantization).
 final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
+    private let everyOverrideRequested = [
+        "QWENVOICE_DEBUG": "1",
+        "QVOICE_TALKER_KV_QUANT": "8",
+        "QWENVOICE_TOKENIZER_RESIDENCY": "off",
+    ]
+
+    /// A distribution host (app or CLI) attests no internal diagnostics
+    /// capability, so the master gate and every override key are inert.
+    func testLoadTimeOverridesAreInertWithoutInternalCapabilityEvenWithDebugGate() {
+        XCTAssertEqual(
+            Qwen3LoadTimeDiagnosticOverrides.resolve(
+                internalDiagnosticsAvailable: false,
+                environment: everyOverrideRequested
+            ),
+            .production
+        )
+        for key in everyOverrideRequested.keys {
+            XCTAssertNil(
+                VocelloQwen3ImplementationDebugGate.value(
+                    for: key,
+                    internalDiagnosticsAvailable: false,
+                    environment: everyOverrideRequested
+                ),
+                key
+            )
+        }
+        // Fail closed by default: a consumer that attests nothing gets no
+        // capability, and the production residency policy is unchanged.
+        XCTAssertFalse(QwenPreparedLoadBehavior().internalDiagnosticsAvailable)
+        XCTAssertFalse(QwenPreparedLoadBehavior.fullCapabilities.internalDiagnosticsAvailable)
+        XCTAssertFalse(QwenPreparedLoadBehavior.streamingOnly.internalDiagnosticsAvailable)
+        XCTAssertEqual(
+            Qwen3TTSPreparedComponentCache.speechTokenizerResidencyEnabled(
+                override: Qwen3LoadTimeDiagnosticOverrides.production.speechTokenizerResidency
+            ),
+            Qwen3TTSPreparedComponentCache.speechTokenizerResidencySupported
+        )
+    }
+
+    func testLoadTimeOverridesRequireBothCapabilityAndDebugGate() {
+        var withoutMasterGate = everyOverrideRequested
+        withoutMasterGate["QWENVOICE_DEBUG"] = nil
+        XCTAssertEqual(
+            Qwen3LoadTimeDiagnosticOverrides.resolve(
+                internalDiagnosticsAvailable: true,
+                environment: withoutMasterGate
+            ),
+            .production
+        )
+
+        let internalRun = Qwen3LoadTimeDiagnosticOverrides.resolve(
+            internalDiagnosticsAvailable: true,
+            environment: everyOverrideRequested
+        )
+        XCTAssertEqual(internalRun.talkerKVQuantBits, 8)
+        XCTAssertEqual(internalRun.speechTokenizerResidency, false)
+
+        var unsupported = everyOverrideRequested
+        unsupported["QVOICE_TALKER_KV_QUANT"] = "3"
+        unsupported["QWENVOICE_TOKENIZER_RESIDENCY"] = " ON "
+        let normalized = Qwen3LoadTimeDiagnosticOverrides.resolve(
+            internalDiagnosticsAvailable: true,
+            environment: unsupported
+        )
+        XCTAssertNil(normalized.talkerKVQuantBits)
+        XCTAssertEqual(normalized.speechTokenizerResidency, true)
+    }
+
+    func testResidencyOverrideGovernsAdoptionOnlyWhenResolved() throws {
+        XCTAssertFalse(Qwen3TTSPreparedComponentCache.speechTokenizerResidencyEnabled(override: false))
+        XCTAssertTrue(Qwen3TTSPreparedComponentCache.speechTokenizerResidencyEnabled(override: true))
+
+        let cache = Qwen3TTSPreparedComponentCache()
+        let tokenizer = try makeTinyTokenizer()
+        cache.storeResidentSpeechTokenizer(
+            tokenizer,
+            identityKey: "trust:aaa",
+            includesEncoder: false,
+            residencyOverride: false
+        )
+        XCTAssertNil(
+            cache.residentSpeechTokenizer(
+                identityKey: "trust:aaa",
+                includeEncoder: false,
+                residencyOverride: true
+            ),
+            "a disabled load never stores a resident"
+        )
+    }
+
     private func makeTinyTokenizer(includeEncoder: Bool = false) throws -> Qwen3TTSSpeechTokenizer {
         let json: [String: Any] = [
             "decoder_config": [

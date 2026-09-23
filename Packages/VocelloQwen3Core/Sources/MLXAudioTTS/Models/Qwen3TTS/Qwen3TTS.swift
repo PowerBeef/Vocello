@@ -129,6 +129,7 @@ private struct QwenPreparedLoadOptions: Sendable {
     let loadSpeakerEncoder: Bool?
     let loadSpeechTokenizerEncoder: Bool?
     let skipSpeechTokenizerEval: Bool
+    var diagnosticOverrides: Qwen3LoadTimeDiagnosticOverrides = .production
 }
 
 private enum Qwen3CustomVoicePrewarmDepth: String, Sendable {
@@ -472,30 +473,12 @@ final class Qwen3TTSPreparedComponentCache: Sendable {
     static let speechTokenizerResidencySupported = true
 #endif
 
-    /// Registered diagnostic switch for the phase 9 residency A/B (inert
-    /// without the QWENVOICE_DEBUG master gate). `off`-family values disable
-    /// residency anywhere; `on`-family values force-enable it — the iOS
-    /// qualification lane's entry point while the adaptive heuristic is dark.
-    private static let speechTokenizerResidencyOverride: String? =
-        VocelloQwen3ImplementationDebugGate.value(
-            for: "QWENVOICE_TOKENIZER_RESIDENCY"
-        )?
-        .trimmingCharacters(in: .whitespacesAndNewlines)
-        .lowercased()
-
-    private static let speechTokenizerResidencyDisabled: Bool = {
-        let raw = speechTokenizerResidencyOverride
-        return raw == "off" || raw == "false" || raw == "0" || raw == "no"
-    }()
-
-    private static let speechTokenizerResidencyForcedOn: Bool = {
-        let raw = speechTokenizerResidencyOverride
-        return raw == "on" || raw == "true" || raw == "1" || raw == "yes"
-    }()
-
-    static var speechTokenizerResidencyEnabled: Bool {
-        if speechTokenizerResidencyForcedOn { return true }
-        return speechTokenizerResidencySupported && !speechTokenizerResidencyDisabled
+    /// `override` is the load's gated diagnostic switch
+    /// (`Qwen3LoadTimeDiagnosticOverrides.speechTokenizerResidency`): `nil`
+    /// keeps the device-class policy, `false` disables residency anywhere,
+    /// `true` force-enables it.
+    static func speechTokenizerResidencyEnabled(override: Bool?) -> Bool {
+        override ?? speechTokenizerResidencySupported
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
@@ -529,9 +512,12 @@ final class Qwen3TTSPreparedComponentCache: Sendable {
     /// an encoder-needing load — that one falls through to the disk load.
     func residentSpeechTokenizer(
         identityKey: String,
-        includeEncoder: Bool
+        includeEncoder: Bool,
+        residencyOverride: Bool? = nil
     ) -> CachedSpeechTokenizerBox? {
-        guard Self.speechTokenizerResidencyEnabled else { return nil }
+        guard Self.speechTokenizerResidencyEnabled(override: residencyOverride) else {
+            return nil
+        }
         return state.withLock { value in
             guard let box = value.residentSpeechTokenizer,
                   box.identityKey == identityKey,
@@ -545,9 +531,10 @@ final class Qwen3TTSPreparedComponentCache: Sendable {
     func storeResidentSpeechTokenizer(
         _ speechTokenizer: Qwen3TTSSpeechTokenizer,
         identityKey: String,
-        includesEncoder: Bool
+        includesEncoder: Bool,
+        residencyOverride: Bool? = nil
     ) {
-        guard Self.speechTokenizerResidencyEnabled else { return }
+        guard Self.speechTokenizerResidencyEnabled(override: residencyOverride) else { return }
         let box = CachedSpeechTokenizerBox(
             identityKey: identityKey,
             includesEncoder: includesEncoder,
@@ -1368,6 +1355,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
     let config: Qwen3TTSModelConfig
     let talker: Qwen3TTSTalkerForConditionalGeneration
+    /// Gated load-time diagnostic (`QVOICE_TALKER_KV_QUANT`); nil in production.
+    let talkerKVQuantBits: Int?
     var speakerEncoder: Qwen3TTSSpeakerEncoder?
     var speechTokenizer: Qwen3TTSSpeechTokenizer?
     var tokenizer: Tokenizer?
@@ -1848,7 +1837,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 keep: inputEmbedsInit.dim(1), window: talkerKVWindow
             )
         } else {
-            cache = talker.makeCache()
+            cache = talker.makeCache(kvQuantBits: talkerKVQuantBits)
         }
         let codeCache = talker.codePredictor.makeCache()
         let (logits, hidden) = talker(inputEmbedsInit, cache: cache)
@@ -2248,10 +2237,12 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     init(
         config: Qwen3TTSModelConfig,
         talker: Qwen3TTSTalkerForConditionalGeneration,
-        speakerEncoder: Qwen3TTSSpeakerEncoder?
+        speakerEncoder: Qwen3TTSSpeakerEncoder?,
+        talkerKVQuantBits: Int? = nil
     ) {
         self.config = config
         self.talker = talker
+        self.talkerKVQuantBits = talkerKVQuantBits
         self.speakerEncoder = speakerEncoder
     }
 
@@ -3343,7 +3334,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 keep: inputEmbedsInit.dim(1), window: talkerKVWindow
             )
         } else {
-            cache = talker.makeCache()
+            cache = talker.makeCache(kvQuantBits: talkerKVQuantBits)
         }
         let isStreaming = onAudioChunk != nil || materializedEventSink != nil
         // Quality-first generation must not retain one lazy MLX graph per
@@ -5000,15 +4991,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         return token.reshaped(1, 1)
     }
 
-    private static let samplerCompileEnabled: Bool = {
-        let raw = VocelloQwen3ImplementationDebugGate.value(
-            for: "QWENVOICE_SAMPLER_COMPILE"
-        )?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-        return raw == "on" || raw == "true" || raw == "1" || raw == "yes"
-    }()
-
     // MARK: - fromPretrained
 
     public static func preparePreparedDirectory(_ modelDir: URL) throws {
@@ -5081,7 +5063,10 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 preparedDirectoryAlreadyValidated: loadBehavior.preparedDirectoryAlreadyValidated,
                 loadSpeakerEncoder: loadBehavior.loadSpeakerEncoder,
                 loadSpeechTokenizerEncoder: loadBehavior.loadSpeechTokenizerEncoder,
-                skipSpeechTokenizerEval: loadBehavior.skipSpeechTokenizerEval
+                skipSpeechTokenizerEval: loadBehavior.skipSpeechTokenizerEval,
+                diagnosticOverrides: .resolve(
+                    internalDiagnosticsAvailable: loadBehavior.internalDiagnosticsAvailable
+                )
             ),
             diagnosticEventSink: diagnosticEventSink,
             isolation: isolation
@@ -5161,7 +5146,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let model = Qwen3TTSModel(
             config: config,
             talker: talkerComponents.talker,
-            speakerEncoder: talkerComponents.speakerEncoder
+            speakerEncoder: talkerComponents.speakerEncoder,
+            talkerKVQuantBits: loadOptions.diagnosticOverrides.talkerKVQuantBits
         )
         model.preparedKey = preparedKey
 
@@ -5702,7 +5688,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             if let residencyIdentity,
                let residentBox = Qwen3TTSPreparedComponentCache.shared.residentSpeechTokenizer(
                    identityKey: residencyIdentity,
-                   includeEncoder: includeEncoder
+                   includeEncoder: includeEncoder,
+                   residencyOverride: loadOptions.diagnosticOverrides.speechTokenizerResidency
                ) {
                 // Fresh-load parity: the encoder trims its cache per encode
                 // call; the decoder's streaming state resets here and again at
@@ -5776,7 +5763,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 Qwen3TTSPreparedComponentCache.shared.storeResidentSpeechTokenizer(
                     loaded,
                     identityKey: residencyIdentity,
-                    includesEncoder: includeEncoder
+                    includesEncoder: includeEncoder,
+                    residencyOverride: loadOptions.diagnosticOverrides.speechTokenizerResidency
                 )
             }
             }

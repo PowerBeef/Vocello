@@ -31,6 +31,11 @@ public struct QwenPreparedLoadBehavior: Sendable, Equatable {
     /// Enables phase 9 in-memory reuse across model switches; nil disables
     /// residency for this load.
     public let speechTokenizerContentIdentity: String?
+    /// Host attestation that the product binary carries the internal
+    /// diagnostics build capability. Only then may `QWENVOICE_DEBUG` enable
+    /// the package's load-time diagnostic overrides; false (the default) keeps
+    /// them inert.
+    public let internalDiagnosticsAvailable: Bool
 
     public init(
         trustPreparedCheckpoint: Bool = false,
@@ -38,7 +43,8 @@ public struct QwenPreparedLoadBehavior: Sendable, Equatable {
         loadSpeakerEncoder: Bool? = nil,
         loadSpeechTokenizerEncoder: Bool? = nil,
         skipSpeechTokenizerEval: Bool = false,
-        speechTokenizerContentIdentity: String? = nil
+        speechTokenizerContentIdentity: String? = nil,
+        internalDiagnosticsAvailable: Bool = false
     ) {
         self.trustPreparedCheckpoint = trustPreparedCheckpoint
         self.preparedDirectoryAlreadyValidated = preparedDirectoryAlreadyValidated
@@ -46,6 +52,7 @@ public struct QwenPreparedLoadBehavior: Sendable, Equatable {
         self.loadSpeechTokenizerEncoder = loadSpeechTokenizerEncoder
         self.skipSpeechTokenizerEval = skipSpeechTokenizerEval
         self.speechTokenizerContentIdentity = speechTokenizerContentIdentity
+        self.internalDiagnosticsAvailable = internalDiagnosticsAvailable
     }
 
     public static let fullCapabilities = QwenPreparedLoadBehavior()

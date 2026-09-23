@@ -25,6 +25,17 @@ LEGACY_COMPATIBILITY_SPI_PATTERN = re.compile(
     rf"@_spi\(\s*{re.escape(LEGACY_COMPATIBILITY_SPI)}\s*\)"
 )
 VOCELLO_QWEN3_CORE_IMPORT_PATTERN = re.compile(r"\bimport\s+VocelloQwen3Core\b")
+PACKAGE_SOURCE_ROOT = "Packages/VocelloQwen3Core/Sources/"
+PACKAGE_DEBUG_GATE = PACKAGE_SOURCE_ROOT + "MLXAudioTTS/RuntimeDebugGate.swift"
+PACKAGE_DEBUG_GATE_CALL = "VocelloQwen3ImplementationDebugGate.value("
+PACKAGE_CAPABILITY = "internalDiagnosticsAvailable"
+PACKAGE_LOAD_BEHAVIOR_SOURCES = (
+    PACKAGE_SOURCE_ROOT + "MLXAudioTTS/TTSModel.swift",
+    PACKAGE_SOURCE_ROOT + "VocelloQwen3Core/LoadedModel.swift",
+)
+PRODUCT_CAPABILITY_ATTESTATION = (
+    "internalDiagnosticsAvailable: RuntimeDebugGate.internalDiagnosticsAvailable"
+)
 PHASE2_ENGINE_ACTOR_STATUS_PENDING = (
     "shipping-through-phase4-implementation-complete-promotion-pending"
 )
@@ -198,6 +209,104 @@ def debug_gate_enforcement_errors(
     ]
 
 
+def call_arguments(source: str, call: str) -> list[tuple[int, str]]:
+    """Return (line, argument text) for each balanced-parenthesis call of `call`."""
+    calls: list[tuple[int, str]] = []
+    start = source.find(call)
+    while start != -1:
+        index = start + len(call)
+        depth = 1
+        while index < len(source) and depth:
+            depth += {"(": 1, ")": -1}.get(source[index], 0)
+            index += 1
+        line = source.count("\n", 0, start) + 1
+        calls.append((line, source[start + len(call) : index - 1]))
+        start = source.find(call, index)
+    return calls
+
+
+def package_debug_gate_capability_errors(sources: dict[str, str]) -> list[str]:
+    """Prove the owned package's diagnostics gate requires the host capability.
+
+    A SwiftPM target never sees the product's VOCELLO_INTERNAL_DIAGNOSTICS
+    compile condition, so the host attests it on every load. The package gate
+    must refuse without that attestation, take it with no default, every package
+    read must pass it through, the load behaviors must default it to false, and
+    the product must derive it only from its own compile-checked gate.
+    `sources` maps repository-relative Swift paths to their text.
+    """
+    errors: list[str] = []
+    gate = sources.get(PACKAGE_DEBUG_GATE)
+    if gate is None:
+        return [f"owned-package debug gate is missing: {PACKAGE_DEBUG_GATE}"]
+    signature = re.search(
+        r"static\s+func\s+value\(\s*for\s+key:\s*String\s*,\s*"
+        rf"{PACKAGE_CAPABILITY}\s*:\s*Bool\s*,",
+        gate,
+    )
+    capability_guard = re.search(
+        rf"guard\s+{PACKAGE_CAPABILITY}\s+else\s*\{{\s*return\s+nil\s*\}}", gate
+    )
+    master_read = gate.find('"QWENVOICE_DEBUG"')
+    if signature is None:
+        errors.append(
+            "owned-package debug gate value(for:) must take "
+            f"{PACKAGE_CAPABILITY}: Bool with no default"
+        )
+    if (
+        capability_guard is None
+        or master_read == -1
+        or capability_guard.start() > master_read
+    ):
+        errors.append(
+            f"owned-package debug gate must refuse without {PACKAGE_CAPABILITY} "
+            "before reading QWENVOICE_DEBUG"
+        )
+
+    package_calls = 0
+    for relative, source in sorted(sources.items()):
+        if not relative.startswith(PACKAGE_SOURCE_ROOT):
+            continue
+        for line, arguments in call_arguments(source, PACKAGE_DEBUG_GATE_CALL):
+            package_calls += 1
+            argument = re.search(rf"\b{PACKAGE_CAPABILITY}\s*:\s*([^,)]+)", arguments)
+            if argument is None or argument.group(1).strip() == "true":
+                errors.append(
+                    f"owned-package diagnostic read does not pass the host "
+                    f"{PACKAGE_CAPABILITY} attestation: {relative}:{line}"
+                )
+    if package_calls == 0:
+        errors.append("owned-package debug gate has no package reads to verify")
+
+    for relative in PACKAGE_LOAD_BEHAVIOR_SOURCES:
+        source = sources.get(relative)
+        if source is None:
+            errors.append(f"owned-package load behavior source is missing: {relative}")
+        elif not re.search(rf"\b{PACKAGE_CAPABILITY}\s*:\s*Bool\s*=\s*false\b", source):
+            errors.append(
+                f"owned-package load behavior must default {PACKAGE_CAPABILITY} "
+                f"to false: {relative}"
+            )
+
+    attestations = 0
+    for relative, source in sorted(sources.items()):
+        if relative.startswith("Sources/"):
+            for line, arguments in call_arguments(source, "VocelloQwen3LoadBehavior("):
+                attestations += 1
+                if PRODUCT_CAPABILITY_ATTESTATION not in re.sub(r"\s+", " ", arguments):
+                    errors.append(
+                        "product load behavior does not attest the compile-checked "
+                        f"internal diagnostics capability: {relative}:{line}"
+                    )
+        if re.search(rf"\b{PACKAGE_CAPABILITY}\s*:\s*true\b", source):
+            errors.append(
+                f"internal diagnostics capability is hard-coded true: {relative}"
+            )
+    if attestations == 0:
+        errors.append("product never attests the internal diagnostics capability on load")
+    return errors
+
+
 def internal_diagnostics_capability_errors(
     contract: dict,
     *,
@@ -335,8 +444,10 @@ def validate_debug_contract() -> list[str]:
                     gated.add(key)
 
     observed: set[str] = set()
+    sources: dict[str, str] = {}
     for path in swift_files(contract.get("sourceRoots", [])):
         source = path.read_text(encoding="utf-8")
+        sources[path.relative_to(ROOT).as_posix()] = source
         observed.update(ENV_PATTERN.findall(source))
         errors.extend(
             debug_gate_enforcement_errors(
@@ -346,6 +457,7 @@ def validate_debug_contract() -> list[str]:
                 master_gate=contract["masterGate"],
             )
         )
+    errors.extend(package_debug_gate_capability_errors(sources))
     for missing in sorted(observed - registered):
         errors.append(f"unregistered runtime environment key: {missing}")
     for stale in sorted(registered - observed):

@@ -962,7 +962,10 @@ Environment-variable ownership is explicit. `config/runtime-debug-knobs.json` re
 supported key and classifies production-affecting overrides, bounded observability, and
 test-target-only device diagnostics. Production-affecting values are read only through
 `RuntimeDebugGate` and require both the `VOCELLO_INTERNAL_DIAGNOSTICS` compile capability and
-`QWENVOICE_DEBUG`; distribution routes omit the capability. Bounded observability remains
+`QWENVOICE_DEBUG`; distribution routes omit the capability. The owned package cannot see that
+compile condition, so the product attests it on every load
+(`VocelloQwen3LoadBehavior.internalDiagnosticsAvailable`, default false) and the package's
+`VocelloQwen3ImplementationDebugGate` refuses its load-time overrides without it. Bounded observability remains
 separately classified, and telemetry records active override key names plus a digest of their
 values without retaining those values. Likewise,
 `config/concurrency-safety.json` is the authoritative inventory and justification for owned

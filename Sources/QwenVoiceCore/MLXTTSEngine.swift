@@ -2099,6 +2099,10 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         }
     }
 
+    /// The owned package cannot see this binary's compile conditions, so every
+    /// load attests the internal diagnostics capability from the product gate;
+    /// distribution builds attest false and the package's load-time overrides
+    /// stay inert even with `QWENVOICE_DEBUG` set.
     nonisolated static func qwenPreparedLoadBehavior(
         for profile: NativeQwenPreparedLoadProfile,
         trustPreparedCheckpoint: Bool,
@@ -2110,7 +2114,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             return VocelloQwen3LoadBehavior(
                 trustPreparedCheckpoint: trustPreparedCheckpoint,
                 preparedDirectoryAlreadyValidated: preparedDirectoryAlreadyValidated,
-                speechTokenizerContentIdentity: speechTokenizerContentIdentity
+                speechTokenizerContentIdentity: speechTokenizerContentIdentity,
+                internalDiagnosticsAvailable: RuntimeDebugGate.internalDiagnosticsAvailable
             )
         case .withoutCloneEncoders, .streamingOnly:
             return VocelloQwen3LoadBehavior(
@@ -2119,7 +2124,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 loadSpeakerEncoder: false,
                 loadSpeechTokenizerEncoder: false,
                 skipSpeechTokenizerEval: true,
-                speechTokenizerContentIdentity: speechTokenizerContentIdentity
+                speechTokenizerContentIdentity: speechTokenizerContentIdentity,
+                internalDiagnosticsAvailable: RuntimeDebugGate.internalDiagnosticsAvailable
             )
         }
     }

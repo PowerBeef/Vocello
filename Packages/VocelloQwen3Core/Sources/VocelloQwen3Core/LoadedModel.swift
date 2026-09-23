@@ -15,6 +15,11 @@ public struct VocelloQwen3LoadBehavior: Codable, Hashable, Sendable {
     /// Host-attested content identity for the speech-tokenizer component;
     /// enables phase 9 in-memory reuse across model switches (nil disables).
     public let speechTokenizerContentIdentity: String?
+    /// The product's internal diagnostics build capability, attested by the
+    /// host from its own compile condition (the package cannot see it). Only
+    /// then may `QWENVOICE_DEBUG` enable the owned runtime's load-time
+    /// diagnostic overrides; the default keeps them inert.
+    public let internalDiagnosticsAvailable: Bool
 
     public init(
         trustPreparedCheckpoint: Bool = false,
@@ -22,7 +27,8 @@ public struct VocelloQwen3LoadBehavior: Codable, Hashable, Sendable {
         loadSpeakerEncoder: Bool? = nil,
         loadSpeechTokenizerEncoder: Bool? = nil,
         skipSpeechTokenizerEval: Bool = false,
-        speechTokenizerContentIdentity: String? = nil
+        speechTokenizerContentIdentity: String? = nil,
+        internalDiagnosticsAvailable: Bool = false
     ) {
         self.trustPreparedCheckpoint = trustPreparedCheckpoint
         self.preparedDirectoryAlreadyValidated = preparedDirectoryAlreadyValidated
@@ -30,6 +36,7 @@ public struct VocelloQwen3LoadBehavior: Codable, Hashable, Sendable {
         self.loadSpeechTokenizerEncoder = loadSpeechTokenizerEncoder
         self.skipSpeechTokenizerEval = skipSpeechTokenizerEval
         self.speechTokenizerContentIdentity = speechTokenizerContentIdentity
+        self.internalDiagnosticsAvailable = internalDiagnosticsAvailable
     }
 
     var compatibilityValue: QwenPreparedLoadBehavior {
@@ -39,7 +46,8 @@ public struct VocelloQwen3LoadBehavior: Codable, Hashable, Sendable {
             loadSpeakerEncoder: loadSpeakerEncoder,
             loadSpeechTokenizerEncoder: loadSpeechTokenizerEncoder,
             skipSpeechTokenizerEval: skipSpeechTokenizerEval,
-            speechTokenizerContentIdentity: speechTokenizerContentIdentity
+            speechTokenizerContentIdentity: speechTokenizerContentIdentity,
+            internalDiagnosticsAvailable: internalDiagnosticsAvailable
         )
     }
 }

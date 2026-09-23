@@ -565,7 +565,9 @@ Do not regress these without a maintainer decision:
 
 `config/runtime-debug-knobs.json` is authoritative. Every production-affecting override below is
 read through `RuntimeDebugGate` and requires both a repository-owned internal diagnostics build and
-`QWENVOICE_DEBUG=1`; distributed builds omit that compile capability. Bounded observability keys
+`QWENVOICE_DEBUG=1`; distributed builds omit that compile capability. Owned-package knobs
+(`QVOICE_TALKER_KV_QUANT`, `QWENVOICE_TOKENIZER_RESIDENCY`) are resolved once per model load and only
+when the product attests that capability through `VocelloQwen3LoadBehavior`. Bounded observability keys
 such as telemetry selection are classified separately and do not change synthesis policy. Internal
 generation telemetry retains override key names and a digest, never raw values.
 

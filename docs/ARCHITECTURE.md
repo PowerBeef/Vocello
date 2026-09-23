@@ -152,7 +152,8 @@ iOS XCUITest), and `VocelloiOSCandidateUI` (standalone preinstalled-candidate ru
 policy XCTest) schemes. XcodeGen cannot directly render those tool and app-host-free test
 schemes (verified unchanged through 2.46.0), so checked-in templates bind to their generated target IDs. The UI schemes are isolated from ordinary test actions; ordinary CI executes the shared
 policy assertions through `VocelloCoreTests`, compiles `VocelloiOSLogic` for the generic device SDK,
-and never executes that standalone bundle. A single shippable config,
+and never executes that standalone bundle; it compiles the `VocelloMacUI` and `VocelloiOSUI` bundles
+(build-for-testing) and never executes them either. A single shippable config,
 **`Release`**, is the only config — there is no `Debug` config or generic `DEBUG` symbol.
 
 ### Key layering rule

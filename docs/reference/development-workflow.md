@@ -34,7 +34,8 @@ git push
 Routing is `scripts/ci/classify_changes.py`, the same file CI uses, so the local plan and the CI
 lanes agree. `scripts/dev.sh check` compiles the affected XCUITest bundles through
 `scripts/build_ui_test_bundles.sh` when UI-test sources or `project.yml` change; it never runs them.
-Push CI does not compile those bundles. On a push, CI diffs each lane against the last run on the
+Push CI compiles both bundles too (`--gate`, after the deterministic builds in their arenas) and never
+runs them. On a push, CI diffs each lane against the last run on the
 branch in which that lane's job passed (not against the previous push), because `cancel-in-progress`
 can drop a superseded push's run and the lanes it owed must still run on the next push; a lane with
 no prior green run always runs. Locally the lanes come from the dirty tree: `swift` runs the macOS
@@ -99,9 +100,9 @@ tests; a test that outgrows its lane moves, it does not slow every push. `pytest
 | `changes` | ubuntu | always | seconds |
 | `contracts` | ubuntu | always | about 1 min: the complete deterministic contract gate (`check_project_inputs.sh --python none`: product contracts, invariants, privacy scan, work authority, benchmark history) |
 | `python` | ubuntu | Python paths, contracts, workflow files | 3 to 4 min: product and tooling tests; research tests when routed |
-| `macos-tests` | macos-26 | Swift compile inputs, the lane's own scripts, build configs and benchmark evidence | cached DerivedData; darwin-only Python modules, macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s) |
+| `macos-tests` | macos-26 | Swift compile inputs, the lane's own scripts, build configs and benchmark evidence | cached DerivedData; darwin-only Python modules, macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s), then `build_ui_test_bundles.sh macos --gate` compiles the macOS XCUITest bundle in the same arena (build only) |
 | `macos-tsan` | macos-26 | Swift compile inputs (same routing as `macos-tests`) | cached `macos-tsan` DerivedData; `scripts/macos_test.sh tsan`, the deterministic core bundles under ThreadSanitizer, blocking since 2026-09-14 (`config/tsan-policy.json`); 5 to 11 min on a second runner |
-| `ios-compile` | macos-26 | iOS compile inputs | cached DerivedData; `build_foundation_targets.sh ios --incremental` at `-Onone` (`QVOICE_FOUNDATION_SWIFT_OPTIMIZATION`) |
+| `ios-compile` | macos-26 | iOS compile inputs | cached DerivedData; `build_foundation_targets.sh ios --incremental` at `-Onone` (`QVOICE_FOUNDATION_SWIFT_OPTIMIZATION`), then `build_ui_test_bundles.sh ios --gate` compiles the iOS XCUITest bundle unsigned in the same arena (build only) |
 | `website` | ubuntu | `website/` | about 1 min |
 | `dependency-submission` | ubuntu | push only (skipped on dispatch) | seconds: `scripts/swift_dependency_snapshot.py` submitted to the GitHub dependency graph; needed by `CI required` |
 | `CI required` | ubuntu | always | the branch-protection context; skipped lanes count as passed |
@@ -112,7 +113,8 @@ on the event name and the ref, so a newer push cancels the previous push run whi
 measurement dispatch never cancels the gate run for a commit. `scripts/dev.sh ci` replays that job
 graph serially: project regeneration, the complete `check_project_inputs.sh` (the Linux `contracts`
 job runs it with `--python none`), `scripts/macos_test.sh test`, `scripts/macos_test.sh tsan`, the
-CLI version identity, `build_foundation_targets.sh ios --incremental`, the website supply-chain
+CLI version identity, `build_foundation_targets.sh ios --incremental`, `build_ui_test_bundles.sh all
+--gate`, the website supply-chain
 check and `npm --prefix website run check`. It is a superset rather than a byte-identical replay: it
 skips no lane by routing, and it runs the whole Python suite inside the gate in one process where CI
 splits it into `-m "not research and not darwin_only"` plus an optional `-m research` on Linux and

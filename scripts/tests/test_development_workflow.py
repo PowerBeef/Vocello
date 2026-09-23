@@ -57,7 +57,7 @@ class CheckPlanTests(unittest.TestCase):
         self.assertIn("npm --prefix website run check", joined)
 
     def test_ui_test_sources_compile_their_bundles(self) -> None:
-        """The bundles compile nowhere else. CI is forbidden from naming them."""
+        """The local check compiles the bundles its dirty tree can break, in their lanes' arenas."""
         for changed, expected in [
             ("Tests/VocelloMacUITests/VocelloMacUITestCase.swift", "macos"),
             ("Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift", "ios"),
@@ -145,8 +145,12 @@ class CommandRunnerTests(unittest.TestCase):
             "scripts/macos_test.sh test",
             "scripts/macos_test.sh tsan",
             "./scripts/build_foundation_targets.sh ios --incremental",
+            "./scripts/build_ui_test_bundles.sh all --gate",
         ):
             self.assertIn(expected, joined)
+        # The gate compile reuses the arenas the deterministic builds warmed, so it follows them.
+        self.assertGreater(joined.index("./scripts/build_ui_test_bundles.sh all --gate"),
+                           joined.index("./scripts/build_foundation_targets.sh ios --incremental"))
         self.assertNotIn("checkpoint", " ".join(joined))
 
     def test_since_adds_committed_paths_and_reaches_child_selection(self) -> None:

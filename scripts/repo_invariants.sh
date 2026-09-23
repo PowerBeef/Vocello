@@ -21,30 +21,27 @@ out="$(rg -n -i 'platform=iOS Simulator|build_run_sim|test_sim|launch_sim' \
   | grep -Ev '^\.claude/settings\.json:[0-9]+:[[:space:]]*"mcp__XcodeBuildMCP__[a-z_]+",?$' || true)"
 [[ -z "$out" ]] || fail "Simulator route in an active surface:\n$out"
 
-# One UI driver: ordinary CI and release workflows never execute UI tests.
+# One UI driver: no workflow executes UI tests. Compiling them is allowed
+# (push CI runs scripts/build_ui_test_bundles.sh --gate, build-for-testing
+# only, PA-24); executing them is not: no test-without-building, no app UI lane
+# and no xcodebuild or xcb_run `test` action, whatever the scheme. Comment
+# lines are prose, not invocations; continued lines are joined first.
 ci_error="$(python3 - 2>&1 <<'PY' || true
 from pathlib import Path
 import re
 
-paths = (
-    Path('.github/workflows/ci.yml'),
-    Path('.github/workflows/release.yml'),
-    Path('.github/workflows/promote-release.yml'),
-    Path('.github/workflows/release-rehearsal.yml'),
-)
+paths = sorted(Path('.github/workflows').glob('*.yml')) + sorted(Path('.github/actions').rglob('*.yml'))
 patterns = {
-    r'\btest-without-building\b': 'executes XCUITest',
-    r'\bscripts/ui_test\.sh\b': 'invokes an app UI lane',
-    r'\bxcodebuild\s+test\b': 'executes xcodebuild test',
-    r'\b(?:VocelloMacUI|VocelloiOSUI|VocelloMacUITests|VocelloiOSUITests)\b': 'references an isolated UI-test scheme or bundle',
+    r'\btest-without-building\b': 'executes XCUITest (test-without-building)',
+    r'\bscripts/ui_test\.sh\b': 'invokes an app UI lane (scripts/ui_test.sh)',
+    r'\b(?:xcodebuild|xcb_run)\b.*(?<![\w./-])test(?![\w.-])': 'runs an xcodebuild test action',
 }
 for path in paths:
-    if not path.is_file():
-        continue
-    text = path.read_text(encoding='utf-8')
-    for pattern, label in patterns.items():
-        if re.search(pattern, text):
-            raise SystemExit(f'{path} {label}; UI execution must stay explicit')
+    lines = [line for line in path.read_text(encoding='utf-8').splitlines() if not line.lstrip().startswith('#')]
+    for line in re.sub(r'\\\n\s*', ' ', '\n'.join(lines)).splitlines():
+        for pattern, label in patterns.items():
+            if re.search(pattern, line):
+                raise SystemExit(f'{path} {label}; UI tests compile in CI but never execute there')
 PY
 )"
 [[ -z "$ci_error" ]] || fail "$ci_error"

@@ -115,7 +115,7 @@ the publisher then classifies from the run's own load sample.
 Ordinary CI and `scripts/dev.sh check` are deterministic. Models, a phone and UI tests never block
 commits, pushes or candidate packaging. `scripts/dev.sh check` compiles the affected XCUITest bundles
 (`scripts/build_ui_test_bundles.sh`, build only) when `Tests/*UITests`, `Tests/UIAutomationSupport`
-or `project.yml` change; push CI never compiles or runs them. Public promotion separately requires all applicable
+or `project.yml` change; push CI compiles them in the Swift and iOS lanes but never runs them. Public promotion separately requires all applicable
 exact-source acceptance lanes. Consult the platform release guide for command-bound evidence, signing
 and artifact verification; a development build is not a processed distribution candidate.
 

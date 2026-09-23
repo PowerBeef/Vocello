@@ -186,6 +186,7 @@ class ClassificationTests(unittest.TestCase):
             "scripts/lib/build_cache.sh": {"swift", "ios", "python"},
             "scripts/lib/jsonio.py": {"swift", "python"},
             "scripts/macos_test.sh": {"swift", "python"},
+            "scripts/build_ui_test_bundles.sh": {"swift", "ios", "python"},
             "scripts/ui_test.sh": {"python"},
             "scripts/privacy_scan.py": {"python"},
             "config/test-quarantine.json": {"swift", "python"},

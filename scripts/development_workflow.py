@@ -177,11 +177,12 @@ def swift_test_commands(paths: list[str], *, everything: bool = False) -> list[l
     return []
 
 
-# The XCUITest bundles compile nowhere else. Push CI is forbidden from naming
-# them (repo_invariants.sh check #2, so CI can never execute XCUITest), and the
-# app-target builds do not include them — so until 2026-09-17 a syntax error in
-# the code that drives every acceptance lane reached a human only when someone
-# ran a lane by hand.
+# The app-target builds do not include the XCUITest bundles, so until
+# 2026-09-17 a syntax error in the code that drives every acceptance lane
+# reached a human only when someone ran a lane by hand. The local check compiles
+# them in their lanes' arenas; push CI compiles them with `--gate` after the
+# deterministic builds (PA-24). Nothing here or in CI executes them
+# (repo_invariants.sh check #2).
 UI_BUNDLE_SOURCES = (
     "Tests/UIAutomationSupport/",
     "Tests/VocelloMacUITests/",
@@ -233,6 +234,8 @@ CI_COMMANDS: list[list[str]] = [
     ["scripts/macos_test.sh", "tsan"],
     ["./scripts/build.sh", "cli", "--version"],
     ["./scripts/build_foundation_targets.sh", "ios", "--incremental"],
+    # After both deterministic builds, in their arenas: only the UI-test targets compile.
+    ["./scripts/build_ui_test_bundles.sh", "all", "--gate"],
     ["python3", "scripts/supply_chain_contract.py", "--installed", "website"],
     ["npm", "--prefix", "website", "run", "check"],
 ]

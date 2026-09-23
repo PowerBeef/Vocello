@@ -18,8 +18,9 @@ References, read only what the change needs: `docs/reference/mlx-guide.md`,
 Verification: `scripts/dev.sh test` (macOS unit and owned-runtime tests), `scripts/dev.sh ios`
 (generic device-SDK compile). `dev.sh check` compiles the XCUITest bundles for you
 (`scripts/build_ui_test_bundles.sh`, build only) whenever the dirty tree touches `Tests/*UITests`,
-`Tests/UIAutomationSupport` or `project.yml`; nothing in CI compiles them. Physical-device and macOS
-XCUITest lanes only when explicitly requested.
+`Tests/UIAutomationSupport` or `project.yml`; push CI compiles both bundles in the Swift and iOS lanes
+(`--gate`) but never executes them. Physical-device and macOS XCUITest lanes only when explicitly
+requested.
 
 ## Engine and runtime (owned package `Packages/VocelloQwen3Core`, `Sources/QwenVoiceCore`)
 

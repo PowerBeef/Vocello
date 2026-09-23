@@ -8,7 +8,9 @@ name: CI
 # scripts already use (config/build-output-policy.json), so a warm push
 # recompiles only what changed. Dispatch with `cold: true` to skip the restore.
 #
-# Ordinary CI is UI-free: no XCUITest, no Simulator, no device, no model.
+# Ordinary CI executes no UI: it compiles the XCUITest bundles
+# (build_ui_test_bundles.sh --gate, build-for-testing only) but never runs them,
+# and uses no Simulator, no device and no model.
 
 on:
   push:
@@ -223,12 +225,20 @@ jobs:
       - name: Verify source-built CLI version identity
         run: ./scripts/build.sh cli --version
 
+      - name: Compile the macOS XCUITest bundle (build only, never run)
+        # PA-24: build-for-testing in the arena the deterministic build just
+        # warmed, with its settings, so only the UI-test target compiles. No
+        # runner is launched; repo_invariants.sh check 2 forbids executing it.
+        run: ./scripts/build_ui_test_bundles.sh macos --gate
+
       - name: Upload test artifacts on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: macos-deterministic-test-artifacts
-          path: build/artifacts/macos/tests/
+          path: |
+            build/artifacts/macos/tests/
+            build/artifacts/ui-bundles/
           if-no-files-found: warn
           retention-days: 7
 
@@ -405,12 +415,21 @@ jobs:
           QVOICE_FOUNDATION_SWIFT_OPTIMIZATION: "-Onone"
         run: ./scripts/build_foundation_targets.sh ios --incremental
 
+      - name: Compile the iOS XCUITest bundle for the device SDK (build only, never run)
+        # PA-24: the same arena and settings as the compile above (unsigned,
+        # -Onone), so only the UI-test target compiles. No phone, no runner.
+        env:
+          QVOICE_FOUNDATION_SWIFT_OPTIMIZATION: "-Onone"
+        run: ./scripts/build_ui_test_bundles.sh ios --gate
+
       - name: Upload compile results on failure
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ios-compile-artifacts
-          path: build/artifacts/foundation/
+          path: |
+            build/artifacts/foundation/
+            build/artifacts/ui-bundles/
           if-no-files-found: warn
           retention-days: 7
 

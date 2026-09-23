@@ -74,7 +74,7 @@ BUILD_CONFIGS = ("config/build-output-policy.json", "config/apple-platform-capab
 # Validated on Linux by the contracts job; the macOS gate does not need them.
 ROADMAP_FILES = ("config/roadmap.json", "config/roadmap-archive.json")
 # The macOS job runs the compile, the deterministic bundles, the CLI identity
-# step and the darwin-only pytest lane (test_benchmark_history); the contract
+# step, the UI-test bundle compile and the darwin-only pytest lane (test_benchmark_history); the contract
 # gate itself runs on Linux (MV-04), so only these scripts are its inputs.
 DARWIN_TEST_INPUTS = ("scripts/tests/test_benchmark_history.py", "scripts/tests/conftest.py",
                       "scripts/benchmark_history.py", "scripts/lib/rtf.py", "scripts/lib/jsonio.py")
@@ -82,12 +82,13 @@ MACOS_LANE_SCRIPTS = ("scripts/macos_test.sh", "scripts/build.sh", "scripts/rege
                       "scripts/generate_cli_scheme.py", "scripts/generate_ios_logic_scheme.py",
                       "scripts/build_output_policy.py", "scripts/cli_version_contract.py",
                       "scripts/ci/restore_mtimes.py", "scripts/lib/xctest_summary.py",
-                      "scripts/lib/build_provenance.py", "scripts/lib/storage_preflight.py")
-# Inputs of the iOS generic compile besides the sources themselves.
+                      "scripts/lib/build_provenance.py", "scripts/lib/storage_preflight.py",
+                      "scripts/build_ui_test_bundles.sh")
+# Inputs of the iOS generic compile (and its UI-test bundle) besides the sources themselves.
 IOS_BUILD_SCRIPTS = ("scripts/build_foundation_targets.sh", "scripts/regenerate_project.sh",
                      "scripts/generate_cli_scheme.py", "scripts/generate_ios_logic_scheme.py",
                      "scripts/lib/ios_platform_preflight.py", "scripts/lib/storage_preflight.py",
-                     "scripts/build_output_policy.py")
+                     "scripts/build_output_policy.py", "scripts/build_ui_test_bundles.sh")
 BENCHMARK_EVIDENCE_PREFIXES = ("benchmarks/runs/", "benchmarks/baselines/")
 BENCHMARK_EVIDENCE_FILES = ("benchmarks/HISTORY.md", "benchmarks/hardware-profiles.json")
 RESEARCH_PREFIXES = (

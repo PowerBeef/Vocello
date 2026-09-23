@@ -22,7 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 13/28 (46%) |
+| `project-audit-2026-09` | active | backend-and-platform | 14/28 (50%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -459,7 +459,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-10` | in-flight | Release signing is isolated from dispatch and build inputs | — |
 | `PA-15` | in-flight | iOS stops generation safely when the app leaves the foreground | — |
 | `PA-16` | planned | Speech-tokenizer attention honors the model's sliding windows | — |
-| `PA-17` | planned | Clone consent is enforced below the views | — |
 | `PA-18` | planned | Public claims match what each download ships | — |
 | `PA-19` | planned | Orchestrators and the generate loop have unit coverage | — |
 | `PA-20` | planned | Accessibility and localization reach every surface | — |
@@ -490,9 +489,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-16`** (planned) — Speech-tokenizer attention honors the model's sliding windows.
   gate: The decoder transformer applies its 72-frame sliding window with a bounded KV cache and the encoder its 250-frame window; a reference-parity fixture against the upstream tokenizer passes, and the fixed-seed QC battery and gate bench show no regression.
-
-- **`PA-17`** (planned) — Clone consent is enforced below the views.
-  gate: A core policy refuses clone generation and enrollment without recorded consent on every entry point, including the CLI, and unit tests prove the refusal.
 
 - **`PA-18`** (planned) — Public claims match what each download ships.
   gate: README and website scope every feature claim to the build it names (AudioSeal marking, Article 50, seed pinning and the new UI marked as 3.0), facts match source (concurrent files, chart record, recommended variant), AudioSeal is attributed with the correct upstream revision, and the website sends basic security headers.

@@ -1432,20 +1432,6 @@
       "updated": "2026-09-22"
     },
     {
-      "id": "PA-17",
-      "title": "Clone consent is enforced below the views",
-      "status": "planned",
-      "gate": "A core policy refuses clone generation and enrollment without recorded consent on every entry point, including the CLI, and unit tests prove the refusal.",
-      "sourceOfTruth": [
-        "Sources/Views/Studio/MacVoiceCloningScreen.swift",
-        "Sources/iOS/IOSGenerationModeViews.swift",
-        "Sources/VocelloCLI/Support.swift"
-      ],
-      "notes": "External audit SEC-04 and TEST-04 (issue #101), confirmed 2026-09-22: voiceCloningConsent is read only in the macOS and iOS clone screens and Settings; nothing in QwenVoiceCore, the store, the executor or the CLI checks it, and only UI tests exercise it. Needed before a CLI download ships.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
-    },
-    {
       "id": "PA-18",
       "title": "Public claims match what each download ships",
       "status": "planned",

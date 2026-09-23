@@ -241,18 +241,23 @@ is re-requested under the same range-qualified identity. A network or transport 
 408, 429, or 5xx (honoring `Retry-After`) are transient too. A range gets `maxRangeRetries`
 (default 3) backoff retries; only then does the failure escalate to the file-level retry, after
 in-flight sibling ranges finish (no new ranges are dispatched), and that escalation keeps the
-partial and the completed-range sidecar, so the next attempt fetches only the gaps. Only a
-genuine range refusal (HTTP 200, or a `Content-Range` naming another range) or a chunk-assembly
-fault still clears the partial and falls back to a single stream, and those failures cancel
-their siblings immediately. The trigger was a 2026-09-23 iPhone update in which one short
-128 MiB range made the file-level retry discard 1.2 GB of completed ranges (4.07 GB on the wire
-for a 2.05 GB file).
+partial and the completed-range sidecar, so the next attempt fetches only the gaps. The restored
+ranges count as progress but not as reused bytes: `reusedVerifiedBytes` covers only ranges a
+prior process left in the sidecar, found on the file's first attempt. A genuine range refusal
+(HTTP 200, or a `Content-Range` naming another range) or a chunk-assembly fault still clears the
+partial and falls back to a single stream, and those failures cancel their siblings immediately.
+A `shortRange` escalation before the last file-level attempt is the one last resort that does
+the same: a server may legally answer every range with a shorter prefix (RFC 9110), so the last
+attempt streams the whole file once instead of failing. The trigger was a 2026-09-23 iPhone
+update in which one short 128 MiB range made the file-level retry discard 1.2 GB of completed
+ranges (4.07 GB on the wire for a 2.05 GB file).
 
 ## States, cancellation, and retry
 
 Visible states are: queued, waiting for connectivity, downloading, retrying, verifying, installing,
 cancelling, installed, failed, deleting, and deleted. Speed and ETA are shown only during active
-transfer. A separate no-progress message appears after 20 seconds of an actively running task;
+transfer. A separate no-progress message appears after 20 seconds in which no running task's
+byte count grows (a range retry refilling its slot counts as growth);
 waiting-for-connectivity comes from the URLSession delegate. On iPhone, the determinate bar means
 exactly `durable logical catalog bytes / catalog bytes` during transfer. Stable whole-file and
 byte-range identities, rather than URLSession task IDs, own those bytes, so a replacement task
@@ -292,8 +297,12 @@ status. A `retrying` phase record carries the typed retry reason (`range-respons
 `chunk-assembly`, `integrity`, `network`, `http-429`, `http-5xx`, `http-other`), and each
 scheduled per-range retry writes a `range-retry` record with its attempt, reason, backoff, the
 range's first byte offset and length, and the sanitized relative path (at most 24 per run; the
-success summary counts all of them). The acceptance validator allows one range of duplicate
-wire bytes per file-level or range-level retry. Task completion
+success summary counts all of them). Like `wireBytes`, the count and the cap span every attempt
+since the process's previous success; a failure does not reset them. The acceptance validator
+(`duplicate_byte_allowance` in `scripts/check_ios_model_management.py`) allows one 128 MiB range
+of duplicate wire bytes per file-level retry plus the recorded `rangeLength` of each range-level
+retry, and fails an artifact with more than four range retries or with retries whose records
+were not persisted. Task completion
 waits for URLSession's terminal callback so the success summary cannot overtake final task metrics.
 Foreground delegate callbacks are serialized, durable staging is sequenced before terminal
 completion, and high-frequency byte callbacks are reduced to bounded cumulative progress updates

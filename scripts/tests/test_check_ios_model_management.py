@@ -497,5 +497,73 @@ class ModelManagementDiagnosisTests(unittest.TestCase):
             self.assertFalse(result["passesContrast"])
 
 
+MIB = 1024 * 1024
+
+
+def range_retry(second, length=128 * MIB):
+    return {
+        "kind": "range-retry",
+        "capturedAtUTC": f"2026-09-23T12:00:{second:02d}Z",
+        "rangeLength": length,
+        "retryReason": "short-range",
+    }
+
+
+def download_success(second, retry_count=0, range_retry_count=0):
+    return {
+        "kind": "success",
+        "capturedAtUTC": f"2026-09-23T12:00:{second:02d}Z",
+        "retryCount": retry_count,
+        "rangeRetryCount": range_retry_count,
+    }
+
+
+class DuplicateByteAllowanceTests(unittest.TestCase):
+    def test_clean_artifact_allows_no_duplicates(self):
+        success = download_success(10)
+        self.assertEqual(MODULE.duplicate_byte_allowance(success, [success]), 0)
+
+    def test_range_retries_allow_their_actual_lengths_plus_file_retries(self):
+        success = download_success(10, retry_count=1, range_retry_count=2)
+        records = [range_retry(3, 32 * MIB), range_retry(4, 8 * MIB), success]
+        self.assertEqual(
+            MODULE.duplicate_byte_allowance(success, records),
+            128 * MIB + 40 * MIB,
+        )
+
+    def test_counts_only_the_newest_records_after_the_previous_success(self):
+        earlier = download_success(5, range_retry_count=1)
+        success = download_success(20, range_retry_count=1)
+        # One record belongs to the earlier artifact; one is from a relaunched process
+        # the success no longer counts; only the newest one is this success's retry.
+        records = [
+            range_retry(2, 64 * MIB),
+            earlier,
+            range_retry(8, 16 * MIB),
+            range_retry(12, 4 * MIB),
+            success,
+        ]
+        self.assertEqual(MODULE.duplicate_byte_allowance(success, records), 4 * MIB)
+
+    def test_rejects_retries_beyond_the_ceiling(self):
+        count = MODULE.MAX_RANGE_RETRIES_PER_ARTIFACT + 1
+        success = download_success(40, range_retry_count=count)
+        records = [range_retry(second) for second in range(1, count + 1)] + [success]
+        with self.assertRaisesRegex(ValueError, "ceiling"):
+            MODULE.duplicate_byte_allowance(success, records)
+
+    def test_rejects_retries_whose_records_are_missing(self):
+        success = download_success(10, range_retry_count=2)
+        with self.assertRaisesRegex(ValueError, "lengths are unknown"):
+            MODULE.duplicate_byte_allowance(success, [range_retry(3), success])
+
+    def test_rejects_a_record_without_a_range_length(self):
+        success = download_success(10, range_retry_count=1)
+        record = range_retry(3)
+        del record["rangeLength"]
+        with self.assertRaisesRegex(ValueError, "rangeLength"):
+            MODULE.duplicate_byte_allowance(success, [record, success])
+
+
 if __name__ == "__main__":
     unittest.main()

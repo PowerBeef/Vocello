@@ -146,6 +146,19 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
             for: .shortRange(path: "p", expectedBytes: 100, receivedBytes: 90))
         XCTAssertFalse(short.avoidChunking)
         XCTAssertFalse(short.clearPartial)
+        // Before the last file-level attempt a short range is the last resort: a server
+        // that always truncates ranges gets one clean single stream. Other transient
+        // failures keep the partial even then.
+        let lastShort = HuggingFaceDownloader.chunkFallbackAdjustment(
+            for: .shortRange(path: "p", expectedBytes: 100, receivedBytes: 90),
+            nextAttemptIsLast: true)
+        XCTAssertTrue(lastShort.avoidChunking)
+        XCTAssertTrue(lastShort.clearPartial)
+        let lastTransient = HuggingFaceDownloader.chunkFallbackAdjustment(
+            for: .httpError(statusCode: 503, path: "p"),
+            nextAttemptIsLast: true)
+        XCTAssertFalse(lastTransient.avoidChunking)
+        XCTAssertFalse(lastTransient.clearPartial)
         XCTAssertEqual(
             ModelDownloadRetryPolicy.disposition(
                 error: HuggingFaceDownloader.DownloadError.shortRange(
@@ -178,11 +191,11 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         XCTAssertEqual(verdict(206, "bytes 100-199/1000"), .complete)
         // The server honored Range for this range but the body ended early (the
         // 2026-09-23 device incident: 125.6 of 134.2 MB), or was oversized.
-        XCTAssertEqual(verdict(206, "bytes 100-199/1000", body: 93), .short(receivedBytes: 93))
-        XCTAssertEqual(verdict(206, "bytes 100-199/1000", body: 101), .short(receivedBytes: 101))
+        XCTAssertEqual(verdict(206, "bytes 100-199/1000", body: 93), .lengthMismatch(receivedBytes: 93))
+        XCTAssertEqual(verdict(206, "bytes 100-199/1000", body: 101), .lengthMismatch(receivedBytes: 101))
         // A Content-Range truncated to a prefix of the request is short, not a
         // different range.
-        XCTAssertEqual(verdict(206, "bytes 100-150/1000", body: 51), .short(receivedBytes: 51))
+        XCTAssertEqual(verdict(206, "bytes 100-150/1000", body: 51), .lengthMismatch(receivedBytes: 51))
         // Genuinely unsupported: Range ignored, missing/malformed header, other range.
         XCTAssertEqual(verdict(200, nil, body: 1000), .unsupported)
         XCTAssertEqual(verdict(200, "bytes 100-199/1000"), .unsupported)

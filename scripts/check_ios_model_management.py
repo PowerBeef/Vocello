@@ -27,6 +27,64 @@ PASS_SCENARIOS = {"acceptance", "queue", "recover", "soak"}
 REQUIRED_PROGRESS_MILESTONES = {"transfer-1", "transfer-25", "transfer-50", "transfer-75", "transfer-95"}
 
 
+# Duplicate wire bytes one file-level retry may meter: at most one 128 MiB range.
+FILE_RETRY_DUPLICATE_ALLOWANCE_BYTES = 128 * 1024 * 1024
+# A healthy artifact needs no range retries; more than this is a regression, not recovery.
+MAX_RANGE_RETRIES_PER_ARTIFACT = 4
+# Mirrors ModelDownloadDiagnosticsStore.maxRangeRetryRecordsPerRun; the two move together.
+PERSISTED_RANGE_RETRY_RECORD_CAP = 24
+
+
+def duplicate_byte_allowance(success: dict[str, Any], records: list[dict[str, Any]]) -> int:
+    """Duplicate wire bytes one successful artifact may meter.
+
+    Each file-level retry may re-fetch one 128 MiB range. Each range-level retry re-fetches
+    exactly its own range, so it adds the actual `rangeLength` of its persisted `range-retry`
+    record rather than a fixed allowance. The store counts range retries (and caps their
+    records) since its last success in this process, which is also the span of `wireBytes`;
+    the success counted the newest `rangeRetryCount` records after the previous success.
+    Fails closed (ValueError) when retries exceed the ceiling or their lengths are unknown.
+    """
+    retry_count = int(success.get("retryCount", 0) or 0)
+    range_retry_count = int(success.get("rangeRetryCount", 0) or 0)
+    if range_retry_count > MAX_RANGE_RETRIES_PER_ARTIFACT:
+        raise ValueError(
+            f"rangeRetryCount={range_retry_count} exceeds the per-artifact ceiling "
+            f"of {MAX_RANGE_RETRIES_PER_ARTIFACT}"
+        )
+    success_time = success.get("capturedAtUTC", "")
+    lower_bound = max(
+        (
+            record.get("capturedAtUTC", "")
+            for record in records
+            if record.get("kind") == "success" and record.get("capturedAtUTC", "") < success_time
+        ),
+        default="",
+    )
+    range_retries = sorted(
+        (
+            record
+            for record in records
+            if record.get("kind") == "range-retry"
+            and lower_bound < record.get("capturedAtUTC", "") <= success_time
+        ),
+        key=lambda record: record.get("capturedAtUTC", ""),
+    )
+    if range_retry_count > PERSISTED_RANGE_RETRY_RECORD_CAP or len(range_retries) < range_retry_count:
+        raise ValueError(
+            f"rangeRetryCount={range_retry_count} but only {len(range_retries)} range-retry "
+            "record(s) persisted; their range lengths are unknown"
+        )
+    counted = range_retries[len(range_retries) - range_retry_count:] if range_retry_count else []
+    range_bytes = 0
+    for record in counted:
+        length = record.get("rangeLength")
+        if not isinstance(length, int) or isinstance(length, bool) or length <= 0:
+            raise ValueError(f"range-retry record has no valid rangeLength: {length!r}")
+        range_bytes += length
+    return retry_count * FILE_RETRY_DUPLICATE_ALLOWANCE_BYTES + range_bytes
+
+
 def load_json(path: pathlib.Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 

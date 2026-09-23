@@ -64,8 +64,10 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         let rangeStart: Int64?
         let rangeLength: Int64?
         let retryDelaySeconds: Double?
-        /// `success` records: every range-level retry scheduled during the run (a range
-        /// retry re-fetches at most one range of duplicate wire bytes).
+        /// `success` records: every range-level retry scheduled during the run, which,
+        /// like `wireBytes`, spans everything since this process's previous success
+        /// (a failure does not reset it). A range retry re-fetches exactly the
+        /// `rangeLength` of its `range-retry` record.
         let rangeRetryCount: Int?
         let networkSeconds: Double?
         let verificationSeconds: Double?
@@ -340,7 +342,9 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     /// reason token.
     /// Every retry is counted for the run's success summary; only the first
     /// `maxRangeRetryRecordsPerRun` are written so a flapping network cannot evict the
-    /// run's task-metrics records from the bounded store.
+    /// run's task-metrics records from the bounded store. A run ends only at
+    /// `recordSuccess` (`recordFailure` never ends it), so the count and the cap span
+    /// every attempt since this process's previous success, matching `wireBytes`.
     public func record(rangeRetry event: HuggingFaceDownloader.RangeRetryEvent) {
         lock.lock()
         if terminalRecorded {
@@ -520,7 +524,10 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     /// with this constant.
     static let maxRetainedRecords = 200
     /// Per-run cap on persisted `range-retry` records (the success summary still counts
-    /// every retry), keeping them well inside `maxRetainedRecords`.
+    /// every retry), keeping them well inside `maxRetainedRecords`. A run spans every
+    /// attempt since this process's previous success. The acceptance validator
+    /// (`duplicate_byte_allowance` in scripts/check_ios_model_management.py) mirrors
+    /// this cap and fails closed when retries outnumber their persisted records.
     static let maxRangeRetryRecordsPerRun = 24
     /// One worst-case one-hour diagnostic transfer persists the durable ledger twice per second,
     /// plus five-second heartbeats and bounded task events. Retain that complete causality chain

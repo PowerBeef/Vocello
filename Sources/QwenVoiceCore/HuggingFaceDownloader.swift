@@ -186,7 +186,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             case .rangeUnsupported(let path):
                 return "Server did not honor the byte-range request for \(path); retrying as a single stream"
             case .shortRange(let path, let expectedBytes, let receivedBytes):
-                return "Byte range for \(path) returned \(receivedBytes) of \(expectedBytes) bytes"
+                return "Byte range for \(path) returned \(receivedBytes) bytes instead of \(expectedBytes)"
             case .chunkAssemblyFailed(let path, let reason):
                 return "Failed to assemble byte-range chunk for \(path): \(reason)"
             case .invalidRemotePath(let path):
@@ -752,9 +752,17 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             let previousLogicalBytes = logicalSlotBytes[logicalSlot] ?? 0
             let updatedLogicalBytes = max(previousLogicalBytes, updatedTaskBytes)
             let delta = updatedLogicalBytes - previousLogicalBytes
-            guard delta != 0 else { return }
-            logicalSlotBytes[logicalSlot] = updatedLogicalBytes
             let now = ProcessInfo.processInfo.systemUptime
+            guard delta != 0 else {
+                // A range retry restarts its task from zero beneath the failed attempt's
+                // bytes in the same logical slot. The wire is live, so it is not a stall.
+                if updatedTaskBytes > previousTaskBytes {
+                    lastProgressAdvanceTime = now
+                    emitRepositoryProgress(isStalled: false)
+                }
+                return
+            }
+            logicalSlotBytes[logicalSlot] = updatedLogicalBytes
             applySpeedMeasurement(now: now, totalDownloaded: repositoryDownloadedBytes, advancedDelta: delta)
             emitRepositoryProgress(isStalled: false)
         }
@@ -772,15 +780,21 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             let staleSlots = logicalSlotFileIndex.keys.filter {
                 logicalSlotFileIndex[$0] == fileIndex
             }
+            let staleBytes = staleSlots.reduce(Int64(0)) { $0 + (logicalSlotBytes[$1] ?? 0) }
             for slot in staleSlots {
                 logicalSlotBytes.removeValue(forKey: slot)
                 logicalSlotFileIndex.removeValue(forKey: slot)
             }
             if publishReset {
                 // A clean retry discards the durable partial represented by this file.
-                // A normal retry keeps it and re-reports the same maximum after reading
-                // the sidecar, so its reused-byte identity remains stable.
+                // A normal retry keeps it: the first attempt's reuse stays counted, and
+                // the retry restores its sidecar ranges without counting them again.
                 reusedVerifiedBytesByFile.removeValue(forKey: fileIndex)
+            } else {
+                // Rebase the speed baseline by the bytes just dropped from the total;
+                // the retry re-adds its restored ranges to both. Otherwise the baseline
+                // stays above the total and speed and ETA freeze for the repository.
+                lastSpeedSampleBytes = max(0, lastSpeedSampleBytes - staleBytes)
             }
             if publishReset, !staleTaskIDs.isEmpty || !staleSlots.isEmpty {
                 // A clean retry invalidated these logical bytes. Publish the lower
@@ -792,18 +806,22 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             }
         }
 
-        /// Bytes of `fileIndex` already durable on disk from completed chunk ranges of a
-        /// prior process (per the completed-range sidecar). Counted under a synthetic
-        /// negative task key — real task keys are never negative — so the per-file
-        /// accounting (`resetFileProgress`/`reportFileCompleted`) reconciles them exactly
-        /// like live task bytes. Baseline-bumped, not speed-sampled: recovered bytes are
-        /// progress, not fresh network throughput.
-        func reportPreexistingFileBytes(fileIndex: Int, bytes: Int64) {
+        /// Bytes of `fileIndex` already durable on disk from completed chunk ranges (per
+        /// the completed-range sidecar). Counted under a synthetic logical slot so the
+        /// per-file accounting (`resetFileProgress`/`reportFileCompleted`) reconciles
+        /// them exactly like live task bytes. Baseline-bumped, not speed-sampled:
+        /// recovered bytes are progress, not fresh network throughput.
+        /// `countsAsReuse` is true only on a file's first attempt in this run, when the
+        /// ranges come from a prior process. A later in-process attempt restores ranges
+        /// this run already put on the wire, which `reusedVerifiedBytes` never includes.
+        func reportPreexistingFileBytes(fileIndex: Int, bytes: Int64, countsAsReuse: Bool = true) {
             guard bytes > 0 else { return }
-            reusedVerifiedBytesByFile[fileIndex] = max(
-                reusedVerifiedBytesByFile[fileIndex] ?? 0,
-                bytes
-            )
+            if countsAsReuse {
+                reusedVerifiedBytesByFile[fileIndex] = max(
+                    reusedVerifiedBytesByFile[fileIndex] ?? 0,
+                    bytes
+                )
+            }
             let logicalSlot = "recovered-file-\(fileIndex)"
             logicalSlotFileIndex[logicalSlot] = fileIndex
             logicalSlotBytes[logicalSlot] = max(logicalSlotBytes[logicalSlot] ?? 0, bytes)
@@ -2090,16 +2108,23 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                     sha256: sha256,
                     fileIndex: fileIndex,
                     relativePath: relativePath,
-                    avoidChunking: avoidChunking
+                    avoidChunking: avoidChunking,
+                    isFirstAttempt: retryNumber == 0
                 )
                 return
             } catch {
                 if let dlError = error as? DownloadError {
-                    let adjustment = Self.chunkFallbackAdjustment(for: dlError)
+                    let adjustment = Self.chunkFallbackAdjustment(
+                        for: dlError,
+                        nextAttemptIsLast: retryNumber + 1 == engineConfiguration.maxDownloadRetries
+                    )
                     if adjustment.avoidChunking { avoidChunking = true }
                     if adjustment.clearPartial {
                         try? fileManager.removeItem(at: partialURL)
                         try? fileManager.removeItem(at: Self.chunkSidecarURL(forPartial: partialURL))
+                        // The discarded ranges are no longer progress or reuse; publish
+                        // the lower total before the single stream starts.
+                        await state.resetFileProgress(fileIndex: fileIndex, publishReset: true)
                     }
                 }
 
@@ -2153,7 +2178,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         sha256: String?,
         fileIndex: Int,
         relativePath: String,
-        avoidChunking: Bool
+        avoidChunking: Bool,
+        isFirstAttempt: Bool
     ) async throws {
         // Large LFS files (known size + sha256) download as parallel byte-range chunks so
         // the biggest file is no longer a single-connection long pole. Smaller / non-LFS
@@ -2168,7 +2194,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 expectedSize: expectedSize,
                 sha256: sha256,
                 fileIndex: fileIndex,
-                relativePath: relativePath
+                relativePath: relativePath,
+                recoveredRangesCountAsReuse: isFirstAttempt
             )
             return
         }
@@ -2245,14 +2272,21 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// exhausted its own retries (`shortRange`, a network error, HTTP 408/429/5xx)
     /// keeps chunking and keeps the partial: the completed-range sidecar only ever
     /// records length-validated ranges, so the next attempt fetches just the gaps.
+    /// The one exception is a `shortRange` escalation before the last file-level
+    /// attempt: a server that always answers a range with a shorter prefix (a 206
+    /// with a prefix Content-Range is legal under RFC 9110) would otherwise fail every
+    /// attempt, so the last one clears the partial and streams the whole file.
     static func chunkFallbackAdjustment(
-        for error: DownloadError
+        for error: DownloadError,
+        nextAttemptIsLast: Bool = false
     ) -> (avoidChunking: Bool, clearPartial: Bool) {
         switch error {
         case .rangeUnsupported, .chunkAssemblyFailed:
             return (avoidChunking: true, clearPartial: true)
         case .integrityCheckFailed:
             return (avoidChunking: true, clearPartial: false)
+        case .shortRange where nextAttemptIsLast:
+            return (avoidChunking: true, clearPartial: true)
         default:
             return (avoidChunking: false, clearPartial: false)
         }
@@ -2319,7 +2353,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         expectedSize: Int64,
         sha256: String?,
         fileIndex: Int,
-        relativePath: String
+        relativePath: String,
+        recoveredRangesCountAsReuse: Bool
     ) async throws {
         let sidecarURL = Self.chunkSidecarURL(forPartial: partialURL)
         // The sidecar is the only trustworthy record of which ranges landed: a sparse
@@ -2359,7 +2394,11 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             }
         }
         if recoveredBytes > 0 {
-            await state.reportPreexistingFileBytes(fileIndex: fileIndex, bytes: recoveredBytes)
+            await state.reportPreexistingFileBytes(
+                fileIndex: fileIndex,
+                bytes: recoveredBytes,
+                countsAsReuse: recoveredRangesCountAsReuse
+            )
         }
         // A whole-file task for this file (an earlier single-stream fallback, or a
         // pre-chunking build's task) must not run beside chunk transfers.
@@ -2662,7 +2701,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         case .unsupported:
             try? fileManager.removeItem(at: downloaded.url)
             throw DownloadError.rangeUnsupported(path: url.path)
-        case .short(let receivedBytes):
+        case .lengthMismatch(let receivedBytes):
             try? fileManager.removeItem(at: downloaded.url)
             throw DownloadError.shortRange(
                 path: relativePath,
@@ -2704,18 +2743,19 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
     enum RangeResponseVerdict: Equatable, Sendable {
         case complete
-        /// The server honored Range for this range but delivered fewer (or different)
-        /// bytes than it spans: transient, retry the range.
-        case short(receivedBytes: Int64)
+        /// The server honored Range for this range but delivered a body shorter or
+        /// longer than it spans, or a Content-Range truncated to a prefix of it:
+        /// transient, retry the range.
+        case lengthMismatch(receivedBytes: Int64)
         /// HTTP 200, a missing or malformed Content-Range, or one naming a different
         /// range: the server does not serve this range, fall back to a single stream.
         case unsupported
     }
 
     /// Classifies one range response. Only a 206 whose Content-Range starts at the
-    /// requested byte can be `complete` or `short`; a Content-Range that ends early (a
-    /// truncated prefix of the request) is short, one that starts elsewhere or runs past
-    /// the requested end is a different range.
+    /// requested byte can be `complete` or `lengthMismatch`; a Content-Range that ends
+    /// early (a truncated prefix of the request) is a mismatch, one that starts
+    /// elsewhere or runs past the requested end is a different range.
     static func rangeResponseVerdict(
         statusCode: Int?,
         contentRange: String?,
@@ -2730,7 +2770,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
         let rangeLength = range.end - range.start + 1
         guard bounds.end == range.end, bodyBytes == rangeLength else {
-            return .short(receivedBytes: max(0, bodyBytes))
+            return .lengthMismatch(receivedBytes: max(0, bodyBytes))
         }
         return .complete
     }

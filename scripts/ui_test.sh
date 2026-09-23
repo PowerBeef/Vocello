@@ -825,8 +825,11 @@ pull_ios_model_download_diagnostics() {
     --run-id "$run_id" \
     >>"$out/model-download-diagnostics-pull.log" 2>&1 \
     || return 1
-  python3 - "$destination" "$ROOT_DIR/Sources/Resources/qwenvoice_production_model_catalog.json" "$model_scenario" <<'PY' || validation_status=$?
+  python3 - "$destination" "$ROOT_DIR/Sources/Resources/qwenvoice_production_model_catalog.json" "$model_scenario" "$ROOT_DIR/scripts" <<'PY' || validation_status=$?
 import json, os, pathlib, sys
+
+sys.path.insert(0, sys.argv[4])
+from check_ios_model_management import duplicate_byte_allowance
 
 root = pathlib.Path(sys.argv[1])
 catalog = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
@@ -929,22 +932,24 @@ for success in successes[-3:]:
         )
     # The downloader reports all durable preexisting bytes explicitly: shared
     # component files, already-verified staging, and recovered chunk ranges. The
-    # equality is therefore exact even after cancel/relaunch recovery. A retry may
-    # meter duplicate network bytes, but only within one 128 MiB range per retry;
-    # range-level retries (rangeRetryCount) each re-fetch at most one range.
-    retry_count = int(success.get("retryCount", 0) or 0)
-    range_retry_count = int(success.get("rangeRetryCount", 0) or 0)
+    # equality is therefore exact even after cancel/relaunch recovery. A file-level
+    # retry may meter duplicate network bytes within one 128 MiB range; a range-level
+    # retry only its own recorded rangeLength (scripts/check_ios_model_management.py).
     if wire + reused != expected + duplicate:
         raise SystemExit(
             "catalog byte accounting is not exact: "
             f"wire={wire} reused={reused} expected={expected} duplicate={duplicate}"
         )
-    max_overage = (retry_count + range_retry_count) * 128 * 1024 * 1024
+    try:
+        max_overage = duplicate_byte_allowance(success, records)
+    except ValueError as error:
+        raise SystemExit(f"range-retry evidence cannot bound duplicate wire bytes: {error}") from error
     if duplicate > max_overage:
         raise SystemExit(
             "duplicate wire bytes exceed the recorded retry allowance: "
-            f"duplicate={duplicate} retryCount={retry_count} "
-            f"rangeRetryCount={range_retry_count}"
+            f"duplicate={duplicate} allowance={max_overage} "
+            f"retryCount={success.get('retryCount', 0)} "
+            f"rangeRetryCount={success.get('rangeRetryCount', 0)}"
         )
     validated.append({
         "capturedAtUTC": success_time,
@@ -954,6 +959,8 @@ for success in successes[-3:]:
         "reusedVerifiedBytes": reused,
         "duplicateBytes": duplicate,
         "retryCount": success.get("retryCount", 0),
+        "rangeRetryCount": success.get("rangeRetryCount", 0),
+        "duplicateAllowanceBytes": max_overage,
         "protocols": protocols,
         "thermalState": success.get("thermalState"),
         "networkSeconds": success.get("networkSeconds"),

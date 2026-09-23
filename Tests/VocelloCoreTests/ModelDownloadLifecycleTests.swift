@@ -1007,7 +1007,8 @@ final class ModelDownloadLifecycleTests: XCTestCase {
             "bytes=\(ranges[index].start)-\(ranges[index].end)"
         }
 
-        func run() async throws {
+        @discardableResult
+        func run() async throws -> HuggingFaceDownloader.RepositoryTransferAccounting {
             let digest = SHA256.hash(data: payload).map { String(format: "%02x", $0) }.joined()
             let file = HuggingFaceDownloader.RepoFile(
                 path: ModelDownloadLifecycleTests.stubRelativePath,
@@ -1015,7 +1016,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
                 sha256: digest,
                 absoluteURL: URL(string: "https://\(host)/\(ModelDownloadLifecycleTests.stubRelativePath)")
             )
-            try await downloader.downloadFiles(
+            return try await downloader.downloadFiles(
                 [file],
                 repo: "stub/model",
                 revision: String(repeating: "a", count: 40),
@@ -1032,6 +1033,9 @@ final class ModelDownloadLifecycleTests: XCTestCase {
 
         var requests: [String] { RangeStubURLProtocol.requests(host: host) }
 
+        /// Every response body byte the stub served: the wire bytes of this delivery.
+        var servedBodyBytes: Int { RangeStubURLProtocol.servedBodyBytes(host: host) }
+
         func requestCount(_ header: String) -> Int {
             requests.filter { $0 == header }.count
         }
@@ -1040,7 +1044,8 @@ final class ModelDownloadLifecycleTests: XCTestCase {
     private func makeStubbedDelivery(
         faults: [Int: [RangeStubURLProtocol.Fault]] = [:],
         ignoreRange: Bool = false,
-        maxRangeRetries: Int = 3
+        maxRangeRetries: Int = 3,
+        maxDownloadRetries: Int = 3
     ) throws -> StubbedDelivery {
         let host = "\(UUID().uuidString.lowercased()).range-stub.invalid"
         let payload = Data((0..<8_192).map { UInt8(truncatingIfNeeded: $0 &* 31 &+ 7) })
@@ -1051,6 +1056,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         configuration.chunkTargetSize = 1_024
         configuration.chunkWorkerCount = 1
         configuration.maxRangeRetries = maxRangeRetries
+        configuration.maxDownloadRetries = maxDownloadRetries
         let ranges = HuggingFaceDownloader.chunkRanges(
             total: Int64(payload.count),
             chunkSize: configuration.chunkTargetSize,
@@ -1168,12 +1174,20 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         )
         defer { tearDownStubbedDelivery(delivery) }
 
-        try await delivery.run()
+        let accounting = try await delivery.run()
 
         XCTAssertEqual(try delivery.installedPayload(), delivery.payload)
         // The initial request and its one range retry come back short; the file-level
         // retry then resumes from the sidecar and fetches only the missing range.
         XCTAssertEqual(delivery.requestCount(delivery.header(last)), 3)
+        // Ranges this run put on the wire are restored by the retry, never reported as
+        // reused: reuse covers only bytes from a prior process.
+        XCTAssertEqual(accounting.reusedVerifiedBytes, 0)
+        XCTAssertEqual(
+            delivery.servedBodyBytes,
+            delivery.payload.count + 10 + 10,
+            "the wire carries the file once plus only the two short bodies of the re-fetched range"
+        )
         for index in delivery.ranges.indices where index != last {
             XCTAssertEqual(
                 delivery.requestCount(delivery.header(index)),
@@ -1186,6 +1200,38 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         let retrying = delivery.progress.values.filter { $0.phase == .retrying }
         XCTAssertFalse(retrying.isEmpty)
         XCTAssertTrue(retrying.allSatisfy { $0.retryReason == .shortRange && $0.retryCount == 1 })
+    }
+
+    func testServerThatAlwaysTruncatesARangeEndsInOneSingleStream() async throws {
+        let last = HuggingFaceDownloader.chunkRanges(
+            total: 8_192,
+            chunkSize: 1_024,
+            tailWorkerCount: 1
+        ).count - 1
+        // RFC 9110 lets a server answer a range with a 206 for a shorter prefix; this
+        // one always does for the last range.
+        let delivery = try makeStubbedDelivery(
+            faults: [last: Array(repeating: .truncatedContentRange(100), count: 8)],
+            maxRangeRetries: 0,
+            maxDownloadRetries: 2
+        )
+        defer { tearDownStubbedDelivery(delivery) }
+
+        let accounting = try await delivery.run()
+
+        XCTAssertEqual(try delivery.installedPayload(), delivery.payload)
+        // The first file-level retry keeps the partial and re-requests only the
+        // truncated range; the last attempt clears it and streams the whole file once.
+        XCTAssertEqual(delivery.requestCount(delivery.header(last)), 2)
+        for index in delivery.ranges.indices where index != last {
+            XCTAssertEqual(delivery.requestCount(delivery.header(index)), 1, "range \(index) is fetched once")
+        }
+        XCTAssertEqual(delivery.requestCount(""), 1, "exactly one single-stream fallback")
+        XCTAssertEqual(delivery.requests.last, "")
+        XCTAssertEqual(accounting.reusedVerifiedBytes, 0)
+        let retrying = delivery.progress.values.filter { $0.phase == .retrying }
+        XCTAssertFalse(retrying.isEmpty)
+        XCTAssertTrue(retrying.allSatisfy { $0.retryReason == .shortRange })
     }
 
     func testCancellationDuringRangeRetryBackoffNeverRetries() async throws {
@@ -1240,6 +1286,8 @@ private final class RangeStubURLProtocol: URLProtocol {
     enum Fault: Sendable {
         /// 206 with the full Content-Range but only this many body bytes.
         case shortBody(Int)
+        /// 206 whose Content-Range and body cover only this many leading bytes.
+        case truncatedContentRange(Int)
         case transportError(Int)
         case status(Int, retryAfter: String?)
     }
@@ -1249,6 +1297,7 @@ private final class RangeStubURLProtocol: URLProtocol {
         var faults: [String: [Fault]]
         var ignoreRange: Bool
         var requests: [String] = []
+        var servedBodyBytes = 0
     }
 
     private struct Plan: Sendable {
@@ -1271,6 +1320,10 @@ private final class RangeStubURLProtocol: URLProtocol {
 
     static func requests(host: String) -> [String] {
         scenarios.withLock { $0[host]?.requests ?? [] }
+    }
+
+    static func servedBodyBytes(host: String) -> Int {
+        scenarios.withLock { $0[host]?.servedBodyBytes ?? 0 }
     }
 
     override class func canInit(with request: URLRequest) -> Bool {
@@ -1308,7 +1361,7 @@ private final class RangeStubURLProtocol: URLProtocol {
             if let retryAfter { headers["Retry-After"] = retryAfter }
             respond(statusCode: statusCode, headers: headers, body: Data("unavailable".utf8))
             return
-        case .shortBody, nil:
+        case .shortBody, .truncatedContentRange, nil:
             break
         }
         let total = Int64(plan.payload.count)
@@ -1316,13 +1369,17 @@ private final class RangeStubURLProtocol: URLProtocol {
             respond(statusCode: 200, headers: [:], body: plan.payload)
             return
         }
-        var body = plan.payload.subdata(in: Int(bounds.start)..<Int(bounds.end + 1))
+        var end = bounds.end
+        if case .truncatedContentRange(let count) = plan.fault {
+            end = min(end, bounds.start + Int64(count) - 1)
+        }
+        var body = plan.payload.subdata(in: Int(bounds.start)..<Int(end + 1))
         if case .shortBody(let count) = plan.fault {
             body = body.prefix(count)
         }
         respond(
             statusCode: 206,
-            headers: ["Content-Range": "bytes \(bounds.start)-\(bounds.end)/\(total)"],
+            headers: ["Content-Range": "bytes \(bounds.start)-\(end)/\(total)"],
             body: body
         )
     }
@@ -1337,6 +1394,9 @@ private final class RangeStubURLProtocol: URLProtocol {
                 httpVersion: "HTTP/1.1",
                 headerFields: headers
               ) else { return }
+        if let host = url.host {
+            _ = Self.scenarios.withLock { $0[host]?.servedBodyBytes += body.count }
+        }
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: body)
         client?.urlProtocolDidFinishLoading(self)

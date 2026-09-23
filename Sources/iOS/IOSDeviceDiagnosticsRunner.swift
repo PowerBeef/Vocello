@@ -46,6 +46,10 @@ import UIKit
 @MainActor
 enum IOSDeviceDiagnosticsRunner {
     private static let environmentKey = "QVOICE_IOS_DEVICE_DIAGNOSTICS_SPEC"
+    /// PA-17: the store refuses clone generation and enrollment until the phone's
+    /// visible Settings consent is recorded; every headless lane names that one
+    /// precondition with this reason (`scripts/ios_device.sh` turns it into advice).
+    private static let cloneConsentNotRecordedReason = "clone-consent-not-recorded"
     private static let memoryQualificationEnvironmentKey =
         "QVOICE_IOS_DEVICE_MEMORY_QUALIFICATION_SPEC"
     private static let cloneConditioningAcceptanceEnvironmentKey =
@@ -304,7 +308,7 @@ enum IOSDeviceDiagnosticsRunner {
             // PA-17: the store refuses enrollment until the device's visible Settings
             // consent is recorded; name that precondition instead of a generic error.
             result.failureReason = error is VoiceCloningConsentRequiredError
-                ? "clone-consent-not-recorded"
+                ? Self.cloneConsentNotRecordedReason
                 : "enrollment-error"
             result.failureDescription = String(describing: error).prefix(300).description
         }
@@ -775,7 +779,11 @@ enum IOSDeviceDiagnosticsRunner {
                 generationID: generationID,
                 runID: runID,
                 script: spec.text,
-                fallbackFailureCode: metadata.code,
+                // PA-17: a clone cell refused because the phone's visible Settings
+                // consent is off names that precondition, like fixture enrollment.
+                fallbackFailureCode: error is VoiceCloningConsentRequiredError
+                    ? Self.cloneConsentNotRecordedReason
+                    : metadata.code,
                 engine: engine
             )
             record.apply(evidence)
@@ -1181,6 +1189,9 @@ enum IOSDeviceDiagnosticsRunner {
                         + "\(plan.expectedConditioningMode) PASS"
                     )
                 } catch {
+                    if error is VoiceCloningConsentRequiredError {
+                        failureCode = .cloneConsentNotRecorded
+                    }
                     if appTimelineSubmitted {
                         await AppGenerationTimeline.shared.recordFailed(id: generationID)
                     }
@@ -1408,6 +1419,9 @@ enum IOSDeviceDiagnosticsRunner {
                         + "\(plannedTake.cell) \(actualWarmState) PASS"
                     )
                 } catch {
+                    if error is VoiceCloningConsentRequiredError {
+                        failureCode = .cloneConsentNotRecorded
+                    }
                     if appTimelineSubmitted {
                         await AppGenerationTimeline.shared.recordFailed(id: generationID)
                     }
@@ -2669,6 +2683,8 @@ enum IOSDeviceDiagnosticsRunner {
         case interrupted
         case scratchCleanupFailed = "scratch_cleanup_failed"
         case resultWriteFailed = "result_write_failed"
+        /// PA-17: the same named reason as fixture enrollment.
+        case cloneConsentNotRecorded = "clone-consent-not-recorded"
     }
     #endif
 

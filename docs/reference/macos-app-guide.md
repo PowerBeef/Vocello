@@ -160,7 +160,7 @@ without native pinned-header material or section rules. Search still renders a f
 |---|---|
 | Enroll | `voices_enrollButton` (toolbar) |
 | Row | `voicesRow_<voiceID>` (name) / `voicesRow_<voiceID>_transcriptStatus` (metadata) / `voicesRow_<voiceID>_qualityWarning` (compact icon, opens the popover with `voicesRow_<voiceID>_replaceReference`) / `voicesRow_play_<voiceID>` / `voicesRow_use_<voiceID>` / `voicesRow_more_<voiceID>` (native MenuButton containing `voicesRow_delete_<voiceID>`); a 32-point avatar, two-line metadata and compact actions share one horizontal row |
-| Enrollment sheet | `voicesEnroll_nameField` / `_audioPathField` / `_browseButton` / `_recordButton` / `_transcriptField` / `_transcriptionStatus` / `_referenceLanguagePicker` / `_useAudioOnlyButton` / `_confirmButton` / `_cancelButton` |
+| Enrollment sheet | `voicesEnroll_nameField` / `_audioPathField` / `_browseButton` / `_recordButton` / `_transcriptField` / `_transcriptionStatus` / `_referenceLanguagePicker` / `_useAudioOnlyButton` / `_confirmButton` / `_cancelButton`; `voicesEnroll_inlineConsent` (one-time, same key as the Settings toggle) shows while consent is off and Confirm stays disabled until it is recorded |
 
 Confirm prepares a private candidate first. A clean candidate commits immediately; a warned
 candidate commits only on Keep, while Discard, Cancel, and outside dismissal discard it. Editing a

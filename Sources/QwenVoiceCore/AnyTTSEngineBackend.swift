@@ -240,11 +240,21 @@ public final class AnyTTSEngineBackend {
     public func unloadModel() async throws { try await unloadModelBlock() }
     public func prepareAudio(_ request: AudioPreparationRequest) async throws -> AudioNormalizationResult { try await prepareAudioBlock(request) }
     public func ensureModelLoadedIfNeeded(id: String) async { await ensureModelLoadedIfNeededBlock(id) }
-    public func prewarmModelIfNeeded(for request: GenerationRequest) async { await prewarmModelIfNeededBlock(request) }
-    public func prefetchInteractiveReadinessIfNeeded(for request: GenerationRequest) async -> InteractivePrefetchDiagnostics? {
-        await prefetchInteractiveReadinessIfNeededBlock(request)
+    /// Proactive warm-up of a request conditioned on a reference voice is skipped,
+    /// not raised, while consent is missing: it is best-effort work no caller awaits
+    /// a failure from, and the take itself is refused at `generate`.
+    public func prewarmModelIfNeeded(for request: GenerationRequest) async {
+        guard admitsProactiveVoiceCloningWork(for: request) else { return }
+        await prewarmModelIfNeededBlock(request)
     }
+    public func prefetchInteractiveReadinessIfNeeded(for request: GenerationRequest) async -> InteractivePrefetchDiagnostics? {
+        guard admitsProactiveVoiceCloningWork(for: request) else { return nil }
+        return await prefetchInteractiveReadinessIfNeededBlock(request)
+    }
+    /// Clone-reference priming conditions the engine on a reference voice, so it is
+    /// refused like clone generation until consent is recorded.
     public func ensureCloneReferencePrimed(modelID: String, reference: CloneReference) async throws {
+        try voiceCloningConsentBlock().admit(.generation)
         try await ensureCloneReferencePrimedBlock(modelID, reference)
     }
     public func cancelClonePreparationIfNeeded() async { await cancelClonePreparationIfNeededBlock() }
@@ -263,6 +273,15 @@ public final class AnyTTSEngineBackend {
     /// Refuses saved-voice enrollment unless consent is recorded.
     public func admitVoiceEnrollment() throws(VoiceCloningConsentRequiredError) {
         try voiceCloningConsentBlock().admit(.enrollment)
+    }
+
+    private func admitsProactiveVoiceCloningWork(for request: GenerationRequest) -> Bool {
+        do {
+            try admitVoiceCloning(for: request)
+            return true
+        } catch {
+            return false
+        }
     }
 
     public func generate(_ request: GenerationRequest) async throws -> GenerationResult {
@@ -306,8 +325,11 @@ public final class AnyTTSEngineBackend {
             enrollmentMetadata
         )
     }
+    /// Publishing a staged candidate is enrollment too, so consent withdrawn between
+    /// preparation and Keep refuses it; discarding the private candidate stays allowed.
     public func commitPreparedVoiceCandidate(id: UUID) async throws -> PreparedVoice {
-        try await commitPreparedVoiceCandidateBlock(id)
+        try admitVoiceEnrollment()
+        return try await commitPreparedVoiceCandidateBlock(id)
     }
     public func discardPreparedVoiceCandidate(id: UUID) async throws {
         try await discardPreparedVoiceCandidateBlock(id)

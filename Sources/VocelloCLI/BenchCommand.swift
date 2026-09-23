@@ -296,7 +296,7 @@ enum BenchCommand {
             throw CLIError("--warm 0 cannot be used with Clone because Clone has no separate cold cell")
         }
         // PA-17: a Clone cell needs this invocation's recorded consent; refuse before boot.
-        let consent = CLIVoiceCloningConsent.policy(confirmed: args.flag(CLIVoiceCloningConsent.flagName))
+        let consent = try CLIVoiceCloningConsent.policy(from: args)
         for mode in modes.compactMap(GenerationMode.init(rawValue:)) {
             try consent.admitGeneration(mode: mode)
         }

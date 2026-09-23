@@ -46387,6 +46387,138 @@
         }
       }
     },
+    "vocello.mac.cloning.consentRequiredToGenerate": {
+      "comment": "macOS interface: error when a voice-cloning take is refused because consent was not acknowledged; names the macOS Settings section. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable voice-cloning consent in Settings → Voice cloning before generating."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activez le consentement au clonage vocal dans Réglages → Clonage vocal avant de générer."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activa el consentimiento de clonación en Ajustes → Clonación de voz antes de generar."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktiviere vor dem Erzeugen die Kloneinwilligung unter Einstellungen → Stimmklonen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attiva il consenso alla clonazione in Impostazioni → Clonazione vocale prima di generare."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ative o consentimento de clonagem em Ajustes → Clonagem de voz antes de gerar."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成前请在“设置 → 声音克隆”中启用声音克隆授权。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成前に「設定 → ボイスクローン」でクローンの使用同意を有効にしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "생성 전에 설정 → 음성 복제에서 음성 복제 동의를 활성화하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перед генерацией включите согласие на клонирование в «Настройки → Клонирование голоса»."
+          }
+        }
+      }
+    },
+    "vocello.mac.cloning.consentRequiredToSaveVoice": {
+      "comment": "macOS interface: error when saving a voice is refused because voice-cloning consent was not acknowledged; names the macOS Settings section. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable voice-cloning consent in Settings → Voice cloning before saving a voice."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activez le consentement au clonage vocal dans Réglages → Clonage vocal avant d’enregistrer une voix."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activa el consentimiento de clonación en Ajustes → Clonación de voz antes de guardar una voz."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aktiviere vor dem Sichern einer Stimme die Kloneinwilligung unter Einstellungen → Stimmklonen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attiva il consenso alla clonazione in Impostazioni → Clonazione vocale prima di salvare una voce."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ative o consentimento de clonagem em Ajustes → Clonagem de voz antes de salvar uma voz."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存声音前请在“设置 → 声音克隆”中启用声音克隆授权。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "声を保存する前に「設定 → ボイスクローン」でクローンの使用同意を有効にしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "음성을 저장하기 전에 설정 → 음성 복제에서 음성 복제 동의를 활성화하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Перед сохранением голоса включите согласие на клонирование в «Настройки → Клонирование голоса»."
+          }
+        }
+      }
+    },
     "vocello.mac.cloning.consentDetail": {
       "comment": "macOS interface: Voice Cloning readiness detail before the one-time consent. Presentation only.",
       "extractionState": "manual",

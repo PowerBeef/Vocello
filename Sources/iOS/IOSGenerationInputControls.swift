@@ -352,6 +352,10 @@ struct IOSSaveVoiceSheet: View {
     let onSave: () -> Void
 
     @StateObject private var clipPlayer = ClipReviewPlayer()
+    /// PA-17: the store refuses enrollment until the Settings acknowledgment is on,
+    /// so the sheet says so up front and keeps Save disabled instead of failing
+    /// after the user named and reviewed the voice.
+    @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey) private var cloneConsentAcknowledged = false
     @FocusState private var isNameFocused: Bool
     // Real focus binding for the transcript editor — without it the field would resign first
     // responder on every parent re-render (keystroke). The coordinator keeps it in sync.
@@ -365,6 +369,7 @@ struct IOSSaveVoiceSheet: View {
     }
 
     private var isSaveEnabled: Bool {
+        guard cloneConsentAcknowledged else { return false }
         guard !trimmedName.isEmpty else { return false }
         guard let transcriptionReview else { return true }
         guard transcriptionReview.allowsSave(transcript: transcript) else { return false }
@@ -389,6 +394,16 @@ struct IOSSaveVoiceSheet: View {
         IOSBottomSheetSurface(title: title, tint: tint, presentation: .system, onDismiss: onCancel) {
             IOSScrollView(bottomFadeHeight: 0) {
                 VStack(alignment: .leading, spacing: 18) {
+                    if !cloneConsentAcknowledged {
+                        IOSCompactInlineNotice(
+                            message: IOSAppLanguage.shared.presentation.cloningConsentRequiredToSaveVoice,
+                            symbolName: "hand.raised",
+                            tint: tint
+                        )
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("saveVoice_consentRequired")
+                    }
+
                     if let clipAudioURL {
                         clipReviewCard(url: clipAudioURL)
                     }

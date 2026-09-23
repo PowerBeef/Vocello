@@ -321,6 +321,23 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.cloning.consentTitle", defaultValue: "Acknowledge voice cloning consent",
                comment: "macOS interface: Voice Cloning readiness title before the one-time consent. Presentation only.")
     }
+    static var cloningConsentRequiredToGenerate: String {
+        localization.string(localized: "vocello.mac.cloning.consentRequiredToGenerate", defaultValue: "Enable voice-cloning consent in Settings → Voice cloning before generating.",
+               comment: "macOS interface: error when a voice-cloning take is refused because consent was not acknowledged; names the macOS Settings section. Presentation only.")
+    }
+    static var cloningConsentRequiredToSaveVoice: String {
+        localization.string(localized: "vocello.mac.cloning.consentRequiredToSaveVoice", defaultValue: "Enable voice-cloning consent in Settings → Voice cloning before saving a voice.",
+               comment: "macOS interface: error when saving a voice is refused because voice-cloning consent was not acknowledged; names the macOS Settings section. Presentation only.")
+    }
+    /// PA-17: the copy the core consent policy raises on the Mac. The shared
+    /// presentation copy names the iPhone's Settings → Privacy; the Mac toggle
+    /// lives under Settings → Voice cloning.
+    static var voiceCloningConsentRefusalCopy: VoiceCloningConsentPolicy.RefusalCopy {
+        VoiceCloningConsentPolicy.RefusalCopy(
+            generation: cloningConsentRequiredToGenerate,
+            enrollment: cloningConsentRequiredToSaveVoice
+        )
+    }
     static func cloningEntryAudioOnly(_ name: String) -> String {
         localization.format(localization.string(localized: "vocello.mac.cloning.entryAudioOnly",
             defaultValue: "%@ · audio only",

@@ -161,6 +161,11 @@ enum SavedVoiceNameSuggestion {
 struct MacSavedVoiceSheet: View {
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @Environment(\.dismiss) private var dismiss
+    /// PA-17: the store refuses enrollment until the one-time consent is recorded,
+    /// so the sheet offers the same inline acknowledgment as Voice Cloning up front
+    /// and keeps Confirm disabled until it is on.
+    @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey, store: AppDefaults.store)
+    private var cloneConsentAcknowledged = false
 
     let configuration: SavedVoiceSheetConfiguration
     let onComplete: (Voice) -> Void
@@ -232,12 +237,38 @@ struct MacSavedVoiceSheet: View {
     }
 
     private var canSubmit: Bool {
-        !trimmedName.isEmpty
+        cloneConsentAcknowledged
+            && !trimmedName.isEmpty
             && !audioPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && validationMessage == nil
             && !isSaving
             && transcriptionReview.allowsSave(transcript: transcript)
             && !requiresReferenceLanguageConfirmation
+    }
+
+    /// The Voice Cloning screen's inline one-time consent: the Settings toggle stays
+    /// the persistent record; this writes the same stored key before the user
+    /// names, records or reviews anything.
+    private var inlineConsent: some View {
+        VStack(alignment: .leading, spacing: VocelloTheme.Spacing.xs) {
+            Text(MacInterfaceText.cloningConsentRequiredToSaveVoice)
+                .macType(.caption)
+                .foregroundStyle(MacTheme.Text.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .center, spacing: MacTheme.Spacing.snug) {
+                Button {
+                    cloneConsentAcknowledged = true
+                } label: {
+                    Label(MacInterfaceText.settingsCloneConsent, systemImage: "checkmark.circle")
+                }
+                .buttonStyle(MacSettingsActionButtonStyle(tint: tint, prominence: .primary))
+                .accessibilityIdentifier("voicesEnroll_inlineConsent")
+                Text(MacInterfaceText.cloningConsentOneTime)
+                    .macType(.caption)
+                    .foregroundStyle(MacTheme.Text.secondary)
+                    .lineLimit(2)
+            }
+        }
     }
 
     private var requiresReferenceLanguageConfirmation: Bool {
@@ -265,6 +296,10 @@ struct MacSavedVoiceSheet: View {
                     .macType(.rowMeta)
                     .foregroundStyle(MacTheme.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if !cloneConsentAcknowledged {
+                inlineConsent
             }
 
             fieldSection(label: MacInterfaceText.savedVoiceNameSection) {

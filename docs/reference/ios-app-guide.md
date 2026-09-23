@@ -240,7 +240,9 @@ clone reference through the Studio handoff). Studio Clone exposes the same perma
 pipeline directly through `referenceClip_importAudioFile`; it dismisses the custom reference panel
 before presenting Files and never creates a session-only reference. The enrollment sheet exposes
 `saveVoice_nameField`, `saveVoice_transcriptEditor`, `saveVoice_transcriptionStatus`,
-`saveVoice_referenceLanguagePicker`, `saveVoice_useAudioOnlyButton`, and `saveVoice_saveButton`. A
+`saveVoice_referenceLanguagePicker`, `saveVoice_useAudioOnlyButton`, and `saveVoice_saveButton`; while
+voice-cloning consent is off, `saveVoice_consentRequired` (and `iosRecord_consentRequired` on the
+recorder) names Settings → Privacy and Save stays disabled (PA-17). A
 matching `.txt` sidecar is preferred;
 otherwise `VoiceClipTranscriber` starts automatically on device, keeps Save disabled until the
 result is reviewable, and cannot replace a manual edit with a delayed result. If recognition cannot
@@ -381,7 +383,8 @@ Full-screen player (`Sources/iOS/Sheets/IOSPlayerSheet.swift`):
 `iosPlayer_playPause`, `iosPlayer_download` (labeled "Share"),
 `iosPlayer_scrubber`, `iosPlayer_transcript`, and — only when a caller
 supplies a distinct save handler — `iosPlayer_save`. Recording overlay (`Sources/iOS/Overlays/IOSRecordingOverlay.swift`):
-`iosRecord_close`, `iosRecord_start` / `iosRecord_stop`, `iosRecord_retake`, `iosRecord_use`.
+`iosRecord_close`, `iosRecord_start` / `iosRecord_stop`, `iosRecord_retake`, `iosRecord_use`, and the
+conditional `iosRecord_consentRequired` notice.
 Lifecycle toasts (`IOSEngineLifecycleToast.swift`) are transient ("Preparing runtime",
 "Model loading") and labeled with `engineLifecycleToast_<id>`.
 

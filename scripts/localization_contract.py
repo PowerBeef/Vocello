@@ -49,6 +49,7 @@ REQUIRED_SETTINGS = (
 REQUIRED_KEYS = {
     "vocello.error.cancellation_not_finished",
     "vocello.error.cloning_consent_required",
+    "vocello.error.cloning_consent_required_to_save_voice",
     "vocello.error.install_model",
     "vocello.error.long_form_planning_failed",
     "vocello.error.reference_audio_required",

@@ -215,7 +215,8 @@ final class VocelloMacMarketingCaptureUITests: VocelloMacUITestCase {
     /// `QwenVoice-Debug/history.sqlite*`), and the human-named marketing clone
     /// voice below is enrolled through the genuine CLI surface:
     /// `QWENVOICE_DEBUG=1 build/vocello voices enroll --name "Warm storyteller"
-    /// --audio <reference wav> --transcript "<the reference's real transcript>"`.
+    /// --audio <reference wav> --transcript "<the reference's real transcript>"
+    /// --confirm-consent` (only for a voice you own or have permission to clone).
     /// The journey then generates real takes so History shows authored scripts,
     /// never leftover QA fixtures.
     func test02_CloneAndHistoryCapture() throws {

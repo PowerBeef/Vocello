@@ -563,6 +563,13 @@ launches with `QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME`, and validates the enrollmen
 (staged digests, voice ID, quality warnings). The runner deletes the staged inputs after a clean
 enrollment. The command is opt-in and never runs in smoke, benchmark, CI, or release.
 
+**Clone consent precondition (PA-17).** The app refuses clone generation and saved-voice
+enrollment below the views until the phone's visible voice-cloning consent is on (Settings →
+Privacy). Headless lanes cannot record it: `enroll-clone-fixture`, clone diagnostics/bench cells,
+`memory` and `clone-conditioning` then fail with the named reason `clone-consent-not-recorded`, and
+`scripts/ios_device.sh` prints the fix. Turn the toggle on once on the phone, or run a UI lane
+that calls `ensureCloneConsentEnabled()` (for example `scripts/ui_test.sh ios enroll-clone-fixture`).
+
 Clone identity, enrollment-transcription, and French Voice Design reliability use a separate
 source-bound diagnostic that extends the same headless runner. It is read-only with respect to the
 saved-voice catalog: the untracked private map resolves the two stable aliases to exact existing

@@ -26,7 +26,7 @@ struct MacVoiceCloningScreen: View {
     @Environment(ModelManagerViewModel.self) private var modelManager
     @Environment(MacAppModel.self) private var appModel
 
-    @AppStorage("vocello.voiceCloningConsent.v1", store: AppDefaults.store)
+    @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey, store: AppDefaults.store)
     private var cloneConsentAcknowledged = false
 
     @Binding var draft: VoiceCloningDraft

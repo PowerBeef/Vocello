@@ -27,7 +27,7 @@ enum VoicesCommand {
         CLIOutput.configure(args)
         if args.flag("help") { printHelp(); return }
         // PA-17: enrollment needs this invocation's recorded consent; refuse before boot.
-        let consent = CLIVoiceCloningConsent.policy(confirmed: args.flag(CLIVoiceCloningConsent.flagName))
+        let consent = try CLIVoiceCloningConsent.policy(from: args)
         if action == "enroll" || action == "add" {
             try consent.admit(.enrollment)
         }

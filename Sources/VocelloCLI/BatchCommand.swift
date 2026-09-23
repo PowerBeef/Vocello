@@ -44,7 +44,7 @@ enum BatchCommand {
         let mode = try GenerateCommand.resolveMode(args)
         let quality = try GenerateCommand.resolveQuality(args)
         // PA-17: clone needs this invocation's recorded consent; refuse before boot.
-        let consent = CLIVoiceCloningConsent.policy(confirmed: args.flag(CLIVoiceCloningConsent.flagName))
+        let consent = try CLIVoiceCloningConsent.policy(from: args)
         try consent.admitGeneration(mode: mode)
 
         let lines = try readLines(args)

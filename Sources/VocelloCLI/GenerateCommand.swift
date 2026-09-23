@@ -120,7 +120,7 @@ enum GenerateCommand {
         // default to custom (keeps scripted/piped runs unchanged).
         let mode = try resolveModeInteractive(args)
         // PA-17: clone needs this invocation's recorded consent; refuse before boot.
-        let consent = CLIVoiceCloningConsent.policy(confirmed: args.flag(CLIVoiceCloningConsent.flagName))
+        let consent = try CLIVoiceCloningConsent.policy(from: args)
         try consent.admitGeneration(mode: mode)
 
         let dataDir = CLIPaths.dataDirectory(override: args.string("data-dir"))

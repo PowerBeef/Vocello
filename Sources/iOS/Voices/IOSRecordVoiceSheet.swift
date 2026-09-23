@@ -22,6 +22,9 @@ struct IOSRecordVoiceSheet: View {
 
     @EnvironmentObject private var ttsEngine: TTSEngineStore
     @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
+    /// PA-17: saving needs the Settings acknowledgment; the recorder names it before
+    /// the take and `IOSSaveVoiceSheet` keeps Save disabled until it is on.
+    @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey) private var cloneConsentAcknowledged = false
 
     @State private var phase: Phase
     @State private var capturedURL: URL?
@@ -74,6 +77,9 @@ struct IOSRecordVoiceSheet: View {
             switch phase {
             case .recording:
                 IOSRecordingOverlay(
+                    notice: cloneConsentAcknowledged
+                        ? nil
+                        : IOSAppLanguage.shared.presentation.cloningConsentRequiredToSaveVoice,
                     onComplete: { url in
                         // The recorder deletes its temp WAV on `.onDisappear` (stopWithoutSaving),
                         // which fires the moment we switch to `.naming`. Copy it out FIRST so the

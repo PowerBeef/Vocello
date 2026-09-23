@@ -21,6 +21,18 @@ enum CLIVoiceCloningConsent {
         VoiceCloningConsentPolicy(isConsentRecorded: confirmed, refusalCopy: refusalCopy)
     }
 
+    /// The invocation's recorded consent. The flag is bare: a value
+    /// (`--confirm-consent yes`, `--confirm-consent=yes`) is rejected with a clear
+    /// error instead of silently parsing as no consent.
+    static func policy(from args: Args) throws -> VoiceCloningConsentPolicy {
+        if let value = args.string(flagName) {
+            throw CLIError(
+                "--\(flagName) takes no value (got \"\(value)\"): pass the bare flag --\(flagName) to confirm you own or have permission to clone this voice"
+            )
+        }
+        return policy(confirmed: args.flag(flagName))
+    }
+
     /// Fail closed for any caller that does not pass the invocation's flag.
     static let notConfirmed = policy(confirmed: false)
 }

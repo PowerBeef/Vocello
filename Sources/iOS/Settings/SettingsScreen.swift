@@ -436,7 +436,7 @@ struct SettingsScreen: View {
     @Environment(\.iosTabIsActive) private var isTabActive
 
     @AppStorage("autoPlay") private var autoPlay = true
-    @AppStorage("vocello.voiceCloningConsent.v1") private var cloneConsentAcknowledged = false
+    @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey) private var cloneConsentAcknowledged = false
     @AppStorage(IOSGenerationVariationPreference.key) private var generationVariation = IOSGenerationVariationPreference.defaultValue
     @AppStorage(IOSAppDefaults.reduceMotionEnabledKey) private var reduceMotionEnabled = false
     @AppStorage(IOSAppDefaults.reduceTransparencyEnabledKey) private var reduceTransparencyEnabled = false

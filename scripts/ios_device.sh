@@ -645,7 +645,7 @@ cmd_enroll_clone_fixture() {
   [[ -n "$sentinel" && -f "$sentinel" ]] \
     || die "no enrollment completion evidence after ${timeout}s (runID=$run_id)"
 
-  python3 - "$sentinel" <<'PY'
+  python3 - "$sentinel" <<'PY' || { report_clone_consent_advice "$sentinel" failureReason; exit 1; }
 import json, sys
 record = json.load(open(sys.argv[1]))
 status = record.get("status")
@@ -722,6 +722,18 @@ for key, value in os.environ.items():
     if (key.startswith("QWENVOICE_") or key.startswith("QVOICE_")) and key not in env:
         env[key] = value
 print(json.dumps(env))'
+}
+
+# report_clone_consent_advice JSON_FILE KEY
+# PA-17: the app refuses clone generation and saved-voice enrollment until the phone's
+# visible voice-cloning consent is recorded, and the headless runner names that with the
+# reason `clone-consent-not-recorded`. Turn it into the one-time fix instead of a bare code.
+report_clone_consent_advice() {
+  local reason
+  reason="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get(sys.argv[2]) or "")' \
+    "$1" "$2" 2>/dev/null || true)"
+  [[ "$reason" == "clone-consent-not-recorded" ]] || return 0
+  warn "voice-cloning consent is not recorded on the phone. Open Vocello → Settings → Privacy and turn on \"I own or have permission to clone the voices I use\" (or run a UI lane that calls ensureCloneConsentEnabled(), e.g. scripts/ui_test.sh ios enroll-clone-fixture), then rerun this command."
 }
 
 require_diagnostic_clone_voice() {
@@ -896,6 +908,7 @@ PY
       else
         warn "memory qualification produced an invalid bounded failure marker: $failure"
       fi
+      report_clone_consent_advice "$failure" failureCode
       return 22
     fi
     sentinel="$(find "$dest" -type f -path "*/${run_id}/memory-qualification-result.json" 2>/dev/null | head -1)"
@@ -946,6 +959,7 @@ print(
     f"completed={record.get('completedTakeCount', '?')}/2"
 )
 PY
+      report_clone_consent_advice "$failure" failureCode
       return 22
     fi
     sentinel="$(find "$dest" -type f -path "*/${run_id}/clone-conditioning-result.json" 2>/dev/null | head -1)"
@@ -1962,6 +1976,7 @@ for e in r.get("interruptions") or []:
     print("  ⚠ interruption: %s at t=%.1fs" % (e.get("type"), (e.get("atMS") or 0) / 1000.0))
 print("  device   :", r.get("deviceModel"), r.get("systemName"), r.get("systemVersion"))
 PY
+  report_clone_consent_advice "$sentinel" failureCode
 
   note "── telemetry summary (engine decode / RTF / audioQC / RAM) ──"
   require_uninterrupted_success_sentinel "$sentinel" \
@@ -2767,7 +2782,7 @@ _gate_generation_check() {
   done
   [[ -n "$sentinel" && -f "$sentinel" ]] || { echo "no device-diagnostics sentinel after ${timeout}s (device state: $(probe_device_state 2>/dev/null || echo unknown))"; return 1; }
   cp "$sentinel" "$gate_dir/generation-sentinel.json" 2>/dev/null || true
-  python3 - "$sentinel" <<'PY' || return 1
+  python3 - "$sentinel" <<'PY' || { report_clone_consent_advice "$sentinel" failureCode; return 1; }
 import json, sys
 r = json.load(open(sys.argv[1]))
 print(f"status={r.get('status')} mode={r.get('mode')} rtf={r.get('realtimeFactor')} (wall/audio) wall={r.get('wallSeconds')}s error={r.get('error')}")

@@ -265,4 +265,7 @@ public enum IOSMemoryQualificationFailureCode: String, Codable, Equatable, Senda
     case interrupted
     case incompletePlan = "incomplete_plan"
     case resultWriteFailed = "result_write_failed"
+    /// PA-17: the Clone takes were refused because the phone's visible Settings
+    /// voice-cloning consent is not recorded (the same reason as fixture enrollment).
+    case cloneConsentNotRecorded = "clone-consent-not-recorded"
 }

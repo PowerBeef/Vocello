@@ -461,8 +461,12 @@ targets:
       - path: Sources/Services/MacInterfaceLanguage.swift
       - path: Sources/VocelloCLI/CLIProcessSupervisor.swift
       - path: Sources/VocelloCLI/CLIBatchExecution.swift
-      # PA-17: the CLI's consent recording, so its refusal is unit-tested.
+      # PA-17: the CLI's consent recording, its bare-flag parsing (Support.swift)
+      # and the CLIRuntime generate/enroll wrappers, so the refusal is unit-tested
+      # at the engine call around an uninitialized engine.
       - path: Sources/VocelloCLI/CLIVoiceCloningConsent.swift
+      - path: Sources/VocelloCLI/Support.swift
+      - path: Sources/VocelloCLI/CLIRuntime.swift
       - path: Sources/iOSSupport/Models/Generation.swift
       - path: Sources/iOSSupport/Models/PendingVoiceCloningHandoff.swift
       - path: Sources/iOSSupport/Models/IOSStartupReliabilityRecord.swift

@@ -1263,7 +1263,7 @@ struct IOSVoiceDesignView: View {
 
 struct IOSVoiceCloningView: View {
     @EnvironmentObject private var modelInstaller: IOSModelInstallerViewModel
-    @AppStorage("vocello.voiceCloningConsent.v1") private var cloneConsentAcknowledged = false
+    @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey) private var cloneConsentAcknowledged = false
     @EnvironmentObject private var ttsEngine: TTSEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
     @EnvironmentObject private var modelManager: ModelManagerViewModel

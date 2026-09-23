@@ -451,7 +451,7 @@
     },
     {
       "id": "voice-enrollment",
-      "identifierPattern": "saveVoice_(nameField|saveButton|transcriptionStatus|referenceLanguagePicker|useAudioOnlyButton)",
+      "identifierPattern": "saveVoice_(nameField|saveButton|transcriptionStatus|referenceLanguagePicker|useAudioOnlyButton|consentRequired)",
       "sourceToken": "saveVoice_",
       "screen": "Saved voice review",
       "prerequisite": "Test-owned recording or import",
@@ -587,7 +587,7 @@
     },
     {
       "id": "recording-controls",
-      "identifierPattern": "iosRecord_(close|start|stop|retake|use)",
+      "identifierPattern": "iosRecord_(close|start|stop|retake|use|consentRequired)",
       "sourceToken": "iosRecord_",
       "screen": "Reference recording",
       "prerequisite": "Microphone permission restorable",

@@ -11,6 +11,9 @@ import SwiftUI
 /// WAV file URL via `onComplete`. The view does its own permission request;
 /// callers don't need to pre-check microphone access.
 struct IOSRecordingOverlay: View {
+    /// A precondition the caller surfaces before the user records (PA-17: saving
+    /// the clip as a voice needs voice-cloning consent). Nil shows nothing.
+    var notice: String? = nil
     var onComplete: (URL) -> Void
     var onCancel: () -> Void
 
@@ -77,8 +80,18 @@ struct IOSRecordingOverlay: View {
     // MARK: - Top bar
 
     private var topBar: some View {
-        HStack {
-            Spacer()
+        HStack(spacing: 12) {
+            if let notice {
+                IOSCompactInlineNotice(
+                    message: notice,
+                    symbolName: "hand.raised",
+                    tint: Theme.Brand.modeClone
+                )
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("iosRecord_consentRequired")
+            }
+
+            Spacer(minLength: 0)
 
             Button {
                 recorder.stopWithoutSaving()

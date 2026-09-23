@@ -520,6 +520,24 @@ struct VocelloPresentationText: Sendable {
         return localization.format(format, details)
     }
 
+    /// Studio notice shown on return after leaving the foreground cancelled a
+    /// short-form take (PA-15). The take is discarded, never saved to History.
+    var backgroundTakeStopped: String {
+        localization.string(localized: "vocello.presentation.backgroundTakeStopped",
+            defaultValue: "Generation stopped when Vocello left the screen. The unfinished take was discarded.",
+            comment: "Studio notice shown when the user returns after leaving the app (Home, app switch or lock) stopped a take. The unfinished audio was deleted and is not in History."
+        )
+    }
+
+    /// Studio notice shown on return after leaving the foreground stopped a
+    /// long-form project (PA-15). Completed segments are kept for Resume.
+    var backgroundLongFormStopped: String {
+        localization.string(localized: "vocello.presentation.backgroundLongFormStopped",
+            defaultValue: "Long-form stopped when Vocello left the screen. Finished segments are kept; choose Resume project to continue.",
+            comment: "Studio notice shown when the user returns after leaving the app stopped a long-form project. 'Resume project' must match the translated Resume project button label."
+        )
+    }
+
     /// Representative plural contract. Product surfaces can adopt the same
     /// pattern without concatenating independently localized fragments.
     func readyModelCount(_ count: Int) -> String {
@@ -590,5 +608,7 @@ extension VocelloPresentationText {
     static func installModel(named modelName: String) -> String { Self().installModel(named: modelName) }
     static func longFormPlanningFailed(details: String) -> String { Self().longFormPlanningFailed(details: details) }
     static func cancellationCouldNotFinish(details: String) -> String { Self().cancellationCouldNotFinish(details: details) }
+    static var backgroundTakeStopped: String { Self().backgroundTakeStopped }
+    static var backgroundLongFormStopped: String { Self().backgroundLongFormStopped }
     static func readyModelCount(_ count: Int) -> String { Self().readyModelCount(count) }
 }

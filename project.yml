@@ -169,6 +169,8 @@ targets:
       - path: Sources/iOS/TTSEngineStore.swift
       - path: Sources/iOSSupport/Services/IOSGenerationOwnershipAuthority.swift
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
+      # PA-15: StudioGenerationCoordinator carries the iOS foreground-exit notice state.
+      - path: Sources/iOSSupport/Services/IOSBackgroundGenerationPolicy.swift
       - path: Sources/iOSSupport/Services/IOSDeviceDiagnosticsRecorder.swift
       - path: Sources/iOSSupport/Services/AppNotifications.swift
       - path: Sources/iOSSupport/Models/Generation.swift
@@ -472,6 +474,7 @@ targets:
       - path: Sources/SharedSupport/Services/GenerationTextLimitPolicy.swift
       - path: Sources/SharedSupport/Services/WordTimingPlanner.swift
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
+      - path: Sources/iOSSupport/Services/IOSBackgroundGenerationPolicy.swift
       - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
       - path: Sources/iOSSupport/Services/IOSGenerationOwnershipAuthority.swift
@@ -519,6 +522,7 @@ targets:
       - path: Sources/iOSSupport/Services/IOSPullableDiagnosticsMirror.swift
       - path: Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift
       - path: Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift
+      - path: Sources/iOSSupport/Services/IOSBackgroundGenerationPolicy.swift
       - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
       - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
       - path: Sources/iOSSupport/Services/IOSGenerationOwnershipAuthority.swift

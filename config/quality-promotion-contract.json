@@ -412,6 +412,7 @@
           "Sources/iOS/TTSEngineStore.swift",
           "Sources/iOSSupport/Services/IOSGenerationOwnershipAuthority.swift",
           "Sources/iOSSupport/Services/RuntimeReleaseCoordinator.swift",
+          "Sources/iOSSupport/Services/IOSBackgroundGenerationPolicy.swift",
           "config/memory-qualification-policy.json",
           "scripts/benchmark_memory.py",
           "scripts/ios_memory_field_report.py"

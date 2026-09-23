@@ -406,12 +406,15 @@ final class IOSLongFormCoordinator {
     }
 
     /// Returns whether the cancellation was accepted by the attempt authority
-    /// (false while idle or when a cancellation is already pending).
+    /// (false while idle or when a cancellation is already pending). Completed
+    /// segments stay saved, so a cancelled project remains resumable. `reason`
+    /// is `.shutdown` when the app leaves the foreground (PA-15).
     @discardableResult
     func cancel(
         ttsEngine: TTSEngineStore,
         audioPlayer: AudioPlayerViewModel,
-        studioCoordinator: StudioGenerationCoordinator
+        studioCoordinator: StudioGenerationCoordinator,
+        reason: GenerationCancellationReason = .user
     ) -> Bool {
         guard isProcessing else { return false }
         guard let attempt = studioCoordinator.requestCancellation() else { return false }
@@ -421,7 +424,7 @@ final class IOSLongFormCoordinator {
         Task {
             await state.request()
             do {
-                try await ttsEngine.cancelActiveGeneration()
+                try await ttsEngine.cancelActiveGeneration(reason: reason)
                 studioCoordinator.completeCancellation(attempt: attempt)
             } catch {
                 if studioCoordinator.failCancellation(error, attempt: attempt) {

@@ -34,6 +34,9 @@ struct IOSStudioCanvas<SetupChips: View>: View {
     let tint: Color
     let genState: IOSStudioGenState
     let errorMessage: String?
+    /// Foreground-exit notice (PA-15): what leaving the app stopped. Shown in
+    /// the idle dock until dismissed or a new attempt starts.
+    let backgroundNotice: String?
     let canGenerate: Bool
     let modelInstalled: Bool
     let modelDisplayName: String
@@ -45,6 +48,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
     let onPlayerExpand: (() -> Void)?
     /// When provided (Voice Design), the completed player card shows a "Save as voice" button.
     let onSaveAsVoice: (() -> Void)?
+    let onBackgroundNoticeDismiss: (() -> Void)?
     // Batch generation was removed from iOS (2026-07-02): the affordance was dead UI —
     // `onBatch` was nil at every call site because the native in-process engine doesn't
     // support batch (Jetsam risk). macOS batch is unaffected. If it returns, it must be
@@ -58,6 +62,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         tint: Color,
         genState: IOSStudioGenState,
         errorMessage: String? = nil,
+        backgroundNotice: String? = nil,
         canGenerate: Bool,
         modelInstalled: Bool,
         modelDisplayName: String,
@@ -67,7 +72,8 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         onInstallModel: @escaping () -> Void,
         onPlayerDismiss: @escaping () -> Void,
         onPlayerExpand: (() -> Void)? = nil,
-        onSaveAsVoice: (() -> Void)? = nil
+        onSaveAsVoice: (() -> Void)? = nil,
+        onBackgroundNoticeDismiss: (() -> Void)? = nil
     ) {
         self.mode = mode
         self._script = script
@@ -76,6 +82,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         self.tint = tint
         self.genState = genState
         self.errorMessage = errorMessage
+        self.backgroundNotice = backgroundNotice
         self.canGenerate = canGenerate
         self.modelInstalled = modelInstalled
         self.modelDisplayName = modelDisplayName
@@ -86,6 +93,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         self.onPlayerDismiss = onPlayerDismiss
         self.onPlayerExpand = onPlayerExpand
         self.onSaveAsVoice = onSaveAsVoice
+        self.onBackgroundNoticeDismiss = onBackgroundNoticeDismiss
     }
 
     // Plain @State (NOT @FocusState): this drives `IOSFlexibleTextEditor`'s
@@ -335,6 +343,8 @@ struct IOSStudioCanvas<SetupChips: View>: View {
             switch genState {
             case .idle where errorMessage != nil:
                 errorBar
+            case .idle where backgroundNotice != nil:
+                backgroundNoticeBar
             case .idle where !modelInstalled:
                 installCTA
             case .idle:
@@ -401,6 +411,52 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         .buttonStyle(.plain)
         .disabled(!canGenerate)
         .accessibilityIdentifier("textInput_generationError")
+    }
+
+    /// Tapping acknowledges the notice and restores the Generate action; a
+    /// stopped long-form project is resumed from its setup chip.
+    private var backgroundNoticeBar: some View {
+        Button {
+            onBackgroundNoticeDismiss?()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "pause.circle.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 34, height: 34)
+                    .background {
+                        Circle().fill(tint.opacity(0.14))
+                    }
+                    .accessibilityHidden(true)
+
+                Text(verbatim: backgroundNotice ?? "")
+                    .font(.caption)
+                    .foregroundStyle(Theme.Text.primary)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.Text.secondary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 56)
+            .background {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(Color.white.opacity(0.04))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(tint.opacity(0.30), lineWidth: 0.7)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(IOSInterfaceText.dismiss)
+        .accessibilityIdentifier("textInput_backgroundNotice")
     }
 
     private var generateCTA: some View {

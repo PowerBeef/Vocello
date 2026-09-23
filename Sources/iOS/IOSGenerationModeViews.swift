@@ -211,6 +211,7 @@ struct IOSCustomVoiceView: View {
             tint: Theme.Brand.modeCustom,
             genState: studioGenState,
             errorMessage: coordinator.errorMessage,
+            backgroundNotice: coordinator.backgroundInterruptionNoticeMessage,
             canGenerate: canGenerateInCurrentRuntime,
             modelInstalled: isModelAvailable,
             modelDisplayName: IOSSettingsText.builtIn,
@@ -236,7 +237,8 @@ struct IOSCustomVoiceView: View {
                 appModel.requestModelInstallation(model, using: modelInstaller)
             },
             onPlayerDismiss: { coordinator.dismissInlinePlayer() },
-            onPlayerExpand: expandInlinePlayer
+            onPlayerExpand: expandInlinePlayer,
+            onBackgroundNoticeDismiss: { coordinator.dismissBackgroundInterruptionNotice() }
         )
         .opacity(chromeOpacity)
         .iosAppAnimation(Theme.Motion.modeCrossfade, value: isGenerationActive)
@@ -962,6 +964,7 @@ struct IOSVoiceDesignView: View {
             tint: Theme.Brand.modeDesign,
             genState: studioGenState,
             errorMessage: coordinator.errorMessage,
+            backgroundNotice: coordinator.backgroundInterruptionNoticeMessage,
             canGenerate: canGenerateInCurrentRuntime,
             modelInstalled: isModelAvailable,
             modelDisplayName: IOSSettingsText.design,
@@ -988,7 +991,8 @@ struct IOSVoiceDesignView: View {
             },
             onPlayerDismiss: { coordinator.dismissInlinePlayer() },
             onPlayerExpand: expandInlinePlayer,
-            onSaveAsVoice: canSaveVoice ? { presentSaveDesignedVoice() } : nil
+            onSaveAsVoice: canSaveVoice ? { presentSaveDesignedVoice() } : nil,
+            onBackgroundNoticeDismiss: { coordinator.dismissBackgroundInterruptionNotice() }
         )
         .opacity(chromeOpacity)
         .iosAppAnimation(Theme.Motion.modeCrossfade, value: isGenerationActive)
@@ -1568,6 +1572,7 @@ struct IOSVoiceCloningView: View {
                 tint: Theme.Brand.modeClone,
                 genState: studioGenState,
                 errorMessage: coordinator.errorMessage,
+                backgroundNotice: coordinator.backgroundInterruptionNoticeMessage,
                 canGenerate: canGenerateInCurrentRuntime,
                 modelInstalled: isModelAvailable,
                 modelDisplayName: IOSSettingsText.clone,
@@ -1593,7 +1598,8 @@ struct IOSVoiceCloningView: View {
                     appModel.requestModelInstallation(model, using: modelInstaller)
                 },
                 onPlayerDismiss: { coordinator.dismissInlinePlayer() },
-                onPlayerExpand: expandInlinePlayer
+                onPlayerExpand: expandInlinePlayer,
+                onBackgroundNoticeDismiss: { coordinator.dismissBackgroundInterruptionNotice() }
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

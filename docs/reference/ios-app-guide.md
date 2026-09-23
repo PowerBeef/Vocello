@@ -152,6 +152,7 @@ mode segments, composer, and primary action; there is no hidden screen-presence 
 | **Install CTA** | `textInput_installModelButton` | Shown instead of Generate when the model is **missing** (see §3) |
 | Cancel | `textInput_cancelButton` | Inside the generating progress bar |
 | Error retry | `textInput_generationError` | Retry bar on a failed generation |
+| Foreground-exit notice | `textInput_backgroundNotice` | Shown on return after leaving the app stopped a take or long-form project; tap to dismiss |
 | Player controls | `studio_livePreview_playPause`, `studio_livePreview_cancel`; `studio_inlinePlayer_playPause`, `studio_inlinePlayer_save`, `studio_inlinePlayer_download`, `studio_inlinePlayer_dismiss` | Live streaming preview and completed-take controls. The enclosing SwiftUI card has no test identifier. |
 | Cadence review | `studio_inlinePlayer_cadenceNotice`, `studio_inlinePlayer_cadenceRetry` | An accepted take with unusual pause spacing remains playable and saved, but exposes a non-color-only warning and an explicit “Generate again” action using the currently visible settings. Severe gaps remain rejected before this surface. |
 
@@ -179,6 +180,14 @@ failure, deferred cleanup, or cancellation callbacks from an older take therefor
 replace a newer take. Cancel keeps the matching attempt nonterminal until the engine-owned
 cancellation barrier returns; a barrier failure is shown to the user, and a repeated Cancel cannot
 start a second barrier for the same attempt.
+
+Leaving the foreground (PA-15) cannot keep generating, because iOS refuses GPU work from a suspended
+app. On `.background` the app requests finite background time, cancels the running Studio attempt
+through the same barrier with the typed `shutdown` reason (a single take is discarded and never
+reaches History; a long-form project keeps its completed segments for Resume project), and then
+requests the runtime release, which defers until the barrier returns. Returning to `.active` drops
+a still-deferred background release and shows the notice above. The screen stays awake while a
+generation or long-form run is active. The decisions live in `IOSBackgroundGenerationPolicy`.
 
 Short-form Built-in, Design, and Clone takes share one execution boundary in
 `IOSSingleTakeGenerationExecutor`. Views construct the exact mode request and perform any

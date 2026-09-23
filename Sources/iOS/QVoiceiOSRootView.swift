@@ -12,17 +12,26 @@ struct QVoiceiOSRootView: View {
     /// Passed through to `RootView` as a deliberately non-observing reference
     /// (IUI-5 P2); this shell must not subscribe to the store either.
     let ttsEngine: TTSEngineStore
+    /// App-owned foreground-exit handler (PA-15); it reaches the Studio through
+    /// the installed `AppModel`.
+    let backgroundGeneration: IOSBackgroundGenerationController
 
     @State private var appModel: AppModel
 
-    init(modelRegistry: ContractBackedModelRegistry, ttsEngine: TTSEngineStore) {
+    init(
+        modelRegistry: ContractBackedModelRegistry,
+        ttsEngine: TTSEngineStore,
+        backgroundGeneration: IOSBackgroundGenerationController
+    ) {
         self.modelRegistry = modelRegistry
         self.ttsEngine = ttsEngine
+        self.backgroundGeneration = backgroundGeneration
         _appModel = State(initialValue: AppModel(modelRegistry: modelRegistry))
     }
 
     var body: some View {
         RootView(ttsEngine: ttsEngine)
             .environment(appModel)
+            .onAppear { backgroundGeneration.attach(appModel) }
     }
 }

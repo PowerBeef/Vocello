@@ -21,6 +21,8 @@ struct QVoiceiOSApp: App {
     @StateObject private var audioPlayer = AudioPlayerViewModel()
     @StateObject private var savedVoicesViewModel = SavedVoicesViewModel()
     @StateObject private var runtimeReleaseCoordinator = RuntimeReleaseCoordinator()
+    /// PA-15: background time, Studio cancellation/notice and the screen-awake hold.
+    @State private var backgroundGeneration = IOSBackgroundGenerationController()
     @State private var didInitializeEngine = false
     private let memoryBudgetPolicy = IOSMemoryBudgetPolicy.iPhoneShippingDefault
     @Environment(\.scenePhase) private var scenePhase
@@ -58,7 +60,11 @@ struct QVoiceiOSApp: App {
                     .padding()
                 } else if let modelRegistry = deps.registry, let engine = deps.engine, let manager = deps.modelManager, let installer = deps.modelInstaller {
                     if IOSDeviceSupport.isSupportedHardware {
-                        QVoiceiOSRootView(modelRegistry: modelRegistry, ttsEngine: engine)
+                        QVoiceiOSRootView(
+                            modelRegistry: modelRegistry,
+                            ttsEngine: engine,
+                            backgroundGeneration: backgroundGeneration
+                        )
                             .environmentObject(engine)
                             .environmentObject(audioPlayer)
                             .environmentObject(audioPlayer.playbackProgress)
@@ -85,6 +91,11 @@ struct QVoiceiOSApp: App {
                                     let reason = "thermal_\(thermalState.rawValue)"
                                     handleMemoryPressure(reason: reason, severity: .warning)
                                 }
+                            }
+                            .onReceive(engine.performanceActivityUpdates.removeDuplicates()) { isGenerating in
+                                // The screen stays awake while generating, including
+                                // between the segments of a long-form run.
+                                backgroundGeneration.updateScreenAwake(isGenerating: isGenerating)
                             }
                             .onReceive(engine.$hasActiveGeneration) { hasActiveGeneration in
                                 guard !hasActiveGeneration else { return }
@@ -162,6 +173,14 @@ struct QVoiceiOSApp: App {
                     await engine.refreshMemoryContext(reason: "scene_active", source: "app")
                 }
             }
+            // PA-15: the user is back, so a release still deferred for the
+            // foreground exit must never fire, and background time is no
+            // longer needed. Tell the user what the exit stopped.
+            runtimeReleaseCoordinator.cancelPendingRelease(
+                reason: IOSBackgroundGenerationPolicy.releaseReason
+            )
+            backgroundGeneration.endBackgroundTime()
+            backgroundGeneration.presentNoticesOnReturn()
             executeDeferredMemoryPressureReliefIfNeeded()
             executeDeferredRuntimeReleaseIfNeeded()
         case .background:
@@ -169,12 +188,49 @@ struct QVoiceiOSApp: App {
             // (we declare no background-audio mode, so playback can't continue
             // backgrounded anyway). Foregrounding re-activates it.
             setPlaybackSessionActive(false)
-            releaseRuntime(reason: "background")
+            handleForegroundExit()
         case .inactive:
             break
         @unknown default:
             break
         }
+    }
+
+    /// PA-15: iOS refuses GPU work once the app is suspended, so an active
+    /// generation is cancelled before that happens. Ordered: request background
+    /// time, cancel through the typed barrier (`.shutdown`; a single take is
+    /// discarded, a long-form project keeps its completed segments), then
+    /// request the runtime release. With a generation still active the release
+    /// defers and runs from the `hasActiveGeneration` sink once the barrier has
+    /// returned; background time ends when that release completes or expires.
+    private func handleForegroundExit() {
+        let plan = IOSBackgroundGenerationPolicy.backgroundPlan(
+            hasActiveGeneration: deps.engine?.hasActiveGeneration ?? false,
+            studioWork: backgroundGeneration.studioWork
+        )
+        if plan.requestsBackgroundTime {
+            backgroundGeneration.beginBackgroundTime()
+        }
+        if let engine = deps.engine {
+            if let interruption = plan.studioInterruption {
+                backgroundGeneration.interruptStudio(
+                    interruption,
+                    reason: plan.cancellationReason,
+                    ttsEngine: engine,
+                    audioPlayer: audioPlayer
+                )
+            } else if plan.cancelsUnownedEngineGeneration {
+                let reason = plan.cancellationReason
+                Task { @MainActor in
+                    do {
+                        try await engine.cancelActiveGeneration(reason: reason)
+                    } catch {
+                        engine.clearVisibleError()
+                    }
+                }
+            }
+        }
+        releaseRuntime(reason: plan.releaseReason)
     }
 
     private func setPlaybackSessionActive(_ active: Bool) {
@@ -369,6 +425,9 @@ struct QVoiceiOSApp: App {
             engine.clearGenerationActivity()
             if TelemetryGate.resolvedEnabled {
                 print("[QVoiceiOSApp] Released runtime due to \(reason)")
+            }
+            if reason == IOSBackgroundGenerationPolicy.releaseReason {
+                backgroundGeneration.endBackgroundTime()
             }
         }
     }

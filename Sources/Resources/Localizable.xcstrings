@@ -14875,6 +14875,138 @@
         }
       }
     },
+    "vocello.presentation.backgroundTakeStopped": {
+      "comment": "Studio notice shown when the user returns after leaving the app (Home, app switch or lock) stopped a take. The unfinished audio was deleted and is not in History.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generation stopped when Vocello left the screen. The unfinished take was discarded."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La génération s’est arrêtée quand Vocello a quitté l’écran. La prise inachevée a été supprimée."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La generación se detuvo cuando Vocello salió de la pantalla. Se descartó la toma sin terminar."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Erzeugung wurde beendet, als Vocello den Bildschirm verlassen hat. Die unfertige Aufnahme wurde verworfen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La generazione si è interrotta quando Vocello ha lasciato lo schermo. Il take incompleto è stato scartato."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A geração parou quando o Vocello saiu da tela. A tomada inacabada foi descartada."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 离开屏幕后生成已停止，未完成的音频已丢弃。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello が画面から離れたため生成を停止しました。未完成のテイクは破棄しました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello가 화면을 벗어나 생성이 중지되었습니다. 완성되지 않은 테이크는 삭제되었습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Генерация остановлена, так как приложение Vocello ушло с экрана. Незавершённый дубль удалён."
+          }
+        }
+      }
+    },
+    "vocello.presentation.backgroundLongFormStopped": {
+      "comment": "Studio notice shown when the user returns after leaving the app stopped a long-form project. 'Resume project' must match the translated Resume project button label.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Long-form stopped when Vocello left the screen. Finished segments are kept; choose Resume project to continue."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le texte long s’est arrêté quand Vocello a quitté l’écran. Les segments terminés sont conservés ; choisissez Reprendre le projet pour continuer."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El formato largo se detuvo cuando Vocello salió de la pantalla. Los segmentos terminados se conservan; elige Reanudar proyecto para continuar."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Langtext wurde beendet, als Vocello den Bildschirm verlassen hat. Fertige Abschnitte bleiben erhalten; wähle Projekt fortsetzen, um weiterzumachen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il testo lungo si è interrotto quando Vocello ha lasciato lo schermo. I segmenti completati sono conservati; scegli Riprendi progetto per continuare."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O texto longo parou quando o Vocello saiu da tela. Os segmentos concluídos foram mantidos; escolha Retomar projeto para continuar."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 离开屏幕后长文本已停止。已完成的片段会保留；选择“继续项目”即可继续。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello が画面から離れたため長文の生成を停止しました。完了した区間は保持されています。「プロジェクトを再開」で続行できます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello가 화면을 벗어나 긴 원고 생성이 중지되었습니다. 완료된 구간은 유지되며, 프로젝트 재개를 선택하면 계속할 수 있습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Длинный текст остановлен, так как приложение Vocello ушло с экрана. Готовые сегменты сохранены; выберите «Продолжить проект», чтобы продолжить."
+          }
+        }
+      }
+    },
     "vocello.error.cloning_consent_required": {
       "comment": "Studio error shown when Voice Cloning consent has not been acknowledged.",
       "extractionState": "manual",

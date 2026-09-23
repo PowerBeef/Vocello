@@ -104,6 +104,16 @@ final class RuntimeReleaseCoordinator: ObservableObject {
         return executeDeferredReleaseIfReady(hasActiveGeneration: hasActiveGeneration)
     }
 
+    /// Drops a deferred release requested for `reason` so it can never fire later
+    /// (the app returned to the foreground before the generation terminated).
+    /// A release already in flight, or one pending for another reason, is kept.
+    @discardableResult
+    func cancelPendingRelease(reason: String) -> Bool {
+        guard pendingReason == reason else { return false }
+        pendingReason = nil
+        return true
+    }
+
     func requestCacheRelief(
         reason: String,
         severity: MemoryPressureSeverity = .warning,

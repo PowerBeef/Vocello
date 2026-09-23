@@ -311,7 +311,7 @@
     },
     {
       "id": "composer",
-      "identifierPattern": "textInput_(textEditor|clearButton|longFormIndicator|generateButton|cancelButton|generationError|installModelButton)",
+      "identifierPattern": "textInput_(textEditor|clearButton|longFormIndicator|generateButton|cancelButton|generationError|backgroundNotice|installModelButton)",
       "sourceToken": "textInput_",
       "screen": "Studio",
       "prerequisite": "Any generation mode",

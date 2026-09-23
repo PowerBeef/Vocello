@@ -46,8 +46,34 @@ final class StudioGenerationCoordinator {
     /// streaming audible audio (see `studioGenState`).
     private(set) var liveItem: IOSStudioLivePreviewItem?
 
+    /// Notice for work the foreground exit stopped (PA-15), shown once the user is back.
+    private var backgroundNotice = IOSBackgroundInterruptionNoticeState()
+
     var activeAttempt: StudioGenerationAttemptToken? {
         attemptAuthority.currentToken
+    }
+
+    /// `true` while the current attempt runs and no cancellation barrier is pending.
+    var isAttemptRunning: Bool {
+        guard let attempt = attemptAuthority.currentToken else { return false }
+        return attemptAuthority.isRunning(attempt)
+    }
+
+    /// The foreground-exit interruption to tell the user about, once they are back.
+    var backgroundInterruptionNotice: IOSBackgroundInterruption? {
+        backgroundNotice.presented
+    }
+
+    /// Localized copy for `backgroundInterruptionNotice`.
+    var backgroundInterruptionNoticeMessage: String? {
+        switch backgroundNotice.presented {
+        case .singleTakeDiscarded:
+            return IOSAppLanguage.shared.presentation.backgroundTakeStopped
+        case .longFormStopped:
+            return IOSAppLanguage.shared.presentation.backgroundLongFormStopped
+        case nil:
+            return nil
+        }
     }
 
     init(mode: GenerationMode) {
@@ -62,6 +88,7 @@ final class StudioGenerationCoordinator {
     ) -> StudioGenerationAttemptToken? {
         guard let attempt = attemptAuthority.begin() else { return nil }
         errorMessage = nil
+        backgroundNotice.clear()
         lastCompletedOutput = nil
         liveItem = live
         isGenerating = true
@@ -128,6 +155,9 @@ final class StudioGenerationCoordinator {
         attempt: StudioGenerationAttemptToken
     ) -> Bool {
         guard attemptAuthority.failCancellation(attempt) else { return false }
+        // The error explains the failed barrier; a background notice claiming
+        // the work stopped cleanly would contradict it.
+        backgroundNotice.clear()
         errorMessage = IOSAppLanguage.shared.presentation.cancellationCouldNotFinish(
             details: error.localizedDescription
         )
@@ -174,5 +204,23 @@ final class StudioGenerationCoordinator {
     /// Clears the inline player (user dismissed it).
     func dismissInlinePlayer() {
         lastCompletedOutput = nil
+    }
+
+    // MARK: - Foreground exit (PA-15)
+
+    /// Records that the foreground exit cancelled this coordinator's attempt.
+    /// The notice stays hidden until `presentBackgroundInterruptionNoticeIfPending()`.
+    func recordBackgroundInterruption(_ interruption: IOSBackgroundInterruption) {
+        backgroundNotice.record(interruption)
+    }
+
+    /// Called when the scene is active again: surfaces a recorded interruption.
+    func presentBackgroundInterruptionNoticeIfPending() {
+        backgroundNotice.presentOnReturn()
+    }
+
+    /// The user acknowledged the notice.
+    func dismissBackgroundInterruptionNotice() {
+        backgroundNotice.clear()
     }
 }

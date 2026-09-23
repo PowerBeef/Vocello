@@ -442,8 +442,9 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         )
 
         let generate = element("textInput_generateButton")
+        let notice = element("textInput_backgroundNotice")
         XCTAssertTrue(
-            VocelloUIWait.exists(element("textInput_backgroundNotice"), timeout: 30),
+            VocelloUIWait.exists(notice, timeout: 30),
             "Returning after a foreground exit must show the interruption notice"
         )
         XCTAssertFalse(element("studio_livePreview_cancel").exists)
@@ -451,8 +452,11 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
                        "The interrupted take must be discarded, never published")
         XCTAssertFalse(element("textInput_generationError").exists,
                        "A foreground-exit cancellation is not a failure")
-        XCTAssertTrue(VocelloUIWait.enabled(generate, timeout: 60))
         VocelloUIScreenshot.attach(app, named: "ios-foreground-exit-returned")
+        // The notice holds the action slot, like the error bar, until the
+        // user dismisses it; Generate then returns.
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: notice, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.enabled(generate, timeout: 60))
 
         replaceScript(with: "Resume \(completionToken). The train left the station at dawn.")
         _ = generateAndWaitForCompletedPlayer(timeout: 240)
@@ -468,6 +472,46 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
         XCTAssertTrue(VocelloUIWait.exists(element("history_noMatchesState"), timeout: 30))
         XCTAssertEqual(historyRows().count, 0,
                        "A take cancelled by leaving the foreground must never reach History")
+    }
+
+    /// Maintenance on the paired iPhone, on explicit request only
+    /// (`smoke --scenario update-models`): taps each installed model's genuine
+    /// Update control and waits until every model reads Ready. No generation.
+    func testUpdateInstalledModels() {
+        beginSession()
+        defer { endSession() }
+        openVoiceModels()
+        let modelIDs = ["pro_custom", "pro_design", "pro_clone"]
+        var updated: [String] = []
+        for modelID in modelIDs {
+            let update = element("iosModelUpdate_\(modelID)")
+            guard update.waitForExistence(timeout: 10) else { continue }
+            XCTAssertTrue(revealSettingsElement(update, swipingUp: true))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: update, timeout: 20))
+            updated.append(modelID)
+        }
+        VocelloUIScreenshot.attach(app, named: "ios-update-models-started")
+        for modelID in modelIDs {
+            let status = app.staticTexts["iosModelStatus_\(modelID)"].firstMatch
+            var lastKeepAlive = Date()
+            XCTAssertTrue(
+                VocelloUIWait.condition("\(modelID) to read Ready", timeout: 3600) {
+                    // A no-op touch on the status label once a minute keeps the
+                    // phone from auto-locking during multi-gigabyte downloads.
+                    if Date().timeIntervalSince(lastKeepAlive) > 60, status.isHittable {
+                        status.tap()
+                        lastKeepAlive = Date()
+                    }
+                    return ((status.value as? String) ?? status.label).contains("Ready")
+                },
+                "\(modelID) did not finish updating"
+            )
+            XCTAssertFalse(element("iosModelUpdate_\(modelID)").exists,
+                           "\(modelID) still offers an update after it reads Ready")
+        }
+        print("[update-models] updated=\(updated.joined(separator: ","))")
+        VocelloUIScreenshot.attach(app, named: "ios-update-models-ready")
+        leaveVoiceModels()
     }
 
     private func assertAccessibilityControl(

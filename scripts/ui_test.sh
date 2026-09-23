@@ -37,6 +37,7 @@ Usage:
   scripts/ui_test.sh ios smoke
   scripts/ui_test.sh ios smoke --scenario history-transcript --history-row-id generation-N [--retain-result]
   scripts/ui_test.sh ios smoke --scenario foreground-exit
+  scripts/ui_test.sh ios smoke --scenario update-models
   scripts/ui_test.sh ios smoke --preinstalled-candidate VERIFIED_RELEASE_DIRECTORY [--retain-result]
   scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
   scripts/ui_test.sh ios perf [--label RUN_ID]
@@ -181,9 +182,9 @@ elif [[ "$lane" == "screen-protection" ]]; then
   [[ "$scenario_argument" == "inspect" || "$scenario_argument" == "enable" ]] \
     || die "screen-protection --scenario must be inspect or enable"
 elif [[ "$platform" == "ios" && "$lane" == "smoke" && -n "$scenario_argument" ]]; then
-  [[ ( "$scenario_argument" == "history-transcript" || "$scenario_argument" == "foreground-exit" ) \
-      && -z "$candidate_evidence" ]] \
-    || die "development iOS smoke --scenario accepts only history-transcript or foreground-exit"
+  [[ ( "$scenario_argument" == "history-transcript" || "$scenario_argument" == "foreground-exit" \
+        || "$scenario_argument" == "update-models" ) && -z "$candidate_evidence" ]] \
+    || die "development iOS smoke --scenario accepts only history-transcript, foreground-exit or update-models"
   [[ "$scenario_argument" != "history-transcript" || "$history_row_id" =~ ^generation-[0-9]+$ ]] \
     || die "history-transcript requires an exact --history-row-id generation-N"
 elif [[ "$platform" == "macos" && "$lane" == "smoke" && -n "$scenario_argument" ]]; then
@@ -354,6 +355,7 @@ caffeinate -dimsuw $$ &
 step_ledger="$out/required-steps.json"
 step_workflow="ui-$platform-$lane"
 [[ "$scenario_argument" != "history-transcript" ]] || step_workflow="ui-ios-history-transcript"
+[[ "$scenario_argument" != "update-models" ]] || step_workflow="ui-ios-update-models"
 [[ -z "$candidate_evidence" ]] || step_workflow="ui-ios-candidate-smoke"
 if [[ "$lane" == "control-audit" && ( "$control_scenario" == "generation" || "$control_scenario" == "all" ) ]]; then
   step_workflow="ui-ios-control-audit-generation"
@@ -391,6 +393,12 @@ if payload["platform"] == "macos" and payload["lane"] == "smoke" and sys.argv[20
 if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "foreground-exit":
     payload["scenario"] = "foreground-exit"
     payload["evidenceClass"] = "focused-smoke"
+if payload["platform"] == "ios" and payload["lane"] == "smoke" and sys.argv[20] == "update-models":
+    payload["scenario"] = "update-models"
+    payload["evidenceClass"] = "device-maintenance"
+    payload["modes"] = []
+    payload["lengths"] = []
+    payload["warm"] = 0
 if sys.argv[13]:
     payload["treeFingerprint"] = sys.argv[13]
     payload["controlAuditScenario"] = sys.argv[14]
@@ -1549,6 +1557,9 @@ else
     elif [[ "$scenario_argument" == "foreground-exit" ]]; then
       # PA-15: leaving the foreground mid-take cancels it with `shutdown`.
       only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testForegroundExitCancelsGeneration"
+    elif [[ "$scenario_argument" == "update-models" ]]; then
+      # Maintenance: update the installed models through their genuine controls.
+      only_test="VocelloiOSUITests/VocelloiOSSmokeUITests/testUpdateInstalledModels"
     fi
     export TEST_RUNNER_QVOICE_IOS_SMOKE_RUN_ID="$run_id"
   elif [[ "$lane" == "benchmark" ]]; then
@@ -1838,7 +1849,8 @@ PY
   # Collect failed smoke evidence before the aggregate exit. A passing diagnostic
   # subset never converts a failed XCTest into a successful run.
   smoke_diagnostics_status=0
-  if [[ "$lane" == "smoke" ]]; then
+  # Model maintenance generates nothing, so it has no smoke diagnostics to gate.
+  if [[ "$lane" == "smoke" && "$scenario_argument" != "update-models" ]]; then
     if ! required_step_run "$step_ledger" smoke-diagnostics validate_ios_smoke; then
       smoke_diagnostics_status=1
       warn "iOS smoke memory-pressure diagnostics gate failed"

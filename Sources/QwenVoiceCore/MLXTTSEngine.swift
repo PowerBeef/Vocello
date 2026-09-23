@@ -949,9 +949,10 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             loadState = .loaded(modelID: modelID)
             visibleErrorMessage = nil
             scheduleIdleUnloadIfNeeded(modelID: modelID, mode: .clone, isBatch: false)
-        } catch is CancellationError {
+        } catch let error as CancellationError {
+            let unloaded = await unloadAfterCapturedRuntimeFailureIfNeeded(error)
             clonePreparationState = .idle
-            loadState = .loaded(modelID: modelID)
+            loadState = unloaded ? .idle : .loaded(modelID: modelID)
             throw CancellationError()
         } catch {
             // A captured MLX failure gets product copy, and the model it may
@@ -1287,7 +1288,11 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 cancellationReason: cancellationIngress.reason,
                 isTaskCancelled: Task.isCancelled
             ) {
-                loadState = .loaded(modelID: request.modelID)
+                // A runtime failure recorded while the take unwound unloads the
+                // model before the terminal, as the failure path does, so the
+                // load state never claims a model that is gone.
+                let unloaded = await unloadAfterCapturedRuntimeFailureIfNeeded(error)
+                loadState = unloaded ? .idle : .loaded(modelID: request.modelID)
                 // Preserve the UI's no-visible-error cancellation contract while
                 // still closing the service-layer transport accumulator.
                 let coordinatorReason = await activeGenerationCoordinator.currentCancellationReason
@@ -1303,7 +1308,6 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 )
                 let delivery = eventRouter.snapshot(for: deliveryGenerationID)
                 await recordEventDeliveryLossIfNeeded(delivery, request: request)
-                await unloadAfterCapturedRuntimeFailureIfNeeded(error)
                 throw CancellationError()
             }
             if NativeGenerationTerminalClassifier.isRetryableAllocationFailure(error) {
@@ -1363,7 +1367,11 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                         cancellationReason: cancellationIngress.reason,
                         isTaskCancelled: Task.isCancelled
                     ) {
-                        loadState = .loaded(modelID: request.modelID)
+                        // A runtime failure recorded while the take unwound unloads the
+                        // model before the terminal, as the failure path does, so the
+                        // load state never claims a model that is gone.
+                        let unloaded = await unloadAfterCapturedRuntimeFailureIfNeeded(error)
+                        loadState = unloaded ? .idle : .loaded(modelID: request.modelID)
                         let coordinatorReason = await activeGenerationCoordinator.currentCancellationReason
                         let reason = cancellationIngress.reason ?? coordinatorReason ?? .user
                         await yieldEvent(
@@ -1377,7 +1385,6 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                         )
                         let delivery = eventRouter.snapshot(for: deliveryGenerationID)
                         await recordEventDeliveryLossIfNeeded(delivery, request: request)
-                        await unloadAfterCapturedRuntimeFailureIfNeeded(error)
                         throw CancellationError()
                     }
                     await unloadAfterCapturedRuntimeFailureIfNeeded(error)
@@ -1540,13 +1547,15 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     /// retry's cleanup. A take that ended cancelled surfaces no runtime
     /// failure, so the runtime actor's record of one on the loaded model is
     /// consulted as well.
-    private func unloadAfterCapturedRuntimeFailureIfNeeded(_ error: Error) async {
+    @discardableResult
+    private func unloadAfterCapturedRuntimeFailureIfNeeded(_ error: Error) async -> Bool {
         if !Self.requiresUnloadAfterFailure(error) {
-            guard await runtime.requiresUnloadAfterRuntimeFailure() else { return }
+            guard await runtime.requiresUnloadAfterRuntimeFailure() else { return false }
         }
         Memory.clearCache()
         await runtime.unloadModel()
         clonePreparationState = .idle
+        return true
     }
 
     /// Whether a generation failure left MLX state that must not be reused.

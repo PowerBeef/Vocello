@@ -1275,6 +1275,9 @@ final class VocelloQwen3FacadeTests: XCTestCase {
         }
         let snapshot = await engine.snapshot()
         XCTAssertNil(snapshot.activeOperation)
+        // The cancelled prewarm still marks its model for unload.
+        let requiresUnload = await engine.requiresUnloadAfterRuntimeFailure
+        XCTAssertTrue(requiresUnload)
     }
 
     func testEngineProducerAllocationFailureEndsWithMemoryPressure() async throws {

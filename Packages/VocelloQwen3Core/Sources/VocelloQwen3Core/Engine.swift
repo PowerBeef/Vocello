@@ -387,6 +387,19 @@ public actor VocelloQwen3Engine {
         loadedModel != nil && runtimeFailureModelEpoch == modelEpoch
     }
 
+    /// Marks the leased model for unload when MLX recorded a failure during an
+    /// operation, including one that ends cancelled because cancellation won
+    /// its terminal.
+    private func recordRuntimeFailure(
+        _ error: any Error,
+        in mlxErrors: VocelloQwen3MLXErrorScope,
+        lease: VocelloQwen3RuntimeOperationLease
+    ) {
+        if mlxErrors.failure != nil || VocelloQwen3RuntimeFailure(mlxError: error) != nil {
+            runtimeFailureModelEpoch = lease.modelEpoch
+        }
+    }
+
     public func snapshot() -> VocelloQwen3EngineSnapshot {
         VocelloQwen3EngineSnapshot(
             loadedModel: loadedModel?.identity,
@@ -526,9 +539,10 @@ public actor VocelloQwen3Engine {
             generationID: nil,
             phase: .prewarming
         )
+        let cloneErrors = VocelloQwen3MLXErrorScope()
         do {
             try Task.checkCancellation()
-            let prompt = try VocelloQwen3MLXErrorScope().capture {
+            let prompt = try cloneErrors.capture {
                 try model.makeClonePrompt(
                     referenceSamples: referenceSamples,
                     referenceText: referenceText,
@@ -552,6 +566,7 @@ public actor VocelloQwen3Engine {
             phase = .ready
             return handle
         } catch {
+            recordRuntimeFailure(error, in: cloneErrors, lease: lease)
             failOperationIfCurrent(lease)
             throw error
         }
@@ -731,6 +746,7 @@ public actor VocelloQwen3Engine {
             activeOperation = nil
             phase = .ready
         } catch {
+            recordRuntimeFailure(error, in: mlxErrors, lease: lease)
             failOperationIfCurrent(lease)
             throw error
         }
@@ -808,6 +824,7 @@ public actor VocelloQwen3Engine {
                 sampleRate: model.sampleRate
             )
         } catch {
+            recordRuntimeFailure(error, in: mlxErrors, lease: lease)
             failOperationIfCurrent(lease)
             throw error
         }

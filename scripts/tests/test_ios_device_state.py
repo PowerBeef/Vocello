@@ -47,7 +47,7 @@ class IOSDeviceStateHelpersTests(unittest.TestCase):
                     self.assertEqual(completed.returncode, expected, completed.stderr)
 
     def test_xctrace_inventory_distinguishes_online_offline_and_missing_device(self) -> None:
-        udid = "00008150-00181D580ED8401C"
+        udid = "00008150-0000000000000001"  # synthetic; never a real device ID
         fixtures = (
             (f"== Devices ==\nTest iPhone (26.5) ({udid})\n", 0, udid),
             (f"== Devices Offline ==\nTest iPhone (26.5) ({udid})\n", 20, ""),

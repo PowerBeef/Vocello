@@ -207,8 +207,10 @@ background task. Agents never push, touch `main`, run consent-bound lanes or Xco
 `git log main..worktree-<name>` and the diff, then `git merge --ff-only worktree-<name>` (or
 `git cherry-pick <sha>...` when `main` moved; no merge commits without a stated reason), run the
 routed `scripts/dev.sh check` on `main`, push, and clean up with
-`git worktree remove .claude/worktrees/<name>` and `git branch -d worktree-<name>`. Discarding
-unintegrated work (`git branch -D`, `git worktree remove --force`) asks first. The SessionStart banner
+`git worktree remove .claude/worktrees/<name>` and `git branch -d worktree-<name>` (Claude Code
+locks a worktree while its agent runs and unlocks it when the agent finishes; a worktree left locked
+by an interrupted session needs `git worktree unlock .claude/worktrees/<name>` first). Discarding unintegrated work (`git branch -D`,
+`git worktree remove --force`) asks first. The SessionStart banner
 lists open worktrees until they are integrated or removed.
 
 **Budget on 16 GB.** One native build or test at a time (the host lock enforces it). At most three
@@ -260,12 +262,12 @@ in CI.
 Permissions encode the same boundaries. `allow` covers the routine loop: Git inspection, explicit-path
 staging, commits and fast-forward pushes to `main` (the maintainer's standing authorization; the
 commit lint still runs), worktree integration (`git merge --ff-only worktree-*`, `git cherry-pick`,
-`git branch -d worktree-*`, `git worktree list|prune|remove .claude/worktrees/*`), `scripts/dev.sh`,
+`git branch -d worktree-*`, `git worktree list|prune|unlock|remove .claude/worktrees/*`), `scripts/dev.sh`,
 the contract gate, pytest, the roadmap, `gh run` and the deterministic native lanes. `ask` covers the
 consent-bound lanes (`scripts/ui_test.sh`, `scripts/ios_device.sh`, the `scripts/macos_test.sh` model,
 memory, benchmark and release-readiness lanes, model installs), cache cleanup, workflow dispatch,
-destructive Git resets, discarding agent work (`git branch -D`, `git worktree remove --force`,
-`git worktree unlock`) and the XcodeBuildMCP device and test tools. `deny` covers force pushes, pushes
+destructive Git resets, discarding agent work (`git branch -D`, `git worktree remove --force`) and
+the XcodeBuildMCP device and test tools. `deny` covers force pushes, pushes
 of any ref but `main`, hand-made branches and worktrees, `update-ref`, stashing, broad staging,
 whole-cache deletion, releases, the XcodeBuildMCP Simulator tools and `.xcodeproj` edits. Agent
 worktrees (`EnterWorktree`, `Agent` with `isolation: "worktree"`) are allowed. Hooks and permissions

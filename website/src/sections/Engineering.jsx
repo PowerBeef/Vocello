@@ -34,7 +34,7 @@ const LEDGER = [
   },
   {
     k: "One engine, three hosts",
-    v: "On the Mac the engine lives in a separate service process that steps away when idle, so heavy engine memory can never take the app down. The iPhone app and the command-line tool run the same engine.",
+    v: "On the Mac the engine runs inside the app, exactly as on the iPhone, so one lifecycle and one memory policy serve both: the engine trims its caches under memory pressure and unloads an idle model. The command-line tool drives the same engine with no UI.",
   },
   {
     k: "Streaming by design",

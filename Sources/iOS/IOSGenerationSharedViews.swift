@@ -314,6 +314,8 @@ struct IOSCompactInlineNotice: View {
     let message: String
     let symbolName: String
     let tint: Color
+    /// `nil` lets the message wrap fully where losing its tail would lose meaning.
+    var lineLimit: Int? = 2
 
     @Environment(\.iosReduceTransparencyEnabled) private var reduceTransparency
 
@@ -328,7 +330,8 @@ struct IOSCompactInlineNotice: View {
             Text(message)
                 .font(.caption)
                 .foregroundStyle(Theme.Text.secondary)
-                .lineLimit(2)
+                .lineLimit(lineLimit)
+                .fixedSize(horizontal: false, vertical: lineLimit == nil)
 
             Spacer(minLength: 0)
         }

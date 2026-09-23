@@ -424,7 +424,15 @@ final class VoiceCloningConsentPolicyTests: XCTestCase {
         } catch let error as VoiceCloningConsentRequiredError {
             XCTFail("Admitted call was refused on consent: \(error)", file: file, line: line)
         } catch {
-            // Engine-state failure: the call got past the consent admission.
+            // The uninitialized engine's own refusal proves the call got past
+            // the consent admission; any earlier failure would not.
+            XCTAssertEqual(
+                error as? MLXTTSEngineError,
+                .notInitialized,
+                "Expected the engine's notInitialized refusal, got \(error)",
+                file: file,
+                line: line
+            )
         }
     }
 

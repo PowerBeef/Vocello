@@ -398,7 +398,8 @@ struct IOSSaveVoiceSheet: View {
                         IOSCompactInlineNotice(
                             message: IOSAppLanguage.shared.presentation.cloningConsentRequiredToSaveVoice,
                             symbolName: "hand.raised",
-                            tint: tint
+                            tint: tint,
+                            lineLimit: nil
                         )
                         .accessibilityElement(children: .combine)
                         .accessibilityIdentifier("saveVoice_consentRequired")

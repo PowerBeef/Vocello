@@ -967,6 +967,12 @@ enum IOSDeviceDiagnosticsRunner {
             guard NativeTelemetryMode.current() == .verbose, TelemetryGate.resolvedEnabled else {
                 throw DiagnosticsError("clone-conditioning acceptance requires verbose telemetry")
             }
+            // Every acceptance take is a clone take: refuse before any model or
+            // fixture work when the phone has no recorded cloning consent.
+            guard VoiceCloningConsentPolicy(defaults: .standard).isConsentRecorded else {
+                failureCode = .cloneConsentNotRecorded
+                throw DiagnosticsError("clone-conditioning acceptance requires recorded cloning consent")
+            }
             guard let voiceID = trimmedEnvironmentValue(cloneVoiceIDEnvKey),
                   let expectedAudioSHA256 = validatedSHA256EnvironmentValue(
                     expectedCloneAudioSHA256EnvironmentKey
@@ -1273,6 +1279,13 @@ enum IOSDeviceDiagnosticsRunner {
                 throw DiagnosticsError(
                     "memory qualification requires \(cloneVoiceIDEnvKey) with an exact saved voice ID"
                 )
+            }
+            // Refuse before the first take rather than after the Built-in and
+            // Design takes already ran when a planned clone take would be refused.
+            if plan.takes.contains(where: { $0.mode == GenerationMode.clone.rawValue }),
+               !VoiceCloningConsentPolicy(defaults: .standard).isConsentRecorded {
+                failureCode = .cloneConsentNotRecorded
+                throw DiagnosticsError("memory qualification requires recorded cloning consent")
             }
             failureCode = .corpusUnavailable
             guard let text = BenchMatrixSpec.text(for: plan.length) else {

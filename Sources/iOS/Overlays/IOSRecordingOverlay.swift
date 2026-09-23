@@ -80,17 +80,25 @@ struct IOSRecordingOverlay: View {
     // MARK: - Top bar
 
     private var topBar: some View {
-        HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
+            closeRow
+            // Its own full-width row, never truncated, so the Settings path
+            // survives accessibility text sizes and longer translations.
             if let notice {
                 IOSCompactInlineNotice(
                     message: notice,
                     symbolName: "hand.raised",
-                    tint: Theme.Brand.modeClone
+                    tint: Theme.Brand.modeClone,
+                    lineLimit: nil
                 )
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("iosRecord_consentRequired")
             }
+        }
+    }
 
+    private var closeRow: some View {
+        HStack(spacing: 12) {
             Spacer(minLength: 0)
 
             Button {

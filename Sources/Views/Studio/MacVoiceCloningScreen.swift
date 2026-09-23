@@ -126,8 +126,11 @@ struct MacVoiceCloningScreen: View {
         )
     }
 
+    /// Consent is part of the key: priming refused before the inline
+    /// acknowledgment runs again as soon as consent is recorded.
     private var clonePrimingTaskID: String {
-        clonePrimingRequestKey ?? "clone-priming-idle"
+        guard cloneConsentAcknowledged else { return "clone-priming-no-consent" }
+        return clonePrimingRequestKey ?? "clone-priming-idle"
     }
 
     private var cloneContextStatus: VoiceCloningContextStatus? {
@@ -852,7 +855,8 @@ struct MacVoiceCloningScreen: View {
         // records its own model load and conditioning.
         guard !MacGenerationWarmupCoordinator.isSuppressed else { return }
         guard !coordinator.isGenerating, !ttsEngineStore.hasActiveGeneration else { return }
-        guard let model = cloneModel,
+        guard cloneConsentAcknowledged,
+              let model = cloneModel,
               isModelAvailable,
               let refPath = draft.referenceAudioPath,
               clonePrimingRequestKey != nil else {

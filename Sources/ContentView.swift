@@ -33,6 +33,8 @@ struct ContentView: View {
     /// Content size of the window, for the split-view columns' shared backdrop.
     @State private var windowSize: CGSize?
     @State private var didCompleteInitialAvailabilityRefresh = false
+    @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey, store: AppDefaults.store)
+    private var cloneConsentAcknowledged = false
     @StateObject private var generationWarmupCoordinator = MacGenerationWarmupCoordinator()
 
     private var canUseSavedVoicesInVoiceCloning: Bool {
@@ -153,6 +155,8 @@ struct ContentView: View {
         .onChange(of: customVoiceDraft) { _, _ in handleGenerationDraftChange() }
         .onChange(of: voiceDesignDraft) { _, _ in handleGenerationDraftChange() }
         .onChange(of: voiceCloningDraft) { _, _ in handleGenerationDraftChange() }
+        // Recording consent changes the Clone warm target from model-only to primed.
+        .onChange(of: cloneConsentAcknowledged) { _, _ in handleGenerationDraftChange() }
         .onChange(of: voiceCloningDraft.selectedSavedVoiceID) { _, newValue in
             appModel.persistVoiceCloningSavedVoiceID(newValue)
         }
@@ -382,7 +386,10 @@ struct ContentView: View {
             )
             reference = nil
         case .clone:
+            // Without recorded consent the clone model is warmed but the
+            // reference is never primed (the engine would refuse it).
             if allowClonePrime,
+               cloneConsentAcknowledged,
                let referenceAudioPath = voiceCloningDraft.referenceAudioPath?
                 .trimmingCharacters(in: .whitespacesAndNewlines),
                !referenceAudioPath.isEmpty {

@@ -1407,8 +1407,10 @@ struct IOSVoiceCloningView: View {
         )
     }
 
+    /// Consent is part of the key, as on macOS: priming refused before the
+    /// acknowledgment runs again as soon as consent is recorded.
     private var clonePrimingTaskID: String {
-        "\(isActive)-\(clonePrimingRequestKey ?? "clone-priming-idle")"
+        "\(isActive)-\(cloneConsentAcknowledged)-\(clonePrimingRequestKey ?? "clone-priming-idle")"
     }
 
     private var promptText: String {
@@ -2008,7 +2010,8 @@ struct IOSVoiceCloningView: View {
             await ttsEngine.cancelClonePreparationIfNeeded()
             return
         }
-        guard let model = cloneModel,
+        guard cloneConsentAcknowledged,
+              let model = cloneModel,
               let refPath = draft.referenceAudioPath,
               clonePrimingRequestKey != nil else {
             await ttsEngine.cancelClonePreparationIfNeeded()

@@ -152,14 +152,13 @@
       "blockedBy": [
         "RF-01"
       ],
-      "gate": "Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement, version, and collision checks. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; qualified legal/privacy decisions are recorded before closure. Authentication failures remain failures.",
+      "gate": "Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement and version checks and a confirmed-unused build number. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; qualified legal/privacy decisions are recorded before closure. Authentication failures remain failures.",
       "sourceOfTruth": [
-        "scripts/app_store_connect_readiness.py",
-        "scripts/app_store_build_preflight.py",
+        "docs/reference/ios-appstore-submission.md",
         "docs/reference/content-rights-review.md"
       ],
-      "updated": "2026-09-13",
-      "notes": "September 8 credential hygiene: added private-key/signing/local-auth ignore patterns and hardened macOS/iOS workflow creation with umask 077, early cleanup ownership, failure/cancellation traps, pre-existing-file refusal and unconditional best-effort-all cleanup with failure reporting. Synthetic tests execute actual workflow blocks without real credentials or Apple/ASC calls; no account, release or purchase acceptance changed. September 8 authorized account setup: created NON_CONSUMABLE com.patricedery.vocello.design_clone_export (Design & Clone Export), USA base USD 19.99, Apple-managed automatic prices for 174 other territories, no manual regional overrides. Family Sharing was not enabled; API omits its flag, so UI readback remains pending. Product state MISSING_METADATA; localized details, availability, agreements/qualified decisions and physical/processed purchase acceptance remain open. No submission, live purchase, app price or phone change. Apple rejected the prior hyphenated identifier with no product created; corrected identifier is reflected in source and the isolated TEST fixture, with format regression coverage. (Earlier history: git log -p -- config/roadmap.json.)",
+      "updated": "2026-09-22",
+      "notes": "Synthetic tests execute actual workflow blocks without real credentials or Apple/ASC calls; no account, release or purchase acceptance changed. September 8 authorized account setup: created NON_CONSUMABLE com.patricedery.vocello.design_clone_export (Design & Clone Export), USA base USD 19.99, Apple-managed automatic prices for 174 other territories, no manual regional overrides. Family Sharing was not enabled; API omits its flag, so UI readback remains pending. Product state MISSING_METADATA; localized details, availability, agreements/qualified decisions and physical/processed purchase acceptance remain open. No submission, live purchase, app price or phone change. Apple rejected the prior hyphenated identifier with no product created; corrected identifier is reflected in source and the isolated TEST fixture, with format regression coverage. (Earlier history: git log -p -- config/roadmap.json.) 2026-09-22: App Store Connect checks are manual now (asc automation removed; see ASR-08).",
       "unparkWhen": "The maintainer supplies the Apple metadata, availability, agreements and the qualified legal/privacy decisions; the repository side is done."
     },
     {
@@ -223,7 +222,7 @@
       "plan": "release-first-3-0-2026-09",
       "title": "verify the coherent tree and freeze the 3.0.0 candidate",
       "status": "parked",
-      "gate": "On the freeze commit: (1) scripts/dev.sh regen is clean and the full project-input gate, macOS deterministic tests and app build, the generic physical-iOS SDK compile, the website check and the release/privacy/attribution/supply-chain fixtures pass; (2) project.yml MARKETING_VERSION 3.0.0 / CURRENT_PROJECT_VERSION 24 (already set) still match config/public-product-facts.json candidateRelease and a fresh read-only scripts/app_store_build_preflight.py check finds build 24 unused (ASR-08 owns account reconciliation); (3) the commit is on main with exact-SHA CI required and Security green, scripts/quality_promotion.py names the required lanes from config/quality-promotion-contract.json before expensive QA, and the annotated v3.0.0 tag is a separate maintainer authorization proved by scripts/release_source_authority.py; (4) the pre-freeze source amendment is discharged: F-19/F-22 done, F-18/F-20/F-21/F-01/F-06 source-complete with their candidate clauses left to RF-10/RF-12, F-16's recovery/retention source work and RF-13's remaining source-side export surfaces landed or explicitly deferred; (5) no unrelated source or docs edits and no full-tree identity bypass during ICA-04's frozen campaign.",
+      "gate": "On the freeze commit: (1) scripts/dev.sh regen is clean and the full project-input gate, macOS deterministic tests and app build, the generic physical-iOS SDK compile, the website check and the release/privacy/attribution/supply-chain fixtures pass; (2) project.yml MARKETING_VERSION 3.0.0 / CURRENT_PROJECT_VERSION 24 (already set) still match config/public-product-facts.json candidateRelease and App Store Connect shows build 24 unused on a fresh read-only look (web portal or the asc-* skills) (ASR-08 owns account reconciliation); (3) the commit is on main with exact-SHA CI required and Security green, scripts/quality_promotion.py names the required lanes from config/quality-promotion-contract.json before expensive QA, and the annotated v3.0.0 tag is a separate maintainer authorization proved by scripts/release_source_authority.py; (4) the pre-freeze source amendment is discharged: F-19/F-22 done, F-18/F-20/F-21/F-01/F-06 source-complete with their candidate clauses left to RF-10/RF-12, F-16's recovery/retention source work and RF-13's remaining source-side export surfaces landed or explicitly deferred; (5) no unrelated source or docs edits and no full-tree identity bypass during ICA-04's frozen campaign.",
       "sourceOfTruth": [
         "project.yml",
         "config/public-product-facts.json",
@@ -231,8 +230,8 @@
         "scripts/release_evidence.py",
         "scripts/quality_promotion.py"
       ],
-      "updated": "2026-09-14",
-      "notes": "Re-gated 2026-09-13: the September 7 verification on 3272d17e is 85 commits behind main and void, 3.0.0/build 24 are already set, and the promotion inputs are config/quality-promotion-contract.json plus scripts/quality_promotion.py (no quality-promotion.json exists). No tag, signing or account mutation has been performed; build 24 is not reserved; no v3.x tag exists. Planned behind RF-13 because the export purchase must be source-complete before the freeze. (Earlier history: git log -p -- config/roadmap.json.)",
+      "updated": "2026-09-22",
+      "notes": "Re-gated 2026-09-13: the September 7 verification on 3272d17e is 85 commits behind main and void, 3.0.0/build 24 are already set, and the promotion inputs are config/quality-promotion-contract.json plus scripts/quality_promotion.py (no quality-promotion.json exists). No tag, signing or account mutation has been performed; build 24 is not reserved; no v3.x tag exists. Planned behind RF-13 because the export purchase must be source-complete before the freeze. (Earlier history: git log -p -- config/roadmap.json.) 2026-09-22: App Store Connect checks are manual now (asc automation removed; see ASR-08).",
       "blockedBy": [
         "RF-13"
       ],
@@ -268,11 +267,10 @@
       "gate": "Under ASR-05 through ASR-12, verify archive/IPA entitlements/privacy/notices/architecture/UUID identity and absence of internal diagnostics. Separately authorize any internal TestFlight upload, then black-box test the processed candidate through the same XCUITest stack without replacing it with a diagnostics build. Preserve personal data during upgrade; fresh install needs another phone or explicit verified backup/reinstallation authorization. Verify reviewer-critical downloads/modes/import/transcription/permissions/offline/recovery/long-form/export, storage/screenshots, manual-only gaps, fresh regional hosting and all qualified account/privacy/rights decisions. No unexplained required failure; App Review submission requires separate explicit authorization and approval is not guaranteed.",
       "sourceOfTruth": [
         "scripts/verify_ios_release_artifacts.py",
-        "scripts/app_store_connect_readiness.py",
         "docs/reference/ios-appstore-submission.md"
       ],
-      "updated": "2026-09-14",
-      "notes": "September 7 addition: processed candidate must verify RF-13 purchase/restore, relevant offline/refund behavior, free Built-in exports and all-mode free generation/listening/internal History. RF-02 owns product review screenshot, localized product details and first-IAP app-version attachment with separate account/upload/submission approval. StoreKit source is now implemented under RF-13; no processed purchase evidence yet. Earlier checkpoint: September 6: black-box navigation route implemented in the existing ui_test.sh stack, with command-bound release identity, standalone runner, before/after installed identity, crash/attachment collection and no diagnostics dependency. This is not full processed-candidate acceptance; no distribution app was tested. Generation, downloads, long-form, enrollment, upgrade and protected fresh-install acceptance remain required after separate upload authorization. September 6 class: candidate verification and external dependencies. Fail-closed preinstalled-candidate route before authorized TestFlight. Only-phone fresh install needs usable encrypted recovery and immediate uninstall approval. (Earlier history: git log -p -- config/roadmap.json.)",
+      "updated": "2026-09-22",
+      "notes": "RF-02 owns product review screenshot, localized product details and first-IAP app-version attachment with separate account/upload/submission approval. StoreKit source is now implemented under RF-13; no processed purchase evidence yet. Earlier checkpoint: September 6: black-box navigation route implemented in the existing ui_test.sh stack, with command-bound release identity, standalone runner, before/after installed identity, crash/attachment collection and no diagnostics dependency. This is not full processed-candidate acceptance; no distribution app was tested. Generation, downloads, long-form, enrollment, upgrade and protected fresh-install acceptance remain required after separate upload authorization. September 6 class: candidate verification and external dependencies. Fail-closed preinstalled-candidate route before authorized TestFlight. Only-phone fresh install needs usable encrypted recovery and immediate uninstall approval. (Earlier history: git log -p -- config/roadmap.json.) 2026-09-22: App Store Connect checks are manual now (asc automation removed; see ASR-08).",
       "unparkWhen": "ICA-05 closes the frozen campaign and RF-02 supplies the App Store Connect account setup for the processed-candidate purchase proof."
     },
     {
@@ -497,7 +495,7 @@
       "plan": "delivery-prompting-2026-08",
       "title": "Calibrate the layered local delivery evaluator",
       "status": "in-flight",
-      "gate": "Qualify the existing local cascade with byte-bound native Fast QC, independent locale-locked full-file ASR evidence, cached acoustics and optional compact features/heads. Human listening and listener-trained heads are not operational prerequisites. Preserve serial M2/8 GB resource envelopes, source/model/config identities, warnings and inconclusive outcomes. Model adoption requires independent-reference untouched holdout gain on the named metric without measured dimension/preset/speaker/script regressions. No listener-proven claim, prompt edit, automatic publication or ordinary CI model prerequisite.",
+      "gate": "Qualify the existing local cascade with byte-bound native Fast QC, independent locale-locked full-file ASR evidence, cached acoustics and optional compact features/heads. Human listening and listener-trained heads are not operational prerequisites. Preserve serial 8 GB-floor resource envelopes, source/model/config identities, warnings and inconclusive outcomes. Model adoption requires independent-reference untouched holdout gain on the named metric without measured dimension/preset/speaker/script regressions. No listener-proven claim, prompt edit, automatic publication or ordinary CI model prerequisite.",
       "sourceOfTruth": [
         "config/delivery-evaluator-v2-contract.json",
         "config/delivery-evaluator-v2-candidates.json",
@@ -528,7 +526,7 @@
         "file:scripts/tests/test_emotion_advisory.py",
         "commit:ae446132"
       ],
-      "updated": "2026-09-12",
+      "updated": "2026-09-22",
       "notes": "Human listening is no longer required (September 6 decision): byte-bound native QC, independent-family full-file ASR, explicit uncertainty and frozen independent-reference calibration/holdouts replace it; the listening-lane scripts were deleted on September 12 (git history retains them; delivery_promotion_decision.py still reads schema-1 listener results). config/delivery-evaluator-v2-contract.json names polyphase-kaiser5-v2 as deterministicResampling, matching scripts/audio_resampling.py. The evaluator, cache, temporal contour, compact-model, resource-supervisor, cascade, qualification and promotion-decision infrastructure is deterministic and source-bound, but the automatic layers still abstain without calibrated tiny heads. Closure requires an untouched confirmation cohort beating ridge-v1 without a preset, VAD, speaker or script-group regression. No production threshold, prompt, model, seed or release acceptance has changed. (Earlier history: git log -p -- config/roadmap.json.)"
     },
     {
@@ -841,19 +839,17 @@
       "plan": "ios-app-store-readiness-2026-08",
       "title": "Prevent App Store build-number collisions",
       "status": "parked",
-      "gate": "Before archive/upload, a least-privilege read-only App Store Connect preflight must reject an already-used bundle/version/build identity. A documented maintainer-owned operation must update CURRENT_PROJECT_VERSION through project.yml and regenerate the project; the release workflow must never silently invent or mutate a build number.",
+      "gate": "Before archive/upload, the maintainer confirms read-only in App Store Connect (web portal or the asc-* skills) that the bundle/version/build identity is unused, and bumps CURRENT_PROJECT_VERSION through project.yml with a regenerated project when it is not; the release workflow never invents or mutates a build number, and Apple's upload rejection remains the backstop.",
       "sourceOfTruth": [
         "project.yml",
         ".github/workflows/release.yml",
-        "scripts/app_store_build_preflight.py",
-        "scripts/asc_readonly.py",
-        "scripts/install_pinned_asc.sh"
+        "docs/reference/ios-appstore-submission.md"
       ],
       "evidence": [
         "commit:87636935"
       ],
-      "updated": "2026-09-13",
-      "notes": "September 5 read-only collision preflight: zero 3.0.0/build 24 matches; not reserved. No matching 3.0 account version; reconciliation requires explicit authorization. RF-02/RF-09 schedule this dependency. The existing workflow uses digest-pinned asc 4.11.0, ephemeral Keychain authentication and exact bundle/version/build collision preflight; ambiguity/pagination/timeout/cleanup fixtures remain required. September 2 authentication timeouts and September 4 rejection of used 2.4.0/build 23 remain historical evidence. Source project.yml now selects 3.0.0/build 24 and the regenerated project agrees. A fresh September 4 read-only check found zero matching builds with complete pagination. This is not a reservation; closure still requires the exact candidate workflow preflight/readback. No account metadata or build was changed.",
+      "updated": "2026-09-22",
+      "notes": "September 5 read-only collision preflight: zero 3.0.0/build 24 matches; not reserved. No matching 3.0 account version; reconciliation requires explicit authorization. RF-02/RF-09 schedule this dependency. The existing workflow uses digest-pinned asc 4.11.0, ephemeral Keychain authentication and exact bundle/version/build collision preflight; ambiguity/pagination/timeout/cleanup fixtures remain required. September 2 authentication timeouts and September 4 rejection of used 2.4.0/build 23 remain historical evidence. Source project.yml now selects 3.0.0/build 24 and the regenerated project agrees. A fresh September 4 read-only check found zero matching builds with complete pagination. This is not a reservation; closure still requires the exact candidate workflow preflight/readback. No account metadata or build was changed. 2026-09-22: the rorkai asc CLI, its read-only collision preflight (app_store_build_preflight.py) and readiness inventory (app_store_connect_readiness.py) were removed by maintainer decision; App Store Connect checks are now manual (web portal or the asc-* skills, read-only), and Apple rejects a reused build number at the altool upload.",
       "unparkWhen": "The maintainer authorizes the 3.0 App Store Connect version reconciliation and the build-24 reservation (RF-02); a fresh read-only preflight then runs."
     },
     {
@@ -900,20 +896,17 @@
       "plan": "ios-app-store-readiness-2026-08",
       "title": "Audit live App Store Connect and regional compliance read-only",
       "status": "parked",
-      "gate": "With an untracked least-privilege read-only API key, redact and validate the live app identity, platforms, categories, availability/pricing, metadata/localizations/URLs, screenshots, review contact/notes, privacy answers, content-rights and export declarations, current age rating, DSA trader and regional fields, agreements/tax/banking readiness, and all existing build states. Qualified legal/privacy decisions must be recorded; no metadata or build mutation is authorized.",
+      "gate": "Read-only (web portal or the asc-* skills; no automated inventory), redact and validate the live app identity, platforms, categories, availability/pricing, metadata/localizations/URLs, screenshots, review contact/notes, privacy answers, content-rights and export declarations, current age rating, DSA trader and regional fields, agreements/tax/banking readiness, and all existing build states. Qualified legal/privacy decisions must be recorded; no metadata or build mutation is authorized.",
       "sourceOfTruth": [
-        "docs/reference/ios-appstore-submission.md",
-        "config/app-store-connect-readiness-policy.json",
-        "scripts/app_store_connect_readiness.py",
-        "scripts/asc_readonly.py"
+        "docs/reference/ios-appstore-submission.md"
       ],
       "evidence": [
         "commit:87636935",
         "doc:docs/reference/ios-appstore-submission.md",
         "doc:docs/reference/content-rights-review.md"
       ],
-      "updated": "2026-09-13",
-      "notes": "September 5 authenticated inventory INCOMPLETE: content-rights/no-submitted-review and matching Support URL confirmed, pricing/availability and 3.0 readiness unavailable. No 3.0 version. Owner/web/privacy/financial/DSA/regional dependencies remain; packet refreshed without mutation. RF-02/RF-12 schedule this dependency. The existing inventory keeps exact app resolution, paginated JSON, process-group deadlines and redacted digests/counts/state tokens; it now normalizes current asc snake_case state fields without exposing payload values. September 2 Keychain timeouts remain historical failures. The September 4 authenticated read-only inventory succeeded for app/version/release/localization/app-info/content-rights/age-rating/review surfaces and confirms USES_THIRD_PARTY_CONTENT. It remains INCOMPLETE: pricing/availability is uninitialized or unreadable; strict readiness for configured 2.4.0 is unavailable; accessibility declarations are empty; and App Privacy publication, agreements/financial, DSA and regional owner/web checks remain pending. (Earlier history: git log -p -- config/roadmap.json.)",
+      "updated": "2026-09-22",
+      "notes": "September 5 authenticated inventory was INCOMPLETE: content-rights/no-submitted-review and the matching Support URL confirmed; pricing/availability and 3.0 readiness unavailable; no 3.0 version. The September 4 inventory confirmed USES_THIRD_PARTY_CONTENT. Owner/web/privacy/financial/DSA/regional dependencies remain; RF-02/RF-12 schedule this dependency. 2026-09-22: the automated read-only inventory (app_store_connect_readiness.py, asc_readonly.py, the rorkai asc CLI) was removed by maintainer decision; the audit is now a manual read-only pass in the App Store Connect web portal or through the asc-* skills, recorded without payload values. No metadata or build mutation is authorized.",
       "unparkWhen": "A new authenticated read-only inventory is authorized once the 3.0 version exists in App Store Connect."
     },
     {
@@ -1153,6 +1146,25 @@
       "unparkWhen": "All current production models are Ready on the paired phone, then run the iOS benchmark and perf lanes; macOS clauses remain complete."
     },
     {
+      "id": "AV-17",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs)",
+      "status": "parked",
+      "blockedBy": [],
+      "gate": "On mac-mini-m6-16gb (live `publish_benchmark_history.py verify-hardware --platform macos` PASS): (1) QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate, then re-save benchmarks/baselines/mac-gate-bench.json from a three-take run; (2) one clean scripts/ui_test.sh macos benchmark publishes the first canonical M6 ui-generation record, and in the same commit RTF_RECORD, the charts, README prose and the website medians, record id and headline are repinned to it; (3) counted scripts/ui_test.sh macos perf sessions re-derive config/ui-perf-thresholds.json with calibrationProfile mac-mini-m6-16gb; (4) scripts/macos_test.sh memory publishes the first M6 memory-qualification record after a maintainer decision on keeping retained-memory-v1 (5% of 16 GiB) or adopting a floor-anchored v2; (5) the delivery evaluator's compact qualification runs repeat on M6; (6) decide whether a forced floor8GBMac diagnostic lane covers the 8 GB support floor. M2 records are never rewritten or compared.",
+      "sourceOfTruth": [
+        "benchmarks/hardware-profiles.json",
+        "scripts/generate_readme_charts.py",
+        "config/ui-perf-thresholds.json",
+        "config/memory-qualification-policy.json",
+        "benchmarks/baselines/mac-gate-bench.json",
+        "config/delivery-evaluator-v2-contract.json"
+      ],
+      "unparkWhen": "The maintainer explicitly requests the M6 baseline runs and the production Mac models are Ready.",
+      "notes": "Canonical macOS benchmark host switched from mac-mini-m2-8gb to mac-mini-m6-16gb on 2026-09-22 (maintainer decision); published history starts a new series. Until (2) lands, the README and website keep the M2 figures from macos-xcui-benchmark-20260914-062114-379db820, labelled as measured on Mac mini M2 8 GB. No new timing, RAM or threshold claims.",
+      "updated": "2026-09-22"
+    },
+    {
       "id": "AUD-01",
       "title": "iOS launch and deep-link dead ends",
       "status": "parked",
@@ -1378,14 +1390,14 @@
       "id": "PA-05",
       "title": "Release path works end to end and is rehearsed",
       "status": "in-flight",
-      "gate": "release.yml selects Xcode and installs every pinned tool (numpy, pytest, pytest-xdist, asc, gh) through .github/actions/native-toolchain, a secrets-free ad-hoc release rehearsal workflow runs release.sh and the packaged-DMG verification on a schedule and on release-input changes and is green, and the TestFlight upload command is confirmed supported by the pinned Xcode.",
+      "gate": "release.yml selects Xcode and installs every pinned tool (numpy, pytest, pytest-xdist, gh) through .github/actions/native-toolchain, a secrets-free ad-hoc release rehearsal workflow runs release.sh and the packaged-DMG verification on a schedule and on release-input changes and is green, and the TestFlight upload command is confirmed supported by the pinned Xcode.",
       "sourceOfTruth": [
         ".github/workflows/release.yml",
         ".github/actions/native-toolchain/action.yml",
         "config/toolchain.json",
         "scripts/supply_chain_contract.py"
       ],
-      "notes": "External audit CI-01, verified worse on 2026-09-22: three stacked release blockers. The package, compile-ios and archive-ios jobs install numpy but run supply_chain_contract --installed native, which also checks pytest and pytest-xdist (pinned since 25a895ed); package also runs --installed release, whose asc only archive-ios installs; and the macos-26 image now ships gh 2.100.0 against the exact 2.96.0 pin (7261bfbc hit the same drift). release.yml hard-codes Xcode_26.6 three times and duplicates the tool install; a comment says timeout-minutes is 90 while the job allows 150. The archive job uploads with xcrun altool. Nothing exercised the release path between the v2.4.0 tag (Aug 1) and this audit. 2026-09-22: release jobs moved onto the composite action with a release-tools input (asc and a SHA-pinned gh 2.96.0 artifact), and release-rehearsal.yml added; closes when the first rehearsal is green and the altool check is done. First rehearsal run 35782263013 (cf12b994): the pinned release toolchain step passed (pytest, xdist, asc, gh); release.sh, DMG verification and evidence were still running at hand-off, so check that run first.",
+      "notes": "External audit CI-01, verified worse on 2026-09-22: three stacked release blockers. The package, compile-ios and archive-ios jobs install numpy but run supply_chain_contract --installed native, which also checks pytest and pytest-xdist (pinned since 25a895ed); package also runs --installed release, whose asc only archive-ios installs; and the macos-26 image now ships gh 2.100.0 against the exact 2.96.0 pin (7261bfbc hit the same drift). release.yml hard-codes Xcode_26.6 three times and duplicates the tool install; a comment says timeout-minutes is 90 while the job allows 150. 2026-09-22: release jobs moved onto the composite action with a release-tools input (a SHA-pinned gh; the pinned asc was removed by maintainer decision) and release-rehearsal.yml was added; closes when the first rehearsal is green and the altool upload check is done.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },

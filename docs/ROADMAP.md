@@ -14,7 +14,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | --- | --- | --- | --- |
 | `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
 | `audit-remediation-2026-09` | active | backend-and-platform | 0/12 (0%) |
-| `autonomous-validation-remediation-2026-08` | active | release-qa | 10/16 (62%) |
+| `autonomous-validation-remediation-2026-08` | active | release-qa | 10/17 (59%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 15/26 (58%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
@@ -55,7 +55,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: config/toolchain.json pins a CI toolchain that GitHub's runners provide; the macOS and iOS deployment targets stay at 26 in project.yml; any mlx-swift, mlx-swift-lm or swift-transformers move is one authorized change reviewed with the gate benchmark (medians of three warm takes) and a clean unit lane; scripts/dev.sh ci is green on the new pin.
 
 - **`RF-02`** (parked) — complete Apple prerequisites and the consolidated qualified-decision packet.
-  gate: Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement, version, and collision checks. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; qualified legal/privacy decisions are recorded before closure. Authentication failures remain failures.
+  gate: Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement and version checks and a confirmed-unused build number. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; qualified legal/privacy decisions are recorded before closure. Authentication failures remain failures.
   unparkWhen: The maintainer supplies the Apple metadata, availability, agreements and the qualified legal/privacy decisions; the repository side is done.
 
 - **`RF-06`** (parked) — characterize the natural-text audio failures through the frozen campaign (known limitation; causal research deferred).
@@ -67,7 +67,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   unparkWhen: The iOS submission critical path is clear or the maintainer separately prioritizes desktop/CLI qualification.
 
 - **`RF-09`** (parked) — verify the coherent tree and freeze the 3.0.0 candidate.
-  gate: On the freeze commit: (1) scripts/dev.sh regen is clean and the full project-input gate, macOS deterministic tests and app build, the generic physical-iOS SDK compile, the website check and the release/privacy/attribution/supply-chain fixtures pass; (2) project.yml MARKETING_VERSION 3.0.0 / CURRENT_PROJECT_VERSION 24 (already set) still match config/public-product-facts.json candidateRelease and a fresh read-only scripts/app_store_build_preflight.py check finds build 24 unused (ASR-08 owns account reconciliation); (3) the commit is on main with exact-SHA CI required and Security green, scripts/quality_promotion.py names the required lanes from config/quality-promotion-contract.json before expensive QA, and the annotated v3.0.0 tag is a separate maintainer authorization proved by scripts/release_source_authority.py; (4) the pre-freeze source amendment is discharged: F-19/F-22 done, F-18/F-20/F-21/F-01/F-06 source-complete with their candidate clauses left to RF-10/RF-12, F-16's recovery/retention source work and RF-13's remaining source-side export surfaces landed or explicitly deferred; (5) no unrelated source or docs edits and no full-tree identity bypass during ICA-04's frozen campaign.
+  gate: On the freeze commit: (1) scripts/dev.sh regen is clean and the full project-input gate, macOS deterministic tests and app build, the generic physical-iOS SDK compile, the website check and the release/privacy/attribution/supply-chain fixtures pass; (2) project.yml MARKETING_VERSION 3.0.0 / CURRENT_PROJECT_VERSION 24 (already set) still match config/public-product-facts.json candidateRelease and App Store Connect shows build 24 unused on a fresh read-only look (web portal or the asc-* skills) (ASR-08 owns account reconciliation); (3) the commit is on main with exact-SHA CI required and Security green, scripts/quality_promotion.py names the required lanes from config/quality-promotion-contract.json before expensive QA, and the annotated v3.0.0 tag is a separate maintainer authorization proved by scripts/release_source_authority.py; (4) the pre-freeze source amendment is discharged: F-19/F-22 done, F-18/F-20/F-21/F-01/F-06 source-complete with their candidate clauses left to RF-10/RF-12, F-16's recovery/retention source work and RF-13's remaining source-side export surfaces landed or explicitly deferred; (5) no unrelated source or docs edits and no full-tree identity bypass during ICA-04's frozen campaign.
   unparkWhen: RF-13 unparks (the paired iPhone is available for its remaining device gates) and lands; the freeze commit follows it.
 
 - **`RF-10`** (parked) — independently qualify macOS and downloadable CLI.
@@ -165,6 +165,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `AV-13` | planned | XCUITest coverage for the identifiers never exercised (78 macOS, 34 iOS) | — |
 | `AV-14` | parked | re-baseline the benchmark harness under the standard RTF definition (consent-bound runs) | — |
 | `AV-15` | planned | Download scheduling tests drive a controllable clock | — |
+| `AV-17` | parked | First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs) | — |
 
 ### Open items in detail
 
@@ -189,6 +190,10 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 - **`AV-15`** (planned) — Download scheduling tests drive a controllable clock.
   gate: HuggingFaceDownloader's throttle windows take an injected clock instead of ProcessInfo.systemUptime and ModelDownloadChunkSchedulingTests advance it deterministically without sleeping, while one real-throttle integration proof remains; the deterministic macOS test lane runs the suite in under a second.
 
+- **`AV-17`** (parked) — First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs).
+  gate: On mac-mini-m6-16gb (live `publish_benchmark_history.py verify-hardware --platform macos` PASS): (1) QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate, then re-save benchmarks/baselines/mac-gate-bench.json from a three-take run; (2) one clean scripts/ui_test.sh macos benchmark publishes the first canonical M6 ui-generation record, and in the same commit RTF_RECORD, the charts, README prose and the website medians, record id and headline are repinned to it; (3) counted scripts/ui_test.sh macos perf sessions re-derive config/ui-perf-thresholds.json with calibrationProfile mac-mini-m6-16gb; (4) scripts/macos_test.sh memory publishes the first M6 memory-qualification record after a maintainer decision on keeping retained-memory-v1 (5% of 16 GiB) or adopting a floor-anchored v2; (5) the delivery evaluator's compact qualification runs repeat on M6; (6) decide whether a forced floor8GBMac diagnostic lane covers the 8 GB support floor. M2 records are never rewritten or compared.
+  unparkWhen: The maintainer explicitly requests the M6 baseline runs and the production Mac models are Ready.
+
 ## Delivery instruction quality and Qwen3-TTS prompting
 
 `delivery-prompting-2026-08` · **active** · backend-mlx · adopted 2026-08-02
@@ -212,7 +217,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
   unparkWhen: Only when a watched lever becomes runnable on-device at the 8 GB floor: a Qwen3-TTS VoiceEditing/instruct variant that combines ICL with instructions, CosyVoice 3-class instruct control in an MLX-portable form, emotion-vector steering (IndexTTS-2/EmoSteer-class) with published weights, or a quantization-robust valence result. The pinned audit's R8 section is the source list; re-verify claims against primary sources at unpark time rather than trusting the 2026-08 snapshot.
 
 - **`DP-28`** (in-flight) — Calibrate the layered local delivery evaluator.
-  gate: Qualify the existing local cascade with byte-bound native Fast QC, independent locale-locked full-file ASR evidence, cached acoustics and optional compact features/heads. Human listening and listener-trained heads are not operational prerequisites. Preserve serial M2/8 GB resource envelopes, source/model/config identities, warnings and inconclusive outcomes. Model adoption requires independent-reference untouched holdout gain on the named metric without measured dimension/preset/speaker/script regressions. No listener-proven claim, prompt edit, automatic publication or ordinary CI model prerequisite.
+  gate: Qualify the existing local cascade with byte-bound native Fast QC, independent locale-locked full-file ASR evidence, cached acoustics and optional compact features/heads. Human listening and listener-trained heads are not operational prerequisites. Preserve serial 8 GB-floor resource envelopes, source/model/config identities, warnings and inconclusive outcomes. Model adoption requires independent-reference untouched holdout gain on the named metric without measured dimension/preset/speaker/script regressions. No listener-proven claim, prompt edit, automatic publication or ordinary CI model prerequisite.
 
 - **`DP-29`** (in-flight) — Qualify the native-language delivery corpus and cross-language sentinels.
   gate: Corpus structure is landed for nine native speaker-language cells, four fixed cross-language sentinels, three lengths and neutral/congruent/conflicting semantics across calibration/development/confirmation splits. Closure requires fluent review of every Mandarin, Japanese and Korean script, immutable review provenance and digests, no speaker/script/seed or translated-equivalent leakage, independent generated cohorts, ASR/CER/language-ID uncertainty and ignored-sample accounting, and AV-08-compliant evidence before any locale is promoted beyond provisional.
@@ -330,7 +335,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
   unparkWhen: RF-09 produces the archive and IPA for the fail-closed artifact scan (source hygiene is complete).
 
 - **`ASR-08`** (parked) — Prevent App Store build-number collisions.
-  gate: Before archive/upload, a least-privilege read-only App Store Connect preflight must reject an already-used bundle/version/build identity. A documented maintainer-owned operation must update CURRENT_PROJECT_VERSION through project.yml and regenerate the project; the release workflow must never silently invent or mutate a build number.
+  gate: Before archive/upload, the maintainer confirms read-only in App Store Connect (web portal or the asc-* skills) that the bundle/version/build identity is unused, and bumps CURRENT_PROJECT_VERSION through project.yml with a regenerated project when it is not; the release workflow never invents or mutates a build number, and Apple's upload rejection remains the backstop.
   unparkWhen: The maintainer authorizes the 3.0 App Store Connect version reconciliation and the build-24 reservation (RF-02); a fresh read-only preflight then runs.
 
 - **`ASR-09`** (parked) — Prove reviewer access to immutable model hosting.
@@ -341,7 +346,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
   gate: Against a clean exact-tag source, produce a fresh Distribution-signed archive and App Store-exported IPA using a current profile carrying the App Group and increased-memory entitlements; require the existing release verifier, signature trust, profile/team/App ID consistency, privacy manifests, architecture, executable/code continuity, UUID/dSYM, SBOM, checksums, attestation, release evidence, and absence of get-task-allow all to pass. Do not upload as part of this gate.
 
 - **`ASR-11`** (parked) — Audit live App Store Connect and regional compliance read-only.
-  gate: With an untracked least-privilege read-only API key, redact and validate the live app identity, platforms, categories, availability/pricing, metadata/localizations/URLs, screenshots, review contact/notes, privacy answers, content-rights and export declarations, current age rating, DSA trader and regional fields, agreements/tax/banking readiness, and all existing build states. Qualified legal/privacy decisions must be recorded; no metadata or build mutation is authorized.
+  gate: Read-only (web portal or the asc-* skills; no automated inventory), redact and validate the live app identity, platforms, categories, availability/pricing, metadata/localizations/URLs, screenshots, review contact/notes, privacy answers, content-rights and export declarations, current age rating, DSA trader and regional fields, agreements/tax/banking readiness, and all existing build states. Qualified legal/privacy decisions must be recorded; no metadata or build mutation is authorized.
   unparkWhen: A new authenticated read-only inventory is authorized once the 3.0 version exists in App Store Connect.
 
 - **`ASR-12`** (planned) — Complete current signed-candidate physical-device acceptance.
@@ -489,7 +494,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
   gate: build_ui_test_bundles.sh runs through the shared xcb_run lock and QVOICE_* policy paths into the arena its lane uses; probe and bench manifests use run-unique paths under the build-output policy.
 
 - **`PA-05`** (in-flight) — Release path works end to end and is rehearsed.
-  gate: release.yml selects Xcode and installs every pinned tool (numpy, pytest, pytest-xdist, asc, gh) through .github/actions/native-toolchain, a secrets-free ad-hoc release rehearsal workflow runs release.sh and the packaged-DMG verification on a schedule and on release-input changes and is green, and the TestFlight upload command is confirmed supported by the pinned Xcode.
+  gate: release.yml selects Xcode and installs every pinned tool (numpy, pytest, pytest-xdist, gh) through .github/actions/native-toolchain, a secrets-free ad-hoc release rehearsal workflow runs release.sh and the packaged-DMG verification on a schedule and on release-input changes and is green, and the TestFlight upload command is confirmed supported by the pinned Xcode.
 
 - **`PA-06`** (planned) — Routing cost and derived-artifact gaps.
   gate: A Tests/VocelloMacUITests-only change no longer runs the full macOS test and TSan lanes; refresh_derived_artifacts validate_all checks every registered artifact; SwiftLint is pinned or reported when missing; nightly and cache-owner text describe TSan as blocking.

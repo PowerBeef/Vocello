@@ -12,10 +12,8 @@ import Foundation
 ///   aborts with nothing else touched. A subsequent audio-file removal
 ///   failure is a warning outcome, never a rollback — the row is gone and
 ///   the audio stays on disk.
-/// - Clear-all captures audio paths from a fresh database fetch (not the
-///   loaded list), wipes the rows, and only then removes files. A database
-///   failure therefore cannot leave live rows pointing at deleted audio;
-///   later per-file failures are counted and reported as cleanup warnings.
+/// Clear-all is not here: it runs only through the durable, bounded
+/// `GenerationHistoryRecoveryCoordinator` transaction (AUD-05).
 public struct HistoryDeletionEngine: Sendable {
     public enum SingleOutcome: Equatable, Sendable {
         case deleted
@@ -23,36 +21,16 @@ public struct HistoryDeletionEngine: Sendable {
         case audioCleanupFailure(String)
     }
 
-    public struct ClearAllOutcome: Equatable, Sendable {
-        public let failedFileRemovals: Int
-
-        public init(failedFileRemovals: Int) {
-            self.failedFileRemovals = failedFileRemovals
-        }
-    }
-
-    public enum ClearAllError: Error, Equatable, Sendable {
-        case database(String)
-    }
-
     public var deleteRecord: @Sendable (Int64) throws -> Void
-    public var deleteAllRecords: @Sendable () throws -> Void
-    /// Audio paths of every persisted generation — the database is the
-    /// source of truth for the clear-all sweep.
-    public var audioPathsForAllRecords: @Sendable () throws -> [String]
     public var removeFile: @Sendable (String) throws -> Void
     public var fileExists: @Sendable (String) -> Bool
 
     public init(
         deleteRecord: @escaping @Sendable (Int64) throws -> Void,
-        deleteAllRecords: @escaping @Sendable () throws -> Void,
-        audioPathsForAllRecords: @escaping @Sendable () throws -> [String],
         removeFile: @escaping @Sendable (String) throws -> Void,
         fileExists: @escaping @Sendable (String) -> Bool
     ) {
         self.deleteRecord = deleteRecord
-        self.deleteAllRecords = deleteAllRecords
-        self.audioPathsForAllRecords = audioPathsForAllRecords
         self.removeFile = removeFile
         self.fileExists = fileExists
     }
@@ -75,23 +53,5 @@ public struct HistoryDeletionEngine: Sendable {
         } catch {
             return .audioCleanupFailure(error.localizedDescription)
         }
-    }
-
-    public func clearAll(deleteAudio: Bool) throws -> ClearAllOutcome {
-        var failures = 0
-        do {
-            let paths = deleteAudio ? try audioPathsForAllRecords() : []
-            try deleteAllRecords()
-            for path in paths where fileExists(path) {
-                do {
-                    try removeFile(path)
-                } catch {
-                    failures += 1
-                }
-            }
-        } catch {
-            throw ClearAllError.database(error.localizedDescription)
-        }
-        return ClearAllOutcome(failedFileRemovals: failures)
     }
 }

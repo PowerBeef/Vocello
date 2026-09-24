@@ -25,8 +25,8 @@ enum GenerationHistoryRecovery {
         fetchAllGenerations: {
             try DatabaseService.shared.fetchAllGenerations()
         },
-        deleteAllGenerations: {
-            try DatabaseService.shared.deleteAllGenerations()
+        deleteGenerationsThrough: { maxRowID in
+            try DatabaseService.shared.deleteGenerations(throughID: maxRowID)
         },
         referencedAudioPaths: { audioPaths in
             try DatabaseService.shared.referencedAudioPaths(among: audioPaths)
@@ -39,11 +39,23 @@ enum GenerationHistoryRecovery {
     /// the screens report and hand to `retainAudioRemoval(_:)`.
     static let deletionEngine = HistoryDeletionEngine(
         deleteRecord: { try DatabaseService.shared.deleteGeneration(id: $0) },
-        deleteAllRecords: { try DatabaseService.shared.deleteAllGenerations() },
-        audioPathsForAllRecords: { try DatabaseService.shared.fetchAllGenerations().map(\.audioPath) },
-        removeFile: { try FileManager.default.removeItem(atPath: $0) },
+        removeFile: { try removeUnreferencedAudio(atPath: $0) },
         fileExists: { FileManager.default.fileExists(atPath: $0) }
     )
+
+    /// A deleted row's audio is removed only when no other History row and no
+    /// queued take still uses the path, and only a regular file (AUD-05). An
+    /// outbox that cannot be read fully keeps the file: the error makes the
+    /// screen retain it for a later, guarded retry.
+    static func removeUnreferencedAudio(atPath path: String) throws {
+        guard try DatabaseService.shared.referencedAudioPaths(among: [path]).isEmpty else { return }
+        let scan = outboxStore.scan()
+        guard scan.issueCount == 0 else { throw GenerationHistoryOutboxError.unavailable }
+        guard !scan.entries.contains(where: { $0.generation.audioPath == path }) else { return }
+        if GenerationHistoryAudioFile.removeRegularFile(atPath: path) == .failed {
+            throw GenerationHistoryOutboxError.unavailable
+        }
+    }
 
     /// Keeps the audio of a deleted row for a later reconcile to remove (AUD-05).
     /// `false` when even the pending list could not be written.

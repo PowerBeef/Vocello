@@ -241,12 +241,18 @@ final class DatabaseService: @unchecked Sendable {
         }
     }
 
-    func deleteAllGenerations() throws {
+    /// Deletes the rows whose id is at most `maxRowID` and returns their audio
+    /// paths, in one write. Ids auto-increment and are never reused, so a take
+    /// saved after a clear captured its bound survives it (AUD-05).
+    func deleteGenerations(throughID maxRowID: Int64) throws -> [String] {
         let dbQueue = try requireQueue(for: .delete)
         do {
-            try dbQueue.write { db in
+            return try dbQueue.write { db in
                 try longFormAcceptance.reconcile(in: db)
-                _ = try Generation.deleteAll(db)
+                let bounded = Generation.filter(Generation.Columns.id <= maxRowID)
+                let paths = try bounded.select(Generation.Columns.audioPath, as: String.self).fetchAll(db)
+                _ = try bounded.deleteAll(db)
+                return paths
             }
         } catch {
             throw HistoryPersistenceError.classify(error, operation: .delete)

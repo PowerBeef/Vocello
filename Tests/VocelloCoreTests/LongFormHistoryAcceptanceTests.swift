@@ -247,6 +247,8 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
     func testSuspensionBeforeAcceptanceChangesNothingAndTheCandidateStaysAcceptable() async throws {
         let f = try fixture(suspendable: true)
         NotificationCenter.default.post(name: Database.suspendNotification, object: nil)
+        // A throwing step below must not leave every observing queue in the test process suspended.
+        defer { NotificationCenter.default.post(name: Database.resumeNotification, object: nil) }
         do {
             _ = try await f.store.commit(f.input, using: f.queue)
             XCTFail("A suspended database must refuse the acceptance")

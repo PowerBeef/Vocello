@@ -104,7 +104,7 @@ requested.
   holds the attempt-scoped terminal state, `IOSSingleTakeGenerationExecutor` runs the take through
   `MacStudioSingleTakeGenerationHooks` (timeline, playback handoff, History, telemetry merge) and
   `MacStudioGenerationActions` starts each take from the view's immutable plan and cancels through the
-  engine barrier (both on `MacStudioSingleTakeRunner`); no view starts or holds a task of its own.
+  engine barrier (both on `MacStudioSingleTakeRunner`); no view starts or holds a generation task.
   Line batch loops the same executor through `MacLineBatchRunner`; long-form runs the iOS
   `IOSLongFormCoordinator` with `MacStudioLongFormPlatformHooks`; both are owned by `MacAppModel` and
   the batch sheet (`MacBatchGenerationSheet`) only projects their state.

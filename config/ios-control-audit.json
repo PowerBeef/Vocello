@@ -136,8 +136,8 @@
       "path": "Sources/iOS/IOSVoicesView.swift",
       "screen": "Voices",
       "scenario": "stateful",
-      "reason": "Search, filters, speaker rows, previews, saved voice menus, and deletion are identified.",
-      "interactiveOccurrenceCount": 11
+      "reason": "Search, filters, speaker rows, previews, saved voice menus, deletion, and the Saved Voices load-failure Retry are identified.",
+      "interactiveOccurrenceCount": 12
     },
     {
       "path": "Sources/iOS/Overlays/IOSOnboardingFlow.swift",
@@ -488,12 +488,12 @@
     },
     {
       "id": "voices-surface",
-      "identifierPattern": "(screen_voices|voicesSearchField|voicesFilterButton|voicesImportAudioFile|voicesSaveNewVoice)",
+      "identifierPattern": "(screen_voices|voicesSearchField|voicesFilterButton|voicesImportAudioFile|voicesSaveNewVoice|voices_errorState|voices_retryButton)",
       "sourceToken": "voicesSearchField",
       "screen": "Voices",
       "prerequisite": "Voices tab",
       "role": "screen, search, and buttons",
-      "action": "Search, filter, enroll, and import",
+      "action": "Search, filter, enroll, import, and retry a failed Saved Voices load",
       "expectedResult": "Visible voice collection updates without user-data mutation",
       "expectedSemantics": "Search value, filter state, and action hints",
       "minimumTargetPoints": 44,

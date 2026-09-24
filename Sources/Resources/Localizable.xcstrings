@@ -23725,6 +23725,72 @@
         }
       }
     },
+    "vocello.ui.savedVoicesLoadFailed": {
+      "comment": "iOS interface: Saved Voices could not be read; shown instead of an empty library, with Retry. Presentation only; never use as a model prompt or stored identity.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't load saved voices"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de charger les voix enregistrées"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudieron cargar las voces guardadas"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gespeicherte Stimmen konnten nicht geladen werden"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossibile caricare le voci salvate"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível carregar as vozes salvas"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法载入已保存的声音"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存済みの声を読み込めませんでした"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "저장된 음성을 불러오지 못했습니다"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось загрузить сохранённые голоса"
+          }
+        }
+      }
+    },
     "vocello.ui.builtInSpeakers": {
       "comment": "iOS interface: Built-in speakers. Presentation only; never use as a model prompt or stored identity.",
       "extractionState": "manual",

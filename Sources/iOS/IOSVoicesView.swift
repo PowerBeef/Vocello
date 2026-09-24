@@ -105,6 +105,10 @@ struct IOSVoicesView: View {
 
                         voicesSectionHeading(IOSInterfaceText.yourVoices)
 
+                        if let savedVoicesLoadError {
+                            savedVoicesLoadErrorCard(savedVoicesLoadError)
+                        }
+
                         VStack(spacing: 0) {
                             LazyVStack(spacing: 0) {
                             ForEach(filteredSaved, id: \.id) { voice in
@@ -125,7 +129,7 @@ struct IOSVoicesView: View {
                         }
                     }
 
-                    if filteredBuiltIn.isEmpty && filteredSaved.isEmpty {
+                    if filteredBuiltIn.isEmpty && filteredSaved.isEmpty && savedVoicesLoadError == nil {
                         IOSEmptyStateCard(
                             title: IOSInterfaceText.nothingMatches,
                             message: IOSInterfaceText.voiceSearchDetail,
@@ -217,6 +221,33 @@ struct IOSVoicesView: View {
                 importErrorMessage = error.localizedDescription
             }
         }
+    }
+
+    /// A failed Saved Voices load must not look like an empty library (IOS-07).
+    /// Shown while no saved voice is listed; a busy store retries on its own.
+    private var savedVoicesLoadError: String? {
+        guard savedVoicesViewModel.voices.isEmpty, !savedVoicesViewModel.isLoading else { return nil }
+        return savedVoicesViewModel.loadErrorMessage(IOSAppLanguage.shared.presentation)
+    }
+
+    private func savedVoicesLoadErrorCard(_ message: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            IOSEmptyStateCard(
+                title: IOSInterfaceText.savedVoicesLoadFailed,
+                message: message,
+                symbolName: "exclamationmark.triangle",
+                tint: .orange
+            )
+            Button(IOSInterfaceText.retry) {
+                Task { await savedVoicesViewModel.refresh(using: ttsEngine) }
+            }
+            .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
+            .accessibilityIdentifier("voices_retryButton")
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 12)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("voices_errorState")
     }
 
     private func voicesSectionHeading(_ title: String) -> some View {

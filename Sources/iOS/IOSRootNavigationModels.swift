@@ -860,6 +860,10 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.ui.yourVoices", defaultValue: "Your saved voices",
                comment: "iOS interface: Your saved voices. Presentation only; never use as a model prompt or stored identity.")
     }
+    static var savedVoicesLoadFailed: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.savedVoicesLoadFailed", defaultValue: "Couldn't load saved voices",
+               comment: "iOS interface: Saved Voices could not be read; shown instead of an empty library, with Retry. Presentation only; never use as a model prompt or stored identity.")
+    }
     static var builtInSpeakers: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.builtInSpeakers", defaultValue: "Built-in speakers",
                comment: "iOS interface: Built-in speakers. Presentation only; never use as a model prompt or stored identity.")

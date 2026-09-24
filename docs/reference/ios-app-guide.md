@@ -239,6 +239,9 @@ Container `screen_voices`. Filter chips `voicesFilter_all|builtIn|saved`. Built-
 `voicesRow_<speakerId>` (e.g. `voicesRow_aiden`); saved-voice rows `voicesRow_saved_<id>` (an
 emotion-bank member's caption reads "Voice bank · <Delivery>"; standalone voices read "Cloned
 reference" — every member stays listed because each reference clip is individually previewable).
+When Saved Voices cannot be read and none is listed, `voices_errorState` names the failure (or the
+busy-store message while it retries on its own) above the Save card, with `voices_retryButton`
+(PA-21, IOS-07), so a failed load never looks like an empty library.
 The Save a New Voice card has one visible action: `voices_saveNewVoice` starts the recorder
 (iPhone also imports reference files — the "Import audio file" row, `voices_importAudioFile`,
 presents a native `fileImporter` for WAV/MP3/AIFF/M4A and continues through the same

@@ -418,7 +418,8 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         let clearMenu = element("historyClearMenu")
         if clearMenu.exists && clearMenu.isHittable {
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: clearMenu, timeout: 20))
-            let cancel = app.buttons["Cancel"].firstMatch
+            XCTAssertTrue(VocelloUIWait.exists(element("historyClearConfirm"), timeout: 20))
+            let cancel = element("historyClearCancel")
             XCTAssertTrue(VocelloUIWait.exists(cancel, timeout: 20))
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: cancel, timeout: 20))
             XCTAssertTrue(VocelloUIWait.disappears(cancel, timeout: 20))

@@ -20359,6 +20359,342 @@
         }
       }
     },
+    "vocello.ui.historyClearIncomplete": {
+      "comment": "iOS alert title after clearing History when some of its audio files could not be deleted. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some Audio Was Not Deleted"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Certains fichiers audio n’ont pas été supprimés"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Algunos audios no se eliminaron"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einige Audiodateien wurden nicht gelöscht"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alcuni audio non sono stati eliminati"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alguns áudios não foram excluídos"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部分音频未删除"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一部の音声を削除できませんでした"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "일부 오디오를 삭제하지 못했습니다"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не все аудиофайлы удалены"
+          }
+        }
+      }
+    },
+    "vocello.ui.historyClearIncompleteDetail": {
+      "comment": "iOS alert message after clearing History; %1$lld is how many audio files could not be deleted. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "History was cleared, but %1$lld audio file could not be deleted."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "History was cleared, but %1$lld audio files could not be deleted."
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "L’historique a été effacé, mais %1$lld fichier audio n’a pas pu être supprimé."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "L’historique a été effacé, mais %1$lld fichiers audio n’ont pas pu être supprimés."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "L’historique a été effacé, mais %1$lld fichiers audio n’ont pas pu être supprimés."
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Se borró el historial, pero no se pudo eliminar %1$lld archivo de audio."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Se borró el historial, pero no se pudieron eliminar %1$lld archivos de audio."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Se borró el historial, pero no se pudieron eliminar %1$lld archivos de audio."
+                }
+              }
+            }
+          }
+        },
+        "de": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Der Verlauf wurde geleert, aber %1$lld Audiodatei konnte nicht gelöscht werden."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Der Verlauf wurde geleert, aber %1$lld Audiodateien konnten nicht gelöscht werden."
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "La cronologia è stata svuotata, ma %1$lld file audio non è stato eliminato."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "La cronologia è stata svuotata, ma %1$lld file audio non sono stati eliminati."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "La cronologia è stata svuotata, ma %1$lld file audio non sono stati eliminati."
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "O histórico foi limpo, mas %1$lld arquivo de áudio não pôde ser excluído."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "O histórico foi limpo, mas %1$lld arquivos de áudio não puderam ser excluídos."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "O histórico foi limpo, mas %1$lld arquivos de áudio não puderam ser excluídos."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "历史记录已清空，但有 %1$lld 个音频文件无法删除。"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "履歴を消去しましたが、音声ファイル %1$lld 件を削除できませんでした。"
+                }
+              }
+            }
+          }
+        },
+        "ko": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "기록은 지웠지만 오디오 파일 %1$lld개는 삭제하지 못했습니다."
+                }
+              }
+            }
+          }
+        },
+        "ru": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "История очищена, но %1$lld аудиофайл удалить не удалось."
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "История очищена, но %1$lld аудиофайла удалить не удалось."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "История очищена, но %1$lld аудиофайлов удалить не удалось."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "История очищена, но не удалось удалить аудиофайлы: %1$lld."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "vocello.ui.ok": {
+      "comment": "iOS interface: OK, the button that dismisses an informational alert. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aceptar"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "好"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "확인"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ОК"
+          }
+        }
+      }
+    },
     "vocello.ui.historyWaiting": {
       "comment": "iOS interface: Finished audio is waiting for History. Presentation only; never use as a model prompt or stored identity.",
       "extractionState": "manual",
@@ -29873,7 +30209,7 @@
               "one": {
                 "stringUnit": {
                   "state": "translated",
-                  "value": "This permanently deletes all %1$lld history entry and its audio file."
+                  "value": "This permanently deletes %1$lld history entry and its audio file."
                 }
               },
               "other": {

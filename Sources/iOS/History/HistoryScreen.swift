@@ -171,6 +171,9 @@ private struct IOSHistoryLibrarySection: View {
     /// already exported or saved to a Saved outputs folder are outside the app and stay. macOS
     /// keeps "Keep Audio Files" because Finder reaches its output folder.
     @State private var isClearConfirmationPresented = false
+    /// History was cleared but `clearFailedFileRemovals` audio files could not be deleted.
+    @State private var isClearIncompletePresented = false
+    @State private var clearFailedFileRemovals = 0
     @State private var databaseUnavailable = false
     @State private var recoverySnapshot: GenerationHistoryRecoverySnapshot = .empty
     @State private var recoveryAudioURLs: [URL] = []
@@ -185,10 +188,13 @@ private struct IOSHistoryLibrarySection: View {
                 Button {
                     isClearConfirmationPresented = true
                 } label: {
+                    // Drawn at 34 pt; the whole 44-pt frame is the hit target.
                     Image(systemName: "trash.circle")
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(items.isEmpty ? Theme.Text.tertiary : Theme.Text.secondary)
                         .frame(width: 34, height: 34)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .disabled(items.isEmpty || databaseUnavailable)
                 .accessibilityLabel(IOSInterfaceText.clearHistoryLower)
@@ -196,6 +202,12 @@ private struct IOSHistoryLibrarySection: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 10)
+            .alert(IOSInterfaceText.historyClearIncomplete, isPresented: $isClearIncompletePresented) {
+                Button(IOSInterfaceText.ok, role: .cancel) {}
+                    .accessibilityIdentifier("historyClearIncompleteDismiss")
+            } message: {
+                Text(IOSInterfaceText.historyClearIncompleteDetail(clearFailedFileRemovals))
+            }
 
             IOSHistoryFilterChips(selection: $modeFilter)
                 .padding(.bottom, 0)
@@ -284,15 +296,15 @@ private struct IOSHistoryLibrarySection: View {
             guard !Task.isCancelled else { return }
             debouncedQuery = searchQuery
         }
-        .alert(isPresented: $isClearConfirmationPresented) {
-            Alert(
-                title: Text(IOSInterfaceText.clearDeleteQuestion),
-                message: Text(IOSInterfaceText.deleteAllHistory(items.count)),
-                primaryButton: .destructive(Text(IOSInterfaceText.deleteEverything)) {
-                    performClearAll()
-                },
-                secondaryButton: .cancel()
-            )
+        .alert(IOSInterfaceText.clearDeleteQuestion, isPresented: $isClearConfirmationPresented) {
+            Button(IOSInterfaceText.deleteEverything, role: .destructive) {
+                performClearAll()
+            }
+            .accessibilityIdentifier("historyClearConfirm")
+            Button(IOSInterfaceText.cancel, role: .cancel) {}
+                .accessibilityIdentifier("historyClearCancel")
+        } message: {
+            Text(IOSInterfaceText.deleteAllHistory(items.count))
         }
     }
 
@@ -350,10 +362,17 @@ private struct IOSHistoryLibrarySection: View {
     private func performClearAll() {
         Task { @concurrent in
             do {
-                _ = try await GenerationHistoryRecovery.clearAll(deleteAudio: true)
+                let outcome = try await GenerationHistoryRecovery.clearAll(deleteAudio: true)
+                let failures = outcome.failedFileRemovals
                 await MainActor.run {
                     NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
                     reload()
+                    // A partial deletion is never silent (PA-21): the rows are gone but
+                    // some audio stayed in the app's storage.
+                    if failures > 0 {
+                        clearFailedFileRemovals = failures
+                        isClearIncompletePresented = true
+                    }
                 }
             } catch {
                 let message = error.localizedDescription

@@ -648,6 +648,18 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.ui.deleteEverything", defaultValue: "Delete Everything",
                comment: "iOS interface: Delete Everything. Presentation only; never use as a model prompt or stored identity.")
     }
+    static var historyClearIncomplete: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.historyClearIncomplete", defaultValue: "Some Audio Was Not Deleted",
+               comment: "iOS alert title after clearing History when some of its audio files could not be deleted. Presentation only.")
+    }
+    static func historyClearIncompleteDetail(_ count: Int) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.historyClearIncompleteDetail", defaultValue: "History was cleared, but %1$lld audio files could not be deleted.",
+                   comment: "iOS alert message after clearing History; %1$lld is how many audio files could not be deleted. Presentation only."), count)
+    }
+    static var ok: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.ok", defaultValue: "OK",
+               comment: "iOS interface: OK, the button that dismisses an informational alert. Presentation only.")
+    }
     static var historyWaiting: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.historyWaiting", defaultValue: "Finished audio is waiting for History",
                comment: "iOS interface: Finished audio is waiting for History. Presentation only; never use as a model prompt or stored identity.")

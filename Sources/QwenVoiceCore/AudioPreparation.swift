@@ -606,6 +606,8 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
                 "The selected audio file does not contain readable audio frames."
             )
         }
+        // Finalize the header before the caller renames the file into place.
+        writer.close()
 
         return totalWrittenFrames
     }

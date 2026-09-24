@@ -602,7 +602,12 @@ public struct SharedModelComponentStore: Sendable {
                     from: stagedModelURL
                 )
             } else {
-                try file.verify(fileURL: blob)
+                // The downloader's reuse pin (or an absent staged file): the blob is
+                // verified once, right before it is linked below.
+                guard FileManager.default.fileExists(atPath: blob.path) else {
+                    try file.verify(fileURL: blob)
+                    continue
+                }
             }
         }
 
@@ -821,7 +826,9 @@ public struct SharedModelComponentStore: Sendable {
             try SharedComponentFileSystem.move(modelURL, to: tombstone, operation: "tombstone-model")
             return released
         }
-        try Self.removeTombstone(tombstone)
+        // The model is already gone from `models/`; a failed tombstone removal is
+        // left to the trash sweep and never reports the delete as failed.
+        try? Self.removeTombstone(tombstone)
         PreparedModelOverlay.removeCachedOverlay(forModelFolder: modelFolder, modelsRoot: modelsRoot)
         switch reclamation {
         case .immediate:

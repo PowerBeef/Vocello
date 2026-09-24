@@ -811,7 +811,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         )
         Self.scheduleStartupStorageReclamation(
             modelsDirectory: modelAssetStore.rootDirectory,
-            voicesDirectory: voicesDirectory
+            voicesDirectory: voicesDirectory,
+            normalizedCloneReferenceDirectory: normalizedCloneReferenceDirectory
         )
         startMemoryPressureMonitorIfNeeded()
         isInitialized = true
@@ -827,7 +828,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     /// reclamation immediately.
     nonisolated private static func scheduleStartupStorageReclamation(
         modelsDirectory: URL,
-        voicesDirectory: URL
+        voicesDirectory: URL,
+        normalizedCloneReferenceDirectory: URL
     ) {
         Task.detached(priority: .background) {
             _ = try? SharedModelComponentStore(modelsRoot: modelsDirectory)
@@ -835,6 +837,31 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             NativePreparedCloneConditioningCache.pruneTransientClonePromptArtifacts(
                 in: voicesDirectory
             )
+            sweepAbandonedConversionTemporaries(in: normalizedCloneReferenceDirectory)
+        }
+    }
+
+    /// A conversion killed mid-write leaves `.<stem>.converting-<uuid>.wav` beside its
+    /// target; remove those older than an hour (a live conversion is far younger).
+    nonisolated static func sweepAbandonedConversionTemporaries(
+        in directory: URL,
+        olderThan age: TimeInterval = 3600,
+        now: Date = Date()
+    ) {
+        let fileManager = FileManager.default
+        guard let entries = try? fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: []
+        ) else { return }
+        for entry in entries {
+            let name = entry.lastPathComponent
+            guard name.hasPrefix("."), name.contains(".converting-"), name.hasSuffix(".wav") else { continue }
+            let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate ?? .distantPast
+            if now.timeIntervalSince(modified) > age {
+                try? fileManager.removeItem(at: entry)
+            }
         }
     }
 

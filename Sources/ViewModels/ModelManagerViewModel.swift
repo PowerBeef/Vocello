@@ -847,6 +847,9 @@ final class ModelManagerViewModel {
         await stopAndClear(for: model.id)
 
         let modelDir = model.installDirectory(in: modelsDirectory)
+        // Staging first: its reuse pins would otherwise keep the blobs the delete
+        // releases. The downloader is already stopped.
+        HuggingFaceDownloader.discardStaging(forTargetDirectory: modelDir)
         do {
             try SharedModelComponentStore(modelsRoot: modelsDirectory).deleteModel(
                 modelFolder: modelDir.lastPathComponent,
@@ -857,9 +860,6 @@ final class ModelManagerViewModel {
             await handleMutationCompletion(for: model.id)
             return
         }
-        // Also drop any orphaned staging tree (partials/resume data/staged files) so a
-        // deleted model doesn't leave multi-GB under `.qwenvoice-downloads/`.
-        HuggingFaceDownloader.discardStaging(forTargetDirectory: modelDir)
         lastFailureMessages.removeValue(forKey: model.id)
         removeInstallMetadata(for: model)
 

@@ -484,6 +484,28 @@ final class CloneConditioningContractTests: XCTestCase {
     /// frames (or an empty file) that the name-based reuse accepted for good.
     /// Such a file is not reused, and a conversion lands through a hidden
     /// temporary file renamed into place, leaving no temporary behind.
+    func testStartupSweepRemovesOnlyAbandonedConversionTemporaries() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-sweep-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let abandoned = directory.appendingPathComponent(".ref.converting-\(UUID().uuidString).wav")
+        let live = directory.appendingPathComponent(".ref.converting-\(UUID().uuidString).wav")
+        let output = directory.appendingPathComponent("ref.wav")
+        for url in [abandoned, live, output] {
+            XCTAssertTrue(FileManager.default.createFile(atPath: url.path, contents: Data([1])))
+        }
+        let old = Date().addingTimeInterval(-7200)
+        try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: abandoned.path)
+        try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: output.path)
+
+        MLXTTSEngine.sweepAbandonedConversionTemporaries(in: directory)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: abandoned.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: live.path), "a live conversion is kept")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: output.path), "completed outputs are never swept")
+    }
+
     func testPartialNormalizedReferenceIsNotReused() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("vocello-clone-partial-\(UUID().uuidString)", isDirectory: true)

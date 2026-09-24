@@ -312,11 +312,12 @@ final class IOSModelDownloadCoordinator {
             generation: generation
         )
         let targetDir = model.installDirectory(in: AppPaths.modelsDir)
+        // Staging first: its reuse pins would otherwise keep the blobs the delete releases.
+        discardStaging(modelID: model.id)
         try SharedModelComponentStore(modelsRoot: AppPaths.modelsDir).deleteModel(
             modelFolder: targetDir.lastPathComponent,
             reclamation: .background
         )
-        discardStaging(modelID: model.id)
         markLedgerTerminal(modelID: model.id, status: .deleted)
         publishTerminal(modelID: model.id, phase: .deleted)
         traceCurrentState(layer: "filesystem", event: "delete-completed", modelID: model.id, outcome: "target-absent")

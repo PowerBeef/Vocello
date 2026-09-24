@@ -279,8 +279,12 @@ CI or release work.
 
 ### History tab — `Sources/iOS/History/HistoryScreen.swift`
 
-Search `historySearchField`; clear menu `historyClearMenu` → `historyClearKeepFiles` /
-`historyClearDeleteFiles`; retry `historyRetryButton`. Mode-filter chips
+Search `historySearchField`; the trash control `historyClearMenu` opens one confirmation that
+clears History and deletes its audio; retry `historyRetryButton`. There is no "Keep Audio Files"
+option on iPhone (PA-21, IOS-10): outputs live in the private App Group `outputs/`, which neither
+the app nor Files can reach once their rows are gone, while backup would keep carrying them. Copies
+already exported or saved to a Saved outputs folder are outside the app and are not touched. macOS
+keeps the option because Finder reaches its output folder. Mode-filter chips
 `historyModeFilter` container + `historyModeFilter_all|custom|design|clone`. Rows:
 `historyRow_<id>`, tap area `historyRowTap_<id>` (opens player), menu `historyRowMenu_<id>`
 (Play / Save audio / Pin seed / Delete — the pin item `historyRowPinSeed_<id>` appears only for

@@ -152,13 +152,6 @@ private enum IOSHistoryBucket: Int, CaseIterable, Identifiable {
     }
 }
 
-/// Identifiable wrapper driving the clear-history confirmation alert.
-/// `keepFiles` answers GitHub #48 — purge the list, keep the audio on disk.
-private struct IOSHistoryClearConfirmation: Identifiable {
-    let deleteAudio: Bool
-    var id: String { deleteAudio ? "deleteFiles" : "keepFiles" }
-}
-
 private struct IOSHistoryLibrarySection: View {
     @Environment(AppModel.self) private var appModel
     @State private var items: [Generation] = []
@@ -172,7 +165,12 @@ private struct IOSHistoryLibrarySection: View {
     /// Long-form projects whose per-segment map is disclosed (keyed by project ID).
     @State private var expandedProjects: Set<String> = []
     @State private var reloadTask: Task<Void, Never>?
-    @State private var clearConfirmation: IOSHistoryClearConfirmation?
+    /// Clearing History on iPhone always deletes the app's copies of the audio (PA-21, IOS-10).
+    /// Those files live in the private App Group `outputs/`, which neither the app nor Files can
+    /// reach once their rows are gone, while backup would keep carrying them. Copies the user
+    /// already exported or saved to a Saved outputs folder are outside the app and stay. macOS
+    /// keeps "Keep Audio Files" because Finder reaches its output folder.
+    @State private var isClearConfirmationPresented = false
     @State private var databaseUnavailable = false
     @State private var recoverySnapshot: GenerationHistoryRecoverySnapshot = .empty
     @State private var recoveryAudioURLs: [URL] = []
@@ -184,15 +182,8 @@ private struct IOSHistoryLibrarySection: View {
                 IOSSearchField(text: $searchQuery, placeholder: IOSInterfaceText.historySearch)
                     .accessibilityIdentifier("historySearchField")
 
-                Menu {
-                    Button(IOSInterfaceText.clearKeepFiles) {
-                        clearConfirmation = IOSHistoryClearConfirmation(deleteAudio: false)
-                    }
-                    .accessibilityIdentifier("historyClearKeepFiles")
-                    Button(IOSInterfaceText.clearDeleteFiles, role: .destructive) {
-                        clearConfirmation = IOSHistoryClearConfirmation(deleteAudio: true)
-                    }
-                    .accessibilityIdentifier("historyClearDeleteFiles")
+                Button {
+                    isClearConfirmationPresented = true
                 } label: {
                     Image(systemName: "trash.circle")
                         .font(.system(size: 20, weight: .medium))
@@ -293,26 +284,15 @@ private struct IOSHistoryLibrarySection: View {
             guard !Task.isCancelled else { return }
             debouncedQuery = searchQuery
         }
-        .alert(item: $clearConfirmation) { confirmation in
-            if confirmation.deleteAudio {
-                Alert(
-                    title: Text(IOSInterfaceText.clearDeleteQuestion),
-                    message: Text(IOSInterfaceText.deleteAllHistory(items.count)),
-                    primaryButton: .destructive(Text(IOSInterfaceText.deleteEverything)) {
-                        performClearAll(deleteAudio: true)
-                    },
-                    secondaryButton: .cancel()
-                )
-            } else {
-                Alert(
-                    title: Text(IOSInterfaceText.clearQuestion),
-                    message: Text(IOSInterfaceText.clearAllHistory(items.count)),
-                    primaryButton: .destructive(Text(IOSInterfaceText.clearHistory)) {
-                        performClearAll(deleteAudio: false)
-                    },
-                    secondaryButton: .cancel()
-                )
-            }
+        .alert(isPresented: $isClearConfirmationPresented) {
+            Alert(
+                title: Text(IOSInterfaceText.clearDeleteQuestion),
+                message: Text(IOSInterfaceText.deleteAllHistory(items.count)),
+                primaryButton: .destructive(Text(IOSInterfaceText.deleteEverything)) {
+                    performClearAll()
+                },
+                secondaryButton: .cancel()
+            )
         }
     }
 
@@ -363,14 +343,14 @@ private struct IOSHistoryLibrarySection: View {
         return IOSInterfaceText.queuedTakes(count)
     }
 
-    /// Clears the whole history; with `deleteAudio` false the WAVs stay on
-    /// disk (GitHub #48). A durable transaction captures database and pending
-    /// outbox paths, deletes rows first, then clears recovery entries and
-    /// files. Work runs off the main thread; state updates hop to MainActor.
-    private func performClearAll(deleteAudio: Bool) {
+    /// Clears the whole history and its audio (see `isClearConfirmationPresented`).
+    /// A durable transaction captures database and pending outbox paths, deletes
+    /// rows first, then clears recovery entries and files. Work runs off the main
+    /// thread; state updates hop to MainActor.
+    private func performClearAll() {
         Task { @concurrent in
             do {
-                _ = try await GenerationHistoryRecovery.clearAll(deleteAudio: deleteAudio)
+                _ = try await GenerationHistoryRecovery.clearAll(deleteAudio: true)
                 await MainActor.run {
                     NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
                     reload()

@@ -228,10 +228,6 @@ import QwenVoiceCore
         IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.deleteAllHistory", defaultValue: "This permanently deletes all %1$lld history entries and their audio files.",
                    comment: "iOS complete message: deleteAllHistory. Substitutions retain original user content and numeric values."), count)
     }
-    static func clearAllHistory(_ count: Int) -> String {
-        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.clearAllHistory", defaultValue: "This removes all %1$lld history entries. The generated audio files stay on the device.",
-                   comment: "iOS complete message: clearAllHistory. Substitutions retain original user content and numeric values."), count)
-    }
     static func queuedTakes(_ count: Int) -> String {
         IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.queuedTakes", defaultValue: "%1$lld takes remain safely queued and available to retry or export.",
                    comment: "iOS complete message: queuedTakes. Substitutions retain original user content and numeric values."), count)
@@ -616,14 +612,6 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.ui.historySearch", defaultValue: "Search transcript or voice",
                comment: "iOS interface: Search transcript or voice. Presentation only; never use as a model prompt or stored identity.")
     }
-    static var clearKeepFiles: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.ui.clearKeepFiles", defaultValue: "Clear History (Keep Audio Files)…",
-               comment: "iOS interface: Clear History (Keep Audio Files)…. Presentation only; never use as a model prompt or stored identity.")
-    }
-    static var clearDeleteFiles: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.ui.clearDeleteFiles", defaultValue: "Clear History and Delete Audio…",
-               comment: "iOS interface: Clear History and Delete Audio…. Presentation only; never use as a model prompt or stored identity.")
-    }
     static var clearHistoryLower: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.clearHistoryLower", defaultValue: "Clear history",
                comment: "iOS interface: Clear history. Presentation only; never use as a model prompt or stored identity.")
@@ -659,14 +647,6 @@ import QwenVoiceCore
     static var deleteEverything: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.deleteEverything", defaultValue: "Delete Everything",
                comment: "iOS interface: Delete Everything. Presentation only; never use as a model prompt or stored identity.")
-    }
-    static var clearQuestion: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.ui.clearQuestion", defaultValue: "Clear History?",
-               comment: "iOS interface: Clear History?. Presentation only; never use as a model prompt or stored identity.")
-    }
-    static var clearHistory: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.ui.clearHistory", defaultValue: "Clear History",
-               comment: "iOS interface: Clear History. Presentation only; never use as a model prompt or stored identity.")
     }
     static var historyWaiting: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.historyWaiting", defaultValue: "Finished audio is waiting for History",

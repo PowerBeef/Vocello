@@ -414,12 +414,10 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             expected: "A failed startup shows its reason and a Retry that runs startup again",
             actual: "Startup faults are not induced on a user device; this campaign reached the app, so startup succeeded"
         )
+        // PA-21 (IOS-10): the trash control opens the one clear-and-delete confirmation.
         let clearMenu = element("historyClearMenu")
         if clearMenu.exists && clearMenu.isHittable {
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: clearMenu, timeout: 20))
-            let keepAudioAction = app.buttons["Clear History (Keep Audio Files)…"].firstMatch
-            XCTAssertTrue(VocelloUIWait.exists(keepAudioAction, timeout: 20))
-            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: keepAudioAction, timeout: 20))
             let cancel = app.buttons["Cancel"].firstMatch
             XCTAssertTrue(VocelloUIWait.exists(cancel, timeout: 20))
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: cancel, timeout: 20))
@@ -429,8 +427,8 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         recorder.record(
             scenario: "stateful", controlID: "history-surface",
             classification: "BLOCKED_PRESERVATION_POLICY",
-            expected: "Global destructive controls expose choices but never mutate unrelated History",
-            actual: "Menu presentation was inspected and dismissed without confirmation"
+            expected: "The global clear confirmation is presented and cancelled without mutating History",
+            actual: "The clear confirmation was inspected and cancelled"
         )
         recorder.record(
             scenario: "stateful", controlID: "voices-surface",

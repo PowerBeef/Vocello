@@ -58,6 +58,46 @@ class BenchmarkProfileTests(unittest.TestCase):
             self.assertIn("mac-mini-m2-8gb", errors[0])
 
 
+class CandidateClaimTests(unittest.TestCase):
+    PUBLIC = {
+        "stableMacRelease": {"version": "2.4.0", "tag": "v2.4.0"},
+        "candidateRelease": {"version": "3.0.0", "tag": "v3.0.0", "distributionStatus": "unpublished"},
+        "candidateOnlyClaims": {"terms": ["AudioSeal", "eight delivery presets"]},
+    }
+
+    def validate(self, readme: str, website: str = "", public: dict | None = None) -> list[str]:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "README.md").write_text(readme, encoding="utf-8")
+            (root / "website/src").mkdir(parents=True)
+            (root / "website/src/Section.jsx").write_text(website, encoding="utf-8")
+            return MODULE.validate_candidate_claims(root, public or self.PUBLIC)
+
+    def test_candidate_feature_next_to_the_stable_download_fails(self) -> None:
+        errors = self.validate("- Generated audio carries an inaudible AudioSeal watermark.\n")
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("'AudioSeal'", errors[0])
+
+    def test_candidate_feature_labelled_with_the_candidate_version_passes(self) -> None:
+        readme = "- **(3.0)** Generated audio carries an inaudible AudioSeal watermark.\n"
+        website = "<p>\n  In 3.0, Built-in Voice offers one of eight delivery\n  presets.\n</p>\n"
+        self.assertEqual(self.validate(readme, website), [])
+
+    def test_website_copy_is_checked_across_wrapped_lines(self) -> None:
+        errors = self.validate("", "<p>\n  Built-in Voice offers one of eight delivery\n  presets.\n</p>\n")
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("website/src/Section.jsx", errors[0])
+
+    def test_other_version_numbers_do_not_count_as_the_candidate(self) -> None:
+        errors = self.validate("- Vocello 13.0.1 adds an AudioSeal watermark.\n")
+        self.assertEqual(len(errors), 1, errors)
+
+    def test_claims_require_an_unpublished_candidate(self) -> None:
+        public = {key: value for key, value in self.PUBLIC.items() if key != "candidateRelease"}
+        errors = self.validate("", public=public)
+        self.assertTrue(any("requires an unpublished candidateRelease" in e for e in errors), errors)
+
+
 class RepositoryTests(unittest.TestCase):
     def test_repository_public_facts_hold(self) -> None:
         self.assertEqual(MODULE.validate(ROOT), [])

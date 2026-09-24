@@ -32,6 +32,10 @@
 </p>
 
 <p align="center">
+  <strong>Which build this page describes:</strong> the Mac download is Vocello 2.4.0, while this page follows the current source, the upcoming Vocello 3.0. Screenshots show the 3.0 interface, and features new in 3.0 are marked <strong>(3.0)</strong>.
+</p>
+
+<p align="center">
   <em>Write a script, pick or shape a voice, and listen: a native Swift + MLX engine, faster than realtime on an 8&nbsp;GB M2, with nothing leaving your Mac.</em>
 </p>
 
@@ -39,9 +43,9 @@
 
 ## What Vocello does
 
-- **Built-in Voice:** choose one of nine built-in Qwen3 speakers, then set language and delivery.
+- **Built-in Voice:** choose one of nine built-in Qwen3 speakers, then set language and delivery. Vocello 2.4.0 calls this mode Custom Voice.
 - **Voice Design:** describe a voice in plain language and generate it from that brief.
-- **Voice Cloning:** capture a reference you have permission to use, affirm consent, and save it to your voice library. On both platforms, record a clip or import an audio file; on iPhone you can also reuse a saved Voice Design voice as the reference.
+- **Voice Cloning:** capture a reference you have permission to use, affirm consent, and save it to your voice library. On both platforms, record a clip, import an audio file, or reuse a voice from Saved Voices, including one saved from Voice Design.
 
 Scripts past 900 characters become **long-form projects**: planned segments stream one after another while you listen along, then join into a single finished file with a per-segment map in History. Ten languages are supported (Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, and Italian) with automatic detection, and everything (scripts, references, history, audio) stays in local app storage unless you export it.
 
@@ -68,9 +72,9 @@ and [purchase security boundary](SECURITY.md#open-source-purchase-boundary).
 | Voice Design | Voice Cloning |
 | --- | --- |
 | ![Vocello Voice Design screen](docs/screenshots/vocello-voice-design.png) | ![Vocello Voice Cloning screen](docs/screenshots/vocello-voice-cloning.png) |
-| Describe character, age, accent, texture, and delivery. Save a successful design as a reusable voice reference. | Record in the app; the Mac additionally imports WAV, MP3, AIFF, M4A, FLAC, OGG, or WebM files. A transcript improves conditioning but is optional. Generation requires the visible consent acknowledgment in Settings; only clone voices you own or are authorized to use. |
+| Describe character, age, accent, texture, and delivery. Save a successful design as a reusable voice reference. | Record in the app or import a file: WAV, MP3, AIFF, M4A, FLAC, OGG, or WebM on the Mac; WAV, MP3, AIFF, or M4A from Files on iPhone. A transcript improves conditioning but is optional. Generation requires the visible consent acknowledgment in Settings; only clone voices you own or are authorized to use. |
 
-Built-in Voice and Voice Design support eight delivery presets plus a free-text delivery description. The picker is honest about what each preset can promise: four distinct deliveries (Neutral, Calm, Whisper, Sad) come through reliably, and the other four are directional hints that shape energy and pace while the named emotion may not land on every take. Voice Cloning follows the reference voice; with a curated emotion reference bank, a cloned persona additionally offers a delivery choice, with each delivery backed by its own verified reference clip.
+**(3.0)** Built-in Voice and Voice Design support eight delivery presets plus a free-text delivery description. The picker is honest about what each preset can promise: four distinct deliveries (Neutral, Calm, Whisper, Sad) come through reliably, and the other four are directional hints that shape energy and pace while the named emotion may not land on every take. Voice Cloning follows the reference voice; with a curated emotion reference bank, a cloned persona additionally offers a delivery choice, with each delivery backed by its own verified reference clip. In Vocello 2.4.0, Custom Voice and Voice Design offer ten delivery styles at subtle, normal, or strong intensity plus a free-text description, and cloned voices have no delivery choice.
 
 | Models | History |
 | --- | --- |
@@ -79,7 +83,7 @@ Built-in Voice and Voice Design support eight delivery presets plus a free-text 
 
 ## Variation and reproducibility
 
-The Expressive, Balanced, and Consistent variation settings trade take-to-take variety against stability. Multi-line batches share one seed so their lines form a consistent performance. CLI and benchmark callers can provide an explicit seed for reproducible evidence. Every finished take also records the seed it actually used: pin a take's seed from History and subsequent generations reproduce it exactly with the same settings, or leave it unpinned for a fresh take each time.
+The Expressive, Balanced, and Consistent variation settings trade take-to-take variety against stability. Multi-line batches share one seed so their lines form a consistent performance. CLI and benchmark callers can provide an explicit seed for reproducible evidence. **(3.0)** Every finished take also records the seed it actually used: pin a take's seed from History and subsequent generations reproduce it exactly with the same settings, or leave it unpinned for a fresh take each time. In Vocello 2.4.0, interactive takes cannot be pinned or replayed by seed.
 
 ## Local-first privacy
 
@@ -90,10 +94,10 @@ The Expressive, Balanced, and Consistent variation settings trade take-to-take v
 - Voice cloning should only be used with voices you own or have permission to use.
 - Clone generation remains disabled until its visible consent acknowledgment is enabled in
   Settings; the choice is stored locally and can be changed there.
-- Generated audio is marked as AI-generated: an inaudible AudioSeal watermark plus a
-  machine-readable provenance note in the WAV file.
-- If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may
-  require this disclosure (EU AI Act, Article 50).
+- **(3.0)** Generated audio is marked as AI-generated: an inaudible AudioSeal watermark plus a
+  machine-readable provenance note in the WAV file. The 2.4.0 download does not mark its output.
+- In either version, if you publish audio of a cloned real voice, disclose that it is
+  AI-generated. EU law may require this disclosure (EU AI Act, Article 50).
 
 Storage locations and deletion behavior are documented in [`docs/reference/privacy-storage.md`](docs/reference/privacy-storage.md).
 
@@ -119,9 +123,9 @@ With the 2.2.0 release the repository moved from `PowerBeef/QwenVoice` to `Power
 | Mac | macOS 26.0 or newer, Apple Silicon, 8 GB RAM minimum | Speed (4-bit) and Quality (8-bit) | Vocello 2.4.0 is available now |
 | iPhone | iPhone 15 Pro or newer, iOS 26.0 or newer | Speed (4-bit) | Public beta via [TestFlight](https://testflight.apple.com/join/Cvp6yCv7) |
 
-Speed is the recommended default and uses less memory. Quality is a Mac-only option for machines with more headroom. The three recommended Mac Speed packages total about 6 GB.
+Settings recommends Speed on 8 GB Macs, where it uses less memory, and Quality on Macs with 16 GB or more. Quality is a Mac-only option; the iPhone uses Speed. The three Mac Speed packages total about 6 GB.
 
-Support floors and benchmark machines are different facts: the support floor is any Apple Silicon Mac with 8 GB. Canonical evidence is produced on a Mac mini M6 with 16 GB (since 2026-09-22) and an iPhone 17 Pro; the Mac figures published so far were measured on the retired canonical host, a Mac mini M2 with 8 GB, and remain valid history that is never compared with M6 records. See [Performance, measured](#performance-measured) below. The pinned Mac record is `passedWithWarnings` because accepted memory soft trims and audio-QC warnings remain visible rather than being hidden; the [tracked record](benchmarks/runs/ui-generation/macos-xcui-benchmark-20260914-062114-379db820.json), produced on the 2026.08.06.1 model packages, has the exact matrix and conditions.
+Support floors and benchmark machines are different facts: the support floor is any Apple Silicon Mac with 8 GB. Canonical evidence is produced on a Mac mini M6 with 16 GB (since 2026-09-22) and an iPhone 17 Pro; the Mac figures published so far were measured on the retired canonical host, a Mac mini M2 with 8 GB, and remain valid history that is never compared with M6 records. See [Performance, measured](#performance-measured) below. The pinned Mac record is `passedWithWarnings` because accepted memory soft trims and audio-QC warnings remain visible rather than being hidden; the [tracked record](benchmarks/runs/ui-generation/macos-xcui-benchmark-20260914-062114-379db820.json), produced with a Vocello 3.0 build from source on the 2026.08.06.1 model packages, has the exact matrix and conditions.
 
 Macs on macOS 15 can use the legacy [QwenVoice 1.2.3 release](https://github.com/PowerBeef/Vocello/releases/tag/v1.2.3). No Vocello 2.x backport is planned.
 
@@ -129,7 +133,7 @@ Macs on macOS 15 can use the legacy [QwenVoice 1.2.3 release](https://github.com
 
 | | |
 | --- | --- |
-| ![Vocello Studio running on iPhone](docs/screenshots/vocello-ios-studio.png) | The iPhone app uses the same local Qwen3-TTS and MLX foundation with an iPhone-specific in-process runtime. It provides Built-in Voice, Voice Design, Voice Cloning with microphone recording or a saved Voice Design reference, local history, and the memory-conscious Speed models. On-device generation, physical-iPhone XCUITest, and an optional signed archive/TestFlight lane are implemented. A fresh full multilingual physical-iPhone run passed all 19 hint/QC and 18 output gates with policy-accepted warnings; its exploratory record is excluded from clean performance trends. A public TestFlight beta is open: [join here](https://testflight.apple.com/join/Cvp6yCv7). App Store distribution remains a separate maintainer-owned release decision. |
+| ![Vocello Studio running on iPhone](docs/screenshots/vocello-ios-studio.png) | The iPhone app uses the same local Qwen3-TTS and MLX foundation with an iPhone-specific in-process runtime. It provides Built-in Voice, Voice Design, Voice Cloning (from a microphone recording, a WAV, MP3, AIFF, or M4A file in Files, or a saved voice), local history, and the memory-conscious Speed models. On-device generation, physical-iPhone XCUITest, and an optional signed archive/TestFlight lane are implemented. A fresh full multilingual physical-iPhone run passed all 19 hint/QC and 18 output gates with policy-accepted warnings; its exploratory record is excluded from clean performance trends. A public TestFlight beta is open: [join here](https://testflight.apple.com/join/Cvp6yCv7). App Store distribution remains a separate maintainer-owned release decision. |
 
 Current implementation and acceptance status: [`docs/development-progress.md`](docs/development-progress.md).
 
@@ -137,13 +141,13 @@ Current implementation and acceptance status: [`docs/development-progress.md`](d
 
 ## Under the hood
 
-This is the maintained engineering record of the whole package, refreshed with each release. Every claim below traces to a tracked benchmark record, a machine-readable contract, or a documented measurement in this repository.
+This is the maintained engineering record of the whole package, refreshed with each release. It follows the current source, the upcoming 3.0; where the 2.4.0 download differs, the text says so. Every claim below traces to a tracked benchmark record, a machine-readable contract, or a documented measurement in this repository.
 
 ### The owned runtime
 
 Most local TTS tools shell out to a Python reference implementation behind a local server. Vocello generates through a first-party Swift runtime on MLX, [`VocelloQwen3Core`](Packages/VocelloQwen3Core/README.md): no Python, no local server, no bundled weights. The runtime is derived from [`mlx-audio-swift`](https://github.com/Blaizzy/mlx-audio-swift) v0.1.2 and narrowed to exactly what Vocello ships, the Qwen3-TTS runtime and the Mimi codec primitives it needs: about 36,000 of roughly 49,000 upstream lines were removed in that specialization, and every retained, modified and added file is tracked in a generated inventory (`Packages/VocelloQwen3Core/CURRENT_INVENTORY.json`) with its named semantic changes under an immutable lineage ledger (`Packages/VocelloQwen3Core/SEMANTIC_DELTAS.json`). A facade contract rejects any public declaration that leaks raw MLX types, and benchmark-backed capability claims automatically demote when their evidence source drifts from the recorded run.
 
-One engine serves three hosts. On the Mac the engine runs inside the app process, exactly as on the iPhone (since 2026-09-15; the earlier separate XPC service is gone), so one store, one lifecycle and one memory policy serve both apps: the engine's own pressure responder trims and unloads, and the per-tier policy unloads an idle model. The `vocello` command-line tool links the same engine framework and drives it in-process with no UI.
+One engine serves three hosts. **(3.0)** On the Mac the engine runs inside the app process, exactly as on the iPhone (since 2026-09-15; the 2.4.0 download still runs it in a separate XPC service process), so one store, one lifecycle and one memory policy serve both apps: the engine's own pressure responder trims and unloads, and the per-tier policy unloads an idle model. The `vocello` command-line tool links the same engine framework and drives it in-process with no UI.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/charts/architecture-dark.svg">
@@ -165,7 +169,7 @@ Takes are reproducible by construction: every request carries its own seed and f
 
 ### Performance, measured
 
-Every number below comes from a tracked, privacy-safe benchmark record in this repository and was measured on the support-floor tier, a Mac mini M2 with 8 GB, the canonical benchmark host until 2026-09-22. Canonical records now come from a Mac mini M6 with 16 GB and start a new series; M2 and M6 records are never compared.
+Every number below comes from a tracked, privacy-safe benchmark record in this repository and was measured with a Vocello 3.0 build from source on the support-floor tier, a Mac mini M2 with 8 GB, the canonical benchmark host until 2026-09-22. Canonical records now come from a Mac mini M6 with 16 GB and start a new series; M2 and M6 records are never compared.
 
 <!-- rtf-chart:start (generated by scripts/generate_readme_charts.py) -->
 <picture>

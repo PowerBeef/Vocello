@@ -36,7 +36,9 @@ export const Listen = () => {
           <p className="section-sub">
             Each row carries the brief or speaker, the script, the delivery setting that
             produced it, and a waveform from the local render. The set includes a Japanese
-            take and a 31 second narration. Install Vocello to generate your own.
+            take and a 31 second narration. The samples come from Vocello 2.x, so one row
+            uses Excited, a preset that 3.0 folds into Happy. Install Vocello to generate
+            your own.
           </p>
         </div>
 
@@ -82,8 +84,9 @@ export const Listen = () => {
         <div className="listen-deliveries">
           <div className="vc-label" id="delivery-vocab-label">Delivery presets</div>
           <p className="listen-deliveries-sub">
-            Built-in Voice and Voice Design shape a take with one of eight delivery
-            presets or a delivery you describe in your own words.
+            In 3.0, Built-in Voice and Voice Design shape a take with one of eight delivery
+            presets or a delivery you describe in your own words. Vocello 2.4.0 offers ten
+            delivery styles at subtle, normal, or strong intensity.
           </p>
           <div className="try-chips" role="list" aria-labelledby="delivery-vocab-label">
             {DELIVERIES.map((d) => (
@@ -103,7 +106,7 @@ export const Listen = () => {
             />
           </div>
           <figcaption className="try-shot-caption">
-            All eight presets and the free-text delivery live in the app.
+            All eight presets and the free-text delivery live in the 3.0 app.
           </figcaption>
         </figure>
       </div>

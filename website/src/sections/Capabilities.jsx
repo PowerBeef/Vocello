@@ -13,7 +13,7 @@ const ROWS = [
   },
   {
     k: "Downloads that behave",
-    v: "Model installs run three files at a time, retry interrupted transfers automatically, and verify integrity without re-reading multi-gigabyte files. Shared components are stored once across models, saving disk.",
+    v: "Model installs run up to six files at a time, retry interrupted transfers automatically, and verify integrity without re-reading multi-gigabyte files. Shared components are stored once across models, saving disk.",
     tone: "var(--terracotta-300)",
   },
 ];

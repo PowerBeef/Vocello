@@ -12,6 +12,16 @@
     "tag": "v3.0.0",
     "distributionStatus": "unpublished"
   },
+  "candidateOnlyClaims": {
+    "boundary": "Features the stable download does not ship. Wherever README.md or the website mentions one, the candidate version must be named in the same passage. Remove this list when the candidate becomes the stable release.",
+    "terms": [
+      "AudioSeal",
+      "watermark",
+      "pin a take",
+      "eight delivery presets",
+      "runs inside the app"
+    ]
+  },
   "fallbackMacRelease": {
     "version": "1.2.3",
     "tag": "v1.2.3",

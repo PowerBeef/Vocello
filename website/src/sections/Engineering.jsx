@@ -34,7 +34,7 @@ const LEDGER = [
   },
   {
     k: "One engine, three hosts",
-    v: "On the Mac the engine runs inside the app, exactly as on the iPhone, so one lifecycle and one memory policy serve both: the engine trims its caches under memory pressure and unloads an idle model. The command-line tool drives the same engine with no UI.",
+    v: "In 3.0 the Mac engine runs inside the app, exactly as on the iPhone, so one lifecycle and one memory policy serve both: the engine trims its caches under memory pressure and unloads an idle model. Vocello 2.4.0 still runs it in a separate service process. The command-line tool drives the same engine with no UI.",
   },
   {
     k: "Streaming by design",
@@ -121,7 +121,8 @@ export const Engineering = () => (
         <p className="section-note">Measured, not promised</p>
         <h2 id="eng-title" className="section-title">A first-party engine, measured on the minimum Mac.</h2>
         <p className="section-sub">
-          These figures were measured on Vocello's support floor, a Mac mini M2 with 8 GB.
+          These figures were measured with a Vocello 3.0 build from source on the support
+          floor, a Mac mini M2 with 8 GB.
           Speed is the real-time factor: seconds of generation per second of audio.
           Below 1.0, audio generates ahead of playback, and every number here traces
           to a tracked record in the open repository.
@@ -149,7 +150,7 @@ export const Engineering = () => (
       </div>
 
       <p className="perf-provenance">
-        Record <span className="perf-mono">111d88c6</span> in{" "}
+        Record <span className="perf-mono">379db820</span> in{" "}
         <a href="https://github.com/PowerBeef/Vocello/blob/main/benchmarks/HISTORY.md" target="_blank" rel="noreferrer">
           benchmarks/HISTORY.md
         </a>

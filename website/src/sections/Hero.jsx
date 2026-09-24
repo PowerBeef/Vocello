@@ -32,6 +32,10 @@ export const Hero = () => (
         </div>
         <p className="hero-meta">Signed + notarized Mac download · MIT app code · Swift + MLX</p>
         <p className="hero-meta">
+          Screens on this page show the upcoming Vocello 3.0, and features new in 3.0 are
+          marked. The 2.4.0 download calls Built-in Voice by its earlier name, Custom Voice.
+        </p>
+        <p className="hero-meta">
           Also on iPhone:{" "}
           <a className="cta-meta-link" href={TESTFLIGHT} target="_blank" rel="noreferrer">
             join the public beta on TestFlight

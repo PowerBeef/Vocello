@@ -12,7 +12,7 @@ export const WORKFLOWS = [
     body: "Choose one of nine built-in Qwen3-TTS CustomVoice speaker presets, set the delivery, and turn a script into a clean spoken line. The simplest path when you want a consistent voice right away.",
     points: [
       ["Nine built-in speaker presets", "English, Chinese, Japanese, and Korean native presets, each tuned to its language."],
-      ["Delivery presets", "Eight delivery presets: four distinct deliveries (Neutral, Calm, Whisper, Sad) that come through reliably, and four directional hints (Happy, Sad-adjacent Fearful, Angry, Surprised) that shape energy and pace."],
+      ["Delivery presets", "In 3.0, eight delivery presets: four distinct deliveries (Neutral, Calm, Whisper, Sad) that come through reliably, and four directional hints (Happy, Sad-adjacent Fearful, Angry, Surprised) that shape energy and pace. Vocello 2.4.0 offers ten delivery styles at subtle, normal, or strong intensity."],
       ["Custom tone field", "Describe the delivery in your own words when the chips aren't enough."],
     ],
     shot: "assets/screens/custom-voice.png",

@@ -148,6 +148,54 @@ def validate_website_copy(root: Path) -> list[str]:
     return errors
 
 
+CANDIDATE_CLAIM_WINDOW = 240
+
+
+def unscoped_candidate_claims(text: str, terms: list[str], version: str) -> list[str]:
+    """Candidate-only terms whose surrounding passage never names the candidate version."""
+    flat = re.sub(r"\s+", " ", text)
+    marker = re.compile(rf"(?<![\d.]){re.escape(version)}(?!\d)")
+    found: list[str] = []
+    for term in terms:
+        for match in re.finditer(re.escape(term), flat, re.IGNORECASE):
+            start = max(0, match.start() - CANDIDATE_CLAIM_WINDOW)
+            passage = flat[start:match.end() + CANDIDATE_CLAIM_WINDOW]
+            if not marker.search(passage):
+                found.append(term)
+    return sorted(set(found))
+
+
+def validate_candidate_claims(root: Path, public: dict) -> list[str]:
+    """Features only the unpublished candidate ships stay labelled with its version."""
+    claims = public.get("candidateOnlyClaims")
+    if claims is None:
+        return []
+    candidate = public.get("candidateRelease")
+    if not isinstance(candidate, dict) or not isinstance(candidate.get("version"), str):
+        return ["public-product-facts: candidateOnlyClaims requires an unpublished candidateRelease"]
+    terms = claims.get("terms") if isinstance(claims, dict) else None
+    if not isinstance(terms, list) or not terms or not all(isinstance(term, str) and term.strip() for term in terms):
+        return ["public-product-facts: candidateOnlyClaims.terms must be a non-empty list of phrases"]
+    version = re.sub(r"(\.0)+$", "", candidate["version"]) or candidate["version"]
+    if "." not in version:
+        version += ".0"
+    surfaces = [root / "README.md", root / "website/index.html"]
+    source_root = root / "website/src"
+    if source_root.is_dir():
+        surfaces.extend(sorted(path for path in source_root.rglob("*")
+                               if path.is_file() and path.suffix in {".js", ".jsx"}))
+    errors: list[str] = []
+    for path in surfaces:
+        if not path.is_file():
+            continue
+        for term in unscoped_candidate_claims(path.read_text(encoding="utf-8"), terms, version):
+            errors.append(
+                f"{path.relative_to(root)}: mentions candidate-only {term!r} without naming Vocello {version} "
+                "in the same passage; the stable download does not ship it"
+            )
+    return errors
+
+
 def validate(root: Path) -> list[str]:
     public = load_json(root / PUBLIC_FACTS)
     project = (root / "project.yml").read_text(encoding="utf-8") if (root / "project.yml").is_file() else ""
@@ -157,6 +205,7 @@ def validate(root: Path) -> list[str]:
     errors.extend(validate_public_guidance(root, public))
     errors.extend(validate_readme(root, public))
     errors.extend(validate_website_copy(root))
+    errors.extend(validate_candidate_claims(root, public))
     return sorted(set(errors))
 
 

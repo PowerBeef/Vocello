@@ -396,7 +396,7 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
             voiceName: voiceName,
             modeLabel: modeLabel,
             modeTint: modeTint,
-            subtitle: history.formattedDate,
+            subtitle: history.formattedDate(in: IOSAppLanguage.shared.localization),
             avatarSeed: voiceName,
             avatarInitials: voiceName,
             waveformSeed: history.id.map { Int(truncatingIfNeeded: $0) } ?? IOSStableVisualHash.int(history.audioPath),

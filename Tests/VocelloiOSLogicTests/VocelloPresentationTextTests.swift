@@ -79,6 +79,21 @@ final class VocelloPresentationTextTests: XCTestCase {
         XCTAssertEqual(text.generationFailureMessage(TTSEngineError.unsupportedRequest("Host copy")), "Host copy")
     }
 
+    /// PA-20 (MAC-10): sizes and dates follow the interface language, not the process locale.
+    func testFormattersFollowTheInterfaceLanguage() {
+        let bundle = Bundle(for: Self.self)
+        let french = VocelloLocalization(bundle: bundle, language: "fr")
+        let english = VocelloLocalization(bundle: bundle, language: "en")
+        let size = french.fileSize(1_500_000_000)
+        XCTAssertTrue(size.contains("Go"), size)
+        XCTAssertTrue(english.fileSize(1_500_000_000).contains("GB"))
+        XCTAssertTrue(english.fileSize(2_400_000_000, allowedUnits: [.gb, .mb]).contains("GB"))
+        let middayUTC = Date(timeIntervalSince1970: 1_789_473_600) // 2026-09-15 12:00 UTC
+        let frenchDate = french.dateTime(middayUTC)
+        XCTAssertTrue(frenchDate.contains("sept"), frenchDate)
+        XCTAssertTrue(english.dateTime(middayUTC).contains("Sep"), english.dateTime(middayUTC))
+    }
+
     func testEveryGenerationFailureReasonHasTranslatedCatalogCopy() {
         let bundle = Bundle(for: Self.self)
         let english = VocelloPresentationText(localization: VocelloLocalization(bundle: bundle, language: "en"))

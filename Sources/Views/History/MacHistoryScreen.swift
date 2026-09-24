@@ -33,7 +33,7 @@ private struct MacHistoryListItem: Identifiable, Sendable {
         self.generation = generation
         self.audioFileExists = FileManager.default.fileExists(atPath: generation.audioPath)
         self.textPreview = generation.textPreview
-        self.formattedDate = generation.createdAt.formatted(date: .abbreviated, time: .shortened)
+        self.formattedDate = generation.formattedDate(in: MacInterfaceLanguage.current)
         self.searchKey = GenerationHistoryPageQuery.lowercasedSearchKey(text: generation.text, voice: generation.voice)
         self.waveformSeed = generation.id.map { Int(truncatingIfNeeded: $0) }
             ?? VocelloStableVisualHash.int(generation.audioPath)
@@ -630,14 +630,14 @@ private extension MacHistoryScreen {
         case .keepFiles:
             actionAlert = MacHistoryActionAlert(
                 title: MacInterfaceText.historyClearTitle,
-                message: MacInterfaceText.historyClearMessage(String(max(archiveCount, items.count))),
+                message: MacInterfaceText.historyClearMessage(max(archiveCount, items.count)),
                 confirmTitle: MacInterfaceText.historyClearConfirm,
                 onConfirm: { performClearAll(deleteAudio: false) }
             )
         case .deleteFiles:
             actionAlert = MacHistoryActionAlert(
                 title: MacInterfaceText.historyClearDeleteTitle,
-                message: MacInterfaceText.historyClearDeleteMessage(String(max(archiveCount, items.count))),
+                message: MacInterfaceText.historyClearDeleteMessage(max(archiveCount, items.count)),
                 confirmTitle: MacInterfaceText.historyDeleteEverything,
                 onConfirm: { performClearAll(deleteAudio: true) }
             )

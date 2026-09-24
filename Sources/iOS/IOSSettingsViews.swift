@@ -14,14 +14,9 @@ enum IOSSettingsSupportInfo {
 
 @MainActor
 enum IOSSettingsFormatters {
-    static let byteCount: ByteCountFormatter = {
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .file
-        return formatter
-    }()
-
+    /// File sizes follow the interface language, not the process locale (PA-20).
     static func fileSize(_ bytes: Int64) -> String {
-        byteCount.string(fromByteCount: bytes)
+        IOSAppLanguage.shared.localization.fileSize(bytes)
     }
 }
 

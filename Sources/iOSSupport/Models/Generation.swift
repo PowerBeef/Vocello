@@ -21,16 +21,10 @@ struct Generation: Identifiable, Codable, Hashable, Sendable {
     /// The engine's effective sampling seed for this take (UInt64 stored as
     /// its Int64 bit pattern), or nil for rows recorded before v6 (DP-15).
     var seed: Int64?
-    private static let dateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateStyle = .medium
-        f.timeStyle = .short
-        return f
-    }()
-
-    /// Display-friendly date string
-    var formattedDate: String {
-        Self.dateFormatter.string(from: createdAt)
+    /// Display-friendly date string in the interface locale (PA-20: never the
+    /// process locale, which ignores the in-app language).
+    func formattedDate(in localization: VocelloLocalization) -> String {
+        localization.dateTime(createdAt)
     }
 
     /// Short text preview (first 60 chars)

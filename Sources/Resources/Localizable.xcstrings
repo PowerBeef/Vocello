@@ -49694,67 +49694,205 @@
       }
     },
     "vocello.mac.batch.clipsGenerated": {
-      "comment": "macOS interface: batch completion message; %@ is the clip count. Presentation only.",
+      "comment": "macOS interface: batch completion message; %1$lld is the clip count (plural). Presentation only.",
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ clips generated successfully."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld clip generated successfully."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld clips generated successfully."
+                }
+              }
+            }
           }
         },
         "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ extraits générés avec succès."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld extrait généré avec succès."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld extraits générés avec succès."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld extraits générés avec succès."
+                }
+              }
+            }
           }
         },
         "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ clips generados correctamente."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld clip generado correctamente."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld clips generados correctamente."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld clips generados correctamente."
+                }
+              }
+            }
           }
         },
         "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ Clips erfolgreich erzeugt."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld Clip erfolgreich erzeugt."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld Clips erfolgreich erzeugt."
+                }
+              }
+            }
           }
         },
         "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ clip generati correttamente."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld clip generato correttamente."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld clip generati correttamente."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld clip generati correttamente."
+                }
+              }
+            }
           }
         },
         "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ clipes gerados com sucesso."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld clipe gerado com sucesso."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld clipes gerados com sucesso."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld clipes gerados com sucesso."
+                }
+              }
+            }
           }
         },
         "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "成功生成 %@ 条音频。"
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "成功生成 %1$lld 条音频。"
+                }
+              }
+            }
           }
         },
         "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ 件の音声を生成しました。"
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld 件の音声を生成しました。"
+                }
+              }
+            }
           }
         },
         "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "오디오 %@개를 생성했습니다."
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "오디오 %1$lld개를 생성했습니다."
+                }
+              }
+            }
           }
         },
         "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Успешно создано записей: %@."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Успешно создана %1$lld запись."
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Успешно созданы %1$lld записи."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Успешно создано %1$lld записей."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Успешно создано записей: %1$lld."
+                }
+              }
+            }
           }
         }
       }
@@ -51476,67 +51614,205 @@
       }
     },
     "vocello.mac.history.clearMessage": {
-      "comment": "macOS interface: confirmation message for clearing History; %@ is the entry count. Presentation only.",
+      "comment": "macOS interface: confirmation message for clearing History while keeping audio files; %1$lld is the entry count (plural). Presentation only.",
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This removes all %@ history entries. The generated audio files stay on disk in your outputs folder."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This removes %1$lld history entry. Its generated audio file stays on disk in your outputs folder."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This removes all %1$lld history entries. The generated audio files stay on disk in your outputs folder."
+                }
+              }
+            }
           }
         },
         "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cette action supprime les %@ entrées de l’historique. Les fichiers audio générés restent sur le disque dans votre dossier de sorties."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Cette action supprime %1$lld entrée de l’historique. Son fichier audio généré reste sur le disque dans votre dossier de sorties."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Cette action supprime les %1$lld entrées de l’historique. Les fichiers audio générés restent sur le disque dans votre dossier de sorties."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Cette action supprime les %1$lld entrées de l’historique. Les fichiers audio générés restent sur le disque dans votre dossier de sorties."
+                }
+              }
+            }
           }
         },
         "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esto elimina las %@ entradas del historial. Los archivos de audio generado permanecen en la carpeta de salida del disco."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Esto elimina %1$lld entrada del historial. Su archivo de audio generado permanece en la carpeta de salida del disco."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Esto elimina las %1$lld entradas del historial. Los archivos de audio generado permanecen en la carpeta de salida del disco."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Esto elimina las %1$lld entradas del historial. Los archivos de audio generado permanecen en la carpeta de salida del disco."
+                }
+              }
+            }
           }
         },
         "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dies entfernt alle %@ Verlaufseinträge. Die erzeugten Audiodateien bleiben im Ausgabeordner auf der Festplatte."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Dies entfernt %1$lld Verlaufseintrag. Die erzeugte Audiodatei bleibt im Ausgabeordner auf der Festplatte."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Dies entfernt alle %1$lld Verlaufseinträge. Die erzeugten Audiodateien bleiben im Ausgabeordner auf der Festplatte."
+                }
+              }
+            }
           }
         },
         "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Rimuove tutte le %@ voci della cronologia. I file audio generati restano sul disco nella cartella di output."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Rimuove %1$lld voce della cronologia. Il file audio generato resta sul disco nella cartella di output."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Rimuove tutte le %1$lld voci della cronologia. I file audio generati restano sul disco nella cartella di output."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Rimuove tutte le %1$lld voci della cronologia. I file audio generati restano sul disco nella cartella di output."
+                }
+              }
+            }
           }
         },
         "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Remove todas as %@ entradas do histórico. Os arquivos de áudio gerados permanecem no disco, na pasta de saída."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Remove %1$lld entrada do histórico. O arquivo de áudio gerado permanece no disco, na pasta de saída."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Remove todas as %1$lld entradas do histórico. Os arquivos de áudio gerados permanecem no disco, na pasta de saída."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Remove todas as %1$lld entradas do histórico. Os arquivos de áudio gerados permanecem no disco, na pasta de saída."
+                }
+              }
+            }
           }
         },
         "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "这会移除全部 %@ 条历史记录。生成的音频文件仍保留在磁盘的输出文件夹中。"
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "这会移除全部 %1$lld 条历史记录。生成的音频文件仍保留在磁盘的输出文件夹中。"
+                }
+              }
+            }
           }
         },
         "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "履歴 %@ 件をすべて削除します。生成した音声ファイルはディスクの出力フォルダに残ります。"
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "履歴 %1$lld 件をすべて削除します。生成した音声ファイルはディスクの出力フォルダに残ります。"
+                }
+              }
+            }
           }
         },
         "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "기록 항목 %@개를 모두 제거합니다. 생성된 오디오 파일은 디스크의 출력 폴더에 남습니다."
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "기록 항목 %1$lld개를 모두 제거합니다. 생성된 오디오 파일은 디스크의 출력 폴더에 남습니다."
+                }
+              }
+            }
           }
         },
         "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Будут удалены все записи истории (%@). Созданные аудиофайлы останутся на диске в папке результатов."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Будет удалена %1$lld запись истории. Созданный аудиофайл останется на диске в папке результатов."
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Будут удалены все %1$lld записи истории. Созданные аудиофайлы останутся на диске в папке результатов."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Будут удалены все %1$lld записей истории. Созданные аудиофайлы останутся на диске в папке результатов."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Будут удалены все записи истории (%1$lld). Созданные аудиофайлы останутся на диске в папке результатов."
+                }
+              }
+            }
           }
         }
       }
@@ -51674,67 +51950,205 @@
       }
     },
     "vocello.mac.history.clearDeleteMessage": {
-      "comment": "macOS interface: confirmation message for clearing History and deleting audio; %@ is the entry count. Presentation only.",
+      "comment": "macOS interface: confirmation message for clearing History and deleting audio; %1$lld is the entry count (plural). Presentation only.",
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This permanently deletes all %@ history entries and their audio files."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This permanently deletes %1$lld history entry and its audio file."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "This permanently deletes all %1$lld history entries and their audio files."
+                }
+              }
+            }
           }
         },
         "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cette action supprime définitivement les %@ entrées de l’historique et leurs fichiers audio."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "L’entrée d’historique et son fichier audio seront supprimés définitivement (%1$lld)."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld entrées d’historique et leurs fichiers audio seront supprimés définitivement."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld entrées d’historique et leurs fichiers audio seront supprimés définitivement."
+                }
+              }
+            }
           }
         },
         "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esto elimina permanentemente las %@ entradas del historial y sus archivos de audio."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Esto elimina permanentemente %1$lld entrada del historial y su archivo de audio."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Esto elimina permanentemente las %1$lld entradas del historial y sus archivos de audio."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Esto elimina permanentemente las %1$lld entradas del historial y sus archivos de audio."
+                }
+              }
+            }
           }
         },
         "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Dies löscht alle %@ Verlaufseinträge und ihre Audiodateien dauerhaft."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Dies löscht %1$lld Verlaufseintrag und seine Audiodatei dauerhaft."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Dies löscht alle %1$lld Verlaufseinträge und ihre Audiodateien dauerhaft."
+                }
+              }
+            }
           }
         },
         "it": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Elimina definitivamente tutte le %@ voci della cronologia e i relativi file audio."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Elimina definitivamente %1$lld voce della cronologia e il relativo file audio."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Elimina definitivamente tutte le %1$lld voci della cronologia e i relativi file audio."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Elimina definitivamente tutte le %1$lld voci della cronologia e i relativi file audio."
+                }
+              }
+            }
           }
         },
         "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Exclui permanentemente todas as %@ entradas do histórico e seus arquivos de áudio."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Exclui permanentemente %1$lld entrada do histórico e seu arquivo de áudio."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Exclui permanentemente todas as %1$lld entradas do histórico e seus arquivos de áudio."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Exclui permanentemente todas as %1$lld entradas do histórico e seus arquivos de áudio."
+                }
+              }
+            }
           }
         },
         "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "这会永久删除全部 %@ 条历史记录及其音频文件。"
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "这将永久删除全部 %1$lld 条历史记录及其音频文件。"
+                }
+              }
+            }
           }
         },
         "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "履歴 %@ 件とその音声ファイルを完全に削除します。"
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "履歴 %1$lld 件とその音声ファイルをすべて完全に削除します。"
+                }
+              }
+            }
           }
         },
         "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "기록 항목 %@개와 해당 오디오 파일을 모두 영구 삭제합니다."
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "기록 항목 %1$lld개와 해당 오디오 파일을 모두 영구 삭제합니다."
+                }
+              }
+            }
           }
         },
         "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Будут навсегда удалены все записи истории (%@) и их аудиофайлы."
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Будет навсегда удалена %1$lld запись истории и её аудиофайл."
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Будут навсегда удалены все %1$lld записи истории и их аудиофайлы."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Будут навсегда удалены все %1$lld записей истории и их аудиофайлы."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Будут навсегда удалены все записи истории (%1$lld) и их аудиофайлы."
+                }
+              }
+            }
           }
         }
       }

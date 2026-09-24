@@ -366,7 +366,7 @@ struct MacSettingsScreen: View {
             switch status {
             case .downloaded(let sizeBytes), .updateAvailable(let sizeBytes, _):
                 guard sizeBytes > 0 else { return "" }
-                let size = ByteCountFormatter.string(fromByteCount: Int64(sizeBytes), countStyle: .file)
+                let size = MacInterfaceLanguage.current.fileSize(Int64(sizeBytes))
                 return " (\(size))"
             default:
                 return ""

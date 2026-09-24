@@ -60,7 +60,9 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
   System Default uses OS language preferences and bundle matching, with English fallback.
   No `AppleLanguages` preference mutation, bundle swizzling, or root identity reset is used.
   The SwiftUI locale retains the current region; StoreKit prices remain opaque supplied strings.
-- `VocelloLocalization` resolves the selected compiled catalog bundle. `IOSInterfaceText` and
+- `VocelloLocalization` resolves the selected compiled catalog bundle; since PA-20 its `fileSize`
+  and `dateTime` helpers format model and file sizes and History dates in the interface locale on
+  both platforms, never the process locale. `IOSInterfaceText` and
   `IOSSettingsText` read the observable owner; iOS dynamic copy uses its `presentation` context.
   Since 2026-09-15 (CONV-14) macOS has the same owner type: `MacInterfaceLanguage` holds an
   `IOSAppLanguage` over `AppDefaults.store` (the same `vocello.ios.interfaceLanguage` key, in the

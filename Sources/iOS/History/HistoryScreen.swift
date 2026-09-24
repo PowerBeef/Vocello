@@ -785,7 +785,7 @@ private struct IOSHistoryItemCard: View {
                                 Text(modeText)
                             }
                             Text("·")
-                            Text(item.formattedDate)
+                            Text(item.formattedDate(in: IOSAppLanguage.shared.localization))
                             if let durationText {
                                 Text("·")
                                 Text(durationText)
@@ -891,7 +891,7 @@ private struct IOSHistoryItemCard: View {
     }
 
     private var accessibilityMetadata: String {
-        let parts = [item.voice, modeText, item.formattedDate, durationText]
+        let parts = [item.voice, modeText, item.formattedDate(in: IOSAppLanguage.shared.localization), durationText]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
         return parts.joined(separator: ", ")

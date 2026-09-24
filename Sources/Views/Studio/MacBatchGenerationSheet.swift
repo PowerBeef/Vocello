@@ -801,7 +801,7 @@ private struct MacBatchOutcomePresentation {
     private static func completedMessage(savedCount: Int) -> String {
         savedCount == 1
             ? MacInterfaceText.batchOneClipGenerated
-            : MacInterfaceText.batchClipsGenerated(String(savedCount))
+            : MacInterfaceText.batchClipsGenerated(savedCount)
     }
 
     private static func cancelledMessage(savedCount: Int, total: Int, restartFailedMessage: String?) -> String {

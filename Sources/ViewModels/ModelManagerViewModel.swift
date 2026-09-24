@@ -614,11 +614,9 @@ final class ModelManagerViewModel {
         return MacInterfaceText.modelsFilesMissing(String(missingRequiredPaths.count))
     }
 
+    /// Sizes follow the interface language, not the process locale (PA-20).
     private nonisolated static func formattedFileSize(_ bytes: Int64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useGB, .useMB]
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: bytes)
+        MacInterfaceLanguage.current.fileSize(bytes, allowedUnits: [.gb, .mb])
     }
 
     func use(_ model: TTSModel) {

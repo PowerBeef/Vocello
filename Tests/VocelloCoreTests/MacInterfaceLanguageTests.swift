@@ -136,6 +136,24 @@ final class MacInterfaceLanguageTests: XCTestCase {
         MacInterfaceLanguage.select(IOSAppLanguage.system)
     }
 
+    /// PA-20 (MAC-11): count-bearing Mac copy uses catalog plural rules in the interface language.
+    func testMacCountCopyUsesPluralRules() {
+        XCTAssertEqual(MacInterfaceText.batchClipsGenerated(1), "1 clip generated successfully.")
+        XCTAssertEqual(MacInterfaceText.batchClipsGenerated(3), "3 clips generated successfully.")
+        XCTAssertTrue(MacInterfaceText.historyClearMessage(1).hasPrefix("This removes 1 history entry."))
+        XCTAssertTrue(MacInterfaceText.historyClearMessage(4).hasPrefix("This removes all 4 history entries."))
+        XCTAssertEqual(
+            MacInterfaceText.historyClearDeleteMessage(1),
+            "This permanently deletes 1 history entry and its audio file."
+        )
+        MacInterfaceLanguage.select(IOSUILanguage.russian.rawValue)
+        XCTAssertEqual(MacInterfaceText.batchClipsGenerated(1), "Успешно создана 1 запись.")
+        XCTAssertEqual(MacInterfaceText.batchClipsGenerated(2), "Успешно созданы 2 записи.")
+        XCTAssertEqual(MacInterfaceText.batchClipsGenerated(5), "Успешно создано 5 записей.")
+        XCTAssertEqual(MacInterfaceText.batchClipsGenerated(21), "Успешно создана 21 запись.")
+        MacInterfaceLanguage.select(IOSAppLanguage.system)
+    }
+
     func testCompiledRussianAndEastAsianPlurals() {
         let bundle = Bundle(for: Self.self)
         let russian = VocelloPresentationText(localization: VocelloLocalization(bundle: bundle, language: "ru"))

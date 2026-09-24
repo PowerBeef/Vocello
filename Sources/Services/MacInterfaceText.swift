@@ -79,10 +79,10 @@ enum MacInterfaceText {
             defaultValue: "%1$@ of %2$@ clips completed",
             comment: "macOS interface: batch progress count line; %1$@ completed, %2$@ total. Presentation only."), count, total)
     }
-    static func batchClipsGenerated(_ count: String) -> String {
+    static func batchClipsGenerated(_ count: Int) -> String {
         localization.format(localization.string(localized: "vocello.mac.batch.clipsGenerated",
-            defaultValue: "%@ clips generated successfully.",
-            comment: "macOS interface: batch completion message; %@ is the clip count. Presentation only."), count)
+            defaultValue: "%1$lld clips generated successfully.",
+            comment: "macOS interface: batch completion message; %1$lld is the clip count (plural). Presentation only."), count)
     }
     static var batchComplete: String {
         localization.string(localized: "vocello.mac.batch.complete", defaultValue: "Batch Complete",
@@ -655,10 +655,10 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.history.clearDeleteFiles", defaultValue: "Clear History and Delete Audio…",
                comment: "macOS interface: History toolbar menu action that clears entries and deletes audio files. Presentation only.")
     }
-    static func historyClearDeleteMessage(_ count: String) -> String {
+    static func historyClearDeleteMessage(_ count: Int) -> String {
         localization.format(localization.string(localized: "vocello.mac.history.clearDeleteMessage",
-            defaultValue: "This permanently deletes all %@ history entries and their audio files.",
-            comment: "macOS interface: confirmation message for clearing History and deleting audio; %@ is the entry count. Presentation only."), count)
+            defaultValue: "This permanently deletes all %1$lld history entries and their audio files.",
+            comment: "macOS interface: confirmation message for clearing History and deleting audio; %1$lld is the entry count (plural). Presentation only."), count)
     }
     static var historyClearDeleteTitle: String {
         localization.string(localized: "vocello.mac.history.clearDeleteTitle", defaultValue: "Clear History and Delete Audio?",
@@ -672,10 +672,10 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.history.clearKeepFiles", defaultValue: "Clear History (Keep Audio Files)…",
                comment: "macOS interface: History toolbar menu action that clears entries and keeps audio files. Presentation only.")
     }
-    static func historyClearMessage(_ count: String) -> String {
+    static func historyClearMessage(_ count: Int) -> String {
         localization.format(localization.string(localized: "vocello.mac.history.clearMessage",
-            defaultValue: "This removes all %@ history entries. The generated audio files stay on disk in your outputs folder.",
-            comment: "macOS interface: confirmation message for clearing History; %@ is the entry count. Presentation only."), count)
+            defaultValue: "This removes all %1$lld history entries. The generated audio files stay on disk in your outputs folder.",
+            comment: "macOS interface: confirmation message for clearing History; %1$lld is the entry count (plural). Presentation only."), count)
     }
     static var historyClearTitle: String {
         localization.string(localized: "vocello.mac.history.clearTitle", defaultValue: "Clear History?",

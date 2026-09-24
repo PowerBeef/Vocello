@@ -45,6 +45,23 @@ struct VocelloLocalization: Sendable {
         String(format: format, locale: locale, arguments: arguments)
     }
 
+    /// A file size in this context's locale, so units and separators follow the
+    /// interface language rather than the process locale (PA-20, MAC-10).
+    func fileSize(_ bytes: Int64, allowedUnits: ByteCountFormatStyle.Units = .all) -> String {
+        ByteCountFormatStyle(
+            style: .file,
+            allowedUnits: allowedUnits,
+            spellsOutZero: true,
+            includesActualByteCount: false,
+            locale: locale
+        ).format(bytes)
+    }
+
+    /// An abbreviated date with a short time in this context's locale (History rows).
+    func dateTime(_ date: Date) -> String {
+        date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened, locale: locale))
+    }
+
     func string(localized key: String, defaultValue: String? = nil, comment: StaticString? = nil) -> String {
         // Selecting a locale on Text does not change Foundation's bundle lookup.
         // Resolve the compiled localization once per context, not once per rendered label.

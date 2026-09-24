@@ -84,6 +84,10 @@ REQUIRED_KEYS = {
 REQUIRED_PLURAL_KEYS = {
     "vocello.models.ready_count",
     "vocello.history.recovery_export_failure",
+    # PA-20 (MAC-11): macOS counts that read "1 clips" before plural rules.
+    "vocello.mac.batch.clipsGenerated",
+    "vocello.mac.history.clearDeleteMessage",
+    "vocello.mac.history.clearMessage",
 }
 REQUIRED_LOCALES = ("en", "fr", "es", "de", "it", "pt-BR", "zh-Hans", "ja", "ko", "ru")
 # UI identifiers, deliberately separate from the model's spoken-language enum.

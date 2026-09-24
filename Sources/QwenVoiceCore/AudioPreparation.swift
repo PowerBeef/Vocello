@@ -334,7 +334,7 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         if outputURL != sourceURL,
            Self.canReuseExistingNormalizedOutput(
                 at: outputURL,
-                fingerprint: fingerprint
+                fingerprint: request.outputReuseFingerprint ?? fingerprint
             ) {
             return try Self.makeResult(
                 sourceURL: sourceURL,
@@ -683,7 +683,9 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
             && isFloat == false
     }
 
-    private static func fileFingerprint(for url: URL) -> String {
+    /// Path/size/mtime fingerprint of a source file, carried in every
+    /// `AudioNormalizationResult` (and from there in clone-artifact metadata).
+    static func fileFingerprint(for url: URL) -> String {
         let resolvedPath = url.resolvingSymlinksInPath().path
         let attributes = (try? FileManager.default.attributesOfItem(atPath: resolvedPath)) ?? [:]
         let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
@@ -709,8 +711,12 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
 }
 
 public extension AudioPreparationRequest {
-    init(inputURL: URL, outputURL: URL? = nil) {
-        self.init(inputPath: inputURL.path, outputPath: outputURL?.path)
+    init(inputURL: URL, outputURL: URL? = nil, outputReuseFingerprint: String? = nil) {
+        self.init(
+            inputPath: inputURL.path,
+            outputPath: outputURL?.path,
+            outputReuseFingerprint: outputReuseFingerprint
+        )
     }
 
     var inputURL: URL {

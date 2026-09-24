@@ -53,12 +53,20 @@ final class GenerationCancellationIngress: Sendable {
     }
 }
 
-/// Main-actor admission latch for critical memory-pressure relief.
+/// Main-actor admission latch shared by every memory relief that can release
+/// model state: kernel critical relief, caller-requested hard trims and full
+/// unloads, and idle unload.
 ///
 /// Model-operation ownership also lives on `MLXTTSEngine`'s main-actor
 /// isolation domain. Keeping the latch there makes "gate is open" and
 /// "operation became active" one atomic, non-suspending decision. An actor
 /// hop here would leave a check-then-enter race between those two states.
+///
+/// Reliefs may overlap (a caller's full unload while a kernel critical trim is
+/// still running), so the latch counts its holders: each `close()` is paired
+/// with exactly one `reopen()`, and admission resumes only when the last
+/// holder reopens. One relief finishing can never readmit work while another
+/// is still releasing state.
 @MainActor
 final class CriticalMemoryReliefAdmission {
     private struct Waiter {
@@ -66,15 +74,19 @@ final class CriticalMemoryReliefAdmission {
         let continuation: CheckedContinuation<Void, Never>
     }
 
-    private(set) var isClosed = false
+    private var holderCount = 0
     private var waiters: [Waiter] = []
+
+    var isClosed: Bool {
+        holderCount > 0
+    }
 
     var allowsProactiveOperation: Bool {
         !isClosed
     }
 
     func close() {
-        isClosed = true
+        holderCount += 1
     }
 
     func waitUntilOpen() async throws {
@@ -101,8 +113,9 @@ final class CriticalMemoryReliefAdmission {
     }
 
     func reopen() {
-        guard isClosed else { return }
-        isClosed = false
+        guard holderCount > 0 else { return }
+        holderCount -= 1
+        guard holderCount == 0 else { return }
         let pending = waiters
         waiters.removeAll(keepingCapacity: false)
         pending.forEach { $0.continuation.resume() }

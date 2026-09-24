@@ -198,7 +198,6 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
 
     private static let preparedCacheMarkerFileName = ".qvoice_prepared_cache.json"
     private static let qwenSourceCheckpointTrustFileName = ".qvoice_qwen_checkpoint_trust.json"
-    private static let qwenPreparedOverlayDirectoryName = ".qvoice_prepared_model"
     private static let preparedCacheSchemaVersion = 3
     private static let qwenModelWeightsRelativePath = "model.safetensors"
     private static let qwenSpeechTokenizerConfigRelativePath = "speech_tokenizer/config.json"
@@ -218,6 +217,10 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
     private(set) var loadedModel: UnsafeSpeechGenerationModel?
     private(set) var loadedModelRuntimeIdentity: ModelRuntimeIdentity?
     private(set) var prewarmedIdentityKeys: Set<String> = []
+    /// Load epoch: every unload advances it. A load that started in an
+    /// earlier epoch was superseded by an unload (memory relief, stop) while
+    /// it was suspended in the loader and must not publish its model.
+    private var loadEpoch = ModelLoadEpoch()
 
     init(
         modelAssetStore: any ModelAssetStore,
@@ -260,6 +263,7 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
             )
         }
 
+        let startedEpoch = loadEpoch
         let descriptor = try descriptor(for: id)
         let state = modelAssetStore.state(for: descriptor)
         guard case .available = state else {
@@ -361,6 +365,11 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
                 message: "Failed to load native model '\(descriptor.name)'"
             )
         }
+        // An unload ran while this load was suspended: dropping the model here
+        // keeps a relief-released model from becoming resident again.
+        guard loadEpoch == startedEpoch else {
+            throw CancellationError()
+        }
         let modelLoadMS = modelLoadStartedAt.elapsedMilliseconds
         var timingsMS = model.loadDiagnosticsTimingsMS
         timingsMS["cache_prepare"] = cachePrepareMS
@@ -412,6 +421,11 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
             preparedMetadataByDescriptorID[descriptor.id] = persistedMetadata
         }
 
+        // The model is published, but an unload during the diagnostics above
+        // already released it; do not hand the caller a model it no longer owns.
+        guard loadEpoch == startedEpoch else {
+            throw CancellationError()
+        }
         await emitDiagnostic(
             "coordinator-load-before-return",
             details: diagnosticDetails(
@@ -443,6 +457,7 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
     }
 
     func unloadModel() async {
+        loadEpoch.advance()
         resetLoadedState()
     }
 
@@ -612,9 +627,15 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
         try preparedInputs.qwenRuntimeProfile.validateCapability(.fullCapabilities)
         let additionalArtifacts = Self.additionalPreparedArtifacts(for: modelType)
         let usePreparedOverlay = true
-        let targetDirectory = sourceDirectory.appendingPathComponent(
-            Self.qwenPreparedOverlayDirectoryName,
-            isDirectory: true
+        // The overlay is rebuildable runtime cache, so it lives under the runtime cache
+        // directory rather than inside the installed model folder, where its symlinks made the
+        // shared-component store's migrate and repair fail (PA-22 / CORE-08). An overlay an
+        // earlier build left in the model folder is removed here; the next step rebuilds it in
+        // the cache when no valid one exists there yet.
+        PreparedModelOverlay.removeLegacyOverlay(in: sourceDirectory, fileManager: fileManager)
+        let targetDirectory = PreparedModelOverlay.directory(
+            forSourceDirectory: sourceDirectory,
+            hubCacheDirectory: hubCacheDirectory
         )
 
         let cacheValidation = try Self.preparedCacheIsValid(
@@ -1360,5 +1381,54 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
 
     private static func sha256Hex(data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+/// Generation counter for model loads. `MLXModelLoadCoordinator` is a
+/// reentrant actor: an unload can run while a load is suspended in the
+/// loader. The load compares the epoch it started in with the current one
+/// before publishing, so a load that an unload superseded never becomes
+/// resident.
+struct ModelLoadEpoch: Equatable, Sendable {
+    private(set) var value: UInt64 = 0
+
+    mutating func advance() {
+        value &+= 1
+    }
+}
+
+/// Location of the prepared-model overlay: a mirror of one installed model folder (absolute
+/// symlinks to its files plus the sanitized config and prepared tokenizer artifacts) that the
+/// loader reads. It is rebuildable cache and lives under the runtime cache directory, keyed by the
+/// model's install folder name, never inside the model folder itself.
+enum PreparedModelOverlay {
+    /// Where builds before PA-22 kept the overlay: a hidden directory inside the model folder.
+    static let legacyDirectoryName = ".qvoice_prepared_model"
+    static let cacheSubdirectoryName = "prepared_models"
+
+    static func directory(forSourceDirectory sourceDirectory: URL, hubCacheDirectory: URL) -> URL {
+        hubCacheDirectory
+            .appendingPathComponent(cacheSubdirectoryName, isDirectory: true)
+            .appendingPathComponent(sourceDirectory.lastPathComponent, isDirectory: true)
+    }
+
+    /// Removes a legacy in-folder overlay and any interrupted rebuild of it
+    /// (`.qvoice_prepared_model.tmp.<uuid>`). Only the overlay's own entries are removed; the
+    /// symlinks inside it are unlinked, never followed. Idempotent and best effort.
+    static func removeLegacyOverlay(in modelDirectory: URL, fileManager: FileManager = .default) {
+        guard let entries = try? fileManager.contentsOfDirectory(
+            at: modelDirectory,
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+            options: []
+        ) else {
+            return
+        }
+        for entry in entries {
+            let name = entry.lastPathComponent
+            guard name == legacyDirectoryName || name.hasPrefix("\(legacyDirectoryName).tmp.") else {
+                continue
+            }
+            try? fileManager.removeItem(at: entry)
+        }
     }
 }

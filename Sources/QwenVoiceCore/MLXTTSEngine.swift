@@ -240,13 +240,21 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
 
     private func performIdleUnloadIfStillIdle(modelID: String, token: UUID) async {
         guard idleUnloadToken == token, canIdleUnload(modelID: modelID) else { return }
-        await runtime.unloadModel()
-        guard idleUnloadToken == token, canIdleUnload(modelID: modelID) else { return }
+        // Idle unload shares the memory-relief admission gate. The check above
+        // proved no model operation is in flight, and closing the gate keeps
+        // one from starting (and publishing a model) while this one releases.
+        // The token and task are cleared first so closing the gate does not
+        // cancel the task running this unload.
         idleUnloadToken = nil
         idleUnloadTask = nil
-        loadState = .idle
-        clonePreparationState = .idle
-        visibleErrorMessage = nil
+        closeAdmissionForCriticalMemoryRelief()
+        await runtime.unloadModel()
+        if canIdleUnload(modelID: modelID) {
+            loadState = .idle
+            clonePreparationState = .idle
+            visibleErrorMessage = nil
+        }
+        publishCriticalMemoryReliefCompletion()
     }
 
     private func canIdleUnload(modelID: String) -> Bool {
@@ -342,10 +350,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         }
     }
 
+    /// Every call takes one hold on the shared relief latch and must be paired
+    /// with exactly one `publishCriticalMemoryReliefCompletion()`.
     private func closeAdmissionForCriticalMemoryRelief() {
         cancelIdleUnload()
-        guard !criticalMemoryReliefAdmission.isClosed else { return }
-        objectWillChange.send()
+        if !criticalMemoryReliefAdmission.isClosed {
+            objectWillChange.send()
+        }
         criticalMemoryReliefAdmission.close()
     }
 
@@ -777,10 +788,33 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             normalizedCloneReferenceDirectory: normalizedCloneReferenceDirectory,
             voicesDirectory: voicesDirectory
         )
+        Self.scheduleStartupStorageReclamation(
+            modelsDirectory: modelAssetStore.rootDirectory,
+            voicesDirectory: voicesDirectory
+        )
         startMemoryPressureMonitorIfNeeded()
         isInitialized = true
         loadState = .idle
         clonePreparationState = .idle
+    }
+
+    /// Once per engine start (app launch, every CLI command), off the startup
+    /// path: reclaim shared model components no installed model references and
+    /// `trash/`/`staging/` leftovers from interrupted operations, and trim the
+    /// transient clone-prompt artifacts to their retention bound. Both are best
+    /// effort and protect in-flight work; a model delete does the same
+    /// reclamation immediately.
+    nonisolated private static func scheduleStartupStorageReclamation(
+        modelsDirectory: URL,
+        voicesDirectory: URL
+    ) {
+        Task.detached(priority: .background) {
+            _ = try? SharedModelComponentStore(modelsRoot: modelsDirectory)
+                .reclaimUnreferencedComponents()
+            NativePreparedCloneConditioningCache.pruneTransientClonePromptArtifacts(
+                in: voicesDirectory
+            )
+        }
     }
 
     public func ping() async throws -> Bool {
@@ -2009,8 +2043,23 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         )
     }
 
+    /// Caller-requested relief (iOS memory warnings, the memory-budget
+    /// policy, post-generation trims). A soft trim only drops reclaimable
+    /// caches. A hard trim or full unload releases state that an in-flight
+    /// load, prewarm or clone prime would otherwise publish back afterwards, so
+    /// it takes the same admission gate as kernel critical relief: close
+    /// admission, wait out the running model operation, trim, then reopen.
+    /// Cancelling an active generation stays the caller's decision; this waits
+    /// for it rather than trimming under it.
     public func trimMemory(level: NativeMemoryTrimLevel, reason: String) async {
+        guard level != .softTrim else {
+            await applyMemoryPressureTrim(level: level, reason: reason)
+            return
+        }
+        closeAdmissionForCriticalMemoryRelief()
+        await waitForModelOperationsToQuiesce()
         await applyMemoryPressureTrim(level: level, reason: reason)
+        publishCriticalMemoryReliefCompletion()
     }
 
     private func applyMemoryPressureTrim(

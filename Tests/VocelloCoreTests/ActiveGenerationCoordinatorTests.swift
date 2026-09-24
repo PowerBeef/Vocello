@@ -478,4 +478,155 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
             ]
         )
     }
+
+    /// PA-22 / CORE-06: reliefs can overlap (a caller's full unload during a
+    /// kernel critical trim). Admission resumes only when the last holder
+    /// reopens, so one relief finishing never readmits work under another.
+    @MainActor
+    func testReliefAdmissionReopensOnlyAfterEveryHolderReleases() async throws {
+        let admission = CriticalMemoryReliefAdmission()
+        admission.close()
+        admission.close()
+        let entered = TestLockedValue<Bool>()
+        let waiter = Task { @MainActor in
+            try await admission.waitUntilOpen()
+            entered.store(true)
+        }
+        for _ in 0..<20 { await Task.yield() }
+
+        admission.reopen()
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertTrue(admission.isClosed)
+        XCTAssertFalse(admission.allowsProactiveOperation)
+        XCTAssertNil(entered.value)
+
+        admission.reopen()
+        try await waiter.value
+        XCTAssertFalse(admission.isClosed)
+        XCTAssertEqual(entered.value, true)
+
+        // An unpaired reopen cannot drive the count below zero.
+        admission.reopen()
+        admission.close()
+        XCTAssertTrue(admission.isClosed)
+        admission.reopen()
+        XCTAssertFalse(admission.isClosed)
+    }
+
+    /// PA-22 / CORE-06: a caller's full unload (iOS memory policy) used to run
+    /// while a proactive load was suspended in the model loader; the load then
+    /// published its model after the unload. The trim now closes admission and
+    /// waits out the in-flight operation before it unloads.
+    @MainActor
+    func testCallerFullUnloadWaitsForInFlightProactiveLoad() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-relief-gate-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let registry = try ContractBackedModelRegistry(
+            manifestURL: repositoryRoot.appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+        )
+        let coordinator = SuspendingLoadCoordinator()
+        let engine = MLXTTSEngine(
+            modelRegistry: registry,
+            modelAssetStore: LocalModelAssetStore(
+                rootDirectory: root.appendingPathComponent("models", isDirectory: true),
+                descriptors: []
+            ),
+            audioPreparationService: NativeAudioPreparationService(),
+            documentIO: LocalDocumentIO(
+                importedReferenceDirectory: root.appendingPathComponent("imported", isDirectory: true)
+            ),
+            streamSessionsDirectory: root.appendingPathComponent("streams", isDirectory: true),
+            loadCoordinator: coordinator,
+            streamingSessionFactory: { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in
+                fatalError("This test never starts a generation.")
+            }
+        )
+
+        let load = Task { @MainActor in
+            await engine.ensureModelLoadedIfNeeded(id: "relief-fixture-model")
+        }
+        await coordinator.waitUntilLoadBegins()
+        let trim = Task { @MainActor in
+            await engine.trimMemory(level: .fullUnload, reason: "test_caller_full_unload")
+        }
+        for _ in 0..<50 { await Task.yield() }
+        try await Task.sleep(nanoseconds: 50_000_000)
+        let whileLoading = await coordinator.events
+        XCTAssertEqual(whileLoading, ["load-begin"], "a full unload must not run under a suspended load")
+
+        await coordinator.releaseLoad()
+        await load.value
+        await trim.value
+
+        let events = await coordinator.events
+        let loadEnd = try XCTUnwrap(events.firstIndex(of: "load-end"))
+        let firstUnload = try XCTUnwrap(events.firstIndex(of: "unload"))
+        XCTAssertLessThan(loadEnd, firstUnload)
+        XCTAssertEqual(events.last, "unload")
+        XCTAssertEqual(engine.loadState, .idle)
+    }
+
+    func testModelLoadEpochAdvancesOnEveryUnload() {
+        var epoch = ModelLoadEpoch()
+        let started = epoch
+        XCTAssertEqual(epoch, started)
+        epoch.advance()
+        XCTAssertNotEqual(epoch, started, "a load that started before an unload must not publish")
+        let restarted = epoch
+        epoch.advance()
+        XCTAssertNotEqual(epoch, restarted)
+    }
+}
+
+/// A model coordinator whose load suspends until the test releases it, then
+/// fails, so the relief ordering is observable without MLX weights.
+private actor SuspendingLoadCoordinator: MLXModelCoordinating {
+    private struct FixtureLoadError: Error {}
+
+    private(set) var events: [String] = []
+    private let loadGate = TestGenerationGate()
+    private var loadBeganWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func waitUntilLoadBegins() async {
+        guard !events.contains("load-begin") else { return }
+        await withCheckedContinuation { continuation in
+            loadBeganWaiters.append(continuation)
+        }
+    }
+
+    func releaseLoad() async {
+        await loadGate.open()
+    }
+
+    func qwen3Capabilities(for id: String) async throws -> Qwen3TTSModelCapabilities {
+        throw FixtureLoadError()
+    }
+
+    func loadModel(
+        id: String,
+        capabilityProfile: NativeLoadCapabilityProfile
+    ) async throws -> NativeModelLoadResult {
+        events.append("load-begin")
+        let waiters = loadBeganWaiters
+        loadBeganWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        await loadGate.wait()
+        events.append("load-end")
+        throw FixtureLoadError()
+    }
+
+    func unloadModel() async {
+        events.append("unload")
+    }
+
+    func isPrewarmed(identityKey: String) async -> Bool { false }
+    func markPrewarmed(identityKey: String) async {}
+    func clearPrewarmState() async {}
+    func setTelemetryRecorder(_ recorder: NativeTelemetryRecorder?) async {}
+    func requiresUnloadAfterRuntimeFailure() async -> Bool { false }
 }

@@ -1,3 +1,4 @@
+@preconcurrency import AVFoundation
 import Foundation
 @testable import QwenVoiceCore
 import XCTest
@@ -410,5 +411,157 @@ final class CloneConditioningContractTests: XCTestCase {
                 )
             }
         }
+    }
+
+    /// PA-22 / CORE-04: a reference that needs conversion (here 48 kHz) is
+    /// normalized once. The output is named by source content, and both the
+    /// in-memory entry and the on-disk output are reused by that same
+    /// fingerprint, so `reusedNormalizedReference` reports the reuse that
+    /// actually happened.
+    func testConvertedCloneReferenceReusesItsContentNamedOutput() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-clone-reuse-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("reference.wav")
+        try Self.writeSineWAV(sampleRate: 48_000, seconds: 1, to: source)
+        let normalizedDirectory = root.appendingPathComponent("normalized", isDirectory: true)
+        let counter = PreparationCallCounter()
+        let service = CountingAudioPreparationService(
+            base: NativeAudioPreparationService(),
+            counter: counter
+        )
+        let reference = CloneReference(audioPath: source.path)
+        func resolve(
+            with cache: NativePreparedCloneConditioningCache
+        ) async throws -> ResolvedCloneConditioning {
+            try await cache.resolve(
+                modelID: "clone-fixture",
+                reference: reference,
+                sampleRate: 24_000,
+                audioPreparationService: service,
+                normalizedCloneReferenceDirectory: normalizedDirectory
+            )
+        }
+
+        let first = try await resolve(with: NativePreparedCloneConditioningCache(capacity: 4))
+        XCTAssertFalse(first.normalizedReference.wasAlreadyCanonical)
+        XCTAssertFalse(first.reusedNormalizedReference)
+        let output = first.normalizedReference.normalizedURL
+        let contentFingerprint = try NativePreparedCloneConditioningCache.stableCloneReferenceFingerprint(
+            for: source
+        )
+        XCTAssertTrue(output.lastPathComponent.contains(contentFingerprint))
+
+        // Age the output so a re-conversion (which rewrites it) is observable.
+        let aged = Date(timeIntervalSince1970: 1_000_000_000)
+        try FileManager.default.setAttributes([.modificationDate: aged], ofItemAtPath: output.path)
+
+        // A fresh cache (next launch, or after a trim) reuses the file on disk.
+        let second = try await resolve(with: NativePreparedCloneConditioningCache(capacity: 4))
+        XCTAssertTrue(second.reusedNormalizedReference)
+        XCTAssertEqual(second.normalizedReference.normalizedPath, output.path)
+        let secondModified = try XCTUnwrap(
+            FileManager.default.attributesOfItem(atPath: output.path)[.modificationDate] as? Date
+        )
+        XCTAssertEqual(secondModified.timeIntervalSince1970, aged.timeIntervalSince1970, accuracy: 1)
+        let callsAfterSecond = await counter.count
+        XCTAssertEqual(callsAfterSecond, 2)
+
+        // One cache instance reuses its in-memory entry without preparing again.
+        let cache = NativePreparedCloneConditioningCache(capacity: 4)
+        _ = try await resolve(with: cache)
+        let callsBeforeRepeat = await counter.count
+        let repeated = try await resolve(with: cache)
+        let callsAfterRepeat = await counter.count
+        XCTAssertEqual(callsAfterRepeat, callsBeforeRepeat)
+        XCTAssertTrue(repeated.reusedNormalizedReference)
+        XCTAssertEqual(repeated.normalizedReference.normalizedPath, output.path)
+    }
+
+    /// PA-22 / CORE-05 (lifecycle half): prompts derived from one-off
+    /// references are transient; only the most recently used few are kept.
+    /// In-flight staging and saved-voice prompts are never touched.
+    func testTransientClonePromptArtifactsKeepOnlyTheMostRecentlyUsed() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-transient-prompts-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let voices = root.appendingPathComponent("voices", isDirectory: true)
+        let transientRoot = NativePreparedCloneConditioningCache.transientClonePromptRootDirectory(in: voices)
+        let savedVoicePrompts = NativePreparedCloneConditioningCache.preparedVoiceClonePromptRootDirectory(
+            in: voices,
+            voiceID: "saved-voice"
+        )
+        let staging = transientRoot.appendingPathComponent(".artifact-new.staging.fixture", isDirectory: true)
+        for directory in [savedVoicePrompts, staging] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        for index in 0..<10 {
+            let artifact = transientRoot.appendingPathComponent(
+                String(format: "artifact-%02d", index),
+                isDirectory: true
+            )
+            try FileManager.default.createDirectory(at: artifact, withIntermediateDirectories: true)
+            try Data("{}".utf8).write(to: artifact.appendingPathComponent("manifest.json"))
+            try FileManager.default.setAttributes(
+                [.modificationDate: base.addingTimeInterval(Double(index))],
+                ofItemAtPath: artifact.path
+            )
+        }
+        try FileManager.default.setAttributes(
+            [.modificationDate: base.addingTimeInterval(-3_600)],
+            ofItemAtPath: staging.path
+        )
+
+        NativePreparedCloneConditioningCache.pruneTransientClonePromptArtifacts(in: voices, retaining: 8)
+        NativePreparedCloneConditioningCache.pruneTransientClonePromptArtifacts(in: voices, retaining: 8)
+
+        let remaining = try FileManager.default.contentsOfDirectory(atPath: transientRoot.path)
+            .filter { !$0.hasPrefix(".") }
+            .sorted()
+        XCTAssertEqual(remaining, (2..<10).map { String(format: "artifact-%02d", $0) })
+        XCTAssertTrue(FileManager.default.fileExists(atPath: staging.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: savedVoicePrompts.path))
+    }
+
+    private static func writeSineWAV(sampleRate: Double, seconds: Double, to url: URL) throws {
+        let settings: [String: Any] = [
+            AVFormatIDKey: Int(kAudioFormatLinearPCM),
+            AVSampleRateKey: sampleRate,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsFloatKey: false,
+        ]
+        let file = try AVAudioFile(forWriting: url, settings: settings)
+        let frames = AVAudioFrameCount(sampleRate * seconds)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames),
+              let channel = buffer.floatChannelData?.pointee else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        buffer.frameLength = frames
+        for index in 0..<Int(frames) {
+            channel[index] = Float(0.2 * sin(2.0 * .pi * 220.0 * Double(index) / sampleRate))
+        }
+        try file.write(from: buffer)
+    }
+}
+
+private actor PreparationCallCounter {
+    private(set) var count = 0
+
+    func increment() {
+        count += 1
+    }
+}
+
+private struct CountingAudioPreparationService: AudioPreparationService {
+    let base: NativeAudioPreparationService
+    let counter: PreparationCallCounter
+
+    func normalizeAudio(_ request: AudioPreparationRequest) async throws -> AudioNormalizationResult {
+        await counter.increment()
+        return try await base.normalizeAudio(request)
     }
 }

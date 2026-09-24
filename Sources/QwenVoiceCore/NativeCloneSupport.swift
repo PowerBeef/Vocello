@@ -327,6 +327,9 @@ actor NativePreparedCloneConditioningCache {
                     expectedMetadata: artifactMetadata,
                     conditioningDigest: conditioning.internalIdentity.digest
                 )
+                if conditioning.preparedVoiceID == nil {
+                    Self.markTransientClonePromptArtifactUsed(artifactDirectory)
+                }
                 cacheCloneHandle(handle, for: promptIdentity)
                 return conditioning.withCloneHandle(
                     handle,
@@ -375,6 +378,9 @@ actor NativePreparedCloneConditioningCache {
                 to: artifactDirectory,
                 metadata: artifactMetadata.fillingCreatedAtIfNeeded()
             )
+            if conditioning.preparedVoiceID == nil, let voicesDirectory {
+                Self.pruneTransientClonePromptArtifacts(in: voicesDirectory)
+            }
         }
         return conditioning.withCloneHandle(
             handle,
@@ -414,7 +420,11 @@ actor NativePreparedCloneConditioningCache {
     ) async throws -> NormalizedCloneReferenceOutcome {
         let cacheKey = normalizedReferenceCacheKey(referenceFingerprint: referenceFingerprint)
         if let cachedResult = normalizedReferenceCache[cacheKey],
-           Self.canReuseCachedNormalizedReference(cachedResult, for: sourceURL) {
+           Self.canReuseCachedNormalizedReference(
+               cachedResult,
+               for: sourceURL,
+               referenceFingerprint: referenceFingerprint
+           ) {
             touchNormalizedReference(cacheKey)
             try Self.mirrorTranscriptSidecarIfNeeded(from: sourceURL, to: cachedResult.normalizedURL)
             return NormalizedCloneReferenceOutcome(
@@ -435,9 +445,13 @@ actor NativePreparedCloneConditioningCache {
                     referenceFingerprint: referenceFingerprint
                 )
             )
+            // The output is named by source content, so reuse is decided by
+            // that same fingerprint here and inside the preparation service;
+            // the reported reuse is the reuse that happens.
             normalizationRequest = AudioPreparationRequest(
                 inputURL: sourceURL,
-                outputURL: outputURL
+                outputURL: outputURL,
+                outputReuseFingerprint: referenceFingerprint
             )
             reusedExistingOutput = NativeAudioPreparationService.canReuseExistingNormalizedOutput(
                 at: outputURL,
@@ -566,11 +580,18 @@ actor NativePreparedCloneConditioningCache {
         lruKeys = lruKeys.filter { retainedKeys.contains($0) }
     }
 
-    private static func canReuseCachedNormalizedReference(
+    /// The in-memory entry is keyed by the source's content fingerprint, and a
+    /// converted output is named by it, so the on-disk check uses that same
+    /// fingerprint. The result's own path/size/mtime fingerprint must still
+    /// match the source so the metadata it carries (clone-artifact
+    /// `sourceAudioFingerprint`) is what a fresh preparation would report.
+    static func canReuseCachedNormalizedReference(
         _ result: AudioNormalizationResult,
-        for sourceURL: URL
+        for sourceURL: URL,
+        referenceFingerprint: String
     ) -> Bool {
-        guard result.sourceURL.standardizedFileURL == sourceURL.standardizedFileURL else {
+        guard result.sourceURL.standardizedFileURL == sourceURL.standardizedFileURL,
+              result.fingerprint == NativeAudioPreparationService.fileFingerprint(for: sourceURL) else {
             return false
         }
         if result.wasAlreadyCanonical {
@@ -578,7 +599,7 @@ actor NativePreparedCloneConditioningCache {
         }
         return NativeAudioPreparationService.canReuseExistingNormalizedOutput(
             at: result.normalizedURL,
-            fingerprint: result.fingerprint
+            fingerprint: referenceFingerprint
         )
     }
 
@@ -827,9 +848,65 @@ actor NativePreparedCloneConditioningCache {
             conditioning: conditioning,
             language: language
         )
-        return voicesDirectory
-            .appendingPathComponent(".qvoice_clone_prompts", isDirectory: true)
+        return Self.transientClonePromptRootDirectory(in: voicesDirectory)
             .appendingPathComponent(digest, isDirectory: true)
+    }
+
+    /// Clone prompts derived from a one-off reference (no saved voice) hold a
+    /// speaker embedding and codec tokens, so they are transient rather than
+    /// kept forever: only the most recently used few stay on disk. A saved
+    /// voice's prompts live under its own `<id>.clone_prompt` directory and are
+    /// deleted with the voice. Where this directory sits for backup purposes is
+    /// ASR-06's classification, not this lifecycle.
+    static let transientClonePromptArtifactRetentionLimit = 8
+
+    static func transientClonePromptRootDirectory(in voicesDirectory: URL) -> URL {
+        voicesDirectory.appendingPathComponent(".qvoice_clone_prompts", isDirectory: true)
+    }
+
+    /// Keeps the `limit` most recently used transient artifacts and removes the
+    /// rest. Hidden entries (in-flight atomic-publication staging) are left
+    /// alone. Best effort: a directory another process removes first, or one
+    /// that cannot be removed, is skipped; a pruned artifact is rebuilt from its
+    /// reference on the next take that needs it.
+    static func pruneTransientClonePromptArtifacts(
+        in voicesDirectory: URL,
+        retaining limit: Int = transientClonePromptArtifactRetentionLimit,
+        fileManager: FileManager = .default
+    ) {
+        let keys: [URLResourceKey] = [.isDirectoryKey, .isSymbolicLinkKey, .contentModificationDateKey]
+        guard let entries = try? fileManager.contentsOfDirectory(
+            at: transientClonePromptRootDirectory(in: voicesDirectory),
+            includingPropertiesForKeys: keys,
+            options: [.skipsHiddenFiles]
+        ) else {
+            return
+        }
+        let artifacts = entries.compactMap { url -> (url: URL, lastUsed: Date)? in
+            guard let values = try? url.resourceValues(forKeys: Set(keys)),
+                  values.isDirectory == true,
+                  values.isSymbolicLink != true else {
+                return nil
+            }
+            return (url, values.contentModificationDate ?? .distantPast)
+        }
+        guard artifacts.count > max(limit, 0) else { return }
+        let newestFirst = artifacts.sorted {
+            $0.lastUsed == $1.lastUsed
+                ? $0.url.lastPathComponent < $1.url.lastPathComponent
+                : $0.lastUsed > $1.lastUsed
+        }
+        for artifact in newestFirst.dropFirst(max(limit, 0)) {
+            try? fileManager.removeItem(at: artifact.url)
+        }
+    }
+
+    /// Adoption counts as use, so the retention order is least recently used.
+    private static func markTransientClonePromptArtifactUsed(_ directory: URL) {
+        try? FileManager.default.setAttributes(
+            [.modificationDate: Date()],
+            ofItemAtPath: directory.path
+        )
     }
 
     private func clonePromptArtifactDigest(

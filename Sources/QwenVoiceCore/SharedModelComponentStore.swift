@@ -771,9 +771,21 @@ public struct SharedModelComponentStore: Sendable {
         )
     }
 
-    /// Atomically removes one model directory. Shared blobs are deliberately retained; liveness
-    /// and pruning are separate so deleting one model cannot invalidate another model's links.
-    public func deleteModel(modelFolder: String) throws {
+    /// How long automatic reclamation leaves a freshly published blob, or a fresh `trash/` or
+    /// `staging/` entry, alone. Publication and installation are separate steps (a blob is
+    /// published, then hard-linked into the replica that becomes the model), and another process
+    /// may be between them; the grace period, together with the hard-link check, keeps an
+    /// in-flight install's components from being reclaimed under it.
+    public static let automaticReclaimGracePeriod: TimeInterval = 15 * 60
+
+    /// Atomically removes one model directory, then reclaims what no installed model still
+    /// references: shared blobs no strict installed manifest lists (so another model's links stay
+    /// valid) and leftover `trash/` and `staging/` entries. The model removal is the operation's
+    /// result; reclamation is best effort and its failure never fails the delete.
+    public func deleteModel(
+        modelFolder: String,
+        componentGracePeriod: TimeInterval = SharedModelComponentStore.automaticReclaimGracePeriod
+    ) throws {
         guard SharedComponentIdentityValidation.isSafeFolder(modelFolder) else {
             throw SharedModelComponentStoreError.invalidModelFolder
         }
@@ -785,7 +797,40 @@ public struct SharedModelComponentStore: Sendable {
             guard FileManager.default.fileExists(atPath: modelURL.path) else { return }
             try SharedComponentFileSystem.move(modelURL, to: tombstone, operation: "tombstone-model")
         }
-        try FileManager.default.removeItem(at: tombstone)
+        try Self.removeTombstone(tombstone)
+        _ = try? reclaimUnreferencedComponents(gracePeriod: componentGracePeriod)
+    }
+
+    /// Automatic reclamation, run after every model delete and once per engine start. Unlike the
+    /// exact `pruneUnreferencedComponents()`, it also sweeps `trash/` and `staging/` leftovers
+    /// from interrupted operations and protects what may belong to an operation in flight: a blob
+    /// with another hard link (an install or migration replica holds it) or one published within
+    /// the grace period, and trash or staging entries younger than it. A store that does not exist
+    /// yet is left uncreated.
+    @discardableResult
+    public func reclaimUnreferencedComponents(
+        gracePeriod: TimeInterval = SharedModelComponentStore.automaticReclaimGracePeriod
+    ) throws -> SharedComponentPruneResult {
+        guard FileManager.default.fileExists(atPath: storeRoot.path) else {
+            return SharedComponentPruneResult(removedDigests: [], preservedDigests: [])
+        }
+        let cutoff = Date().addingTimeInterval(-max(gracePeriod, 0))
+        for root in [trashRoot, stagingRoot] {
+            let entries = (try? FileManager.default.contentsOfDirectory(
+                at: root,
+                includingPropertiesForKeys: nil,
+                options: []
+            )) ?? []
+            for entry in entries {
+                guard let status = SharedComponentFileSystem.linkStatus(entry),
+                      status.changedAt < cutoff else { continue }
+                try? Self.removeTombstone(entry)
+            }
+        }
+        return try pruneUnreferencedComponents { blob in
+            guard let status = SharedComponentFileSystem.linkStatus(blob) else { return true }
+            return status.linkCount > 1 || status.changedAt >= cutoff
+        }
     }
 
     /// Computes component liveness exclusively from strict installed manifests. There is no
@@ -797,6 +842,12 @@ public struct SharedModelComponentStore: Sendable {
     /// Moves unreferenced blobs to private trash while holding the publication lock, then removes
     /// them after releasing it. A malformed manifest or missing live blob makes pruning fail closed.
     public func pruneUnreferencedComponents() throws -> SharedComponentPruneResult {
+        try pruneUnreferencedComponents { _ in false }
+    }
+
+    private func pruneUnreferencedComponents(
+        isProtected: (URL) -> Bool
+    ) throws -> SharedComponentPruneResult {
         try prepareStoreDirectories()
         var removed: [String] = []
         var preserved: [String] = []
@@ -804,7 +855,7 @@ public struct SharedModelComponentStore: Sendable {
         try withPublicationLock {
             let live = Set(try livenessUnlocked().liveBlobDigests)
             for (digest, url) in try allStoredBlobs() {
-                if live.contains(digest) {
+                if live.contains(digest) || isProtected(url) {
                     preserved.append(digest)
                 } else {
                     let tombstone = trashRoot.appendingPathComponent("blob-\(UUID().uuidString)")
@@ -815,7 +866,7 @@ public struct SharedModelComponentStore: Sendable {
             }
         }
         for tombstone in tombstones {
-            try FileManager.default.removeItem(at: tombstone)
+            try Self.removeTombstone(tombstone)
         }
         return SharedComponentPruneResult(
             removedDigests: removed.sorted(),
@@ -896,6 +947,11 @@ public struct SharedModelComponentStore: Sendable {
         guard FileManager.default.fileExists(atPath: modelURL.path) else {
             throw SharedModelComponentStoreError.modelNotFound
         }
+        // A model loaded by a build before PA-22 carries the engine's rebuildable overlay of
+        // absolute symlinks inside its folder. The replica accepts only regular files, so without
+        // this every migrate or repair of such a model failed and fell back to a full re-download.
+        // The overlay is cache the engine now rebuilds outside the model folder.
+        PreparedModelOverlay.removeLegacyOverlay(in: modelURL)
         let replica = modelsRoot.appendingPathComponent(
             ".\(modelURL.lastPathComponent).component-migration.\(UUID().uuidString)",
             isDirectory: true
@@ -1063,6 +1119,17 @@ public struct SharedModelComponentStore: Sendable {
         return result
     }
 
+    /// Removes a private tombstone. Another process's reclamation sweep may already have removed
+    /// it, which is success rather than a failure of this operation.
+    private static func removeTombstone(_ tombstone: URL) throws {
+        do {
+            try FileManager.default.removeItem(at: tombstone)
+        } catch {
+            guard FileManager.default.fileExists(atPath: tombstone.path) else { return }
+            throw error
+        }
+    }
+
     private func prepareStoreDirectories() throws {
         for directory in [modelsRoot, blobsRoot, stagingRoot, trashRoot] {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -1139,6 +1206,11 @@ public actor SharedModelComponentStoreCoordinator {
 
     public func deleteModel(modelFolder: String) throws {
         try store.deleteModel(modelFolder: modelFolder)
+    }
+
+    @discardableResult
+    public func reclaimUnreferencedComponents() throws -> SharedComponentPruneResult {
+        try store.reclaimUnreferencedComponents()
     }
 
     public func liveness() throws -> SharedComponentLiveness {
@@ -1291,6 +1363,23 @@ private enum SharedComponentFileSystem {
             size: size,
             modificationNanoseconds: Int64(modification.timeIntervalSince1970 * 1_000_000_000)
         )
+    }
+
+    /// Hard-link count and status-change time (ctime: set by publication's rename and chmod, and
+    /// by every link or unlink), read without following a symlink. `nil` when the entry cannot be
+    /// read; reclamation treats that as protected.
+    static func linkStatus(_ url: URL) -> (linkCount: UInt64, changedAt: Date)? {
+        var info = stat()
+        let result = url.withUnsafeFileSystemRepresentation { path -> Int32 in
+            guard let path else { return -1 }
+            return lstat(path, &info)
+        }
+        guard result == 0 else { return nil }
+        let changedAt = Date(
+            timeIntervalSince1970: TimeInterval(info.st_ctimespec.tv_sec)
+                + TimeInterval(info.st_ctimespec.tv_nsec) / 1_000_000_000
+        )
+        return (UInt64(info.st_nlink), changedAt)
     }
 
     static func sameFile(_ first: URL, _ second: URL) throws -> Bool {

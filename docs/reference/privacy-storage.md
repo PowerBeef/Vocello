@@ -44,12 +44,21 @@ Maintained macOS subtrees and preferences:
 - `models/` stores installed Hugging Face model files. Speed and Quality folders for the same
   generation mode can coexist on macOS. Catalog-v2 installs may also use the hidden
   `.qwenvoice-components-v1/` content-addressed store; ordinary model paths remain regular hard
-  links, and component liveness is derived from strict installed manifests.
+  links, and component liveness is derived from strict installed manifests. Deleting a model, and
+  each engine start, reclaims blobs no installed manifest lists plus `trash/` and `staging/`
+  leftovers of interrupted operations; a blob another hard link holds or one published in the last
+  15 minutes is left for a later pass. The rebuildable prepared-model overlay (symlinks to the
+  model's files plus its sanitized config) lives in `cache/native_mlx/prepared_models/`, never in
+  the model folder.
 - `.qwenvoice-downloads/` stores staged model downloads, partial files, resume data, and download-state metadata while a download is in progress.
 - `diagnostics/model-downloads/` stores allowlisted transfer/failure summaries, capped at 200 records and 5 MB; raw URLs and absolute paths are excluded.
 - `outputs/CustomVoice/`, `outputs/VoiceDesign/`, and `outputs/Clones/` store generated audio unless the user chooses a different output directory. If a user-chosen directory becomes missing or unwritable, new audio falls back to these default folders and Settings shows a warning — a generation is never lost to a vanished folder.
 - `outputs/bench-archive/` (one folder per run ID; debug-store only; created by `vocello bench --delivery`) retains each delivery benchmark run's take WAVs and result/prosody/quality manifests as the durable measurement evidence. Local-only, never tracked or uploaded; unbounded, prune manually ([`delivery-harness.md`](delivery-harness.md) §3).
 - `voices/` stores committed saved-voice reference assets (the source audio format plus an optional `.txt` transcript sidecar). Each voice is individually deletable; deleting a voice-bank member does not delete its siblings.
+  A saved voice's prepared clone prompts (`<id>.clone_prompt/`) are deleted with it. Prompts derived
+  from a one-off reference (speaker embedding and codec tokens) are transient: `voices/.qvoice_clone_prompts/`
+  keeps only the 8 most recently used. Moving them out of the backed-up `voices/` tree is ASR-06's
+  backup classification.
 - `voice-candidates/` privately stages saved-voice review candidates. Candidates are not listed or usable as saved voices, expire after 24 hours, and are removed on Cancel, Discard, or outside dismissal. `voice-transactions/` holds short-lived commit/replacement/delete journals; startup reconciliation restores a pre-publication replacement, completes a post-publication commit, and completes a user-confirmed delete without resurrecting it. Reconciliation ignores hidden and non-directory entries (such as `.DS_Store`) moves a journal it cannot interpret, with every asset it holds, to `voice-transactions-quarantine/` instead of deleting it, and leaves a journal from a newer Vocello build in place. The store lock is shared with the CLI: a busy or unreconcilable store never fails engine startup, and Saved Voices report the busy state and retry.
 - Reference-clip **recording** (macOS, 2026-06) uses two short-lived directories under the system temporary directory: `voice-clone-references/` holds the in-progress capture and `voice-enroll/` holds a stable copy while the private candidate is prepared. Both are deleted as part of enrollment/cancel; only an explicitly committed candidate moves into `voices/`.
 - `history.sqlite` stores local generation history. Database initialization, migration, read,
@@ -126,7 +135,9 @@ Maintained iPhone subtrees:
 
 - `models/` stores verified installed model files plus the hidden catalog-v2
   `.qwenvoice-components-v1/` content-addressed store. Model-visible component paths are regular
-  hard links; deletion preserves blobs still live in another strict installed manifest.
+  hard links; deletion preserves blobs still live in another strict installed manifest and reclaims
+  the rest (see the macOS entry for the protections). The prepared-model overlay lives in
+  `cache/native_mlx/prepared_models/`, which is excluded from backup.
 - `ios_model_delivery_state.json` under `downloads/` is the atomic schema-v2 delivery ledger. It stores only privacy-safe identifiers, relative paths, receipts, retry counts, byte progress, and terminal state.
 - `downloads/staging/` is the only iPhone delivery staging tree; it holds durable delegate files plus per-model verified files, partials, and resume data.
 - `diagnostics/model-downloads/` stores allowlisted local transfer/failure summaries, capped at 200 records and 5 MB (the same shared store as macOS). It excludes raw URLs, absolute paths, device identity, and user data.
@@ -140,6 +151,7 @@ Maintained iPhone subtrees:
   account-review work. Storage-failure and original-reference recovery remain free. New generated
   Saved Voices retain source mode in enrollment metadata; legacy references are not reclassified.
 - `voices/` stores committed saved-voice reference assets. Each row can delete only its own audio, transcript, and prepared prompt artifacts after an explicit confirmation; other voice-bank members remain intact.
+  Prompts derived from one-off references follow the same bounded retention as on macOS.
 - `voice-candidates/` privately stages review candidates for at most 24 hours. They are invisible to the saved-voice catalog until Keep/Save commits them; Cancel, Discard, and outside dismissal remove them. `voice-transactions/` is the bounded recovery journal for commit/replacement/delete operations. `voice-transactions-quarantine/` keeps journals reconciliation could not interpret, with the assets they hold; nothing is deleted from it automatically. Journals written by a newer Vocello build (a newer schema version) stay in `voice-transactions/` untouched.
 - `cache/imported_references/` stores app-owned materializations of WAV, MP3, AIFF, or M4A files
   selected directly from Studio Clone, selected from Voices, or opened through Files, plus an

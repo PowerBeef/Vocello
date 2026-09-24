@@ -503,6 +503,150 @@ final class SharedModelComponentStoreTests: XCTestCase {
         XCTAssertEqual(liveness.liveBlobDigests, [])
     }
 
+    /// PA-22 / CORE-07: deleting a model reclaims the shared blobs no installed manifest still
+    /// lists, and sweeps `trash/` and `staging/` entries interrupted operations left behind.
+    func testDeleteReclaimsUnreferencedComponentsAndSweepsLeftovers() throws {
+        let fixture = try migratedFixture(label: "reclaim")
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let store = fixture.store
+        let blob = try store.blobURL(for: fixture.file.sha256)
+        let interruptedDelete = store.storeRoot.appendingPathComponent("trash/model-interrupted", isDirectory: true)
+        let interruptedPublish = store.storeRoot.appendingPathComponent("staging/interrupted", isDirectory: true)
+        try write(Data("tombstoned".utf8), to: interruptedDelete.appendingPathComponent("weights.bin"))
+        try write(Data("partial".utf8), to: interruptedPublish.appendingPathComponent("blob.bin"))
+
+        try store.deleteModel(modelFolder: fixture.model.lastPathComponent, componentGracePeriod: 0)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.model.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: blob.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: interruptedDelete.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: interruptedPublish.path))
+        XCTAssertEqual(
+            try FileManager.default.contentsOfDirectory(
+                atPath: store.storeRoot.appendingPathComponent("trash", isDirectory: true).path
+            ),
+            []
+        )
+    }
+
+    /// Automatic reclamation never takes a component an install in flight may still need: a blob
+    /// another hard link holds (the install replica) or one published within the grace period.
+    /// It also never creates a store that does not exist yet.
+    func testAutomaticReclaimProtectsInFlightAndFreshComponents() throws {
+        let root = try temporaryDirectory("reclaim-protection")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let models = root.appendingPathComponent("models", isDirectory: true)
+        let source = root.appendingPathComponent("source", isDirectory: true)
+        try write(Data("published-not-installed".utf8), to: source.appendingPathComponent("component.bin"))
+        let file = try SharedComponentFileIdentity.verify(
+            relativePath: "component.bin",
+            fileURL: source.appendingPathComponent("component.bin")
+        )
+        let store = SharedModelComponentStore(modelsRoot: models)
+        XCTAssertEqual(
+            try store.reclaimUnreferencedComponents(gracePeriod: 0),
+            SharedComponentPruneResult(removedDigests: [], preservedDigests: [])
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.storeRoot.path))
+
+        _ = try store.publish(content: SharedComponentContentIdentity(files: [file]), from: source)
+        let blob = try store.blobURL(for: file.sha256)
+        XCTAssertEqual(try store.reclaimUnreferencedComponents().preservedDigests, [file.sha256])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: blob.path))
+
+        let replica = models.appendingPathComponent(".model-a.component-install.fixture", isDirectory: true)
+        try FileManager.default.createDirectory(at: replica, withIntermediateDirectories: true)
+        try FileManager.default.linkItem(at: blob, to: replica.appendingPathComponent("component.bin"))
+        XCTAssertEqual(try store.reclaimUnreferencedComponents(gracePeriod: 0).preservedDigests, [file.sha256])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: blob.path))
+
+        try FileManager.default.removeItem(at: replica)
+        XCTAssertEqual(try store.reclaimUnreferencedComponents(gracePeriod: 0).removedDigests, [file.sha256])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: blob.path))
+    }
+
+    /// PA-22 / CORE-08: a model loaded by an earlier build carries the engine's overlay of
+    /// absolute symlinks inside its folder. Migration and repair used to fail on it and fall back
+    /// to a full re-download; they now drop the rebuildable overlay and succeed.
+    func testMigrationAndRepairSucceedWithLegacyPreparedOverlayPresent() throws {
+        let root = try temporaryDirectory("legacy-overlay")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let models = root.appendingPathComponent("models", isDirectory: true)
+        let model = models.appendingPathComponent("model-legacy", isDirectory: true)
+        let bytes = Data("shared-legacy".utf8)
+        try write(bytes, to: model.appendingPathComponent("codec/shared.bin"))
+        try write(Data("unique".utf8), to: model.appendingPathComponent("unique.bin"))
+        try addLegacyOverlay(to: model)
+        let file = try identity(path: "codec/shared.bin", bytes: bytes)
+        let content = try SharedComponentContentIdentity(files: [file])
+        let manifest = try SharedComponentInstalledModelManifest(
+            modelIdentity: "identity-legacy",
+            contentIdentity: content,
+            compatibilityIdentity: compatibility(content: content, capability: .decoderOnly)
+        )
+        let store = SharedModelComponentStore(modelsRoot: models)
+        let validate: @Sendable (URL) throws -> Void = { installed in
+            guard FileManager.default.fileExists(atPath: installed.appendingPathComponent("unique.bin").path) else {
+                throw ProbeError.failed
+            }
+        }
+
+        _ = try store.migrate(
+            SharedComponentMigrationPlan(modelFolder: model.lastPathComponent, manifest: manifest),
+            validateInstalledModel: validate
+        )
+        XCTAssertEqual(try store.audit(modelFolder: model.lastPathComponent).state, .healthy)
+        XCTAssertEqual(try Data(contentsOf: model.appendingPathComponent("unique.bin")), Data("unique".utf8))
+        XCTAssertFalse(hasLegacyOverlayEntries(in: model))
+
+        try addLegacyOverlay(to: model)
+        try FileManager.default.removeItem(at: model.appendingPathComponent(file.relativePath))
+        XCTAssertEqual(try store.audit(modelFolder: model.lastPathComponent).state, .repairable)
+        _ = try store.repair(modelFolder: model.lastPathComponent, validateInstalledModel: validate)
+        XCTAssertEqual(try store.audit(modelFolder: model.lastPathComponent).state, .healthy)
+        XCTAssertFalse(hasLegacyOverlayEntries(in: model))
+
+        // Idempotent: nothing left to remove is not an error.
+        PreparedModelOverlay.removeLegacyOverlay(in: model)
+        XCTAssertEqual(try store.audit(modelFolder: model.lastPathComponent).state, .healthy)
+    }
+
+    func testPreparedModelOverlayLivesUnderTheRuntimeCache() {
+        let source = URL(fileURLWithPath: "/fixture/models/Qwen3-TTS-Fixture", isDirectory: true)
+        let hubCache = URL(fileURLWithPath: "/fixture/cache/native_mlx", isDirectory: true)
+        let overlay = PreparedModelOverlay.directory(forSourceDirectory: source, hubCacheDirectory: hubCache)
+        XCTAssertEqual(overlay.path, "/fixture/cache/native_mlx/prepared_models/Qwen3-TTS-Fixture")
+        XCTAssertFalse(overlay.path.hasPrefix(source.path + "/"))
+    }
+
+    /// The overlay layout builds before PA-22 wrote: absolute symlinks to the model's files,
+    /// plus an interrupted rebuild next to it.
+    private func addLegacyOverlay(to model: URL) throws {
+        for directoryName in [
+            PreparedModelOverlay.legacyDirectoryName,
+            "\(PreparedModelOverlay.legacyDirectoryName).tmp.fixture",
+        ] {
+            let overlay = model.appendingPathComponent(directoryName, isDirectory: true)
+            try FileManager.default.createDirectory(
+                at: overlay.appendingPathComponent("codec", isDirectory: true),
+                withIntermediateDirectories: true
+            )
+            try FileManager.default.createSymbolicLink(
+                atPath: overlay.appendingPathComponent("unique.bin").path,
+                withDestinationPath: model.appendingPathComponent("unique.bin").path
+            )
+            try FileManager.default.createSymbolicLink(
+                atPath: overlay.appendingPathComponent("codec/shared.bin").path,
+                withDestinationPath: model.appendingPathComponent("codec/shared.bin").path
+            )
+        }
+    }
+
+    private func hasLegacyOverlayEntries(in model: URL) -> Bool {
+        let entries = (try? FileManager.default.contentsOfDirectory(atPath: model.path)) ?? []
+        return entries.contains { $0.hasPrefix(PreparedModelOverlay.legacyDirectoryName) }
+    }
+
     private struct MigratedFixture {
         let root: URL
         let model: URL

@@ -918,10 +918,21 @@ public enum PreparedVoiceQualityWarning {
 public struct AudioPreparationRequest: Hashable, Codable, Sendable {
     public let inputPath: String
     public let outputPath: String?
+    /// The fingerprint the caller encoded in `outputPath`'s file name. When
+    /// set, an existing canonical output carrying it is reused instead of
+    /// being matched against the service's own path/size/mtime fingerprint,
+    /// so a caller that names outputs by content (clone references) gets the
+    /// reuse its name promises.
+    public let outputReuseFingerprint: String?
 
-    public init(inputPath: String, outputPath: String? = nil) {
+    public init(
+        inputPath: String,
+        outputPath: String? = nil,
+        outputReuseFingerprint: String? = nil
+    ) {
         self.inputPath = inputPath
         self.outputPath = outputPath
+        self.outputReuseFingerprint = outputReuseFingerprint
     }
 }
 

@@ -482,3 +482,11 @@ with residency on and off, live adoption (`speech_tokenizer_load` 503 → 0 ms,
 PASS `mac-memory-qualification-20260726-115343-5a1c8a85`
 (Custom→Design→Clone, three retained takes per mode). The registered
 `QWENVOICE_TOKENIZER_RESIDENCY` knob is the gated diagnostic off-switch.
+
+## Amendment 2026-09-24 — in-process batch API removed (PA-07)
+
+`MLXTTSEngine.generateBatch`, its `batchGeneration` operation kind and
+`NativeMemoryPolicyResolver.postBatchTrimLevel` had no callers and are
+deleted, superseding the 2026-07-24 note that the CLI still used the engine
+batch API. The CLI `batch` command and the macOS `MacLineBatchRunner` loop the
+single-take path.

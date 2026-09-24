@@ -12,8 +12,8 @@ import Foundation
 /// - `QWENVOICE_NATIVE_TELEMETRY_MODE` set to `light` / `lightweight` (back-compat).
 /// - An in-process override (`applyHandshakeMode(_:)`): `vocello bench` latches its
 ///   `--telemetry` mode so `verbose` reaches the engine even if `isEnabled` was already
-///   resolved. The name predates the retired XPC `initialize` handshake; every host now
-///   runs the engine in its own process.
+///   resolved. The name predates the retired XPC `initialize` handshake. Every host now
+///   runs the engine in-process, so the latch is set and read in the same process.
 public enum TelemetryGate {
     private static let environmentKey = "QWENVOICE_DEBUG"
     private static let telemetryModeKey = "QWENVOICE_NATIVE_TELEMETRY_MODE"

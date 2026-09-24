@@ -36,9 +36,10 @@ public enum BenchRunContext {
     /// Bench driver writes a current-take manifest in temporary storage so
     /// warm-session takes still stamp take index + cell without relaunching.
     ///
-    /// macOS keeps the fixed path in the global temporary directory that its
-    /// bench tooling has always used; the app and the CLI both run the engine
-    /// in-process. iOS must use its sandbox-owned temporary directory.
+    /// macOS uses a fixed global path because processes outside the app write
+    /// it: `scripts/ui_test.sh` and the XCUITest runner
+    /// (`VocelloMacBenchmarkUITests`). The app and the CLI read it in-process.
+    /// iOS uses its sandbox-owned temporary directory.
     public static func writeCurrentTakeFile(
         takeIndex: Int,
         cell: String,

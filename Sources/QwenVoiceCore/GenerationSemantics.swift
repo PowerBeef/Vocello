@@ -347,7 +347,8 @@ public enum GenerationSemantics {
 
         public var cacheKey: String { "qv-prewarm-v1-\(digest)" }
 
-        /// Compatibility output for existing public string APIs.
+        /// Delimiter-joined legacy form, kept so tests can show that distinct
+        /// identities which alias here stay distinct in `canonicalSerialization`.
         public var legacyKey: String {
             switch self {
             case .model(let modelID, let mode):
@@ -361,7 +362,8 @@ public enum GenerationSemantics {
         }
     }
 
-    /// Collision-safe identity for a batch generation session.
+    /// Collision-safe identity for a generation session; its digest is the
+    /// `sessionIdentityDigest` of every `GenerationRequestReceipt`.
     ///
     /// The former implementation concatenated payload fields with `|` before
     /// applying a 64-bit FNV hash. Inputs containing that delimiter could alias

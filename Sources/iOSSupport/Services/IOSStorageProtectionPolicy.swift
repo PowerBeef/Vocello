@@ -22,6 +22,13 @@ enum IOSStorageProtectionPolicy {
         let recursive: Bool
     }
 
+    /// What one pass left unapplied (PA-21, IOS-06). A governed directory or the root that
+    /// cannot be protected fails the pass; a single descendant file that cannot be updated
+    /// is counted and retried on the next launch instead of stopping startup.
+    struct ApplyReport: Equatable, Sendable {
+        var descendantFailureCount = 0
+    }
+
     static let protectionClass = FileProtectionType.completeUntilFirstUserAuthentication
 
     static let entries: [Entry] = [
@@ -41,8 +48,12 @@ enum IOSStorageProtectionPolicy {
         Entry(id: "history", relativePath: "history.sqlite", pathPrefix: "history.sqlite", isDirectory: false, backup: .included, recursive: false),
     ]
 
-    static func apply(at root: URL, fileManager: FileManager = .default) throws {
+    /// Applies the policy to the governed tree. Bootstrap runs this off the main actor
+    /// (IOS-06) before the engine and the background delivery coordinator exist.
+    @discardableResult
+    static func apply(at root: URL, fileManager: FileManager = .default) throws -> ApplyReport {
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+        var report = ApplyReport()
 
         for entry in entries {
             if let prefix = entry.pathPrefix {
@@ -52,7 +63,7 @@ enum IOSStorageProtectionPolicy {
                     options: [.skipsHiddenFiles]
                 )
                 for child in children where child.lastPathComponent.hasPrefix(prefix) {
-                    try apply(entry, to: child, fileManager: fileManager)
+                    applyToDescendant(entry, at: child, fileManager: fileManager, report: &report)
                 }
                 continue
             }
@@ -67,6 +78,7 @@ enum IOSStorageProtectionPolicy {
             }
             try apply(entry, to: url, fileManager: fileManager)
 
+            // Without an error handler the enumerator skips an unreadable child and continues.
             guard entry.recursive,
                   let enumerator = fileManager.enumerator(
                       at: url,
@@ -76,8 +88,22 @@ enum IOSStorageProtectionPolicy {
                 continue
             }
             for case let child as URL in enumerator {
-                try apply(entry, to: child, fileManager: fileManager)
+                applyToDescendant(entry, at: child, fileManager: fileManager, report: &report)
             }
+        }
+        return report
+    }
+
+    private static func applyToDescendant(
+        _ entry: Entry,
+        at url: URL,
+        fileManager: FileManager,
+        report: inout ApplyReport
+    ) {
+        do {
+            try apply(entry, to: url, fileManager: fileManager)
+        } catch {
+            report.descendantFailureCount += 1
         }
     }
 
@@ -106,7 +132,7 @@ enum IOSStorageProtectionPolicy {
     /// window and restores the exact original mode even when the metadata operation fails.
     ///
     /// The app has no second model-owning process, and this runs before the engine or background
-    /// delivery coordinator is created. Hard-linked replicas share the same inode and therefore
+    /// delivery coordinator is created (bootstrap awaits the pass before building either). Hard-linked replicas share the same inode and therefore
     /// return to the same immutable mode together.
     @discardableResult
     static func withMetadataWriteAccess<T>(

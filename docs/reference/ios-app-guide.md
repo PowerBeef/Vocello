@@ -131,6 +131,13 @@ archive/IPA verification rejects any capability drift.
 
 ## 2. The app, screen by screen
 
+### Startup — `Sources/iOS/IOSAppBootstrap.swift`
+
+The launch mark shows while the storage-protection pass runs off the main actor and the
+dependencies are built. If startup fails, `startup_errorState` shows the reason with
+`startup_retryButton`, which runs startup again without a relaunch. A failed engine
+initialization after startup is retried the next time the app becomes active.
+
 ### Onboarding (first run) — `Sources/iOS/Overlays/IOSOnboardingFlow.swift`
 
 Three pages (Welcome → Install → Ready). Controls: `onboarding_skip` (top-right on pages

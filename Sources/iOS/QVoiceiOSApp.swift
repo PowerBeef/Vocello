@@ -23,6 +23,8 @@ struct QVoiceiOSApp: App {
     /// PA-15: background time, Studio cancellation/notice and the screen-awake hold.
     @State private var backgroundGeneration = IOSBackgroundGenerationController()
     @State private var didInitializeEngine = false
+    /// Engine initialization failed; the next return to the foreground retries it (AUD-01).
+    @State private var engineStartFailed = false
     private let memoryBudgetPolicy = IOSMemoryBudgetPolicy.iPhoneShippingDefault
     @Environment(\.scenePhase) private var scenePhase
 
@@ -45,20 +47,11 @@ struct QVoiceiOSApp: App {
         WindowGroup {
             Group {
                 if let error = deps.startupError {
-                    VStack(spacing: 16) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 64, height: 64)
-                            .foregroundColor(.orange)
-                        Text(IOSInterfaceText.initializationFailed)
-                            .font(.title2.bold())
-                        Text(error.localizedDescription)
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal)
-                    }
-                    .padding()
+                    IOSStartupFailureView(
+                        error: error,
+                        isRetrying: deps.isStarting,
+                        onRetry: { deps.retry() }
+                    )
                 } else if let modelRegistry = deps.registry, let engine = deps.engine, let manager = deps.modelManager, let installer = deps.modelInstaller {
                     if IOSDeviceSupport.isSupportedHardware {
                         QVoiceiOSRootView(
@@ -128,6 +121,8 @@ struct QVoiceiOSApp: App {
                     } else {
                         IOSUnsupportedDeviceView(reason: IOSDeviceSupport.unsupportedReason)
                     }
+                } else {
+                    IOSStartupProgressView()
                 }
             }
             .preferredColorScheme(.dark)
@@ -161,6 +156,7 @@ struct QVoiceiOSApp: App {
                 IOSDeviceDiagnosticsRunner.runIfRequested(engine: engine)
             } catch {
                 didInitializeEngine = false
+                engineStartFailed = true
                 if TelemetryGate.resolvedEnabled {
                     print("[QVoiceiOSApp] Engine initialization failed: \(error.localizedDescription)")
                 }
@@ -174,6 +170,10 @@ struct QVoiceiOSApp: App {
         case .active:
             appLanguage.refreshSystemLanguage()
             Task { await IOSExportCommerce.shared.refresh() }
+            if engineStartFailed {
+                engineStartFailed = false
+                startEngineIfNeeded()
+            }
             if let engine = deps.engine {
                 Task {
                     await engine.refreshMemoryContext(reason: "scene_active", source: "app")

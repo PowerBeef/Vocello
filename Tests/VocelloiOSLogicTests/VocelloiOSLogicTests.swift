@@ -416,6 +416,45 @@ final class VocelloiOSLogicTests: XCTestCase {
         XCTAssertEqual(byID["history"]?.pathPrefix, "history.sqlite")
     }
 
+    /// IOS-06: one file that cannot take the governed attributes is counted and left for the
+    /// next launch; it no longer fails startup.
+    func testStorageProtectionDescendantFailureIsCountedNotFatal() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "vocello-storage-policy-descendant-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        let outputs = root.appendingPathComponent("outputs", isDirectory: true)
+        try FileManager.default.createDirectory(at: outputs, withIntermediateDirectories: true)
+        try Data("take".utf8).write(to: outputs.appendingPathComponent("take.wav"))
+        try Data("take".utf8).write(to: outputs.appendingPathComponent("unwritable.wav"))
+
+        let report = try IOSStorageProtectionPolicy.apply(
+            at: root,
+            fileManager: StorageProtectionFaultFileManager(failingName: "unwritable.wav")
+        )
+
+        XCTAssertEqual(report.descendantFailureCount, 1)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("voices").path))
+    }
+
+    /// A governed directory that cannot be protected still fails the pass, which the app shows
+    /// with Retry.
+    func testStorageProtectionGovernedDirectoryFailureStillThrows() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "vocello-storage-policy-governed-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        XCTAssertThrowsError(
+            try IOSStorageProtectionPolicy.apply(
+                at: root,
+                fileManager: StorageProtectionFaultFileManager(failingName: "voices")
+            )
+        )
+    }
+
     func testStorageProtectionMetadataUpdateRestoresImmutableModelFile() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(
             "vocello-storage-policy-\(UUID().uuidString)",
@@ -734,5 +773,27 @@ final class VocelloiOSLogicTests: XCTestCase {
             gpuRecommendedWorkingSetBytes: nil,
             hasUnifiedMemory: true
         )
+    }
+}
+
+/// Skips the data-protection class (it is iOS-only; the macOS host would reject it) and fails
+/// every metadata write to items named `failingName`, so a test can place one fault.
+private final class StorageProtectionFaultFileManager: FileManager {
+    private let failingName: String
+
+    init(failingName: String) {
+        self.failingName = failingName
+        super.init()
+    }
+
+    override func setAttributes(
+        _ attributes: [FileAttributeKey: Any],
+        ofItemAtPath path: String
+    ) throws {
+        if URL(fileURLWithPath: path).lastPathComponent == failingName {
+            throw CocoaError(.fileWriteNoPermission)
+        }
+        guard attributes[.protectionKey] == nil else { return }
+        try super.setAttributes(attributes, ofItemAtPath: path)
     }
 }

@@ -4,18 +4,59 @@ import SwiftUI
 import UIKit
 import QwenVoiceCore
 
+/// Builds the app's dependencies (PA-21, AUD-01, IOS-06).
+///
+/// The storage-protection pass walks the whole App Group tree, so it runs off the main
+/// actor; the registry, engine store and installer are created on the main actor only
+/// after it has finished, as the immutable model-file metadata window requires. A
+/// failure is shown with Retry instead of ending the session.
 @MainActor
 final class IOSAppDependenciesContainer: ObservableObject {
-    let registry: ContractBackedModelRegistry?
-    let documentIO: LocalDocumentIO?
-    let engine: TTSEngineStore?
-    let modelManager: ModelManagerViewModel?
-    let modelInstaller: IOSModelInstallerViewModel?
-    let startupError: Error?
+    @Published private(set) var registry: ContractBackedModelRegistry?
+    @Published private(set) var documentIO: LocalDocumentIO?
+    @Published private(set) var engine: TTSEngineStore?
+    @Published private(set) var modelManager: ModelManagerViewModel?
+    @Published private(set) var modelInstaller: IOSModelInstallerViewModel?
+    @Published private(set) var startupError: Error?
+    @Published private(set) var isStarting = false
+
+    private var bootstrapTask: Task<Void, Never>?
 
     init() {
+        start()
+    }
+
+    /// Runs startup again after a failure. Ignored while a pass is running or
+    /// once the dependencies exist.
+    func retry() {
+        guard startupError != nil else { return }
+        start()
+    }
+
+    private func start() {
+        guard bootstrapTask == nil, engine == nil else { return }
+        startupError = nil
+        isStarting = true
+        bootstrapTask = Task { [weak self] in
+            let protection = await Task.detached(priority: .userInitiated) {
+                Result { try IOSStorageProtectionPolicy.apply(at: AppPaths.appSupportDir) }
+            }.value
+            self?.finishStart(protection: protection)
+        }
+    }
+
+    private func finishStart(
+        protection: Result<IOSStorageProtectionPolicy.ApplyReport, any Error>
+    ) {
+        defer {
+            bootstrapTask = nil
+            isStarting = false
+        }
         do {
-            try IOSStorageProtectionPolicy.apply(at: AppPaths.appSupportDir)
+            let report = try protection.get()
+            if report.descendantFailureCount > 0, TelemetryGate.resolvedEnabled {
+                print("[bootstrap] storage protection left \(report.descendantFailureCount) file(s) for the next launch")
+            }
             let registry = try TTSContract.loadRegistry()
             let documentIO = LocalDocumentIO(importedReferenceDirectory: AppPaths.importedReferenceAudioDir)
             let selectedBackend = try QVoiceiOSApp.makeBackend(
@@ -23,21 +64,16 @@ final class IOSAppDependenciesContainer: ObservableObject {
                 documentIO: documentIO
             )
             let installer = selectedBackend.modelInstaller
-            self.registry = registry
-            self.documentIO = documentIO
-            self.engine = selectedBackend.engineStore
-            self.modelManager = selectedBackend.modelManager
-            self.modelInstaller = installer
             IOSModelDeliveryBackgroundEventRelay.handler = { identifier, completionHandler in
                 _ = installer.handleBackgroundEventsCompletion(identifier, completionHandler)
             }
+            self.registry = registry
+            self.documentIO = documentIO
+            self.modelManager = selectedBackend.modelManager
+            self.modelInstaller = installer
+            self.engine = selectedBackend.engineStore
             self.startupError = nil
         } catch {
-            self.registry = nil
-            self.documentIO = nil
-            self.engine = nil
-            self.modelManager = nil
-            self.modelInstaller = nil
             self.startupError = error
         }
     }
@@ -189,6 +225,57 @@ enum IOSDeviceSupport {
                 String(cString: $0)
             }
         }
+    }
+}
+
+/// Shown while startup runs: the launch mark, so the transition from the launch
+/// screen reads as one step.
+struct IOSStartupProgressView: View {
+    var body: some View {
+        ZStack {
+            Color(red: 13 / 255, green: 14 / 255, blue: 18 / 255)
+                .ignoresSafeArea()
+            VStack(spacing: 24) {
+                Image("VocelloLaunchLogo")
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 200)
+                    .accessibilityHidden(true)
+                ProgressView()
+            }
+        }
+    }
+}
+
+/// Startup failed (AUD-01): say so and offer Retry instead of a dead end.
+struct IOSStartupFailureView: View {
+    let error: Error
+    let isRetrying: Bool
+    let onRetry: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 64, height: 64)
+                .foregroundColor(.orange)
+                .accessibilityHidden(true)
+            Text(IOSInterfaceText.initializationFailed)
+                .font(.title2.bold())
+            Text(error.localizedDescription)
+                .multilineTextAlignment(.center)
+                .foregroundColor(.secondary)
+                .padding(.horizontal)
+            Button(IOSInterfaceText.retry, action: onRetry)
+                .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.gold)
+                .disabled(isRetrying)
+                .accessibilityIdentifier("startup_retryButton")
+        }
+        .padding()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("startup_errorState")
     }
 }
 

@@ -208,6 +208,11 @@ metadata operation throws. This does not weaken the protection class, make model
 persistently writable, or create another model owner; policy application still completes before
 the engine and background delivery coordinator are created.
 
+Since PA-21 (audit IOS-06) the pass runs off the main actor while the launch mark shows, and the
+dependencies are built on the main actor only after it returns. The root and every governed
+directory must take the policy, or startup shows the failure with Retry. A single descendant file
+that cannot be updated is counted and retried on the next launch instead of stopping startup.
+
 The deterministic policy validator rejects a missing path class, a protection mismatch, or an
 unclassified maintained subtree. ASR-06 remains open until an exact signed candidate proves the
 effective file attributes, backup exclusions, deletion behavior, and locked/relaunch behavior on a

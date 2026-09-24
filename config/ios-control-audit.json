@@ -56,6 +56,13 @@
       "interactiveOccurrenceCount": 5
     },
     {
+      "path": "Sources/iOS/IOSAppBootstrap.swift",
+      "screen": "Startup failure",
+      "scenario": "stateful",
+      "reason": "Retry appears only when startup itself fails (storage protection, bundled contract, or backend construction); ordinary device runs cannot induce that fault.",
+      "interactiveOccurrenceCount": 1
+    },
+    {
       "path": "Sources/iOS/App/TabDock.swift",
       "screen": "Tab dock",
       "scenario": "inventory",
@@ -274,6 +281,21 @@
       "action": "Inspect warning; retry/export only a run-owned take",
       "expectedResult": "Successful audio remains playable; storage retry never regenerates audio",
       "expectedSemantics": "History failure distinct from synthesis, retry enabled state, export availability",
+      "minimumTargetPoints": 44,
+      "mutationClass": "reversible",
+      "scenario": "stateful",
+      "availability": "conditional"
+    },
+    {
+      "id": "startup-recovery",
+      "identifierPattern": "startup_(errorState|retryButton)",
+      "sourceToken": "startup_retryButton",
+      "screen": "Startup failure",
+      "prerequisite": "App startup failed before the root view existed",
+      "role": "status and buttons",
+      "action": "Read the failure and retry startup",
+      "expectedResult": "Retry runs startup again without a relaunch; success shows the app",
+      "expectedSemantics": "Failure title, reason, and an enabled Retry while no attempt runs",
       "minimumTargetPoints": 44,
       "mutationClass": "reversible",
       "scenario": "stateful",

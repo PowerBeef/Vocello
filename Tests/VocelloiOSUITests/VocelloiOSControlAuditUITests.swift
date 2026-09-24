@@ -99,7 +99,8 @@ private final class IOSControlAuditRecorder {
         "root-tabs", "studio-modes", "composer", "speaker-options", "speaker-previews",
         "delivery-options", "delivery-editor", "language-options", "variation-options",
         "studio-chips", "reference-actions", "voice-enrollment", "voices-surface",
-        "saved-voice-rows", "history-surface", "history-unqueued", "history-rows", "settings-preferences",
+        "saved-voice-rows", "history-surface", "history-unqueued", "startup-recovery", "history-rows",
+        "settings-preferences",
         "settings-links", "model-rows", "player-controls", "recording-controls",
         "attribution-controls", "onboarding-controls", "sheet-navigation",
     ]
@@ -406,6 +407,12 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             classification: "BLOCKED_PRESERVATION_POLICY",
             expected: "Failed durable enqueue exposes Retry and Export without claiming failed synthesis",
             actual: "Storage faults are deterministic fixtures; this campaign does not corrupt storage or retry user-owned audio"
+        )
+        recorder.record(
+            scenario: "stateful", controlID: "startup-recovery",
+            classification: "BLOCKED_PRESERVATION_POLICY",
+            expected: "A failed startup shows its reason and a Retry that runs startup again",
+            actual: "Startup faults are not induced on a user device; this campaign reached the app, so startup succeeded"
         )
         let clearMenu = element("historyClearMenu")
         if clearMenu.exists && clearMenu.isHittable {

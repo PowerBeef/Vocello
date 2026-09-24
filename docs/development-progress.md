@@ -28,7 +28,10 @@ out on "internal playback stays available" for the first Design History row, a 0
 (`ios-xcui-purchase-20260924-073819-32d98675`, attachments hold the failure tree and screenshot).
 Diagnosed from the failure screenshot: autoplay had finished a one-second Design clip, so the
 button read Play; the lane now opens the longest row and accepts finished playback (bbd8434f). Next,
-when the phone is available: rerun `--scenario exports`, then the remaining export surfaces on RF-13; the rest of the plan below is
+when the phone is available: rerun `--scenario exports`, then the remaining export surfaces on RF-13.
+Also closed September 24 without the phone: PA-22 (core storage and memory relief) and PA-21 (iOS
+audio-session owner, startup Retry, drafts, Wi-Fi copy; iPhone History clear deletes its audio);
+their device checks are on AUD-02 and their leftovers on PA-30; the rest of the plan below is
 unchanged (PA-16 needs an M6 gate-bench baseline first).
 
 ### Current state (September 23)

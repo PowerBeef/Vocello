@@ -22,7 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 17/30 (57%) |
+| `project-audit-2026-09` | active | backend-and-platform | 19/31 (61%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -461,10 +461,9 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-18` | planned | Public claims match what each download ships | — |
 | `PA-19` | planned | Orchestrators and the generate loop have unit coverage | — |
 | `PA-20` | planned | Accessibility and localization reach every surface | — |
-| `PA-21` | planned | iOS lifecycle, audio session and startup are recoverable | — |
-| `PA-22` | planned | Core storage and memory lifecycle is bounded | — |
 | `PA-25` | planned | Docs and tooling stay proportional | — |
 | `PA-26` | planned | Low-severity backlog from the external audit | — |
+| `PA-30` | planned | Leftovers from PA-21 and PA-22 | — |
 
 ### Open items in detail
 
@@ -495,17 +494,14 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-20`** (planned) — Accessibility and localization reach every surface.
   gate: macOS and iOS route computed English and typed errors through catalog keys with plural rules and the in-app locale, VoiceOver announces generation state changes, fixed fonts scale, timed banners with actions stay, and website text meets 4.5:1 contrast.
 
-- **`PA-21`** (planned) — iOS lifecycle, audio session and startup are recoverable.
-  gate: Audio-session changes have one owner, previews pause shared playback, startup failures offer retry, saved-voice load errors are shown, downloads say they need Wi-Fi, drafts survive relaunch, and keep-audio-files is defined for iOS.
-
-- **`PA-22`** (planned) — Core storage and memory lifecycle is bounded.
-  gate: Clone-reference caching keys on the same fingerprint it stores, derived clone prompts follow their voice's lifecycle and backup class, all memory trims share one admission gate with load epochs, shared components and trash are pruned, and the prepared-model overlay lives outside the model folder.
-
 - **`PA-25`** (planned) — Docs and tooling stay proportional.
   gate: Resume now keeps only current checkpoints, dated reports move out of docs/reference with an index, research-only scripts run outside the product gate with their own environment, source-text tests are replaced, and a contract lands only when another retires.
 
 - **`PA-26`** (planned) — Low-severity backlog from the external audit.
   gate: Every Low and Info finding in the external audit that no other item covers is fixed or declined with a reason, section by section.
+
+- **`PA-30`** (planned) — Leftovers from PA-21 and PA-22.
+  gate: The Studio Clone reference picker shows a saved-voice load failure with Retry; History writes survive app suspension (GRDB suspension notifications) behind an adversarial review of the recovery path; the maintainer decides whether audio kept by earlier Keep Audio Files clears is removed; the resident speech tokenizer gets an owner-scoped release (ENG-06) only with a device memory re-qualification.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

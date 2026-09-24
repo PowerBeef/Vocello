@@ -1174,9 +1174,9 @@
         "Sources/iOS/Sheets/IOSPlayerSheet.swift",
         "Sources/iOS/Studio/IOSStudioInlinePlayerCard.swift"
       ],
-      "notes": "Revalidated 2026-09-18 (P1): the recorder selects .record and later deactivates; the shared player does not restore its category. ClipReviewPlayer does. The shared player already observes interruptions/routes; the other two AVAudioPlayer owners do not. Record-then-play silence and recovery after calls/headset changes require phone evidence. See project-review-2026-09-18.md.",
+      "notes": "Revalidated 2026-09-18 (P1): the recorder selects .record and later deactivates; the shared player does not restore its category. ClipReviewPlayer does. The shared player already observes interruptions/routes; the other two AVAudioPlayer owners do not. Record-then-play silence and recovery after calls/headset changes require phone evidence. See project-review-2026-09-18.md. 2026-09-24: PA-21 now gives the session one owner (IOSAudioSessionOwner). Device checks left here: music continues through launch and return until Vocello plays; first playback is audible with the Silent switch; sheet expand/close pauses and resumes; voice samples mix, Studio does not; a capped (20.5 s) recording then clip review and Studio playback are audible; Control Center mid-recording keeps the category; background lets Music resume; call/Siri interruptions; startup Retry after a real failure.",
       "plan": "audit-remediation-2026-09",
-      "updated": "2026-09-18",
+      "updated": "2026-09-24",
       "unparkWhen": "the paired iPhone is available and unlocked for a consented lane (CONV-20)"
     },
     {
@@ -1458,34 +1458,6 @@
       "updated": "2026-09-23"
     },
     {
-      "id": "PA-21",
-      "title": "iOS lifecycle, audio session and startup are recoverable",
-      "status": "planned",
-      "gate": "Audio-session changes have one owner, previews pause shared playback, startup failures offer retry, saved-voice load errors are shown, downloads say they need Wi-Fi, drafts survive relaunch, and keep-audio-files is defined for iOS.",
-      "sourceOfTruth": [
-        "Sources/iOS/QVoiceiOSApp.swift",
-        "Sources/iOS/App/RootView.swift",
-        "Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift"
-      ],
-      "notes": "External audit IOS-03 to IOS-11 (IOS-05 is F-25), confirmed 2026-09-22 with corrections: the category flip happens on return to active, the Wi-Fi-only download policy is deliberate and only the copy is missing, and one of the two locks is non-blocking. AUD-01 and AUD-02 keep their own scope; storage protection runs on the main actor at launch.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
-    },
-    {
-      "id": "PA-22",
-      "title": "Core storage and memory lifecycle is bounded",
-      "status": "planned",
-      "gate": "Clone-reference caching keys on the same fingerprint it stores, derived clone prompts follow their voice's lifecycle and backup class, all memory trims share one admission gate with load epochs, shared components and trash are pruned, and the prepared-model overlay lives outside the model folder.",
-      "sourceOfTruth": [
-        "Sources/QwenVoiceCore/NativeCloneSupport.swift",
-        "Sources/QwenVoiceCore/SharedModelComponentStore.swift",
-        "Sources/QwenVoiceCore/MLXModelLoadCoordinator.swift"
-      ],
-      "notes": "External audit CORE-04 to CORE-08 and ENG-06, confirmed 2026-09-22 with corrections: CORE-08 is reached only for legacy or repairable installs, and the idle-unload half of CORE-06 is guarded. CORE-04 also makes reuse telemetry false. CORE-05's backup classification belongs with ASR-06.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
-    },
-    {
       "id": "PA-25",
       "title": "Docs and tooling stay proportional",
       "status": "planned",
@@ -1510,6 +1482,21 @@
       "notes": "External audit 2026-09-22, sections 5 to 12: the Low and Info rows not grouped into PA-01 to PA-25 or existing items (for example ENG-07 to ENG-17, CORE-10 to CORE-22, MAC-09 to MAC-26, IOS-16 to IOS-25, SEC-08 to SEC-16, CI-09 to CI-21, WEB-02, WEB-06 to WEB-08, UX-01, REPO-01 to REPO-04). Work them in batches by area; the report's verification addendum lists the rows that are wrong or already fixed.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
+    },
+    {
+      "id": "PA-30",
+      "plan": "project-audit-2026-09",
+      "title": "Leftovers from PA-21 and PA-22",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "The Studio Clone reference picker shows a saved-voice load failure with Retry; History writes survive app suspension (GRDB suspension notifications) behind an adversarial review of the recovery path; the maintainer decides whether audio kept by earlier Keep Audio Files clears is removed; the resident speech tokenizer gets an owner-scoped release (ENG-06) only with a device memory re-qualification.",
+      "sourceOfTruth": [
+        "Sources/iOS/Sheets/IOSBottomSheets.swift",
+        "Sources/iOSSupport/Services/DatabaseService.swift",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
+      ],
+      "notes": "Split out 2026-09-24. IOS-11 (partly confirmed): History is a plain DatabaseQueue in the App Group with no suspension handling; a suspended write would reach HistoryPersistenceError.classify and RecoverableStoreCoordinator, a data-loss path. ENG-06 is latent: the speech tokenizer is adopted across engines, safe today because one model operation runs at a time; a strict owner token can double the resident tokenizer on iOS (about 218 MB). Orphaned audio from earlier Keep Audio Files clears is user data.",
+      "updated": "2026-09-24"
     }
   ]
 }

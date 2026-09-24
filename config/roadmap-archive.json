@@ -3884,6 +3884,57 @@
         "run:ios-xcui-model-download-20260923-153238-b9c61ec0",
         "file:docs/reference/model-delivery.md"
       ]
+    },
+    {
+      "id": "PA-22",
+      "title": "Core storage and memory lifecycle is bounded",
+      "status": "done",
+      "gate": "Clone-reference caching keys on the same fingerprint it stores, derived clone prompts follow their voice's lifecycle and backup class, all memory trims share one admission gate with load epochs, shared components and trash are pruned, and the prepared-model overlay lives outside the model folder.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/NativeCloneSupport.swift",
+        "Sources/QwenVoiceCore/SharedModelComponentStore.swift",
+        "Sources/QwenVoiceCore/MLXModelLoadCoordinator.swift"
+      ],
+      "notes": "Closed 2026-09-24 (external audit CORE-04 to CORE-08; ENG-06 moved to PA-30). CORE-04: converted clone references reuse by the content fingerprint they are named with (truthful reuse telemetry), written to a hidden temp and renamed atomically, reuse requires audio frames, engine start sweeps abandoned temporaries. CORE-05: one-off clone prompts keep the 8 most recent (backup class stays with ASR-06). CORE-06: hard trims and full unloads wait behind the running model operation through a counted relief latch; idle unload takes the same gate and survives a hard trim; a load superseded by an unload (load epoch) settles quietly. CORE-07: a delete discards staging first, reclaims its own released blobs and prepared overlay (off the main actor), reused blobs are hard-link pinned into download staging so no reclaim breaks an in-flight download, staging sweep judges the newest child. CORE-08: the prepared-model overlay lives under cache/native_mlx/prepared_models with an idempotent legacy cleanup. Three adversarial reviews; no deadlock or data-loss path found.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-24",
+      "evidence": [
+        "commit:b4294412",
+        "commit:bc9130d0",
+        "commit:366e8810",
+        "commit:286e7d7b",
+        "commit:f353e31e",
+        "file:Tests/VocelloCoreTests/SharedModelComponentStoreTests.swift",
+        "file:Tests/VocelloCoreTests/ActiveGenerationCoordinatorTests.swift"
+      ]
+    },
+    {
+      "id": "PA-21",
+      "title": "iOS lifecycle, audio session and startup are recoverable",
+      "status": "done",
+      "gate": "Audio-session changes have one owner, previews pause shared playback, startup failures offer retry, saved-voice load errors are shown, downloads say they need Wi-Fi, drafts survive relaunch, and keep-audio-files is defined for iOS.",
+      "sourceOfTruth": [
+        "Sources/iOS/QVoiceiOSApp.swift",
+        "Sources/iOS/App/RootView.swift",
+        "Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift"
+      ],
+      "notes": "Closed 2026-09-24 in source (external audit IOS-03 to IOS-10; IOS-05 was F-25; IOS-11 moved to PA-30). One IOSAudioSessionOwner applies every category/activation change from an IOSAudioSessionLedger (recording outranks playback, newest claim decides, deactivate on last release, no claims while backgrounded); players pause each other; blocking activation only off the main actor. Startup storage protection runs off the main actor, counts non-fatal descendant failures but stops on a failed 0444 restore, and the failure screen has Retry. A failed Saved Voices load shows with Retry; downloads say they need Wi-Fi; Studio drafts survive relaunch (a saved voice only by ID); on iPhone clearing History deletes its audio (no Keep Audio Files; exports and Saved outputs untouched). Device-only checks are listed on AUD-02. Two adversarial reviews; one blocking recorder-claim leak fixed.",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-24",
+      "evidence": [
+        "commit:037b68f6",
+        "commit:a32a0f7f",
+        "commit:5eefc45f",
+        "commit:7c6ea69c",
+        "commit:0459ece1",
+        "commit:16567846",
+        "commit:fb068fe9",
+        "commit:be536818",
+        "commit:18f3bdf8",
+        "commit:56e3f950",
+        "commit:9b574859",
+        "file:Tests/VocelloiOSLogicTests/IOSAudioSessionPolicyTests.swift"
+      ]
     }
   ]
 }

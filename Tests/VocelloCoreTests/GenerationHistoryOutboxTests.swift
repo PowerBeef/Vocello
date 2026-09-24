@@ -311,6 +311,123 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         XCTAssertEqual(result.snapshot.pendingCount, 1)
     }
 
+    /// An unreadable removal list used to fail the clear after its rows were
+    /// gone, so every later reconcile resumed the clear and deleted the takes
+    /// saved since. The list is now set aside, counted, and kept.
+    func testUnreadableRemovalListIsSetAsideAndNeverMakesAClearDeleteLaterTakes() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        _ = try state.commit(fixture.generation)
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+        let removalList = fixture.store.rootURL.appendingPathComponent("audio-removals.json")
+        try Data("not-json".utf8).write(to: removalList)
+
+        let outcome = try await coordinator.clearAll(deleteAudio: true)
+
+        XCTAssertEqual(outcome.failedFileRemovals, 0)
+        XCTAssertFalse(outcome.snapshot.clearRecoveryPending, "The clear finished")
+        XCTAssertEqual(outcome.snapshot.issueCount, 1, "The unreadable list is reported")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+        let setAside = try FileManager.default.contentsOfDirectory(atPath: fixture.store.rootURL.path)
+            .filter { $0.hasSuffix(".unreadable") }
+        XCTAssertEqual(setAside.count, 1, "Its content is kept, not deleted")
+        XCTAssertEqual(fixture.store.scan().issueCount, 0, "A set-aside list is not an outbox entry")
+
+        let later = try makeAudio(in: fixture, named: "later.wav")
+        _ = try state.commit(generation(fixture, audioPath: later.path))
+        let deletesBefore = state.counts.deletes
+        for _ in 0..<2 {
+            let result = await coordinator.reconcile()
+            XCTAssertFalse(result.snapshot.clearRecoveryPending)
+        }
+        XCTAssertEqual(state.counts.deletes, deletesBefore)
+        XCTAssertEqual(state.counts.rows, 1)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: later.path))
+    }
+
+    /// A clear transaction resumed after its rows were deleted never deletes
+    /// rows again; it only finishes the hand-off and retires.
+    func testClearResumedPastRowDeletionKeepsTakesSavedSince() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        let later = try makeAudio(in: fixture, named: "later.wav")
+        _ = try state.commit(generation(fixture, audioPath: later.path))
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+        let transaction = GenerationHistoryClearTransaction(
+            deleteAudio: true,
+            audioPaths: [fixture.audioURL.path],
+            pendingEntryIDs: []
+        ).markingRowsDeleted()
+        try encode(transaction).write(to: fixture.store.rootURL.appendingPathComponent("clear-transaction.json"))
+
+        let result = await coordinator.reconcile()
+
+        XCTAssertEqual(state.counts.deletes, 0)
+        XCTAssertEqual(state.counts.rows, 1)
+        XCTAssertEqual(result.snapshot, .empty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: later.path))
+    }
+
+    /// A transaction written before the phase existed still deletes its rows.
+    func testClearTransactionWithoutAPhaseStillDeletesItsRows() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        _ = try state.commit(fixture.generation)
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+        let transaction = GenerationHistoryClearTransaction(
+            deleteAudio: false,
+            audioPaths: [fixture.audioURL.path],
+            pendingEntryIDs: []
+        )
+        var legacy = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encode(transaction)) as? [String: Any]
+        )
+        XCTAssertNotNil(legacy.removeValue(forKey: "rowsDeleted"))
+        try JSONSerialization.data(withJSONObject: legacy)
+            .write(to: fixture.store.rootURL.appendingPathComponent("clear-transaction.json"))
+
+        let result = await coordinator.reconcile()
+
+        XCTAssertEqual(state.counts.deletes, 1)
+        XCTAssertEqual(state.counts.rows, 0)
+        XCTAssertEqual(result.snapshot, .empty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+    }
+
+    /// A path retained while a retry pass awaits the database must survive
+    /// that pass: the pass removes only what it resolved.
+    func testPathRetainedDuringARetryPassStaysListed() async throws {
+        let fixture = try makeFixture()
+        let (entered, enteredContinuation) = AsyncStream<Void>.makeStream()
+        let (release, releaseContinuation) = AsyncStream<Void>.makeStream()
+        let coordinator = GenerationHistoryRecoveryCoordinator(
+            store: fixture.store,
+            commitGeneration: { _, generation in generation },
+            fetchAllGenerations: { [] },
+            deleteAllGenerations: {},
+            referencedAudioPaths: { _ in
+                enteredContinuation.yield()
+                for await _ in release { break }
+                return []
+            }
+        )
+        let first = try makeAudio(in: fixture, named: "first.wav")
+        let second = try makeAudio(in: fixture, named: "second.wav")
+        try await coordinator.retainAudioRemoval(first.path)
+
+        let pass = Task { await coordinator.reconcile() }
+        for await _ in entered { break }
+        try await coordinator.retainAudioRemoval(second.path)
+        releaseContinuation.yield()
+        let result = await pass.value
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: first.path), "The pass removed its own path")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: second.path))
+        XCTAssertEqual(result.snapshot.pendingAudioRemovalCount, 1, "The retained path is still listed")
+        XCTAssertEqual(try fixture.store.loadPendingAudioRemovals(), [second.path])
+    }
+
     // MARK: - Suspension (IOS-11)
 
     /// A take whose database write meets a suspended History database is

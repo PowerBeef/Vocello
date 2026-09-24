@@ -824,11 +824,13 @@ to typed privacy-safe classifications; an unavailable store never masquerades as
 turns a destructive operation into a successful no-op. Both platforms expose a recovery banner:
 macOS offers Retry, Reveal, and Export, while iOS offers Retry and system share/export. Clear-all
 first persists a transaction containing database and pending-outbox paths, deletes SQLite rows,
-then removes outbox entries and hands requested WAVs to a durable removal list before the
-transaction retires; an interrupted cleanup resumes before any pending append can replay. A WAV
-that cannot be removed, after a clear or a single-row delete, stays on that list: the user is told,
-the recovery banner counts it, and every reconcile retries it, never while a row or a queued take
-still references the path (AUD-05).
+then records that its rows are gone, removes outbox entries and hands requested WAVs to a durable
+removal list before the transaction retires; an interrupted cleanup resumes before any pending
+append can replay, and a resume past the row deletion never deletes rows again. A WAV that cannot
+be removed, after a clear or a single-row delete, stays on that list: the user is told, the recovery
+banner counts it, and every reconcile retries it, never while a row or a queued take still
+references the path. An unreadable list is set aside unparsed and counted as a recovery issue, and
+a fresh list starts (AUD-05).
 
 **`UserDefaults` keys**: `vocello.voiceCloningConsent.v1` (visible Settings-owned clone-consent
 acknowledgment; below the views `AnyTTSEngineBackend` reads it through `VoiceCloningConsentPolicy`

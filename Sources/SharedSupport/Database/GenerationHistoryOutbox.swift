@@ -37,13 +37,22 @@ struct GenerationHistoryClearTransaction: Codable, Equatable, Sendable {
     let audioPaths: [String]
     let pendingEntryIDs: [UUID]
     let createdAt: Date
+    /// The History rows are gone. A resumed transaction in this phase never
+    /// deletes rows again: by then History may hold takes saved after the
+    /// clear (AUD-05). Absent, and so `false`, in older transactions.
+    let rowsDeleted: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, id, deleteAudio, audioPaths, pendingEntryIDs, createdAt, rowsDeleted
+    }
 
     init(
         id: UUID = UUID(),
         deleteAudio: Bool,
         audioPaths: [String],
         pendingEntryIDs: [UUID],
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        rowsDeleted: Bool = false
     ) {
         self.schemaVersion = Self.schemaVersion
         self.id = id
@@ -51,6 +60,30 @@ struct GenerationHistoryClearTransaction: Codable, Equatable, Sendable {
         self.audioPaths = Array(Set(audioPaths)).sorted()
         self.pendingEntryIDs = Array(Set(pendingEntryIDs)).sorted { $0.uuidString < $1.uuidString }
         self.createdAt = createdAt
+        self.rowsDeleted = rowsDeleted
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        id = try container.decode(UUID.self, forKey: .id)
+        deleteAudio = try container.decode(Bool.self, forKey: .deleteAudio)
+        audioPaths = try container.decode([String].self, forKey: .audioPaths)
+        pendingEntryIDs = try container.decode([UUID].self, forKey: .pendingEntryIDs)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        rowsDeleted = try container.decodeIfPresent(Bool.self, forKey: .rowsDeleted) ?? false
+    }
+
+    /// The same transaction, past its row deletion.
+    func markingRowsDeleted() -> GenerationHistoryClearTransaction {
+        GenerationHistoryClearTransaction(
+            id: id,
+            deleteAudio: deleteAudio,
+            audioPaths: audioPaths,
+            pendingEntryIDs: pendingEntryIDs,
+            createdAt: createdAt,
+            rowsDeleted: true
+        )
     }
 }
 
@@ -335,6 +368,53 @@ struct GenerationHistoryOutboxStore: Sendable {
         }
     }
 
+    /// Adds paths to the pending list. A list that cannot be read is set aside
+    /// (`unreadableAudioRemovalCount()` reports it as a recovery issue) and a
+    /// fresh list starts: the paths it held stay unknown, so nothing they name
+    /// is deleted, but a damaged list never blocks the clear or the delete that
+    /// has to record new paths (AUD-05).
+    func appendPendingAudioRemovals(_ audioPaths: [String]) throws {
+        let existing: [String]
+        do {
+            existing = try loadPendingAudioRemovals()
+        } catch {
+            try setAsideUnreadableAudioRemovals()
+            existing = []
+        }
+        try writePendingAudioRemovals(existing + audioPaths)
+    }
+
+    /// Removal lists set aside because they could not be read. They are kept,
+    /// never parsed again, and never deleted by the app.
+    func unreadableAudioRemovalCount() -> Int {
+        let urls = (try? FileManager.default.contentsOfDirectory(
+            at: rootURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        return urls.count { $0.pathExtension == Self.unreadableExtension }
+    }
+
+    /// `scan()` reads only `.json` and `.writing` files, so a set-aside list is
+    /// never mistaken for an outbox entry.
+    private static let unreadableExtension = "unreadable"
+
+    private func setAsideUnreadableAudioRemovals() throws {
+        let fileManager = FileManager.default
+        let stamp = UUID().uuidString.lowercased()
+        do {
+            for url in [audioRemovalsURL, audioRemovalsWritingURL] where fileManager.fileExists(atPath: url.path) {
+                let asideURL = rootURL.appendingPathComponent(
+                    "audio-removals-\(stamp).\(url.pathExtension).\(Self.unreadableExtension)",
+                    isDirectory: false
+                )
+                try fileManager.moveItem(at: url, to: asideURL)
+            }
+        } catch {
+            throw GenerationHistoryOutboxError.unavailable
+        }
+    }
+
     /// Replaces the pending list; an empty list removes it.
     func writePendingAudioRemovals(_ audioPaths: [String]) throws {
         do {
@@ -507,13 +587,12 @@ actor GenerationHistoryRecoveryCoordinator {
             clearIssueCount = 1
         }
         let removalCount: Int
-        let removalIssueCount: Int
+        var removalIssueCount = store.unreadableAudioRemovalCount()
         do {
             removalCount = try store.loadPendingAudioRemovals().count
-            removalIssueCount = 0
         } catch {
             removalCount = 0
-            removalIssueCount = 1
+            removalIssueCount += 1
         }
         return GenerationHistoryRecoverySnapshot(
             pendingCount: scan.entries.count,
@@ -566,10 +645,19 @@ actor GenerationHistoryRecoveryCoordinator {
     }
 
     private func completeClearTransaction(_ transaction: GenerationHistoryClearTransaction) async throws -> Int {
-        do {
-            try await deleteAllGenerations()
-        } catch {
-            throw GenerationHistoryOutboxError.clearUnavailable
+        var transaction = transaction
+        if !transaction.rowsDeleted {
+            do {
+                try await deleteAllGenerations()
+            } catch {
+                throw GenerationHistoryOutboxError.clearUnavailable
+            }
+            // Record the phase before any later step can fail: from here on a
+            // resume must not delete rows again, since History may then hold
+            // takes saved after the clear (AUD-05). If even this write fails,
+            // the steps below still run and usually retire the transaction.
+            transaction = transaction.markingRowsDeleted()
+            try? store.writeClearTransaction(transaction)
         }
         for id in transaction.pendingEntryIDs {
             try store.removeEntry(id: id)
@@ -581,11 +669,10 @@ actor GenerationHistoryRecoveryCoordinator {
 
         // The rows are gone. Their audio moves to the durable removal list
         // before the transaction retires, so a file that cannot be removed now
-        // is retried by a later reconcile. Keeping the transaction instead
-        // would resume the whole clear on every reconcile and delete the takes
-        // saved after it (AUD-05).
+        // is retried by a later reconcile rather than by resuming the clear
+        // (AUD-05).
         do {
-            try store.writePendingAudioRemovals(store.loadPendingAudioRemovals() + transaction.audioPaths)
+            try store.appendPendingAudioRemovals(transaction.audioPaths)
         } catch {
             throw GenerationHistoryOutboxError.clearUnavailable
         }
@@ -599,7 +686,7 @@ actor GenerationHistoryRecoveryCoordinator {
     /// a later reconcile retries the removal instead of leaving the file behind
     /// silently (AUD-05).
     func retainAudioRemoval(_ audioPath: String) throws {
-        try store.writePendingAudioRemovals(store.loadPendingAudioRemovals() + [audioPath])
+        try store.appendPendingAudioRemovals([audioPath])
     }
 
     /// Retries the pending audio removals. Audio a History row or a queued take
@@ -609,21 +696,34 @@ actor GenerationHistoryRecoveryCoordinator {
     private func removePendingAudio() async throws -> Set<String> {
         let pending = try store.loadPendingAudioRemovals()
         guard !pending.isEmpty else { return [] }
-        let queued = Set(store.scan().entries.map(\.generation.audioPath))
         let referenced = try await referencedAudioPaths(pending)
+        // The await lets other work on this actor run, and
+        // `retainAudioRemoval(_:)` may have added a path meanwhile. So only the
+        // paths this pass resolved leave the list, which is read again below;
+        // a list rebuilt from `pending` would drop the new path silently.
+        let queued = Set(store.scan().entries.map(\.generation.audioPath))
         let fileManager = FileManager.default
-        var remaining: [String] = []
-        for path in pending where !queued.contains(path) && !referenced.contains(path) {
+        var resolved: Set<String> = []
+        for path in pending {
+            if queued.contains(path) || referenced.contains(path) {
+                resolved.insert(path)
+                continue
+            }
             var isDirectory: ObjCBool = false
             guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory),
                   !isDirectory.boolValue
-            else { continue }
+            else {
+                resolved.insert(path)
+                continue
+            }
             do {
                 try fileManager.removeItem(atPath: path)
+                resolved.insert(path)
             } catch {
-                remaining.append(path)
+                // Stays listed for the next reconcile.
             }
         }
+        let remaining = try store.loadPendingAudioRemovals().filter { !resolved.contains($0) }
         try store.writePendingAudioRemovals(remaining)
         return Set(remaining)
     }

@@ -34,11 +34,13 @@ struct IOSStudioDraftSnapshot: Codable, Equatable, Sendable {
     }
 
     struct Clone: Codable, Equatable, Sendable {
-        /// Only a saved voice is restored as the reference; its path and
-        /// transcript are checked against the library when the Studio hydrates.
+        /// Only a saved voice is restored as the reference, and only by its ID:
+        /// the Studio's hydration (`SavedVoiceCloneHydration`) derives its
+        /// current audio path and transcript from the library, so no App Group
+        /// path goes stale after a restore and no transcript outlives the voice.
+        /// A reference that is not a saved voice (an imported or recorded clip
+        /// still being enrolled) lives in regenerable storage and is not kept.
         var savedVoiceID: String?
-        var referenceAudioPath: String?
-        var referenceTranscript: String
         var language: String
         var pinnedSeed: UInt64?
         var text: String
@@ -53,15 +55,30 @@ struct IOSStudioDraftSnapshot: Codable, Equatable, Sendable {
         self.version = Self.currentVersion
         self.custom = custom
         self.design = design
-        var clone = clone
-        if clone.savedVoiceID == nil {
-            // A reference that is not a saved voice (an imported or recorded
-            // clip still being enrolled) lives in regenerable storage; it is
-            // never restored.
-            clone.referenceAudioPath = nil
-            clone.referenceTranscript = ""
-        }
         self.clone = clone
+        normalize()
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version, custom, design, clone
+    }
+
+    /// A decoded snapshot takes the same normalization as a built one. Keys
+    /// an earlier build wrote and this one no longer reads (such as the saved
+    /// voice's path and transcript) are ignored.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decode(Int.self, forKey: .version)
+        custom = try container.decode(Custom.self, forKey: .custom)
+        design = try container.decode(Design.self, forKey: .design)
+        clone = try container.decode(Clone.self, forKey: .clone)
+        normalize()
+    }
+
+    private mutating func normalize() {
+        if let id = clone.savedVoiceID, id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            clone.savedVoiceID = nil
+        }
     }
 }
 

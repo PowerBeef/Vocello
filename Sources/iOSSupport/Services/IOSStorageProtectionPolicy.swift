@@ -29,6 +29,13 @@ enum IOSStorageProtectionPolicy {
         var descendantFailureCount = 0
     }
 
+    /// A read-only (`0444`) file was made writable for its metadata update and could not be
+    /// made read-only again. Always fatal, even for a descendant: continuing would leave a
+    /// digest-verified model component writable. Startup shows it with Retry.
+    struct ModeRestoreFailure: Error {
+        let underlying: any Error
+    }
+
     static let protectionClass = FileProtectionType.completeUntilFirstUserAuthentication
 
     static let entries: [Entry] = [
@@ -63,7 +70,7 @@ enum IOSStorageProtectionPolicy {
                     options: [.skipsHiddenFiles]
                 )
                 for child in children where child.lastPathComponent.hasPrefix(prefix) {
-                    applyToDescendant(entry, at: child, fileManager: fileManager, report: &report)
+                    try applyToDescendant(entry, at: child, fileManager: fileManager, report: &report)
                 }
                 continue
             }
@@ -88,20 +95,24 @@ enum IOSStorageProtectionPolicy {
                 continue
             }
             for case let child as URL in enumerator {
-                applyToDescendant(entry, at: child, fileManager: fileManager, report: &report)
+                try applyToDescendant(entry, at: child, fileManager: fileManager, report: &report)
             }
         }
         return report
     }
 
+    /// A descendant whose attributes cannot be updated is counted and retried next launch;
+    /// one whose read-only mode could not be restored stops the pass (`ModeRestoreFailure`).
     private static func applyToDescendant(
         _ entry: Entry,
         at url: URL,
         fileManager: FileManager,
         report: inout ApplyReport
-    ) {
+    ) throws {
         do {
             try apply(entry, to: url, fileManager: fileManager)
+        } catch let failure as ModeRestoreFailure {
+            throw failure
         } catch {
             report.descendantFailureCount += 1
         }
@@ -159,10 +170,14 @@ enum IOSStorageProtectionPolicy {
         }
         // Restoration failure wins over the metadata result because leaving a verified model
         // component writable would violate the shared-store immutability contract.
-        try fileManager.setAttributes(
-            [.posixPermissions: NSNumber(value: mode)],
-            ofItemAtPath: url.path
-        )
+        do {
+            try fileManager.setAttributes(
+                [.posixPermissions: NSNumber(value: mode)],
+                ofItemAtPath: url.path
+            )
+        } catch {
+            throw ModeRestoreFailure(underlying: error)
+        }
         return try result.get()
     }
 }

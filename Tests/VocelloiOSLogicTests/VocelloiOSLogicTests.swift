@@ -455,6 +455,41 @@ final class VocelloiOSLogicTests: XCTestCase {
         )
     }
 
+    /// PA-21 review: a descendant model file that was made writable for its metadata update
+    /// and could not be made read-only again fails the pass instead of being counted, so a
+    /// digest-verified component is never left writable while startup continues.
+    func testStorageProtectionModeRestoreFailureOnADescendantIsFatal() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "vocello-storage-policy-restore-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        defer { try? FileManager.default.removeItem(at: root) }
+        let models = root.appendingPathComponent("models", isDirectory: true)
+        try FileManager.default.createDirectory(at: models, withIntermediateDirectories: true)
+        let component = models.appendingPathComponent("model.safetensors", isDirectory: false)
+        try Data("immutable-model".utf8).write(to: component)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: NSNumber(value: 0o444)],
+            ofItemAtPath: component.path
+        )
+        XCTAssertThrowsError(
+            try IOSStorageProtectionPolicy.apply(
+                at: root,
+                fileManager: StorageProtectionModeRestoreFaultFileManager()
+            )
+        ) { error in
+            XCTAssertTrue(
+                error is IOSStorageProtectionPolicy.ModeRestoreFailure,
+                "a failed restore is not a countable descendant failure"
+            )
+        }
+        let mode = try XCTUnwrap(
+            FileManager.default.attributesOfItem(atPath: component.path)[.posixPermissions]
+                as? NSNumber
+        ).intValue
+        XCTAssertEqual(mode & 0o777, 0o644, "the widening ran; only the restore failed")
+    }
+
     func testStorageProtectionMetadataUpdateRestoresImmutableModelFile() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(
             "vocello-storage-policy-\(UUID().uuidString)",
@@ -791,6 +826,22 @@ private final class StorageProtectionFaultFileManager: FileManager {
         ofItemAtPath path: String
     ) throws {
         if URL(fileURLWithPath: path).lastPathComponent == failingName {
+            throw CocoaError(.fileWriteNoPermission)
+        }
+        guard attributes[.protectionKey] == nil else { return }
+        try super.setAttributes(attributes, ofItemAtPath: path)
+    }
+}
+
+/// Skips the data-protection class like `StorageProtectionFaultFileManager` and fails only the
+/// second of the two `.posixPermissions` writes around a read-only file's metadata window: the
+/// widening (owner write added) succeeds, the restore (owner write removed) fails.
+private final class StorageProtectionModeRestoreFaultFileManager: FileManager {
+    override func setAttributes(
+        _ attributes: [FileAttributeKey: Any],
+        ofItemAtPath path: String
+    ) throws {
+        if let mode = (attributes[.posixPermissions] as? NSNumber)?.intValue, mode & 0o200 == 0 {
             throw CocoaError(.fileWriteNoPermission)
         }
         guard attributes[.protectionKey] == nil else { return }

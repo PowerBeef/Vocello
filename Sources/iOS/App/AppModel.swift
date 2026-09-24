@@ -339,8 +339,6 @@ final class AppModel {
             ),
             clone: .init(
                 savedVoiceID: voiceCloningDraft.selectedSavedVoiceID,
-                referenceAudioPath: voiceCloningDraft.referenceAudioPath,
-                referenceTranscript: voiceCloningDraft.referenceTranscript,
                 language: voiceCloningDraft.selectedLanguage.rawValue,
                 pinnedSeed: voiceCloningDraft.pinnedSeed,
                 text: voiceCloningDraft.text
@@ -364,14 +362,15 @@ final class AppModel {
             delivery: Self.delivery(snapshot.design.delivery),
             text: snapshot.design.text
         )
-        // A saved voice that no longer exists is cleared by the Studio's
-        // hydration (`SavedVoiceCloneHydration`), as for any stale selection.
+        // Only the saved voice's ID is kept. The Studio's hydration
+        // (`SavedVoiceCloneHydration`) applies its current path and transcript
+        // from the library, or clears a voice that no longer exists.
         voiceCloningDraft = VoiceCloningDraft(
             selectedSavedVoiceID: snapshot.clone.savedVoiceID,
             pinnedSeed: snapshot.clone.pinnedSeed,
-            referenceAudioPath: snapshot.clone.referenceAudioPath,
+            referenceAudioPath: nil,
             selectedLanguage: Self.language(snapshot.clone.language),
-            referenceTranscript: snapshot.clone.referenceTranscript,
+            referenceTranscript: "",
             text: snapshot.clone.text
         )
     }

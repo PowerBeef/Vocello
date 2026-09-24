@@ -179,11 +179,14 @@ Maintained iPhone subtrees:
 
 The iPhone app intentionally keeps shared state constrained to the App Group app-support subtree. It does not use a parallel shared-user-defaults channel for model or voice state.
 
-The Studio drafts (scripts, voice brief, custom delivery text, language, pinned seed and a selected
-saved voice's reference) are kept in the app's own preferences under `vocello.ios.studioDrafts.v1`
+The Studio drafts (scripts, voice brief, custom delivery text, language, pinned seed and the ID of
+a selected saved voice) are kept in the app's own preferences under `vocello.ios.studioDrafts.v1`
 so that iOS terminating the app in the background does not lose them (PA-21, IOS-09). They are
 saved each time the scene leaves the foreground, stay on the device with the default data
-protection class and back up like History. A reference that is not a saved voice is never stored.
+protection class and back up like History. Only the saved voice's ID is stored: the Studio derives
+its audio path and transcript from the library when it restores the draft, so no App Group path goes
+stale after a backup restore and no transcript outlives a deleted voice. A reference that is not a
+saved voice is never stored.
 
 ### Data protection and backup policy
 
@@ -219,7 +222,10 @@ the engine and background delivery coordinator are created.
 Since PA-21 (audit IOS-06) the pass runs off the main actor while the launch mark shows, and the
 dependencies are built on the main actor only after it returns. The root and every governed
 directory must take the policy, or startup shows the failure with Retry. A single descendant file
-that cannot be updated is counted and retried on the next launch instead of stopping startup.
+that cannot be updated is counted and retried on the next launch instead of stopping startup. The
+one exception is a read-only file whose `0444` mode could not be restored after its metadata
+window: that failure is always fatal, so startup shows it with Retry instead of leaving a verified
+model component writable.
 
 The deterministic policy validator rejects a missing path class, a protection mismatch, or an
 unclassified maintained subtree. ASR-06 remains open until an exact signed candidate proves the

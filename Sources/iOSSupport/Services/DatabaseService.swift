@@ -150,6 +150,33 @@ final class DatabaseService: @unchecked Sendable {
         }
     }
 
+    /// The subset of `audioPaths` that History rows still reference, so a
+    /// retried audio removal never deletes audio a row points at.
+    func referencedAudioPaths(among audioPaths: [String]) throws -> Set<String> {
+        guard !audioPaths.isEmpty else { return [] }
+        let dbQueue = try requireQueue(for: .read)
+        do {
+            return try dbQueue.read { db in
+                var referenced: Set<String> = []
+                var start = audioPaths.startIndex
+                while start < audioPaths.endIndex {
+                    let end = audioPaths.index(start, offsetBy: 500, limitedBy: audioPaths.endIndex) ?? audioPaths.endIndex
+                    let chunk = Array(audioPaths[start..<end])
+                    let found = try String.fetchSet(
+                        db,
+                        sql: "SELECT audioPath FROM generations WHERE audioPath IN (\(databaseQuestionMarks(count: chunk.count)))",
+                        arguments: StatementArguments(chunk)
+                    )
+                    referenced.formUnion(found)
+                    start = end
+                }
+                return referenced
+            }
+        } catch {
+            throw HistoryPersistenceError.classify(error, operation: .read)
+        }
+    }
+
     func deleteGeneration(id: Int64) throws {
         let dbQueue = try requireQueue(for: .delete)
         do {

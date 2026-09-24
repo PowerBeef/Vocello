@@ -601,6 +601,19 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.engine.coldStartLowMemory", defaultValue: "Model unloaded to save memory. First generate reloads it — normal on 8 GB Macs.",
                comment: "macOS interface: readiness detail on 8 GB Macs when the model is unloaded. Presentation only.")
     }
+    static func historyAudioRemovalMany(_ count: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.history.audioRemovalMany",
+            defaultValue: "%@ audio files from deleted takes are still in the output folder. Retry to delete them, or reveal them in Finder.",
+            comment: "macOS interface: recovery banner detail; %@ is how many audio files of deleted takes could not be deleted yet (2 or more). Presentation only."), count)
+    }
+    static var historyAudioRemovalOne: String {
+        localization.string(localized: "vocello.mac.history.audioRemovalOne", defaultValue: "1 audio file from deleted takes is still in the output folder. Retry to delete it, or reveal it in Finder.",
+               comment: "macOS interface: recovery banner detail when one audio file of a deleted take could not be deleted yet. Presentation only.")
+    }
+    static var historyAudioRemovalTitle: String {
+        localization.string(localized: "vocello.mac.history.audioRemovalTitle", defaultValue: "Audio from deleted takes remains",
+               comment: "macOS interface: History recovery banner title when only audio of deleted takes waits to be deleted. Presentation only.")
+    }
     static var historyAudioUnavailable: String {
         localization.string(localized: "vocello.mac.history.audioUnavailable", defaultValue: "Audio unavailable",
                comment: "macOS interface: History row play tile label when the WAV is missing. Presentation only.")

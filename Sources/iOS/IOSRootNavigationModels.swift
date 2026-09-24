@@ -661,6 +661,18 @@ import QwenVoiceCore
         IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.historyClearIncompleteDetail", defaultValue: "History was cleared, but %1$lld audio files could not be deleted.",
                    comment: "iOS alert message after clearing History; %1$lld is how many audio files could not be deleted. Presentation only."), count)
     }
+    static var historyDeleteAudioKept: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.historyDeleteAudioKept", defaultValue: "The take was removed from History, but its audio file could not be deleted. Vocello will try again later.",
+               comment: "iOS alert message after deleting one History take whose audio file could not be deleted; a later retry removes it. Presentation only.")
+    }
+    static var historyAudioRemovalTitle: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.historyAudioRemovalTitle", defaultValue: "Audio from deleted takes remains",
+               comment: "iOS History recovery banner title when only audio of deleted takes waits to be deleted. Presentation only.")
+    }
+    static func historyAudioRemovalPending(_ count: Int) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.historyAudioRemovalPending", defaultValue: "%1$lld audio files from deleted takes are still stored on this iPhone. Retry to delete them.",
+                   comment: "iOS History recovery banner detail; %1$lld is how many audio files of deleted takes could not be deleted yet. Presentation only."), count)
+    }
     static var ok: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.ok", defaultValue: "OK",
                comment: "iOS interface: OK, the button that dismisses an informational alert. Presentation only.")

@@ -20629,6 +20629,342 @@
         }
       }
     },
+    "vocello.ui.historyDeleteAudioKept": {
+      "comment": "iOS alert message after deleting one History take whose audio file could not be deleted; a later retry removes it. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The take was removed from History, but its audio file could not be deleted. Vocello will try again later."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La prise a été retirée de l’historique, mais son fichier audio n’a pas pu être supprimé. Vocello réessaiera plus tard."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La toma se quitó del historial, pero no se pudo eliminar su archivo de audio. Vocello lo volverá a intentar más tarde."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Aufnahme wurde aus dem Verlauf entfernt, aber ihre Audiodatei konnte nicht gelöscht werden. Vocello versucht es später erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il take è stato rimosso dalla cronologia, ma non è stato possibile eliminare il suo file audio. Vocello riproverà più tardi."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A tomada foi removida do histórico, mas não foi possível excluir o arquivo de áudio. O Vocello tentará novamente mais tarde."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该条音频已从历史记录移除，但无法删除其音频文件。Vocello 稍后会再试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テイクを履歴から削除しましたが、音声ファイルを削除できませんでした。Vocelloが後でもう一度試します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "테이크를 기록에서 제거했지만 오디오 파일은 삭제하지 못했습니다. Vocello가 나중에 다시 시도합니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дубль удалён из истории, но его аудиофайл удалить не удалось. Vocello попробует ещё раз позже."
+          }
+        }
+      }
+    },
+    "vocello.ui.historyAudioRemovalTitle": {
+      "comment": "iOS History recovery banner title when only audio of deleted takes waits to be deleted. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio from deleted takes remains"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Des fichiers audio de prises supprimées subsistent"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quedan audios de tomas eliminadas"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio gelöschter Aufnahmen ist noch vorhanden"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restano audio di take eliminati"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ainda há áudio de tomadas excluídas"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已删除条目的音频仍未清除"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除したテイクの音声が残っています"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "삭제한 테이크의 오디오가 남아 있습니다"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Остались аудиофайлы удалённых дублей"
+          }
+        }
+      }
+    },
+    "vocello.ui.historyAudioRemovalPending": {
+      "comment": "iOS History recovery banner detail; %1$lld is how many audio files of deleted takes could not be deleted yet. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld audio file from deleted takes is still stored on this iPhone. Retry to delete it."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld audio files from deleted takes are still stored on this iPhone. Retry to delete them."
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld fichier audio de prises supprimées est encore stocké sur cet iPhone. Réessayez pour le supprimer."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld fichiers audio de prises supprimées sont encore stockés sur cet iPhone. Réessayez pour les supprimer."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld fichiers audio de prises supprimées sont encore stockés sur cet iPhone. Réessayez pour les supprimer."
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld archivo de audio de tomas eliminadas sigue guardado en este iPhone. Reintenta para eliminarlo."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld archivos de audio de tomas eliminadas siguen guardados en este iPhone. Reintenta para eliminarlos."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld archivos de audio de tomas eliminadas siguen guardados en este iPhone. Reintenta para eliminarlos."
+                }
+              }
+            }
+          }
+        },
+        "de": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld Audiodatei gelöschter Aufnahmen ist noch auf diesem iPhone gespeichert. Versuche es erneut, um sie zu löschen."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld Audiodateien gelöschter Aufnahmen sind noch auf diesem iPhone gespeichert. Versuche es erneut, um sie zu löschen."
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld file audio di take eliminati è ancora salvato su questo iPhone. Riprova per eliminarlo."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld file audio di take eliminati sono ancora salvati su questo iPhone. Riprova per eliminarli."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld file audio di take eliminati sono ancora salvati su questo iPhone. Riprova per eliminarli."
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld arquivo de áudio de tomadas excluídas ainda está armazenado neste iPhone. Tente novamente para excluí-lo."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld arquivos de áudio de tomadas excluídas ainda estão armazenados neste iPhone. Tente novamente para excluí-los."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld arquivos de áudio de tomadas excluídas ainda estão armazenados neste iPhone. Tente novamente para excluí-los."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "已删除条目的 %1$lld 个音频文件仍存储在此 iPhone 上。请重试以删除。"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "削除したテイクの音声ファイル%1$lld件がこのiPhoneに残っています。再試行すると削除します。"
+                }
+              }
+            }
+          }
+        },
+        "ko": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "삭제한 테이크의 오디오 파일 %1$lld개가 이 iPhone에 아직 저장되어 있습니다. 다시 시도하면 삭제합니다."
+                }
+              }
+            }
+          }
+        },
+        "ru": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld аудиофайл удалённых дублей всё ещё хранится на этом iPhone. Повторите, чтобы удалить его."
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld аудиофайла удалённых дублей всё ещё хранятся на этом iPhone. Повторите, чтобы удалить их."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld аудиофайлов удалённых дублей всё ещё хранятся на этом iPhone. Повторите, чтобы удалить их."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld аудиофайла удалённых дублей всё ещё хранятся на этом iPhone. Повторите, чтобы удалить их."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "vocello.ui.ok": {
       "comment": "iOS interface: OK, the button that dismisses an informational alert. Presentation only.",
       "extractionState": "manual",
@@ -59319,6 +59655,204 @@
           "stringUnit": {
             "state": "translated",
             "value": "Аудио недоступно"
+          }
+        }
+      }
+    },
+    "vocello.mac.history.audioRemovalMany": {
+      "comment": "macOS interface: recovery banner detail; %@ is how many audio files of deleted takes could not be deleted yet (2 or more). Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ audio files from deleted takes are still in the output folder. Retry to delete them, or reveal them in Finder."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ fichiers audio de prises supprimées se trouvent encore dans le dossier de sortie. Réessayez pour les supprimer, ou affichez-les dans le Finder."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ archivos de audio de tomas eliminadas siguen en la carpeta de salida. Reintenta para eliminarlos o muéstralos en el Finder."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ Audiodateien gelöschter Aufnahmen liegen noch im Ausgabeordner. Versuche es erneut, um sie zu löschen, oder zeige sie im Finder."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ file audio di take eliminati sono ancora nella cartella di output. Riprova per eliminarli o mostrali nel Finder."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ arquivos de áudio de tomadas excluídas ainda estão na pasta de saída. Tente novamente para excluí-los ou mostre-os no Finder."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已删除条目的 %@ 个音频文件仍在输出文件夹中。请重试以删除，或在访达中显示。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除したテイクの音声ファイル%@件が出力フォルダに残っています。再試行して削除するか、Finderで表示してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "삭제한 테이크의 오디오 파일 %@개가 아직 출력 폴더에 있습니다. 다시 시도해 삭제하거나 Finder에서 보세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Аудиофайлов удалённых дублей в папке результатов: %@. Повторите, чтобы удалить их, или покажите их в Finder."
+          }
+        }
+      }
+    },
+    "vocello.mac.history.audioRemovalOne": {
+      "comment": "macOS interface: recovery banner detail when one audio file of a deleted take could not be deleted yet. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 audio file from deleted takes is still in the output folder. Retry to delete it, or reveal it in Finder."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 fichier audio de prises supprimées se trouve encore dans le dossier de sortie. Réessayez pour le supprimer, ou affichez-le dans le Finder."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 archivo de audio de tomas eliminadas sigue en la carpeta de salida. Reintenta para eliminarlo o muéstralo en el Finder."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 Audiodatei gelöschter Aufnahmen liegt noch im Ausgabeordner. Versuche es erneut, um sie zu löschen, oder zeige sie im Finder."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 file audio di take eliminati è ancora nella cartella di output. Riprova per eliminarlo o mostralo nel Finder."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 arquivo de áudio de tomadas excluídas ainda está na pasta de saída. Tente novamente para excluí-lo ou mostre-o no Finder."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已删除条目的 1 个音频文件仍在输出文件夹中。请重试以删除，或在访达中显示。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除したテイクの音声ファイル1件が出力フォルダに残っています。再試行して削除するか、Finderで表示してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "삭제한 테이크의 오디오 파일 1개가 아직 출력 폴더에 있습니다. 다시 시도해 삭제하거나 Finder에서 보세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 аудиофайл удалённых дублей всё ещё находится в папке результатов. Повторите, чтобы удалить его, или покажите его в Finder."
+          }
+        }
+      }
+    },
+    "vocello.mac.history.audioRemovalTitle": {
+      "comment": "macOS interface: History recovery banner title when only audio of deleted takes waits to be deleted. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio from deleted takes remains"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Des fichiers audio de prises supprimées subsistent"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quedan audios de tomas eliminadas"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio gelöschter Aufnahmen ist noch vorhanden"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restano audio di take eliminati"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ainda há áudio de tomadas excluídas"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已删除条目的音频仍未清除"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除したテイクの音声が残っています"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "삭제한 테이크의 오디오가 남아 있습니다"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Остались аудиофайлы удалённых дублей"
           }
         }
       }

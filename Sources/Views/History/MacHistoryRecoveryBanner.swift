@@ -3,6 +3,7 @@ import SwiftUI
 /// Pending-history recovery card above the list (the iOS recovery banner
 /// with the desktop's Reveal action). Identifiers are the lane contract.
 struct MacHistoryRecoveryBanner: View {
+    let title: String
     let message: String
     let canReveal: Bool
     let canExport: Bool
@@ -12,7 +13,7 @@ struct MacHistoryRecoveryBanner: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: VocelloTheme.Spacing.snug) {
-            Label(MacInterfaceText.historyFinishedAudioWaiting, systemImage: "arrow.clockwise.icloud")
+            Label(title, systemImage: "arrow.clockwise.icloud")
                 .macType(.screenTitle)
                 .foregroundStyle(MacTheme.Text.primary)
             Text(message)

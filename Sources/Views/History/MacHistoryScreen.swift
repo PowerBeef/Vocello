@@ -198,19 +198,6 @@ private struct MacHistoryActionAlert: Identifiable {
     static var items: [MacHistoryListItem] = []
 }
 
-/// Database- and file-manager-backed effects for the pure sequencing engine
-/// (W2-B). The rules live tested in `QwenVoiceCore.HistoryDeletionEngine`;
-/// this wiring is the only untested residue.
-extension HistoryDeletionEngine {
-    static let databaseBacked = HistoryDeletionEngine(
-        deleteRecord: { try DatabaseService.shared.deleteGeneration(id: $0) },
-        deleteAllRecords: { try DatabaseService.shared.deleteAllGenerations() },
-        audioPathsForAllRecords: { try DatabaseService.shared.fetchAllGenerations().map(\.audioPath) },
-        removeFile: { try FileManager.default.removeItem(atPath: $0) },
-        fileExists: { FileManager.default.fileExists(atPath: $0) }
-    )
-}
-
 /// History in the iOS design over the shared `Generation` and
 /// `DatabaseService`: date-bucketed rows with mode-tinted thumbnails, the
 /// mode filter chips, the pending-recovery card, and the desktop's toolbar
@@ -261,8 +248,12 @@ struct MacHistoryScreen: View {
             VStack(alignment: .leading, spacing: VocelloTheme.Spacing.md) {
                 if recoverySnapshot.needsAttention {
                     MacHistoryRecoveryBanner(
+                        title: recoverySnapshot.onlyAudioRemovalsPending
+                            ? MacInterfaceText.historyAudioRemovalTitle
+                            : MacInterfaceText.historyFinishedAudioWaiting,
                         message: recoveryMessage,
-                        canReveal: recoverySnapshot.availableAudioCount > 0,
+                        canReveal: recoverySnapshot.availableAudioCount > 0
+                            || recoverySnapshot.pendingAudioRemovalCount > 0,
                         canExport: !recoveryAudioURLs.isEmpty,
                         onRetry: { reloadHistory(reopenFailedStore: true) },
                         onReveal: { MacHistoryFileActions.openOutputsFolder() },
@@ -519,6 +510,12 @@ struct MacHistoryScreen: View {
         }
         if recoverySnapshot.issueCount > 0 {
             return MacInterfaceText.historyRecoveryUnverified
+        }
+        if recoverySnapshot.pendingCount == 0, recoverySnapshot.pendingAudioRemovalCount > 0 {
+            let removals = recoverySnapshot.pendingAudioRemovalCount
+            return removals == 1
+                ? MacInterfaceText.historyAudioRemovalOne
+                : MacInterfaceText.historyAudioRemovalMany(String(removals))
         }
         let count = recoverySnapshot.pendingCount
         return count == 1
@@ -785,8 +782,9 @@ private extension MacHistoryScreen {
     /// drawing the list. The engine stays pure and synchronous -- its rules are
     /// tested in `QwenVoiceCore` and are worth keeping that way -- so the hop
     /// happens here, at the one place that knows it is on the main actor.
+    /// Audio that could not be removed is kept for a later reconcile (AUD-05).
     func deleteItem(_ item: MacHistoryListItem) async -> HistoryDeletionEngine.SingleOutcome {
-        let engine = HistoryDeletionEngine.databaseBacked
+        let engine = GenerationHistoryRecovery.deletionEngine
         let recordID = item.generation.id
         let audioPath = item.generation.audioPath
         let outcome = await Task.detached(priority: .userInitiated) {
@@ -798,6 +796,10 @@ private extension MacHistoryScreen {
             return outcome
         }
         databaseUnavailable = false
+        if case .audioCleanupFailure = outcome {
+            _ = await GenerationHistoryRecovery.retainAudioRemoval(audioPath)
+            refreshRecoveryState()
+        }
 
         items.removeAll { $0.id == item.id }
         itemsRevision &+= 1

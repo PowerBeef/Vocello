@@ -45,8 +45,13 @@ final class GenerationHistoryOutboxTests: XCTestCase {
     private struct StubError: Error {}
 
     private var temporaryRoots: [URL] = []
+    private var lockedDirectories: [URL] = []
 
     override func tearDownWithError() throws {
+        for directory in lockedDirectories {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directory.path)
+        }
+        lockedDirectories.removeAll()
         for root in temporaryRoots {
             try? FileManager.default.removeItem(at: root)
         }
@@ -224,6 +229,132 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         XCTAssertTrue(result.snapshot.clearRecoveryPending)
     }
 
+    // MARK: - Audio that could not be removed (AUD-05)
+
+    func testPartialClearKeepsFailedAudioForRetryAndNeverReclearsLaterTakes() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        let locked = try makeLockableAudio(in: fixture, named: "stuck.wav")
+        _ = try state.commit(generation(fixture, audioPath: locked.audio.path))
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+        try lock(locked.directory)
+
+        let outcome = try await coordinator.clearAll(deleteAudio: true)
+
+        XCTAssertEqual(outcome.failedFileRemovals, 1)
+        XCTAssertFalse(outcome.snapshot.clearRecoveryPending, "The clear itself finished")
+        XCTAssertEqual(outcome.snapshot.pendingAudioRemovalCount, 1)
+        XCTAssertTrue(outcome.snapshot.onlyAudioRemovalsPending)
+        XCTAssertEqual(state.counts.rows, 0)
+
+        // A take saved after the clear must survive every later reconcile; a
+        // retained clear transaction used to resume and delete it.
+        let later = try makeAudio(in: fixture, named: "later.wav")
+        _ = try state.commit(generation(fixture, audioPath: later.path))
+        let deletesBefore = state.counts.deletes
+        let blocked = await coordinator.reconcile()
+        XCTAssertEqual(state.counts.deletes, deletesBefore)
+        XCTAssertEqual(state.counts.rows, 1)
+        XCTAssertEqual(blocked.snapshot.pendingAudioRemovalCount, 1)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: locked.audio.path))
+
+        try unlock(locked.directory)
+        let retried = await coordinator.reconcile()
+        XCTAssertEqual(retried.snapshot, .empty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: locked.audio.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: later.path))
+        XCTAssertEqual(state.counts.rows, 1)
+    }
+
+    func testSingleDeleteAudioThatCouldNotBeRemovedIsRetriedUntilGone() async throws {
+        let fixture = try makeFixture()
+        let locked = try makeLockableAudio(in: fixture, named: "single.wav")
+        let coordinator = makeCoordinator(store: fixture.store, state: CommitState())
+        try lock(locked.directory)
+
+        try await coordinator.retainAudioRemoval(locked.audio.path)
+        XCTAssertEqual(fixture.store.scan().issueCount, 0, "The removal list is not an outbox entry")
+        let blocked = await coordinator.reconcile()
+        XCTAssertEqual(blocked.snapshot.pendingAudioRemovalCount, 1)
+        XCTAssertTrue(blocked.snapshot.needsAttention)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: locked.audio.path))
+
+        try unlock(locked.directory)
+        let retried = await coordinator.reconcile()
+        XCTAssertEqual(retried.snapshot, .empty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: locked.audio.path))
+    }
+
+    func testRetriedRemovalNeverDeletesReferencedQueuedOrNonFileAudio() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        let referenced = try makeAudio(in: fixture, named: "referenced.wav")
+        _ = try state.commit(generation(fixture, audioPath: referenced.path))
+        let queued = try makeAudio(in: fixture, named: "queued.wav")
+        _ = try fixture.store.enqueue(generation(fixture, audioPath: queued.path), operation: .append)
+        let directory = fixture.store.rootURL.deletingLastPathComponent()
+            .appendingPathComponent("not-audio.wav", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        state.setFailure(true) // keep the queued take queued through reconcile
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+
+        for path in [referenced.path, queued.path, directory.path] {
+            try await coordinator.retainAudioRemoval(path)
+        }
+        let result = await coordinator.reconcile()
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: referenced.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: queued.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: directory.path))
+        XCTAssertEqual(result.snapshot.pendingAudioRemovalCount, 0)
+        XCTAssertEqual(result.snapshot.pendingCount, 1)
+    }
+
+    private func makeAudio(
+        in fixture: (store: GenerationHistoryOutboxStore, generation: Generation, audioURL: URL),
+        named name: String
+    ) throws -> URL {
+        let url = fixture.audioURL.deletingLastPathComponent().appendingPathComponent(name)
+        try Data([0x52, 0x49, 0x46, 0x46]).write(to: url)
+        return url
+    }
+
+    private func makeLockableAudio(
+        in fixture: (store: GenerationHistoryOutboxStore, generation: Generation, audioURL: URL),
+        named name: String
+    ) throws -> (directory: URL, audio: URL) {
+        let directory = fixture.audioURL.deletingLastPathComponent()
+            .appendingPathComponent("locked-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let audio = directory.appendingPathComponent(name)
+        try Data([0x52, 0x49, 0x46, 0x46]).write(to: audio)
+        return (directory, audio)
+    }
+
+    /// A read-only directory refuses the unlink, as a real removal failure would.
+    private func lock(_ directory: URL) throws {
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: directory.path)
+        lockedDirectories.append(directory)
+        let probe = directory.appendingPathComponent("probe")
+        if FileManager.default.createFile(atPath: probe.path, contents: Data()) {
+            try? FileManager.default.removeItem(at: probe)
+            throw XCTSkip("File permissions are not enforced for this user")
+        }
+    }
+
+    private func unlock(_ directory: URL) throws {
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directory.path)
+    }
+
+    private func generation(
+        _ fixture: (store: GenerationHistoryOutboxStore, generation: Generation, audioURL: URL),
+        audioPath: String
+    ) -> Generation {
+        var copy = fixture.generation
+        copy.audioPath = audioPath
+        return copy
+    }
+
     private func makeFixture(createAudio: Bool = true) throws -> (
         store: GenerationHistoryOutboxStore,
         generation: Generation,
@@ -264,7 +395,10 @@ final class GenerationHistoryOutboxTests: XCTestCase {
             store: store,
             commitGeneration: { _, generation in try state.commit(generation) },
             fetchAllGenerations: { state.rows() },
-            deleteAllGenerations: { try state.deleteAll() }
+            deleteAllGenerations: { try state.deleteAll() },
+            referencedAudioPaths: { paths in
+                Set(state.rows().map(\.audioPath)).intersection(paths)
+            }
         )
     }
 

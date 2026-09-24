@@ -171,9 +171,10 @@ private struct IOSHistoryLibrarySection: View {
     /// already exported or saved to a Saved outputs folder are outside the app and stay. macOS
     /// keeps "Keep Audio Files" because Finder reaches its output folder.
     @State private var isClearConfirmationPresented = false
-    /// History was cleared but `clearFailedFileRemovals` audio files could not be deleted.
-    @State private var isClearIncompletePresented = false
-    @State private var clearFailedFileRemovals = 0
+    /// A clear or a single delete removed rows but some audio could not be
+    /// deleted (PA-21, AUD-05). Never silent; `audioNotDeletedMessage` says which.
+    @State private var isAudioNotDeletedPresented = false
+    @State private var audioNotDeletedMessage = ""
     @State private var databaseUnavailable = false
     @State private var recoverySnapshot: GenerationHistoryRecoverySnapshot = .empty
     @State private var recoveryAudioURLs: [URL] = []
@@ -202,11 +203,11 @@ private struct IOSHistoryLibrarySection: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 10)
-            .alert(IOSInterfaceText.historyClearIncomplete, isPresented: $isClearIncompletePresented) {
+            .alert(IOSInterfaceText.historyClearIncomplete, isPresented: $isAudioNotDeletedPresented) {
                 Button(IOSInterfaceText.ok, role: .cancel) {}
                     .accessibilityIdentifier("historyClearIncompleteDismiss")
             } message: {
-                Text(IOSInterfaceText.historyClearIncompleteDetail(clearFailedFileRemovals))
+                Text(audioNotDeletedMessage)
             }
 
             IOSHistoryFilterChips(selection: $modeFilter)
@@ -310,7 +311,7 @@ private struct IOSHistoryLibrarySection: View {
 
     private var historyRecoveryBanner: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(IOSInterfaceText.historyWaiting, systemImage: "arrow.clockwise.icloud")
+            Label(recoveryTitle, systemImage: recoverySnapshot.onlyAudioRemovalsPending ? "trash" : "arrow.clockwise.icloud")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.Text.primary)
             Text(recoveryMessage)
@@ -341,6 +342,12 @@ private struct IOSHistoryLibrarySection: View {
         .iosExportPresentation(recoveryExportGate)
     }
 
+    private var recoveryTitle: String {
+        recoverySnapshot.onlyAudioRemovalsPending
+            ? IOSInterfaceText.historyAudioRemovalTitle
+            : IOSInterfaceText.historyWaiting
+    }
+
     private var recoveryMessage: String {
         if recoverySnapshot.longFormRecoveryPending {
             return IOSAppLanguage.shared.presentation.longFormRecoveryDetail
@@ -350,6 +357,9 @@ private struct IOSHistoryLibrarySection: View {
         }
         if recoverySnapshot.issueCount > 0 {
             return IOSInterfaceText.historyRecoveryProblem
+        }
+        if recoverySnapshot.pendingCount == 0, recoverySnapshot.pendingAudioRemovalCount > 0 {
+            return IOSInterfaceText.historyAudioRemovalPending(recoverySnapshot.pendingAudioRemovalCount)
         }
         let count = recoverySnapshot.pendingCount
         return IOSInterfaceText.queuedTakes(count)
@@ -368,10 +378,10 @@ private struct IOSHistoryLibrarySection: View {
                     NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
                     reload()
                     // A partial deletion is never silent (PA-21): the rows are gone but
-                    // some audio stayed in the app's storage.
+                    // some audio stayed in the app's storage until a later retry removes it.
                     if failures > 0 {
-                        clearFailedFileRemovals = failures
-                        isClearIncompletePresented = true
+                        audioNotDeletedMessage = IOSInterfaceText.historyClearIncompleteDetail(failures)
+                        isAudioNotDeletedPresented = true
                     }
                 }
             } catch {
@@ -583,18 +593,30 @@ private struct IOSHistoryLibrarySection: View {
         appModel.tab = .studio
     }
 
+    /// Off the main thread, as on macOS: a synchronous SQLite write, then a file
+    /// removal. The row goes first (`HistoryDeletionEngine`). Audio that then
+    /// cannot be removed is reported and kept for a later reconcile to remove,
+    /// because nothing can reach it in the App Group once its row is gone (AUD-05).
     private func delete(_ item: Generation) {
-        do {
-            if let id = item.id {
-                try DatabaseService.shared.deleteGeneration(id: id)
+        let engine = GenerationHistoryRecovery.deletionEngine
+        let recordID = item.id
+        let audioPath = item.audioPath
+        Task {
+            let outcome = await Task.detached(priority: .userInitiated) {
+                engine.deleteSingle(recordID: recordID, audioPath: audioPath)
+            }.value
+            switch outcome {
+            case .deleted:
+                reload()
+            case .audioCleanupFailure:
+                _ = await GenerationHistoryRecovery.retainAudioRemoval(audioPath)
+                audioNotDeletedMessage = IOSInterfaceText.historyDeleteAudioKept
+                isAudioNotDeletedPresented = true
+                reload()
+            case .databaseFailure(let message):
+                databaseUnavailable = true
+                errorMessage = message
             }
-            if FileManager.default.fileExists(atPath: item.audioPath) {
-                try? FileManager.default.removeItem(atPath: item.audioPath)
-            }
-            reload()
-        } catch {
-            databaseUnavailable = true
-            errorMessage = error.localizedDescription
         }
     }
 }

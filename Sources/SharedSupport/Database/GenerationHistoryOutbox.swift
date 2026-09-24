@@ -54,6 +54,22 @@ struct GenerationHistoryClearTransaction: Codable, Equatable, Sendable {
     }
 }
 
+/// Audio whose History rows are already gone (a clear, or a single delete) but
+/// whose file could not be removed. The list outlives the operation so a later
+/// reconcile retries the removal; in the app's private storage the file is
+/// otherwise unreachable once its row is gone (AUD-05).
+struct GenerationHistoryPendingAudioRemovals: Codable, Equatable, Sendable {
+    static let schemaVersion = 1
+
+    let schemaVersion: Int
+    let audioPaths: [String]
+
+    init(audioPaths: [String]) {
+        self.schemaVersion = Self.schemaVersion
+        self.audioPaths = Array(Set(audioPaths)).sorted()
+    }
+}
+
 struct GenerationHistoryOutboxScan: Sendable {
     let entries: [GenerationHistoryOutboxEntry]
     let issueCount: Int
@@ -97,9 +113,18 @@ struct GenerationHistoryRecoverySnapshot: Equatable, Sendable {
     let clearRecoveryPending: Bool
     var unqueuedCount: Int = 0
     var longFormRecoveryPending: Bool = false
+    /// Audio of deleted takes that could not be removed yet; Retry removes it.
+    var pendingAudioRemovalCount: Int = 0
 
     var needsAttention: Bool {
         pendingCount > 0 || unqueuedCount > 0 || issueCount > 0 || clearRecoveryPending || longFormRecoveryPending
+            || pendingAudioRemovalCount > 0
+    }
+
+    /// Only audio of deleted takes is waiting: nothing is queued for History.
+    var onlyAudioRemovalsPending: Bool {
+        pendingAudioRemovalCount > 0 && pendingCount == 0 && unqueuedCount == 0 && issueCount == 0
+            && !clearRecoveryPending && !longFormRecoveryPending
     }
 }
 
@@ -126,6 +151,24 @@ struct GenerationHistoryOutboxStore: Sendable {
 
     private var clearTransactionWritingURL: URL {
         rootURL.appendingPathComponent("clear-transaction.writing", isDirectory: false)
+    }
+
+    private var audioRemovalsURL: URL {
+        rootURL.appendingPathComponent("audio-removals.json", isDirectory: false)
+    }
+
+    private var audioRemovalsWritingURL: URL {
+        rootURL.appendingPathComponent("audio-removals.writing", isDirectory: false)
+    }
+
+    /// Store-owned files that are not outbox entries.
+    private var reservedFileNames: Set<String> {
+        [
+            clearTransactionURL.lastPathComponent,
+            clearTransactionWritingURL.lastPathComponent,
+            audioRemovalsURL.lastPathComponent,
+            audioRemovalsWritingURL.lastPathComponent,
+        ]
     }
 
     func enqueue(
@@ -157,9 +200,9 @@ struct GenerationHistoryOutboxStore: Sendable {
             )
             var entries: [GenerationHistoryOutboxEntry] = []
             var issues = 0
+            let reserved = reservedFileNames
             for url in urls.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
-                if url.lastPathComponent == clearTransactionWritingURL.lastPathComponent
-                    || url.lastPathComponent == clearTransactionURL.lastPathComponent {
+                if reserved.contains(url.lastPathComponent) {
                     continue
                 }
                 if url.pathExtension == "writing" {
@@ -261,6 +304,59 @@ struct GenerationHistoryOutboxStore: Sendable {
         }
     }
 
+    /// Audio paths waiting for removal. An interrupted rewrite is promoted like
+    /// the clear marker; an unreadable list throws and deletes nothing.
+    func loadPendingAudioRemovals() throws -> [String] {
+        let fileManager = FileManager.default
+        if !fileManager.fileExists(atPath: audioRemovalsURL.path),
+           fileManager.fileExists(atPath: audioRemovalsWritingURL.path) {
+            do {
+                let interrupted: GenerationHistoryPendingAudioRemovals = try decode(audioRemovalsWritingURL)
+                guard interrupted.schemaVersion == GenerationHistoryPendingAudioRemovals.schemaVersion else {
+                    throw GenerationHistoryOutboxError.corruptEntry
+                }
+                try fileManager.moveItem(at: audioRemovalsWritingURL, to: audioRemovalsURL)
+            } catch {
+                throw GenerationHistoryOutboxError.unavailable
+            }
+        }
+        guard fileManager.fileExists(atPath: audioRemovalsURL.path) else { return [] }
+        do {
+            let removals: GenerationHistoryPendingAudioRemovals = try decode(audioRemovalsURL)
+            guard removals.schemaVersion == GenerationHistoryPendingAudioRemovals.schemaVersion else {
+                throw GenerationHistoryOutboxError.corruptEntry
+            }
+            if fileManager.fileExists(atPath: audioRemovalsWritingURL.path) {
+                try fileManager.removeItem(at: audioRemovalsWritingURL)
+            }
+            return removals.audioPaths
+        } catch {
+            throw GenerationHistoryOutboxError.unavailable
+        }
+    }
+
+    /// Replaces the pending list; an empty list removes it.
+    func writePendingAudioRemovals(_ audioPaths: [String]) throws {
+        do {
+            if audioPaths.isEmpty {
+                let fileManager = FileManager.default
+                for url in [audioRemovalsURL, audioRemovalsWritingURL]
+                where fileManager.fileExists(atPath: url.path) {
+                    try fileManager.removeItem(at: url)
+                }
+                return
+            }
+            try ensureRoot()
+            try atomicWrite(
+                encode(GenerationHistoryPendingAudioRemovals(audioPaths: audioPaths)),
+                to: audioRemovalsURL,
+                writingURL: audioRemovalsWritingURL
+            )
+        } catch {
+            throw GenerationHistoryOutboxError.unavailable
+        }
+    }
+
     private func validate(_ entry: GenerationHistoryOutboxEntry, filenameID: UUID?) throws {
         guard entry.schemaVersion == GenerationHistoryOutboxEntry.schemaVersion else {
             throw GenerationHistoryOutboxError.corruptEntry
@@ -330,22 +426,27 @@ actor GenerationHistoryRecoveryCoordinator {
     typealias Commit = @Sendable (GenerationHistoryOutboxOperation, Generation) async throws -> Generation
     typealias FetchAll = @Sendable () async throws -> [Generation]
     typealias DeleteAll = @Sendable () async throws -> Void
+    /// The subset of the given audio paths that History rows still reference.
+    typealias ReferencedAudioPaths = @Sendable ([String]) async throws -> Set<String>
 
     private let store: GenerationHistoryOutboxStore
     private let commitGeneration: Commit
     private let fetchAllGenerations: FetchAll
     private let deleteAllGenerations: DeleteAll
+    private let referencedAudioPaths: ReferencedAudioPaths
 
     init(
         store: GenerationHistoryOutboxStore,
         commitGeneration: @escaping Commit,
         fetchAllGenerations: @escaping FetchAll,
-        deleteAllGenerations: @escaping DeleteAll
+        deleteAllGenerations: @escaping DeleteAll,
+        referencedAudioPaths: @escaping ReferencedAudioPaths
     ) {
         self.store = store
         self.commitGeneration = commitGeneration
         self.fetchAllGenerations = fetchAllGenerations
         self.deleteAllGenerations = deleteAllGenerations
+        self.referencedAudioPaths = referencedAudioPaths
     }
 
     func commit(_ entry: GenerationHistoryOutboxEntry) async throws -> Generation {
@@ -381,6 +482,9 @@ actor GenerationHistoryRecoveryCoordinator {
                 committed.append(saved)
             }
         }
+        // After the commits, so audio that just became a row is recognized as
+        // referenced. A failure leaves the list for the next reconcile.
+        _ = try? await removePendingAudio()
         return GenerationHistoryReconciliationResult(
             committed: committed,
             snapshot: snapshot()
@@ -402,11 +506,21 @@ actor GenerationHistoryRecoveryCoordinator {
             clearPending = true
             clearIssueCount = 1
         }
+        let removalCount: Int
+        let removalIssueCount: Int
+        do {
+            removalCount = try store.loadPendingAudioRemovals().count
+            removalIssueCount = 0
+        } catch {
+            removalCount = 0
+            removalIssueCount = 1
+        }
         return GenerationHistoryRecoverySnapshot(
             pendingCount: scan.entries.count,
             availableAudioCount: available,
-            issueCount: scan.issueCount + missing + clearIssueCount,
-            clearRecoveryPending: clearPending
+            issueCount: scan.issueCount + missing + clearIssueCount + removalIssueCount,
+            clearRecoveryPending: clearPending,
+            pendingAudioRemovalCount: removalCount
         )
     }
 
@@ -460,21 +574,57 @@ actor GenerationHistoryRecoveryCoordinator {
         for id in transaction.pendingEntryIDs {
             try store.removeEntry(id: id)
         }
+        guard transaction.deleteAudio else {
+            try store.removeClearTransaction()
+            return 0
+        }
 
-        var failures = 0
-        if transaction.deleteAudio {
-            let fileManager = FileManager.default
-            for path in transaction.audioPaths where fileManager.fileExists(atPath: path) {
-                do {
-                    try fileManager.removeItem(atPath: path)
-                } catch {
-                    failures += 1
-                }
+        // The rows are gone. Their audio moves to the durable removal list
+        // before the transaction retires, so a file that cannot be removed now
+        // is retried by a later reconcile. Keeping the transaction instead
+        // would resume the whole clear on every reconcile and delete the takes
+        // saved after it (AUD-05).
+        do {
+            try store.writePendingAudioRemovals(store.loadPendingAudioRemovals() + transaction.audioPaths)
+        } catch {
+            throw GenerationHistoryOutboxError.clearUnavailable
+        }
+        try store.removeClearTransaction()
+        _ = try? await removePendingAudio()
+        let fileManager = FileManager.default
+        return transaction.audioPaths.count { fileManager.fileExists(atPath: $0) }
+    }
+
+    /// A single delete removed the row but not its audio file: keep the path so
+    /// a later reconcile retries the removal instead of leaving the file behind
+    /// silently (AUD-05).
+    func retainAudioRemoval(_ audioPath: String) throws {
+        try store.writePendingAudioRemovals(store.loadPendingAudioRemovals() + [audioPath])
+    }
+
+    /// Retries the pending audio removals. Audio a History row or a queued take
+    /// still points at is never removed (it only leaves the list), and neither
+    /// is anything but a regular file. Returns the paths still pending.
+    @discardableResult
+    private func removePendingAudio() async throws -> Set<String> {
+        let pending = try store.loadPendingAudioRemovals()
+        guard !pending.isEmpty else { return [] }
+        let queued = Set(store.scan().entries.map(\.generation.audioPath))
+        let referenced = try await referencedAudioPaths(pending)
+        let fileManager = FileManager.default
+        var remaining: [String] = []
+        for path in pending where !queued.contains(path) && !referenced.contains(path) {
+            var isDirectory: ObjCBool = false
+            guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory),
+                  !isDirectory.boolValue
+            else { continue }
+            do {
+                try fileManager.removeItem(atPath: path)
+            } catch {
+                remaining.append(path)
             }
         }
-        if failures == 0 {
-            try store.removeClearTransaction()
-        }
-        return failures
+        try store.writePendingAudioRemovals(remaining)
+        return Set(remaining)
     }
 }

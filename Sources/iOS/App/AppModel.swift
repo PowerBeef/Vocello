@@ -307,6 +307,99 @@ final class AppModel {
         if let raw = IOSAppDefaults.lastTabRawValue, let restored = IOSAppTab(rawValue: raw) {
             self.tab = restored
         }
+
+        // Drafts survive termination in the background (PA-21, IOS-09).
+        if let snapshot = IOSStudioDraftPersistence.load(from: .standard) {
+            restoreDrafts(from: snapshot, defaultSpeakerID: modelRegistry.defaultSpeaker.id)
+        }
+    }
+
+    // MARK: - Draft persistence (PA-21, IOS-09)
+
+    /// Saves the three Studio drafts; called whenever the scene leaves the foreground.
+    func persistDrafts(to defaults: UserDefaults = .standard) {
+        IOSStudioDraftPersistence.save(draftSnapshot, to: defaults)
+    }
+
+    private var draftSnapshot: IOSStudioDraftSnapshot {
+        IOSStudioDraftSnapshot(
+            custom: .init(
+                speakerID: customVoiceDraft.selectedSpeaker,
+                language: customVoiceDraft.selectedLanguage.rawValue,
+                pinnedSeed: customVoiceDraft.pinnedSeed,
+                delivery: Self.snapshot(of: customVoiceDraft.delivery),
+                text: customVoiceDraft.text
+            ),
+            design: .init(
+                voiceDescription: voiceDesignDraft.voiceDescription,
+                language: voiceDesignDraft.selectedLanguage.rawValue,
+                pinnedSeed: voiceDesignDraft.pinnedSeed,
+                delivery: Self.snapshot(of: voiceDesignDraft.delivery),
+                text: voiceDesignDraft.text
+            ),
+            clone: .init(
+                savedVoiceID: voiceCloningDraft.selectedSavedVoiceID,
+                referenceAudioPath: voiceCloningDraft.referenceAudioPath,
+                referenceTranscript: voiceCloningDraft.referenceTranscript,
+                language: voiceCloningDraft.selectedLanguage.rawValue,
+                pinnedSeed: voiceCloningDraft.pinnedSeed,
+                text: voiceCloningDraft.text
+            )
+        )
+    }
+
+    private func restoreDrafts(from snapshot: IOSStudioDraftSnapshot, defaultSpeakerID: String) {
+        let knownSpeaker = TTSContract.allSpeakerDescriptors.contains { $0.id == snapshot.custom.speakerID }
+        customVoiceDraft = CustomVoiceDraft(
+            selectedSpeaker: knownSpeaker ? snapshot.custom.speakerID : defaultSpeakerID,
+            pinnedSeed: snapshot.custom.pinnedSeed,
+            selectedLanguage: Self.language(snapshot.custom.language),
+            delivery: Self.delivery(snapshot.custom.delivery),
+            text: snapshot.custom.text
+        )
+        voiceDesignDraft = VoiceDesignDraft(
+            voiceDescription: snapshot.design.voiceDescription,
+            pinnedSeed: snapshot.design.pinnedSeed,
+            selectedLanguage: Self.language(snapshot.design.language),
+            delivery: Self.delivery(snapshot.design.delivery),
+            text: snapshot.design.text
+        )
+        // A saved voice that no longer exists is cleared by the Studio's
+        // hydration (`SavedVoiceCloneHydration`), as for any stale selection.
+        voiceCloningDraft = VoiceCloningDraft(
+            selectedSavedVoiceID: snapshot.clone.savedVoiceID,
+            pinnedSeed: snapshot.clone.pinnedSeed,
+            referenceAudioPath: snapshot.clone.referenceAudioPath,
+            selectedLanguage: Self.language(snapshot.clone.language),
+            referenceTranscript: snapshot.clone.referenceTranscript,
+            text: snapshot.clone.text
+        )
+    }
+
+    private static func snapshot(of delivery: DeliveryInputState) -> IOSStudioDraftSnapshot.Delivery {
+        .init(
+            mode: delivery.mode.rawValue,
+            presetID: delivery.selectedPresetID,
+            intensity: delivery.selectedIntensity.rawValue,
+            customText: delivery.customText
+        )
+    }
+
+    private static func delivery(_ snapshot: IOSStudioDraftSnapshot.Delivery) -> DeliveryInputState {
+        guard let mode = DeliveryInputMode(rawValue: snapshot.mode),
+              let intensity = EmotionIntensity(rawValue: snapshot.intensity) else {
+            return DeliveryInputState()
+        }
+        return DeliveryInputState(
+            mode: mode,
+            selectedPresetID: snapshot.presetID,
+            selectedIntensity: intensity,
+            customText: snapshot.customText
+        )
+    }
+
+    private static func language(_ rawValue: String) -> Qwen3SupportedLanguage {
+        Qwen3SupportedLanguage(rawValue: rawValue) ?? .auto
     }
 }
 

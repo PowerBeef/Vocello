@@ -829,7 +829,9 @@ append can replay.
 acknowledgment; below the views `AnyTTSEngineBackend` reads it through `VoiceCloningConsentPolicy`
 on every clone generation and saved-voice enrollment and refuses both without it, while the CLI
 records consent per invocation with `--confirm-consent`), `vocello.ios.interfaceLanguage` (the interface language, in `AppDefaults.store` on
-macOS through `MacInterfaceLanguage`), per-mode variant choices (`QwenVoice.MacModelVariantPreference.<mode>`) and the
+macOS through `MacInterfaceLanguage`), `vocello.ios.studioDrafts.v1` (the iPhone Studio drafts,
+saved whenever the scene leaves the foreground and restored at launch so a background termination
+keeps the script; `IOSStudioDraftPersistence`, PA-21), per-mode variant choices (`QwenVoice.MacModelVariantPreference.<mode>`) and the
 `QwenVoice.PreferSpeedEverywhere` lower-memory preference (`MacModelVariantResolution`: explicit
 choice, then Speed when the preference is on, then the hardware recommendation), and UI state
 (`QwenVoice.LastSelectedSidebarItem`, `QwenVoice.LastVoiceCloningSavedVoiceID`). Debug mode is not

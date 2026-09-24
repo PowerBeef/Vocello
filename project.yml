@@ -495,6 +495,8 @@ targets:
       - path: Sources/iOSSupport/Services/SavedVoicesBusyRetryPolicy.swift
       # PA-21: the one iOS audio-session owner's decision table.
       - path: Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift
+      # PA-21: Studio drafts kept across launches (IOS-09).
+      - path: Sources/iOSSupport/Services/IOSStudioDraftPersistence.swift
     dependencies:
       - target: QwenVoiceCore
       - package: GRDB
@@ -551,6 +553,8 @@ targets:
       - path: Sources/iOSSupport/Services/SavedVoicesBusyRetryPolicy.swift
       # PA-21: the one iOS audio-session owner's decision table.
       - path: Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift
+      # PA-21: Studio drafts kept across launches (IOS-09).
+      - path: Sources/iOSSupport/Services/IOSStudioDraftPersistence.swift
     dependencies:
       - target: QwenVoiceCore
     settings:

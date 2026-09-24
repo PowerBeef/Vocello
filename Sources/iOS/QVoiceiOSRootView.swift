@@ -17,6 +17,7 @@ struct QVoiceiOSRootView: View {
     let backgroundGeneration: IOSBackgroundGenerationController
 
     @State private var appModel: AppModel
+    @Environment(\.scenePhase) private var scenePhase
 
     init(
         modelRegistry: ContractBackedModelRegistry,
@@ -33,5 +34,12 @@ struct QVoiceiOSRootView: View {
         RootView(ttsEngine: ttsEngine)
             .environment(appModel)
             .onAppear { backgroundGeneration.attach(appModel) }
+            // PA-21 (IOS-09): iOS may terminate the app once it is backgrounded,
+            // so the drafts are saved every time the scene leaves the foreground.
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase != .active {
+                    appModel.persistDrafts()
+                }
+            }
     }
 }

@@ -177,6 +177,12 @@ Maintained iPhone subtrees:
 
 The iPhone app intentionally keeps shared state constrained to the App Group app-support subtree. It does not use a parallel shared-user-defaults channel for model or voice state.
 
+The Studio drafts (scripts, voice brief, custom delivery text, language, pinned seed and a selected
+saved voice's reference) are kept in the app's own preferences under `vocello.ios.studioDrafts.v1`
+so that iOS terminating the app in the background does not lose them (PA-21, IOS-09). They are
+saved each time the scene leaves the foreground, stay on the device with the default data
+protection class and back up like History. A reference that is not a saved voice is never stored.
+
 ### Data protection and backup policy
 
 `config/ios-storage-protection-policy.json` is the path-level authority. During bootstrap,

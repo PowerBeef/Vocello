@@ -111,6 +111,11 @@ enum IOSHistoryModeFilter: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    /// The `Generation.mode` the page query keeps; nil keeps every mode.
+    var generationMode: String? {
+        self == .all ? nil : rawValue
+    }
+
     func matches(_ item: Generation) -> Bool {
         switch self {
         case .all: return true
@@ -162,6 +167,13 @@ private struct IOSHistoryLibrarySection: View {
     @State private var debouncedQuery: String = ""
     @State private var groupedItems: [(bucket: IOSHistoryBucket, items: [IOSHistoryEntry])] = []
     @State private var filteredItemCount = 0
+    /// Bounded pages (AUD-05): `items` holds the first `pageLimit` entries that
+    /// `loadedRequest` asked for; Show More asks for one more page.
+    /// `archiveCount` counts every row, whatever the filter.
+    @State private var pageLimit = GenerationHistoryPageRequest.pageSize
+    @State private var loadedRequest: GenerationHistoryPageRequest?
+    @State private var hasMoreItems = false
+    @State private var archiveCount = 0
     /// Long-form projects whose per-segment map is disclosed (keyed by project ID).
     @State private var expandedProjects: Set<String> = []
     @State private var reloadTask: Task<Void, Never>?
@@ -192,12 +204,12 @@ private struct IOSHistoryLibrarySection: View {
                     // Drawn at 34 pt; the whole 44-pt frame is the hit target.
                     Image(systemName: "trash.circle")
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(items.isEmpty ? Theme.Text.tertiary : Theme.Text.secondary)
+                        .foregroundStyle(archiveCount == 0 ? Theme.Text.tertiary : Theme.Text.secondary)
                         .frame(width: 34, height: 34)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
-                .disabled(items.isEmpty || databaseUnavailable)
+                .disabled(archiveCount == 0 || databaseUnavailable)
                 .accessibilityLabel(IOSInterfaceText.clearHistoryLower)
                 .accessibilityIdentifier("historyClearMenu")
             }
@@ -238,7 +250,7 @@ private struct IOSHistoryLibrarySection: View {
                             .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
                             .padding(.horizontal, 20)
                             .accessibilityIdentifier("historyRetryButton")
-                    } else if items.isEmpty {
+                    } else if archiveCount == 0 {
                         IOSEmptyStateCard(
                             title: IOSInterfaceText.noTakes,
                             message: IOSInterfaceText.noTakesDetail,
@@ -270,6 +282,16 @@ private struct IOSHistoryLibrarySection: View {
                                 }
                             }
                         }
+                        if hasMoreItems {
+                            Button(IOSInterfaceText.historyShowMore) {
+                                pageLimit += GenerationHistoryPageRequest.pageSize
+                                loadPage(reconciling: false)
+                            }
+                            .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .accessibilityIdentifier("historyShowMoreButton")
+                        }
                     }
                 }
                 .padding(.bottom, 8)
@@ -287,10 +309,10 @@ private struct IOSHistoryLibrarySection: View {
             reloadTask = nil
         }
         .onChange(of: modeFilter) { _, _ in
-            recomputePresentation()
+            showFirstPage()
         }
         .onChange(of: debouncedQuery) { _, _ in
-            recomputePresentation()
+            showFirstPage()
         }
         .task(id: searchQuery) {
             try? await Task.sleep(for: .milliseconds(150))
@@ -305,7 +327,7 @@ private struct IOSHistoryLibrarySection: View {
             Button(IOSInterfaceText.cancel, role: .cancel) {}
                 .accessibilityIdentifier("historyClearCancel")
         } message: {
-            Text(IOSInterfaceText.deleteAllHistory(items.count))
+            Text(IOSInterfaceText.deleteAllHistory(archiveCount))
         }
     }
 
@@ -395,29 +417,63 @@ private struct IOSHistoryLibrarySection: View {
     }
 
     private func reload(reopenFailedStore: Bool = false) {
+        loadPage(reconciling: true, reopenFailedStore: reopenFailedStore)
+    }
+
+    /// A filter or search change. While the whole archive is loaded it is
+    /// filtered in memory, as before paging; otherwise the database answers from
+    /// the first page, so no match hides beyond the rows already loaded.
+    private func showFirstPage() {
+        recomputePresentation()
+        guard !holdsWholeArchive else { return }
+        pageLimit = GenerationHistoryPageRequest.pageSize
+        loadPage(reconciling: false)
+    }
+
+    /// The loaded rows are the complete, unfiltered archive.
+    private var holdsWholeArchive: Bool {
+        guard let loadedRequest, !hasMoreItems else { return false }
+        return loadedRequest.isUnfiltered
+    }
+
+    /// Reads the current page off the main thread. A full reload reconciles
+    /// pending History first; a filter, search or Show More only reads.
+    private func loadPage(reconciling: Bool, reopenFailedStore: Bool = false) {
         reloadTask?.cancel()
+        let request = GenerationHistoryPageRequest(
+            mode: modeFilter.generationMode,
+            query: debouncedQuery,
+            limit: pageLimit
+        )
         reloadTask = Task {
             do {
-                let (loadedItems, availablePaths) = try await Task.detached(
+                let (page, availablePaths) = try await Task.detached(
                     priority: .userInitiated
-                ) { () throws -> ([Generation], Set<String>) in
+                ) { () throws -> (GenerationHistoryPage, Set<String>) in
                     if reopenFailedStore {
                         try DatabaseService.shared.reopenIfNeeded()
                     }
-                    _ = await GenerationHistoryRecovery.reconcile()
-                    let loaded = try DatabaseService.shared.fetchAllGenerations()
+                    if reconciling {
+                        _ = await GenerationHistoryRecovery.reconcile()
+                    }
+                    let page = try DatabaseService.shared.fetchGenerationPage(request)
                     // Row menus need audio availability; resolving it here
                     // keeps the per-row stat(2) off the main thread and out of
                     // the scroll path (IUI-4 P5).
                     let fileManager = FileManager.default
                     let available = Set(
-                        loaded.map(\.audioPath)
+                        page.rows.map(\.audioPath)
                             .filter { fileManager.fileExists(atPath: $0) }
                     )
-                    return (loaded, available)
+                    return (page, available)
                 }.value
                 guard !Task.isCancelled else { return }
-                items = loadedItems
+                // Newest first throughout, segments included, so an in-memory
+                // search lists them in place as it did before paging.
+                items = page.rows.sorted { ($0.createdAt, $0.id ?? 0) > ($1.createdAt, $1.id ?? 0) }
+                loadedRequest = request
+                hasMoreItems = page.hasMore
+                archiveCount = page.archiveCount
                 availableAudioPaths = availablePaths
                 databaseUnavailable = false
                 errorMessage = nil
@@ -426,6 +482,9 @@ private struct IOSHistoryLibrarySection: View {
             } catch {
                 guard !Task.isCancelled else { return }
                 items = []
+                loadedRequest = nil
+                hasMoreItems = false
+                archiveCount = 0
                 groupedItems = []
                 filteredItemCount = 0
                 databaseUnavailable = true
@@ -461,13 +520,16 @@ private struct IOSHistoryLibrarySection: View {
         query: String
     ) -> [(bucket: IOSHistoryBucket, items: [IOSHistoryEntry])] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        // The page query matches with the same predicate, so a filtered page and
+        // this list agree on every row.
         let filteredItems = items.filter { item in
             guard modeFilter.matches(item) else { return false }
-            guard !trimmed.isEmpty else { return true }
-            if item.text.localizedCaseInsensitiveContains(trimmed) { return true }
-            if let voice = item.voice, voice.localizedCaseInsensitiveContains(trimmed) { return true }
-            if item.mode.localizedCaseInsensitiveContains(trimmed) { return true }
-            return false
+            return GenerationHistoryPageQuery.matchesTranscriptVoiceOrMode(
+                text: item.text,
+                voice: item.voice,
+                mode: item.mode,
+                query: trimmed
+            )
         }
 
         // Long-form grouping (mirrors macOS History semantics): a project's

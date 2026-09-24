@@ -427,6 +427,8 @@ targets:
       - path: Sources/SharedSupport/Database/GenerationHistoryOutbox.swift
       - path: Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift
       - path: Sources/SharedSupport/Database/GenerationHistoryEnqueueState.swift
+      # AUD-05: the bounded History page query, run against real SQLite.
+      - path: Sources/SharedSupport/Database/GenerationHistoryPage.swift
       - path: Sources/SharedSupport/Services/VocelloPresentationText.swift
       - path: Sources/SharedSupport/Services/VocelloLocalization.swift
       # The scale's tables, so MacTypeScaleTests can hold their shape: six type

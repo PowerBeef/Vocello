@@ -73,8 +73,8 @@
       "path": "Sources/iOS/History/HistoryScreen.swift",
       "screen": "History",
       "scenario": "stateful",
-      "reason": "History search, filters, rows, menus, recovery, and confirm-only clear actions are source-bound here.",
-      "interactiveOccurrenceCount": 12
+      "reason": "History search, filters, rows, menus, recovery, Show More paging, and confirm-only clear actions are source-bound here.",
+      "interactiveOccurrenceCount": 13
     },
     {
       "path": "Sources/iOS/IOSDesignSystemPrimitives.swift",
@@ -518,12 +518,12 @@
     },
     {
       "id": "history-surface",
-      "identifierPattern": "history(SearchField|ModeFilter|ClearMenu|ClearConfirm|ClearCancel|ClearIncompleteDismiss|RetryButton|Recovery_retry|Recovery_export)",
+      "identifierPattern": "history(SearchField|ModeFilter|ClearMenu|ClearConfirm|ClearCancel|ClearIncompleteDismiss|RetryButton|Recovery_retry|Recovery_export|ShowMoreButton)",
       "sourceToken": "historySearchField",
       "screen": "History",
       "prerequisite": "History tab",
       "role": "search, menu, and buttons",
-      "action": "Search, filter, recover, and cancel global clear",
+      "action": "Search, filter, load the next page, recover, and cancel global clear",
       "expectedResult": "Global destructive confirmation is cancelled without mutation",
       "expectedSemantics": "Labels, values, errors, and destructive confirmation",
       "minimumTargetPoints": 44,

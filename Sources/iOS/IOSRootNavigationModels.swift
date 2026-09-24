@@ -673,6 +673,10 @@ import QwenVoiceCore
         IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.historyAudioRemovalPending", defaultValue: "%1$lld audio files from deleted takes are still stored on this iPhone. Retry to delete them.",
                    comment: "iOS History recovery banner detail; %1$lld is how many audio files of deleted takes could not be deleted yet. Presentation only."), count)
     }
+    static var historyShowMore: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.historyShowMore", defaultValue: "Show More",
+               comment: "iOS History button below the list that loads the next page of older takes. Presentation only.")
+    }
     static var ok: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.ok", defaultValue: "OK",
                comment: "iOS interface: OK, the button that dismisses an informational alert. Presentation only.")

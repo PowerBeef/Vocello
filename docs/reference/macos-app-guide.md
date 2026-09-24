@@ -136,6 +136,7 @@ setup chips wrap when the actual available width cannot fit them.
 | Long-form project | joined row plus `history_longFormSegmentsToggle_<digest8>` disclosure over the per-segment map; segments collapse under the project, flatten during search, and orphans stay visible |
 | Degraded database state | `history_errorState`; destructive actions stay disabled until a later reload/read succeeds |
 | Pending-history recovery | `historyRecovery_banner` with `historyRecovery_retry`, `historyRecovery_reveal`, and `historyRecovery_export` |
+| Paging | `history_showMoreButton` below the list loads the next 500 entries (AUD-05); sort, filter and search reach the whole archive through `GenerationHistoryPageQuery` with the list's own predicate, and run in memory while the whole archive is loaded |
 
 Database failures are typed and fail closed: an unavailable store is not shown as empty History.
 Published single takes are queued before their idempotent database write when storage permits. Startup and History

@@ -851,6 +851,10 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.history.segmentsOne", defaultValue: "1 segment",
                comment: "macOS interface: long-form project disclosure label for a single segment. Presentation only.")
     }
+    static var historyShowMore: String {
+        localization.string(localized: "vocello.mac.history.showMore", defaultValue: "Show More",
+               comment: "macOS interface: button below the History list that loads the next page of takes. Presentation only.")
+    }
     static var historySortAccessibility: String {
         localization.string(localized: "vocello.mac.history.sortAccessibility", defaultValue: "Sort history",
                comment: "macOS interface: VoiceOver label of the History toolbar sort menu. Presentation only.")

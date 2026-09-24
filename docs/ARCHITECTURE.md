@@ -816,7 +816,10 @@ Layout under the root: `models/` (downloaded HF weights, staged in
 History storage fails closed. After atomic WAV publication, `GenerationPersistence` first writes a
 schema-v1 sidecar under `history-outbox/`, then schedules an idempotent `audioPath`-bound SQLite
 commit; only a successful database transaction removes the sidecar. Startup and every History open
-reconcile retained entries. Database open, migration, read, write, and delete failures are reduced
+reconcile retained entries. Both History screens read bounded pages (`GenerationHistoryPageQuery`,
+500 entries, a long-form project counted once); sort, mode filter and search run in SQL over the whole
+table, and a read takes the SQLite writer only while a long-form journal is pending (AUD-05).
+Database open, migration, read, write, and delete failures are reduced
 to typed privacy-safe classifications; an unavailable store never masquerades as empty History or
 turns a destructive operation into a successful no-op. Both platforms expose a recovery banner:
 macOS offers Retry, Reveal, and Export, while iOS offers Retry and system share/export. Clear-all

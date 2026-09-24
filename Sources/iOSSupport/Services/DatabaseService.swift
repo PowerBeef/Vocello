@@ -159,11 +159,43 @@ final class DatabaseService: @unchecked Sendable {
         }
     }
 
+    /// Every row, newest first. Screens page instead (`fetchGenerationPage`);
+    /// clear-all still needs every audio path.
     func fetchAllGenerations() throws -> [Generation] {
         let dbQueue = try requireQueue(for: .read)
         do {
+            // AUD-05: the writer and the journal work only while a long-form
+            // journal is pending; otherwise a read transaction suffices (see
+            // `LongFormHistoryAcceptanceStore.reconcile`).
+            guard longFormAcceptance.hasPendingRecovery else {
+                return try dbQueue.read { db in
+                    try Generation.order(Generation.Columns.createdAt.desc).fetchAll(db)
+                }
+            }
             return try dbQueue.write { db in
                 return try longFormAcceptance.readableHistory(in: db)
+            }
+        } catch {
+            throw HistoryPersistenceError.classify(error, operation: .read)
+        }
+    }
+
+    /// One bounded page of History (AUD-05); filter and search reach every row.
+    func fetchGenerationPage(_ request: GenerationHistoryPageRequest) throws -> GenerationHistoryPage {
+        let dbQueue = try requireQueue(for: .read)
+        do {
+            guard longFormAcceptance.hasPendingRecovery else {
+                return try dbQueue.read { db in
+                    try GenerationHistoryPageQuery.fetch(request, includesLongFormProjects: true, in: db)
+                }
+            }
+            return try dbQueue.write { db in
+                let reconciled = try longFormAcceptance.reconcileBeforeReading(in: db)
+                return try GenerationHistoryPageQuery.fetch(
+                    request,
+                    includesLongFormProjects: reconciled,
+                    in: db
+                )
             }
         } catch {
             throw HistoryPersistenceError.classify(error, operation: .read)

@@ -155,8 +155,11 @@ struct LongFormHistoryAcceptanceStore: Sendable {
         return joined
     }
 
-    /// Invoke before every History read/write, not merely at app launch. A failed
+    /// Invoke before every History write, and before every read while a journal
+    /// is pending (`hasPendingRecovery`), not merely at app launch. A failed
     /// commit cannot be exposed as an accepted project or bypassed by clear-all.
+    /// A read with no journal pending needs no writer: SQLite shows it only
+    /// committed rows, and a committed row is the acceptance witness (AUD-05).
     func reconcile(in db: Database) throws {
         for url in try journalURLs() {
             do {
@@ -205,13 +208,23 @@ struct LongFormHistoryAcceptanceStore: Sendable {
     /// A damaged project must not hide unrelated standalone recordings. Project
     /// rows remain withheld and all mutations still require successful recovery.
     func readableHistory(in db: Database) throws -> [Generation] {
-        do { try reconcile(in: db) }
-        catch LongFormAcceptanceError.recoveryRequired {
+        guard try reconcileBeforeReading(in: db) else {
             return try Generation
                 .filter(Generation.Columns.longFormProjectID == nil && Generation.Columns.longFormRole == nil)
                 .order(Generation.Columns.createdAt.desc).fetchAll(db)
         }
         return try Generation.order(Generation.Columns.createdAt.desc).fetchAll(db)
+    }
+
+    /// Reconciles ahead of a read on the writer. `false` when recovery is
+    /// required: the read must then withhold every long-form project row.
+    func reconcileBeforeReading(in db: Database) throws -> Bool {
+        do {
+            try reconcile(in: db)
+            return true
+        } catch LongFormAcceptanceError.recoveryRequired {
+            return false
+        }
     }
 
     var hasPendingRecovery: Bool {

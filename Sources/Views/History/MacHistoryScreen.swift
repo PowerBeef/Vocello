@@ -34,7 +34,7 @@ private struct MacHistoryListItem: Identifiable, Sendable {
         self.audioFileExists = FileManager.default.fileExists(atPath: generation.audioPath)
         self.textPreview = generation.textPreview
         self.formattedDate = generation.createdAt.formatted(date: .abbreviated, time: .shortened)
-        self.searchKey = "\(generation.text)\n\(generation.voice ?? "")".lowercased()
+        self.searchKey = GenerationHistoryPageQuery.lowercasedSearchKey(text: generation.text, voice: generation.voice)
         self.waveformSeed = generation.id.map { Int(truncatingIfNeeded: $0) }
             ?? VocelloStableVisualHash.int(generation.audioPath)
         self.saveVoiceSource = Self.makeSaveVoiceSource(for: generation)
@@ -193,9 +193,25 @@ private struct MacHistoryActionAlert: Identifiable {
 }
 
 /// Built rows of the last load, so a re-created screen starts from them
-/// without stat-ing files or re-deriving row data.
+/// without stat-ing files or re-deriving row data, and the page they came from.
 @MainActor private enum MacHistorySessionCache {
     static var items: [MacHistoryListItem] = []
+    static var pageLimit = GenerationHistoryPageRequest.pageSize
+    static var loadedRequest: GenerationHistoryPageRequest?
+    static var hasMoreItems = false
+    static var archiveCount = 0
+}
+
+private extension HistorySortOrder {
+    var pageOrder: GenerationHistoryPageRequest.Order {
+        switch self {
+        case .newest: .newest
+        case .oldest: .oldest
+        case .longestDuration: .longest
+        case .shortestDuration: .shortest
+        case .mode: .mode
+        }
+    }
 }
 
 /// History in the iOS design over the shared `Generation` and
@@ -219,6 +235,13 @@ struct MacHistoryScreen: View {
     var onPinSeed: ((Generation) -> Void)? = nil
 
     @State private var items: [MacHistoryListItem] = MacHistorySessionCache.items
+    /// Bounded pages (AUD-05), as on iPhone: `items` holds the first
+    /// `pageLimit` entries `loadedRequest` asked for; Show More asks for one
+    /// more page. `archiveCount` counts every row, whatever the filter.
+    @State private var pageLimit = MacHistorySessionCache.pageLimit
+    @State private var loadedRequest: GenerationHistoryPageRequest? = MacHistorySessionCache.loadedRequest
+    @State private var hasMoreItems = MacHistorySessionCache.hasMoreItems
+    @State private var archiveCount = MacHistorySessionCache.archiveCount
     @State private var isLoading = false
     @State private var loadTask: Task<Void, Never>?
     @State private var loadError: String?
@@ -241,6 +264,17 @@ struct MacHistoryScreen: View {
 
     private var searchActive: Bool {
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// No row at all, as opposed to no row matching the filter or search.
+    private var archiveIsEmpty: Bool {
+        items.isEmpty && archiveCount == 0
+    }
+
+    /// The loaded rows are the complete, unfiltered archive.
+    private var holdsWholeArchive: Bool {
+        guard let loadedRequest, !hasMoreItems else { return false }
+        return loadedRequest.isUnfiltered
     }
 
     var body: some View {
@@ -289,15 +323,15 @@ struct MacHistoryScreen: View {
             refreshRecoveryState()
         }
         .onChange(of: itemsRevision) { _, _ in recomputeFilteredItems() }
-        .onChange(of: sortOrder) { _, _ in recomputeFilteredItems() }
-        .onChange(of: modeFilter) { _, _ in recomputeFilteredItems() }
+        .onChange(of: sortOrder) { _, _ in pageInputsChanged() }
+        .onChange(of: modeFilter) { _, _ in pageInputsChanged() }
         .onChange(of: expandedProjects) { _, _ in recomputeSections() }
         .onChange(of: searchText) { _, _ in
             searchDebounceTask?.cancel()
             searchDebounceTask = Task {
                 try? await Task.sleep(for: .milliseconds(200))
                 guard !Task.isCancelled else { return }
-                recomputeFilteredItems()
+                pageInputsChanged()
             }
         }
         .onDisappear(perform: handleDisappear)
@@ -372,9 +406,9 @@ struct MacHistoryScreen: View {
         } else if filteredItems.isEmpty {
             historyStateContainer(identifier: "history_emptyState") {
                 VocelloEmptyStateCard(
-                    title: items.isEmpty ? MacInterfaceText.historyNoTakesTitle : MacInterfaceText.historyNoMatchesTitle,
-                    message: items.isEmpty ? MacInterfaceText.historyNoTakesDetail : MacInterfaceText.historyNoMatchesDetail,
-                    symbolName: items.isEmpty ? "clock.arrow.circlepath" : "line.3.horizontal.decrease.circle",
+                    title: archiveIsEmpty ? MacInterfaceText.historyNoTakesTitle : MacInterfaceText.historyNoMatchesTitle,
+                    message: archiveIsEmpty ? MacInterfaceText.historyNoTakesDetail : MacInterfaceText.historyNoMatchesDetail,
+                    symbolName: archiveIsEmpty ? "clock.arrow.circlepath" : "line.3.horizontal.decrease.circle",
                     tint: MacTheme.historyTint,
                     maxWidth: MacShellMetrics.emptyStateCardMaxWidth,
                     symbolIsDecorative: true
@@ -409,6 +443,20 @@ struct MacHistoryScreen: View {
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
                     }
+                }
+                if hasMoreItems {
+                    Button(MacInterfaceText.historyShowMore) {
+                        pageLimit += GenerationHistoryPageRequest.pageSize
+                        reloadHistory(reconciling: false)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(MacTheme.historyTint)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, VocelloTheme.Spacing.md)
+                    .accessibilityIdentifier("history_showMoreButton")
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
                 }
             }
             .listStyle(.plain)
@@ -544,6 +592,8 @@ private extension MacHistoryScreen {
             items[existingIndex] = MacHistoryListItem(generation: generation)
         } else {
             items.append(MacHistoryListItem(generation: generation))
+            archiveCount += 1
+            MacHistorySessionCache.archiveCount = archiveCount
         }
         itemsRevision &+= 1
         MacHistorySessionCache.items = items
@@ -572,7 +622,7 @@ private extension MacHistoryScreen {
             )
             return
         }
-        guard !items.isEmpty else {
+        guard archiveCount > 0 || !items.isEmpty else {
             presentActionAlert(title: MacInterfaceText.historyEmptyTitle, message: MacInterfaceText.historyEmptyMessage)
             return
         }
@@ -580,18 +630,40 @@ private extension MacHistoryScreen {
         case .keepFiles:
             actionAlert = MacHistoryActionAlert(
                 title: MacInterfaceText.historyClearTitle,
-                message: MacInterfaceText.historyClearMessage(String(items.count)),
+                message: MacInterfaceText.historyClearMessage(String(max(archiveCount, items.count))),
                 confirmTitle: MacInterfaceText.historyClearConfirm,
                 onConfirm: { performClearAll(deleteAudio: false) }
             )
         case .deleteFiles:
             actionAlert = MacHistoryActionAlert(
                 title: MacInterfaceText.historyClearDeleteTitle,
-                message: MacInterfaceText.historyClearDeleteMessage(String(items.count)),
+                message: MacInterfaceText.historyClearDeleteMessage(String(max(archiveCount, items.count))),
                 confirmTitle: MacInterfaceText.historyDeleteEverything,
                 onConfirm: { performClearAll(deleteAudio: true) }
             )
         }
+    }
+
+    /// A sort, filter or search change. While the whole archive is loaded it is
+    /// sorted and filtered in memory, as before paging; otherwise the database
+    /// answers from the first page, so no match hides beyond the loaded rows.
+    func pageInputsChanged() {
+        recomputeFilteredItems()
+        guard !holdsWholeArchive else { return }
+        pageLimit = GenerationHistoryPageRequest.pageSize
+        reloadHistory(reconciling: false)
+    }
+
+    /// The page the current sort, filter and search ask for; the search uses
+    /// this list's own predicate (`MacHistoryListItem.searchKey`).
+    func currentPageRequest() -> GenerationHistoryPageRequest {
+        GenerationHistoryPageRequest(
+            mode: modeFilter.generationMode?.rawValue,
+            query: searchText,
+            searchStyle: .lowercasedTranscriptAndVoice,
+            order: sortOrder.pageOrder,
+            limit: pageLimit
+        )
     }
 
     func recomputeFilteredItems() {
@@ -644,7 +716,10 @@ private extension MacHistoryScreen {
         .accessibilityIdentifier(identifier)
     }
 
-    func reloadHistory(reopenFailedStore: Bool = false) {
+    /// Reads the current page off the main actor. A full reload reconciles
+    /// pending History first; a sort, filter, search or Show More only reads.
+    /// A reload asked for during another coalesces into one full reload.
+    func reloadHistory(reopenFailedStore: Bool = false, reconciling: Bool = true) {
         if loadTask != nil {
             pendingReloadAfterCurrentLoad = true
             return
@@ -658,6 +733,7 @@ private extension MacHistoryScreen {
 
         let interval = AppPerformanceSignposts.begin("History Reload")
         let wallStart = DispatchTime.now().uptimeNanoseconds
+        let request = currentPageRequest()
 
         loadTask = Task {
             var didFinishReload = false
@@ -670,20 +746,29 @@ private extension MacHistoryScreen {
             }
 
             do {
-                let loadedItems = try await Task.detached(priority: .userInitiated) {
+                let (loadedItems, hasMore, count) = try await Task.detached(priority: .userInitiated) {
                     if reopenFailedStore {
                         try DatabaseService.shared.reopenIfNeeded()
                     }
-                    _ = await GenerationHistoryRecovery.reconcile()
-                    let generations = try DatabaseService.shared.fetchAllGenerations()
-                    return generations.map(MacHistoryListItem.init)
+                    if reconciling {
+                        _ = await GenerationHistoryRecovery.reconcile()
+                    }
+                    let page = try DatabaseService.shared.fetchGenerationPage(request)
+                    return (page.rows.map(MacHistoryListItem.init), page.hasMore, page.archiveCount)
                 }.value
 
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
                     items = loadedItems
+                    loadedRequest = request
+                    hasMoreItems = hasMore
+                    archiveCount = count
                     itemsRevision &+= 1
                     MacHistorySessionCache.items = loadedItems
+                    MacHistorySessionCache.pageLimit = request.limit
+                    MacHistorySessionCache.loadedRequest = request
+                    MacHistorySessionCache.hasMoreItems = hasMore
+                    MacHistorySessionCache.archiveCount = count
                     loadError = nil
                     databaseUnavailable = false
                     isLoading = false
@@ -802,8 +887,10 @@ private extension MacHistoryScreen {
         }
 
         items.removeAll { $0.id == item.id }
+        archiveCount = max(0, archiveCount - 1)
         itemsRevision &+= 1
         MacHistorySessionCache.items = items
+        MacHistorySessionCache.archiveCount = archiveCount
         return outcome
     }
 
@@ -831,8 +918,12 @@ private extension MacHistoryScreen {
             await MainActor.run {
                 databaseUnavailable = false
                 items = []
+                hasMoreItems = false
+                archiveCount = 0
                 itemsRevision &+= 1
                 MacHistorySessionCache.items = []
+                MacHistorySessionCache.hasMoreItems = false
+                MacHistorySessionCache.archiveCount = 0
 
                 if failures > 0 {
                     presentActionAlert(

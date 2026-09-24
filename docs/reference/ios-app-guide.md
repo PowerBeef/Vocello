@@ -303,7 +303,12 @@ keeps the option because Finder reaches its output folder. Mode-filter chips
 (Play / Save audio / Pin seed / Delete — the pin item `historyRowPinSeed_<id>` appears only for
 takes with a recorded seed and lands in that take's Studio mode with `studioChip_seedPin`
 visible), delete-confirm `historyRowDeleteConfirm_<id>`. Grouped by Today /
-Yesterday / Previous 7/30 Days / Earlier.
+Yesterday / Previous 7/30 Days / Earlier. The list loads bounded pages of 500 entries (a long-form
+project counts once and brings all its segments); `historyShowMoreButton` loads the next page
+(AUD-05). While the whole archive fits in what is loaded, search and filters run in memory as
+before; otherwise `GenerationHistoryPageQuery` answers them in SQL with the list's own predicate,
+so a match is never hidden beyond the loaded page. Reads take no SQLite write transaction unless a
+long-form journal is pending.
 
 Database failures are typed and fail closed. The error state does not masquerade as empty History;
 destructive actions remain disabled until `historyRetryButton` completes a successful read.

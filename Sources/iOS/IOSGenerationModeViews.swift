@@ -888,10 +888,10 @@ struct IOSVoiceDesignView: View {
 
     private func suggestedDesignedVoiceName() -> String {
         let brief = draft.voiceDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !brief.isEmpty else { return "Designed voice" }
+        guard !brief.isEmpty else { return IOSInterfaceText.designedMeta }
         let words = brief.split(whereSeparator: { $0 == " " || $0.isNewline }).prefix(3)
         let joined = words.joined(separator: " ")
-        guard !joined.isEmpty else { return "Designed voice" }
+        guard !joined.isEmpty else { return IOSInterfaceText.designedMeta }
         return joined.prefix(1).uppercased() + joined.dropFirst()
     }
 
@@ -1175,7 +1175,7 @@ struct IOSVoiceDesignView: View {
             .split(separator: " ")
             .prefix(3)
             .joined(separator: " ")
-        return clipped.isEmpty ? "Designed Voice" : clipped
+        return clipped.isEmpty ? IOSInterfaceText.designedMeta : clipped
     }
 
     private func generate() {

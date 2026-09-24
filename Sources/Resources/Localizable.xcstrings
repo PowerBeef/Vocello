@@ -68270,7 +68270,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Voix_conçue"
+            "value": "Voix_créée"
           }
         },
         "es": {
@@ -68282,13 +68282,13 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Entworfene_Stimme"
+            "value": "Gestaltete_Stimme"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Voce_progettata"
+            "value": "Voce_creata"
           }
         },
         "pt-BR": {
@@ -68300,7 +68300,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "设计的声音"
+            "value": "设计声音"
           }
         },
         "ja": {
@@ -68385,6 +68385,402 @@
           "stringUnit": {
             "state": "translated",
             "value": "Образец %@"
+          }
+        }
+      }
+    },
+    "vocello.ui.engineToastInterrupted": {
+      "comment": "iOS interface: transient toast while the on-device voice engine is paused by the system; generation resumes on its own. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine paused. Generation will resume shortly."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moteur en pause. La génération va reprendre sous peu."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motor en pausa. La generación se reanudará en breve."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine pausiert. Die Erzeugung wird gleich fortgesetzt."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motore in pausa. La generazione riprenderà a breve."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mecanismo pausado. A geração será retomada em instantes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "引擎已暂停，生成将很快恢复。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エンジンを一時停止しました。まもなく生成を再開します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "엔진이 일시 정지되었습니다. 곧 생성이 재개됩니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Движок приостановлен. Генерация скоро продолжится."
+          }
+        }
+      }
+    },
+    "vocello.ui.engineToastRecovering": {
+      "comment": "iOS interface: transient toast while the on-device voice engine recovers after an interruption. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine recovering…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rétablissement du moteur…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recuperando el motor…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine wird wiederhergestellt …"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ripristino del motore…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recuperando o mecanismo…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在恢复引擎…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エンジンを復旧しています…"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "엔진 복구 중…"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Восстановление движка…"
+          }
+        }
+      }
+    },
+    "vocello.ui.engineToastRestarted": {
+      "comment": "iOS interface: transient toast after the on-device voice engine restarted. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine restarted."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moteur redémarré."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motor reiniciado."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine neu gestartet."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motore riavviato."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mecanismo reiniciado."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "引擎已重新启动。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エンジンを再起動しました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "엔진이 다시 시작되었습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Движок перезапущен."
+          }
+        }
+      }
+    },
+    "vocello.ui.engineToastFailed": {
+      "comment": "iOS interface: error toast when the on-device voice engine failed without a specific message. 'Settings → Voice Models' must match the Settings tab and its Voice Models row. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine error. Try again, or open Settings → Voice Models."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erreur du moteur. Réessayez ou ouvrez Réglages → Modèles vocaux."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error del motor. Vuelve a intentarlo o abre Ajustes → Modelos de voz."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Engine-Fehler. Versuche es erneut oder öffne Einstellungen → Sprachmodelle."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Errore del motore. Riprova oppure apri Impostazioni → Modelli vocali."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erro no mecanismo. Tente novamente ou abra Ajustes → Modelos de voz."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "引擎出错。请重试，或打开“设置 → 语音模型”。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "エンジンエラー。もう一度お試しいただくか、「設定 → 音声モデル」を開いてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "엔진 오류. 다시 시도하거나 설정 → 음성 모델을 여세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ошибка движка. Повторите попытку или откройте «Настройки → Голосовые модели»."
+          }
+        }
+      }
+    },
+    "vocello.ui.engineToastDismissHint": {
+      "comment": "iOS VoiceOver hint on the engine error toast, which the user can activate to dismiss it. Describe the result, not the gesture. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dismisses this message."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masque ce message."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oculta este mensaje."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blendet diese Meldung aus."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiude questo messaggio."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fecha esta mensagem."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭此消息。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このメッセージを閉じます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 메시지를 닫습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Скрывает это сообщение."
+          }
+        }
+      }
+    },
+    "vocello.ui.engineStartFailed": {
+      "comment": "iOS interface: error when the on-device voice engine could not start at launch; %1$@ is an already localized reason. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The voice engine couldn't start. %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le moteur vocal n’a pas pu démarrer. %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El motor de voz no pudo iniciarse. %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Sprach-Engine konnte nicht starten. %1$@"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il motore vocale non è riuscito ad avviarsi. %1$@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O mecanismo de voz não conseguiu iniciar. %1$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音引擎无法启动。%1$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声エンジンを起動できませんでした。%1$@"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "음성 엔진을 시작할 수 없습니다. %1$@"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось запустить голосовой движок. %1$@"
           }
         }
       }

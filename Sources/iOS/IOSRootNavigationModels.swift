@@ -336,6 +336,31 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.ui.designedMeta", defaultValue: "Designed voice",
                comment: "iOS interface: Designed voice. Presentation only.")
     }
+    // PA-20 (IOS-14): engine lifecycle toasts and the launch failure.
+    static var engineToastInterrupted: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.engineToastInterrupted", defaultValue: "Engine paused. Generation will resume shortly.",
+               comment: "iOS interface: transient toast while the voice engine is paused. Presentation only.")
+    }
+    static var engineToastRecovering: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.engineToastRecovering", defaultValue: "Engine recovering…",
+               comment: "iOS interface: transient toast while the voice engine recovers. Presentation only.")
+    }
+    static var engineToastRestarted: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.engineToastRestarted", defaultValue: "Engine restarted.",
+               comment: "iOS interface: transient toast after the voice engine restarted. Presentation only.")
+    }
+    static var engineToastFailed: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.engineToastFailed", defaultValue: "Engine error. Try again, or open Settings → Voice Models.",
+               comment: "iOS interface: engine error toast without a specific message. Presentation only.")
+    }
+    static var engineToastDismissHint: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.engineToastDismissHint", defaultValue: "Dismisses this message.",
+               comment: "iOS VoiceOver hint on the engine error toast. Presentation only.")
+    }
+    static func engineStartFailed(_ reason: String) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.engineStartFailed", defaultValue: "The voice engine couldn't start. %1$@",
+                   comment: "iOS interface: launch failure of the voice engine; %1$@ is a localized reason. Presentation only."), reason)
+    }
     static var longForm: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.longForm", defaultValue: "Long-form",
                comment: "iOS interface: Long-form. Presentation only.")

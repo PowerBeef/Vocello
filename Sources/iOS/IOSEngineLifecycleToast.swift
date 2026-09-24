@@ -71,7 +71,7 @@ struct IOSEngineLifecycleToast: View {
         }
         .accessibilityIdentifier("engineLifecycleToast_\(descriptor.identifier)")
         .accessibilityAddTraits(descriptor.isError ? .isButton : [])
-        .accessibilityHint(descriptor.isError ? "Double tap to dismiss" : "")
+        .accessibilityHint(descriptor.isError ? IOSInterfaceText.engineToastDismissHint : "")
     }
 
     private func dismissError() {
@@ -125,21 +125,21 @@ struct IOSEngineLifecycleToast: View {
         case .interrupted:
             return ToastDescriptor(
                 identifier: "interrupted",
-                message: "Engine paused. Generation will resume shortly.",
+                message: IOSInterfaceText.engineToastInterrupted,
                 symbol: "pause.circle",
                 tint: .yellow
             )
         case .recovering:
             return ToastDescriptor(
                 identifier: "recovering",
-                message: "Engine recovering…",
+                message: IOSInterfaceText.engineToastRecovering,
                 symbol: "arrow.triangle.2.circlepath",
                 tint: .yellow
             )
         case .invalidated:
             return ToastDescriptor(
                 identifier: "invalidated",
-                message: "Engine restarted.",
+                message: IOSInterfaceText.engineToastRestarted,
                 symbol: "arrow.clockwise.circle",
                 tint: Theme.Brand.gold
             )
@@ -148,7 +148,7 @@ struct IOSEngineLifecycleToast: View {
                 identifier: "failed",
                 // D3: the destination must exist — the Settings section is
                 // titled "Voice models" (there is no "Model Downloads").
-                message: "Engine error. Try again, or open Settings → Voice models.",
+                message: IOSInterfaceText.engineToastFailed,
                 symbol: "exclamationmark.triangle",
                 tint: .red,
                 isError: true

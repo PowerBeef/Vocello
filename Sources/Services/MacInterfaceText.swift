@@ -14,6 +14,11 @@ enum MacInterfaceText {
     static var presentation: VocelloPresentationText { VocelloPresentationText(localization: localization) }
     /// Shared iOS navigation vocabulary, resolved through the Mac language owner.
     static var tabVoices: String { presentation.tabVoices }
+    /// Typed engine and generation failures in the interface language (PA-20);
+    /// see `VocelloPresentationText.generationFailureMessage(_:)`.
+    static func generationFailureMessage(_ error: Error) -> String {
+        presentation.generationFailureMessage(error)
+    }
     static func studioModeTitle(_ mode: GenerationMode) -> String {
         let text = VocelloPresentationText(localization: localization)
         return switch mode {

@@ -392,6 +392,12 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
 
     public private(set) var visibleErrorMessage: String?
 
+    /// Interface copy for an error the engine surfaces (`visibleErrorMessage`, a
+    /// failed load state, a failed clone preparation). App hosts install their
+    /// interface-language mapper (PA-20); without one (the CLI) the error's own
+    /// English description is used. Diagnostics never read this copy.
+    public var visibleErrorDescription: (@MainActor (Error) -> String)?
+
     private let audioPreparationService: any AudioPreparationService
     private let documentIO: any DocumentIO
     private let streamSessionsDirectory: URL
@@ -1061,7 +1067,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             clonePreparationState = ClonePreparationState(
                 phase: .failed,
                 identityKey: uiIdentityKey,
-                message: surfacedError.localizedDescription
+                message: presentedDescription(of: surfacedError)
             )
             handle(surfacedError)
             throw surfacedError
@@ -2052,8 +2058,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     }
 
     private func handle(_ error: Error) {
-        visibleErrorMessage = error.localizedDescription
-        loadState = .failed(message: error.localizedDescription)
+        let message = presentedDescription(of: error)
+        visibleErrorMessage = message
+        loadState = .failed(message: message)
+    }
+
+    private func presentedDescription(of error: Error) -> String {
+        visibleErrorDescription?(error) ?? error.localizedDescription
     }
 
     nonisolated private static func diagnosticDetailsString(from details: [String: String]) -> String {

@@ -117,6 +117,7 @@ class LocalizationContractTests(unittest.TestCase):
                 "IOSAppLanguage.shared.presentation.longFormPlanningFailed\n"
                 "IOSAppLanguage.shared.presentation.cloningConsentRequired\n"
                 "IOSAppLanguage.shared.presentation.referenceAudioRequired\n"
+                "IOSAppLanguage.shared.presentation.generationFailureMessage\n"
             ),
             "Sources/iOS/Studio/StudioGenerationCoordinator.swift": (
                 "IOSAppLanguage.shared.presentation.cancellationCouldNotFinish\n"

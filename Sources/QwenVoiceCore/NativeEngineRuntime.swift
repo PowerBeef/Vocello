@@ -49,6 +49,46 @@ enum NativeRuntimeStage: String, Codable, Sendable {
             return "runtime unload"
         }
     }
+
+    /// Whether the stage runs before a take starts streaming (validation, model
+    /// load, warm-up, clone preparation or unload). Interface copy for a runtime
+    /// failure here speaks of preparing the model, not of a lost take.
+    var precedesGeneration: Bool {
+        switch self {
+        case .requestValidation, .preparedCacheValidation, .preparedCacheRebuild,
+             .tokenizerPreparation, .upstreamModelLoad, .prewarm, .clonePreparation, .unload:
+            return true
+        case .streamStartup, .firstChunk, .streamGenerationEnded, .streamCompleted, .streamFailed:
+            return false
+        }
+    }
+}
+
+/// Why the mandatory final audio-quality check rejected a take, from its QC
+/// flags. One classification selects both the engine's English message and the
+/// interface copy the app hosts present (`GenerationFailurePresentationReason`).
+enum NativeAudioQualityRejection: Sendable, Equatable {
+    case silentGap
+    case noSpeech
+    case unstable
+    case unclassified
+
+    init(flags: [String]) {
+        if flags.contains(where: { $0.hasPrefix("dropout:") }) {
+            self = .silentGap
+        } else if flags.contains("near_silent") || flags.contains("silent") || flags.contains("empty") {
+            self = .noSpeech
+        } else if flags.contains("nonfinite") || flags.contains("clipping") || flags.contains("clicks") {
+            self = .unstable
+        } else {
+            self = .unclassified
+        }
+    }
+
+    /// The flags a rejection error carries as its comma-joined diagnostic detail.
+    init(diagnosticDetail: String?) {
+        self.init(flags: (diagnosticDetail ?? "").split(separator: ",").map(String.init))
+    }
 }
 
 enum NativeRuntimeFailureCode: String, Sendable {
@@ -60,10 +100,17 @@ enum NativeRuntimeFailureCode: String, Sendable {
     case memoryPressure = "runtime.memory_pressure"
 }
 
+/// `message` is the engine's English text for the CLI and diagnostics. App hosts
+/// present catalog copy in the interface language instead, keyed on the typed
+/// `GenerationFailurePresentationReason` this error resolves to (PA-20).
 struct NativeRuntimeError: LocalizedError, Sendable {
     let stage: NativeRuntimeStage
     let message: String
     let underlyingDescription: String?
+    /// Interface reason of the typed error this one wraps (an unreadable clone
+    /// reference, a full disk, a missing model), so a wrapped cause is not
+    /// presented as an internal engine failure. Path-free.
+    let wrappedPresentationReason: GenerationFailurePresentationReason?
     /// Typed disposition of the wrapped error, captured when the error is
     /// wrapped so terminal and allocation-retry decisions never read the
     /// wrapped error's text.
@@ -88,6 +135,7 @@ struct NativeRuntimeError: LocalizedError, Sendable {
         self.stage = stage
         self.message = message
         self.underlyingDescription = underlying.map { String(reflecting: $0) }
+        self.wrappedPresentationReason = underlying.flatMap { GenerationFailurePresentationReason($0) }
         self.underlyingDisposition = disposition
             ?? underlying.map(NativeGenerationTerminalClassifier.disposition(of:))
             ?? .failure

@@ -963,7 +963,7 @@ struct MacVoiceCloningScreen: View {
                 persistenceCaller: "MacVoiceCloningScreen"
             )
         } catch {
-            coordinator.rejectStart(error.localizedDescription)
+            coordinator.rejectStart(MacInterfaceText.generationFailureMessage(error))
             return
         }
         MacStudioGenerationActions.startSingleTake(

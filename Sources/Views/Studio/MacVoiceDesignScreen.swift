@@ -384,7 +384,7 @@ struct MacVoiceDesignScreen: View {
                 persistenceCaller: "MacVoiceDesignScreen"
             )
         } catch {
-            coordinator.rejectStart(error.localizedDescription)
+            coordinator.rejectStart(MacInterfaceText.generationFailureMessage(error))
             return
         }
         let appModel = appModel

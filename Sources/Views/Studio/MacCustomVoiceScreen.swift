@@ -345,7 +345,7 @@ struct MacCustomVoiceScreen: View {
                 persistenceCaller: "MacCustomVoiceScreen"
             )
         } catch {
-            coordinator.rejectStart(error.localizedDescription)
+            coordinator.rejectStart(MacInterfaceText.generationFailureMessage(error))
             return
         }
         MacStudioGenerationActions.startSingleTake(

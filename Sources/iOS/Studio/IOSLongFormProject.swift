@@ -776,9 +776,10 @@ final class IOSLongFormProjectRunner {
                     markCancelled(startingAt: index)
                     return .cancelled(segments: segments)
                 }
-                segments[index].status = .failed(message: error.localizedDescription)
+                let message = hooks.presentation.generationFailureMessage(error)
+                segments[index].status = .failed(message: message)
                 onSegmentsUpdated(segments)
-                return .failed(segments: segments, message: error.localizedDescription)
+                return .failed(segments: segments, message: message)
             }
         }
 
@@ -1048,7 +1049,7 @@ final class IOSLongFormProjectRunner {
                 return (.cancelled(segments: segments), priorReplacements)
             }
             return (
-                .failed(segments: segments, message: error.localizedDescription),
+                .failed(segments: segments, message: hooks.presentation.generationFailureMessage(error)),
                 priorReplacements
             )
         }

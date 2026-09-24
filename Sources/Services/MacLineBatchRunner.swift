@@ -213,8 +213,9 @@ final class MacLineBatchRunner {
                 markCancelled(startingAt: index)
                 return (.cancelled(items: items, restartFailedMessage: nil), lastSaved)
             } catch {
-                items[index].status = .failed(message: error.localizedDescription)
-                return (.failed(items: items, message: error.localizedDescription), lastSaved)
+                let message = MacInterfaceText.generationFailureMessage(error)
+                items[index].status = .failed(message: message)
+                return (.failed(items: items, message: message), lastSaved)
             }
         }
 

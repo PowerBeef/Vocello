@@ -47,6 +47,24 @@ REQUIRED_SETTINGS = (
     "SWIFT_EMIT_LOC_STRINGS",
 )
 REQUIRED_KEYS = {
+    # PA-20: typed engine and generation failures in the interface language.
+    "vocello.error.audio_qc_no_speech",
+    "vocello.error.audio_qc_rejected",
+    "vocello.error.audio_qc_silent_gap",
+    "vocello.error.audio_qc_unstable",
+    "vocello.error.engine_not_ready",
+    "vocello.error.generation_incomplete",
+    "vocello.error.generation_memory_pressure",
+    "vocello.error.generation_preparation_failed",
+    "vocello.error.generation_runtime_failed",
+    "vocello.error.insufficient_memory",
+    "vocello.error.model_unavailable",
+    "vocello.error.reference_audio_missing",
+    "vocello.error.reference_audio_too_long",
+    "vocello.error.reference_audio_unreadable",
+    "vocello.error.reference_audio_unsupported",
+    "vocello.error.storage_full",
+    "vocello.error.storage_unavailable",
     "vocello.error.cancellation_not_finished",
     "vocello.error.cloning_consent_required",
     "vocello.error.cloning_consent_required_to_save_voice",
@@ -270,6 +288,7 @@ def _validate_typed_presentation(root: Path) -> None:
             "IOSAppLanguage.shared.presentation.longFormPlanningFailed",
             "IOSAppLanguage.shared.presentation.cloningConsentRequired",
             "IOSAppLanguage.shared.presentation.referenceAudioRequired",
+            "IOSAppLanguage.shared.presentation.generationFailureMessage",
         ),
         Path("Sources/iOS/Studio/StudioGenerationCoordinator.swift"): (
             "IOSAppLanguage.shared.presentation.cancellationCouldNotFinish",

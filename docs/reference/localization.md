@@ -84,7 +84,14 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
   supplies Settings copy. These presentation owners never assemble generation requests.
 - `VocelloPresentationText` owns dynamic errors and statuses that would otherwise concatenate
   independently translated fragments. Callers pass substitutions into complete localized format
-  strings.
+  strings. Since PA-20, typed engine and generation failures reach both apps through
+  `generationFailureMessage(_:)`, keyed on the path-free `GenerationFailurePresentationReason`
+  (QwenVoiceCore: memory pressure, runtime and preparation failures, the generation limit, the
+  audio-quality rejections, and the reference-audio, storage, memory and model errors an engine
+  failure wraps). The engine's English messages stay the CLI and diagnostic text; each app host
+  installs the mapper as `MLXTTSEngine.visibleErrorDescription`, so the engine's visible error, a
+  failed load and a failed clone preparation read the interface language too. Errors without a typed
+  reason keep their own description.
 - `MacInterfaceText` (`Sources/Services/MacInterfaceText.swift`; the macOS app, and also compiled
   into `VocelloCoreTests`, so it must not reference app-only types) owns the macOS
   interface copy: sidebar, menus, Settings, Saved Voices, History, the generation surfaces and their

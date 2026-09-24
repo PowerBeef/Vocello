@@ -1,3 +1,4 @@
+import QwenVoiceCore
 import XCTest
 
 final class VocelloPresentationTextTests: XCTestCase {
@@ -56,5 +57,43 @@ final class VocelloPresentationTextTests: XCTestCase {
 
     func testPluralContractFormatsTheSourceLanguageFallback() {
         XCTAssertEqual(VocelloPresentationText.readyModelCount(3), "3 models ready")
+    }
+
+    // MARK: - Typed failures (PA-20)
+
+    func testGenerationFailuresPresentTypedCatalogCopyWithoutRawDetail() {
+        let text = VocelloPresentationText()
+        let privatePath = "/private/fixture/reference.wav"
+        XCTAssertEqual(
+            text.generationFailureMessage(TTSEngineError.insufficientMemory("raw engine detail")),
+            "Vocello needs more available memory before loading this model. Close background apps and try again."
+        )
+        let unreadable = text.generationFailureMessage(AudioPreparationError.failedToReadAudio(privatePath))
+        XCTAssertEqual(unreadable, "Vocello couldn't read this reference audio. Choose another audio file.")
+        XCTAssertFalse(unreadable.contains(privatePath))
+        XCTAssertEqual(
+            text.generationFailureMessage(TTSEngineError.savedVoiceStoreBusy),
+            text.savedVoicesStoreBusy
+        )
+        // An untyped error keeps its own description: host copy is already localized.
+        XCTAssertEqual(text.generationFailureMessage(TTSEngineError.unsupportedRequest("Host copy")), "Host copy")
+    }
+
+    func testEveryGenerationFailureReasonHasTranslatedCatalogCopy() {
+        let bundle = Bundle(for: Self.self)
+        let english = VocelloPresentationText(localization: VocelloLocalization(bundle: bundle, language: "en"))
+        for reason in GenerationFailurePresentationReason.allCases {
+            XCTAssertFalse(english.generationFailureMessage(reason).isEmpty, reason.rawValue)
+        }
+        for language in ["fr", "es", "de", "it", "pt-BR", "zh-Hans", "ja", "ko", "ru"] {
+            let text = VocelloPresentationText(localization: VocelloLocalization(bundle: bundle, language: language))
+            for reason in GenerationFailurePresentationReason.allCases {
+                XCTAssertNotEqual(
+                    text.generationFailureMessage(reason),
+                    english.generationFailureMessage(reason),
+                    "\(language) \(reason.rawValue)"
+                )
+            }
+        }
     }
 }

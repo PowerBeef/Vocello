@@ -528,6 +528,96 @@ struct VocelloPresentationText: Sendable {
         return error.localizedDescription
     }
 
+    /// Interface copy for a failure the engine or a generation run surfaces
+    /// (PA-20): typed failures resolve to a path-free
+    /// `GenerationFailurePresentationReason`, so the memory-pressure,
+    /// runtime-failure, generation-limit and audio-quality copy the engine keeps
+    /// in English for the CLI and diagnostics reaches the interface language.
+    /// An error without a typed reason keeps its own description (host copy such
+    /// as a consent refusal is already localized); raw detail stays in the
+    /// failure journal.
+    func generationFailureMessage(_ error: Error) -> String {
+        guard let reason = GenerationFailurePresentationReason(error) else {
+            return error.localizedDescription
+        }
+        return generationFailureMessage(reason)
+    }
+
+    func generationFailureMessage(_ reason: GenerationFailurePresentationReason) -> String {
+        switch reason {
+        case .memoryPressure:
+            return localization.string(localized: "vocello.error.generation_memory_pressure",
+                defaultValue: "There was not enough memory to finish this take, so it was not saved. Close other apps, then retry to generate a new take.",
+                comment: "Studio error after MLX or Metal ran out of memory mid-take.")
+        case .runtimeFailure:
+            return localization.string(localized: "vocello.error.generation_runtime_failed",
+                defaultValue: "The on-device voice engine hit an internal error, so this take was not saved. Retry to generate a new take.",
+                comment: "Studio error after the on-device voice engine failed while a take was generating.")
+        case .preparationFailure:
+            return localization.string(localized: "vocello.error.generation_preparation_failed",
+                defaultValue: "The on-device voice engine couldn't prepare the voice model. Try again; if it keeps failing, repair the model in Settings.",
+                comment: "Error when the voice engine failed while loading or warming a model, before any take started.")
+        case .generationLimit:
+            return localization.string(localized: "vocello.error.generation_incomplete",
+                defaultValue: "This take reached its generation limit before it finished, so the incomplete audio was not saved. Retry to generate a new take.",
+                comment: "Studio error when a take reached the model's generation limit before it finished.")
+        case .audioSilentGap:
+            return localization.string(localized: "vocello.error.audio_qc_silent_gap",
+                defaultValue: "The generated audio contained an unusually long silent gap and was not saved. Retry to generate a new take.",
+                comment: "Studio error when the audio-quality check found an unusually long silence.")
+        case .audioNoSpeech:
+            return localization.string(localized: "vocello.error.audio_qc_no_speech",
+                defaultValue: "The generated audio did not contain usable speech and was not saved. Retry to generate a new take.",
+                comment: "Studio error when the audio-quality check found no usable speech.")
+        case .audioUnstable:
+            return localization.string(localized: "vocello.error.audio_qc_unstable",
+                defaultValue: "The generated audio was unstable or distorted and was not saved. Retry to generate a new take.",
+                comment: "Studio error when the audio-quality check found unstable or distorted audio.")
+        case .audioQualityRejected:
+            return localization.string(localized: "vocello.error.audio_qc_rejected",
+                defaultValue: "The generated audio did not pass its mandatory quality check and was not saved. Retry to generate a new take.",
+                comment: "Studio error when the mandatory audio-quality check rejected a take.")
+        case .insufficientMemory:
+            return localization.string(localized: "vocello.error.insufficient_memory",
+                defaultValue: "Vocello needs more available memory before loading this model. Close background apps and try again.",
+                comment: "Error when too little memory was free to load a voice model.")
+        case .engineNotReady:
+            return localization.string(localized: "vocello.error.engine_not_ready",
+                defaultValue: "The voice engine is still starting. Try again in a moment.",
+                comment: "Error when generation was requested before the voice engine finished starting.")
+        case .savedVoiceStoreBusy:
+            return savedVoicesStoreBusy
+        case .modelUnavailable:
+            return localization.string(localized: "vocello.error.model_unavailable",
+                defaultValue: "This voice model is missing or incomplete. Repair or reinstall it in Settings.",
+                comment: "Error when the installed voice model files are missing or incomplete.")
+        case .referenceAudioMissing:
+            return localization.string(localized: "vocello.error.reference_audio_missing",
+                defaultValue: "The reference audio file is no longer available. Choose it again.",
+                comment: "Voice Cloning error when the reference audio file was moved or deleted.")
+        case .referenceAudioUnsupported:
+            return localization.string(localized: "vocello.error.reference_audio_unsupported",
+                defaultValue: "This audio format can't be used as a reference. Choose another audio file.",
+                comment: "Voice Cloning error when the reference audio format cannot be decoded.")
+        case .referenceAudioTooLong:
+            return localization.string(localized: "vocello.error.reference_audio_too_long",
+                defaultValue: "This reference audio is too long or too large to prepare. Choose a shorter clip.",
+                comment: "Voice Cloning error when the reference audio exceeds the preparation limits.")
+        case .referenceAudioUnreadable:
+            return localization.string(localized: "vocello.error.reference_audio_unreadable",
+                defaultValue: "Vocello couldn't read this reference audio. Choose another audio file.",
+                comment: "Voice Cloning error when the reference audio could not be read.")
+        case .storageFull:
+            return localization.string(localized: "vocello.error.storage_full",
+                defaultValue: "There isn't enough storage space to save this take. Free up space, then try again.",
+                comment: "Error when the device ran out of storage while saving a take.")
+        case .storageUnavailable:
+            return localization.string(localized: "vocello.error.storage_unavailable",
+                defaultValue: "Vocello couldn't write the audio file. Check that the output folder is available, then try again.",
+                comment: "Error when the app could not create or write an audio file.")
+        }
+    }
+
     func cancellationCouldNotFinish(details: String) -> String {
         let format = localization.string(localized: "vocello.error.cancellation_not_finished",
             defaultValue: "Cancellation could not finish safely: %1$@",

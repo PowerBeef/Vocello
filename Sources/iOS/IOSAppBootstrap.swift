@@ -178,6 +178,8 @@ extension QVoiceiOSApp {
             qwenPreparedLoadProfile: cloneCapableLoadProfile()
         )
         let engine = runtime.engine
+        // PA-20: errors the engine surfaces read catalog copy in the interface language.
+        engine.visibleErrorDescription = { IOSAppLanguage.shared.presentation.generationFailureMessage($0) }
         let engineStore = TTSEngineStore(
             backend: AnyTTSEngineBackend(
                 engine: engine,

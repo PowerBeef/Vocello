@@ -371,3 +371,87 @@ public struct GenerationFailureJournalEntry: Codable, Sendable {
         self.requestReceipt = requestReceipt
     }
 }
+
+/// The path-free reason an interface presents for a failure the engine or a
+/// generation run surfaces (PA-20). App hosts map every case to catalog copy in
+/// the interface language (`VocelloPresentationText.generationFailureMessage`);
+/// the engine's own English messages stay the CLI and diagnostic text, and the
+/// failure journal keeps `GenerationFailureDiagnosticLogger.errorMetadata(for:)`.
+///
+/// Resolved from the typed failure code, refined for a rejected take's
+/// audio-quality flags, for the typed reference-audio, storage, memory or model
+/// error an engine failure wraps, and for runtime failures before a take
+/// starts streaming. `nil` for an error without a typed reason (host copy such
+/// as a consent refusal is already localized).
+public enum GenerationFailurePresentationReason: String, Sendable, CaseIterable {
+    case memoryPressure = "runtime.memory_pressure"
+    case runtimeFailure = "runtime.failed"
+    case preparationFailure = "runtime.preparation_failed"
+    case generationLimit = "generation.incomplete"
+    case audioSilentGap = "audio.quality_rejected.silent_gap"
+    case audioNoSpeech = "audio.quality_rejected.no_speech"
+    case audioUnstable = "audio.quality_rejected.unstable"
+    case audioQualityRejected = "audio.quality_rejected"
+    case insufficientMemory = "memory.insufficient"
+    case engineNotReady = "engine.not_initialized"
+    case savedVoiceStoreBusy = "saved_voices.store_busy"
+    case modelUnavailable = "model.unavailable"
+    case referenceAudioMissing = "audio.input_missing"
+    case referenceAudioUnsupported = "audio.input_unsupported"
+    case referenceAudioTooLong = "audio.input_too_long"
+    case referenceAudioUnreadable = "audio.processing_failed"
+    case storageFull = "storage.full"
+    case storageUnavailable = "storage.output_unavailable"
+
+    public init?(_ error: Error) {
+        if let runtimeError = error as? NativeRuntimeError {
+            self = Self.reason(for: runtimeError)
+            return
+        }
+        guard let reason = Self(typedCode: GenerationFailureDiagnosticLogger.errorMetadata(for: error).code) else {
+            return nil
+        }
+        self = reason
+    }
+
+    private static func reason(for runtimeError: NativeRuntimeError) -> Self {
+        switch runtimeError.failureCode {
+        case .memoryPressure:
+            return .memoryPressure
+        case .generationIncomplete:
+            return .generationLimit
+        case .audioQualityRejected:
+            switch NativeAudioQualityRejection(diagnosticDetail: runtimeError.diagnosticDetail) {
+            case .silentGap: return .audioSilentGap
+            case .noSpeech: return .audioNoSpeech
+            case .unstable: return .audioUnstable
+            case .unclassified: return .audioQualityRejected
+            }
+        case .runtimeFailed:
+            if let wrapped = runtimeError.wrappedPresentationReason,
+               wrapped != .runtimeFailure, wrapped != .preparationFailure {
+                return wrapped
+            }
+            return runtimeError.stage.precedesGeneration ? .preparationFailure : .runtimeFailure
+        }
+    }
+
+    /// Typed codes from `GenerationFailureDiagnosticLogger.errorMetadata(for:)`
+    /// that carry a reason people can act on. Other codes keep the error's own text.
+    private init?(typedCode code: String) {
+        switch code {
+        case "memory.insufficient": self = .insufficientMemory
+        case "engine.not_initialized": self = .engineNotReady
+        case "saved_voices.store_busy": self = .savedVoiceStoreBusy
+        case "model.unavailable", "model.unknown": self = .modelUnavailable
+        case "audio.input_missing": self = .referenceAudioMissing
+        case "audio.input_unsupported": self = .referenceAudioUnsupported
+        case "audio.input_too_large", "audio.input_too_long": self = .referenceAudioTooLong
+        case "audio.decode_timeout", "audio.processing_failed": self = .referenceAudioUnreadable
+        case "storage.full": self = .storageFull
+        case "storage.permission_denied", "storage.output_unavailable", "storage.write_failed":
+            self = .storageUnavailable
+        default: return nil
+        }
+    }
+}

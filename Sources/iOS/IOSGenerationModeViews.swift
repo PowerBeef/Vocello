@@ -523,7 +523,10 @@ struct IOSCustomVoiceView: View {
             } catch is CancellationError {
                 // The shared executor owns cancellation cleanup and telemetry.
             } catch {
-                let accepted = coordinator.fail(error.localizedDescription, attempt: attempt)
+                let accepted = coordinator.fail(
+                    IOSAppLanguage.shared.presentation.generationFailureMessage(error),
+                    attempt: attempt
+                )
                 if accepted { IOSHaptics.warning() }
             }
         }
@@ -1253,7 +1256,10 @@ struct IOSVoiceDesignView: View {
             } catch is CancellationError {
                 // The shared executor owns cancellation cleanup and telemetry.
             } catch {
-                let accepted = coordinator.fail(error.localizedDescription, attempt: attempt)
+                let accepted = coordinator.fail(
+                    IOSAppLanguage.shared.presentation.generationFailureMessage(error),
+                    attempt: attempt
+                )
                 if accepted { IOSHaptics.warning() }
             }
         }
@@ -2011,7 +2017,10 @@ struct IOSVoiceCloningView: View {
             } catch is CancellationError {
                 // The shared executor owns cancellation cleanup and telemetry.
             } catch {
-                let accepted = coordinator.fail(error.localizedDescription, attempt: attempt)
+                let accepted = coordinator.fail(
+                    IOSAppLanguage.shared.presentation.generationFailureMessage(error),
+                    attempt: attempt
+                )
                 if accepted { IOSHaptics.warning() }
             }
         }

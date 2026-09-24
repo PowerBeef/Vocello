@@ -202,4 +202,93 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
             true
         )
     }
+
+    // MARK: - Interface reason (PA-20)
+
+    func testPresentationReasonKeysOnTheTypedEngineFailureCode() {
+        typealias Reason = GenerationFailurePresentationReason
+        XCTAssertEqual(Reason(NativeRuntimeError.maximumTokenLimit()), .generationLimit)
+        XCTAssertEqual(
+            Reason(NativeRuntimeError.capturedRuntimeFailure(.allocation, stage: .streamFailed, audioPublished: true)),
+            .memoryPressure
+        )
+        XCTAssertEqual(
+            Reason(NativeRuntimeError.capturedRuntimeFailure(.mlx, stage: .firstChunk, audioPublished: false)),
+            .runtimeFailure
+        )
+        // A runtime failure before a take streams is about preparing the model, not a lost take.
+        XCTAssertEqual(
+            Reason(NativeRuntimeError.capturedRuntimeFailure(.mlx, stage: .upstreamModelLoad, audioPublished: false)),
+            .preparationFailure
+        )
+        XCTAssertEqual(
+            Reason(MLXTTSEngine.surfacedGenerationError(
+                TTSEngineError.generationFailed("private detail"),
+                allocationRetryAttempted: false
+            )),
+            .runtimeFailure
+        )
+    }
+
+    func testPresentationReasonSelectsTheAudioQualityRejectionFromItsFlags() {
+        typealias Reason = GenerationFailurePresentationReason
+        let cases: [([String], Reason)] = [
+            (["dropout:2725ms"], .audioSilentGap),
+            (["near_silent"], .audioNoSpeech),
+            (["empty"], .audioNoSpeech),
+            (["clipping", "clicks"], .audioUnstable),
+            (["rms_drift"], .audioQualityRejected),
+        ]
+        for (flags, expected) in cases {
+            let rejection = StreamingExecutionContext.finalAudioQCRejectionError(flags: flags)
+            XCTAssertEqual(Reason(rejection), expected, flags.joined(separator: ","))
+            // The engine surfaces the rejection unchanged, so the reason survives.
+            let surfaced = MLXTTSEngine.surfacedGenerationError(rejection, allocationRetryAttempted: false)
+            XCTAssertEqual(Reason(surfaced), expected, flags.joined(separator: ","))
+        }
+    }
+
+    func testPresentationReasonUsesTheWrappedTypedCauseWithoutItsPath() {
+        typealias Reason = GenerationFailurePresentationReason
+        let privatePath = "/private/fixture/reference.wav"
+        let unreadable = NativeRuntimeError.wrapping(
+            AudioPreparationError.failedToReadAudio(privatePath),
+            stage: .clonePreparation,
+            message: "The native runtime could not prepare the clone reference"
+        )
+        // The English diagnostic text carries the path; the interface reason does not.
+        XCTAssertTrue(unreadable.localizedDescription.contains(privatePath))
+        XCTAssertEqual(Reason(unreadable), .referenceAudioUnreadable)
+        XCTAssertFalse(Reason(unreadable)?.rawValue.contains(privatePath) ?? true)
+
+        let missingModel = NativeRuntimeError.wrapping(
+            TTSEngineError.modelUnavailable("Model 'fixture' is unavailable or incomplete."),
+            stage: .upstreamModelLoad,
+            message: "The native runtime could not load model 'fixture'"
+        )
+        XCTAssertEqual(Reason(missingModel), .modelUnavailable)
+        XCTAssertEqual(
+            Reason(NativeRuntimeError.wrapping(
+                AudioPreparationError.inputDurationTooLong(maxSeconds: 60, actualSeconds: 90),
+                stage: .clonePreparation,
+                message: "fixture"
+            )),
+            .referenceAudioTooLong
+        )
+    }
+
+    func testPresentationReasonCoversTypedHostErrorsAndLeavesOthersUntyped() {
+        typealias Reason = GenerationFailurePresentationReason
+        XCTAssertEqual(Reason(TTSEngineError.insufficientMemory("fixture")), .insufficientMemory)
+        XCTAssertEqual(Reason(TTSEngineError.notInitialized), .engineNotReady)
+        XCTAssertEqual(Reason(TTSEngineError.savedVoiceStoreBusy), .savedVoiceStoreBusy)
+        XCTAssertEqual(Reason(TTSEngineError.unknownModel("fixture")), .modelUnavailable)
+        XCTAssertEqual(Reason(AudioPreparationError.missingInputFile("/private/fixture.wav")), .referenceAudioMissing)
+        XCTAssertEqual(Reason(CocoaError(.fileWriteOutOfSpace)), .storageFull)
+        XCTAssertEqual(Reason(CocoaError(.fileWriteNoPermission)), .storageUnavailable)
+        // Host copy (a consent refusal, a request rejection) is already localized.
+        XCTAssertNil(Reason(TTSEngineError.unsupportedRequest("fixture")))
+        XCTAssertNil(Reason(TTSEngineError.generationFailed("fixture")))
+        XCTAssertNil(Reason(CancellationError()))
+    }
 }

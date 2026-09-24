@@ -65004,6 +65004,1128 @@
           }
         }
       }
+    },
+    "vocello.error.generation_memory_pressure": {
+      "comment": "Studio error after MLX or Metal ran out of memory mid-take. The take was discarded, never saved to History; the user closes other apps and retries. Engine failure code runtime.memory_pressure.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There was not enough memory to finish this take, so it was not saved. Close other apps, then retry to generate a new take."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La mémoire disponible ne suffisait pas pour terminer cette prise, qui n’a donc pas été enregistrée. Fermez d’autres apps, puis réessayez pour générer une nouvelle prise."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No había suficiente memoria para terminar esta toma, así que no se guardó. Cierra otras apps y vuelve a intentarlo para generar una toma nueva."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Speicher reichte nicht aus, um diese Aufnahme fertigzustellen, daher wurde sie nicht gesichert. Schließe andere Apps und versuche es erneut, um eine neue Aufnahme zu erzeugen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La memoria non era sufficiente per completare questo take, che quindi non è stato salvato. Chiudi le altre app, poi riprova per generare un nuovo take."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não havia memória suficiente para concluir esta tomada, por isso ela não foi salva. Feche outros apps e tente novamente para gerar uma nova tomada."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内存不足，无法完成此音频，因此未保存。请关闭其他应用，然后重试以生成新的音频。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "メモリが不足していたため、このテイクを完了できず保存されませんでした。ほかのアプリを閉じてから、もう一度生成してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메모리가 부족해 이 테이크를 완료하지 못했으며 저장되지 않았습니다. 다른 앱을 닫은 후 다시 시도하여 새 테이크를 생성하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не хватило памяти, чтобы завершить этот дубль, поэтому он не сохранён. Закройте другие приложения и повторите попытку, чтобы создать новый дубль."
+          }
+        }
+      }
+    },
+    "vocello.error.generation_runtime_failed": {
+      "comment": "Studio error after the on-device voice engine failed while a take was generating. The take was discarded; retrying generates a new one. Engine failure code runtime.failed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The on-device voice engine hit an internal error, so this take was not saved. Retry to generate a new take."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le moteur vocal de l’appareil a rencontré une erreur interne, cette prise n’a donc pas été enregistrée. Réessayez pour générer une nouvelle prise."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El motor de voz del dispositivo sufrió un error interno, así que esta toma no se guardó. Vuelve a intentarlo para generar una toma nueva."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Sprach-Engine auf dem Gerät hatte einen internen Fehler, daher wurde diese Aufnahme nicht gesichert. Versuche es erneut, um eine neue Aufnahme zu erzeugen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il motore vocale sul dispositivo ha riscontrato un errore interno, quindi questo take non è stato salvato. Riprova per generare un nuovo take."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O mecanismo de voz do dispositivo encontrou um erro interno, por isso esta tomada não foi salva. Tente novamente para gerar uma nova tomada."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备上的语音引擎遇到内部错误，因此此音频未保存。请重试以生成新的音频。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デバイス上の音声エンジンで内部エラーが発生したため、このテイクは保存されませんでした。もう一度生成してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기기의 음성 엔진에서 내부 오류가 발생해 이 테이크가 저장되지 않았습니다. 다시 시도하여 새 테이크를 생성하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Во встроенном голосовом движке произошла внутренняя ошибка, поэтому дубль не сохранён. Повторите попытку, чтобы создать новый дубль."
+          }
+        }
+      }
+    },
+    "vocello.error.generation_preparation_failed": {
+      "comment": "Error when the on-device voice engine failed while loading or warming a voice model, before any take started. The user retries or repairs the model in Settings.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The on-device voice engine couldn't prepare the voice model. Try again; if it keeps failing, repair the model in Settings."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le moteur vocal de l’appareil n’a pas pu préparer le modèle de voix. Réessayez ; si le problème persiste, réparez le modèle dans Réglages."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El motor de voz del dispositivo no pudo preparar el modelo de voz. Vuelve a intentarlo; si sigue fallando, repara el modelo en Ajustes."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Sprach-Engine auf dem Gerät konnte das Stimmmodell nicht vorbereiten. Versuche es erneut; wenn es weiterhin fehlschlägt, repariere das Modell in den Einstellungen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il motore vocale sul dispositivo non è riuscito a preparare il modello vocale. Riprova; se il problema persiste, ripara il modello in Impostazioni."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O mecanismo de voz do dispositivo não conseguiu preparar o modelo de voz. Tente novamente; se continuar falhando, repare o modelo nos Ajustes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备上的语音引擎无法准备语音模型。请重试；如果仍然失败，请在设置中修复该模型。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "デバイス上の音声エンジンが音声モデルを準備できませんでした。もう一度お試しください。失敗が続く場合は、設定でモデルを修復してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기기의 음성 엔진이 음성 모델을 준비하지 못했습니다. 다시 시도하세요. 계속 실패하면 설정에서 모델을 복구하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Встроенный голосовой движок не смог подготовить голосовую модель. Повторите попытку; если ошибка повторится, исправьте модель в настройках."
+          }
+        }
+      }
+    },
+    "vocello.error.generation_incomplete": {
+      "comment": "Studio error when a take reached the model's generation limit before it finished speaking. The incomplete audio was discarded; retrying generates a new take. Engine failure code generation.incomplete.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This take reached its generation limit before it finished, so the incomplete audio was not saved. Retry to generate a new take."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette prise a atteint sa limite de génération avant la fin, l’audio incomplet n’a donc pas été enregistré. Réessayez pour générer une nouvelle prise."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta toma alcanzó su límite de generación antes de terminar, así que el audio incompleto no se guardó. Vuelve a intentarlo para generar una toma nueva."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Aufnahme hat ihr Erzeugungslimit vor dem Ende erreicht, daher wurde das unvollständige Audio nicht gesichert. Versuche es erneut, um eine neue Aufnahme zu erzeugen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo take ha raggiunto il limite di generazione prima di terminare, quindi l’audio incompleto non è stato salvato. Riprova per generare un nuovo take."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta tomada atingiu o limite de geração antes de terminar, por isso o áudio incompleto não foi salvo. Tente novamente para gerar uma nova tomada."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此音频在完成前达到了生成上限，因此不完整的音频未保存。请重试以生成新的音频。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このテイクは完了前に生成の上限に達したため、不完全な音声は保存されませんでした。もう一度生成してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 테이크가 완료되기 전에 생성 한도에 도달해 불완전한 오디오는 저장되지 않았습니다. 다시 시도하여 새 테이크를 생성하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дубль достиг предела генерации, не завершившись, поэтому неполное аудио не сохранено. Повторите попытку, чтобы создать новый дубль."
+          }
+        }
+      }
+    },
+    "vocello.error.audio_qc_silent_gap": {
+      "comment": "Studio error when the automatic audio-quality check rejected a finished take because it contained an unusually long silence. The take was discarded; retrying generates a new one.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The generated audio contained an unusually long silent gap and was not saved. Retry to generate a new take."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’audio généré contenait un silence anormalement long et n’a pas été enregistré. Réessayez pour générer une nouvelle prise."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El audio generado contenía un silencio inusualmente largo y no se guardó. Vuelve a intentarlo para generar una toma nueva."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das erzeugte Audio enthielt eine ungewöhnlich lange Stille und wurde nicht gesichert. Versuche es erneut, um eine neue Aufnahme zu erzeugen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’audio generato conteneva un silenzio insolitamente lungo e non è stato salvato. Riprova per generare un nuovo take."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O áudio gerado continha um silêncio incomumente longo e não foi salvo. Tente novamente para gerar uma nova tomada."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成的音频中有异常长的静音，因此未保存。请重试以生成新的音频。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成した音声に異常に長い無音が含まれていたため、保存されませんでした。もう一度生成してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "생성된 오디오에 비정상적으로 긴 무음 구간이 있어 저장되지 않았습니다. 다시 시도하여 새 테이크를 생성하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В созданном аудио оказалась необычно длинная пауза, поэтому оно не сохранено. Повторите попытку, чтобы создать новый дубль."
+          }
+        }
+      }
+    },
+    "vocello.error.audio_qc_no_speech": {
+      "comment": "Studio error when the automatic audio-quality check rejected a finished take because it contained no usable speech. The take was discarded; retrying generates a new one.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The generated audio did not contain usable speech and was not saved. Retry to generate a new take."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’audio généré ne contenait pas de parole exploitable et n’a pas été enregistré. Réessayez pour générer une nouvelle prise."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El audio generado no contenía voz utilizable y no se guardó. Vuelve a intentarlo para generar una toma nueva."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das erzeugte Audio enthielt keine brauchbare Sprache und wurde nicht gesichert. Versuche es erneut, um eine neue Aufnahme zu erzeugen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’audio generato non conteneva parlato utilizzabile e non è stato salvato. Riprova per generare un nuovo take."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O áudio gerado não continha fala utilizável e não foi salvo. Tente novamente para gerar uma nova tomada."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成的音频中没有可用的语音，因此未保存。请重试以生成新的音频。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成した音声に使用できる発話が含まれていなかったため、保存されませんでした。もう一度生成してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "생성된 오디오에 사용할 수 있는 음성이 없어 저장되지 않았습니다. 다시 시도하여 새 테이크를 생성하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "В созданном аудио нет пригодной речи, поэтому оно не сохранено. Повторите попытку, чтобы создать новый дубль."
+          }
+        }
+      }
+    },
+    "vocello.error.audio_qc_unstable": {
+      "comment": "Studio error when the automatic audio-quality check rejected a finished take because it was unstable, clipped or distorted. The take was discarded; retrying generates a new one.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The generated audio was unstable or distorted and was not saved. Retry to generate a new take."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’audio généré était instable ou distordu et n’a pas été enregistré. Réessayez pour générer une nouvelle prise."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El audio generado era inestable o estaba distorsionado y no se guardó. Vuelve a intentarlo para generar una toma nueva."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das erzeugte Audio war instabil oder verzerrt und wurde nicht gesichert. Versuche es erneut, um eine neue Aufnahme zu erzeugen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’audio generato era instabile o distorto e non è stato salvato. Riprova per generare un nuovo take."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O áudio gerado estava instável ou distorcido e não foi salvo. Tente novamente para gerar uma nova tomada."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成的音频不稳定或失真，因此未保存。请重试以生成新的音频。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成した音声が不安定または歪んでいたため、保存されませんでした。もう一度生成してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "생성된 오디오가 불안정하거나 왜곡되어 저장되지 않았습니다. 다시 시도하여 새 테이크를 생성하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Созданное аудио было нестабильным или искажённым, поэтому оно не сохранено. Повторите попытку, чтобы создать новый дубль."
+          }
+        }
+      }
+    },
+    "vocello.error.audio_qc_rejected": {
+      "comment": "Studio error when the mandatory automatic audio-quality check rejected a finished take for another reason. The take was discarded; retrying generates a new one.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The generated audio did not pass its mandatory quality check and was not saved. Retry to generate a new take."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’audio généré n’a pas réussi le contrôle de qualité obligatoire et n’a pas été enregistré. Réessayez pour générer une nouvelle prise."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El audio generado no superó la comprobación de calidad obligatoria y no se guardó. Vuelve a intentarlo para generar una toma nueva."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das erzeugte Audio hat die vorgeschriebene Qualitätsprüfung nicht bestanden und wurde nicht gesichert. Versuche es erneut, um eine neue Aufnahme zu erzeugen."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’audio generato non ha superato il controllo di qualità obbligatorio e non è stato salvato. Riprova per generare un nuovo take."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O áudio gerado não passou na verificação de qualidade obrigatória e não foi salvo. Tente novamente para gerar uma nova tomada."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成的音频未通过必需的质量检查，因此未保存。请重试以生成新的音频。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成した音声が必須の品質チェックに合格しなかったため、保存されませんでした。もう一度生成してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "생성된 오디오가 필수 품질 검사를 통과하지 못해 저장되지 않았습니다. 다시 시도하여 새 테이크를 생성하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Созданное аудио не прошло обязательную проверку качества, поэтому оно не сохранено. Повторите попытку, чтобы создать новый дубль."
+          }
+        }
+      }
+    },
+    "vocello.error.insufficient_memory": {
+      "comment": "Error when the app refused to load a voice model because too little memory was free. Nothing was lost; the user closes background apps and tries again.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello needs more available memory before loading this model. Close background apps and try again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello a besoin de plus de mémoire disponible pour charger ce modèle. Fermez les apps en arrière-plan et réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello necesita más memoria disponible para cargar este modelo. Cierra las apps en segundo plano y vuelve a intentarlo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello braucht mehr freien Speicher, um dieses Modell zu laden. Schließe Apps im Hintergrund und versuche es erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello ha bisogno di più memoria disponibile per caricare questo modello. Chiudi le app in background e riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello precisa de mais memória disponível para carregar este modelo. Feche os apps em segundo plano e tente novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 需要更多可用内存才能载入此模型。请关闭后台应用后重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このモデルを読み込むには、Vocello が使用できるメモリがもっと必要です。バックグラウンドのアプリを閉じてから、もう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 모델을 불러오려면 Vocello에 더 많은 사용 가능한 메모리가 필요합니다. 백그라운드 앱을 닫고 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello нужно больше свободной памяти, чтобы загрузить эту модель. Закройте фоновые приложения и повторите попытку."
+          }
+        }
+      }
+    },
+    "vocello.error.engine_not_ready": {
+      "comment": "Error when generation was requested before the on-device voice engine finished starting. Nothing was lost; retrying shortly succeeds.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The voice engine is still starting. Try again in a moment."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le moteur vocal est encore en cours de démarrage. Réessayez dans un instant."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El motor de voz todavía se está iniciando. Vuelve a intentarlo en un momento."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Sprach-Engine startet noch. Versuche es gleich noch einmal."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il motore vocale si sta ancora avviando. Riprova tra un momento."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O mecanismo de voz ainda está iniciando. Tente novamente em instantes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音引擎仍在启动。请稍后重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声エンジンを起動しています。しばらくしてからもう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "음성 엔진이 아직 시작 중입니다. 잠시 후 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Голосовой движок ещё запускается. Повторите попытку чуть позже."
+          }
+        }
+      }
+    },
+    "vocello.error.model_unavailable": {
+      "comment": "Error when the installed voice model files are missing, incomplete or fail verification. The user repairs or reinstalls the model in Settings.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This voice model is missing or incomplete. Repair or reinstall it in Settings."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce modèle de voix est manquant ou incomplet. Réparez-le ou réinstallez-le dans Réglages."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este modelo de voz falta o está incompleto. Repáralo o reinstálalo en Ajustes."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Stimmmodell fehlt oder ist unvollständig. Repariere es oder installiere es in den Einstellungen neu."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo modello vocale manca o è incompleto. Riparalo o reinstallalo in Impostazioni."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este modelo de voz está ausente ou incompleto. Repare ou reinstale o modelo nos Ajustes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此语音模型缺失或不完整。请在设置中修复或重新安装。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この音声モデルが見つからないか、不完全です。設定で修復または再インストールしてください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 음성 모델이 없거나 불완전합니다. 설정에서 복구하거나 다시 설치하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Голосовая модель отсутствует или установлена не полностью. Исправьте или переустановите её в настройках."
+          }
+        }
+      }
+    },
+    "vocello.error.reference_audio_missing": {
+      "comment": "Voice Cloning error when the chosen reference audio file was moved or deleted before it could be prepared. The user chooses the file again.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The reference audio file is no longer available. Choose it again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le fichier audio de référence n’est plus disponible. Choisissez-le à nouveau."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El archivo de audio de referencia ya no está disponible. Vuelve a elegirlo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Referenzaudiodatei ist nicht mehr verfügbar. Wähle sie erneut aus."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il file audio di riferimento non è più disponibile. Sceglilo di nuovo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O arquivo de áudio de referência não está mais disponível. Escolha-o novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参考音频文件已不可用。请重新选择。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "参照音声ファイルが見つかりません。もう一度選択してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "참조 오디오 파일을 더 이상 사용할 수 없습니다. 다시 선택하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Файл с образцом голоса больше недоступен. Выберите его снова."
+          }
+        }
+      }
+    },
+    "vocello.error.reference_audio_unsupported": {
+      "comment": "Voice Cloning error when the chosen reference audio uses a format the app cannot decode. The user chooses another audio file.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This audio format can't be used as a reference. Choose another audio file."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce format audio ne peut pas servir de référence. Choisissez un autre fichier audio."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este formato de audio no se puede usar como referencia. Elige otro archivo de audio."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Audioformat kann nicht als Referenz verwendet werden. Wähle eine andere Audiodatei."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo formato audio non può essere usato come riferimento. Scegli un altro file audio."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este formato de áudio não pode ser usado como referência. Escolha outro arquivo de áudio."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此音频格式不能用作参考。请选择其他音频文件。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この音声形式は参照として使用できません。別の音声ファイルを選択してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 오디오 형식은 참조로 사용할 수 없습니다. 다른 오디오 파일을 선택하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Этот аудиоформат нельзя использовать как образец голоса. Выберите другой аудиофайл."
+          }
+        }
+      }
+    },
+    "vocello.error.reference_audio_too_long": {
+      "comment": "Voice Cloning error when the chosen reference audio exceeds the duration or file-size limit for preparation. The user chooses a shorter clip.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This reference audio is too long or too large to prepare. Choose a shorter clip."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet audio de référence est trop long ou trop volumineux pour être préparé. Choisissez un extrait plus court."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este audio de referencia es demasiado largo o pesado para prepararlo. Elige un clip más corto."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Referenzaudio ist zu lang oder zu groß für die Vorbereitung. Wähle einen kürzeren Clip."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Questo audio di riferimento è troppo lungo o troppo grande da preparare. Scegli una clip più breve."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este áudio de referência é longo ou grande demais para ser preparado. Escolha um trecho mais curto."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此参考音频太长或太大，无法处理。请选择较短的片段。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この参照音声は長すぎるか大きすぎるため準備できません。短いクリップを選択してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 참조 오디오는 너무 길거나 커서 준비할 수 없습니다. 더 짧은 클립을 선택하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Образец голоса слишком длинный или слишком большой для обработки. Выберите фрагмент покороче."
+          }
+        }
+      }
+    },
+    "vocello.error.reference_audio_unreadable": {
+      "comment": "Voice Cloning error when the chosen reference audio could not be read or decoded in time. The user chooses another audio file.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello couldn't read this reference audio. Choose another audio file."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello n’a pas pu lire cet audio de référence. Choisissez un autre fichier audio."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello no pudo leer este audio de referencia. Elige otro archivo de audio."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello konnte dieses Referenzaudio nicht lesen. Wähle eine andere Audiodatei."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello non è riuscito a leggere questo audio di riferimento. Scegli un altro file audio."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello não conseguiu ler este áudio de referência. Escolha outro arquivo de áudio."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 无法读取此参考音频。请选择其他音频文件。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello はこの参照音声を読み込めませんでした。別の音声ファイルを選択してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello가 이 참조 오디오를 읽을 수 없습니다. 다른 오디오 파일을 선택하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello не удалось прочитать образец голоса. Выберите другой аудиофайл."
+          }
+        }
+      }
+    },
+    "vocello.error.storage_full": {
+      "comment": "Error when the device ran out of storage space while saving a take's audio file. The user frees space and tries again.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There isn't enough storage space to save this take. Free up space, then try again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’espace de stockage est insuffisant pour enregistrer cette prise. Libérez de l’espace, puis réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay suficiente espacio de almacenamiento para guardar esta toma. Libera espacio y vuelve a intentarlo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Es ist nicht genug Speicherplatz frei, um diese Aufnahme zu sichern. Gib Speicherplatz frei und versuche es erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lo spazio di archiviazione non è sufficiente per salvare questo take. Libera spazio, poi riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não há espaço de armazenamento suficiente para salvar esta tomada. Libere espaço e tente novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "存储空间不足，无法保存此音频。请释放空间后重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このテイクを保存するためのストレージ容量が足りません。空き容量を増やしてから、もう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 테이크를 저장할 저장 공간이 부족합니다. 공간을 확보한 후 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Недостаточно места в хранилище, чтобы сохранить этот дубль. Освободите место и повторите попытку."
+          }
+        }
+      }
+    },
+    "vocello.error.storage_unavailable": {
+      "comment": "Error when the app could not create or write an audio file (missing folder or no write permission). The user checks the output folder and tries again.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello couldn't write the audio file. Check that the output folder is available, then try again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello n’a pas pu écrire le fichier audio. Vérifiez que le dossier de sorties est disponible, puis réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello no pudo escribir el archivo de audio. Comprueba que la carpeta de salida esté disponible y vuelve a intentarlo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello konnte die Audiodatei nicht schreiben. Prüfe, ob der Ausgabeordner verfügbar ist, und versuche es erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello non è riuscito a scrivere il file audio. Verifica che la cartella di output sia disponibile, poi riprova."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello não conseguiu gravar o arquivo de áudio. Verifique se a pasta de saída está disponível e tente novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 无法写入音频文件。请确认输出文件夹可用，然后重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello は音声ファイルを書き込めませんでした。出力フォルダが使用できることを確認してから、もう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello가 오디오 파일을 쓸 수 없습니다. 출력 폴더를 사용할 수 있는지 확인한 후 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello не удалось записать аудиофайл. Убедитесь, что папка результатов доступна, и повторите попытку."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

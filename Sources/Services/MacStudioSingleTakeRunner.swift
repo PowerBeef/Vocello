@@ -76,7 +76,7 @@ enum MacStudioSingleTakeRunner {
             } catch is CancellationError {
                 // The shared executor owns cancellation cleanup and telemetry.
             } catch {
-                coordinator.fail(error.localizedDescription, attempt: attempt)
+                coordinator.fail(MacInterfaceText.generationFailureMessage(error), attempt: attempt)
             }
         }
         coordinator.installGenerationTask(task, for: attempt)

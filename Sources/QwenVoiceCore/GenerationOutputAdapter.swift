@@ -2326,13 +2326,14 @@ struct StreamingExecutionContext: Sendable {
             + "[\(diagnosticDetail)]."
         )
         let message: String
-        if flags.contains(where: { $0.hasPrefix("dropout:") }) {
+        switch NativeAudioQualityRejection(flags: flags) {
+        case .silentGap:
             message = "The generated audio contained an unusually long silent gap and was not saved. Retry to generate a new take."
-        } else if flags.contains("near_silent") || flags.contains("silent") || flags.contains("empty") {
+        case .noSpeech:
             message = "The generated audio did not contain usable speech and was not saved. Retry to generate a new take."
-        } else if flags.contains("nonfinite") || flags.contains("clipping") || flags.contains("clicks") {
+        case .unstable:
             message = "The generated audio was unstable or distorted and was not saved. Retry to generate a new take."
-        } else {
+        case .unclassified:
             message = "The generated audio did not pass its mandatory quality check and was not saved. Retry to generate a new take."
         }
         return NativeRuntimeError(

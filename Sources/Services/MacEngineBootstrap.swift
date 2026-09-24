@@ -41,6 +41,9 @@ enum MacEngineBootstrap {
             storeVersionSeed: storeVersionSeed(),
             customPrewarmPolicy: customPrewarmPolicy
         )
+        // PA-20: errors the engine surfaces (status strip, failed load or clone
+        // preparation) read catalog copy in the interface language.
+        runtime.engine.visibleErrorDescription = { MacInterfaceText.generationFailureMessage($0) }
         return TTSEngineStore(
             backend: AnyTTSEngineBackend(
                 engine: runtime.engine,

@@ -264,7 +264,7 @@ struct IOSStartupFailureView: View {
                 .accessibilityHidden(true)
             Text(IOSInterfaceText.initializationFailed)
                 .font(.title2.bold())
-            Text(error.localizedDescription)
+            Text(Self.message(for: error))
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
                 .padding(.horizontal)
@@ -276,6 +276,13 @@ struct IOSStartupFailureView: View {
         .padding()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("startup_errorState")
+    }
+
+    /// A restore failure carries no path (privacy) and no user-facing text of its own.
+    private static func message(for error: Error) -> String {
+        error is IOSStorageProtectionPolicy.ModeRestoreFailure
+            ? IOSInterfaceText.storageProtectionRestoreFailed
+            : error.localizedDescription
     }
 }
 

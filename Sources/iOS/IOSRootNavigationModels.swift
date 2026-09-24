@@ -524,6 +524,11 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.ui.unsupportedDevice", defaultValue: "Unsupported Device",
                comment: "iOS interface: Unsupported Device. Presentation only.")
     }
+    static var storageProtectionRestoreFailed: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.storageProtectionRestoreFailed",
+               defaultValue: "Vocello couldn't make a downloaded model file read-only again. Restart your iPhone, then tap Retry.",
+               comment: "iOS interface: startup failure when a model file's read-only mode could not be restored. Presentation only.")
+    }
     static var initializationFailed: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.initializationFailed", defaultValue: "App Initialization Failed",
                comment: "iOS interface: App Initialization Failed. Presentation only.")

@@ -93,8 +93,15 @@ final class IOSAudioSessionOwner: Sendable {
         }
     }
 
+    /// A claim made while the app is in the background: the ledger records nothing and
+    /// the session is left handed back, so a blocking caller must not proceed.
+    struct ClaimRefusedInBackground: Error {}
+
     private func perform(claim: IOSAudioSessionClaim, use: IOSAudioSessionUse) throws {
-        let steps = ledger.withLock { $0.claim(claim, for: use) }
+        let (steps, refused) = ledger.withLock { ledger in
+            (ledger.claim(claim, for: use), ledger.isInBackground)
+        }
+        if refused { throw ClaimRefusedInBackground() }
         do {
             for step in steps {
                 try apply(step)

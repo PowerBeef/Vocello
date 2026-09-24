@@ -762,6 +762,9 @@ final class IOSInlinePlaybackController: NSObject {
         // mirroring it. Only our own player is stopped.
         if sharedPlayer != nil && player == nil {
             stopDisplayLink()
+            // A claim from an earlier own-file playback is not needed while mirroring.
+            IOSAudioSessionOwner.shared.release(sessionClaim)
+            sessionClaim = nil
             return
         }
         player?.stop()

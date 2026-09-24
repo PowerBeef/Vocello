@@ -416,7 +416,8 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         )
         // PA-21 (IOS-10): the trash control opens the one clear-and-delete confirmation.
         let clearMenu = element("historyClearMenu")
-        if clearMenu.exists && clearMenu.isHittable {
+        let clearInspected = clearMenu.exists && clearMenu.isHittable && clearMenu.isEnabled
+        if clearInspected {
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: clearMenu, timeout: 20))
             XCTAssertTrue(VocelloUIWait.exists(element("historyClearConfirm"), timeout: 20))
             let cancel = element("historyClearCancel")
@@ -429,7 +430,9 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             scenario: "stateful", controlID: "history-surface",
             classification: "BLOCKED_PRESERVATION_POLICY",
             expected: "The global clear confirmation is presented and cancelled without mutating History",
-            actual: "The clear confirmation was inspected and cancelled"
+            actual: clearInspected
+                ? "The clear confirmation was inspected and cancelled"
+                : "History had no rows, so the clear control was disabled and not inspected"
         )
         recorder.record(
             scenario: "stateful", controlID: "voices-surface",

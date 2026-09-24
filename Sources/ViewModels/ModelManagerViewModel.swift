@@ -849,7 +849,8 @@ final class ModelManagerViewModel {
         let modelDir = model.installDirectory(in: modelsDirectory)
         do {
             try SharedModelComponentStore(modelsRoot: modelsDirectory).deleteModel(
-                modelFolder: modelDir.lastPathComponent
+                modelFolder: modelDir.lastPathComponent,
+                reclamation: .background
             )
         } catch {
             lastFailureMessages[model.id] = error.localizedDescription

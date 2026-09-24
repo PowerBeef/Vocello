@@ -586,20 +586,22 @@ public struct SharedModelComponentStore: Sendable {
         }
 
         // Publish freshly downloaded component files. A missing staged file is eligible only
-        // when the content-addressed store already contains the exact verified blob.
+        // when the content-addressed store already contains the exact verified blob. A staged
+        // file that is the blob itself (the downloader's reuse pin) is verified once, as a blob.
         for file in plan.manifest.contentIdentity.files {
             let source = try SharedComponentFileSystem.containedURL(
                 root: stagedModelURL,
                 relativePath: file.relativePath
             )
-            if FileManager.default.fileExists(atPath: source.path) {
+            let blob = try blobURL(for: file.sha256)
+            if FileManager.default.fileExists(atPath: source.path),
+               (try? SharedComponentFileSystem.sameFile(source, blob)) != true {
                 try file.verify(fileURL: source)
                 _ = try publish(
                     content: SharedComponentContentIdentity(files: [file]),
                     from: stagedModelURL
                 )
             } else {
-                let blob = try blobURL(for: file.sha256)
                 try file.verify(fileURL: blob)
             }
         }
@@ -778,13 +780,30 @@ public struct SharedModelComponentStore: Sendable {
     /// in-flight install's components from being reclaimed under it.
     public static let automaticReclaimGracePeriod: TimeInterval = 15 * 60
 
+    /// When `deleteModel` reclaims unreferenced components.
+    public enum ReclamationSchedule: Sendable {
+        /// Before `deleteModel` returns.
+        case immediate
+        /// On a detached utility task, so a caller on the main actor does not wait on the
+        /// publication lock or on unlinking multi-gigabyte blobs. The model itself is still
+        /// removed before `deleteModel` returns.
+        case background
+    }
+
     /// Atomically removes one model directory, then reclaims what no installed model still
     /// references: shared blobs no strict installed manifest lists (so another model's links stay
-    /// valid) and leftover `trash/` and `staging/` entries. The model removal is the operation's
-    /// result; reclamation is best effort and its failure never fails the delete.
+    /// valid) and leftover `trash/` and `staging/` entries, and drops the model's rebuildable
+    /// prepared overlay from the runtime cache. The model removal is the operation's result;
+    /// reclamation is best effort and its failure never fails the delete.
+    ///
+    /// The blobs the deleted model itself listed are reclaimed regardless of the grace period when
+    /// nothing else links them: unlinking the model's own hard link refreshes the blob's ctime,
+    /// so the grace period alone would keep every blob a delete just freed. A blob another link
+    /// still holds (an install replica, or a download that pinned it for reuse) stays.
     public func deleteModel(
         modelFolder: String,
-        componentGracePeriod: TimeInterval = SharedModelComponentStore.automaticReclaimGracePeriod
+        componentGracePeriod: TimeInterval = SharedModelComponentStore.automaticReclaimGracePeriod,
+        reclamation: ReclamationSchedule = .immediate
     ) throws {
         guard SharedComponentIdentityValidation.isSafeFolder(modelFolder) else {
             throw SharedModelComponentStoreError.invalidModelFolder
@@ -793,23 +812,52 @@ public struct SharedModelComponentStore: Sendable {
         let modelURL = modelsRoot.appendingPathComponent(modelFolder, isDirectory: true)
         guard FileManager.default.fileExists(atPath: modelURL.path) else { return }
         let tombstone = trashRoot.appendingPathComponent("model-\(UUID().uuidString)", isDirectory: true)
-        try withPublicationLock {
-            guard FileManager.default.fileExists(atPath: modelURL.path) else { return }
+        let releasedDigests: Set<String> = try withPublicationLock {
+            guard FileManager.default.fileExists(atPath: modelURL.path) else { return [] }
+            // Read under the lock, right before the tombstone, so a concurrent repair or
+            // migration cannot swap in a model whose manifest differs from what is removed.
+            let released = (try? readManifest(modelURL: modelURL))
+                .map { Set($0.contentIdentity.files.map(\.sha256)) } ?? []
             try SharedComponentFileSystem.move(modelURL, to: tombstone, operation: "tombstone-model")
+            return released
         }
         try Self.removeTombstone(tombstone)
-        _ = try? reclaimUnreferencedComponents(gracePeriod: componentGracePeriod)
+        PreparedModelOverlay.removeCachedOverlay(forModelFolder: modelFolder, modelsRoot: modelsRoot)
+        switch reclamation {
+        case .immediate:
+            _ = try? reclaimUnreferencedComponents(
+                gracePeriod: componentGracePeriod,
+                releasedDigests: releasedDigests
+            )
+        case .background:
+            let store = self
+            Task.detached(priority: .utility) {
+                _ = try? store.reclaimUnreferencedComponents(
+                    gracePeriod: componentGracePeriod,
+                    releasedDigests: releasedDigests
+                )
+            }
+        }
     }
 
     /// Automatic reclamation, run after every model delete and once per engine start. Unlike the
     /// exact `pruneUnreferencedComponents()`, it also sweeps `trash/` and `staging/` leftovers
     /// from interrupted operations and protects what may belong to an operation in flight: a blob
-    /// with another hard link (an install or migration replica holds it) or one published within
-    /// the grace period, and trash or staging entries younger than it. A store that does not exist
-    /// yet is left uncreated.
+    /// with another hard link (an install or migration replica holds it, or a download pinned it
+    /// for reuse) or one published within the grace period, and trash or staging entries whose
+    /// newest change is younger than it. A store that does not exist yet is left uncreated.
     @discardableResult
     public func reclaimUnreferencedComponents(
         gracePeriod: TimeInterval = SharedModelComponentStore.automaticReclaimGracePeriod
+    ) throws -> SharedComponentPruneResult {
+        try reclaimUnreferencedComponents(gracePeriod: gracePeriod, releasedDigests: [])
+    }
+
+    /// `releasedDigests` are blobs a model delete just unlinked; they skip the grace period (the
+    /// unlink itself refreshed their ctime) but keep the hard-link protection.
+    private func reclaimUnreferencedComponents(
+        gracePeriod: TimeInterval,
+        releasedDigests: Set<String>
     ) throws -> SharedComponentPruneResult {
         guard FileManager.default.fileExists(atPath: storeRoot.path) else {
             return SharedComponentPruneResult(removedDigests: [], preservedDigests: [])
@@ -822,15 +870,51 @@ public struct SharedModelComponentStore: Sendable {
                 options: []
             )) ?? []
             for entry in entries {
-                guard let status = SharedComponentFileSystem.linkStatus(entry),
-                      status.changedAt < cutoff else { continue }
+                // A publication's `staging/<uuid>/` directory keeps its creation ctime while
+                // the blob inside is copied and hashed, so judge the entry by its newest child.
+                guard let changedAt = SharedComponentFileSystem.newestChangeTime(of: entry),
+                      changedAt < cutoff else { continue }
                 try? Self.removeTombstone(entry)
             }
         }
-        return try pruneUnreferencedComponents { blob in
+        return try pruneUnreferencedComponents { digest, blob in
             guard let status = SharedComponentFileSystem.linkStatus(blob) else { return true }
-            return status.linkCount > 1 || status.changedAt >= cutoff
+            if status.linkCount > 1 { return true }
+            if releasedDigests.contains(digest) { return false }
+            return status.changedAt >= cutoff
         }
+    }
+
+    /// Hard-links the stored blob for `file` at `destination`, a path inside a downloader's
+    /// staging tree, so the blob a delivery plan decided to reuse has a second link for as long as
+    /// that staging exists: automatic reclamation never removes a blob another link holds. The
+    /// link is made under the publication lock, so it cannot interleave with a prune.
+    ///
+    /// Returns `false`, leaving nothing at `destination`, when the blob is missing or is not a
+    /// regular file of the expected size; the caller then downloads the file instead. Bytes are
+    /// not hashed here: `installStagedModel` verifies the blob before it links the model.
+    public func pinStoredComponent(_ file: SharedComponentFileIdentity, at destination: URL) -> Bool {
+        guard let blob = try? blobURL(for: file.sha256) else { return false }
+        let pinned = try? withPublicationLock { () throws -> Bool in
+            guard SharedComponentFileSystem.isRegularFileWithoutSymlink(blob),
+                  (try? SharedComponentFileSystem.fileSize(blob, relativePath: file.relativePath))
+                    == file.byteCount else {
+                return false
+            }
+            if FileManager.default.fileExists(atPath: destination.path) {
+                if (try? SharedComponentFileSystem.sameFile(blob, destination)) == true {
+                    return true
+                }
+                try FileManager.default.removeItem(at: destination)
+            }
+            try FileManager.default.createDirectory(
+                at: destination.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try FileManager.default.linkItem(at: blob, to: destination)
+            return true
+        }
+        return pinned ?? false
     }
 
     /// Computes component liveness exclusively from strict installed manifests. There is no
@@ -842,11 +926,11 @@ public struct SharedModelComponentStore: Sendable {
     /// Moves unreferenced blobs to private trash while holding the publication lock, then removes
     /// them after releasing it. A malformed manifest or missing live blob makes pruning fail closed.
     public func pruneUnreferencedComponents() throws -> SharedComponentPruneResult {
-        try pruneUnreferencedComponents { _ in false }
+        try pruneUnreferencedComponents { _, _ in false }
     }
 
     private func pruneUnreferencedComponents(
-        isProtected: (URL) -> Bool
+        isProtected: (_ digest: String, _ blob: URL) -> Bool
     ) throws -> SharedComponentPruneResult {
         try prepareStoreDirectories()
         var removed: [String] = []
@@ -855,7 +939,7 @@ public struct SharedModelComponentStore: Sendable {
         try withPublicationLock {
             let live = Set(try livenessUnlocked().liveBlobDigests)
             for (digest, url) in try allStoredBlobs() {
-                if live.contains(digest) || isProtected(url) {
+                if live.contains(digest) || isProtected(digest, url) {
                     preserved.append(digest)
                 } else {
                     let tombstone = trashRoot.appendingPathComponent("blob-\(UUID().uuidString)")
@@ -1380,6 +1464,21 @@ private enum SharedComponentFileSystem {
                 + TimeInterval(info.st_ctimespec.tv_nsec) / 1_000_000_000
         )
         return (UInt64(info.st_nlink), changedAt)
+    }
+
+    /// The newest ctime of `entry` and, for a directory, of its immediate children, so a
+    /// `staging/<uuid>/` directory whose file is still being written or hashed counts as fresh.
+    /// `nil` when the entry itself cannot be read; the sweep leaves such an entry alone.
+    static func newestChangeTime(of entry: URL) -> Date? {
+        guard let own = linkStatus(entry)?.changedAt else { return nil }
+        let children = (try? FileManager.default.contentsOfDirectory(
+            at: entry,
+            includingPropertiesForKeys: nil,
+            options: []
+        )) ?? []
+        return children.reduce(own) { newest, child in
+            max(newest, linkStatus(child)?.changedAt ?? newest)
+        }
     }
 
     static func sameFile(_ first: URL, _ second: URL) throws -> Bool {

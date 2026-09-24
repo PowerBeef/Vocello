@@ -46,11 +46,13 @@ Maintained macOS subtrees and preferences:
   `.qwenvoice-components-v1/` content-addressed store; ordinary model paths remain regular hard
   links, and component liveness is derived from strict installed manifests. Deleting a model, and
   each engine start, reclaims blobs no installed manifest lists plus `trash/` and `staging/`
-  leftovers of interrupted operations; a blob another hard link holds or one published in the last
-  15 minutes is left for a later pass. The rebuildable prepared-model overlay (symlinks to the
-  model's files plus its sanitized config) lives in `cache/native_mlx/prepared_models/`, never in
-  the model folder.
-- `.qwenvoice-downloads/` stores staged model downloads, partial files, resume data, and download-state metadata while a download is in progress.
+  leftovers of interrupted operations. A blob another hard link holds is always kept (an install
+  replica, or a download that reuses it: the download hard-links each reused blob into its own
+  staging until the install consumes it). Otherwise a blob published in the last 15 minutes is left
+  for a later pass, except the deleted model's own blobs, which its delete reclaims at once. The
+  rebuildable prepared-model overlay (symlinks to the model's files plus its sanitized config) lives
+  in `cache/native_mlx/prepared_models/`, never in the model folder, and is removed with its model.
+- `.qwenvoice-downloads/` stores staged model downloads, partial files, resume data, and download-state metadata while a download is in progress. A download that reuses shared components holds a hard link to each reused blob here (no extra disk space).
 - `diagnostics/model-downloads/` stores allowlisted transfer/failure summaries, capped at 200 records and 5 MB; raw URLs and absolute paths are excluded.
 - `outputs/CustomVoice/`, `outputs/VoiceDesign/`, and `outputs/Clones/` store generated audio unless the user chooses a different output directory. If a user-chosen directory becomes missing or unwritable, new audio falls back to these default folders and Settings shows a warning — a generation is never lost to a vanished folder.
 - `outputs/bench-archive/` (one folder per run ID; debug-store only; created by `vocello bench --delivery`) retains each delivery benchmark run's take WAVs and result/prosody/quality manifests as the durable measurement evidence. Local-only, never tracked or uploaded; unbounded, prune manually ([`delivery-harness.md`](delivery-harness.md) §3).
@@ -139,7 +141,7 @@ Maintained iPhone subtrees:
   the rest (see the macOS entry for the protections). The prepared-model overlay lives in
   `cache/native_mlx/prepared_models/`, which is excluded from backup.
 - `ios_model_delivery_state.json` under `downloads/` is the atomic schema-v2 delivery ledger. It stores only privacy-safe identifiers, relative paths, receipts, retry counts, byte progress, and terminal state.
-- `downloads/staging/` is the only iPhone delivery staging tree; it holds durable delegate files plus per-model verified files, partials, and resume data.
+- `downloads/staging/` is the only iPhone delivery staging tree; it holds durable delegate files plus per-model verified files, partials, and resume data, and hard links to the shared blobs a delivery reuses.
 - `diagnostics/model-downloads/` stores allowlisted local transfer/failure summaries, capped at 200 records and 5 MB (the same shared store as macOS). It excludes raw URLs, absolute paths, device identity, and user data.
 - `outputs/` stores generated audio. Settings → Models & Files → "Saved outputs" optionally copies new Built-in clips
   to a user-granted Files/iCloud folder; Design/Clone copies require the iOS export purchase.

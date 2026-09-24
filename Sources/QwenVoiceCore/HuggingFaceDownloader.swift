@@ -1573,15 +1573,6 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 throw DownloadError.apiError("Shared component installation plan does not match the artifact")
             }
         }
-        let reusedFiles = installedFiles.filter { !downloadPaths.contains($0.path) }
-        let totalBytes = installedFiles.reduce(Int64(0)) { $0 + $1.size }
-        await state.beginRepositoryDownload(
-            totalBytes: totalBytes,
-            totalFiles: installedFiles.count,
-            preverifiedBytes: reusedFiles.reduce(Int64(0)) { $0 + $1.size },
-            preverifiedFiles: reusedFiles.count
-        )
-
         let stagingRoot = explicitStagingRoot ?? Self.stagingRoot(forTargetDirectory: targetDir)
         let filesRoot = stagingRoot.appendingPathComponent("files", isDirectory: true)
         let partialRoot = stagingRoot.appendingPathComponent("partials", isDirectory: true)
@@ -1595,6 +1586,25 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         Self.markExcludedFromBackup(resumeRoot)
         try fileManager.createDirectory(at: durableTemporaryDirectory, withIntermediateDirectories: true)
         Self.markExcludedFromBackup(durableTemporaryDirectory)
+
+        var files = files
+        if let sharedComponentPlan {
+            files = try Self.pinReusedSharedComponents(
+                downloadFiles: files,
+                installedFiles: installedFiles,
+                plan: sharedComponentPlan,
+                store: SharedModelComponentStore(modelsRoot: targetDir.deletingLastPathComponent()),
+                filesRoot: filesRoot
+            )
+        }
+        let reusedFiles = installedFiles.filter { file in !files.contains { $0.path == file.path } }
+        let totalBytes = installedFiles.reduce(Int64(0)) { $0 + $1.size }
+        await state.beginRepositoryDownload(
+            totalBytes: totalBytes,
+            totalFiles: installedFiles.count,
+            preverifiedBytes: reusedFiles.reduce(Int64(0)) { $0 + $1.size },
+            preverifiedFiles: reusedFiles.count
+        )
 
         if let requestIdentity {
             var expectedTasks: [(URL, ModelDownloadTaskIdentity)] = []
@@ -3244,6 +3254,38 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         } catch {
             return false
         }
+    }
+
+    /// A delivery plan reuses verified store blobs instead of downloading them, decided when the
+    /// plan is made. Automatic reclamation (every engine start, every other model's delete)
+    /// removes an unreferenced blob that has a single link, so without a hold the install would
+    /// find the blob gone and fail after the whole transfer. Each reused shared-component file is
+    /// therefore hard-linked from the store into this download's staging tree first: the second
+    /// link keeps the blob until the install consumes it or the staging is discarded, across
+    /// relaunches too, since staging persists. A blob that vanished after planning is downloaded
+    /// instead. Returns the files to download.
+    static func pinReusedSharedComponents(
+        downloadFiles: [RepoFile],
+        installedFiles: [RepoFile],
+        plan: SharedComponentMigrationPlan,
+        store: SharedModelComponentStore,
+        filesRoot: URL
+    ) throws -> [RepoFile] {
+        let downloadPaths = Set(downloadFiles.map(\.path))
+        var effective = downloadFiles
+        for component in plan.manifest.contentIdentity.files
+            where !downloadPaths.contains(component.relativePath) {
+            let relativePath = try validatedRelativeRepoPath(component.relativePath)
+            let destination = try validatedDestinationURL(for: relativePath, in: filesRoot)
+            if store.pinStoredComponent(component, at: destination) {
+                continue
+            }
+            guard let file = installedFiles.first(where: { $0.path == component.relativePath }) else {
+                throw DownloadError.apiError("Shared component installation plan does not match the artifact")
+            }
+            effective.append(file)
+        }
+        return effective
     }
 
     private static func stagingRoot(forTargetDirectory targetDir: URL) -> URL {

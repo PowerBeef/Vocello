@@ -313,7 +313,8 @@ final class IOSModelDownloadCoordinator {
         )
         let targetDir = model.installDirectory(in: AppPaths.modelsDir)
         try SharedModelComponentStore(modelsRoot: AppPaths.modelsDir).deleteModel(
-            modelFolder: targetDir.lastPathComponent
+            modelFolder: targetDir.lastPathComponent,
+            reclamation: .background
         )
         discardStaging(modelID: model.id)
         markLedgerTerminal(modelID: model.id, status: .deleted)
@@ -1020,7 +1021,8 @@ final class IOSModelDownloadCoordinator {
         }
         do {
             try SharedModelComponentStore(modelsRoot: AppPaths.modelsDir).deleteModel(
-                modelFolder: active.targetDir.lastPathComponent
+                modelFolder: active.targetDir.lastPathComponent,
+                reclamation: .background
             )
             return true
         } catch {

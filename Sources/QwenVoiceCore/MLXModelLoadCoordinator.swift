@@ -1412,6 +1412,26 @@ enum PreparedModelOverlay {
             .appendingPathComponent(sourceDirectory.lastPathComponent, isDirectory: true)
     }
 
+    /// Removes the cached overlay of a deleted model. Every host roots its runtime at one
+    /// directory (`NativeRuntimePaths.rooted(at:)`: `<root>/models` beside
+    /// `<root>/cache/native_mlx`), so the overlay is found from the models root; a models root
+    /// outside that layout has no overlay here and nothing is removed. The overlay's symlinks
+    /// are unlinked, never followed. Best effort and idempotent.
+    static func removeCachedOverlay(
+        forModelFolder modelFolder: String,
+        modelsRoot: URL,
+        fileManager: FileManager = .default
+    ) {
+        let modelsRoot = modelsRoot.standardizedFileURL
+        let paths = NativeRuntimePaths.rooted(at: modelsRoot.deletingLastPathComponent())
+        guard paths.modelsDirectory.standardizedFileURL.path == modelsRoot.path else { return }
+        let overlay = directory(
+            forSourceDirectory: modelsRoot.appendingPathComponent(modelFolder, isDirectory: true),
+            hubCacheDirectory: paths.hubCacheDirectory
+        )
+        try? fileManager.removeItem(at: overlay)
+    }
+
     /// Removes a legacy in-folder overlay and any interrupted rebuild of it
     /// (`.qvoice_prepared_model.tmp.<uuid>`). Only the overlay's own entries are removed; the
     /// symlinks inside it are unlinked, never followed. Idempotent and best effort.

@@ -210,10 +210,12 @@ final class SharedModelComponentStoreTests: XCTestCase {
         XCTAssertEqual(firstPrune.preservedDigests, [component.sha256])
         XCTAssertTrue(FileManager.default.fileExists(atPath: blob.path))
 
+        // The last model that listed the blob takes it with it (PA-22 / CORE-07).
         try store.deleteModel(modelFolder: "model-b")
-        let finalPrune = try store.pruneUnreferencedComponents()
-        XCTAssertEqual(finalPrune.removedDigests, [component.sha256])
         XCTAssertFalse(FileManager.default.fileExists(atPath: blob.path))
+        let finalPrune = try store.pruneUnreferencedComponents()
+        XCTAssertTrue(finalPrune.removedDigests.isEmpty)
+        XCTAssertTrue(finalPrune.preservedDigests.isEmpty)
     }
 
     func testValidationFailureAtomicallyRestoresOriginalModel() throws {
@@ -302,7 +304,7 @@ final class SharedModelComponentStoreTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: blob.path))
     }
 
-    func testStagedInstallReusesVerifiedBlobPublishesHardLinksAndPreservesBlobOnDelete() throws {
+    func testStagedInstallReusesVerifiedBlobPublishesHardLinksAndReclaimsBlobOnDelete() throws {
         let root = try temporaryDirectory("staged-install")
         defer { try? FileManager.default.removeItem(at: root) }
         let models = root.appendingPathComponent("models", isDirectory: true)
@@ -341,8 +343,9 @@ final class SharedModelComponentStoreTests: XCTestCase {
         XCTAssertFalse(values.isSymbolicLink ?? true)
         XCTAssertEqual(try store.audit(modelFolder: "model-a").state, .healthy)
 
+        // No other model lists the component, so deleting its only model reclaims it.
         try store.deleteModel(modelFolder: "model-a")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: blob.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: blob.path))
     }
 
     func testStagedInstallValidationFailureLeavesExistingTargetAndStageUntouched() throws {
@@ -527,6 +530,166 @@ final class SharedModelComponentStoreTests: XCTestCase {
             ),
             []
         )
+    }
+
+    /// PA-22 / CORE-07: unlinking the deleted model's own hard link refreshes its blob's ctime, so
+    /// the grace period alone kept every blob a delete freed. With the default grace, the deleted
+    /// model's blobs that nothing else links are reclaimed, while an unrelated blob published
+    /// moments ago keeps its grace, and the model's cached prepared overlay goes with it.
+    func testDeleteWithDefaultGraceReclaimsTheModelsOwnBlobsAndOverlay() throws {
+        let fixture = try migratedFixture(label: "own-blobs")
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let store = fixture.store
+        let ownBlob = try store.blobURL(for: fixture.file.sha256)
+        let source = fixture.root.appendingPathComponent("fresh-source", isDirectory: true)
+        try write(Data("fresh-unrelated".utf8), to: source.appendingPathComponent("fresh.bin"))
+        let fresh = try SharedComponentFileIdentity.verify(
+            relativePath: "fresh.bin",
+            fileURL: source.appendingPathComponent("fresh.bin")
+        )
+        _ = try store.publish(content: SharedComponentContentIdentity(files: [fresh]), from: source)
+        let freshBlob = try store.blobURL(for: fresh.sha256)
+        let overlay = PreparedModelOverlay.directory(
+            forSourceDirectory: fixture.model,
+            hubCacheDirectory: fixture.root.appendingPathComponent("cache/native_mlx", isDirectory: true)
+        )
+        try FileManager.default.createDirectory(at: overlay, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            atPath: overlay.appendingPathComponent("unique.bin").path,
+            withDestinationPath: fixture.model.appendingPathComponent("unique.bin").path
+        )
+        let otherOverlay = overlay.deletingLastPathComponent()
+            .appendingPathComponent("model-other", isDirectory: true)
+        try FileManager.default.createDirectory(at: otherOverlay, withIntermediateDirectories: true)
+
+        try store.deleteModel(modelFolder: fixture.model.lastPathComponent)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.model.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ownBlob.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: freshBlob.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: overlay.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: otherOverlay.path))
+    }
+
+    /// PA-22 / CORE-07: a delivery plan decides to reuse a stored blob, then downloads the rest.
+    /// Meanwhile reclamation (engine start, another model's delete) runs. The downloader's pin, a
+    /// hard link in its staging tree, keeps the orphan blob past any grace period, and the install
+    /// then consumes the pinned blob. A blob that is already gone cannot be pinned, and the
+    /// downloader fetches that file instead of failing the install after the transfer.
+    func testDownloadReusePinKeepsPlannedBlobThroughReclaimUntilInstall() throws {
+        let root = try temporaryDirectory("reuse-pin")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let models = root.appendingPathComponent("models", isDirectory: true)
+        let source = root.appendingPathComponent("source", isDirectory: true)
+        let filesRoot = root.appendingPathComponent("download-staging/files", isDirectory: true)
+        let componentBytes = Data("reused-component".utf8)
+        try write(componentBytes, to: source.appendingPathComponent("speech_tokenizer/model.bin"))
+        try write(Data("unique-model".utf8), to: filesRoot.appendingPathComponent("model.bin"))
+        let component = try SharedComponentFileIdentity.verify(
+            relativePath: "speech_tokenizer/model.bin",
+            fileURL: source.appendingPathComponent("speech_tokenizer/model.bin")
+        )
+        let content = try SharedComponentContentIdentity(files: [component])
+        let plan = try SharedComponentMigrationPlan(
+            modelFolder: "model-a",
+            manifest: SharedComponentInstalledModelManifest(
+                modelIdentity: "pro_custom:speed",
+                contentIdentity: content,
+                compatibilityIdentity: compatibility(content: content, capability: .encoderAndDecoder)
+            )
+        )
+        let store = SharedModelComponentStore(modelsRoot: models)
+        _ = try store.publish(content: content, from: source)
+        let blob = try store.blobURL(for: component.sha256)
+        XCTAssertTrue(try store.containsVerified(content), "the plan reuses the stored blob")
+
+        let uniqueFile = HuggingFaceDownloader.RepoFile(path: "model.bin", size: 12, sha256: nil)
+        let componentFile = HuggingFaceDownloader.RepoFile(
+            path: component.relativePath,
+            size: component.byteCount,
+            sha256: component.sha256
+        )
+        let toDownload = try HuggingFaceDownloader.pinReusedSharedComponents(
+            downloadFiles: [uniqueFile],
+            installedFiles: [uniqueFile, componentFile],
+            plan: plan,
+            store: store,
+            filesRoot: filesRoot
+        )
+        XCTAssertEqual(toDownload, [uniqueFile], "a pinned blob is not downloaded")
+        let pinned = filesRoot.appendingPathComponent(component.relativePath)
+        XCTAssertTrue(try sameFile(blob, pinned))
+
+        // Orphan, older than any grace, one store link: only the pin protects it.
+        XCTAssertEqual(
+            try store.reclaimUnreferencedComponents(gracePeriod: 0).preservedDigests,
+            [component.sha256]
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: blob.path))
+        // Pinning again (a relaunched download) is idempotent.
+        XCTAssertTrue(store.pinStoredComponent(component, at: pinned))
+
+        _ = try store.installStagedModel(plan, stagedModelURL: filesRoot) { _ in }
+        let visible = models.appendingPathComponent("model-a", isDirectory: true)
+            .appendingPathComponent(component.relativePath)
+        XCTAssertTrue(try sameFile(blob, visible))
+        XCTAssertEqual(try store.audit(modelFolder: "model-a").state, .healthy)
+
+        // A blob that vanished after planning is downloaded instead of pinned.
+        let missing = try identity(path: component.relativePath, bytes: Data("never-published".utf8))
+        let otherFilesRoot = root.appendingPathComponent("other-staging/files", isDirectory: true)
+        let missingPin = otherFilesRoot.appendingPathComponent(missing.relativePath)
+        XCTAssertFalse(store.pinStoredComponent(missing, at: missingPin))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: missingPin.path))
+        let missingContent = try SharedComponentContentIdentity(files: [missing])
+        let missingPlan = try SharedComponentMigrationPlan(
+            modelFolder: "model-b",
+            manifest: SharedComponentInstalledModelManifest(
+                modelIdentity: "pro_design:speed",
+                contentIdentity: missingContent,
+                compatibilityIdentity: compatibility(content: missingContent, capability: .decoderOnly)
+            )
+        )
+        let missingFile = HuggingFaceDownloader.RepoFile(
+            path: missing.relativePath,
+            size: missing.byteCount,
+            sha256: missing.sha256
+        )
+        XCTAssertEqual(
+            try HuggingFaceDownloader.pinReusedSharedComponents(
+                downloadFiles: [uniqueFile],
+                installedFiles: [uniqueFile, missingFile],
+                plan: missingPlan,
+                store: store,
+                filesRoot: otherFilesRoot
+            ),
+            [uniqueFile, missingFile]
+        )
+    }
+
+    /// A publication's `staging/<uuid>/` directory keeps its creation ctime while the blob inside
+    /// is still being written or hashed; the sweep judges the entry by its newest child.
+    func testStagingSweepJudgesAnEntryByItsNewestChild() throws {
+        let root = try temporaryDirectory("staging-newest-child")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SharedModelComponentStore(
+            modelsRoot: root.appendingPathComponent("models", isDirectory: true)
+        )
+        let publication = store.storeRoot.appendingPathComponent("staging/in-progress", isDirectory: true)
+        let blob = publication.appendingPathComponent("blob")
+        try write(Data("partial".utf8), to: blob)
+        Thread.sleep(forTimeInterval: 0.8)
+        // Writing in place changes the file's ctime but not its directory's.
+        let handle = try FileHandle(forWritingTo: blob)
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data("-more".utf8))
+        try handle.close()
+
+        _ = try store.reclaimUnreferencedComponents(gracePeriod: 0.5)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: publication.path))
+
+        _ = try store.reclaimUnreferencedComponents(gracePeriod: 0)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: publication.path))
     }
 
     /// Automatic reclamation never takes a component an install in flight may still need: a blob

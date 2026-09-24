@@ -157,10 +157,19 @@ final class HistoryPersistenceErrorTests: XCTestCase {
         XCTAssertEqual(try queue.read { try Generation.fetchCount($0) }, 0)
     }
 
+    /// File-backed, as History is: GRDB observes the suspension notifications
+    /// only for a queue opened on a path, never for an in-memory one.
     private func makeSuspendableQueue() throws -> DatabaseQueue {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("HistorySuspension-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
         var configuration = Configuration()
         configuration.observesSuspensionNotifications = true
-        let queue = try DatabaseQueue(configuration: configuration)
+        let queue = try DatabaseQueue(
+            path: directory.appendingPathComponent("history.sqlite").path,
+            configuration: configuration
+        )
         try GenerationMigrations.makeMigrator().migrate(queue)
         return queue
     }

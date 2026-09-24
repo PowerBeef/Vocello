@@ -318,7 +318,9 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         roots.append(root)
         var configuration = Configuration()
         configuration.observesSuspensionNotifications = suspendable
-        let queue = try DatabaseQueue(configuration: configuration)
+        // File-backed, as History is: GRDB never observes suspension for an
+        // in-memory queue.
+        let queue = try DatabaseQueue(path: root.appendingPathComponent("history.sqlite").path, configuration: configuration)
         try GenerationMigrations.makeMigrator().migrate(queue)
         let plan = try LongFormPlanner.plan(
             spokenTextPlan: SpokenTextPlanner.plan(originalText: "First sentence. Second sentence."),

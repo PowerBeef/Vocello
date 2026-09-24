@@ -320,7 +320,11 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         let fixture = try makeFixture()
         var configuration = Configuration()
         configuration.observesSuspensionNotifications = true
-        let queue = try DatabaseQueue(configuration: configuration)
+        // File-backed: GRDB never observes suspension for an in-memory queue.
+        let queue = try DatabaseQueue(
+            path: fixture.store.rootURL.deletingLastPathComponent().appendingPathComponent("history.sqlite").path,
+            configuration: configuration
+        )
         try GenerationMigrations.makeMigrator().migrate(queue)
         let coordinator = GenerationHistoryRecoveryCoordinator(
             store: fixture.store,

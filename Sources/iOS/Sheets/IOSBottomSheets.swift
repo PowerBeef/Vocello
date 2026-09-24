@@ -1124,6 +1124,18 @@ struct IOSVoicePickerOption: Identifiable, Equatable {
 
 // MARK: - Reference clip picker
 
+/// Rebuilds its content whenever Saved Voices publishes. A bottom panel is
+/// built from a closure outside its presenter's body, so without this a Retry
+/// from the load-failure card would never replace the card with the list.
+struct IOSSavedVoicesObservingHost<Content: View>: View {
+    @EnvironmentObject private var savedVoicesViewModel: SavedVoicesViewModel
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+    }
+}
+
 /// Sources for a clone reference clip: record on-device or pick a saved voice.
 struct IOSReferenceClipSheet: View {
     let savedVoices: [IOSVoicePickerOption]
@@ -1132,6 +1144,10 @@ struct IOSReferenceClipSheet: View {
     var onRequestImport: () -> Void
     var onDismiss: (() -> Void)?
     var presentation: IOSBottomSheetPresentationStyle = .system
+    /// A failed Saved Voices load, shown with Retry instead of as an empty list
+    /// (PA-30; the Voices tab does the same since PA-21).
+    var savedVoicesLoadError: String? = nil
+    var onRetrySavedVoices: (() -> Void)? = nil
 
     var body: some View {
         IOSBottomSheetSurface(
@@ -1143,6 +1159,10 @@ struct IOSReferenceClipSheet: View {
             IOSScrollView(bottomFadeHeight: 0) {
                 VStack(alignment: .leading, spacing: 14) {
                     sourcePicker
+
+                    if savedVoices.isEmpty, let savedVoicesLoadError {
+                        savedVoicesLoadErrorCard(savedVoicesLoadError)
+                    }
 
                     if !savedVoices.isEmpty {
                         let recommended = savedVoices.filter(\.isRecommended)
@@ -1232,6 +1252,25 @@ struct IOSReferenceClipSheet: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private func savedVoicesLoadErrorCard(_ message: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            IOSEmptyStateCard(
+                title: IOSInterfaceText.savedVoicesLoadFailed,
+                message: message,
+                symbolName: "exclamationmark.triangle",
+                tint: .orange
+            )
+            if let onRetrySavedVoices {
+                Button(IOSInterfaceText.retry, action: onRetrySavedVoices)
+                    .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.modeClone)
+                    .accessibilityIdentifier("referenceClip_savedVoicesRetryButton")
+            }
+        }
+        .padding(.top, 6)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("referenceClip_savedVoicesErrorState")
     }
 
     private func savedVoicesHeader(_ title: String) -> some View {

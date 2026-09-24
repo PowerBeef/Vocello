@@ -169,7 +169,7 @@ mode segments, composer, and primary action; there is no hidden screen-presence 
 |---|---|
 | Custom | `studioChip_voice` → voice picker · `studioChip_delivery` · `studioChip_language` · `studioChip_seedPin` (only while a seed is pinned) |
 | Design | `studioChip_voiceBrief` → brief editor · `studioChip_delivery` · `studioChip_language` · `studioChip_seedPin` (conditional) |
-| Clone | `studioChip_reference` → saved voice, `referenceClip_recordNewClip`, or `referenceClip_importAudioFile` · `studioChip_bankDelivery` (only while a bank member is selected) · `studioChip_language` · `studioChip_seedPin` (conditional) |
+| Clone | `studioChip_reference` → saved voice, `referenceClip_recordNewClip`, or `referenceClip_importAudioFile` (a failed Saved Voices load shows `referenceClip_savedVoicesErrorState` with `referenceClip_savedVoicesRetryButton`, PA-30) · `studioChip_bankDelivery` (only while a bank member is selected) · `studioChip_language` · `studioChip_seedPin` (conditional) |
 
 `studioChip_seedPin` (DP-15) shows the pinned sampling seed; tapping offers the unpin
 confirmation, returning to a fresh seed per take. `studioChip_bankDelivery` (DP-16) shows the

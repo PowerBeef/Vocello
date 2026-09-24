@@ -178,8 +178,8 @@
       "path": "Sources/iOS/Sheets/IOSBottomSheets.swift",
       "screen": "Studio selector sheets",
       "scenario": "inventory",
-      "reason": "All speaker, delivery, language, reference, and model selector options use stable families.",
-      "interactiveOccurrenceCount": 2
+      "reason": "All speaker, delivery, language, reference, and model selector options, and the reference picker's Saved Voices load-failure Retry, use stable families.",
+      "interactiveOccurrenceCount": 3
     },
     {
       "path": "Sources/iOS/Sheets/IOSPlayerSheet.swift",
@@ -458,13 +458,13 @@
     },
     {
       "id": "reference-actions",
-      "identifierPattern": "referenceClip_(importAudioFile|recordNewClip)",
+      "identifierPattern": "referenceClip_(importAudioFile|recordNewClip|savedVoicesErrorState|savedVoicesRetryButton)",
       "sourceToken": "referenceClip_",
       "screen": "Clone reference picker",
       "prerequisite": "Clone selected",
       "role": "button",
-      "action": "Open Files or recording enrollment",
-      "expectedResult": "Enrollment flow opens without mutating draft on cancel",
+      "action": "Open Files or recording enrollment, or retry a failed Saved Voices load",
+      "expectedResult": "Enrollment flow opens without mutating draft on cancel; Retry reloads Saved Voices",
       "expectedSemantics": "Action label and explanatory hint",
       "minimumTargetPoints": 44,
       "mutationClass": "external-system",

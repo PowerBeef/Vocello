@@ -1723,32 +1723,46 @@ struct IOSVoiceCloningView: View {
     private func presentReferencePicker() {
         appModel.presentBottomPanel { bottomSafeAreaInset, availableHeight, dismiss in
             AnyView(
-                IOSReferenceClipSheet(
-                    savedVoices: savedVoiceOptions,
-                    selectedSavedVoiceID: Binding(
-                        get: { draft.selectedSavedVoiceID },
-                        set: { newValue in
-                            guard let id = newValue,
-                                  let voice = savedVoices.first(where: { $0.id == id })
-                            else { return }
-                            applySavedVoice(voice)
-                            dismiss()
+                IOSSavedVoicesObservingHost {
+                    IOSReferenceClipSheet(
+                        savedVoices: savedVoiceOptions,
+                        selectedSavedVoiceID: Binding(
+                            get: { draft.selectedSavedVoiceID },
+                            set: { newValue in
+                                guard let id = newValue,
+                                      let voice = savedVoices.first(where: { $0.id == id })
+                                else { return }
+                                applySavedVoice(voice)
+                                dismiss()
+                            }
+                        ),
+                        onRequestRecord: {
+                            appModel.requestCloneReferenceRecording(afterDismiss: dismiss)
+                        },
+                        onRequestImport: {
+                            appModel.requestCloneReferenceImport(afterDismiss: dismiss)
+                        },
+                        onDismiss: dismiss,
+                        presentation: .edgeToEdge(
+                            bottomSafeAreaInset: bottomSafeAreaInset,
+                            height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
+                        ),
+                        savedVoicesLoadError: savedVoicesLoadError,
+                        onRetrySavedVoices: {
+                            Task { await savedVoicesViewModel.refresh(using: ttsEngine) }
                         }
-                    ),
-                    onRequestRecord: {
-                        appModel.requestCloneReferenceRecording(afterDismiss: dismiss)
-                    },
-                    onRequestImport: {
-                        appModel.requestCloneReferenceImport(afterDismiss: dismiss)
-                    },
-                    onDismiss: dismiss,
-                    presentation: .edgeToEdge(
-                        bottomSafeAreaInset: bottomSafeAreaInset,
-                        height: IOSBottomSheetChrome.expandedHeight(forScreenHeight: availableHeight)
                     )
-                )
+                }
             )
         }
+    }
+
+    /// A failed Saved Voices load must not look like an empty list (PA-30); the
+    /// same condition as the Voices tab: shown while no saved voice is listed,
+    /// and a busy store retries on its own.
+    private var savedVoicesLoadError: String? {
+        guard savedVoicesViewModel.voices.isEmpty, !savedVoicesViewModel.isLoading else { return nil }
+        return savedVoicesViewModel.loadErrorMessage(IOSAppLanguage.shared.presentation)
     }
 
     private func presentBankDeliveryPicker(_ persona: VoiceBankCatalog.Persona) {

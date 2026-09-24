@@ -451,6 +451,7 @@ targets:
       - path: Sources/iOSSupport/Services/IOSAppLanguage.swift
       - path: Sources/iOS/Commerce/IOSCommercePresentationText.swift
       - path: Sources/iOS/Commerce/IOSStoreKitClient.swift
+      - path: Sources/iOSSupport/Services/IOSCommerceErrorDiagnostics.swift
       - path: Sources/iOSSupport/Services/IOSSettingsModelNavigation.swift
       - path: Sources/Services/MacFileSaveCopy.swift
       - path: Sources/Services/MacStudioGenerationRequestFactory.swift
@@ -544,6 +545,7 @@ targets:
       - path: Sources/iOSSupport/Services/IOSAppLanguage.swift
       - path: Sources/iOS/Commerce/IOSCommercePresentationText.swift
       - path: Sources/iOS/Commerce/IOSStoreKitClient.swift
+      - path: Sources/iOSSupport/Services/IOSCommerceErrorDiagnostics.swift
       - path: Sources/iOSSupport/Services/SavedVoicesBusyRetryPolicy.swift
     dependencies:
       - target: QwenVoiceCore

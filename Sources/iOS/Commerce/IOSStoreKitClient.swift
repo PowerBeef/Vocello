@@ -33,6 +33,9 @@ final class IOSStoreKitClient: IOSExportPurchaseClient {
             result = try await loadedProduct.purchase()
         } catch where Self.isUserCancellation(error) {
             return .cancelled
+        } catch {
+            IOSCommerceErrorDiagnostics.recordPurchaseFailure(error)
+            throw error
         }
         switch result {
         case .success(let verification):

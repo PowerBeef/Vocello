@@ -1,6 +1,6 @@
 import Foundation
 
-/// Shared benchmark matrix corpus + iteration spec for `vocello bench` and macOS XPC UI bench.
+/// Shared benchmark matrix corpus + iteration spec for `vocello bench` and the macOS UI bench.
 /// Keep identical to `benchmarks/baseline-*-length-sweep.md` and
 /// `scripts/summarize_generation_telemetry.py` len-bucket thresholds.
 public enum BenchMatrixSpec {

@@ -8,9 +8,9 @@ import Foundation
 /// layer appends one JSON line to `<appSupport>/diagnostics/<layer>/generations.jsonl`.
 ///
 /// Hardening notes (Phase 2b):
-/// - All file writes are wrapped in `NSFileCoordinator` so the app process and the
-///   engine-service / XPC helper don't corrupt shared JSONL files when they append
-///   concurrently.
+/// - All file writes are wrapped in `NSFileCoordinator` so concurrent writers (the
+///   app and the `vocello` CLI can share one diagnostics root) don't corrupt shared
+///   JSONL files when they append concurrently.
 /// - Errors are written to `stderr` instead of `stdout`, so they don't pollute the
 ///   CLI output stream (e.g., benchmark JSON capture).
 /// - The append path still creates files atomically when they don't exist.

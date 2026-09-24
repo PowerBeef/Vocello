@@ -68,7 +68,7 @@ public struct PartialGenerationStreamingIdentityV9: Codable, Hashable, Sendable 
 
 public enum PreviewPublicationDispositionV9: String, Codable, Hashable, Sendable {
     /// The PCM-bearing event was synchronously handed to the product sink. This
-    /// does not claim that an XPC client or player rendered it.
+    /// does not claim that a consumer or player rendered it.
     case publishedToProductSink = "published-to-product-sink"
     case notRequested = "not-requested"
     case unavailable
@@ -185,7 +185,8 @@ public struct PartialCodecFrameFlowV9: Codable, Hashable, Sendable {
     }
 }
 
-/// The current XPC row retains exact aggregate counters and the first/last
+/// The transport row (written by the retired XPC transport; in-process hosts
+/// leave it absent) retains exact aggregate counters and the first/last
 /// sequence, but not the complete observed sequence list.
 public struct PartialXPCTransportSummaryV9: Codable, Hashable, Sendable {
     public let chunksForwarded: Int

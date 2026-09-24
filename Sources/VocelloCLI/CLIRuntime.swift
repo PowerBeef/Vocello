@@ -1,10 +1,10 @@
 import Foundation
 import QwenVoiceCore
 
-/// In-process engine for the CLI. Mirrors `EngineServiceHost`'s runtime wiring
+/// In-process engine for the CLI. Mirrors `MacEngineBootstrap`'s runtime wiring
 /// (manifest → platform-expanded registry → `NativeRuntimeFactory.make` →
-/// `engine.initialize`) but without XPC — the CLI links `QwenVoiceCore` and
-/// drives `MLXTTSEngine` directly.
+/// `engine.initialize`) — the CLI links `QwenVoiceCore` and drives
+/// `MLXTTSEngine` directly.
 /// Read-only runtime context (registry + model asset store) for commands that
 /// don't generate audio.
 @MainActor
@@ -33,7 +33,7 @@ struct CLIRuntime {
         let deviceClass = NativeMemoryPolicyResolver.deviceClass()
         let registry = try ContractBackedModelRegistry(manifestURL: manifestURL)
             .expandedForPlatform(.macOS, deviceClass: deviceClass, includeBaseAliases: true)
-        // Same tiered prewarm policy as the XPC host: defer the dedicated custom
+        // Same tiered prewarm policy as the macOS app: defer the dedicated custom
         // prewarm on the 8 GB floor tier (the work folds into the first generation).
         let customPrewarmPolicy: NativeCustomPrewarmPolicy =
             deviceClass == .floor8GBMac ? .skipDedicatedCustomPrewarm : .eager

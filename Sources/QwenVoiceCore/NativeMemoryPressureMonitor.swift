@@ -163,10 +163,9 @@ actor NativeMemoryPressureResponseExecutor {
 }
 
 /// Subscribes to kernel memory-pressure events and publishes the translated
-/// `NativeMemoryTrimLevel` to interested consumers. macOS uses it for the
-/// XPC engine process on 8 GB and 16 GB Macs; iOS uses it in the app process
-/// (the engine runs in-process) so MLX can shed cache based on kernel pressure
-/// events.
+/// `NativeMemoryTrimLevel` to interested consumers. macOS starts it for the
+/// in-process engine on 8 GB and 16 GB Macs; iOS starts it in the app process
+/// too, so MLX can shed cache based on kernel pressure events.
 ///
 /// Mapping from kernel pressure event to trim level:
 ///

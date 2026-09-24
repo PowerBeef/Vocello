@@ -10,9 +10,10 @@ import Foundation
 /// - `QWENVOICE_DEBUG` env var (`1` / `true` / `on` / `yes`) — mirrors `DebugMode`'s env
 ///   key, so `scripts/build.sh run` lights up every process it launches.
 /// - `QWENVOICE_NATIVE_TELEMETRY_MODE` set to `light` / `lightweight` (back-compat).
-/// - A handshake override (`applyHandshakeMode(_:)`): the app process resolves its own
-///   environment mode and passes it to engine processes over the IPC `initialize`
-///   handshake. The host applies it on receipt, so `verbose` reaches the engine too.
+/// - An in-process override (`applyHandshakeMode(_:)`): `vocello bench` latches its
+///   `--telemetry` mode so `verbose` reaches the engine even if `isEnabled` was already
+///   resolved. The name predates the retired XPC `initialize` handshake; every host now
+///   runs the engine in its own process.
 public enum TelemetryGate {
     private static let environmentKey = "QWENVOICE_DEBUG"
     private static let telemetryModeKey = "QWENVOICE_NATIVE_TELEMETRY_MODE"
@@ -25,7 +26,8 @@ public enum TelemetryGate {
     nonisolated(unsafe) private static var handshakeMode: NativeTelemetryMode?
 
     /// Master on/off for durable telemetry persistence in this process.
-    /// True if the environment enabled it, or a host learned the toggle over IPC.
+    /// True if the environment enabled it, or a host latched a mode through
+    /// `applyHandshakeMode(_:)`.
     public static var resolvedEnabled: Bool {
         if isEnabled { return true }
         lock.lock()
@@ -33,10 +35,10 @@ public enum TelemetryGate {
         return handshakeOverride
     }
 
-    /// Called by an engine-process host with the app's resolved telemetry **mode**.
-    /// The environment (`QWENVOICE_NATIVE_TELEMETRY_MODE`) does not cross the process
-    /// boundary, so `verbose` (raw per-sample sidecar) would otherwise never reach the
-    /// engine — this carries it. One-way latch; `.off` is ignored.
+    /// Called by a host (today `vocello bench`) to latch a telemetry **mode** in this
+    /// process. `isEnabled` is resolved once from the environment, possibly before the
+    /// host parsed its flags, so `verbose` (raw per-sample sidecar) could otherwise miss
+    /// the engine — this carries it. One-way latch; `.off` is ignored.
     public static func applyHandshakeMode(_ mode: NativeTelemetryMode) {
         guard mode != .off else { return }
         lock.lock()
@@ -45,25 +47,24 @@ public enum TelemetryGate {
         handshakeMode = mode
     }
 
-    /// The mode learned over the handshake (engine processes), or nil app-side.
+    /// The latched mode, or nil when no host latched one.
     public static var handshakeResolvedMode: NativeTelemetryMode? {
         lock.lock()
         defer { lock.unlock() }
         return handshakeMode
     }
 
-    /// The telemetry **mode** as seen from the **app process** — the env mode if set
-    /// explicitly, else `.lightweight` when the explicit process gate
-    /// is on, else `.off`. The client ships this over the handshake.
+    /// The telemetry **mode** for this process — `NativeTelemetryMode.current()` (the
+    /// env mode, else a latched mode) when it is not `.off`, else `.lightweight` when
+    /// the explicit process gate is on, else `.off`.
     public static var appProcessIntendedMode: NativeTelemetryMode {
         let envMode = NativeTelemetryMode.current()
         if envMode != .off { return envMode }
         return appProcessIntendedEnabled ? .lightweight : .off
     }
 
-    /// The telemetry decision as seen from the app process. It is shipped to
-    /// engine hosts on the initialize handshake because environment values do
-    /// not automatically cross an XPC process boundary.
+    /// The telemetry decision from this process's environment, ignoring any
+    /// latched mode.
     public static var appProcessIntendedEnabled: Bool {
         isEnabled
     }

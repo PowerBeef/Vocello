@@ -14,8 +14,8 @@ import Foundation
 /// the chunk and the AudioSeal watermark flip on together (one byte-identity
 /// discontinuity for the fixed-seed evidence methodology).
 public enum WAVProvenanceChunk {
-    /// Marketing version of the process embedding the chunk (app, XPC engine
-    /// service, or CLI; all targets carry `MARKETING_VERSION`). `nil` when the
+    /// Marketing version of the process embedding the chunk (the macOS or iOS
+    /// app, or the CLI; all targets carry `MARKETING_VERSION`). `nil` when the
     /// host bundle has no version so the field is omitted rather than invented.
     public static let generatorVersion: String? = {
         guard let raw = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,

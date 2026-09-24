@@ -474,6 +474,8 @@ public struct ChunkInterarrivalStatisticsV9: Hashable, Codable, Sendable {
     }
 }
 
+/// Transport summary recorded by the retired XPC transport. Kept so recorded v9
+/// projections still decode; in-process hosts leave `transport` nil.
 public struct XPCTransportSummaryV9: Hashable, Codable, Sendable {
     public let observedSequences: [UInt64]
     public let maximumBacklog: Int

@@ -10,7 +10,7 @@ import OSLog
 // MARK: - QwenVoiceCore Runtime Ownership
 //
 // `GenerationOutputAdapter` is now owned by `QwenVoiceCore` and is
-// shared by the active macOS XPC service and the iPhone in-process engine.
+// shared by every in-process engine host (macOS app, iOS app, `vocello` CLI).
 // Keep behavior changes here aligned with the platform host adapters.
 
 protocol GenerationOutputAdapting {
@@ -113,7 +113,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
     private let initialMLXMemorySnapshots: [String: NativeMLXMemorySnapshot]
     private let requestReceipt: GenerationRequestReceipt
     private let pcmScratchBuffer: PCM16ScratchBuffer?
-    /// Sendable holder for the engine process's app-support directory; read at
+    /// Sendable holder for the engine's app-support directory; read at
     /// telemetry-write time so the rescued `TelemetrySummary` lands under
     /// `diagnostics/engine/generations.jsonl`. `nil` for callers that don't supply it.
     private let diagnosticAppSupportBox: DiagnosticAppSupportBox?
@@ -1146,7 +1146,7 @@ private final class PCM16ChunkFileWriter {
             )
             try file.write(from: buffer)
         }
-        // Force the kernel to commit the completed WAV so cross-process
+        // Force the kernel to commit the completed WAV so independent
         // readers (the UI's AVAudioFile(forReading:) in
         // AudioPlayerViewModel.loadPCMBuffer) observe a non-zero-length file.
         // Without this, chunk consumers intermittently saw audioFile.length
@@ -1674,8 +1674,8 @@ struct StreamingExecutionContext: Sendable {
                             streamSessionDirectory: sessionDirectory.path,
                             previewAudio: previewAudio,
                             // Transport sequencing is zero-based: the first
-                            // emitted chunk is index 0, matching the XPC gap
-                            // detector and accumulator contract.
+                            // emitted chunk is index 0, matching the transport
+                            // gap-detection contract (`chunkSequence`).
                             chunkSequence: UInt64(transportSequence)
                         )
                     )

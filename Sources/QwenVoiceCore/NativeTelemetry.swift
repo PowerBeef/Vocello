@@ -179,7 +179,7 @@ public func currentTaskQOSNotes() -> [String: String] {
 /// the darwin task role (the field `taskpolicy -c` clamps), the main thread's
 /// QoS class, and the unix nice value. Added by the 2026-07-23 pipeline-pacing
 /// diagnosis: identical -O engine code measured RTF 1.81 in an interactive
-/// process versus ~0.75 inside the XPC service, and no unprivileged external
+/// process versus ~0.75 inside the since-retired XPC service, and no unprivileged external
 /// tool can read another process's role — self-reporting makes class demotion
 /// visible in every generation row.
 public func currentProcessSchedulingNotes() -> [String: String] {

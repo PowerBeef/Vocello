@@ -742,10 +742,11 @@ public struct GenerationMemoryMetrics: Hashable, Codable, Sendable {
 
 /// One durable telemetry row for a single generation, written by one layer.
 ///
-/// Every layer (engine / engine-service / app) emits its own
-/// record keyed by the same `generationID` (threaded app → engine, see
-/// `NativeEngineRuntime`), so the per-layer JSONL streams join cleanly into the
-/// unified `generations-merged.jsonl` (`layer == "merged"`).
+/// Every layer (engine / app; `engine-service` only in rows from the retired
+/// XPC service) emits its own record keyed by the same `generationID`
+/// (threaded app → engine, see `NativeEngineRuntime`), so the per-layer JSONL
+/// streams join cleanly into the unified `generations-merged.jsonl`
+/// (`layer == "merged"`).
 ///
 /// Naming note: deliberately avoids the `Probe`/`Benchmark` tokens banned by
 /// `scripts/check_project_inputs.sh`.

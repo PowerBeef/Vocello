@@ -1,6 +1,6 @@
 import Foundation
 
-/// Bench metadata stamped into telemetry `notes` when macOS XPC UI bench env vars are set.
+/// Bench metadata stamped into telemetry `notes` when the macOS bench env vars are set.
 public enum BenchRunContext {
     private static let runIDKey = "QVOICE_MAC_BENCH_RUN_ID"
     private static let takeIndexKey = "QVOICE_MAC_BENCH_TAKE_INDEX"
@@ -22,10 +22,10 @@ public enum BenchRunContext {
         guard TelemetryGate.resolvedEnabled else { return [:] }
         var notes = notesFromEnvironment(intendedWarmState: intendedWarmState)
         if let fileNotes = currentTakeFileNotes() {
-            // The engine service keeps the environment from its first launch,
-            // while the benchmark advances multiple warm takes in that same
-            // process. The current-take file is therefore authoritative for
-            // the fields it carries.
+            // The process keeps the environment from its launch, while the
+            // benchmark advances multiple warm takes in that same process. The
+            // current-take file is therefore authoritative for the fields it
+            // carries.
             for (key, value) in fileNotes {
                 notes[key] = value
             }
@@ -36,9 +36,9 @@ public enum BenchRunContext {
     /// Bench driver writes a current-take manifest in temporary storage so
     /// warm-session takes still stamp take index + cell without relaunching.
     ///
-    /// macOS deliberately uses the global temporary directory because the app,
-    /// CLI, and XPC service must share this file. iOS runs the engine in-process
-    /// and must use its sandbox-owned temporary directory.
+    /// macOS keeps the fixed path in the global temporary directory that its
+    /// bench tooling has always used; the app and the CLI both run the engine
+    /// in-process. iOS must use its sandbox-owned temporary directory.
     public static func writeCurrentTakeFile(
         takeIndex: Int,
         cell: String,

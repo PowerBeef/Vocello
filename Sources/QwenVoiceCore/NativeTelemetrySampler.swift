@@ -37,7 +37,9 @@ public enum TelemetrySampleKind: String, Hashable, Codable, Sendable {
 }
 
 /// Stable process ownership for memory samples. The absolute uptime timestamp
-/// lets app/XPC/engine samplers align rows without sharing a relative clock.
+/// lets samplers in different processes align rows without sharing a relative
+/// clock. `engineService` survives only to decode rows from the retired XPC
+/// engine service.
 public enum TelemetryProcessRole: String, Hashable, Codable, Sendable {
     case app
     case engine
@@ -106,7 +108,7 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
     /// Actual capture time relative to the shared generation clock.
     public let capturedElapsedNS: UInt64?
     /// Absolute monotonic system-uptime clock. Unlike `capturedElapsedNS`, this
-    /// value is comparable across app, XPC, and engine processes on one boot.
+    /// value is comparable across processes on one boot.
     public let capturedUptimeNS: UInt64?
     /// `max(capturedElapsedNS - scheduledElapsedNS, 0)` for periodic samples.
     public let latenessNS: UInt64?

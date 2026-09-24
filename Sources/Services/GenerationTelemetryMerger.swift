@@ -17,7 +17,7 @@ import QwenVoiceCore
 enum GenerationTelemetryMerger {
     private static let mergedFileName = "generations-merged.jsonl"
     // Audit J1: 3 s of polling at .background priority was not enough — under
-    // bench load the app/engine-service layer writes (themselves detached
+    // bench load the app and engine layer writes (themselves detached
     // background tasks) get starved past the window, the merge gave up, and the
     // flush marker advanced with the app row still unwritten; the bench's next
     // relaunch then terminated the app mid-write. .utility + a 15 s window keeps

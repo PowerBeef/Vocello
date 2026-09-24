@@ -5,10 +5,10 @@ import Foundation
 
 // MARK: - QwenVoiceCore Runtime Ownership
 //
-// Audio normalization is owned by `QwenVoiceCore` and shared by the active
-// macOS XPC service and the iPhone in-process engine. `AudioPreparationRequest`
-// is defined in `SemanticTypes.swift`; this file owns the concrete native
-// normalization service used by both platforms.
+// Audio normalization is owned by `QwenVoiceCore` and shared by every host
+// that runs the engine in-process (macOS app, iOS app, `vocello` CLI).
+// `AudioPreparationRequest` is defined in `SemanticTypes.swift`; this file owns
+// the concrete native normalization service used by both platforms.
 
 public enum AudioPreparationError: LocalizedError, Equatable {
     case missingInputFile(String)

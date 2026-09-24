@@ -1059,9 +1059,9 @@ public enum NativeTelemetryMode: String, Hashable, Codable, Sendable {
         case "light", "lightweight":
             return .lightweight
         default:
-            // No explicit env mode. In an engine process the app's mode arrives over
-            // the IPC handshake (env can't cross the process boundary) — honor it so
-            // `verbose` actually reaches the engine. Otherwise follow the master gate.
+            // No explicit env mode. A mode latched in-process through
+            // `TelemetryGate.applyHandshakeMode` (`vocello bench`) wins so
+            // `verbose` reaches the engine. Otherwise follow the master gate.
             if let handshakeMode = TelemetryGate.handshakeResolvedMode {
                 return handshakeMode
             }
@@ -1091,8 +1091,8 @@ public enum NativeStreamingOutputPolicy: String, Hashable, Codable, Sendable {
 /// Audio files on disk are unaffected; only the in-flight preview data
 /// carried by `GenerationEvent.chunk` is controlled here. **Defaults to
 /// `.emit` on every platform** — iOS streaming-playback consumes this PCM
-/// to play audio live during generation, and the iOS engine runs
-/// in-process so the bytes never cross XPC/JSON (the old `.skip` default
+/// to play audio live during generation, and every engine runs
+/// in-process so the bytes are never serialized (the old `.skip` default
 /// was a dead-extension-era artifact). Set `QWENVOICE_STREAMING_PREVIEW_DATA=off`
 /// to suppress it (e.g. to isolate memory in a benchmark).
 public enum NativeStreamingPreviewDataPolicy: String, Hashable, Codable, Sendable {

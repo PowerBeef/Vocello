@@ -1090,11 +1090,11 @@ enum MacInterfaceText {
     }
     static var readinessEngineStarting: String {
         localization.string(localized: "vocello.mac.readiness.engineStarting", defaultValue: "Engine starting",
-               comment: "macOS interface: readiness title while the engine service starts. Presentation only.")
+               comment: "macOS interface: readiness title while the engine starts. Presentation only.")
     }
     static var readinessEngineStartingDetail: String {
         localization.string(localized: "vocello.mac.readiness.engineStartingDetail", defaultValue: "The engine is still preparing.",
-               comment: "macOS interface: readiness detail while the engine service starts. Presentation only.")
+               comment: "macOS interface: readiness detail while the engine starts. Presentation only.")
     }
     static var readinessInstallActiveModel: String {
         localization.string(localized: "vocello.mac.readiness.installActiveModel", defaultValue: "Install the active model",

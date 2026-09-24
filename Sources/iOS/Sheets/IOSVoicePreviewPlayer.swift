@@ -45,7 +45,9 @@ final class IOSVoicePreviewPlayer: NSObject, ObservableObject {
     /// and plays it. Returns silently when the WAV is missing — the
     /// asset set may be incomplete during development.
     func play(voiceID: String) {
-        stop()
+        // Keep the session claim: switching samples renews it instead of
+        // deactivating and reactivating the session between two previews.
+        stopPlayer()
 
         guard let url = Bundle.main.url(
             forResource: voiceID,
@@ -61,11 +63,12 @@ final class IOSVoicePreviewPlayer: NSObject, ObservableObject {
             if TelemetryGate.resolvedEnabled {
                 print("[IOSVoicePreviewPlayer] No sample WAV for voice id '\(voiceID)' under voice-previews/")
             }
+            stop()
             return
         }
 
         do {
-            sessionClaim = try IOSAudioSessionOwner.shared.activate(.mixablePreview)
+            sessionClaim = try IOSAudioSessionOwner.shared.activate(.mixablePreview, renewing: sessionClaim)
             IOSPlaybackExclusivity.didStartPlayback(self)
 
             let player = try AVAudioPlayer(contentsOf: url)
@@ -83,11 +86,15 @@ final class IOSVoicePreviewPlayer: NSObject, ObservableObject {
     }
 
     func stop() {
+        stopPlayer()
+        IOSAudioSessionOwner.shared.release(sessionClaim)
+        sessionClaim = nil
+    }
+
+    private func stopPlayer() {
         player?.stop()
         player = nil
         currentlyPlayingID = nil
-        IOSAudioSessionOwner.shared.release(sessionClaim)
-        sessionClaim = nil
     }
 }
 

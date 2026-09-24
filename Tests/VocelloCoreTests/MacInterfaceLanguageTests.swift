@@ -95,6 +95,47 @@ final class MacInterfaceLanguageTests: XCTestCase {
         }
     }
 
+    /// PA-20 (MAC-06): engine display strings keep their English identities in
+    /// QwenVoiceCore while the Mac interface renders catalog copy. The English
+    /// catalog copy must stay in step with those identities.
+    func testEngineDisplayStringsMatchTheirEnglishIdentities() {
+        for language in Qwen3SupportedLanguage.allCases {
+            XCTAssertEqual(MacInterfaceText.languageName(language), language.displayName)
+        }
+        for preset in EmotionPreset.all {
+            XCTAssertEqual(MacInterfaceText.presetName(id: preset.id), preset.label)
+        }
+        XCTAssertNil(MacInterfaceText.presetName(id: "retired"))
+        XCTAssertEqual(MacInterfaceText.deliveryDurationAdvisory, DeliveryInstructionAdvisor.advisoryMessage)
+        let tokens = ["reference_duration_short", "reference_duration_long",
+                      "reference_duration_excessive", "reference_quality_unreadable"]
+        for token in tokens + ["unknown_token"] {
+            XCTAssertEqual(MacInterfaceText.qualityWarningHeadline(token: token), PreparedVoiceQualityWarning.headline(for: token))
+        }
+        for set in [[], ["reference_duration_short"], ["reference_duration_long", "reference_quality_unreadable"],
+                    ["reference_duration_excessive"], ["unknown_token"]] {
+            XCTAssertEqual(MacInterfaceText.qualityWarningSummary(tokens: set), PreparedVoiceQualityWarning.summary(for: set))
+        }
+    }
+
+    func testEngineDisplayStringsFollowTheInterfaceLanguage() {
+        MacInterfaceLanguage.select(IOSUILanguage.french.rawValue)
+        XCTAssertEqual(MacInterfaceText.languageName(.english), "Anglais")
+        XCTAssertEqual(MacInterfaceText.languageName(.french), "Français")
+        XCTAssertNotEqual(MacInterfaceText.deliveryDurationAdvisory, DeliveryInstructionAdvisor.advisoryMessage)
+        XCTAssertNotEqual(MacInterfaceText.presetName(id: "calm"), "Calm")
+        let summary = MacInterfaceText.qualityWarningSummary(tokens: ["reference_duration_excessive"])
+        XCTAssertTrue(summary.hasPrefix("Le clonage vocal"), summary)
+        XCTAssertNotEqual(MacInterfaceText.historySuggestedVoiceName("Vivian"), "Vivian Sample")
+        XCTAssertTrue(MacInterfaceText.historySuggestedVoiceName("Vivian").contains("Vivian"))
+        // Typed engine failures follow the Mac owner too (MAC-07).
+        XCTAssertNotEqual(
+            MacInterfaceText.generationFailureMessage(TTSEngineError.insufficientMemory("raw")),
+            VocelloPresentationText().generationFailureMessage(TTSEngineError.insufficientMemory("raw"))
+        )
+        MacInterfaceLanguage.select(IOSAppLanguage.system)
+    }
+
     func testCompiledRussianAndEastAsianPlurals() {
         let bundle = Bundle(for: Self.self)
         let russian = VocelloPresentationText(localization: VocelloLocalization(bundle: bundle, language: "ru"))

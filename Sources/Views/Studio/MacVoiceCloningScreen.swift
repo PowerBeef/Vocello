@@ -598,14 +598,14 @@ struct MacVoiceCloningScreen: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("voiceCloning_referenceWarning")
         .accessibilityHint(
-            selectedVoice?.qualityWarnings.first.flatMap(PreparedVoiceQualityWarning.headline(for:)) ?? shortLabel
+            selectedVoice?.qualityWarnings.first.flatMap { MacInterfaceText.qualityWarningHeadline(token: $0) } ?? shortLabel
         )
         .popover(isPresented: $showsWarningDetails, arrowEdge: .top) {
             VStack(alignment: .leading, spacing: MacTheme.Spacing.snug) {
                 Label(MacInterfaceText.voicesReferenceOutsideRange, systemImage: "exclamationmark.triangle.fill")
                     .macType(.screenTitle)
                     .foregroundStyle(MacTheme.Status.guarded)
-                Text(PreparedVoiceQualityWarning.summary(for: selectedVoice?.qualityWarnings ?? [token]))
+                Text(MacInterfaceText.qualityWarningSummary(tokens: selectedVoice?.qualityWarnings ?? [token]))
                     .macType(.body)
                     .fixedSize(horizontal: false, vertical: true)
             }

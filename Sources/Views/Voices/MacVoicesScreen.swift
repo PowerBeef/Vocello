@@ -199,7 +199,7 @@ struct MacVoicesScreen: View {
     private func rowCaption(for voice: Voice, bankCatalog: VoiceBankCatalog) -> String {
         if let persona = bankCatalog.persona(containing: voice.id) {
             let delivery = persona.presetID(for: voice.id)
-                .flatMap { EmotionPreset.preset(id: $0)?.label }
+                .flatMap { MacInterfaceText.presetName(id: $0) }
                 ?? MacInterfaceText.deliveryNeutral
             return MacInterfaceText.voicesVoiceBank(delivery)
         }
@@ -367,7 +367,7 @@ private struct MacVoiceRow: View {
     }
 
     private var qualityHeadline: String? {
-        voice.qualityWarnings.first.flatMap(PreparedVoiceQualityWarning.headline(for:))
+        voice.qualityWarnings.first.flatMap { MacInterfaceText.qualityWarningHeadline(token: $0) }
     }
 
     var body: some View {
@@ -497,7 +497,7 @@ private struct MacVoiceRowMetadata: View {
                 .macType(.screenTitle)
                 .foregroundStyle(MacTheme.Status.guarded)
 
-            Text(PreparedVoiceQualityWarning.summary(for: qualityWarnings))
+            Text(MacInterfaceText.qualityWarningSummary(tokens: qualityWarnings))
                 .macType(.body)
                 .fixedSize(horizontal: false, vertical: true)
 

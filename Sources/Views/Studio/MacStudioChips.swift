@@ -35,7 +35,7 @@ struct MacDeliverySelection: Equatable {
             let trimmed = customText.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? MacInterfaceText.emotionCustom : trimmed
         }
-        return selectedPreset(for: emotion)?.label ?? emotion
+        return selectedPreset(for: emotion).flatMap { MacInterfaceText.presetName(id: $0.id) } ?? emotion
     }
 }
 
@@ -182,7 +182,7 @@ struct MacStudioDeliveryFooter: View {
                     }
 
                 if DeliveryInstructionAdvisor.hasDurationDirective(selection.customText) {
-                    Label(DeliveryInstructionAdvisor.advisoryMessage, systemImage: "exclamationmark.triangle")
+                    Label(MacInterfaceText.deliveryDurationAdvisory, systemImage: "exclamationmark.triangle")
                         .macType(.caption)
                         .foregroundStyle(MacTheme.Status.guarded)
                         .accessibilityIdentifier("\(accessibilityPrefix)_durationAdvisory")
@@ -212,18 +212,23 @@ struct MacStudioLanguageChip: View {
     var body: some View {
         let options = Qwen3SupportedLanguage.allCases
         let recommended: Qwen3SupportedLanguage? = detectedLanguage == .auto ? nil : detectedLanguage
-        let label = LanguageSelectionPresentation.buttonLabel(selected: selectedLanguage, detected: detectedLanguage)
+        let label = MacInterfaceText.languageName(
+            LanguageSelectionPresentation.effective(selected: selectedLanguage, detected: detectedLanguage)
+        )
         MacStudioSetupChip(
             eyebrow: isFollowingDetection ? MacInterfaceText.languageAutoDetail : MacInterfaceText.sectionLanguage,
             value: label,
             leadingSymbol: "globe",
             tint: tint,
             accessibilityIdentifier: accessibilityIdentifier,
-            accessibilityValue: isFollowingDetection ? "\(label), auto" : label
+            accessibilityValue: isFollowingDetection ? "\(label), \(MacInterfaceText.languageAuto)" : label
         ) {
             if let recommended {
                 Section(MacInterfaceText.recommendedForScript) {
-                    languageRow(recommended, title: MacInterfaceText.workflowDetectedLanguage(recommended.displayName))
+                    languageRow(
+                        recommended,
+                        title: MacInterfaceText.workflowDetectedLanguage(MacInterfaceText.languageName(recommended))
+                    )
                 }
                 Section(MacInterfaceText.workflowAllLanguages) {
                     ForEach(options.filter { $0 != recommended }, id: \.self) { language in
@@ -240,7 +245,7 @@ struct MacStudioLanguageChip: View {
 
     private func languageRow(_ language: Qwen3SupportedLanguage, title: String? = nil) -> some View {
         Toggle(
-            title ?? language.displayName,
+            title ?? MacInterfaceText.languageName(language),
             isOn: Binding(
                 get: { selectedLanguage == language },
                 set: { _ in selectedLanguage = language }

@@ -119,7 +119,8 @@ enum SavedVoiceNameSanitizer {
 }
 
 enum SavedVoiceNameSuggestion {
-    static let designedVoiceFallback = "Designed_Voice"
+    /// Interface-language fallback (`vocello.mac.savedVoice.designedVoiceFallback`).
+    static var designedVoiceFallback: String { MacInterfaceText.savedVoiceDesignedVoiceFallback }
 
     static func designResultName(
         from voiceDescription: String,
@@ -395,7 +396,7 @@ struct MacSavedVoiceSheet: View {
                     Text(VocelloPresentationText.referenceLanguagePlaceholder)
                         .tag(Qwen3SupportedLanguage.auto)
                     ForEach(Qwen3SupportedLanguage.selectableCases, id: \.self) { language in
-                        Text(language.displayName).tag(language)
+                        Text(MacInterfaceText.languageName(language)).tag(language)
                     }
                 }
                 .labelsHidden()
@@ -790,7 +791,7 @@ struct MacSavedVoiceSheet: View {
     }
 
     private func reviewAlertMessage(for candidate: PreparedVoiceCandidate) -> String {
-        errorMessage ?? PreparedVoiceQualityWarning.summary(for: candidate.qualityWarnings)
+        errorMessage ?? MacInterfaceText.qualityWarningSummary(tokens: candidate.qualityWarnings)
     }
 }
 

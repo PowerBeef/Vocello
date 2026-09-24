@@ -102,7 +102,11 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
   model-driven labels (sidebar items and sections, variant names, model statuses, readiness copy,
   batch and alert text) read the catalog too, through the owner's hand-maintained `modeName`,
   `qualityWarningShortLabel` and `activityLabel` helpers, so `GenerationMode.displayName` and
-  `EngineActivityLabels` stay English identities for the engine, CLI and telemetry. The validator
+  `EngineActivityLabels` stay English identities for the engine, CLI and telemetry. Since PA-20
+  the speech-language names, saved-voice quality warnings, the delivery duration advisory, voice-bank
+  preset names and suggested voice names follow the same rule (`languageName`, `presetName`,
+  `qualityWarningHeadline`, `qualityWarningSummary`), and `MacInterfaceLanguageTests` holds their
+  English copy equal to the QwenVoiceCore identities. The validator
   binds every `vocello.mac.` key to exactly one default there, like the iOS and shared prefixes.
   Numeric-only displays (timers, counts, seeds) use `Text(verbatim:)` so they never become catalog
   keys. During a macOS UI lane, doubled or UPPERCASE text is the pseudo-localization diagnostic, not

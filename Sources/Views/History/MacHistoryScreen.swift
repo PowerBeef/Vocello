@@ -75,7 +75,7 @@ private struct MacHistoryListItem: Identifiable, Sendable {
     private static func suggestedSavedVoiceName(for generation: Generation) -> String {
         if let voice = generation.voice?.trimmingCharacters(in: .whitespacesAndNewlines),
            !voice.isEmpty {
-            return "\(voice) Sample"
+            return MacInterfaceText.historySuggestedVoiceName(voice)
         }
         return URL(fileURLWithPath: generation.audioPath)
             .deletingPathExtension()

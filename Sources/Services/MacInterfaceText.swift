@@ -1972,6 +1972,179 @@ enum MacInterfaceText {
     // Hand-maintained: each branch reads a catalog entry above, so enum cases and
     // engine activity labels reach the interface language without leaving the owner.
 
+    // MARK: Engine display strings (PA-20, MAC-06)
+    // QwenVoiceCore keeps English identities (`Qwen3SupportedLanguage.displayName`,
+    // `PreparedVoiceQualityWarning`, `DeliveryInstructionAdvisor.advisoryMessage`,
+    // `EmotionPreset.label`) for the engine, CLI and telemetry; the Mac interface
+    // renders them through these catalog helpers.
+
+    static var languageAuto: String {
+        localization.string(localized: "vocello.mac.language.auto", defaultValue: "Auto",
+               comment: "macOS interface: language menu option that follows the detected language. Presentation only.")
+    }
+    static var languageChinese: String {
+        localization.string(localized: "vocello.mac.language.chinese", defaultValue: "Chinese",
+               comment: "macOS interface: display name of a speech language. Presentation only.")
+    }
+    static var languageEnglish: String {
+        localization.string(localized: "vocello.mac.language.english", defaultValue: "English",
+               comment: "macOS interface: display name of a speech language. Presentation only.")
+    }
+    static var languageJapanese: String {
+        localization.string(localized: "vocello.mac.language.japanese", defaultValue: "Japanese",
+               comment: "macOS interface: display name of a speech language. Presentation only.")
+    }
+    static var languageKorean: String {
+        localization.string(localized: "vocello.mac.language.korean", defaultValue: "Korean",
+               comment: "macOS interface: display name of a speech language. Presentation only.")
+    }
+    static var languageGerman: String {
+        localization.string(localized: "vocello.mac.language.german", defaultValue: "German",
+               comment: "macOS interface: display name of a speech language. Presentation only.")
+    }
+    static var languageFrench: String {
+        localization.string(localized: "vocello.mac.language.french", defaultValue: "French",
+               comment: "macOS interface: display name of a speech language. Presentation only.")
+    }
+    static var languageRussian: String {
+        localization.string(localized: "vocello.mac.language.russian", defaultValue: "Russian",
+               comment: "macOS interface: display name of a speech language. Presentation only.")
+    }
+    static var languagePortuguese: String {
+        localization.string(localized: "vocello.mac.language.portuguese", defaultValue: "Portuguese",
+               comment: "macOS interface: display name of a speech language. Presentation only.")
+    }
+    static var languageSpanish: String {
+        localization.string(localized: "vocello.mac.language.spanish", defaultValue: "Spanish",
+               comment: "macOS interface: display name of a speech language. Presentation only.")
+    }
+    static var languageItalian: String {
+        localization.string(localized: "vocello.mac.language.italian", defaultValue: "Italian",
+               comment: "macOS interface: display name of a speech language. Presentation only.")
+    }
+    static var qualityShort: String {
+        localization.string(localized: "vocello.mac.quality.short", defaultValue: "Reference is shorter than recommended (under 10 seconds).",
+               comment: "macOS interface: saved-voice reference quality warning copy. Presentation only.")
+    }
+    static var qualityLong: String {
+        localization.string(localized: "vocello.mac.quality.long", defaultValue: "Reference is longer than recommended (over 30 seconds).",
+               comment: "macOS interface: saved-voice reference quality warning copy. Presentation only.")
+    }
+    static var qualityExcessive: String {
+        localization.string(localized: "vocello.mac.quality.excessive", defaultValue: "Reference exceeds the 60 second maximum supported for cloning.",
+               comment: "macOS interface: saved-voice reference quality warning copy. Presentation only.")
+    }
+    static var qualityUnreadable: String {
+        localization.string(localized: "vocello.mac.quality.unreadable", defaultValue: "Reference audio could not be read.",
+               comment: "macOS interface: saved-voice reference quality warning copy. Presentation only.")
+    }
+    static var qualityIntro: String {
+        localization.string(localized: "vocello.mac.quality.intro", defaultValue: "Voice cloning works best with 10–20 seconds of clean speech.",
+               comment: "macOS interface: saved-voice reference quality warning copy. Presentation only.")
+    }
+    static var qualityHard: String {
+        localization.string(localized: "vocello.mac.quality.hard", defaultValue: "Pick a clip that is 60 seconds or shorter to use it for cloning.",
+               comment: "macOS interface: saved-voice reference quality warning copy. Presentation only.")
+    }
+    static var qualitySoft: String {
+        localization.string(localized: "vocello.mac.quality.soft", defaultValue: "Clones from references outside this range still work, but may sound less consistent.",
+               comment: "macOS interface: saved-voice reference quality warning copy. Presentation only.")
+    }
+    static var deliveryDurationAdvisory: String {
+        localization.string(localized: "vocello.mac.delivery.durationAdvisory", defaultValue: "Timing requests aren’t honored — the voice can’t target a duration, so this may distort pacing instead.",
+               comment: "macOS interface: advisory under a custom delivery that asks for a duration. Presentation only.")
+    }
+    static var presetHappy: String {
+        localization.string(localized: "vocello.mac.preset.happy", defaultValue: "Happy",
+               comment: "macOS interface: delivery preset name in a voice-bank caption. Presentation only.")
+    }
+    static var presetSad: String {
+        localization.string(localized: "vocello.mac.preset.sad", defaultValue: "Sad",
+               comment: "macOS interface: delivery preset name in a voice-bank caption. Presentation only.")
+    }
+    static var presetAngry: String {
+        localization.string(localized: "vocello.mac.preset.angry", defaultValue: "Angry",
+               comment: "macOS interface: delivery preset name in a voice-bank caption. Presentation only.")
+    }
+    static var presetFearful: String {
+        localization.string(localized: "vocello.mac.preset.fearful", defaultValue: "Fearful",
+               comment: "macOS interface: delivery preset name in a voice-bank caption. Presentation only.")
+    }
+    static var presetSurprised: String {
+        localization.string(localized: "vocello.mac.preset.surprised", defaultValue: "Surprised",
+               comment: "macOS interface: delivery preset name in a voice-bank caption. Presentation only.")
+    }
+    static var presetCalm: String {
+        localization.string(localized: "vocello.mac.preset.calm", defaultValue: "Calm",
+               comment: "macOS interface: delivery preset name in a voice-bank caption. Presentation only.")
+    }
+    static var presetWhisper: String {
+        localization.string(localized: "vocello.mac.preset.whisper", defaultValue: "Whisper",
+               comment: "macOS interface: delivery preset name in a voice-bank caption. Presentation only.")
+    }
+    static var savedVoiceDesignedVoiceFallback: String {
+        localization.string(localized: "vocello.mac.savedVoice.designedVoiceFallback", defaultValue: "Designed_Voice",
+               comment: "macOS interface: suggested saved-voice name when a Voice Design brief gives no words. Presentation only.")
+    }
+    static func historySuggestedVoiceName(_ voice: String) -> String {
+        localization.format(localization.string(localized: "vocello.mac.history.suggestedVoiceName",
+            defaultValue: "%@ Sample",
+            comment: "macOS interface: suggested name when saving a History clone result as a voice; %@ is the take's voice name. Presentation only."), voice)
+    }
+
+    /// Interface name of a speech language.
+    static func languageName(_ language: Qwen3SupportedLanguage) -> String {
+        switch language {
+        case .auto: languageAuto
+        case .chinese: languageChinese
+        case .english: languageEnglish
+        case .japanese: languageJapanese
+        case .korean: languageKorean
+        case .german: languageGerman
+        case .french: languageFrench
+        case .russian: languageRussian
+        case .portuguese: languagePortuguese
+        case .spanish: languageSpanish
+        case .italian: languageItalian
+        }
+    }
+
+    /// Interface name of a delivery preset by id; the base delivery reads
+    /// `deliveryNeutral`, an unknown id nil.
+    static func presetName(id: String) -> String? {
+        switch id {
+        case "neutral": deliveryNeutral
+        case "happy": presetHappy
+        case "sad": presetSad
+        case "angry": presetAngry
+        case "fearful": presetFearful
+        case "surprised": presetSurprised
+        case "calm": presetCalm
+        case "whisper": presetWhisper
+        default: nil
+        }
+    }
+
+    /// Interface headline of a saved-voice quality warning token, or nil for
+    /// tokens without one (`PreparedVoiceQualityWarning.headline(for:)`).
+    static func qualityWarningHeadline(token: String) -> String? {
+        switch token {
+        case "reference_duration_short": qualityShort
+        case "reference_duration_long": qualityLong
+        case "reference_duration_excessive": qualityExcessive
+        case "reference_quality_unreadable": qualityUnreadable
+        default: nil
+        }
+    }
+
+    /// Interface rendering of `PreparedVoiceQualityWarning.summary(for:)`.
+    static func qualityWarningSummary(tokens: [String]) -> String {
+        let lines = tokens.compactMap { qualityWarningHeadline(token: $0) }
+        guard !lines.isEmpty else { return qualityIntro }
+        let trailer = PreparedVoiceQualityWarning.isHardBlocking(tokens) ? qualityHard : qualitySoft
+        return qualityIntro + "\n\n" + lines.map { "• \($0)" }.joined(separator: "\n") + "\n\n" + trailer
+    }
+
     /// Interface name of a generation mode (`GenerationMode.displayName` is the
     /// English identity shared with the engine, CLI and telemetry).
     static func modeName(_ mode: GenerationMode) -> String {

@@ -74,7 +74,9 @@ struct MacCustomVoiceScreen: View {
         // follows Auto) so the native-speaker hint fires before any manual pick.
         guard effectiveLanguage != .auto, effectiveLanguage != speakerNativeLanguage else { return nil }
         return MacInterfaceText.customSpeakerNativeLanguageHint(
-            speakerDisplayName, speakerNativeLanguage.displayName, effectiveLanguage.displayName
+            speakerDisplayName,
+            MacInterfaceText.languageName(speakerNativeLanguage),
+            MacInterfaceText.languageName(effectiveLanguage)
         )
     }
 

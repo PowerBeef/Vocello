@@ -265,7 +265,7 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
     /// row labels end with the clip duration (", 3.5s").
     private func longestHistoryRow() throws -> XCUIElement {
         let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "historyRowTap_"))
-        try require("History rows") { rows.count > 0 }
+        try require("History rows") { rows.firstMatch.exists }
         var best: (element: XCUIElement, seconds: Double)?
         for index in 0..<min(rows.count, 8) {
             let candidate = rows.element(boundBy: index)

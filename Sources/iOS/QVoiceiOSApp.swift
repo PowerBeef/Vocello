@@ -168,6 +168,9 @@ struct QVoiceiOSApp: App {
     private func handleScenePhaseChange(_ scenePhase: ScenePhase) {
         switch scenePhase {
         case .active:
+            // PA-21: claims take effect again. Until now a late live chunk or an
+            // interruption ending in the background could not reactivate the session.
+            IOSAudioSessionOwner.shared.enterForeground()
             appLanguage.refreshSystemLanguage()
             Task { await IOSExportCommerce.shared.refresh() }
             if engineStartFailed {

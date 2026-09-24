@@ -709,8 +709,9 @@ final class IOSInlinePlaybackController: NSObject {
         }
         guard ensureOwnPlayer(), let player else { return }
         // PA-21: the session activates when playback starts, not when the card
-        // loads, so a card that is only shown never interrupts other audio.
-        sessionClaim = try? IOSAudioSessionOwner.shared.activate(.playback, renewing: sessionClaim)
+        // loads, so a card that is only shown never interrupts other audio. The
+        // claim never blocks the main actor; AVAudioPlayer activates implicitly.
+        sessionClaim = IOSAudioSessionOwner.shared.activateAsync(.playback, renewing: sessionClaim)
         IOSPlaybackExclusivity.didStartPlayback(self)
         player.play()
         isPlaying = true

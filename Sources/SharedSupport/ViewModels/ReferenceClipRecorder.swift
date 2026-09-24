@@ -67,6 +67,11 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
     private var interruptionObserver: NSObjectProtocol?
     /// Hold on the audio session while capturing (PA-21).
     private var recordingClaim: IOSAudioSessionClaim?
+    /// `start()` is waiting for the session off the main actor.
+    private var isActivatingSession = false
+    /// Advanced by every stop, so a start whose activation finishes after the
+    /// user cancelled never begins capturing.
+    private var captureGeneration: UInt64 = 0
     #endif
 
     deinit {
@@ -142,11 +147,33 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
             return
         }
 
+        #if os(iOS)
+        // Activation blocks behind every queued session step, so it runs off the
+        // main actor; capture starts only once the session is configured. A
+        // second start or a stop while it runs wins over this one.
+        guard !isActivatingSession else { return }
+        isActivatingSession = true
+        let generation = captureGeneration
+        let activation: Result<IOSAudioSessionClaim, any Error>
+        do {
+            activation = .success(try await referenceClipActivateRecordingSession(renewing: recordingClaim))
+        } catch {
+            activation = .failure(error)
+        }
+        isActivatingSession = false
+        guard generation == captureGeneration, !isRecording else {
+            if case .success(let claim) = activation, claim != recordingClaim {
+                IOSAudioSessionOwner.shared.release(claim)
+            }
+            return
+        }
+        #endif
+
         do {
             #if os(iOS)
             // The one session owner (PA-21) applies `.record`/`.measurement`; recording
             // outranks playback until this claim is released, and every player pauses.
-            recordingClaim = try IOSAudioSessionOwner.shared.activate(.recording, renewing: recordingClaim)
+            recordingClaim = try activation.get()
             IOSPlaybackExclusivity.didStartPlayback(self)
             #endif
 
@@ -288,6 +315,7 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
         amplitude = 0
         levels = []
         #if os(iOS)
+        captureGeneration &+= 1
         removeInterruptionObserver()
         #endif
         releaseRecordingClaim()
@@ -397,6 +425,22 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
         }
     }
 
+    /// The delegate's finish, on the main actor. Only the current recorder
+    /// counts: a replaced or discarded one changes nothing.
+    fileprivate func recorderDidFinish(_ finished: ObjectIdentifier, url: URL, successfully flag: Bool) {
+        guard let recorder, ObjectIdentifier(recorder) == finished else { return }
+        meteringTimer?.invalidate()
+        meteringTimer = nil
+        isRecording = false
+        if flag {
+            lastSavedURL = url
+        }
+        #if os(iOS)
+        removeInterruptionObserver()
+        #endif
+        releaseRecordingClaim()
+    }
+
     private func makeOutputURL() -> URL {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("voice-clone-references", isDirectory: true)
@@ -408,15 +452,28 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
 }
 
 extension ReferenceClipRecorder: AVAudioRecorderDelegate {
+    /// The recorder also stops itself at `record(forDuration:)`'s cap, which can
+    /// come before the metering timer's own stop after a main-thread hitch. The
+    /// overlay then offers the clip without calling a stop, so this is where the
+    /// capture's session claim and interruption observer end (PA-21); both
+    /// releases are idempotent with `stopAndSave()`. A stale callback from a
+    /// recorder that was replaced or discarded changes nothing.
     nonisolated func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
+        let finished = ObjectIdentifier(recorder)
+        let url = recorder.url
         Task { @MainActor [weak self] in
-            guard let self else { return }
-            self.meteringTimer?.invalidate()
-            self.meteringTimer = nil
-            self.isRecording = false
-            if flag {
-                self.lastSavedURL = recorder.url
-            }
+            self?.recorderDidFinish(finished, url: url, successfully: flag)
         }
     }
 }
+
+#if os(iOS)
+/// Claims the session for capture off the main actor: activation is a blocking
+/// call that waits behind every queued session step (PA-21).
+@concurrent
+private func referenceClipActivateRecordingSession(
+    renewing claim: IOSAudioSessionClaim?
+) async throws -> IOSAudioSessionClaim {
+    try IOSAudioSessionOwner.shared.activate(.recording, renewing: claim)
+}
+#endif

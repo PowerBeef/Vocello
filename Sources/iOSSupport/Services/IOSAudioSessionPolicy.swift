@@ -83,7 +83,9 @@ struct IOSAudioSessionClaim: Hashable, Sendable {
 ///   decides the configuration.
 /// - The session deactivates only when the last claim is released, and the
 ///   base configuration is restored after any other configuration.
-/// - Leaving the foreground drops every claim and deactivates the session.
+/// - Leaving the foreground drops every claim and deactivates the session;
+///   until the app is active again a claim changes nothing, so a late live
+///   chunk or an interruption ending in the background cannot reactivate it.
 struct IOSAudioSessionLedger: Equatable, Sendable {
     private struct Holder: Equatable, Sendable {
         let claim: IOSAudioSessionClaim
@@ -93,6 +95,8 @@ struct IOSAudioSessionLedger: Equatable, Sendable {
     private var holders: [Holder] = []
     private(set) var appliedConfiguration: IOSAudioSessionConfiguration?
     private(set) var isActive = false
+    /// Set by `enterBackground`, cleared by `enterForeground`.
+    private(set) var isInBackground = false
 
     init() {}
 
@@ -119,11 +123,14 @@ struct IOSAudioSessionLedger: Equatable, Sendable {
     }
 
     /// Records `claim` for `use` (a held claim becomes the newest again) and
-    /// returns the steps that make the session ready for it.
+    /// returns the steps that make the session ready for it. In the background
+    /// the claim is not recorded and nothing changes: the session stays handed
+    /// back until the app is active again.
     mutating func claim(
         _ claim: IOSAudioSessionClaim,
         for use: IOSAudioSessionUse
     ) -> [IOSAudioSessionStep] {
+        guard !isInBackground else { return [] }
         holders.removeAll { $0.claim == claim }
         holders.append(Holder(claim: claim, use: use))
         var steps: [IOSAudioSessionStep] = []
@@ -152,10 +159,18 @@ struct IOSAudioSessionLedger: Equatable, Sendable {
         return releaseSession()
     }
 
-    /// An activation for `claim` failed: the session is not active, and the
-    /// claim is dropped so it cannot keep the session configured for it.
-    mutating func activationFailed(_ claim: IOSAudioSessionClaim) -> [IOSAudioSessionStep] {
-        isActive = false
+    /// Applying `steps`, the steps returned for `claim`, failed. The claim is
+    /// dropped so it cannot keep the session configured for it. The session is
+    /// inactive only when those steps were to activate it: a failed
+    /// configuration while another holder keeps the session active leaves it
+    /// active, so the last release still deactivates it.
+    mutating func activationFailed(
+        _ claim: IOSAudioSessionClaim,
+        steps: [IOSAudioSessionStep]
+    ) -> [IOSAudioSessionStep] {
+        if steps.contains(.activate) {
+            isActive = false
+        }
         guard holds(claim) else { return [] }
         holders.removeAll { $0.claim == claim }
         let required = requiredConfiguration
@@ -168,8 +183,15 @@ struct IOSAudioSessionLedger: Equatable, Sendable {
     /// claim ends and the session is handed back to other apps. Deactivation is
     /// unconditional because a player may have activated the session implicitly.
     mutating func enterBackground() -> [IOSAudioSessionStep] {
+        isInBackground = true
         holders.removeAll()
         return releaseSession(force: true)
+    }
+
+    /// The app is active again, so claims take effect. The session stays
+    /// inactive until the next playback or recording claims it.
+    mutating func enterForeground() {
+        isInBackground = false
     }
 
     private mutating func releaseSession(force: Bool = false) -> [IOSAudioSessionStep] {

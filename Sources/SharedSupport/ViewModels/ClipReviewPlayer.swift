@@ -66,8 +66,9 @@ final class ClipReviewPlayer: NSObject, ObservableObject {
         #if os(iOS)
         // Claim playback through the one session owner (PA-21) so the clip comes out of the
         // speaker after a recording, and pause any other player. (macOS has no AVAudioSession;
-        // output routing is direct.)
-        sessionClaim = try? IOSAudioSessionOwner.shared.activate(.playback, renewing: sessionClaim)
+        // output routing is direct.) The claim never blocks the main actor: AVAudioPlayer
+        // activates the session itself if it plays first.
+        sessionClaim = IOSAudioSessionOwner.shared.activateAsync(.playback, renewing: sessionClaim)
         IOSPlaybackExclusivity.didStartPlayback(self)
         #endif
         player.play()

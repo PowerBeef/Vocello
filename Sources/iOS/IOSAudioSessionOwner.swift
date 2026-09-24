@@ -7,9 +7,11 @@ import QwenVoiceCore
 /// Players and the recorder claim the session for a use and release the claim
 /// when they are done; `IOSAudioSessionLedger` decides the category and
 /// activation steps, and this owner applies them on one serial queue. Because
-/// activation is a blocking call into the media server, `activate` may be
-/// called off the main actor (the player sheet does), and `activateAsync`
-/// never blocks its caller.
+/// activation is a blocking call into the media server and waits behind every
+/// queued step, `activate` is called only off the main actor (the player
+/// sheet's load and the recorder's start hop there first). `activateAsync`
+/// never blocks its caller; players that activate the session implicitly
+/// (`AVAudioPlayer`) use it.
 final class IOSAudioSessionOwner: Sendable {
     static let shared = IOSAudioSessionOwner()
 
@@ -32,7 +34,8 @@ final class IOSAudioSessionOwner: Sendable {
     }
 
     /// Claims the session for `use` and activates it, blocking until the
-    /// session is ready. Pass the caller's current claim to renew it.
+    /// session is ready. Pass the caller's current claim to renew it. Never
+    /// call it on the main actor: it waits behind every queued step.
     func activate(
         _ use: IOSAudioSessionUse,
         renewing claim: IOSAudioSessionClaim? = nil
@@ -67,9 +70,17 @@ final class IOSAudioSessionOwner: Sendable {
     }
 
     /// Leaving the foreground ends every claim and hands the session back.
+    /// Claims made before `enterForeground` change nothing.
     func enterBackground() {
         queue.async { [self] in
             performIgnoringFailures(ledger.withLock { $0.enterBackground() })
+        }
+    }
+
+    /// The app is active again: new claims activate the session.
+    func enterForeground() {
+        queue.async { [self] in
+            ledger.withLock { $0.enterForeground() }
         }
     }
 
@@ -90,7 +101,7 @@ final class IOSAudioSessionOwner: Sendable {
             }
         } catch {
             log("claim for \(use.rawValue) failed: \(error.localizedDescription)")
-            performIgnoringFailures(ledger.withLock { $0.activationFailed(claim) })
+            performIgnoringFailures(ledger.withLock { $0.activationFailed(claim, steps: steps) })
             throw error
         }
     }

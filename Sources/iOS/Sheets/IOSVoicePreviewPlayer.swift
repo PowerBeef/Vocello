@@ -30,6 +30,17 @@ final class IOSVoicePreviewPlayer: NSObject, ObservableObject {
         }
     }
 
+    /// The picker can be dismissed while a sample plays. Releasing twice (after
+    /// `stop()`) changes nothing, and AVAudioPlayer holds its delegate
+    /// unowned, so it is cleared before the player goes away.
+    deinit {
+        MainActor.assumeIsolated {
+            player?.delegate = nil
+            player?.stop()
+            IOSAudioSessionOwner.shared.release(sessionClaim)
+        }
+    }
+
     /// Toggles preview for the given voice id. If the same voice is
     /// already previewing, stops it; otherwise stops any in-flight
     /// preview and starts the new one.
@@ -68,7 +79,9 @@ final class IOSVoicePreviewPlayer: NSObject, ObservableObject {
         }
 
         do {
-            sessionClaim = try IOSAudioSessionOwner.shared.activate(.mixablePreview, renewing: sessionClaim)
+            // The claim never blocks the main actor; AVAudioPlayer activates
+            // the session itself if it plays before the owner's steps run.
+            sessionClaim = IOSAudioSessionOwner.shared.activateAsync(.mixablePreview, renewing: sessionClaim)
             IOSPlaybackExclusivity.didStartPlayback(self)
 
             let player = try AVAudioPlayer(contentsOf: url)

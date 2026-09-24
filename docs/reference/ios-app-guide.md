@@ -279,8 +279,10 @@ CI or release work.
 
 ### History tab — `Sources/iOS/History/HistoryScreen.swift`
 
-Search `historySearchField`; the trash control `historyClearMenu` opens one confirmation that
-clears History and deletes its audio; retry `historyRetryButton`. There is no "Keep Audio Files"
+Search `historySearchField`; the trash control `historyClearMenu` (drawn at 34 pt, a 44-pt target)
+opens one confirmation, `historyClearConfirm` / `historyClearCancel`, that clears History and deletes
+its audio; if some audio files could not be deleted, a notice says how many
+(`historyClearIncompleteDismiss`); retry `historyRetryButton`. There is no "Keep Audio Files"
 option on iPhone (PA-21, IOS-10): outputs live in the private App Group `outputs/`, which neither
 the app nor Files can reach once their rows are gone, while backup would keep carrying them. Copies
 already exported or saved to a Saved outputs folder are outside the app and are not touched. macOS
@@ -412,7 +414,12 @@ hold a mixable claim, and the recorder holds `.record` (which outranks playback 
 session deactivates with `.notifyOthersOnDeactivation` only when the last claim is released, and
 the default category is restored afterwards. `IOSPlaybackExclusivity` keeps one player audible:
 a starting player or recording pauses the others, and a paused live preview does not resume on
-its next chunk. Leaving the foreground drops every claim and hands the session back.
+its next chunk. Leaving the foreground drops every claim and hands the session back; until the app
+is active again a claim changes nothing, so a late live chunk or an interruption ending in the
+background cannot reactivate the session. `AVAudioPlayer` players claim without blocking
+(`activateAsync`); only the player sheet's load and the recorder's start use the blocking
+`activate`, off the main actor, and the recorder starts capturing once the session is configured.
+A recording that stops itself at its time cap releases its claim like an explicit stop.
 
 ---
 

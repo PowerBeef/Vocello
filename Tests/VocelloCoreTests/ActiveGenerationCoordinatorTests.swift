@@ -1,6 +1,7 @@
 import XCTest
 import os
 @testable import QwenVoiceCore
+import VocelloQwen3Core
 
 private final class TestLockedValue<Value: Sendable>: Sendable {
     private let storage = OSAllocatedUnfairLock<Value?>(initialState: nil)
@@ -581,6 +582,218 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         epoch.advance()
         XCTAssertNotEqual(epoch, restarted)
     }
+
+    /// PA-22 / CORE-06: closing admission for a caller's hard trim cancels the
+    /// pending idle unload, and `generate` schedules idle unload before the
+    /// store's post-generation hard trim, so the model stayed resident for good.
+    /// A relief that leaves the model loaded now schedules its idle unload again.
+    @MainActor
+    func testIdleUnloadSurvivesACallerHardTrim() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-idle-after-trim-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let registry = try Self.contractRegistry()
+        let model = try XCTUnwrap(registry.models.first)
+        guard NativeMemoryPolicyResolver.policy(mode: model.mode, isBatch: false)
+            .unloadAfterIdleSeconds != nil else {
+            throw XCTSkip("This host's memory tier never idle-unloads a model.")
+        }
+        let coordinator = ResidentLoadCoordinator()
+        let engine = Self.makeFixtureEngine(
+            root: root,
+            registry: registry,
+            coordinator: coordinator,
+            idleUnloadDelay: 0.5
+        )
+
+        await engine.ensureModelLoadedIfNeeded(id: model.id)
+        XCTAssertEqual(engine.loadState, .loaded(modelID: model.id))
+        await engine.trimMemory(level: .hardTrim, reason: "test_post_generation_hard_trim")
+        XCTAssertEqual(engine.loadState, .loaded(modelID: model.id), "a hard trim keeps the model")
+
+        let deadline = ContinuousClock.now + .seconds(10)
+        while engine.loadState != .idle, ContinuousClock.now < deadline {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertEqual(engine.loadState, .idle, "idle unload must still run after the hard trim")
+        let events = await coordinator.events
+        XCTAssertEqual(events.filter { $0 == "unload" }.count, 1)
+    }
+
+    /// PA-22 / CORE-06: a load an unload superseded throws a raw cancellation
+    /// from the coordinator (the load epoch), which the runtime wraps. The engine
+    /// used to surface that as a failed load; it now settles quietly.
+    @MainActor
+    func testEpochCancelledLoadSettlesWithoutAVisibleFailure() async throws {
+        let wrapped = NativeRuntimeError.wrapping(
+            CancellationError(),
+            stage: .upstreamModelLoad,
+            message: "The native runtime could not load model 'fixture'"
+        )
+        XCTAssertTrue(MLXTTSEngine.isModelOperationCancellation(wrapped))
+        XCTAssertTrue(MLXTTSEngine.isModelOperationCancellation(CancellationError()))
+        XCTAssertFalse(MLXTTSEngine.isModelOperationCancellation(
+            NativeRuntimeError.wrapping(
+                CocoaError(.fileReadCorruptFile),
+                stage: .upstreamModelLoad,
+                message: "fixture"
+            )
+        ))
+
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-epoch-cancel-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = Self.makeFixtureEngine(
+            root: root,
+            registry: try Self.contractRegistry(),
+            coordinator: SupersededLoadCoordinator(),
+            idleUnloadDelay: nil
+        )
+
+        await engine.ensureModelLoadedIfNeeded(id: "superseded-fixture-model")
+        XCTAssertEqual(engine.loadState, .idle)
+        XCTAssertNil(engine.visibleErrorMessage)
+    }
+
+    private static func contractRegistry() throws -> ContractBackedModelRegistry {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return try ContractBackedModelRegistry(
+            manifestURL: repositoryRoot.appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+        )
+    }
+
+    @MainActor
+    private static func makeFixtureEngine(
+        root: URL,
+        registry: ContractBackedModelRegistry,
+        coordinator: any MLXModelCoordinating,
+        idleUnloadDelay: Double?
+    ) -> MLXTTSEngine {
+        MLXTTSEngine(
+            modelRegistry: registry,
+            modelAssetStore: LocalModelAssetStore(
+                rootDirectory: root.appendingPathComponent("models", isDirectory: true),
+                descriptors: []
+            ),
+            audioPreparationService: NativeAudioPreparationService(),
+            documentIO: LocalDocumentIO(
+                importedReferenceDirectory: root.appendingPathComponent("imported", isDirectory: true)
+            ),
+            streamSessionsDirectory: root.appendingPathComponent("streams", isDirectory: true),
+            loadCoordinator: coordinator,
+            streamingSessionFactory: { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in
+                fatalError("This test never starts a generation.")
+            },
+            idleUnloadDelayOverride: idleUnloadDelay,
+            // Stay off MLX: this bundle runs under the ThreadSanitizer lane.
+            allocatorControl: .inert
+        )
+    }
+}
+
+/// A model coordinator whose load always ends the way a load an unload
+/// superseded ends: the coordinator's epoch guard throws a raw cancellation.
+private actor SupersededLoadCoordinator: MLXModelCoordinating {
+    func qwen3Capabilities(for id: String) async throws -> Qwen3TTSModelCapabilities {
+        throw CancellationError()
+    }
+
+    func loadModel(
+        id: String,
+        capabilityProfile: NativeLoadCapabilityProfile
+    ) async throws -> NativeModelLoadResult {
+        throw CancellationError()
+    }
+
+    func unloadModel() async {}
+    func isPrewarmed(identityKey: String) async -> Bool { false }
+    func markPrewarmed(identityKey: String) async {}
+    func clearPrewarmState() async {}
+    func setTelemetryRecorder(_ recorder: NativeTelemetryRecorder?) async {}
+    func requiresUnloadAfterRuntimeFailure() async -> Bool { false }
+}
+
+/// A model coordinator whose load succeeds with an unloaded runtime actor, so
+/// the engine's resident-model lifecycle (idle unload, trims) is observable
+/// without MLX weights. The model is never used to generate.
+private actor ResidentLoadCoordinator: MLXModelCoordinating {
+    private(set) var events: [String] = []
+
+    func qwen3Capabilities(for id: String) async throws -> Qwen3TTSModelCapabilities {
+        Self.capabilities
+    }
+
+    func loadModel(
+        id: String,
+        capabilityProfile: NativeLoadCapabilityProfile
+    ) async throws -> NativeModelLoadResult {
+        events.append("load")
+        let facts = VocelloQwen3LoadedModelFacts(
+            identity: VocelloQwen3ModelIdentity(
+                modelID: id,
+                repositoryID: "fixture/repository",
+                revision: "fixture",
+                artifactVersion: "fixture"
+            ),
+            sampleRate: 24_000,
+            capabilities: VocelloQwen3CapabilitySet([VocelloQwen3Capability]()),
+            loadDiagnostics: VocelloQwen3RuntimeDiagnosticsSnapshot()
+        )
+        return NativeModelLoadResult(
+            model: UnsafeSpeechGenerationModel(engine: VocelloQwen3Engine(), facts: facts),
+            modelRuntimeIdentity: ModelRuntimeIdentity(resolvedModelID: id),
+            didLoad: true,
+            capabilityProfile: capabilityProfile,
+            qwen3Capabilities: Self.capabilities,
+            timingsMS: [:],
+            booleanFlags: [:],
+            stringFlags: [:]
+        )
+    }
+
+    func unloadModel() async {
+        events.append("unload")
+    }
+
+    func isPrewarmed(identityKey: String) async -> Bool { false }
+    func markPrewarmed(identityKey: String) async {}
+    func clearPrewarmState() async {}
+    func setTelemetryRecorder(_ recorder: NativeTelemetryRecorder?) async {}
+    func requiresUnloadAfterRuntimeFailure() async -> Bool { false }
+
+    private static let capabilities = Qwen3TTSModelCapabilities(
+        modelSize: .pro1b7,
+        familyType: .customVoice,
+        supportsInstructionControl: true,
+        supportsVoiceClone: false,
+        supportsXVectorOnlyClone: false,
+        requiresSpeakerEncoder: false,
+        tokenizerProfile: Qwen3TTSTokenizerProfile(
+            name: "qwen3",
+            sampleRateHz: 24_000,
+            frameRateHz: 12.5,
+            decoderQuantizers: 16,
+            encoderValidQuantizers: 8,
+            encoderConfiguredQuantizers: 8,
+            codebookSize: 2_048,
+            semanticCodebookSize: 4_096
+        ),
+        generationDefaults: Qwen3TTSGenerationDefaultsProfile(
+            checkpointMaxNewTokens: nil,
+            wrapperFallbackMaxNewTokens: 2_048,
+            appPolicyMaxNewTokens: 2_048,
+            temperature: 0.9,
+            topP: 1,
+            topK: 50,
+            doSample: true,
+            repetitionPenalty: 1.05,
+            source: .appPolicy
+        ),
+        artifactAvailability: .publicArtifact
+    )
 }
 
 /// A model coordinator whose load suspends until the test releases it, then

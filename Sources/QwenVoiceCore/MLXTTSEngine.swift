@@ -175,7 +175,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
 
     private func applyMemoryPolicyIfKnown(modelID: String, isBatch: Bool) {
         guard let mode = modelRegistry.model(id: modelID)?.mode else { return }
-        NativeMemoryPolicyResolver.apply(
+        allocatorControl.applyPolicy(
             NativeMemoryPolicyResolver.policy(mode: mode, isBatch: isBatch)
         )
     }
@@ -372,6 +372,23 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         guard criticalMemoryReliefAdmission.isClosed else { return }
         objectWillChange.send()
         criticalMemoryReliefAdmission.reopen()
+        rescheduleIdleUnloadAfterRelief()
+    }
+
+    /// Closing admission cancels a pending idle unload, and a relief that keeps
+    /// the model resident (a hard trim, or a full unload that a later load
+    /// superseded) would otherwise leave it loaded for good: `generate` schedules
+    /// idle unload before the store's post-generation hard trim runs. Once the
+    /// last relief holder reopens admission, a model that is still loaded and
+    /// idle gets its idle unload back.
+    private func rescheduleIdleUnloadAfterRelief() {
+        guard !criticalMemoryReliefAdmission.isClosed,
+              idleUnloadToken == nil,
+              case .loaded(let modelID) = loadState,
+              canIdleUnload(modelID: modelID) else {
+            return
+        }
+        scheduleIdleUnloadIfNeeded(modelID: modelID, isBatch: false)
     }
 
     public private(set) var visibleErrorMessage: String?
@@ -384,6 +401,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     private let runtime: NativeEngineRuntime
     private let streamingSessionFactory: StreamingSessionFactory
     private let idleUnloadDelayOverride: Double?
+    private let allocatorControl: NativeMLXAllocatorControl
     private var isInitialized = false
     private var appSupportDirectoryURL: URL?
     private var voicesDirectory: URL?
@@ -585,7 +603,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         customPrewarmPolicy: NativeCustomPrewarmPolicy = .eager,
         diagnosticAppSupportBox: DiagnosticAppSupportBox = DiagnosticAppSupportBox(),
         streamingSessionFactory: @escaping StreamingSessionFactory,
-        idleUnloadDelayOverride: Double? = nil
+        idleUnloadDelayOverride: Double? = nil,
+        allocatorControl: NativeMLXAllocatorControl = .live
     ) {
         self.modelRegistry = modelRegistry
         self.modelAssetStore = modelAssetStore
@@ -595,6 +614,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         self.telemetryRecorder = telemetryRecorder
         self.diagnosticAppSupportBox = diagnosticAppSupportBox
         self.idleUnloadDelayOverride = idleUnloadDelayOverride
+        self.allocatorControl = allocatorControl
         self.runtime = NativeEngineRuntime(
             loadCoordinator: loadCoordinator,
             audioPreparationService: audioPreparationService,
@@ -615,7 +635,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                     details: details,
                     appSupportDirectoryURL: diagnosticAppSupportBox.url
                 )
-            }
+            },
+            allocatorControl: allocatorControl
         )
         self.streamingSessionFactory = streamingSessionFactory
         self.memoryPressureMonitor = NativeMemoryPressureMonitor()
@@ -843,6 +864,9 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             clonePreparationState = .idle
             visibleErrorMessage = nil
             scheduleIdleUnloadIfNeeded(modelID: id, isBatch: false)
+        } catch let error where Self.isModelOperationCancellation(error) {
+            await settleCancelledModelOperation()
+            throw CancellationError()
         } catch {
             // No silent Quality→Speed downgrade: a model load that fails
             // (including an 8-bit allocation failure on a memory-constrained
@@ -876,6 +900,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             _ = try await runtime.loadModel(id: id)
             loadState = .loaded(modelID: id)
             scheduleIdleUnloadIfNeeded(modelID: id, isBatch: false)
+        } catch let error where Self.isModelOperationCancellation(error) {
+            await settleCancelledModelOperation()
         } catch {
             handle(error)
         }
@@ -898,6 +924,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             loadState = .loaded(modelID: request.modelID)
             visibleErrorMessage = nil
             scheduleIdleUnloadIfNeeded(modelID: request.modelID, mode: request.mode, isBatch: false)
+        } catch let error where Self.isModelOperationCancellation(error) {
+            await settleCancelledModelOperation()
         } catch {
             handle(error)
         }
@@ -983,10 +1011,16 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             loadState = .loaded(modelID: modelID)
             visibleErrorMessage = nil
             scheduleIdleUnloadIfNeeded(modelID: modelID, mode: .clone, isBatch: false)
-        } catch let error as CancellationError {
+        } catch let error where Self.isModelOperationCancellation(error) {
+            // A raw cancellation, or one the runtime wrapped (a model load
+            // inside priming that an unload superseded), is not a failure.
             let unloaded = await unloadAfterCapturedRuntimeFailureIfNeeded(error)
             clonePreparationState = .idle
-            loadState = unloaded ? .idle : .loaded(modelID: modelID)
+            var stillLoaded = false
+            if !unloaded {
+                stillLoaded = await runtime.loadedModelID() == modelID
+            }
+            loadState = stillLoaded ? .loaded(modelID: modelID) : .idle
             throw CancellationError()
         } catch {
             // A captured MLX failure gets product copy, and the model it may
@@ -1571,6 +1605,27 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             retryAttempt: retryAttempt,
             operationGeneration: operationGeneration
         )
+    }
+
+    /// Typed cancellation, raw or wrapped by the runtime: a model load that an
+    /// unload superseded (the coordinator's load epoch) throws a raw
+    /// `CancellationError` that `NativeEngineRuntime` wraps in a
+    /// `NativeRuntimeError`, so a plain `is CancellationError` check misses it.
+    nonisolated static func isModelOperationCancellation(_ error: Error) -> Bool {
+        NativeGenerationTerminalClassifier.reason(for: error) == .cancelled
+    }
+
+    /// A model load or prewarm that ended cancelled is not a failure and
+    /// surfaces no error: the unload that superseded it owns the outcome. The
+    /// published state is re-derived from what the runtime still holds.
+    private func settleCancelledModelOperation() async {
+        if let modelID = await runtime.loadedModelID() {
+            loadState = .loaded(modelID: modelID)
+            scheduleIdleUnloadIfNeeded(modelID: modelID, isBatch: false)
+        } else {
+            loadState = .idle
+            clonePreparationState = .idle
+        }
     }
 
     /// After MLX raised an error mid-generation the loaded model may hold

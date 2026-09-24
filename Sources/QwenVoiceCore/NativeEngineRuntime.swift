@@ -388,6 +388,8 @@ actor NativeEngineRuntime {
     /// report `~/Library/Logs/DiagnosticReports/QwenVoiceEngineService-2026-05-15-162429.ips`
     /// for the failing call stacks.
     private let prewarmSlot = PrewarmSlotGate()
+    /// MLX allocator side effects of caller trims; `.live` outside lifecycle tests.
+    private let allocatorControl: NativeMLXAllocatorControl
 
     init(
         loadCoordinator: any MLXModelCoordinating,
@@ -398,8 +400,10 @@ actor NativeEngineRuntime {
         customPrewarmPolicy: NativeCustomPrewarmPolicy = .eager,
         speakerNativeLanguages: [String: String] = [:],
         diagnosticAppSupportBox: DiagnosticAppSupportBox? = nil,
-        diagnosticEventSink: (@Sendable (String, [String: String]) async -> Void)? = nil
+        diagnosticEventSink: (@Sendable (String, [String: String]) async -> Void)? = nil,
+        allocatorControl: NativeMLXAllocatorControl = .live
     ) {
+        self.allocatorControl = allocatorControl
         self.loadCoordinator = loadCoordinator
         self.audioPreparationService = audioPreparationService
         self.preparedCloneConditioningCache = preparedCloneConditioningCache
@@ -427,6 +431,12 @@ actor NativeEngineRuntime {
 
     func loadModel(id: String) async throws -> NativeModelLoadResult {
         try await loadModel(id: id, preserveActiveClonePrimeToken: false)
+    }
+
+    /// The model this runtime last loaded and has not unloaded since, if any.
+    /// A load that ends cancelled (an unload superseded it) leaves `nil`.
+    func loadedModelID() -> String? {
+        activeModelID
     }
 
     func unloadModel() async {
@@ -560,7 +570,7 @@ actor NativeEngineRuntime {
         switch level {
         case .softTrim:
             await preparedCloneConditioningCache.softTrim(retainingMostRecent: 1)
-            Memory.clearCache()
+            allocatorControl.clearCache()
         case .hardTrim:
             await preparedCloneConditioningCache.clear()
             await loadCoordinator.clearPrewarmState()
@@ -571,7 +581,7 @@ actor NativeEngineRuntime {
             activeCloneConditioningIdentity = nil
             primedCloneReferenceKeys.removeAll()
             clonePrimeTimingOverridesMS.removeAll()
-            Memory.clearCache()
+            allocatorControl.clearCache()
             await clearQwen3MemoryCachesIfNeeded()
         case .fullUnload:
             await unloadModel()

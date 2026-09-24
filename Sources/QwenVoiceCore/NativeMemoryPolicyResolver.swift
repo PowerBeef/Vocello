@@ -246,3 +246,19 @@ public enum NativeMemoryPolicyResolver {
     }
 
 }
+
+/// The process-wide MLX allocator side effects of the engine's memory lifecycle:
+/// applying a tier's cache policy before a load and clearing the buffer cache on
+/// a trim. Production always uses `.live`; lifecycle tests pass `.inert` so the
+/// core test bundle, which the ThreadSanitizer lane runs, never touches MLX.
+struct NativeMLXAllocatorControl: Sendable {
+    let applyPolicy: @Sendable (NativeMemoryPolicy) -> Void
+    let clearCache: @Sendable () -> Void
+
+    static let live = NativeMLXAllocatorControl(
+        applyPolicy: { NativeMemoryPolicyResolver.apply($0) },
+        clearCache: { Memory.clearCache() }
+    )
+
+    static let inert = NativeMLXAllocatorControl(applyPolicy: { _ in }, clearCache: {})
+}

@@ -32,8 +32,24 @@ of Meta's AudioSeal watermark generator (`audioseal_wm_16bits`, MIT-licensed cod
 `MARK-001` entry in `SEMANTIC_DELTAS.json`. The validation that preceded the port recorded the
 `audioseal` 0.2.0 Python package and weights fetched from Meta's Hugging Face repository
 `facebook/audioseal`, and the parity fixtures come from the PyTorch reference implementation. The exact
-upstream Git commit and Hugging Face revision were not recorded when the port was made. The AudioSeal
-license notice is in [`NOTICES.md`](NOTICES.md).
+upstream revisions were not recorded when the port was made; on 2026-09-24 they were reconstructed from
+public metadata (no weights downloaded):
+
+- **Weights.** The `audioseal_wm_16bits` card points at `generator_base.pth` in `facebook/audioseal`.
+  Its content never changed: every revision from its upload (`20f3f5ae`, 2024-03-11, as
+  `generator.pth`) through the current `main` (`3c19eba53390776cf2cc9ed5f6c9ac67ce72ecba`, 2025-12-09)
+  carries the same LFS object, 58,805,980 bytes, SHA-256
+  `7a845b5fbe9364a63a3909d8ab3fe064d13a76ae4c2e983573e08c69b7b51748`. The separate
+  `generator_streaming.pth` (added 2025-12-09) is a different, Moshi-based architecture that this port
+  does not implement. The hosted fp16 conversion
+  (`marking/audioseal_wm16_generator_fp16.safetensors`, 73 tensors, 14,675,873 parameters, base SEANet
+  `encoder`/`decoder`/`msg_processor` layout) matches the base generator's shape; the byte-level
+  conversion itself is not reproduced (the conversion script is not in this repository).
+- **Code.** `audioseal` 0.2.0 was published to PyPI on 2025-12-17; the GitHub commit that sets
+  `__version__ = "0.2.0"` is `a0ce2564ff2ba706356cdd2ad4308c4bd499b43c` (2025-12-19, "Push streaming
+  audioseal"). Upstream does not tag releases; the only later commit adds copyright headers.
+
+The AudioSeal license notice is in [`NOTICES.md`](NOTICES.md).
 
 Qwen3-TTS model and research attribution belongs to the Qwen team. Model weights are not included
 in this repository and retain their own upstream terms.

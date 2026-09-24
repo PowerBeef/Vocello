@@ -430,7 +430,7 @@
       "evidenceClass": "static",
       "benchmarkRecordIDs": [],
       "benchmarkEvidenceStatus": "unverified",
-      "benchmarkEvidenceReason": "Numerical parity is the governing evidence: whole-buffer output matches the PyTorch reference (facebookresearch/audioseal, audioseal 0.2.0 package, MIT; the exact upstream commit was not recorded) at >=40 dB SNR on committed-protocol fixtures, the exact-streaming windowed path matches whole-buffer at >=55 dB, and the reference detector scores Swift-marked real speech 1.0000 with the fixed 0x56C0 payload decoding exactly (CP-2 stage-2 evidence, 2026-08-06). Memory-qualified benchmarks arrive with the publication-seam integration.",
+      "benchmarkEvidenceReason": "Numerical parity is the governing evidence: whole-buffer output matches the PyTorch reference (facebookresearch/audioseal, audioseal 0.2.0 package = GitHub a0ce2564ff2b, MIT; weights facebook/audioseal generator_base.pth, LFS SHA-256 7a845b5fbe93, identical at every revision; reconstructed 2026-09-24 from public metadata, see ORIGINS.md) at >=40 dB SNR on committed-protocol fixtures, the exact-streaming windowed path matches whole-buffer at >=55 dB, and the reference detector scores Swift-marked real speech 1.0000 with the fixed 0x56C0 payload decoding exactly (CP-2 stage-2 evidence, 2026-08-06). Memory-qualified benchmarks arrive with the publication-seam integration.",
       "upstreamDisposition": "local-only",
       "upstreamEquivalentCommit": null,
       "removalCriteria": "Remove only if Vocello adopts a different Article 50 marking layer or upstream mlx-audio-swift ships an equivalent watermark generator."

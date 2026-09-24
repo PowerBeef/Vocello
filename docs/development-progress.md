@@ -31,7 +31,10 @@ button read Play; the lane now opens the longest row and accepts finished playba
 when the phone is available: rerun `--scenario exports`, then the remaining export surfaces on RF-13.
 Also closed September 24 without the phone: PA-22 (core storage and memory relief) and PA-21 (iOS
 audio-session owner, startup Retry, drafts, Wi-Fi copy; iPhone History clear deletes its audio);
-their device checks are on AUD-02 and their leftovers on PA-30; the rest of the plan below is
+their device checks are on AUD-02 and their leftovers on PA-30. Wave 1 of the unattended work
+(worktree agents plus adversarial review, verified natively by the lead): PA-07 and F-26 closed,
+PA-18 in flight (the AudioSeal upstream revision needs the maintainer; iPhone screenshots need a
+device lane); the rest of the plan below is
 unchanged (PA-16 needs an M6 gate-bench baseline first).
 
 ### Current state (September 23)

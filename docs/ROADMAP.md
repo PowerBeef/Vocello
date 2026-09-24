@@ -16,13 +16,13 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `audit-remediation-2026-09` | active | backend-and-platform | 0/12 (0%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 10/17 (59%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
-| `engineering-review-remediation-2026-08` | active | backend-and-platform | 16/26 (62%) |
+| `engineering-review-remediation-2026-08` | active | backend-and-platform | 17/26 (65%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
 | `ios-control-audit-2026-08` | active | ios | 17/21 (81%) |
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 19/31 (61%) |
+| `project-audit-2026-09` | active | backend-and-platform | 20/31 (65%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -247,7 +247,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `F-20` | parked | P2 — make CLI signal cancellation graceful and bounded | `RF-10` |
 | `F-21` | parked | P1 — restore CLI batch admission and preserve partial outcomes | `RF-10` |
 | `F-23` | parked | P2 — preserve explicit Play intent across live-to-file finalization | `RF-10` |
-| `F-26` | planned | P2 — CLI: playback children, the pre-supervisor signal window and signal-coincident failure classification | — |
 
 ### Open items in detail
 
@@ -285,9 +284,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 - **`F-23`** (parked) — P2 — preserve explicit Play intent across live-to-file finalization.
   gate: Explicit Play after finalization resumes heard currentTime (or restarts at end), independently of Auto-play and buffered duration. Deterministic fixtures pass; a source-bound long-clip UI pilot and applicable packaged macOS playback prove play/pause/scrub/History. Preserve failed pilots; unavailable controls never count as exercised.
   unparkWhen: RF-10 unparks (a signed macOS candidate is authorized).
-
-- **`F-26`** (planned) — P2 — CLI: playback children, the pre-supervisor signal window and signal-coincident failure classification.
-  gate: Three bounded CLI gaps outside the F-20 fixtures: (1) afplay children outlive a signalled CLI because playback uses try? run() then waitUntilExit() with no termination on forced exit (Sources/VocelloCLI/GenerateCommand.swift:244-249, Sources/VocelloCLI/BatchCommand.swift:123-130); (2) the Dispatch signal sources are installed after the command task starts, leaving a window in which SIGINT/SIGTERM kill the process without owned cleanup (Sources/VocelloCLI/CLIProcessSupervisor.swift:16-19,57-60); (3) a genuine generation failure that coincides with a signal is reported as cancelled (Sources/VocelloCLI/CLIBatchExecution.swift:69-71). Closure: terminate owned playback children on cancellation and forced exit, install signal sources before the task starts or buffer early signals, classify failure-then-signal as failed with the cancellation noted, and cover each with deterministic fixtures; documented exit codes unchanged.
 
 ## iOS App Store readiness
 
@@ -454,11 +450,10 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | --- | --- | --- | --- |
 | `PA-05` | in-flight | Release path works end to end and is rehearsed | — |
 | `PA-06` | planned | Routing cost and derived-artifact gaps | — |
-| `PA-07` | planned | Remove dead engine, downloader and XPC-era code | — |
 | `PA-08` | planned | Consolidate duplicated platform logic and misleading names | — |
 | `PA-10` | in-flight | Release signing is isolated from dispatch and build inputs | — |
 | `PA-16` | planned | Speech-tokenizer attention honors the model's sliding windows | — |
-| `PA-18` | planned | Public claims match what each download ships | — |
+| `PA-18` | in-flight | Public claims match what each download ships | — |
 | `PA-19` | planned | Orchestrators and the generate loop have unit coverage | — |
 | `PA-20` | planned | Accessibility and localization reach every surface | — |
 | `PA-25` | planned | Docs and tooling stay proportional | — |
@@ -473,9 +468,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-06`** (planned) — Routing cost and derived-artifact gaps.
   gate: A Tests/VocelloMacUITests-only change no longer runs the full macOS test and TSan lanes; refresh_derived_artifacts validate_all checks every registered artifact; SwiftLint is pinned or reported when missing; nightly and cache-owner text describe TSan as blocking.
 
-- **`PA-07`** (planned) — Remove dead engine, downloader and XPC-era code.
-  gate: generateBatch, downloadRepo, samplerCompileEnabled and the unused handshake latch are removed or given a caller; stale XPC comments are corrected; the concurrency budget drops with any removed nonisolated(unsafe); the unused HuggingFace product link is removed or justified.
-
 - **`PA-08`** (planned) — Consolidate duplicated platform logic and misleading names.
   gate: Each consolidation lands separately with unchanged identifiers and behavior: one download driver seam, one observation model for the model managers, one Mac player card, root models constructed once, generateVoiceDesign renamed for the all-mode loop, OWNERSHIP.json lists MLXAudioMark, and the Cmd-6 menu title matches its destination.
 
@@ -485,7 +477,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-16`** (planned) — Speech-tokenizer attention honors the model's sliding windows.
   gate: The decoder transformer applies its 72-frame sliding window with a bounded KV cache and the encoder its 250-frame window; a reference-parity fixture against the upstream tokenizer passes, and the fixed-seed QC battery and gate bench show no regression.
 
-- **`PA-18`** (planned) — Public claims match what each download ships.
+- **`PA-18`** (in-flight) — Public claims match what each download ships.
   gate: README and website scope every feature claim to the build it names (AudioSeal marking, Article 50, seed pinning and the new UI marked as 3.0), facts match source (concurrent files, chart record, recommended variant), AudioSeal is attributed with the correct upstream revision, and the website sends basic security headers.
 
 - **`PA-19`** (planned) — Orchestrators and the generate loop have unit coverage.

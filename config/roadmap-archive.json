@@ -3935,6 +3935,47 @@
         "commit:9b574859",
         "file:Tests/VocelloiOSLogicTests/IOSAudioSessionPolicyTests.swift"
       ]
+    },
+    {
+      "id": "PA-07",
+      "title": "Remove dead engine, downloader and XPC-era code",
+      "status": "done",
+      "gate": "generateBatch, downloadRepo, samplerCompileEnabled and the unused handshake latch are removed or given a caller; stale XPC comments are corrected; the concurrency budget drops with any removed nonisolated(unsafe); the unused HuggingFace product link is removed or justified.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "Sources/QwenVoiceCore/NativeDeviceClassGate.swift",
+        "project.yml"
+      ],
+      "notes": "Closed 2026-09-24. Removed with no callers: MLXTTSEngine.generateBatch (and the batch operation kind, allowsBatchRequest and postBatchTrimLevel), HuggingFaceDownloader.downloadRepo with its live repository listing and the write-only download-state manifest (downloadFiles on the catalog plan is the only download path), the NativeDeviceClassGate handshake latch (nonisolated(unsafe) budget 7 to 6), and XPC-era identifiers nothing read (EngineCapabilities, the wire schema/codec). samplerCompileEnabled was already gone with PA-02. Stale comments about a separate engine process corrected across Sources; legacy telemetry decoders keep their XPC-named types, documented as legacy. The HuggingFace product link left the four app targets; the owned package still pins swift-huggingface. Left for a package-scoped change: TTS.loadModel(modelRepo:)/fromPretrained/resolveOrDownloadModel revision main (SEC-12 package half) and dead package streams/writers (ENG-18).",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-24",
+      "evidence": [
+        "commit:825a5aef",
+        "commit:4a3728cd",
+        "commit:095d230d"
+      ]
+    },
+    {
+      "id": "F-26",
+      "plan": "engineering-review-remediation-2026-08",
+      "title": "P2 — CLI: playback children, the pre-supervisor signal window and signal-coincident failure classification",
+      "status": "done",
+      "gate": "Three bounded CLI gaps outside the F-20 fixtures: (1) afplay children outlive a signalled CLI because playback uses try? run() then waitUntilExit() with no termination on forced exit (Sources/VocelloCLI/GenerateCommand.swift:244-249, Sources/VocelloCLI/BatchCommand.swift:123-130); (2) the Dispatch signal sources are installed after the command task starts, leaving a window in which SIGINT/SIGTERM kill the process without owned cleanup (Sources/VocelloCLI/CLIProcessSupervisor.swift:16-19,57-60); (3) a genuine generation failure that coincides with a signal is reported as cancelled (Sources/VocelloCLI/CLIBatchExecution.swift:69-71). Closure: terminate owned playback children on cancellation and forced exit, install signal sources before the task starts or buffer early signals, classify failure-then-signal as failed with the cancellation noted, and cover each with deterministic fixtures; documented exit codes unchanged.",
+      "sourceOfTruth": [
+        "Sources/VocelloCLI/GenerateCommand.swift",
+        "Sources/VocelloCLI/BatchCommand.swift",
+        "Sources/VocelloCLI/CLIProcessSupervisor.swift",
+        "Sources/VocelloCLI/CLIBatchExecution.swift",
+        "Tests/VocelloCoreTests/CLIExecutionTests.swift"
+      ],
+      "updated": "2026-09-24",
+      "notes": "Closed 2026-09-24. The CLI owns its playback children (an injected launcher; afplay is terminated and reaped on signal or forced exit, and a failed launch is balanced and reported), signal handling is armed before any command work starts, and a genuine generation failure that coincides with a signal is classified as a failure by type, not as a cancellation; the forced exit path alone exits. Deterministic CLIExecutionTests cover each, including a real /bin/sleep child under TSan.",
+      "evidence": [
+        "commit:776d8ccb",
+        "commit:788204fc",
+        "file:Tests/VocelloCoreTests/CLIExecutionTests.swift"
+      ]
     }
   ]
 }

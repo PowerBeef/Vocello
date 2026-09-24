@@ -4,12 +4,14 @@ import Synchronization
 /// Signal handlers contain no Swift work: Dispatch delivers signals on a
 /// dedicated queue. The first signal cancels the owned command and waits for
 /// its cleanup; a second signal or deadline is explicitly a forced exit, which
-/// first stops and reaps every owned child process.
+/// first stops and reaps every owned child process. Once chosen, the forced
+/// path is the only owner of the process exit.
 final class CLIProcessSupervisor: Sendable {
     private struct State: Sendable {
         var command: Task<Int32, Never>?
         var firstSignal: Int32?
         var finished = false
+        var forcing = false
     }
     private let state = Mutex(State())
     private let children: CLIChildProcesses
@@ -34,7 +36,10 @@ final class CLIProcessSupervisor: Sendable {
     func receive(_ signal: Int32) {
         let action = state.withLock { state -> (Task<Int32, Never>?, Bool) in
             guard !state.finished else { return (nil, false) }
-            if state.firstSignal != nil { return (nil, true) }
+            if state.firstSignal != nil {
+                state.forcing = true
+                return (nil, true)
+            }
             state.firstSignal = signal
             return (state.command, false)
         }
@@ -43,14 +48,21 @@ final class CLIProcessSupervisor: Sendable {
     }
 
     func enforceDeadline() {
-        let signal = state.withLock { !$0.finished ? $0.firstSignal : nil }
+        let signal = state.withLock { state -> Int32? in
+            guard !state.finished, let signal = state.firstSignal else { return nil }
+            state.forcing = true
+            return signal
+        }
         if let signal { forced(128 + signal) }
     }
 
-    func finish(code: Int32) -> Int32 {
+    /// The exit status of the finished command, or nil when a forced exit
+    /// already owns the process exit and the caller must not exit as well.
+    func finish(code: Int32) -> Int32? {
         state.withLock {
             $0.finished = true
             $0.command = nil
+            guard !$0.forcing else { return nil }
             return $0.firstSignal.map { 128 + $0 } ?? code
         }
     }
@@ -92,18 +104,28 @@ final class CLIProcessSupervisor: Sendable {
         }
         let command = Task { await operation() }
         supervisor.attach(command)
-        let code = supervisor.finish(code: await command.value)
+        // A forced exit's reap also unblocks the command while the forced
+        // path goes on to call `exit` on the signal queue; returning here
+        // would race it with a second `exit` from main.
+        guard let code = supervisor.finish(code: await command.value) else {
+            await parkForever()
+        }
         for source in sources { source.cancel() }
         for number in signals { signal(number, SIG_DFL) }
         return code
+    }
+
+    /// Never resumes: the forced exit ends the process.
+    private static func parkForever() async -> Never {
+        await withUnsafeContinuation { (_: UnsafeContinuation<Never, Never>) in }
     }
 }
 
 // MARK: - Owned child processes
 
 /// A child process the CLI launched and must not leave behind (today only
-/// `--play`'s afplay). Both waits return only after the child has exited and
-/// been reaped.
+/// `--play`'s afplay). The waits report only a child that has exited and been
+/// reaped; the forced path's bounded wait may give up first.
 protocol CLIChildProcess: Sendable {
     /// Graceful stop (SIGTERM), sent when the owning command is cancelled.
     func terminate()
@@ -130,6 +152,9 @@ final class CLIChildProcesses: Sendable {
     private let state = Mutex(State())
 
     var liveCount: Int { state.withLock { $0.live.count } }
+
+    /// `stopAll` has run: a forced exit owns the process exit and its report.
+    var forcedExitBegan: Bool { state.withLock { $0.closed } }
 
     /// Runs one child to exit. Throws `CancellationError`, only after the
     /// child is reaped, when the owning task was cancelled.
@@ -179,7 +204,15 @@ final class CLIFoundationChildProcess: CLIChildProcess {
         let exited = DispatchGroup()
         exited.enter()
         process.terminationHandler = { @Sendable _ in exited.leave() }
-        try process.run()
+        do {
+            try process.run()
+        } catch {
+            // No termination handler runs for a child that never started;
+            // balance the group, which traps if released while entered.
+            process.terminationHandler = nil
+            exited.leave()
+            throw error
+        }
         return CLIFoundationChildProcess(process: process, exited: exited)
     }
 

@@ -242,9 +242,16 @@ final class CLIExecutionTests: XCTestCase {
         supervisor.receive(SIGINT)
         supervisor.enforceDeadline()
         XCTAssertEqual(forced.withLock { $0 }, [130, 143])
-        XCTAssertEqual(supervisor.finish(code: 0), 143)
+        XCTAssertNil(supervisor.finish(code: 0), "the forced path alone owns the exit")
         supervisor.receive(SIGINT)
         XCTAssertEqual(forced.withLock { $0.count }, 2)
+
+        let deadlineForced = Mutex<[Int32]>([])
+        let deadline = CLIProcessSupervisor(forceExit: { code in deadlineForced.withLock { $0.append(code) } })
+        deadline.receive(SIGINT)
+        deadline.enforceDeadline()
+        XCTAssertEqual(deadlineForced.withLock { $0 }, [130])
+        XCTAssertNil(deadline.finish(code: 130), "a command that ends after the deadline must not exit too")
     }
 
     func testSignalBeforeAttachmentCancelsTheLateCommand() async {
@@ -334,11 +341,14 @@ final class CLIExecutionTests: XCTestCase {
         supervisor.receive(SIGINT)
         await fulfillment(of: [terminated], timeout: 2)
         XCTAssertEqual(children.liveCount, 1)
+        XCTAssertFalse(children.forcedExitBegan)
         supervisor.receive(SIGINT)
         XCTAssertEqual(log.all, ["launch afplay /fixture/a.wav", "terminate", "kill", "reaped", "exit 130"])
+        XCTAssertTrue(children.forcedExitBegan)
+        // The reap also unwinds the command, but it must not report or exit.
         let result = await command.value
         XCTAssertEqual(result, 1)
-        XCTAssertEqual(supervisor.finish(code: result), 130)
+        XCTAssertNil(supervisor.finish(code: result), "the forced path alone owns the exit")
         XCTAssertEqual(children.liveCount, 0)
         do {
             try await children.run(CLIPlayback.player, arguments: ["/fixture/b.wav"], launch: launcher)
@@ -357,6 +367,51 @@ final class CLIExecutionTests: XCTestCase {
             throw CocoaError(.fileNoSuchFile)
         }
         XCTAssertEqual(attempts.all, ["/fixture/a.wav"])
+        XCTAssertEqual(children.liveCount, 0)
+    }
+
+    /// Launch failure must not leave the exit wait entered: libdispatch traps
+    /// when an entered group is released.
+    func testRealLauncherThatCannotStartThrowsAndLeavesNoChild() async {
+        let children = CLIChildProcesses()
+        do {
+            try await children.run(URL(fileURLWithPath: "/nonexistent/vocello-player"), arguments: [],
+                launch: CLIFoundationChildProcess.launch)
+            XCTFail("a missing player cannot start")
+        } catch {
+            XCTAssertFalse(error is CancellationError)
+        }
+        XCTAssertEqual(children.liveCount, 0)
+    }
+
+    /// The production launcher with a real child: cancellation's SIGTERM and
+    /// the forced SIGKILL each end in a reap that the matching wait observes.
+    func testRealChildIsStoppedAndReapedThroughTheProductionLauncher() async throws {
+        let sleeper = URL(fileURLWithPath: "/bin/sleep")
+        let killed = try CLIFoundationChildProcess.launch(sleeper, ["30"])
+        defer { killed.forceKill() }
+        XCTAssertFalse(killed.waitUntilExit(timeout: .now() + .milliseconds(50)), "the child must be running")
+        killed.forceKill()
+        XCTAssertTrue(killed.waitUntilExit(timeout: .now() + 5))
+
+        let children = CLIChildProcesses()
+        let launched = expectation(description: "child launched")
+        let launcher: CLIProcessLauncher = { executable, arguments in
+            let child = try CLIFoundationChildProcess.launch(executable, arguments)
+            launched.fulfill()
+            return child
+        }
+        let started = ContinuousClock.now
+        let command = Task {
+            try await children.run(sleeper, arguments: ["30"], launch: launcher)
+        }
+        await fulfillment(of: [launched], timeout: 5)
+        command.cancel()
+        guard case .failure(let error) = await command.result else {
+            return XCTFail("a cancelled child must report cancellation")
+        }
+        XCTAssertTrue(error is CancellationError)
+        XCTAssertLessThan(ContinuousClock.now - started, .seconds(10), "SIGTERM, not the child's own exit")
         XCTAssertEqual(children.liveCount, 0)
     }
 

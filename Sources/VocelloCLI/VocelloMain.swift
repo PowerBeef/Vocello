@@ -50,7 +50,11 @@ enum VocelloMain {
                 exit(2)
             }
         } catch is CancellationError {
-            FileHandle.standardError.write(Data("Cancelled; command cleanup completed.\n".utf8))
+            // A forced exit's reap of a `--play` child also unwinds the
+            // command; the forced path reports that exit, not this one.
+            if !CLIChildProcesses.shared.forcedExitBegan {
+                FileHandle.standardError.write(Data("Cancelled; command cleanup completed.\n".utf8))
+            }
             return 130
         } catch {
             FileHandle.standardError.write(Data("error: \(error)\n".utf8))

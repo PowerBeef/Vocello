@@ -132,8 +132,9 @@ set) and forces telemetry on.
 - Exit codes: `0` success · `1` error · `2` usage / unknown command · `130` interrupted (Ctrl-C) · `143` terminated (SIGTERM).
 - Signal handling is armed before any command work starts. The first SIGINT/SIGTERM cancels the
   owned command and awaits its cleanup. A second signal or 30-second deadline forces exit with an
-  explicit stderr warning after killing and reaping any `--play` child; exit status alone is not
-  proof of clean cancellation. Model/loading/finalization cleanup remains engine-owned.
+  explicit stderr warning after killing any `--play` child and waiting up to 2 seconds for its
+  reap; exit status alone is not proof of clean cancellation. Model/loading/finalization cleanup
+  remains engine-owned.
 - A signalled run exits `130`/`143` even when the command also failed for another reason; stderr
   (`error: …` versus `Cancelled; …`) and batch rows say which it was.
 

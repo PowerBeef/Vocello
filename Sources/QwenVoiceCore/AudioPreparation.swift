@@ -268,7 +268,14 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         guard normalizedStem.contains(fingerprint) else {
             return false
         }
-        return isCanonicalWAV(at: outputURL)
+        // A canonical header alone is not a reusable output: a conversion an
+        // earlier build interrupted (it wrote in place) can leave a header with
+        // no frames under the content-derived name, which would be reused forever.
+        guard let file = try? AVAudioFile(forReading: outputURL),
+              file.length > 0 else {
+            return false
+        }
+        return isCanonical(file: file, sourceURL: outputURL)
     }
 
     private func normalizeAudioAsynchronously(_ request: AudioPreparationRequest) async throws -> AudioNormalizationResult {
@@ -352,33 +359,29 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
             throw AudioPreparationError.failedToCreateOutputDirectory(parentDirectory.path)
         }
 
-        if fileManager.fileExists(atPath: outputURL.path) {
-            try? fileManager.removeItem(at: outputURL)
-        }
-
+        // Convert into a hidden sibling and rename it onto `outputURL` only
+        // after the conversion completed and the writer closed, so the
+        // content-named output is never observed partially written: a crash or
+        // cancellation mid-conversion leaves at most the hidden temporary file.
+        let temporaryURL = Self.temporaryConversionURL(for: outputURL)
         let writtenFrameCount: Int64
         do {
             writtenFrameCount = try await Self.convertAudio(
                 inputURL: sourceURL,
-                outputURL: outputURL,
+                outputURL: temporaryURL,
                 limits: limits,
                 deadline: deadline,
                 testingHooks: testingHooks
             )
+            try Self.replaceItem(at: outputURL, withConvertedAudioAt: temporaryURL)
         } catch is CancellationError {
-            if outputURL != sourceURL {
-                try? fileManager.removeItem(at: outputURL)
-            }
+            try? fileManager.removeItem(at: temporaryURL)
             throw AudioPreparationError.cancelled
         } catch let error as AudioPreparationError {
-            if outputURL != sourceURL {
-                try? fileManager.removeItem(at: outputURL)
-            }
+            try? fileManager.removeItem(at: temporaryURL)
             throw error
         } catch {
-            if outputURL != sourceURL {
-                try? fileManager.removeItem(at: outputURL)
-            }
+            try? fileManager.removeItem(at: temporaryURL)
             throw AudioPreparationError.conversionFailed(error.localizedDescription)
         }
 
@@ -411,6 +414,31 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
 
         let stem = Self.sanitizedStem(for: sourceURL)
         return preparedAudioDirectory.appendingPathComponent("\(stem)_\(fingerprint).wav")
+    }
+
+    /// Hidden sibling of `outputURL` in the same directory (so the final rename
+    /// stays on one volume), keeping the `.wav` extension the writer's file
+    /// type is inferred from.
+    static func temporaryConversionURL(for outputURL: URL) -> URL {
+        let stem = outputURL.deletingPathExtension().lastPathComponent
+        return outputURL.deletingLastPathComponent().appendingPathComponent(
+            ".\(stem).converting-\(UUID().uuidString).wav",
+            isDirectory: false
+        )
+    }
+
+    /// Atomically replaces `outputURL` (present or not) with the completed
+    /// conversion at `temporaryURL`.
+    private static func replaceItem(at outputURL: URL, withConvertedAudioAt temporaryURL: URL) throws {
+        let result = temporaryURL.withUnsafeFileSystemRepresentation { temporaryPath in
+            outputURL.withUnsafeFileSystemRepresentation { outputPath -> Int32 in
+                guard let temporaryPath, let outputPath else { return -1 }
+                return rename(temporaryPath, outputPath)
+            }
+        }
+        guard result == 0 else {
+            throw AudioPreparationError.failedToCreateOutput(outputURL.path)
+        }
     }
 
     private static func convertAudio(

@@ -479,6 +479,86 @@ final class CloneConditioningContractTests: XCTestCase {
         XCTAssertEqual(repeated.normalizedReference.normalizedPath, output.path)
     }
 
+    /// PA-22 / CORE-04: conversion used to write the content-named output in
+    /// place, so an interrupted conversion left a canonical header without
+    /// frames (or an empty file) that the name-based reuse accepted for good.
+    /// Such a file is not reused, and a conversion lands through a hidden
+    /// temporary file renamed into place, leaving no temporary behind.
+    func testPartialNormalizedReferenceIsNotReused() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-clone-partial-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("reference.wav")
+        try Self.writeSineWAV(sampleRate: 48_000, seconds: 1, to: source)
+        let normalizedDirectory = root.appendingPathComponent("normalized", isDirectory: true)
+        try FileManager.default.createDirectory(at: normalizedDirectory, withIntermediateDirectories: true)
+        let fingerprint = try NativePreparedCloneConditioningCache.stableCloneReferenceFingerprint(for: source)
+        let output = normalizedDirectory.appendingPathComponent(
+            NativePreparedCloneConditioningCache.stableNormalizedCloneReferenceFileName(
+                for: source,
+                referenceFingerprint: fingerprint
+            )
+        )
+
+        try Self.writeCanonicalHeaderOnlyWAV(to: output)
+        XCTAssertTrue(NativeAudioPreparationService.isCanonicalWAV(at: output), "the header alone is canonical")
+        XCTAssertFalse(NativeAudioPreparationService.canReuseExistingNormalizedOutput(
+            at: output,
+            fingerprint: fingerprint
+        ))
+        try Data().write(to: output)
+        XCTAssertFalse(NativeAudioPreparationService.canReuseExistingNormalizedOutput(
+            at: output,
+            fingerprint: fingerprint
+        ))
+
+        let resolved = try await NativePreparedCloneConditioningCache(capacity: 4).resolve(
+            modelID: "clone-fixture",
+            reference: CloneReference(audioPath: source.path),
+            sampleRate: 24_000,
+            audioPreparationService: NativeAudioPreparationService(),
+            normalizedCloneReferenceDirectory: normalizedDirectory
+        )
+        XCTAssertFalse(resolved.reusedNormalizedReference)
+        XCTAssertEqual(resolved.normalizedReference.normalizedPath, output.path)
+        XCTAssertGreaterThan(try AVAudioFile(forReading: output).length, 0)
+        XCTAssertTrue(NativeAudioPreparationService.canReuseExistingNormalizedOutput(
+            at: output,
+            fingerprint: fingerprint
+        ))
+        // A conversion interrupted after its writer opened never exposes a
+        // partial file at the output path, and leaves no temporary behind.
+        let interruptedOutput = normalizedDirectory.appendingPathComponent("interrupted.wav")
+        let interrupting = NativeAudioPreparationService(
+            testingHooks: AudioPreparationTestingHooks(
+                beforeWriterCreation: nil,
+                beforeConversionLoop: {
+                    if FileManager.default.fileExists(atPath: interruptedOutput.path) {
+                        throw PartialOutputVisible()
+                    }
+                    throw CancellationError()
+                }
+            )
+        )
+        do {
+            _ = try await interrupting.normalizeAudio(
+                AudioPreparationRequest(inputURL: source, outputURL: interruptedOutput)
+            )
+            XCTFail("the interrupted conversion must not complete")
+        } catch {
+            guard case AudioPreparationError.cancelled = error else {
+                return XCTFail("the output path held a partial file mid-conversion: \(error)")
+            }
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: interruptedOutput.path))
+        let hiddenLeftovers = try FileManager.default.contentsOfDirectory(atPath: normalizedDirectory.path)
+            .filter { $0.hasPrefix(".") }
+        XCTAssertEqual(hiddenLeftovers, [])
+    }
+
+    private struct PartialOutputVisible: Error {}
+
     /// PA-22 / CORE-05 (lifecycle half): prompts derived from one-off
     /// references are transient; only the most recently used few are kept.
     /// In-flight staging and saved-voice prompts are never touched.
@@ -523,6 +603,20 @@ final class CloneConditioningContractTests: XCTestCase {
         XCTAssertEqual(remaining, (2..<10).map { String(format: "artifact-%02d", $0) })
         XCTAssertTrue(FileManager.default.fileExists(atPath: staging.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: savedVoicePrompts.path))
+    }
+
+    /// A canonical (24 kHz mono 16-bit) WAV header with no audio frames: what an
+    /// in-place conversion interrupted right after creating its writer left.
+    private static func writeCanonicalHeaderOnlyWAV(to url: URL) throws {
+        let settings: [String: Any] = [
+            AVFormatIDKey: Int(kAudioFormatLinearPCM),
+            AVSampleRateKey: NativeAudioPreparationService.canonicalSampleRate,
+            AVNumberOfChannelsKey: Int(NativeAudioPreparationService.canonicalChannelCount),
+            AVLinearPCMBitDepthKey: NativeAudioPreparationService.canonicalBitDepth,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsFloatKey: false,
+        ]
+        _ = try AVAudioFile(forWriting: url, settings: settings)
     }
 
     private static func writeSineWAV(sampleRate: Double, seconds: Double, to url: URL) throws {

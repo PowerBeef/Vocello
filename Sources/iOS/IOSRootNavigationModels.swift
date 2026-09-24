@@ -665,6 +665,10 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.ui.historyDeleteAudioKept", defaultValue: "The take was removed from History, but its audio file could not be deleted. Vocello will try again later.",
                comment: "iOS alert message after deleting one History take whose audio file could not be deleted; a later retry removes it. Presentation only.")
     }
+    static var historyDeleteAudioStranded: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.historyDeleteAudioStranded", defaultValue: "The take was removed from History, but its audio file could not be deleted and is still stored on this iPhone.",
+               comment: "iOS alert message after deleting one History take whose audio file could not be deleted and could not be kept for a later retry either. Presentation only.")
+    }
     static var historyAudioRemovalTitle: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.historyAudioRemovalTitle", defaultValue: "Audio from deleted takes remains",
                comment: "iOS History recovery banner title when only audio of deleted takes waits to be deleted. Presentation only.")

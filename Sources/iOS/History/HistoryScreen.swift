@@ -671,8 +671,11 @@ private struct IOSHistoryLibrarySection: View {
             case .deleted:
                 reload()
             case .audioCleanupFailure:
-                _ = await GenerationHistoryRecovery.retainAudioRemoval(audioPath)
-                audioNotDeletedMessage = IOSInterfaceText.historyDeleteAudioKept
+                // Promise a later retry only when the path is on the removal list.
+                let retained = await GenerationHistoryRecovery.retainAudioRemoval(audioPath)
+                audioNotDeletedMessage = retained
+                    ? IOSInterfaceText.historyDeleteAudioKept
+                    : IOSInterfaceText.historyDeleteAudioStranded
                 isAudioNotDeletedPresented = true
                 reload()
             case .databaseFailure(let message):

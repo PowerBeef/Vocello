@@ -292,8 +292,9 @@ Search `historySearchField`; the trash control `historyClearMenu` (drawn at 34 p
 opens one confirmation, `historyClearConfirm` / `historyClearCancel`, that clears History and deletes
 its audio; if some audio files could not be deleted, a notice says how many
 (`historyClearIncompleteDismiss`, also shown when a single row's audio could not be deleted); that
-audio stays on a durable removal list that every reconcile retries and the recovery banner counts
-(AUD-05); retry `historyRetryButton`. There is no "Keep Audio Files"
+audio stays on a durable removal list that every reconcile retries and the recovery banner counts,
+and when even that list cannot be written the notice says the file remains instead of promising a
+retry (AUD-05); retry `historyRetryButton`. There is no "Keep Audio Files"
 option on iPhone (PA-21, IOS-10): outputs live in the private App Group `outputs/`, which neither
 the app nor Files can reach once their rows are gone, while backup would keep carrying them. Copies
 already exported or saved to a Saved outputs folder are outside the app and are not touched. macOS

@@ -20695,6 +20695,72 @@
         }
       }
     },
+    "vocello.ui.historyDeleteAudioStranded": {
+      "comment": "iOS alert message after deleting one History take whose audio file could not be deleted and could not be kept for a later retry either. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The take was removed from History, but its audio file could not be deleted and is still stored on this iPhone."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La prise a été retirée de l’historique, mais son fichier audio n’a pas pu être supprimé et reste stocké sur cet iPhone."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La toma se quitó del historial, pero no se pudo eliminar su archivo de audio, que sigue guardado en este iPhone."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Aufnahme wurde aus dem Verlauf entfernt, aber ihre Audiodatei konnte nicht gelöscht werden und ist noch auf diesem iPhone gespeichert."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il take è stato rimosso dalla cronologia, ma non è stato possibile eliminare il suo file audio, che è ancora salvato su questo iPhone."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A tomada foi removida do histórico, mas não foi possível excluir o arquivo de áudio, que ainda está armazenado neste iPhone."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该条音频已从历史记录移除，但无法删除其音频文件，该文件仍存储在此 iPhone 上。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テイクを履歴から削除しましたが、音声ファイルを削除できませんでした。ファイルはこのiPhoneに残っています。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "테이크를 기록에서 제거했지만 오디오 파일은 삭제하지 못해 이 iPhone에 아직 저장되어 있습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Дубль удалён из истории, но его аудиофайл удалить не удалось, и он всё ещё хранится на этом iPhone."
+          }
+        }
+      }
+    },
     "vocello.ui.historyAudioRemovalTitle": {
       "comment": "iOS History recovery banner title when only audio of deleted takes waits to be deleted. Presentation only.",
       "extractionState": "manual",

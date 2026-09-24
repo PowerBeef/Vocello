@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 import re
 
-PHASES = ["local_environment", "initial_locked", "restore_not_owned", "cancelled",
+PHASES = ["local_environment", "initial_locked", "restore_not_owned", "purchase_failed",
           "purchased", "relaunch_entitlement", "restored", "revoked", "pending", "approved"]
 PREFIX = "VOCELLO_LOCAL_PURCHASE_RESULT="
 EXPORT_PHASES = PHASES + ["owned_product_unavailable"] + [

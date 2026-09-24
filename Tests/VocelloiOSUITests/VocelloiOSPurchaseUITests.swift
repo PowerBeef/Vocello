@@ -131,15 +131,21 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
         try locked()
         record("restore_not_owned")
 
+        // An injected purchase error reaches the app as StoreKitError.unknown on the
+        // physical local StoreKit environment (observed 2026-09-24), whatever case the
+        // runner injects, so this arm proves the failure path: the failure notice,
+        // still locked, nothing finished. User cancellation (returned or thrown) is
+        // proven by IOSExportPurchaseTests.
         try await store.setSimulatedError(.generic(.userCancelled), forAPI: .purchase)
         try tap("exportPurchase_buy")
-        try notice("Purchase cancelled")
+        try notice("could not complete")
         try locked()
+        XCTAssertTrue(store.allTransactions().isEmpty, "A failed purchase must leave no transaction")
         try await store.setSimulatedError(nil, forAPI: .purchase)
         let clearedError = await store.simulatedError(forAPI: .purchase)
-        XCTAssertNil(clearedError, "Cancellation injection must be cleared before positive purchase")
+        XCTAssertNil(clearedError, "Failure injection must be cleared before positive purchase")
         guard clearedError == nil else { throw Failure.observation }
-        record("cancelled")
+        record("purchase_failed")
 
         // Keep the positive transaction independent of the fault-injection arm.
         // Read back the cleared error above, then reset Apple's other session options.

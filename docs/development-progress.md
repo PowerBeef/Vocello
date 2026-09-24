@@ -26,8 +26,9 @@ map to cancelled in the StoreKit adapter). `scripts/ui_test.sh ios purchase` lif
 (`ios-xcui-purchase-20260924-073512-c7d44217`). `--scenario exports` passed 14 phases, then timed
 out on "internal playback stays available" for the first Design History row, a 0.9 s clip
 (`ios-xcui-purchase-20260924-073819-32d98675`, attachments hold the failure tree and screenshot).
-Next: diagnose that check (likely a short-clip assumption in `checkHistoryExports`), finish the
-exports scenario, then the remaining export surfaces listed on RF-13; the rest of the plan below is
+Diagnosed from the failure screenshot: autoplay had finished a one-second Design clip, so the
+button read Play; the lane now opens the longest row and accepts finished playback (bbd8434f). Next,
+when the phone is available: rerun `--scenario exports`, then the remaining export surfaces on RF-13; the rest of the plan below is
 unchanged (PA-16 needs an M6 gate-bench baseline first).
 
 ### Current state (September 23)

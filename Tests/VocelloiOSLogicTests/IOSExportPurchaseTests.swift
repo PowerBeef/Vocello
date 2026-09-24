@@ -1,3 +1,4 @@
+import StoreKit
 import XCTest
 import QwenVoiceCore
 
@@ -100,6 +101,27 @@ final class IOSExportPurchaseTests: XCTestCase {
         await store.purchase()
         XCTAssertFalse(store.permits([.generatedPremium]))
         XCTAssertEqual(store.notice, .failed)
+    }
+
+    func testThrownUserCancellationIsACancellationNotAFailure() {
+        let cancellations: [any Error] = [
+            StoreKitError.userCancelled,
+            SKError(.paymentCancelled),
+            NSError(domain: "vocello.test.wrapper", code: 1,
+                    userInfo: [NSUnderlyingErrorKey: StoreKitError.userCancelled]),
+        ]
+        for error in cancellations {
+            XCTAssertTrue(IOSStoreKitClient.isUserCancellation(error), "\(error)")
+        }
+        let failures: [any Error] = [
+            StoreKitError.unknown,
+            StoreKitError.networkError(URLError(.notConnectedToInternet)),
+            SKError(.paymentInvalid),
+            URLError(.cancelled),
+        ]
+        for error in failures {
+            XCTAssertFalse(IOSStoreKitClient.isUserCancellation(error), "\(error)")
+        }
     }
 
     func testMissingOrWrongProductRefusesPurchase() async {

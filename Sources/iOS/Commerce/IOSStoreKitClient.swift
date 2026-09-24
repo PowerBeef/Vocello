@@ -28,7 +28,13 @@ final class IOSStoreKitClient: IOSExportPurchaseClient {
 
     func purchase() async throws -> IOSExportPurchaseResult {
         guard let loadedProduct else { throw CommerceError.productUnavailable }
-        switch try await loadedProduct.purchase() {
+        let result: Product.PurchaseResult
+        do {
+            result = try await loadedProduct.purchase()
+        } catch where Self.isUserCancellation(error) {
+            return .cancelled
+        }
+        switch result {
         case .success(let verification):
             retainForFinish(verification)
             return .success(Self.summary(verification))
@@ -70,6 +76,24 @@ final class IOSStoreKitClient: IOSExportPurchaseClient {
         return IOSExportTransaction(id: transaction.id, productID: transaction.productID,
             verified: verified, nonConsumable: transaction.productType == .nonConsumable,
             revoked: transaction.revocationDate != nil || transaction.isUpgraded)
+    }
+
+    /// StoreKit reports a user cancellation as a `.userCancelled` result, but can also
+    /// throw it (`StoreKitError.userCancelled`, or `SKError.paymentCancelled`, possibly as
+    /// an underlying error). Every form is the cancellation the user chose, never an App
+    /// Store failure; anything else stays a failure.
+    static func isUserCancellation(_ error: any Error, depth: Int = 0) -> Bool {
+        if let storeKitError = error as? StoreKitError, case .userCancelled = storeKitError {
+            return true
+        }
+        let nsError = error as NSError
+        if nsError.domain == SKErrorDomain, nsError.code == SKError.Code.paymentCancelled.rawValue {
+            return true
+        }
+        guard depth < 4, let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? any Error else {
+            return false
+        }
+        return isUserCancellation(underlying, depth: depth + 1)
     }
 
     private enum CommerceError: Error { case productUnavailable, unsupportedResult }

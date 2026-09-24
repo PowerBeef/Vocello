@@ -450,6 +450,7 @@ targets:
       - path: Sources/Models/TranscriptNormalization.swift
       - path: Sources/iOSSupport/Services/IOSAppLanguage.swift
       - path: Sources/iOS/Commerce/IOSCommercePresentationText.swift
+      - path: Sources/iOS/Commerce/IOSStoreKitClient.swift
       - path: Sources/iOSSupport/Services/IOSSettingsModelNavigation.swift
       - path: Sources/Services/MacFileSaveCopy.swift
       - path: Sources/Services/MacStudioGenerationRequestFactory.swift
@@ -542,6 +543,7 @@ targets:
       - path: Sources/SharedSupport/Services/VocelloLocalization.swift
       - path: Sources/iOSSupport/Services/IOSAppLanguage.swift
       - path: Sources/iOS/Commerce/IOSCommercePresentationText.swift
+      - path: Sources/iOS/Commerce/IOSStoreKitClient.swift
       - path: Sources/iOSSupport/Services/SavedVoicesBusyRetryPolicy.swift
     dependencies:
       - target: QwenVoiceCore

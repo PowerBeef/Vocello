@@ -190,6 +190,7 @@
 		3C9418DBE9247CC7C70FC84E /* MacModelVariantResolution.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7FE9D2BDA257CCFD9C61608 /* MacModelVariantResolution.swift */; };
 		3C95AE735CD9F27854A2BA5A /* DocumentIO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C465AE879E2D9F601EC26DB /* DocumentIO.swift */; };
 		3CB983EC52EAFD3B140F1312 /* NativeRuntimeFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3912F66CF11ACFE5DD83B2BE /* NativeRuntimeFactory.swift */; };
+		3CEA42AC76C95CA60677D58B /* IOSStoreKitClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A7B133AE6DB019C4EFCF763 /* IOSStoreKitClient.swift */; };
 		3D4801D2BC17706C34B391DE /* IOSStartupReliabilityPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB33FBAF4A255EE5634DA2AF /* IOSStartupReliabilityPlan.swift */; };
 		3D80DC80959739793C35458D /* SemanticTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3391463774A620DD7488F8FB /* SemanticTypes.swift */; };
 		3D8813651CD03DBB73CF1029 /* MLXTTSEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5480928772E9EF2D5AE57945 /* MLXTTSEngine.swift */; };
@@ -688,6 +689,7 @@
 		FCB49229725E2D9C59B1A52C /* GenerationTelemetrySchemaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2559353B52F1887141092C7C /* GenerationTelemetrySchemaTests.swift */; };
 		FCCE330E59AC279B18DA3671 /* IOSModelDownloadCancellationSequenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE9EB77045E28CAA92AE3CBE /* IOSModelDownloadCancellationSequenceTests.swift */; };
 		FDEB16B4E669707B8B8D0327 /* IOSStartupReliabilityRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 232D2030911B51F4A2D991B4 /* IOSStartupReliabilityRecord.swift */; };
+		FDEFCBCCD47A08EC2B67D975 /* IOSStoreKitClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A7B133AE6DB019C4EFCF763 /* IOSStoreKitClient.swift */; };
 		FE5FA62325678411A11D14DF /* HistoryPersistenceError.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F8727F31A416A0EB376386 /* HistoryPersistenceError.swift */; };
 		FE6A167E57D941174806BBD7 /* LongTextGenerationRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A4F18EF6E8C4624607CF181 /* LongTextGenerationRouter.swift */; };
 		FF540F76D257DCBF303A314D /* GenerationVariationPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AC640F31070C11F3F6C432D /* GenerationVariationPreference.swift */; };
@@ -2963,6 +2965,7 @@
 				25053A56CB221EA70CEF940F /* IOSStartupReliabilityPlanTests.swift in Sources */,
 				B80876FF0855FFA54AD4384D /* IOSStartupReliabilityRecord.swift in Sources */,
 				3ACFD2029190F71999219D87 /* IOSStorageProtectionPolicy.swift in Sources */,
+				FDEFCBCCD47A08EC2B67D975 /* IOSStoreKitClient.swift in Sources */,
 				202A2DA2AC1981459AD1F2AD /* LanguageFixtures.swift in Sources */,
 				A81C30D0CF51F4112214F107 /* LanguageSelectionPresentation.swift in Sources */,
 				FB580B67F03AAA61FA205BCE /* LanguageSelectionPresentationTests.swift in Sources */,
@@ -3265,6 +3268,7 @@
 				114356812C5C0E4A9A7549B4 /* IOSSingleTakeGenerationExecutorTests.swift in Sources */,
 				FDEB16B4E669707B8B8D0327 /* IOSStartupReliabilityRecord.swift in Sources */,
 				C1E668AE2F56D318A497E673 /* IOSStorageProtectionPolicy.swift in Sources */,
+				3CEA42AC76C95CA60677D58B /* IOSStoreKitClient.swift in Sources */,
 				18555A16C61F5482D428784A /* PendingVoiceCloningHandoff.swift in Sources */,
 				C4271A349C771C876F413F18 /* ReferenceTranscriptionReviewState.swift in Sources */,
 				E36C809B2425122F4AD617EC /* RuntimeReleaseCoordinator.swift in Sources */,

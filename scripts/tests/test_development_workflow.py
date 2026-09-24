@@ -237,6 +237,16 @@ class CommandRunnerTests(unittest.TestCase):
         self.assertIn("Changed paths: 0; lanes: none", stdout.getvalue())
         self.assertIn("--since origin/main", stderr.getvalue())
 
+    def test_an_empty_since_range_says_so_instead_of_suggesting_since(self) -> None:
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with mock.patch.object(MODULE, "_git", return_value=b""), \
+                mock.patch.object(MODULE, "changed_paths", return_value=[]), \
+                mock.patch.dict(MODULE.os.environ), redirect_stdout(stdout), redirect_stderr(stderr):
+            self.assertEqual(MODULE.main(["check", "--dry-run", "--since", "HEAD"]), 0)
+        self.assertIn("Changed paths: 0; lanes: none", stdout.getvalue())
+        self.assertIn("nothing committed since HEAD", stderr.getvalue())
+        self.assertNotIn("--since origin/main", stderr.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

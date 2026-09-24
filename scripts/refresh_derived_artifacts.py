@@ -48,7 +48,7 @@ ARTIFACTS: tuple[DerivedArtifact, ...] = (
         description="Sources/Resources/qwenvoice_production_model_catalog.json",
         check=("python3", "scripts/model_catalog_contract.py", "rebuild", "--check"),
         rebuild=("python3", "scripts/model_catalog_contract.py", "rebuild"),
-        stale_markers=("is stale; run model_catalog_contract.py rebuild",),
+        stale_markers=("qwenvoice_production_model_catalog.json is stale",),
     ),
     DerivedArtifact(
         artifact_id="readme-charts",
@@ -95,27 +95,35 @@ def is_stale(artifact: DerivedArtifact, result: subprocess.CompletedProcess[str]
     return any(marker in text for marker in artifact.stale_markers)
 
 
+def classify(artifact: DerivedArtifact, result: subprocess.CompletedProcess[str]) -> tuple[str, str]:
+    """Return (state, detail) for one artifact from its check. state is ok|stale|error."""
+    if result.returncode == 0:
+        return "ok", "fresh"
+    if is_stale(artifact, result):
+        return "stale", "needs rebuild"
+    # A shared check (the vendor inventory and facade baseline share one validate)
+    # also fails when only a sibling is stale: that sibling's rebuild owns it, and
+    # the closing validate still fails closed on anything else.
+    siblings = [
+        other.artifact_id
+        for other in ARTIFACTS
+        if other is not artifact and other.check == artifact.check and is_stale(other, result)
+    ]
+    if siblings:
+        return "ok", f"fresh; shared check reports {', '.join(siblings)} stale"
+    detail = combined_output(result).strip().splitlines()
+    message = detail[-1] if detail else f"exit {result.returncode}"
+    return "error", message[:160]
+
+
 def check_status(root: Path) -> list[tuple[DerivedArtifact, str, str]]:
     """Return (artifact, state, detail) rows. state is ok|stale|error."""
+    results: dict[tuple[str, ...], subprocess.CompletedProcess[str]] = {}
     rows: list[tuple[DerivedArtifact, str, str]] = []
-    # Share one vendor validate when both inventory artifacts need it.
-    vendor_result: subprocess.CompletedProcess[str] | None = None
     for artifact in ARTIFACTS:
-        if artifact.check[1:3] == ("scripts/qwen3_core_contract.py", "validate"):
-            if vendor_result is None:
-                vendor_result = run_command(artifact.check, cwd=root)
-            result = vendor_result
-        else:
-            result = run_command(artifact.check, cwd=root)
-        if result.returncode == 0:
-            rows.append((artifact, "ok", "fresh"))
-            continue
-        if is_stale(artifact, result):
-            rows.append((artifact, "stale", "needs rebuild"))
-            continue
-        detail = combined_output(result).strip().splitlines()
-        message = detail[-1] if detail else f"exit {result.returncode}"
-        rows.append((artifact, "error", message[:160]))
+        if artifact.check not in results:  # a shared check runs once
+            results[artifact.check] = run_command(artifact.check, cwd=root)
+        rows.append((artifact, *classify(artifact, results[artifact.check])))
     return rows
 
 
@@ -126,27 +134,26 @@ def refresh(
     dry_run: bool,
     only: set[str] | None,
 ) -> int:
-    rows = check_status(root)
-    selected = []
-    for artifact, state, _detail in rows:
+    # Each artifact is checked when it is reached, after every earlier rebuild:
+    # an input can itself be derived (the attributions read the model catalog), so
+    # a status taken up front would miss what an upstream rebuild makes stale.
+    results: dict[tuple[str, ...], subprocess.CompletedProcess[str]] = {}
+    rebuilt: set[tuple[str, ...]] = set()
+    for artifact in ARTIFACTS:
         if only is not None and artifact.artifact_id not in only:
             continue
-        if all_artifacts or state == "stale":
-            selected.append(artifact)
-        elif state == "error":
-            print(f"error: {artifact.artifact_id}: {_detail}", file=sys.stderr)
-            return 1
-
-    if not selected:
-        print("Derived artifacts: nothing to refresh")
-        return 0
-
-    # De-duplicate rebuilds while preserving order (facade/inventory share validate).
-    seen: set[tuple[str, ...]] = set()
-    for artifact in selected:
-        if artifact.rebuild in seen:
+        if not all_artifacts:
+            if artifact.check not in results:  # siblings share it until a rebuild
+                results[artifact.check] = run_command(artifact.check, cwd=root)
+            state, detail = classify(artifact, results[artifact.check])
+            if state == "error":
+                print(f"error: {artifact.artifact_id}: {detail}", file=sys.stderr)
+                return 1
+            if state != "stale":
+                continue
+        if artifact.rebuild in rebuilt:
             continue
-        seen.add(artifact.rebuild)
+        rebuilt.add(artifact.rebuild)
         print(f"{'dry-run' if dry_run else 'refresh'}: {artifact.artifact_id} ({artifact.description})")
         if dry_run:
             continue
@@ -156,6 +163,12 @@ def refresh(
             return 1
         if result.stdout.strip():
             print(result.stdout.rstrip())
+        results.clear()  # later checks see this rebuild
+
+    if not rebuilt:
+        print("Derived artifacts: nothing to refresh")
+    elif dry_run and not all_artifacts:
+        print("dry-run: a refresh re-checks later artifacts after each rebuild and may rebuild more")
     return 0
 
 

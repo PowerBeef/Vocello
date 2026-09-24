@@ -81,17 +81,17 @@ or a locked agent worktree before any model loads, and
 `memory` and `lang-bench` are consent-bound (`ask` rules in `.claude/settings.json`; explicit
 request required) and are never run unasked; the storage floors every lane checks first are listed under Instruments profiles below.
 
-## Scheduled ThreadSanitizer characterization
+## Blocking ThreadSanitizer subset
 
 ```sh
 scripts/macos_test.sh tsan
 ```
 
-This explicit lane instruments the deterministic `VocelloCoreTests` and injectable
-`VocelloEngineIntegrationTests` bundles. It does not execute the MLX/Metal runtime tests, whose
+This lane instruments the deterministic `VocelloCoreTests` bundle, the whole subset
+`config/tsan-policy.json` names. It does not execute the MLX/Metal runtime tests, whose
 lazy graph and single-owner behavior remain covered by their owned deterministic suite. Xcode may
 still compile linked MLX targets while building the test host. The driver launches Xcode's resolved
-`xctest` binary directly with each bundle's own embedded TSan runtime preloaded; repository-owned
+`xctest` binary directly with the bundle's own embedded TSan runtime preloaded; repository-owned
 Mach-O files remain arm64-only, while only the named Xcode sanitizer dylib may retain its universal
 toolchain slices.
 

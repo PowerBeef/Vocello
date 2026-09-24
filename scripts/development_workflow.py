@@ -366,8 +366,9 @@ def main(argv: list[str] | None = None) -> int:
                 os.environ[SINCE_ENV] = args.since
             plan = check_plan(args.paths or changed_paths(args.since))
             if not plan["changedPaths"]:
-                print("==> [dev] clean tree: no lane to run; `check --since origin/main` plans for "
-                      "committed work", file=sys.stderr, flush=True)
+                hint = (f"clean tree and nothing committed since {args.since}: no lane to run" if args.since
+                        else "clean tree: no lane to run; `check --since origin/main` plans for committed work")
+                print(f"==> [dev] {hint}", file=sys.stderr, flush=True)
             if args.dry_run:
                 lanes = ", ".join(k for k, v in plan["lanes"].items() if v) or "none"
                 print(f"Changed paths: {len(plan['changedPaths'])}; lanes: {lanes}")

@@ -17,6 +17,19 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### Paused September 24 — resume at RF-13
+
+The maintainer paused work after the RF-13 device run. RF-13 (iOS Design/Clone export unlock,
+local StoreKit only): the cancellation blocker is resolved (an injected purchase error reaches the
+app as `StoreKitError.unknown`; the lane now proves the failure path, and thrown user cancellations
+map to cancelled in the StoreKit adapter). `scripts/ui_test.sh ios purchase` lifecycle PASS
+(`ios-xcui-purchase-20260924-073512-c7d44217`). `--scenario exports` passed 14 phases, then timed
+out on "internal playback stays available" for the first Design History row, a 0.9 s clip
+(`ios-xcui-purchase-20260924-073819-32d98675`, attachments hold the failure tree and screenshot).
+Next: diagnose that check (likely a short-clip assumption in `checkHistoryExports`), finish the
+exports scenario, then the remaining export surfaces listed on RF-13; the rest of the plan below is
+unchanged (PA-16 needs an M6 gate-bench baseline first).
+
 ### Current state (September 23)
 
 Mac mini M6 (16 GB, Xcode 27; CI stays on Xcode 26.6). The lead session on `main` integrates and

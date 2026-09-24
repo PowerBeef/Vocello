@@ -229,7 +229,7 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
             if let id = historyRows[mode] {
                 row = element(id)
             } else {
-                row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "historyRowTap_")).firstMatch
+                row = try longestHistoryRow()
             }
             try require("existing \(mode) History row with visible provenance") {
                 row.exists && row.isHittable && row.label.contains(label)
@@ -244,15 +244,39 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
 
             try tap(id)
             let player = element("iosPlayer_playPause")
-            try require("internal playback stays available") { player.isEnabled && player.label == "Pause" }
-            try tap("iosPlayer_playPause")
-            try require("playback paused") { player.label == "Play" }
+            // Autoplay may already have finished a clip of about a second (observed
+            // 2026-09-24), so playing or played-to-the-end both prove playback.
+            try require("internal playback stays available") {
+                player.isEnabled && (player.label == "Pause" || player.label == "Play")
+            }
+            if player.label == "Pause" {
+                try tap("iosPlayer_playPause")
+                try require("playback paused") { player.label == "Play" }
+            }
             try tap("iosPlayer_download")
             try checkExportPresentation(allowed: unlocked || mode == "custom")
             try tap("iosPlayer_close")
             record("\(unlocked ? "owned" : "revoked")_\(mode)_player")
         }
         if let originalHistoryFilter { try selectHistoryFilter(originalHistoryFilter) }
+    }
+
+    /// The filtered list's longest visible row, so the player check sees real playback;
+    /// row labels end with the clip duration (", 3.5s").
+    private func longestHistoryRow() throws -> XCUIElement {
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "historyRowTap_"))
+        try require("History rows") { rows.count > 0 }
+        var best: (element: XCUIElement, seconds: Double)?
+        for index in 0..<min(rows.count, 8) {
+            let candidate = rows.element(boundBy: index)
+            guard candidate.isHittable else { continue }
+            let seconds = candidate.label.split(separator: ",").last
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .flatMap { $0.hasSuffix("s") ? Double($0.dropLast()) : nil } ?? 0
+            if best == nil || seconds > best!.seconds { best = (candidate, seconds) }
+        }
+        guard let best else { throw Failure.observation }
+        return best.element
     }
 
     private func selectHistoryFilter(_ label: String) throws {

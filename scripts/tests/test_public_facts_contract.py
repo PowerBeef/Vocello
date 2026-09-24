@@ -65,12 +65,14 @@ class CandidateClaimTests(unittest.TestCase):
         "candidateOnlyClaims": {"terms": ["AudioSeal", "eight delivery presets"]},
     }
 
-    def validate(self, readme: str, website: str = "", public: dict | None = None) -> list[str]:
+    def validate(self, readme: str, website: str = "", public: dict | None = None, page: str = "") -> list[str]:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "README.md").write_text(readme, encoding="utf-8")
             (root / "website/src").mkdir(parents=True)
             (root / "website/src/Section.jsx").write_text(website, encoding="utf-8")
+            (root / "website/public/privacy").mkdir(parents=True)
+            (root / "website/public/privacy/index.html").write_text(page, encoding="utf-8")
             return MODULE.validate_candidate_claims(root, public or self.PUBLIC)
 
     def test_candidate_feature_next_to_the_stable_download_fails(self) -> None:
@@ -91,6 +93,24 @@ class CandidateClaimTests(unittest.TestCase):
     def test_other_version_numbers_do_not_count_as_the_candidate(self) -> None:
         errors = self.validate("- Vocello 13.0.1 adds an AudioSeal watermark.\n")
         self.assertEqual(len(errors), 1, errors)
+        errors = self.validate("- Vocello 3.0.1 adds an AudioSeal watermark.\n")
+        self.assertEqual(len(errors), 1, errors)
+
+    def test_a_measurement_is_not_a_version_label(self) -> None:
+        for readme in (
+            "Peaks stay near 3.0 GB. Generated audio carries an inaudible AudioSeal watermark.\n",
+            "Peak memory in 3.0 GB. Generated audio carries an inaudible AudioSeal watermark.\n",
+            "Peaks stay low (3.0 GB). Generated audio carries an inaudible AudioSeal watermark.\n",
+        ):
+            with self.subTest(readme=readme):
+                self.assertEqual(len(self.validate(readme)), 1, readme)
+        self.assertEqual(self.validate("Vocello 3.0.0 marks audio with AudioSeal.\n"), [])
+
+    def test_public_html_pages_are_checked(self) -> None:
+        errors = self.validate("", page="<p>Generated audio carries an AudioSeal watermark.</p>\n")
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("website/public/privacy/index.html", errors[0])
+        self.assertEqual(self.validate("", page="<p>In Vocello 3.0, audio carries an AudioSeal watermark.</p>\n"), [])
 
     def test_claims_require_an_unpublished_candidate(self) -> None:
         public = {key: value for key, value in self.PUBLIC.items() if key != "candidateRelease"}

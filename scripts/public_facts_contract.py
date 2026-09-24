@@ -149,12 +149,21 @@ def validate_website_copy(root: Path) -> list[str]:
 
 
 CANDIDATE_CLAIM_WINDOW = 240
+MEASUREMENT_UNIT = r"(?!(?:\s|&nbsp;)*(?:[KMGT]i?B|ms|%|×|x)(?!\w))"
+
+
+def candidate_label(version: str) -> re.Pattern[str]:
+    """A version label, never a bare number: "(3.0)", "Vocello 3.0" or "in 3.0", but not "3.0 GB"."""
+    escaped = re.escape(version)
+    return re.compile(
+        rf"\({escaped}\)|\b(?:Vocello|[Ii]n)(?: |&nbsp;){escaped}(?:\.0)*(?!\.?\d){MEASUREMENT_UNIT}"
+    )
 
 
 def unscoped_candidate_claims(text: str, terms: list[str], version: str) -> list[str]:
-    """Candidate-only terms whose surrounding passage never names the candidate version."""
+    """Candidate-only terms whose surrounding passage never labels them with the candidate version."""
     flat = re.sub(r"\s+", " ", text)
-    marker = re.compile(rf"(?<![\d.]){re.escape(version)}(?!\d)")
+    marker = candidate_label(version)
     found: list[str] = []
     for term in terms:
         for match in re.finditer(re.escape(term), flat, re.IGNORECASE):
@@ -184,14 +193,17 @@ def validate_candidate_claims(root: Path, public: dict) -> list[str]:
     if source_root.is_dir():
         surfaces.extend(sorted(path for path in source_root.rglob("*")
                                if path.is_file() and path.suffix in {".js", ".jsx"}))
+    public_root = root / "website/public"
+    if public_root.is_dir():
+        surfaces.extend(sorted(path for path in public_root.rglob("*.html") if path.is_file()))
     errors: list[str] = []
     for path in surfaces:
         if not path.is_file():
             continue
         for term in unscoped_candidate_claims(path.read_text(encoding="utf-8"), terms, version):
             errors.append(
-                f"{path.relative_to(root)}: mentions candidate-only {term!r} without naming Vocello {version} "
-                "in the same passage; the stable download does not ship it"
+                f"{path.relative_to(root)}: mentions candidate-only {term!r} without a ({version}), "
+                f"Vocello {version} or in {version} label in the same passage; the stable download does not ship it"
             )
     return errors
 

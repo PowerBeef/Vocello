@@ -6,7 +6,7 @@ import importlib.util
 import io
 import subprocess
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -67,6 +67,27 @@ class CheckPlanTests(unittest.TestCase):
                 joined = commands(MODULE.check_plan([changed]))
                 self.assertIn(f"./scripts/build_ui_test_bundles.sh {expected}", joined)
 
+    def test_xcuitest_only_changes_skip_the_deterministic_suites(self) -> None:
+        """PA-06: no macOS test bundle compiles the XCUITest sources, so only their bundle compiles."""
+        mac = commands(MODULE.check_plan(["Tests/VocelloMacUITests/VocelloMacUITestCase.swift"]))
+        self.assertIn("./scripts/build_ui_test_bundles.sh macos", mac)
+        self.assertFalse(any("macos_test.sh" in c or "build_foundation_targets" in c for c in mac), mac)
+        ios = commands(MODULE.check_plan(["Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift"]))
+        self.assertIn("./scripts/build_ui_test_bundles.sh ios", ios)
+        self.assertFalse(any("macos_test.sh" in c for c in ios), ios)
+        # Beside a changed test class, a UI-test file never widens core-test to the whole lane.
+        test_file = next(ROOT.glob("Tests/VocelloCoreTests/*Tests.swift")).relative_to(ROOT).as_posix()
+        mixed = commands(MODULE.check_plan([test_file, "Tests/VocelloMacUITests/VocelloMacUITestCase.swift"]))
+        self.assertTrue(any("core-test --only" in c for c in mixed), mixed)
+        self.assertNotIn("scripts/macos_test.sh test", mixed)
+
+    def test_a_clean_tree_routes_no_lane(self) -> None:
+        plan = MODULE.check_plan([])
+        self.assertFalse(any(plan["lanes"].values()), plan["lanes"])
+        joined = commands(plan)
+        for lane_command in ("macos_test.sh", "build_foundation_targets", "npm --prefix website", "build_ui_test_bundles"):
+            self.assertFalse(any(lane_command in c for c in joined), joined)
+
     def test_ordinary_source_change_does_not_compile_ui_bundles(self) -> None:
         joined = commands(MODULE.check_plan(["Sources/ContentView.swift"]))
         self.assertFalse(any("build_ui_test_bundles" in c for c in joined))
@@ -92,6 +113,33 @@ class CheckPlanTests(unittest.TestCase):
             self.assertNotIn("ui_test.sh", command.split()[0])
             self.assertNotIn("ios_device.sh", command)
             self.assertNotIn("release.sh", command.split()[0])
+
+
+class LintTests(unittest.TestCase):
+    """SwiftLint is pinned like shellcheck and never skipped silently (PA-06)."""
+
+    def lint(self, *, installed: bool, version: str | None = None) -> tuple[list[str], str]:
+        swift = "Sources/ContentView.swift"
+        stderr = io.StringIO()
+        with mock.patch.object(MODULE, "_which", side_effect=lambda name: installed if name == "swiftlint" else True), \
+                mock.patch.object(MODULE, "_installed_version", return_value=version), redirect_stderr(stderr):
+            joined = [" ".join(command) for command in MODULE.lint_commands([swift])]
+        return joined, stderr.getvalue()
+
+    def test_a_missing_swiftlint_is_reported(self) -> None:
+        joined, stderr = self.lint(installed=False)
+        self.assertFalse(any(c.startswith("swiftlint") for c in joined), joined)
+        self.assertIn("swiftlint is not on PATH", stderr)
+        self.assertIn("install_pinned_tools.sh swiftlint", stderr)
+
+    def test_only_a_swiftlint_other_than_the_pin_is_named(self) -> None:
+        pinned = MODULE._pinned_version("swiftlint")
+        self.assertRegex(pinned or "", r"^\d+\.\d+\.\d+$")
+        joined, stderr = self.lint(installed=True, version=pinned)
+        self.assertTrue(any(c.startswith("swiftlint lint") for c in joined), joined)
+        self.assertEqual(stderr, "")
+        _, stderr = self.lint(installed=True, version="0.0.1")
+        self.assertIn(f"swiftlint 0.0.1 is not the pinned {pinned}", stderr)
 
 
 class PythonSelectionTests(unittest.TestCase):
@@ -180,6 +228,14 @@ class CommandRunnerTests(unittest.TestCase):
         run.assert_not_called()
         self.assertIn("git diff --check", buffer.getvalue())
         self.assertIn("lanes: none", buffer.getvalue())
+
+    def test_a_clean_tree_dry_run_plans_no_lane_and_points_at_since(self) -> None:
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with mock.patch.object(MODULE, "changed_paths", return_value=[]), \
+                redirect_stdout(stdout), redirect_stderr(stderr):
+            self.assertEqual(MODULE.main(["check", "--dry-run"]), 0)
+        self.assertIn("Changed paths: 0; lanes: none", stdout.getvalue())
+        self.assertIn("--since origin/main", stderr.getvalue())
 
 
 if __name__ == "__main__":

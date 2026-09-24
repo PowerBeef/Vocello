@@ -57,6 +57,7 @@ jobs:
       research: ${{ steps.classify.outputs.research }}
       website: ${{ steps.classify.outputs.website }}
       workflows: ${{ steps.classify.outputs.workflows }}
+      macos_ui: ${{ steps.classify.outputs.macos_ui }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -181,7 +182,10 @@ jobs:
     name: macOS deterministic tests
     needs: changes
     # Never on a pull request (PA-23): the Linux lanes gate PRs, main gates the Mac.
-    if: github.event_name != 'pull_request' && needs.changes.outputs.swift == 'true'
+    # A change only to the macOS XCUITest sources (macos_ui without swift, PA-06)
+    # runs this job for the bundle compile alone: the deterministic steps below
+    # and the TSan job have nothing of it to prove.
+    if: github.event_name != 'pull_request' && (needs.changes.outputs.swift == 'true' || needs.changes.outputs.macos_ui == 'true')
     runs-on: macos-26
     timeout-minutes: 45
     steps:
@@ -236,22 +240,28 @@ jobs:
         run: ./scripts/regenerate_project.sh --fast
 
       - name: Darwin-only Python modules
+        if: needs.changes.outputs.swift == 'true'
         env:
           VOCELLO_QUARANTINE: "1"
         run: python3 -m pytest -n auto -m darwin_only
 
       - name: Run deterministic macOS tests
+        if: needs.changes.outputs.swift == 'true'
         env:
           VOCELLO_QUARANTINE: "1"
         run: scripts/macos_test.sh test
 
       - name: Verify source-built CLI version identity
+        if: needs.changes.outputs.swift == 'true'
         run: ./scripts/build.sh cli --version
 
       - name: Compile the macOS XCUITest bundle (build only, never run)
         # PA-24: build-for-testing in the arena the deterministic build just
-        # warmed, with its settings, so only the UI-test target compiles. No
-        # runner is launched; repo_invariants.sh check 2 forbids executing it.
+        # warmed, with its settings, so only the UI-test target compiles. On a
+        # UI-test-only push (PA-06) the deterministic build is skipped and this
+        # also brings the app host current in the restored arena, with the same
+        # settings. No runner is launched; repo_invariants.sh check 2 forbids
+        # executing it.
         run: ./scripts/build_ui_test_bundles.sh macos --gate
 
       - name: Upload test artifacts on failure

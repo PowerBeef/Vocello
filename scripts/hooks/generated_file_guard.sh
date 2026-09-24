@@ -32,6 +32,8 @@ while IFS= read -r file_path; do
     block "edit config/roadmap.json, then python3 scripts/roadmap.py render" ;;
   Sources/Resources/qwenvoice_production_model_catalog.json)
     block "edit config/model-artifact-receipts.json, then python3 scripts/model_catalog_contract.py rebuild" ;;
+  Sources/Resources/third_party_attributions.json)
+    block "edit config/third-party-attribution-policy.json or its inputs, then python3 scripts/attribution_manifest.py rebuild" ;;
   docs/charts/*.svg)
     block "python3 scripts/generate_readme_charts.py" ;;
   benchmarks/HISTORY.md)

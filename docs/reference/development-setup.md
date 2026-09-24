@@ -49,8 +49,9 @@ Homebrew supplies the general tools; the four tools whose exact version matters 
 from the repository's SHA-pinned installer instead:
 
 ```sh
-brew install gh python node@24 swiftlint
+brew install gh python node@24
 ./scripts/install_pinned_tools.sh
+./scripts/install_pinned_tools.sh swiftlint   # optional: the advisory local lint
 cat >> ~/.zprofile <<'EOF'
 export PATH="$HOME/.qwenvoice-pinned-tools/bin:/opt/homebrew/opt/node@24/bin:$PATH"
 EOF
@@ -66,8 +67,9 @@ xcodegen's version decides the bytes of the generated Xcode project. xcodegen is
 first build even if you never edit `project.yml`, because the build scripts regenerate the project
 whenever their generation stamp under `build/` is missing; `rg` is required by
 `scripts/repo_invariants.sh` and the contract gate. `node@24` is keg-only, hence its `PATH` entry.
-SwiftLint is optional (`scripts/dev.sh lint` runs its advisory rules when installed). `gh` is the CI
-and release interface (`gh run watch`).
+SwiftLint is optional and pinned the same way (`artifactPins.swiftlint`, installed only when named):
+`scripts/dev.sh lint` runs its advisory rules, and reports when it is missing or is not the pinned
+version. `gh` is the CI and release interface (`gh run watch`).
 
 ## 3. Python
 

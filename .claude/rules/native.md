@@ -18,8 +18,9 @@ References, read only what the change needs: `docs/reference/mlx-guide.md`,
 Verification: `scripts/dev.sh test` (macOS unit and owned-runtime tests), `scripts/dev.sh ios`
 (generic device-SDK compile). `dev.sh check` compiles the XCUITest bundles for you
 (`scripts/build_ui_test_bundles.sh`, build only) whenever the dirty tree touches `Tests/*UITests`,
-`Tests/UIAutomationSupport` or `project.yml`; push CI compiles both bundles in the Swift and iOS lanes
-(`--gate`) but never executes them. Physical-device and macOS XCUITest lanes only when explicitly
+`Tests/UIAutomationSupport` or `project.yml`; push CI compiles both bundles in the `macos-tests` and
+`ios-compile` jobs (`--gate`) but never executes them; a change only under `Tests/Vocello*UITests`
+skips the deterministic suites and TSan. Physical-device and macOS XCUITest lanes only when explicitly
 requested.
 
 ## Engine and runtime (owned package `Packages/VocelloQwen3Core`, `Sources/QwenVoiceCore`)
@@ -157,8 +158,9 @@ requested.
 - **Flaky tests are quarantined, not deleted or retried.** List the test in `config/test-quarantine.json`
   and call `try TestQuarantine.skipIfListed(self)`; push CI skips it, nightly still runs it, and the entry
   expires after 30 days.
-- `scripts/dev.sh lint` runs the advisory SwiftLint rules in `.swiftlint.yml` on changed files when
-  SwiftLint is installed; formatting stays Xcode's.
+- `scripts/dev.sh lint` runs the advisory SwiftLint rules in `.swiftlint.yml` on changed files and
+  reports a missing or unpinned SwiftLint (`./scripts/install_pinned_tools.sh swiftlint`); formatting
+  stays Xcode's.
 
 ## Common mistakes
 

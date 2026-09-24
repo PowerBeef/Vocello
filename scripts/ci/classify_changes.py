@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """Classify the paths a push changed into CI lanes.
 
-Writes `<lane>=true|false` for the lanes swift, ios, python, research, website
-and workflows to $GITHUB_OUTPUT (or stdout when unset). An empty or unknowable
-diff (first push, dispatch, rewritten history) enables every lane, so routing
-can only ever skip work, never invent a pass.
+Writes `<lane>=true|false` for the lanes swift, ios, python, research, website,
+workflows and macos_ui to $GITHUB_OUTPUT (or stdout when unset). An empty or
+unknowable diff (first push, dispatch, rewritten history) enables every lane, so
+routing can only ever skip work, never invent a pass.
+
+`macos_ui` is the macOS XCUITest bundle's own sources (PA-06). The macOS job
+compiles that bundle on every run; when only `macos_ui` routes it, the job
+compiles the bundle and skips the deterministic suites, and the TSan job stays
+off: no deterministic bundle, sanitizer subset or app target compiles those
+sources. The iOS XCUITest sources route to the iOS lane alone, whose job
+compiles them.
 
 Each lane is diffed against the last run on this branch in which that lane's
 job passed (`CI_HISTORY_PATH`, written by the workflow from `gh run view`), not
@@ -32,14 +39,16 @@ import os
 import subprocess
 import sys
 
-LANES = ("swift", "ios", "python", "research", "website", "workflows")
-# The CI job whose success proves a lane ran; research shares the Python job.
+LANES = ("swift", "ios", "python", "research", "website", "workflows", "macos_ui")
+# The CI job whose success proves a lane ran; research shares the Python job and
+# macos_ui the macOS job, which compiles the macOS XCUITest bundle on every run.
 LANE_JOBS = {
     "swift": "macOS deterministic tests",
     "ios": "iOS compile check (device SDK)",
     "python": "Python tests (linux)",
     "research": "Python tests (linux)",
     "website": "Website deterministic checks",
+    "macos_ui": "macOS deterministic tests",
 }
 # Jobs that route with a lane and must also have passed before its base
 # advances. Without the TSan job here, a run whose deterministic tests passed
@@ -62,6 +71,15 @@ MACOS_ONLY = (
     "Sources/VocelloCLI/*",
     "Tests/VocelloMacUITests/*",
 )
+
+# Sources that only an XCUITest bundle compiles: no deterministic bundle, TSan
+# subset or app target reads them, so they never route to the swift lane. The
+# macOS bundle's sources route to macos_ui, the iOS bundles' to ios.
+# Tests/UIAutomationSupport stays a swift input: VocelloCoreTests compiles part
+# of it (project.yml), and it reaches both XCUITest bundles.
+MACOS_UI_TEST_SOURCES = ("Tests/VocelloMacUITests/",)
+IOS_UI_TEST_SOURCES = ("Tests/VocelloiOSUITests/",)
+SHARED_UI_TEST_SOURCES = ("Tests/UIAutomationSupport/",)
 
 # Push CI's own inputs: when they change, every native lane reruns. Other
 # workflows (nightly, release, security, promotion, dependabot) and the
@@ -121,6 +139,8 @@ def _is_benchmark_evidence(path: str) -> bool:
 
 def _is_swift(path: str) -> bool:
     """Inputs of the macOS job: the compile, its own driver scripts and the darwin-only pytest lane."""
+    if path.startswith(MACOS_UI_TEST_SOURCES + IOS_UI_TEST_SOURCES):
+        return False
     if path.startswith(("Sources/", "Tests/", "QwenVoice.xcodeproj/", "config/xcode-schemes/")):
         return True
     if path == "project.yml" or path.endswith("Package.resolved"):
@@ -149,6 +169,11 @@ def _is_ios(path: str) -> bool:
     if path.startswith("Sources/Resources/"):
         return path.endswith(".xcstrings")
     return (path.startswith("Sources/") or path.startswith("Tests/")) and not _match(path, MACOS_ONLY)
+
+
+def _is_macos_ui(path: str) -> bool:
+    """Sources of the macOS XCUITest bundle that are not already swift-lane compile inputs."""
+    return path.startswith(MACOS_UI_TEST_SOURCES + SHARED_UI_TEST_SOURCES)
 
 
 def _is_python(path: str) -> bool:
@@ -195,6 +220,8 @@ def classify(paths: list[str]) -> dict[str, bool]:
             lanes["ios"] = True
         if _is_research(path):
             lanes["research"] = True
+        if _is_macos_ui(path):
+            lanes["macos_ui"] = True
     return lanes
 
 

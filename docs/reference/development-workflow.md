@@ -24,7 +24,7 @@ scripts/dev.sh test --only FooTests  # one XCTest class on the incremental test 
 scripts/dev.sh py                    # Python consumers of the changed tooling (--all, --lane, or modules)
 scripts/dev.sh contracts             # the contract gate alone (check_project_inputs.sh --local)
 scripts/dev.sh ios                   # generic device-SDK compile (incremental, no phone)
-scripts/dev.sh regen                 # regenerate roadmap render, catalog, inventories, charts
+scripts/dev.sh regen                 # regenerate roadmap render, catalog, inventories, charts, attributions
 scripts/dev.sh ci                    # what push CI runs, serially, when you want the push green first time
 git add <assigned-files>
 git commit
@@ -35,10 +35,15 @@ Routing is `scripts/ci/classify_changes.py`, the same file CI uses, so the local
 lanes agree. `scripts/dev.sh check` compiles the affected XCUITest bundles through
 `scripts/build_ui_test_bundles.sh` when UI-test sources or `project.yml` change; it never runs them.
 Push CI compiles both bundles too (`--gate`, after the deterministic builds in their arenas) and never
-runs them. On a push, CI diffs each lane against the last run on the
+runs them. XCUITest-only sources never reach the `swift` lane, since no deterministic bundle or TSan
+subset compiles them: `Tests/VocelloMacUITests` routes to `macos_ui`, which runs `macos-tests` for
+the bundle compile alone, and `Tests/VocelloiOSUITests` routes to `ios` alone
+(`Tests/UIAutomationSupport` stays a `swift` input because `VocelloCoreTests` compiles part of it).
+On a push, CI diffs each lane against the last run on the
 branch in which that lane's job passed (not against the previous push), because `cancel-in-progress`
 can drop a superseded push's run and the lanes it owed must still run on the next push; a lane with
-no prior green run always runs. Locally the lanes come from the dirty tree: `swift` runs the macOS
+no prior green run always runs. Locally the lanes come from the dirty tree, and a clean tree routes
+no lane (`--since origin/main` plans for committed work): `swift` runs the macOS
 test bundles (`scripts/macos_test.sh test`, or `core-test --only` when only test classes changed),
 `ios` runs the generic compile, `python` runs the reverse-dependency Python selection, `website`
 runs `npm --prefix website run check`. A change to shared tooling (`scripts/lib/`,
@@ -76,13 +81,16 @@ CI while nothing under `scripts/` or `config/` is dirty.
 
 ## Lint and warnings
 
-`scripts/dev.sh lint` runs `git diff --check`, the privacy scan, shellcheck on changed shell and, when
-SwiftLint is installed, the low-noise rules in `.swiftlint.yml` on changed Swift files under `Sources/`
-and `Tests/` (advisory; formatting stays Xcode's). Owned Xcode targets compile with
-`SWIFT_TREAT_WARNINGS_AS_ERRORS`, so a new warning fails the local build before it reaches CI. Flaky
-tests go into `config/test-quarantine.json` (`Tests/VocelloCoreTests/TestQuarantine.swift` for XCTest,
-the pytest node id for Python); push CI sets `VOCELLO_QUARANTINE=1` and skips them, nightly runs them,
-and `scripts/repo_invariants.sh` fails once an entry is 30 days old.
+`scripts/dev.sh lint` runs `git diff --check`, the privacy scan, shellcheck on changed shell and
+SwiftLint's low-noise rules in `.swiftlint.yml` on changed Swift files under `Sources/` and `Tests/`
+(advisory; formatting stays Xcode's). Both linters are pinned in `config/toolchain.json`; a missing
+one is reported, not silently skipped, and a SwiftLint other than the pin is named
+(`./scripts/install_pinned_tools.sh swiftlint` installs the pin; CI never runs it). Owned Xcode
+targets compile with `SWIFT_TREAT_WARNINGS_AS_ERRORS`, so a new warning fails the local build before
+it reaches CI. Flaky tests go into `config/test-quarantine.json`
+(`Tests/VocelloCoreTests/TestQuarantine.swift` for XCTest, the pytest node id for Python); push CI
+sets `VOCELLO_QUARANTINE=1` and skips them, nightly runs them, and `scripts/repo_invariants.sh`
+fails once an entry is 30 days old.
 
 ## Python tests
 
@@ -100,8 +108,8 @@ tests; a test that outgrows its lane moves, it does not slow every push. `pytest
 | `changes` | ubuntu | always | seconds |
 | `contracts` | ubuntu | always | about 1 min: the action-pin check (`supply_chain_contract.py`) first, then the complete deterministic contract gate (`check_project_inputs.sh --python none`: product contracts, invariants, privacy scan, work authority, benchmark history) |
 | `python` | ubuntu | Python paths, contracts, workflow files | 3 to 4 min: product and tooling tests; research tests when routed |
-| `macos-tests` | macos-26 | never on a pull request; Swift compile inputs, the lane's own scripts, build configs and benchmark evidence | cached DerivedData; darwin-only Python modules, macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s), then `build_ui_test_bundles.sh macos --gate` compiles the macOS XCUITest bundle in the same arena (build only) |
-| `macos-tsan` | macos-26 | never on a pull request; Swift compile inputs (same routing as `macos-tests`) | cached `macos-tsan` DerivedData; `scripts/macos_test.sh tsan`, the deterministic core bundles under ThreadSanitizer, blocking since 2026-09-14 (`config/tsan-policy.json`); 5 to 11 min on a second runner |
+| `macos-tests` | macos-26 | never on a pull request; Swift compile inputs, the lane's own scripts, build configs and benchmark evidence; also macOS XCUITest sources (`macos_ui`), which run only the bundle compile | cached DerivedData; darwin-only Python modules, macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s), then `build_ui_test_bundles.sh macos --gate` compiles the macOS XCUITest bundle in the same arena (build only) |
+| `macos-tsan` | macos-26 | never on a pull request; the `swift` lane only (never `macos_ui`) | cached `macos-tsan` DerivedData; `scripts/macos_test.sh tsan`, the deterministic core bundles under ThreadSanitizer, blocking since 2026-09-14 (`config/tsan-policy.json`); 5 to 11 min on a second runner |
 | `ios-compile` | macos-26 | never on a pull request; iOS compile inputs | cached DerivedData; `build_foundation_targets.sh ios --incremental` at `-Onone` (`QVOICE_FOUNDATION_SWIFT_OPTIMIZATION`), then `build_ui_test_bundles.sh ios --gate` compiles the iOS XCUITest bundle unsigned in the same arena (build only) |
 | `website` | ubuntu | `website/` | about 1 min |
 | `dependency-submission` | ubuntu | push only (skipped on dispatch and pull requests) | seconds: `scripts/swift_dependency_snapshot.py` submitted to the GitHub dependency graph; needed by `CI required` |

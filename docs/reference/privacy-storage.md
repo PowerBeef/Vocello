@@ -302,7 +302,7 @@ block byte-for-byte, so a manifest change cannot silently leave documentation st
 | --- | --- | --- | --- | --- |
 | `build/cache/xcode/macos/` | macOS -Onone builds: development app, CLI and deterministic test bundles | `cache` | `aggressive` | Persistent incremental macOS Xcode cache |
 | `build/cache/xcode/macos-optimized/` | Optimized (-O) macOS builds: benchmark CLI and macOS XCUITest lanes | `cache` | `aggressive` | Persistent incremental optimized macOS Xcode cache; keeps the -Onone arena from recompiling after every optimized build |
-| `build/cache/xcode/macos-tsan/` | Scheduled macOS ThreadSanitizer characterization lane | `cache` | `aggressive` | Isolated incremental macOS ThreadSanitizer Xcode cache |
+| `build/cache/xcode/macos-tsan/` | Blocking macOS ThreadSanitizer subset: push CI macos-tsan job and scripts/macos_test.sh tsan | `cache` | `aggressive` | Isolated incremental macOS ThreadSanitizer Xcode cache |
 | `build/cache/xcode/ios-device/` | Physical-device iOS build and XCUITest lanes | `cache` | `aggressive` | Persistent incremental physical-device Xcode cache |
 | `build/cache/xcode/source-packages/` | Serialized Xcode SwiftPM resolver | `cache` | `aggressive` | Shared pinned Xcode package checkout and artifact store |
 | `build/cache/swiftpm/mlx-audio-runtime/` | Owned Vocello Qwen3 Core SwiftPM commands | `cache` | `aggressive` | Persistent package-specific SwiftPM scratch cache |

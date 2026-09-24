@@ -165,6 +165,34 @@ class RoutingTests(unittest.TestCase):
         lanes, reason = MODULE.route_push(self.head, self.shas["c2"], history, cwd=str(self.repo))
         self.assertTrue(lanes["swift"], reason)
 
+    def test_a_macos_ui_test_push_compiles_the_bundle_without_the_suites_or_tsan(self) -> None:
+        # PA-06: only the macOS XCUITest sources changed since every lane last
+        # passed; the macOS job runs for the bundle compile, TSan does not.
+        self.commit("c4", "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift")
+        history = self.history(c3="swift,ios,python,website,macos_ui")
+        lanes, reason = MODULE.route_push(self.shas["c4"], self.shas["c3"], history, cwd=str(self.repo))
+        self.assertEqual({lane for lane, on in lanes.items() if on}, {"macos_ui"}, reason)
+
+    def test_a_macos_ui_only_run_proves_the_swift_lane_at_its_head(self) -> None:
+        # The macOS job passed with its deterministic steps routed off and the
+        # TSan job skipped inside a green run: swift had nothing to prove there,
+        # so both bases advance and a later docs push reruns nothing native.
+        self.commit("c4", "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift")
+        self.commit("c5", "docs/other.md")
+        tsan = MODULE.LANE_COMPANION_JOBS["swift"][0]
+        history = [{"headSha": self.shas["c4"], "conclusion": "success",
+                    "jobs": {MODULE.LANE_JOBS["macos_ui"]: "success", tsan: "skipped"}}]
+        bases = MODULE.lane_bases(history, self.shas["c5"], cwd=str(self.repo))
+        self.assertEqual(bases["swift"], self.shas["c4"])
+        self.assertEqual(bases["macos_ui"], self.shas["c4"])
+        # A failed UI-bundle compile keeps macos_ui owed and never advances swift.
+        failed = [{"headSha": self.shas["c4"], "conclusion": "failure",
+                   "jobs": {MODULE.LANE_JOBS["macos_ui"]: "failure", tsan: "skipped"}},
+                  *self.history(c3="swift,macos_ui")]
+        lanes, reason = MODULE.route_push(self.shas["c5"], self.shas["c4"], failed, cwd=str(self.repo))
+        self.assertTrue(lanes["macos_ui"], reason)
+        self.assertFalse(lanes["swift"], reason)
+
 
 class ClassificationTests(unittest.TestCase):
     def lanes(self, path: str) -> set[str]:
@@ -223,6 +251,22 @@ class ClassificationTests(unittest.TestCase):
         }
         for path, lanes in expected.items():
             self.assertEqual(self.lanes(path), lanes, path)
+
+    def test_xcuitest_only_sources_skip_the_swift_lane(self) -> None:
+        # PA-06: no deterministic bundle or TSan subset compiles the XCUITest
+        # targets. The shared support module stays a swift input because
+        # VocelloCoreTests compiles part of it.
+        expected = {
+            "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift": {"macos_ui"},
+            "Tests/VocelloMacUITests/Info.plist": {"macos_ui"},
+            "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift": {"ios"},
+            "Tests/UIAutomationSupport/VocelloUIInteractionPolicy.swift": {"swift", "ios", "macos_ui"},
+            "Tests/VocelloCoreTests/CLIExecutionTests.swift": {"swift", "ios"},
+            "Tests/VocelloiOSLogicTests/X.swift": {"swift", "ios"},
+        }
+        for path, lanes in expected.items():
+            self.assertEqual(self.lanes(path), lanes, path)
+        self.assertTrue(MODULE.classify([])["macos_ui"])
 
 
 if __name__ == "__main__":

@@ -5,9 +5,9 @@
 # builds and the deterministic suites never touch, so until 2026-09-17 a syntax
 # error in the code that drives every acceptance lane reached a human only when
 # someone ran a lane. `scripts/dev.sh check` runs this when UI-test sources or
-# project.yml change, and push CI runs it with `--gate` in the Swift and iOS
-# lanes (PA-24). Compiling is not executing: `repo_invariants.sh` check #2
-# still forbids every workflow from executing XCUITest.
+# project.yml change, and push CI runs it with `--gate` in the macos-tests and
+# ios-compile jobs (PA-24). Compiling is not executing: `repo_invariants.sh`
+# check #2 still forbids every workflow from executing XCUITest.
 #
 # Two arenas:
 #   default  each bundle compiles with its lane's exact settings in the lane's
@@ -16,7 +16,9 @@
 #            deterministic build that just ran there (`scripts/macos_test.sh
 #            test` on macOS, `build_foundation_targets.sh ios --incremental` on
 #            iOS), so the app host is already current and only the UI-test
-#            target compiles. Push CI uses this right after those builds.
+#            target compiles. Push CI uses this right after those builds; on
+#            a push that changed only the macOS UI-test sources the macOS
+#            build is skipped and this brings the app host current itself.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

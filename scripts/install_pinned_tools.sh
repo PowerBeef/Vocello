@@ -13,7 +13,8 @@
 # Usage: scripts/install_pinned_tools.sh [--prefix DIR] [TOOL...]
 #   Default prefix: $HOME/.qwenvoice-pinned-tools/bin
 #   Default tools: xcodegen ripgrep xcbeautify shellcheck. Name other
-#   `artifactPins` entries (for example gh, which release jobs need) to install them.
+#   `artifactPins` entries (for example gh, which release jobs need, or
+#   swiftlint for the advisory local lint, which CI never runs) to install them.
 #   In GitHub Actions the prefix is appended to $GITHUB_PATH so subsequent
 #   steps resolve the pinned binaries first.
 

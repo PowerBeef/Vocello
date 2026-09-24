@@ -158,7 +158,7 @@
       "id": "xcode-macos-tsan-derived-data",
       "path": "build/cache/xcode/macos-tsan",
       "class": "cache",
-      "owner": "Scheduled macOS ThreadSanitizer characterization lane",
+      "owner": "Blocking macOS ThreadSanitizer subset: push CI macos-tsan job and scripts/macos_test.sh tsan",
       "cleanup": "aggressive",
       "retention": "Isolated incremental macOS ThreadSanitizer Xcode cache",
       "env": "QVOICE_XCODE_MACOS_TSAN_DERIVED"

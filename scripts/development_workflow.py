@@ -74,8 +74,16 @@ def _load(relative: str):
 
 
 def lanes_for(paths: list[str]) -> dict[str, bool]:
-    """Same routing CI uses (scripts/ci/classify_changes.py)."""
-    return _load("scripts/ci/classify_changes.py").classify(paths)
+    """Same routing CI uses (scripts/ci/classify_changes.py), except for an empty path set.
+
+    CI treats an empty diff as unknowable and runs every lane; locally it is a
+    clean tree, which has nothing to verify (`check --since REF` plans for
+    committed work).
+    """
+    classify_changes = _load("scripts/ci/classify_changes.py")
+    if not paths:
+        return {lane: False for lane in classify_changes.LANES}
+    return classify_changes.classify(paths)
 
 
 def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict:
@@ -161,7 +169,43 @@ def lint_commands(paths: list[str]) -> list[list[str]]:
              and p.startswith(("Sources/", "Tests/"))]
     if swift and _which("swiftlint"):
         commands.append(["swiftlint", "lint", "--quiet", "--strict", "--config", ".swiftlint.yml", *swift])
+        pinned, installed = _pinned_version("swiftlint"), _installed_version(["swiftlint", "version"])
+        if pinned and installed != pinned:
+            print(
+                f"==> [dev] swiftlint {installed or 'of unknown version'} is not the pinned {pinned}; its "
+                "advisory findings can differ (scripts/install_pinned_tools.sh swiftlint installs the pin)",
+                file=sys.stderr, flush=True,
+            )
+    elif swift:
+        print(
+            f"==> [dev] swiftlint is not on PATH; {len(swift)} changed Swift file(s) are not linted "
+            "(config/toolchain.json pins the version; scripts/install_pinned_tools.sh swiftlint installs it)",
+            file=sys.stderr, flush=True,
+        )
     return commands
+
+
+def _pinned_version(tool: str) -> str | None:
+    """The release-artifact version config/toolchain.json pins for `tool`, if any."""
+    try:
+        manifest = json.loads((ROOT / "config/toolchain.json").read_text(encoding="utf-8"))
+        return str(manifest["artifactPins"][tool]["version"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def _installed_version(command: list[str]) -> str | None:
+    try:
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=10, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    lines = completed.stdout.strip().splitlines()
+    return lines[0].strip() if completed.returncode == 0 and lines else None
+
+
+# XCUITest-only sources: no deterministic macOS bundle compiles them, so they
+# never make a Swift change "product" (their bundles compile via ui_bundle_mode).
+UI_TEST_ONLY_SOURCES = ("Tests/VocelloMacUITests/", "Tests/VocelloiOSUITests/")
 
 
 def swift_test_commands(paths: list[str], *, everything: bool = False) -> list[list[str]]:
@@ -169,7 +213,8 @@ def swift_test_commands(paths: list[str], *, everything: bool = False) -> list[l
         return [["scripts/macos_test.sh", "test"]]
     classes = changed_swift_test_classes(paths)
     product = [p for p in paths if p.startswith(("Sources/", "Tests/")) and p.endswith(".swift")
-               and not p.startswith(("Tests/VocelloCoreTests/", "Tests/VocelloiOSLogicTests/"))]
+               and not p.startswith(("Tests/VocelloCoreTests/", "Tests/VocelloiOSLogicTests/",
+                                     *UI_TEST_ONLY_SOURCES))]
     if product:
         return [["scripts/macos_test.sh", "test"]]
     if classes:
@@ -271,7 +316,7 @@ def run_commands(commands: list[list[str]]) -> None:
 def print_status() -> None:
     branch = _git("symbolic-ref", "--quiet", "--short", "HEAD").decode().strip() or "detached HEAD"
     paths = changed_paths()
-    lanes = [name for name, on in lanes_for(paths).items() if on] if paths else []
+    lanes = [name for name, on in lanes_for(paths).items() if on]
     print(f"branch: {branch}")
     print(f"dirty: {len(paths)} path(s)")
     print(f"lanes: {', '.join(lanes) or 'none'} (scripts/dev.sh check --dry-run for the commands)")
@@ -294,7 +339,7 @@ def main(argv: list[str] | None = None) -> int:
     check.add_argument("--since", metavar="REF",
                        help="also plan for everything committed since REF (for example origin/main): "
                             "verifies an unpushed batch after its commits leave the tree clean")
-    sub.add_parser("lint", help="git diff --check, privacy scan, shellcheck on changed shell")
+    sub.add_parser("lint", help="git diff --check, privacy scan, shellcheck on changed shell, swiftlint on changed Swift")
     sub.add_parser("contracts", help="product and repository contracts (check_project_inputs.sh --local)")
     py = sub.add_parser("py", help="Python tests: changed consumers (default), --all, --lane, or explicit modules")
     py.add_argument("--all", action="store_true")
@@ -320,6 +365,9 @@ def main(argv: list[str] | None = None) -> int:
                 _git("rev-parse", "--verify", "--quiet", f"{args.since}^{{commit}}")
                 os.environ[SINCE_ENV] = args.since
             plan = check_plan(args.paths or changed_paths(args.since))
+            if not plan["changedPaths"]:
+                print("==> [dev] clean tree: no lane to run; `check --since origin/main` plans for "
+                      "committed work", file=sys.stderr, flush=True)
             if args.dry_run:
                 lanes = ", ".join(k for k, v in plan["lanes"].items() if v) or "none"
                 print(f"Changed paths: {len(plan['changedPaths'])}; lanes: {lanes}")

@@ -58,6 +58,13 @@ ARTIFACTS: tuple[DerivedArtifact, ...] = (
         stale_markers=("README charts are stale",),
     ),
     DerivedArtifact(
+        artifact_id="third-party-attributions",
+        description="Sources/Resources/third_party_attributions.json",
+        check=("python3", "scripts/attribution_manifest.py", "validate"),
+        rebuild=("python3", "scripts/attribution_manifest.py", "rebuild"),
+        stale_markers=("third_party_attributions.json is stale",),
+    ),
+    DerivedArtifact(
         artifact_id="roadmap-render",
         description="docs/ROADMAP.md",
         check=("python3", "scripts/roadmap.py", "render", "--check"),
@@ -164,11 +171,9 @@ def print_status(root: Path) -> int:
 
 
 def validate_all(root: Path) -> int:
-    commands = (
-        ("python3", "scripts/qwen3_core_contract.py", "validate"),
-        ("python3", "scripts/model_catalog_contract.py", "rebuild", "--check"),
-        ("python3", "scripts/roadmap.py", "render", "--check"),
-    )
+    # Every registered artifact's check, once each (the vendor inventory and
+    # facade baseline share one validate), so a new registration is validated too.
+    commands = tuple(dict.fromkeys(artifact.check for artifact in ARTIFACTS))
     for command in commands:
         result = run_command(command, cwd=root)
         if result.returncode != 0:

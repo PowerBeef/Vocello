@@ -1,9 +1,12 @@
 name: Nightly
 
-# The slow lanes that never belonged on every push: the Thread Sanitizer
-# subset, the complete Python suite, and cold foundation compiles of both
-# platforms. Failure opens (or refreshes) one issue labelled `nightly`; nothing
-# here blocks a commit or a push, and no retry is automatic.
+# The cold and complete passes behind push CI: a cold run of the Thread
+# Sanitizer subset (push CI's macos-tsan job runs it on its warm cache and has
+# blocked every Swift push since 2026-09-14, config/tsan-policy.json), the
+# complete Python suite including quarantined tests, and cold foundation
+# compiles of both platforms. Failure opens (or refreshes) one issue labelled
+# `nightly`; this workflow itself blocks no commit or push, and no retry is
+# automatic.
 on:
   schedule:
     - cron: '0 4 * * *'

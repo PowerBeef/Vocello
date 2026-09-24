@@ -580,8 +580,10 @@ The three macOS Studio modes generate through the shared pipeline: a per-mode
 `StudioGenerationCoordinator` owned by `MacAppModel` holds the attempt-scoped terminal state,
 `IOSSingleTakeGenerationExecutor` runs the take, and `MacStudioSingleTakeGenerationHooks` owns the
 frontend timeline, the live-preview estimate, the playback handoff with autoplay, History
-persistence and the two-layer telemetry merge; `MacStudioGenerationActions` cancels through the
-engine's barrier. The batch sheet (`MacBatchGenerationSheet`) runs the two batch shapes on the same
+persistence and the two-layer telemetry merge. A screen validates its draft and hands the immutable
+plan to `MacStudioGenerationActions`, whose `MacStudioSingleTakeRunner` starts the take, installs its
+task on the coordinator and cancels through the engine's barrier; no screen constructs or holds a
+generation task. The batch sheet (`MacBatchGenerationSheet`) runs the two batch shapes on the same
 pipeline: a line-by-line batch on `MacLineBatchRunner` (one ordinary take per line through the
 single-take executor and the macOS hooks) and a long-form project on the shared iOS
 `IOSLongFormCoordinator` / `IOSLongFormProjectRunner` with `MacStudioLongFormPlatformHooks`, both

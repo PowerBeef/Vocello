@@ -103,7 +103,8 @@ requested.
 - **Studio generation runs on the shared pipeline.** `StudioGenerationCoordinator` (owned by `MacAppModel`)
   holds the attempt-scoped terminal state, `IOSSingleTakeGenerationExecutor` runs the take through
   `MacStudioSingleTakeGenerationHooks` (timeline, playback handoff, History, telemetry merge) and
-  `MacStudioGenerationActions` cancels through the engine barrier; no view starts a task of its own.
+  `MacStudioGenerationActions` starts each take from the view's immutable plan and cancels through the
+  engine barrier (both on `MacStudioSingleTakeRunner`); no view starts or holds a task of its own.
   Line batch loops the same executor through `MacLineBatchRunner`; long-form runs the iOS
   `IOSLongFormCoordinator` with `MacStudioLongFormPlatformHooks`; both are owned by `MacAppModel` and
   the batch sheet (`MacBatchGenerationSheet`) only projects their state.

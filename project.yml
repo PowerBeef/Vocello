@@ -452,6 +452,11 @@ targets:
       - path: Sources/iOSSupport/Services/IOSSettingsModelNavigation.swift
       - path: Sources/Services/MacFileSaveCopy.swift
       - path: Sources/Services/MacStudioGenerationRequestFactory.swift
+      # AUD-03: the Studio start/cancel owner on the real attempt-scoped
+      # coordinator (and the dock payloads it publishes), with a fake engine.
+      - path: Sources/Services/MacStudioSingleTakeRunner.swift
+      - path: Sources/iOS/Studio/StudioGenerationCoordinator.swift
+      - path: Sources/iOS/Studio/StudioGenerationItems.swift
       - path: Sources/Services/MacLineBatchRequest.swift
       - path: Sources/Services/MacModelVariantResolution.swift
       - path: Sources/Services/LongTextGenerationRouter.swift

@@ -11,14 +11,16 @@ import QwenVoiceCore
 /// attempt-scoped lifecycle methods. `start()` returns the token required by
 /// every asynchronous terminal callback.
 ///
-/// The actual `await ttsEngine.generate(...)` call deliberately lives
-/// in the per-mode views (final architecture, not a TODO) — they
-/// assemble mode-specific `GenerationRequest` payloads from their
-/// drafts + speakers + delivery state and the environment-owned engine
-/// stores — while UI-visible state (`isGenerating`, `errorMessage`,
+/// On iOS the per-mode views assemble mode-specific `GenerationRequest`
+/// payloads from their drafts + speakers + delivery state and run the take
+/// through `IOSSingleTakeGenerationExecutor`; on macOS the views hand an
+/// immutable plan to `MacStudioGenerationActions`, whose
+/// `MacStudioSingleTakeRunner` starts the take and installs its task here
+/// (AUD-03). UI-visible state (`isGenerating`, `errorMessage`,
 /// `lastCompletedOutput`) flows through this Observable so the unified
 /// StudioScreen + StudioDock can react without per-mode branching. The
-/// shared cancel path is `IOSStudioGenerationActions.cancelGeneration`.
+/// shared cancel paths are `IOSStudioGenerationActions.cancelGeneration`
+/// and `MacStudioGenerationActions.cancelGeneration`.
 @MainActor
 @Observable
 final class StudioGenerationCoordinator {

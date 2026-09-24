@@ -18,7 +18,8 @@ private struct CloneReferenceSessionState: Equatable {
 
 /// The iOS-derived Studio canvas with a native reference popover. Reference
 /// selection, import, recording and transcript review share one focused surface;
-/// generation and proactive priming retain their existing owners.
+/// a take goes to `MacStudioGenerationActions` as an immutable plan (with its
+/// on-demand clone priming) and proactive priming stays with the engine store.
 struct MacVoiceCloningScreen: View {
     @EnvironmentObject private var ttsEngineStore: TTSEngineStore
     @EnvironmentObject private var audioPlayer: AudioPlayerViewModel
@@ -934,24 +935,7 @@ struct MacVoiceCloningScreen: View {
 
         let text = currentDraft.text
         let voiceName = selectedVoice?.name ?? URL(fileURLWithPath: refPath).deletingPathExtension().lastPathComponent
-        let modeLabel = MacInterfaceText.modeName(.clone)
-        let waveformSeed = VocelloStableVisualHash.int(text)
-        let primingKey = clonePrimingRequestKey
-        guard let attempt = coordinator.start(live: IOSStudioLivePreviewItem(
-            voiceName: voiceName,
-            modeLabel: modeLabel,
-            mode: .clone,
-            transcript: text,
-            waveformSeed: waveformSeed,
-            estimatedAudioDuration: LivePreviewEstimate(text: text)?.estimatedAudioDuration ?? 0
-        )) else { return }
-
-        let reference = CloneReference(
-            audioPath: refPath,
-            transcript: currentDraft.trimmedReferenceTranscript,
-            preparedVoiceID: currentDraft.selectedSavedVoiceID
-        )
-        let request = MacStudioGenerationRequestFactory.voiceClone(
+        guard let request = MacStudioGenerationRequestFactory.voiceClone(
             modelID: model.id,
             text: text,
             outputPath: makeOutputPath(subfolder: model.outputSubfolder, text: text),
@@ -961,57 +945,42 @@ struct MacVoiceCloningScreen: View {
             preparedVoiceID: currentDraft.selectedSavedVoiceID,
             seed: currentDraft.pinnedSeed,
             variation: GenerationVariationPreference.requestValue()
+        ) else {
+            // Defensive: the checks above already guarantee a reference and a script.
+            coordinator.rejectStart(MacInterfaceText.cloningReferenceRequired)
+            return
+        }
+        let plan: IOSSingleTakeGenerationPlan
+        do {
+            plan = try IOSSingleTakeGenerationPlan(
+                request: request,
+                modelTier: model.tier,
+                historyVoice: voiceName,
+                historyEmotion: nil,
+                displayVoiceName: voiceName,
+                modeLabel: MacInterfaceText.modeName(.clone),
+                waveformSeed: VocelloStableVisualHash.int(text),
+                persistenceCaller: "MacVoiceCloningScreen"
+            )
+        } catch {
+            coordinator.rejectStart(error.localizedDescription)
+            return
+        }
+        MacStudioGenerationActions.startSingleTake(
+            plan,
+            coordinator: coordinator,
+            ttsEngine: ttsEngineStore,
+            audioPlayer: audioPlayer,
+            clonePriming: MacStudioClonePriming(
+                modelID: model.id,
+                reference: CloneReference(
+                    audioPath: refPath,
+                    transcript: currentDraft.trimmedReferenceTranscript,
+                    preparedVoiceID: currentDraft.selectedSavedVoiceID
+                ),
+                expectedKey: clonePrimingRequestKey
+            )
         )
-        let hooks = MacStudioSingleTakeGenerationHooks(engine: ttsEngineStore, audioPlayer: audioPlayer)
-        let store = ttsEngineStore
-        let coordinator = coordinator
-        let task = Task { @MainActor in
-            defer { coordinator.finish(attempt: attempt) }
-            do {
-                let primedReferenceMatches = store.clonePreparationState.isPrimed
-                    && store.clonePreparationState.key == primingKey
-                if !primedReferenceMatches {
-                    do {
-                        try await store.ensureCloneReferencePrimed(modelID: model.id, reference: reference)
-                    } catch {
-                        if DebugMode.isEnabled {
-                            print("[Performance][MacVoiceCloningScreen] clone priming degraded: \(error.localizedDescription)")
-                        }
-                    }
-                }
-                guard let request else {
-                    throw MacVoiceCloningScreenError.requestConstructionFailed
-                }
-                let plan = try IOSSingleTakeGenerationPlan(
-                    request: request,
-                    modelTier: model.tier,
-                    historyVoice: voiceName,
-                    historyEmotion: nil,
-                    displayVoiceName: voiceName,
-                    modeLabel: modeLabel,
-                    waveformSeed: waveformSeed,
-                    persistenceCaller: "MacVoiceCloningScreen"
-                )
-                let result = try await IOSSingleTakeGenerationExecutor.run(plan: plan, hooks: hooks)
-                coordinator.complete(hooks.inlinePlayerItem(for: result, plan: plan), attempt: attempt)
-            } catch is CancellationError {
-                // The shared executor owns cancellation cleanup and telemetry.
-            } catch {
-                coordinator.fail(error.localizedDescription, attempt: attempt)
-            }
-        }
-        coordinator.installGenerationTask(task, for: attempt)
-    }
-}
-
-/// Defensive error for an invariant the sync prefix already validated.
-private enum MacVoiceCloningScreenError: LocalizedError {
-    case requestConstructionFailed
-
-    var errorDescription: String? {
-        switch self {
-        case .requestConstructionFailed: MacInterfaceText.cloningReferenceRequired
-        }
     }
 }
 

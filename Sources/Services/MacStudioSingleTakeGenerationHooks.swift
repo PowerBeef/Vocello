@@ -9,7 +9,7 @@ import QwenVoiceCore
 /// cancelled take never lands in History on either platform: a result that
 /// materialized after the cancellation is removed, as the iOS hooks do.
 @MainActor
-final class MacStudioSingleTakeGenerationHooks: IOSSingleTakeGenerationExecutionHooks {
+final class MacStudioSingleTakeGenerationHooks: MacStudioSingleTakeHooks {
     private let engine: TTSEngineStore
     private let audioPlayer: AudioPlayerViewModel
     private let playbackOperationID = UUID()

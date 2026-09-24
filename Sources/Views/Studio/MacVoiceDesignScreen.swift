@@ -11,8 +11,9 @@ private struct VoiceDesignActionAlert: Identifiable {
 /// Voice Design on the iOS Studio canvas (`IOSVoiceDesignView`): the brief
 /// editor behind a setup chip, the Delivery and Language chips, the pinned-seed and
 /// line-by-line toggle, the readiness line, the save-as-voice action for the last
-/// take, and the dock. Generation runs on the shared pipeline with the
-/// Design request from `MacStudioGenerationRequestFactory`. Every
+/// take, and the dock. Generation runs on the shared pipeline: the Design
+/// request from `MacStudioGenerationRequestFactory` goes to
+/// `MacStudioGenerationActions` as an immutable plan. Every
 /// `voiceDesign_*`, `textInput_*` and `delivery_*` identifier is the lane
 /// contract.
 struct MacVoiceDesignScreen: View {
@@ -360,19 +361,6 @@ struct MacVoiceDesignScreen: View {
         let text = draft.text
         let voiceDescription = draft.voiceDescription
         let emotion = draft.emotion
-        let voiceName = briefDisplayName
-        let modeLabel = MacInterfaceText.modeName(.design)
-        let waveformSeed = VocelloStableVisualHash.int(text)
-        guard let attempt = coordinator.start(live: IOSStudioLivePreviewItem(
-            voiceName: voiceName,
-            modeLabel: modeLabel,
-            mode: .design,
-            transcript: text,
-            waveformSeed: waveformSeed,
-            estimatedAudioDuration: LivePreviewEstimate(text: text)?.estimatedAudioDuration ?? 0
-        )) else { return }
-        appModel.designSavedVoiceCandidate = nil
-
         let request = MacStudioGenerationRequestFactory.voiceDesign(
             modelID: model.id,
             text: text,
@@ -383,37 +371,42 @@ struct MacVoiceDesignScreen: View {
             seed: draft.pinnedSeed,
             variation: GenerationVariationPreference.requestValue()
         )
-        let hooks = MacStudioSingleTakeGenerationHooks(engine: ttsEngineStore, audioPlayer: audioPlayer)
-        let coordinator = coordinator
-        let task = Task { @MainActor in
-            defer { coordinator.finish(attempt: attempt) }
-            do {
-                let plan = try IOSSingleTakeGenerationPlan(
-                    request: request,
-                    modelTier: model.tier,
-                    historyVoice: voiceDescription,
-                    historyEmotion: emotion,
-                    displayVoiceName: voiceName,
-                    modeLabel: modeLabel,
-                    waveformSeed: waveformSeed,
-                    persistenceCaller: "MacVoiceDesignScreen"
-                )
-                let result = try await IOSSingleTakeGenerationExecutor.run(plan: plan, hooks: hooks)
-                if coordinator.complete(hooks.inlinePlayerItem(for: result, plan: plan), attempt: attempt) {
-                    appModel.designSavedVoiceCandidate = VoiceDesignSavedVoiceCandidate(
-                        audioPath: result.audioPath,
-                        transcript: text,
-                        voiceDescription: voiceDescription,
-                        emotion: emotion,
-                        text: text
-                    )
-                }
-            } catch is CancellationError {
-                // The shared executor owns cancellation cleanup and telemetry.
-            } catch {
-                coordinator.fail(error.localizedDescription, attempt: attempt)
-            }
+        let plan: IOSSingleTakeGenerationPlan
+        do {
+            plan = try IOSSingleTakeGenerationPlan(
+                request: request,
+                modelTier: model.tier,
+                historyVoice: voiceDescription,
+                historyEmotion: emotion,
+                displayVoiceName: briefDisplayName,
+                modeLabel: MacInterfaceText.modeName(.design),
+                waveformSeed: VocelloStableVisualHash.int(text),
+                persistenceCaller: "MacVoiceDesignScreen"
+            )
+        } catch {
+            coordinator.rejectStart(error.localizedDescription)
+            return
         }
-        coordinator.installGenerationTask(task, for: attempt)
+        let appModel = appModel
+        let started = MacStudioGenerationActions.startSingleTake(
+            plan,
+            coordinator: coordinator,
+            ttsEngine: ttsEngineStore,
+            audioPlayer: audioPlayer,
+            onCompleted: { result in
+                appModel.designSavedVoiceCandidate = VoiceDesignSavedVoiceCandidate(
+                    audioPath: result.audioPath,
+                    transcript: text,
+                    voiceDescription: voiceDescription,
+                    emotion: emotion,
+                    text: text
+                )
+            }
+        )
+        // The task cannot run before this returns, so a new take always
+        // replaces the previous candidate before it can publish its own.
+        if started {
+            appModel.designSavedVoiceCandidate = nil
+        }
     }
 }

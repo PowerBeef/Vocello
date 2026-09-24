@@ -6,9 +6,11 @@ import SwiftUI
 /// composer, the Voice / Delivery / Language chips (menus on the desktop),
 /// the readiness line and the dock with the line-by-line toggle and
 /// Generate CTA, the generating bar or the player card. Generation runs on
-/// the shared pipeline: `StudioGenerationCoordinator` (owned by
-/// `MacAppModel`), a request from `MacStudioGenerationRequestFactory`, and
-/// `IOSSingleTakeGenerationExecutor` with the macOS hooks. Generate opens the
+/// the shared pipeline: the screen builds the request with
+/// `MacStudioGenerationRequestFactory` and hands the immutable plan to
+/// `MacStudioGenerationActions`, which runs `IOSSingleTakeGenerationExecutor`
+/// with the macOS hooks under the `StudioGenerationCoordinator` owned by
+/// `MacAppModel`; the screen never holds a generation task. Generate opens the
 /// batch sheet for long scripts or the line-by-line override. Every `customVoice_*`,
 /// `textInput_*` and `delivery_*` identifier is the lane contract.
 struct MacCustomVoiceScreen: View {
@@ -318,19 +320,6 @@ struct MacCustomVoiceScreen: View {
 
         let text = draft.text
         let speaker = draft.selectedSpeaker
-        let voiceName = speakerDisplayName
-        let modeLabel = MacInterfaceText.modeName(.custom)
-        // Same seed for the live and final card so the decorative waveform keeps its shape.
-        let waveformSeed = VocelloStableVisualHash.int(text)
-        guard let attempt = coordinator.start(live: IOSStudioLivePreviewItem(
-            voiceName: voiceName,
-            modeLabel: modeLabel,
-            mode: .custom,
-            transcript: text,
-            waveformSeed: waveformSeed,
-            estimatedAudioDuration: LivePreviewEstimate(text: text)?.estimatedAudioDuration ?? 0
-        )) else { return }
-
         let request = MacStudioGenerationRequestFactory.customVoice(
             modelID: model.id,
             text: text,
@@ -342,31 +331,29 @@ struct MacCustomVoiceScreen: View {
             seed: draft.pinnedSeed,
             variation: GenerationVariationPreference.requestValue()
         )
-        let historyEmotion = model.supportsInstructionControl ? draft.emotion : nil
-        let hooks = MacStudioSingleTakeGenerationHooks(engine: ttsEngineStore, audioPlayer: audioPlayer)
-        let coordinator = coordinator
-        let task = Task { @MainActor in
-            defer { coordinator.finish(attempt: attempt) }
-            do {
-                let plan = try IOSSingleTakeGenerationPlan(
-                    request: request,
-                    modelTier: model.tier,
-                    historyVoice: speaker,
-                    historyEmotion: historyEmotion,
-                    displayVoiceName: voiceName,
-                    modeLabel: modeLabel,
-                    waveformSeed: waveformSeed,
-                    persistenceCaller: "MacCustomVoiceScreen"
-                )
-                let result = try await IOSSingleTakeGenerationExecutor.run(plan: plan, hooks: hooks)
-                coordinator.complete(hooks.inlinePlayerItem(for: result, plan: plan), attempt: attempt)
-            } catch is CancellationError {
-                // The shared executor owns cancellation cleanup and telemetry.
-            } catch {
-                coordinator.fail(error.localizedDescription, attempt: attempt)
-            }
+        let plan: IOSSingleTakeGenerationPlan
+        do {
+            plan = try IOSSingleTakeGenerationPlan(
+                request: request,
+                modelTier: model.tier,
+                historyVoice: speaker,
+                historyEmotion: model.supportsInstructionControl ? draft.emotion : nil,
+                displayVoiceName: speakerDisplayName,
+                modeLabel: MacInterfaceText.modeName(.custom),
+                // Same seed for the live and final card so the decorative waveform keeps its shape.
+                waveformSeed: VocelloStableVisualHash.int(text),
+                persistenceCaller: "MacCustomVoiceScreen"
+            )
+        } catch {
+            coordinator.rejectStart(error.localizedDescription)
+            return
         }
-        coordinator.installGenerationTask(task, for: attempt)
+        MacStudioGenerationActions.startSingleTake(
+            plan,
+            coordinator: coordinator,
+            ttsEngine: ttsEngineStore,
+            audioPlayer: audioPlayer
+        )
     }
 }
 

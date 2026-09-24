@@ -1,5 +1,9 @@
 // AudioSeal watermark generator — MLX port of Meta's audioseal_wm_16bits
-// (facebookresearch/audioseal @ cc2700db, MIT, code and weights).
+// (facebookresearch/audioseal, MIT, code and weights; notice in NOTICES.md).
+// Reference: the audioseal 0.2.0 Python package with weights from the
+// facebook/audioseal Hugging Face repository. The exact upstream Git commit
+// was not recorded (see ORIGINS.md); the hash previously cited here was the
+// UTMOSv2 pin from scripts/mos_advisory.py, not an AudioSeal revision.
 //
 // Architecture: EnCodec-style SEANet encoder (conv stack + 2-layer LSTM,
 // bottleneck 128) → additive 16-bit message embedding → SEANet decoder

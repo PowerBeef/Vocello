@@ -1,7 +1,8 @@
 // Parity and structure tests for the MLXAudioMark AudioSeal port (CP-2).
 //
 // The numerical parity tests compare against fixtures minted from the
-// PyTorch reference (facebookresearch/audioseal @ cc2700db) with the fixed
+// PyTorch reference (facebookresearch/audioseal, the audioseal 0.2.0 package;
+// the exact upstream commit was not recorded, see ORIGINS.md) with the fixed
 // 0x56C0 message. Weights and fixtures are not committed (no bundled
 // weights); the tests locate them via QWENVOICE_AUDIOSEAL_FIXTURES and skip
 // cleanly when the directory is absent (ordinary CI), so this suite stays

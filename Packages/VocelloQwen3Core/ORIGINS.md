@@ -26,5 +26,14 @@ byte-identical files, modified 11, added 12, and removed none. The immutable cla
 destination-digest snapshot is [`RELOCATION_INVENTORY.json`](RELOCATION_INVENTORY.json). These
 historical relocation facts are distinct from the live upstream-delta counts.
 
+The `MLXAudioMark` target is not part of the `mlx-audio-swift` import. It is a repository-owned port
+of Meta's AudioSeal watermark generator (`audioseal_wm_16bits`, MIT-licensed code and weights) from
+[`facebookresearch/audioseal`](https://github.com/facebookresearch/audioseal), recorded as the
+`MARK-001` entry in `SEMANTIC_DELTAS.json`. The validation that preceded the port recorded the
+`audioseal` 0.2.0 Python package and weights fetched from Meta's Hugging Face repository
+`facebook/audioseal`, and the parity fixtures come from the PyTorch reference implementation. The exact
+upstream Git commit and Hugging Face revision were not recorded when the port was made. The AudioSeal
+license notice is in [`NOTICES.md`](NOTICES.md).
+
 Qwen3-TTS model and research attribution belongs to the Qwen team. Model weights are not included
 in this repository and retain their own upstream terms.

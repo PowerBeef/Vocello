@@ -53,7 +53,7 @@
     },
     {
       "path": "Sources/MLXAudioMark/AudioSealGenerator.swift",
-      "sha256": "5f3edab5cfed85d7d88066bbeed0316229d5ccb920b6c4f63cfc71c4f97ff4fb",
+      "sha256": "ce72751dc64dbcd16c3a44feb19beff7b1168fd68699647ec7c64efec5220b52",
       "upstreamStatus": "added"
     },
     {
@@ -178,7 +178,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/AudioSealParityTests.swift",
-      "sha256": "e205aacdb7feaa93cc4328072b0bd00ad791f9bb8e9963f957424ec99310bbd3",
+      "sha256": "0c2fd8c07b733caaf0b35fc9fd2264514697d7e48eec0193bd4db0fa80ace274",
       "upstreamStatus": "added"
     },
     {

@@ -320,10 +320,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
     }
 
-    /// Monotonic seconds behind the registry's progress windows: the 0.25 s publication
-    /// throttle, the 0.5 s speed-sample window and the 20 s stall threshold. Production
-    /// reads the process uptime; tests inject a manual source and step it without
-    /// sleeping.
+    /// Monotonic seconds behind every downloader progress window: the delegate ingress
+    /// gate's 0.25 s window, and the registry's 0.25 s publication throttle, 0.5 s
+    /// speed-sample window and 20 s stall threshold. Production reads the process uptime;
+    /// tests inject a manual source and step it without sleeping.
     struct ProgressClock: Sendable {
         let now: @Sendable () -> TimeInterval
 
@@ -1199,6 +1199,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// metrics callback has consumed them.
     private let chunkTaskPathsBox = Mutex<[Int: String]>([:])
     private let state: DownloadStateRegistry
+    /// The one time source for the delegate ingress gate and the registry's windows.
+    private let progressClock: ProgressClock
     private let delegateProgressGate = Mutex(ModelDownloadDelegateProgressGate())
     private let terminalEventSequencer = ModelDownloadDelegateTerminalSequencer()
     private let resolveBaseURL: URL
@@ -1403,9 +1405,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     ) {
         let progressBox = progressHandler.map(RepositoryProgressHandlerBox.init)
         let lifecycleBox = lifecycleEventHandler.map(LifecycleEventHandlerBox.init)
+        let progressClock = ProgressClock.processUptime
+        self.progressClock = progressClock
         state = DownloadStateRegistry(
             repositoryProgressHandler: progressBox,
-            lifecycleEventHandler: lifecycleBox
+            lifecycleEventHandler: lifecycleBox,
+            clock: progressClock
         )
         self.resolveBaseURL = resolveBaseURL
         self.fileManagerBox = FileManagerBox(fileManager)
@@ -3262,7 +3267,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 taskID: taskID,
                 totalBytesWritten: totalBytesWritten,
                 totalBytesExpected: totalBytesExpectedToWrite,
-                uptime: ProcessInfo.processInfo.systemUptime
+                uptime: progressClock.now()
             )
         }
         guard shouldForward else { return }

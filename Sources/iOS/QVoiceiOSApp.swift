@@ -1,4 +1,3 @@
-import AVFoundation
 import MLX
 import SwiftUI
 import UIKit
@@ -29,7 +28,9 @@ struct QVoiceiOSApp: App {
 
     init() {
         _deps = StateObject(wrappedValue: IOSAppDependenciesContainer())
-        configureAudioSession()
+        // PA-21: the playback category is set without activating the session;
+        // players activate it through the owner when playback actually starts.
+        IOSAudioSessionOwner.shared.prepareForLaunch()
         configureNativeRuntimeMemoryCacheIfNeeded()
         IOSCrashObserver.shared.start()
         IOSMetricKitMemoryReporter.shared.start()
@@ -173,7 +174,6 @@ struct QVoiceiOSApp: App {
         case .active:
             appLanguage.refreshSystemLanguage()
             Task { await IOSExportCommerce.shared.refresh() }
-            setPlaybackSessionActive(true)
             if let engine = deps.engine {
                 Task {
                     await engine.refreshMemoryContext(reason: "scene_active", source: "app")
@@ -193,8 +193,8 @@ struct QVoiceiOSApp: App {
         case .background:
             // Hand the audio session back to the system so other apps can resume
             // (we declare no background-audio mode, so playback can't continue
-            // backgrounded anyway). Foregrounding re-activates it.
-            setPlaybackSessionActive(false)
+            // backgrounded anyway). The next playback or recording activates it.
+            IOSAudioSessionOwner.shared.enterBackground()
             handleForegroundExit()
         case .inactive:
             break
@@ -250,22 +250,6 @@ struct QVoiceiOSApp: App {
                 reason: plan.releaseReason,
                 hasActiveGeneration: engine.hasActiveGeneration
             )
-        }
-    }
-
-    private func setPlaybackSessionActive(_ active: Bool) {
-        let session = AVAudioSession.sharedInstance()
-        do {
-            if active {
-                try session.setCategory(.playback, mode: .default)
-                try session.setActive(true)
-            } else {
-                try session.setActive(false, options: .notifyOthersOnDeactivation)
-            }
-        } catch {
-            if TelemetryGate.resolvedEnabled {
-                print("[QVoiceiOSApp] Audio session \(active ? "activate" : "deactivate") failed: \(error.localizedDescription)")
-            }
         }
     }
 
@@ -502,18 +486,6 @@ struct QVoiceiOSApp: App {
             await MainActor.run {
                 NotificationCenter.default.post(name: .generationSaved, object: nil)
                 NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
-            }
-        }
-    }
-
-    private func configureAudioSession() {
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default)
-            try session.setActive(true)
-        } catch {
-            if TelemetryGate.resolvedEnabled {
-                print("[QVoiceiOSApp] Failed to configure audio session: \(error.localizedDescription)")
             }
         }
     }

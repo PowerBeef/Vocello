@@ -388,6 +388,18 @@ conditional `iosRecord_consentRequired` notice.
 Lifecycle toasts (`IOSEngineLifecycleToast.swift`) are transient ("Preparing runtime",
 "Model loading") and labeled with `engineLifecycleToast_<id>`.
 
+**Audio session (PA-21, AUD-02).** `IOSAudioSessionOwner` is the only code that calls
+`setCategory` or `setActive`; `IOSAudioSessionLedger` (`Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift`)
+decides the steps. Launch sets `.playback` without activating, and returning to the foreground
+changes nothing, so opening Vocello leaves Music or Podcasts playing. Players and the recorder claim
+the session when they start: the shared Studio player holds its claim until the app leaves the
+foreground, the player sheet, inline card and clip review hold `.playback`, voice-picker samples
+hold a mixable claim, and the recorder holds `.record` (which outranks playback while held). The
+session deactivates with `.notifyOthersOnDeactivation` only when the last claim is released, and
+the default category is restored afterwards. `IOSPlaybackExclusivity` keeps one player audible:
+a starting player or recording pauses the others, and a paused live preview does not resume on
+its next chunk. Leaving the foreground drops every claim and hands the session back.
+
 ---
 
 ## 3. Model download management & state (generation precondition)

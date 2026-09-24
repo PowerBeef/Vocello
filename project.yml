@@ -493,6 +493,8 @@ targets:
       - path: Sources/iOSSupport/Services/IOSExportPurchaseState.swift
       - path: Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift
       - path: Sources/iOSSupport/Services/SavedVoicesBusyRetryPolicy.swift
+      # PA-21: the one iOS audio-session owner's decision table.
+      - path: Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift
     dependencies:
       - target: QwenVoiceCore
       - package: GRDB
@@ -547,6 +549,8 @@ targets:
       - path: Sources/iOS/Commerce/IOSStoreKitClient.swift
       - path: Sources/iOSSupport/Services/IOSCommerceErrorDiagnostics.swift
       - path: Sources/iOSSupport/Services/SavedVoicesBusyRetryPolicy.swift
+      # PA-21: the one iOS audio-session owner's decision table.
+      - path: Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift
     dependencies:
       - target: QwenVoiceCore
     settings:

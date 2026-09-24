@@ -16,6 +16,16 @@ final class ClipReviewPlayer: NSObject, ObservableObject {
     private var timer: Timer?
     #if os(iOS)
     private var interruptionObserver: NSObjectProtocol?
+    /// Hold on the audio session while reviewing (PA-21).
+    private var sessionClaim: IOSAudioSessionClaim?
+
+    override init() {
+        super.init()
+        IOSPlaybackExclusivity.register(self) { [weak self] in
+            guard let self, self.isPlaying else { return }
+            self.pause()
+        }
+    }
     #endif
 
     deinit {
@@ -26,6 +36,7 @@ final class ClipReviewPlayer: NSObject, ObservableObject {
             if let interruptionObserver {
                 NotificationCenter.default.removeObserver(interruptionObserver)
             }
+            IOSAudioSessionOwner.shared.release(sessionClaim)
             #endif
             player?.delegate = nil
             player?.stop()
@@ -53,11 +64,11 @@ final class ClipReviewPlayer: NSObject, ObservableObject {
     private func play() {
         guard let player else { return }
         #if os(iOS)
-        // The recorder leaves the session on `.record`/deactivated — switch to playback so the
-        // clip comes out of the speaker. (macOS has no AVAudioSession; output routing is direct.)
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .default, options: [])
-        try? session.setActive(true, options: [])
+        // Claim playback through the one session owner (PA-21) so the clip comes out of the
+        // speaker after a recording, and pause any other player. (macOS has no AVAudioSession;
+        // output routing is direct.)
+        sessionClaim = try? IOSAudioSessionOwner.shared.activate(.playback, renewing: sessionClaim)
+        IOSPlaybackExclusivity.didStartPlayback(self)
         #endif
         player.play()
         isPlaying = true
@@ -86,6 +97,8 @@ final class ClipReviewPlayer: NSObject, ObservableObject {
         stopTimer()
         #if os(iOS)
         removeInterruptionObserver()
+        IOSAudioSessionOwner.shared.release(sessionClaim)
+        sessionClaim = nil
         #endif
     }
 

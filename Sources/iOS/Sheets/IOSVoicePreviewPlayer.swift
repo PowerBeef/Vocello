@@ -18,6 +18,17 @@ final class IOSVoicePreviewPlayer: NSObject, ObservableObject {
     @Published private(set) var currentlyPlayingID: String?
 
     private var player: AVAudioPlayer?
+    /// Mixable hold on the audio session while a sample plays (PA-21). The
+    /// owner restores the default category when it is released, so mixing
+    /// never leaks into later playback.
+    private var sessionClaim: IOSAudioSessionClaim?
+
+    override init() {
+        super.init()
+        IOSPlaybackExclusivity.register(self) { [weak self] in
+            self?.stop()
+        }
+    }
 
     /// Toggles preview for the given voice id. If the same voice is
     /// already previewing, stops it; otherwise stops any in-flight
@@ -54,9 +65,8 @@ final class IOSVoicePreviewPlayer: NSObject, ObservableObject {
         }
 
         do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try session.setActive(true, options: [])
+            sessionClaim = try IOSAudioSessionOwner.shared.activate(.mixablePreview)
+            IOSPlaybackExclusivity.didStartPlayback(self)
 
             let player = try AVAudioPlayer(contentsOf: url)
             player.delegate = self
@@ -76,14 +86,18 @@ final class IOSVoicePreviewPlayer: NSObject, ObservableObject {
         player?.stop()
         player = nil
         currentlyPlayingID = nil
+        IOSAudioSessionOwner.shared.release(sessionClaim)
+        sessionClaim = nil
     }
 }
 
 extension IOSVoicePreviewPlayer: AVAudioPlayerDelegate {
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        let finished = ObjectIdentifier(player)
         Task { @MainActor [weak self] in
-            self?.player = nil
-            self?.currentlyPlayingID = nil
+            guard let self, let current = self.player,
+                  ObjectIdentifier(current) == finished else { return }
+            self.stop()
         }
     }
 }

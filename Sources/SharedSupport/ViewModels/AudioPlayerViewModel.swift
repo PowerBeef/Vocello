@@ -271,6 +271,9 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
     private var interruptionObserver: NSObjectProtocol?
     private var routeChangeObserver: NSObjectProtocol?
     private var shouldResumeAfterInterruption = false
+    /// Held from the first playback until the app leaves the foreground (PA-21),
+    /// so a closing preview never deactivates the session under this player.
+    private var sessionClaim: IOSAudioSessionClaim?
     /// During a headless batch run, streamed chunks are ignored so each item
     /// doesn't start the live-preview player. The engine still streams
     /// internally (flat memory), and dropped PCM chunk events carry no files
@@ -328,6 +331,9 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         bindGenerationEventSource()
         #if os(iOS)
         registerAudioSessionObservers()
+        IOSPlaybackExclusivity.register(self) { [weak self] in
+            self?.pauseForOtherPlayback()
+        }
         #endif
     }
 
@@ -395,6 +401,25 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         @unknown default:
             break
         }
+    }
+
+    /// Claims playback through the one session owner (PA-21) without blocking
+    /// the first chunk, and pauses every other player.
+    private func claimSharedPlaybackSession() {
+        sessionClaim = IOSAudioSessionOwner.shared.activateAsync(.sharedPlayback, renewing: sessionClaim)
+        IOSPlaybackExclusivity.didStartPlayback(self)
+    }
+
+    /// Another player (a preview, the player sheet, clip review or the recorder)
+    /// started. A paused live preview must not resume on its next chunk, so
+    /// autoplay ends for this session; Play resumes it.
+    private func pauseForOtherPlayback() {
+        guard isPlaying else { return }
+        if playbackMode == .live {
+            liveAutoplayEnabled = false
+        }
+        shouldResumeAfterInterruption = false
+        pause()
     }
 
     private func handleAudioRouteChange(reasonRaw: UInt?) {
@@ -1089,6 +1114,11 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
 
         guard livePlayback.isConfigured else { return }
 
+        #if os(iOS)
+        if !isPlaying {
+            claimSharedPlaybackSession()
+        }
+        #endif
         do {
             try livePlayback.startEngineIfNeeded()
             if !livePlayback.isNodePlaying {
@@ -1416,6 +1446,9 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
 
     private func attemptFilePlay(playbackTelemetrySessionID: String? = nil) {
         guard var player else { return }
+        #if os(iOS)
+        claimSharedPlaybackSession()
+        #endif
 
         if player.currentTime >= player.duration, player.duration > 0 {
             player.currentTime = 0

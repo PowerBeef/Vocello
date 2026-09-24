@@ -1,6 +1,5 @@
 import AVFoundation
 import SwiftUI
-import Synchronization
 import QwenVoiceCore
 
 /// Full-screen Player sheet from design_references/Vocello iOS/player.jsx.
@@ -662,24 +661,18 @@ private struct IOSPlayerScrubSection: View {
 
 // MARK: - Off-MainActor audio loading (IUI-4 P1)
 
-/// Serializes AVAudioSession activate/deactivate. Ordering alone is not
-/// enough — a deactivation can be *enqueued* after a newer presentation's
-/// activation (a dismissed-mid-load sheet releases its session only when the
-/// stale decode result arrives) — so every activation takes a fresh epoch and
-/// a deactivation executes only while its own activation is still the newest.
-/// Both interleavings matter: dismiss-before-activation must still release
-/// the orphaned session, and dismiss-then-reopen must never silence the new
-/// sheet's session (adversarial review of this change, 2026-08-12).
-private let iosPlayerAudioSessionQueue = DispatchQueue(
-    label: "com.qwenvoice.player-audio-session", qos: .userInitiated)
-private let iosPlayerSessionEpoch = Mutex(0)
+// Session changes go through `IOSAudioSessionOwner` (PA-21). Its claims
+// replace the epoch this sheet used to keep: a release changes nothing once a
+// newer presentation holds its own claim, so dismiss-then-reopen never
+// silences the new sheet, and a dismissed-mid-load sheet still releases the
+// claim its stale load took.
 
 /// The off-MainActor product of a load. Not Sendable (AVAudioPlayer); crosses
 /// back to the MainActor as a `sending` disconnected value.
 private struct IOSPlayerLoadedAudio {
     let player: AVAudioPlayer
     let spans: [IOSWordSpan]
-    let sessionEpoch: Int
+    let sessionClaim: IOSAudioSessionClaim
 }
 
 /// Session activation is a blocking IPC to mediaserverd (tens to hundreds of
@@ -690,15 +683,7 @@ private struct IOSPlayerLoadedAudio {
 private func iosPlayerLoadAudio(
     url: URL, transcript: String
 ) async throws -> sending IOSPlayerLoadedAudio {
-    let epoch = try iosPlayerAudioSessionQueue.sync {
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playback, mode: .default, options: [])
-        try session.setActive(true, options: [])
-        return iosPlayerSessionEpoch.withLock { epoch in
-            epoch += 1
-            return epoch
-        }
-    }
+    let claim = try IOSAudioSessionOwner.shared.activate(.playback)
     do {
         let player = try AVAudioPlayer(contentsOf: url)
         player.prepareToPlay()
@@ -706,21 +691,11 @@ private func iosPlayerLoadAudio(
             transcript: transcript,
             audioDuration: player.duration
         )
-        return IOSPlayerLoadedAudio(player: player, spans: spans, sessionEpoch: epoch)
+        return IOSPlayerLoadedAudio(player: player, spans: spans, sessionClaim: claim)
     } catch {
-        // Activation succeeded but the decode failed: release the session
-        // unless someone newer has already claimed it.
-        iosPlayerDeactivateSession(ifCurrentEpoch: epoch)
+        // Activation succeeded but the decode failed: give the claim back.
+        IOSAudioSessionOwner.shared.release(claim)
         throw error
-    }
-}
-
-private func iosPlayerDeactivateSession(ifCurrentEpoch epoch: Int?) {
-    guard let epoch else { return }
-    iosPlayerAudioSessionQueue.async {
-        guard iosPlayerSessionEpoch.withLock({ $0 }) == epoch else { return }
-        try? AVAudioSession.sharedInstance().setActive(
-            false, options: .notifyOthersOnDeactivation)
     }
 }
 
@@ -791,7 +766,15 @@ final class IOSPlayerSheetController: NSObject, ObservableObject {
     private var displayLink: CADisplayLink?
     private var loadedItem: IOSPlayerSheetItem?
     private var loadGeneration = 0
-    private var sessionEpoch: Int?
+    private var sessionClaim: IOSAudioSessionClaim?
+
+    override init() {
+        super.init()
+        // One audible player at a time (PA-21): another player starting pauses this sheet.
+        IOSPlaybackExclusivity.register(self) { [weak self] in
+            self?.pauseForOtherPlayback()
+        }
+    }
 
     var progress: Double {
         guard duration > 0 else { return 0 }
@@ -817,13 +800,14 @@ final class IOSPlayerSheetController: NSObject, ObservableObject {
             let loaded = try await iosPlayerLoadAudio(url: audioURL, transcript: transcript)
             guard generation == loadGeneration else {
                 // Dismissed (or superseded) while loading: never adopt the
-                // stale player, and release the session it activated — unless
-                // a newer presentation has already re-activated it.
-                iosPlayerDeactivateSession(ifCurrentEpoch: loaded.sessionEpoch)
+                // stale player, and release the claim its load took. A newer
+                // presentation's claim keeps the session active.
+                IOSAudioSessionOwner.shared.release(loaded.sessionClaim)
                 return
             }
             loadedItem = item
-            sessionEpoch = loaded.sessionEpoch
+            IOSAudioSessionOwner.shared.release(sessionClaim)
+            sessionClaim = loaded.sessionClaim
             loaded.player.delegate = self
             self.player = loaded.player
             self.duration = loaded.player.duration
@@ -842,10 +826,22 @@ final class IOSPlayerSheetController: NSObject, ObservableObject {
 
     func play() {
         guard let player else { return }
+        // Renewal is asynchronous and cheap while the claim is held; after a
+        // background transition it reactivates the session for this sheet.
+        sessionClaim = IOSAudioSessionOwner.shared.activateAsync(.playback, renewing: sessionClaim)
+        IOSPlaybackExclusivity.didStartPlayback(self)
         player.play()
         isPlaying = true
         startDisplayLink()
         IOSHaptics.selection()
+    }
+
+    /// Another player started: pause without the transport haptic.
+    private func pauseForOtherPlayback() {
+        guard isPlaying else { return }
+        player?.pause()
+        isPlaying = false
+        stopDisplayLink()
     }
 
     func pause() {
@@ -866,12 +862,11 @@ final class IOSPlayerSheetController: NSObject, ObservableObject {
         player?.stop()
         isPlaying = false
         stopDisplayLink()
-        // Deactivation blocks like activation does; run it off the dismiss
-        // transaction. Epoch-guarded: releases only the activation this
-        // controller adopted (nil while a load is still in flight — the
-        // stale-load guard releases that one with its own epoch).
-        iosPlayerDeactivateSession(ifCurrentEpoch: sessionEpoch)
-        sessionEpoch = nil
+        // The owner releases off the dismiss transaction. Only the claim this
+        // controller adopted is released (nil while a load is still in flight;
+        // the stale-load guard releases that one).
+        IOSAudioSessionOwner.shared.release(sessionClaim)
+        sessionClaim = nil
     }
 
     func skip(by seconds: TimeInterval) {

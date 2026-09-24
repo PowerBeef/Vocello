@@ -65,6 +65,8 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
     private var virtualSource: (url: URL, duration: Double, envelope: [Double])?
     #if os(iOS)
     private var interruptionObserver: NSObjectProtocol?
+    /// Hold on the audio session while capturing (PA-21).
+    private var recordingClaim: IOSAudioSessionClaim?
     #endif
 
     deinit {
@@ -73,6 +75,7 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
             if let interruptionObserver {
                 NotificationCenter.default.removeObserver(interruptionObserver)
             }
+            IOSAudioSessionOwner.shared.release(recordingClaim)
             #endif
             meteringTimer?.invalidate()
         }
@@ -141,9 +144,10 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
 
         do {
             #if os(iOS)
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.record, mode: .measurement, options: [])
-            try session.setActive(true, options: [])
+            // The one session owner (PA-21) applies `.record`/`.measurement`; recording
+            // outranks playback until this claim is released, and every player pauses.
+            recordingClaim = try IOSAudioSessionOwner.shared.activate(.recording, renewing: recordingClaim)
+            IOSPlaybackExclusivity.didStartPlayback(self)
             #endif
 
             let url = makeOutputURL()
@@ -164,6 +168,7 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
             recorder.delegate = self
             guard recorder.record(forDuration: Self.maxDuration + 0.5) else {
                 recordingFailed = true
+                releaseRecordingClaim()
                 return
             }
 
@@ -182,7 +187,15 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
         } catch {
             isRecording = false
             recordingFailed = true
+            releaseRecordingClaim()
         }
+    }
+
+    private func releaseRecordingClaim() {
+        #if os(iOS)
+        IOSAudioSessionOwner.shared.release(recordingClaim)
+        recordingClaim = nil
+        #endif
     }
 
     #if os(iOS)
@@ -247,8 +260,8 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
         isRecording = false
         #if os(iOS)
         removeInterruptionObserver()
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         #endif
+        releaseRecordingClaim()
         lastSavedURL = recorder.url
         return recorder.url
     }
@@ -276,8 +289,8 @@ final class ReferenceClipRecorder: NSObject, ObservableObject {
         levels = []
         #if os(iOS)
         removeInterruptionObserver()
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         #endif
+        releaseRecordingClaim()
     }
 
     func reset() {

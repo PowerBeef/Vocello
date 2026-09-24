@@ -616,6 +616,19 @@ final class IOSInlinePlaybackController: NSObject {
     // (it owns the live preview). The final card later re-adopts by URL (matched).
     private var isLiveMirroring = false
 
+    /// This card's hold on the audio session while it plays its own file (PA-21).
+    @ObservationIgnored private var sessionClaim: IOSAudioSessionClaim?
+
+    override init() {
+        super.init()
+        // One audible player at a time (PA-21): another player starting pauses
+        // this card's own player. Mirroring the shared player needs nothing;
+        // the shared player pauses itself.
+        IOSPlaybackExclusivity.register(self) { [weak self] in
+            self?.pauseOwnPlayerForOtherPlayback()
+        }
+    }
+
     private var isAdopting: Bool {
         if isLiveMirroring, sharedPlayer != nil { return true }
         guard player == nil, let shared = sharedPlayer, let url = adoptedURL else { return false }
@@ -658,9 +671,6 @@ final class IOSInlinePlaybackController: NSObject {
         if player != nil { return true }
         guard let url = adoptedURL ?? loadedURL else { return false }
         do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [])
-            try session.setActive(true, options: [])
             let p = try AVAudioPlayer(contentsOf: url)
             p.delegate = self
             p.prepareToPlay()
@@ -676,9 +686,6 @@ final class IOSInlinePlaybackController: NSObject {
     func load(url: URL, autoplay: Bool) async {
         guard loadedURL != url else { return }
         do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [])
-            try session.setActive(true, options: [])
             let player = try AVAudioPlayer(contentsOf: url)
             player.delegate = self
             player.prepareToPlay()
@@ -701,9 +708,23 @@ final class IOSInlinePlaybackController: NSObject {
             return
         }
         guard ensureOwnPlayer(), let player else { return }
+        // PA-21: the session activates when playback starts, not when the card
+        // loads, so a card that is only shown never interrupts other audio.
+        sessionClaim = try? IOSAudioSessionOwner.shared.activate(.playback, renewing: sessionClaim)
+        IOSPlaybackExclusivity.didStartPlayback(self)
         player.play()
         isPlaying = true
         startDisplayLink()
+    }
+
+    /// Another player started: pause this card's own player. The shared player
+    /// being mirrored or forwarded to pauses itself.
+    private func pauseOwnPlayerForOtherPlayback() {
+        guard let player, player.isPlaying else { return }
+        player.pause()
+        guard !isAdopting else { return }
+        isPlaying = false
+        stopDisplayLink()
     }
 
     func pause() {
@@ -745,6 +766,8 @@ final class IOSInlinePlaybackController: NSObject {
         player?.stop()
         isPlaying = false
         stopDisplayLink()
+        IOSAudioSessionOwner.shared.release(sessionClaim)
+        sessionClaim = nil
     }
 
     func scrub(to fraction: Double) {

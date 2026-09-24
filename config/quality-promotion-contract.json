@@ -433,6 +433,7 @@
           "Sources/Views/**",
           "Sources/iOS/**",
           "Sources/iOSSupport/Services/*UIPerf*.swift",
+          "Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift",
           "Tests/VocelloMacUITests/**",
           "Tests/VocelloiOSUITests/**",
           "config/ui-perf-thresholds.json",

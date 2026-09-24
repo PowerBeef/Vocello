@@ -180,6 +180,34 @@ final class CLIExecutionTests: XCTestCase {
         XCTAssertTrue(cancelled.cancelled)
     }
 
+    func testFailureCoincidingWithCancellationStaysFailedAndNotesIt() async throws {
+        let requests = (0..<2).map { request($0, root: URL(fileURLWithPath: "/missing/\(UUID())")) }
+        let failed = await Task {
+            await CLIBatchExecution.run(requests) { _ in
+                withUnsafeCurrentTask { $0?.cancel() }
+                throw Failure.injected
+            }
+        }.value
+        XCTAssertEqual(failed.rows.map(\.status), [.failed, .notAttempted])
+        XCTAssertEqual(failed.rows[0].errorCode, "generation_failed")
+        XCTAssertEqual(failed.rows[0].cancellationRequested, true)
+        XCTAssertFalse(failed.cancelled)
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(failed.rows)) as? [[String: Any]]
+        XCTAssertEqual(encoded?[0]["cancellationRequested"] as? Bool, true)
+        XCTAssertNil(encoded?[1]["cancellationRequested"])
+
+        let cancelled = await Task {
+            await CLIBatchExecution.run(requests) { _ in
+                withUnsafeCurrentTask { $0?.cancel() }
+                throw CancellationError()
+            }
+        }.value
+        XCTAssertEqual(cancelled.rows.map(\.status), [.cancelled, .notAttempted])
+        XCTAssertEqual(cancelled.rows[0].errorCode, "cancelled")
+        XCTAssertNil(cancelled.rows[0].cancellationRequested)
+        XCTAssertTrue(cancelled.cancelled)
+    }
+
     func testSignalCancellationWaitsForOwnedCleanupAndPreservesSignalStatus() async {
         for number in [SIGINT, SIGTERM] {
             let forced = Mutex<[Int32]>([])
@@ -231,6 +259,107 @@ final class CLIExecutionTests: XCTestCase {
         XCTAssertTrue(forced.withLock { $0.isEmpty })
     }
 
+    /// SIGUSR1's default action kills the process, so the command signals
+    /// itself only after proving the disposition is already owned.
+    func testSignalHandlingIsArmedBeforeCommandWorkStarts() async {
+        let number = SIGUSR1
+        let observed = EventLog()
+        let code = await CLIProcessSupervisor.run(signals: [number]) {
+            var current = sigaction()
+            sigaction(number, nil, &current)
+            let handler = withUnsafeBytes(of: current.__sigaction_u) { $0.load(as: UInt.self) }
+            let ignore = withUnsafeBytes(of: SIG_IGN) { $0.load(as: UInt.self) }
+            let armed = handler == ignore
+            observed.append(armed ? "armed" : "unarmed")
+            guard armed else { return 1 }
+            kill(getpid(), number)
+            do {
+                try await Task.sleep(for: .seconds(10))
+                observed.append("not cancelled")
+                return 1
+            } catch {
+                observed.append("cancelled")
+                return 0
+            }
+        }
+        XCTAssertEqual(observed.all, ["armed", "cancelled"])
+        XCTAssertEqual(code, 128 + number)
+    }
+
+    func testPlaybackCancellationTerminatesAndReapsThePlayerBeforeReportingCancellation() async {
+        let log = EventLog()
+        let children = CLIChildProcesses()
+        let child = FakeChild(log: log, honoursTerminate: true)
+        let launched = expectation(description: "player launched")
+        let launcher: CLIProcessLauncher = { executable, arguments in
+            log.append("launch \(executable.lastPathComponent) \(arguments.joined(separator: " "))")
+            launched.fulfill()
+            return child
+        }
+        let playback = Task {
+            try await CLIPlayback.play(["/fixture/a.wav", "/fixture/b.wav"], children: children, launch: launcher)
+        }
+        await fulfillment(of: [launched], timeout: 2)
+        XCTAssertEqual(children.liveCount, 1)
+        playback.cancel()
+        guard case .failure(let error) = await playback.result else {
+            return XCTFail("cancelled playback must report cancellation")
+        }
+        XCTAssertTrue(error is CancellationError)
+        XCTAssertEqual(log.all, ["launch afplay /fixture/a.wav", "terminate", "reaped"])
+        XCTAssertEqual(children.liveCount, 0)
+    }
+
+    func testForcedExitKillsAndReapsThePlayerFirstAndRefusesLaterLaunches() async {
+        let log = EventLog()
+        let children = CLIChildProcesses()
+        let launched = expectation(description: "player launched")
+        let terminated = expectation(description: "graceful stop requested")
+        // A player that ignores SIGTERM, so only the forced exit can stop it.
+        let child = FakeChild(log: log, honoursTerminate: false, terminated: terminated)
+        let launcher: CLIProcessLauncher = { executable, arguments in
+            log.append("launch \(executable.lastPathComponent) \(arguments.joined(separator: " "))")
+            launched.fulfill()
+            return child
+        }
+        let supervisor = CLIProcessSupervisor(children: children, forceExit: { log.append("exit \($0)") })
+        let command = Task<Int32, Never> {
+            do {
+                try await CLIPlayback.play(["/fixture/a.wav"], children: children, launch: launcher)
+                return 0
+            } catch { return 1 }
+        }
+        supervisor.attach(command)
+        await fulfillment(of: [launched], timeout: 2)
+        supervisor.receive(SIGINT)
+        await fulfillment(of: [terminated], timeout: 2)
+        XCTAssertEqual(children.liveCount, 1)
+        supervisor.receive(SIGINT)
+        XCTAssertEqual(log.all, ["launch afplay /fixture/a.wav", "terminate", "kill", "reaped", "exit 130"])
+        let result = await command.value
+        XCTAssertEqual(result, 1)
+        XCTAssertEqual(supervisor.finish(code: result), 130)
+        XCTAssertEqual(children.liveCount, 0)
+        do {
+            try await children.run(CLIPlayback.player, arguments: ["/fixture/b.wav"], launch: launcher)
+            XCTFail("no child may start once a forced exit began")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+        XCTAssertFalse(log.all.contains("launch afplay /fixture/b.wav"))
+    }
+
+    func testPlayerThatCannotStartIsANoteNotAnError() async throws {
+        let attempts = EventLog()
+        let children = CLIChildProcesses()
+        try await CLIPlayback.play(["/fixture/a.wav", "/fixture/b.wav"], children: children) { _, arguments in
+            attempts.append(arguments.joined(separator: " "))
+            throw CocoaError(.fileNoSuchFile)
+        }
+        XCTAssertEqual(attempts.all, ["/fixture/a.wav"])
+        XCTAssertEqual(children.liveCount, 0)
+    }
+
     private func request(_ index: Int, root: URL) -> GenerationRequest {
         CLIBatchExecution.makeRequests(lines: ["test"], mode: .custom, modelID: "fixture",
             outputDirectory: root, filenamePrefix: "fixture-\(index)",
@@ -239,5 +368,65 @@ final class CLIExecutionTests: XCTestCase {
     }
     private func result(_ request: GenerationRequest) -> GenerationResult {
         GenerationResult(audioPath: request.outputPath, durationSeconds: 1, streamSessionDirectory: nil, usedStreaming: false)
+    }
+}
+
+private final class EventLog: Sendable {
+    private let events = Mutex<[String]>([])
+    var all: [String] { events.withLock { $0 } }
+    func append(_ event: String) { events.withLock { $0.append(event) } }
+}
+
+/// Stands in for afplay: it exits only when stopped, and records each stop
+/// and its reap in the shared log.
+private final class FakeChild: CLIChildProcess {
+    private struct State: Sendable {
+        var exited = false
+        var waiters: [CheckedContinuation<Void, Never>] = []
+    }
+    private let state = Mutex(State())
+    private let log: EventLog
+    private let honoursTerminate: Bool
+    private let terminated: XCTestExpectation?
+
+    init(log: EventLog, honoursTerminate: Bool, terminated: XCTestExpectation? = nil) {
+        self.log = log
+        self.honoursTerminate = honoursTerminate
+        self.terminated = terminated
+    }
+
+    func terminate() {
+        log.append("terminate")
+        terminated?.fulfill()
+        if honoursTerminate { markExited() }
+    }
+
+    func forceKill() {
+        log.append("kill")
+        markExited()
+    }
+
+    func waitUntilExit() async {
+        await withCheckedContinuation { (reaped: CheckedContinuation<Void, Never>) in
+            let exited = state.withLock { state -> Bool in
+                if !state.exited { state.waiters.append(reaped) }
+                return state.exited
+            }
+            if exited { reaped.resume() }
+        }
+    }
+
+    func waitUntilExit(timeout: DispatchTime) -> Bool { state.withLock { $0.exited } }
+
+    private func markExited() {
+        let waiters = state.withLock { state -> [CheckedContinuation<Void, Never>]? in
+            guard !state.exited else { return nil }
+            state.exited = true
+            defer { state.waiters.removeAll() }
+            return state.waiters
+        }
+        guard let waiters else { return }
+        log.append("reaped")
+        for waiter in waiters { waiter.resume() }
     }
 }

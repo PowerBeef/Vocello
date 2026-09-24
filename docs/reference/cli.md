@@ -130,9 +130,12 @@ set) and forces telemetry on.
   `speakers list`, `models`).
 - `--quiet` suppresses the stderr notes; `--verbose` adds per-step detail.
 - Exit codes: `0` success · `1` error · `2` usage / unknown command · `130` interrupted (Ctrl-C) · `143` terminated (SIGTERM).
-- The first SIGINT/SIGTERM cancels the owned command and awaits its cleanup. A second signal or
-  30-second deadline forces exit with an explicit stderr warning; exit status alone is not proof
-  of clean cancellation. Model/loading/finalization cleanup remains engine-owned.
+- Signal handling is armed before any command work starts. The first SIGINT/SIGTERM cancels the
+  owned command and awaits its cleanup. A second signal or 30-second deadline forces exit with an
+  explicit stderr warning after killing and reaping any `--play` child; exit status alone is not
+  proof of clean cancellation. Model/loading/finalization cleanup remains engine-owned.
+- A signalled run exits `130`/`143` even when the command also failed for another reason; stderr
+  (`error: …` versus `Cancelled; …`) and batch rows say which it was.
 
 ## Commands
 
@@ -158,7 +161,7 @@ vocello generate --mode custom|design|clone --variant speed|quality \
 | `--out` | output `.wav` path; default → `<data>/outputs/cli/` |
 | `--stream` | streaming synthesis at the app's 320ms cadence; reports first-chunk latency (TTFC) + chunk count (default) |
 | `--no-stream` | accumulate the full result before decoding (old non-streaming behavior) |
-| `--play` | play the result with `afplay` when done |
+| `--play` | play the result with `afplay` when done; a signal stops and reaps the player, and the published file stays |
 | `--json` | emit a JSON result object instead of the bare path |
 
 Streaming is now the default for `vocello generate`. It mirrors the app's engine streaming path (same
@@ -203,7 +206,9 @@ The command uses the same request builder exercised against the real engine supp
 
 Batch stops at the first failure. Its failure-only JSON is versioned (`schemaVersion: 2`) and
 contains every planned index/generation identity with `completed`, `failed`, `cancelled`, or
-`not_attempted` status; completed paths are retained. Failure exits nonzero. All-success JSON stays
+`not_attempted` status; completed paths are retained. Only the engine's typed cancellation makes a
+row `cancelled`; a genuine failure that coincides with a signal stays `failed` and adds
+`cancellationRequested: true`. Failure exits nonzero. All-success JSON stays
 compatible. There is no automatic retry, seed substitution, or implicit resume. Batch uses Auto
 language per text and non-streaming output; `--language`, `--stream`, and `--out` are rejected
 instead of silently ignored (use `generate` or batch `--out-dir`).

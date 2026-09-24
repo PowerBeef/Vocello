@@ -34,6 +34,9 @@ enum CLIBatchExecution {
         var durationSeconds: Double?
         var finishReason: String?
         var errorCode: String?
+        /// Set only on a `failed` row whose failure coincided with a
+        /// cancellation request; the failure is still the reported outcome.
+        var cancellationRequested: Bool?
     }
     struct Outcome {
         let rows: [Row]
@@ -57,8 +60,7 @@ enum CLIBatchExecution {
                 // Publication is an irreversible commit. Preserve a returned
                 // successful result even if a signal arrived immediately after.
                 guard FileManager.default.fileExists(atPath: result.audioPath) else {
-                    rows[index].status = .failed
-                    rows[index].errorCode = "published_output_missing"
+                    rows[index].fail("published_output_missing")
                     break
                 }
                 rows[index].status = .completed
@@ -66,12 +68,26 @@ enum CLIBatchExecution {
                 rows[index].durationSeconds = result.durationSeconds
                 rows[index].finishReason = result.finishReason?.rawValue
                 results.append(result)
+            } catch is CancellationError {
+                rows[index].status = .cancelled
+                rows[index].errorCode = "cancelled"
+                break
             } catch {
-                rows[index].status = Task.isCancelled || error is CancellationError ? .cancelled : .failed
-                rows[index].errorCode = rows[index].status == .cancelled ? "cancelled" : "generation_failed"
+                // Typed: the engine reports cancellation only as
+                // CancellationError, so a genuine failure that coincides with
+                // a signal stays failed.
+                rows[index].fail("generation_failed")
                 break
             }
         }
         return Outcome(rows: rows, results: results)
+    }
+}
+
+private extension CLIBatchExecution.Row {
+    mutating func fail(_ code: String) {
+        status = .failed
+        errorCode = code
+        if Task.isCancelled { cancellationRequested = true }
     }
 }

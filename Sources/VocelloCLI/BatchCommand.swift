@@ -104,7 +104,10 @@ enum BatchCommand {
                     wallSeconds: wall, items: outcome.rows))
             } else {
                 for result in results { print(result.audioPath) }
-                for row in outcome.rows { note("item \(row.index): \(row.status.rawValue)") }
+                for row in outcome.rows {
+                    let signalled = row.cancellationRequested == true ? " (cancellation requested)" : ""
+                    note("item \(row.index): \(row.status.rawValue)\(signalled)")
+                }
             }
             if outcome.cancelled { throw CancellationError() }
             throw CLIError("batch stopped; completed outputs retained, remaining rows not attempted")
@@ -124,14 +127,7 @@ enum BatchCommand {
         let totalAudio = results.reduce(0.0) { $0 + $1.durationSeconds }
         note("✓ \(results.count) clip(s) · \(String(format: "%.1f", totalAudio))s audio in \(String(format: "%.1f", wall))s")
 
-        if args.flag("play") {
-            for r in results {
-                let p = Process()
-                p.executableURL = URL(fileURLWithPath: "/usr/bin/afplay")
-                p.arguments = [r.audioPath]
-                try? p.run(); p.waitUntilExit()
-            }
-        }
+        if args.flag("play") { try await CLIPlayback.play(results.map(\.audioPath)) }
     }
 
     private static func readLines(_ args: Args) throws -> [String] {

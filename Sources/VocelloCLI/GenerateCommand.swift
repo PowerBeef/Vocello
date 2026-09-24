@@ -253,12 +253,7 @@ enum GenerateCommand {
         let chunks = chunkCount.map { " · chunks=\($0)" } ?? ""
         note("✓ \(String(format: "%.2f", result.durationSeconds))s audio · rtf=\(String(format: "%.2f", rtf)) (\(String(format: "%.2f", speedup))× realtime)\(ttfc)\(chunks) · finish=\(result.finishReason?.rawValue ?? "?")")
 
-        if args.flag("play") {
-            let p = Process()
-            p.executableURL = URL(fileURLWithPath: "/usr/bin/afplay")
-            p.arguments = [result.audioPath]
-            try? p.run(); p.waitUntilExit()
-        }
+        if args.flag("play") { try await CLIPlayback.play([result.audioPath]) }
     }
 
     private static func sha256(_ data: Data) -> String {

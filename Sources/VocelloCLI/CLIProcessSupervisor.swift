@@ -3,7 +3,8 @@ import Synchronization
 
 /// Signal handlers contain no Swift work: Dispatch delivers signals on a
 /// dedicated queue. The first signal cancels the owned command and waits for
-/// its cleanup; a second signal or deadline is explicitly a forced exit.
+/// its cleanup; a second signal or deadline is explicitly a forced exit, which
+/// first stops and reaps every owned child process.
 final class CLIProcessSupervisor: Sendable {
     private struct State: Sendable {
         var command: Task<Int32, Never>?
@@ -11,12 +12,16 @@ final class CLIProcessSupervisor: Sendable {
         var finished = false
     }
     private let state = Mutex(State())
+    private let children: CLIChildProcesses
     private let forceExit: @Sendable (Int32) -> Void
 
-    init(forceExit: @escaping @Sendable (Int32) -> Void = { code in
+    init(children: CLIChildProcesses = CLIChildProcesses(), forceExit: @escaping @Sendable (Int32) -> Void = { code in
         FileHandle.standardError.write(Data("Cancellation cleanup did not finish; forced exit. Recovery artifacts may remain.\n".utf8))
         exit(code)
-    }) { self.forceExit = forceExit }
+    }) {
+        self.children = children
+        self.forceExit = forceExit
+    }
 
     func attach(_ command: Task<Int32, Never>) {
         let cancelled = state.withLock { state in
@@ -33,13 +38,13 @@ final class CLIProcessSupervisor: Sendable {
             state.firstSignal = signal
             return (state.command, false)
         }
-        if action.1 { forceExit(128 + signal) }
+        if action.1 { forced(128 + signal) }
         else { action.0?.cancel() }
     }
 
     func enforceDeadline() {
         let signal = state.withLock { !$0.finished ? $0.firstSignal : nil }
-        if let signal { forceExit(128 + signal) }
+        if let signal { forced(128 + signal) }
     }
 
     func finish(code: Int32) -> Int32 {
@@ -50,14 +55,26 @@ final class CLIProcessSupervisor: Sendable {
         }
     }
 
+    /// No owned child outlives a forced exit.
+    private func forced(_ code: Int32) {
+        children.stopAll()
+        forceExit(code)
+    }
+
+    /// `signals` exists for the in-process fixture; the CLI uses the default.
     @MainActor
-    static func run(_ operation: @escaping @MainActor @Sendable () async -> Int32) async -> Int32 {
-        let supervisor = CLIProcessSupervisor()
+    static func run(
+        signals: [Int32] = [SIGINT, SIGTERM],
+        _ operation: @escaping @MainActor @Sendable () async -> Int32
+    ) async -> Int32 {
+        let supervisor = CLIProcessSupervisor(children: .shared)
         let queue = DispatchQueue(label: "vocello.cli.signals")
-        let command = Task { await operation() }
-        supervisor.attach(command)
-        let sources = [SIGINT, SIGTERM].map { number in
-            signal(number, SIG_IGN)
+        // Arm every signal before the command task exists. Each source is
+        // registered with the kernel before its disposition becomes SIG_IGN, so
+        // an early signal either takes the default action while no command work
+        // exists or reaches the supervisor, which holds it until `attach`.
+        var sources: [any DispatchSourceSignal] = []
+        for number in signals {
             let source = DispatchSource.makeSignalSource(signal: number, queue: queue)
             // Dispatch's legacy callback API does not infer Sendable here.
             // Explicit isolation prevents this MainActor factory from lending
@@ -66,13 +83,150 @@ final class CLIProcessSupervisor: Sendable {
                 supervisor.receive(number)
                 queue.asyncAfter(deadline: .now() + 30) { @Sendable in supervisor.enforceDeadline() }
             }
-            source.resume()
-            return source
+            await withCheckedContinuation { (registered: CheckedContinuation<Void, Never>) in
+                source.setRegistrationHandler { @Sendable in registered.resume() }
+                source.resume()
+            }
+            signal(number, SIG_IGN)
+            sources.append(source)
         }
+        let command = Task { await operation() }
+        supervisor.attach(command)
         let code = supervisor.finish(code: await command.value)
         for source in sources { source.cancel() }
-        signal(SIGINT, SIG_DFL)
-        signal(SIGTERM, SIG_DFL)
+        for number in signals { signal(number, SIG_DFL) }
         return code
+    }
+}
+
+// MARK: - Owned child processes
+
+/// A child process the CLI launched and must not leave behind (today only
+/// `--play`'s afplay). Both waits return only after the child has exited and
+/// been reaped.
+protocol CLIChildProcess: Sendable {
+    /// Graceful stop (SIGTERM), sent when the owning command is cancelled.
+    func terminate()
+    /// Forced stop (SIGKILL), sent only on the forced-exit path.
+    func forceKill()
+    func waitUntilExit() async
+    /// Bounded wait for the forced-exit path, which cannot suspend.
+    func waitUntilExit(timeout: DispatchTime) -> Bool
+}
+
+/// Starts a child. Tests inject a fake, so no real player runs.
+typealias CLIProcessLauncher = @Sendable (_ executable: URL, _ arguments: [String]) throws -> any CLIChildProcess
+
+/// Children owned by the running command. Cancelling the owning task stops its
+/// child and waits for the reap before reporting cancellation; a forced exit
+/// kills and reaps every live child and refuses later launches.
+final class CLIChildProcesses: Sendable {
+    static let shared = CLIChildProcesses()
+
+    private struct State: Sendable {
+        var live: [UUID: any CLIChildProcess] = [:]
+        var closed = false
+    }
+    private let state = Mutex(State())
+
+    var liveCount: Int { state.withLock { $0.live.count } }
+
+    /// Runs one child to exit. Throws `CancellationError`, only after the
+    /// child is reaped, when the owning task was cancelled.
+    func run(_ executable: URL, arguments: [String], launch: CLIProcessLauncher) async throws {
+        try Task.checkCancellation()
+        let id = UUID()
+        // Launch under the lock: a concurrent forced exit either sees this
+        // child or refuses it, never misses it.
+        let child = try state.withLock { state throws -> any CLIChildProcess in
+            guard !state.closed else { throw CancellationError() }
+            let child = try launch(executable, arguments)
+            state.live[id] = child
+            return child
+        }
+        defer { state.withLock { _ = $0.live.removeValue(forKey: id) } }
+        await withTaskCancellationHandler {
+            await child.waitUntilExit()
+        } onCancel: {
+            child.terminate()
+        }
+        try Task.checkCancellation()
+    }
+
+    /// Forced exit: the graceful SIGTERM already went out with the first
+    /// signal, so escalate to SIGKILL and wait, bounded, for each reap.
+    func stopAll(timeout: DispatchTimeInterval = .seconds(2)) {
+        let live = state.withLock { state -> [any CLIChildProcess] in
+            state.closed = true
+            return Array(state.live.values)
+        }
+        for child in live { child.forceKill() }
+        let deadline = DispatchTime.now() + timeout
+        for child in live { _ = child.waitUntilExit(timeout: deadline) }
+    }
+}
+
+/// `Process`-backed child. Exit is observed through Foundation's reaping
+/// termination handler, never a blocking `waitUntilExit()` on the main actor.
+final class CLIFoundationChildProcess: CLIChildProcess {
+    private let process: Process
+    private let exited: DispatchGroup
+
+    static let launch: CLIProcessLauncher = { executable, arguments in
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = arguments
+        let exited = DispatchGroup()
+        exited.enter()
+        process.terminationHandler = { @Sendable _ in exited.leave() }
+        try process.run()
+        return CLIFoundationChildProcess(process: process, exited: exited)
+    }
+
+    private init(process: Process, exited: DispatchGroup) {
+        self.process = process
+        self.exited = exited
+    }
+
+    func terminate() {
+        if process.isRunning { process.terminate() }
+    }
+
+    func forceKill() {
+        if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+    }
+
+    func waitUntilExit() async {
+        await withCheckedContinuation { (reaped: CheckedContinuation<Void, Never>) in
+            exited.notify(queue: .global(qos: .utility)) { @Sendable in reaped.resume() }
+        }
+    }
+
+    func waitUntilExit(timeout: DispatchTime) -> Bool {
+        exited.wait(timeout: timeout) == .success
+    }
+}
+
+/// `--play`: afplay each published file in order through an owned child. A
+/// player that cannot start is a note, not an error: the output is already
+/// published. A signal stops the current child and skips the rest.
+enum CLIPlayback {
+    static let player = URL(fileURLWithPath: "/usr/bin/afplay")
+
+    static func play(
+        _ paths: [String],
+        children: CLIChildProcesses = .shared,
+        launch: CLIProcessLauncher = CLIFoundationChildProcess.launch
+    ) async throws {
+        for path in paths {
+            do {
+                try await children.run(player, arguments: [path], launch: launch)
+            } catch let cancellation as CancellationError {
+                throw cancellation
+            } catch {
+                note("playback unavailable: \(error.localizedDescription)")
+                return
+            }
+        }
     }
 }

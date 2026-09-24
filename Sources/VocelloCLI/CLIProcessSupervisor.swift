@@ -115,9 +115,13 @@ final class CLIProcessSupervisor: Sendable {
         return code
     }
 
-    /// Never resumes: the forced exit ends the process.
+    /// Never resumes: the forced exit ends the process. A sleep loop rather than a
+    /// Never-typed continuation, which the pinned CI compiler (Xcode 26.6) rejects as
+    /// "will never be executed" under warnings-as-errors.
     private static func parkForever() async -> Never {
-        await withUnsafeContinuation { (_: UnsafeContinuation<Never, Never>) in }
+        while true {
+            try? await Task.sleep(for: .seconds(3600))
+        }
     }
 }
 

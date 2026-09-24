@@ -433,7 +433,9 @@ comes from `qwenvoice_ios_model_catalog.json`.
 
 Cancel opens a confirmation dialog: `iosModelCancelDownloadConfirmButton` (cancel, deletes staged
 data). There is no paused state or Resume control. Waiting for connectivity comes from URLSession;
-an active task separately reports no progress after 20 seconds. `iosModelProgress_<id>` exposes
+downloads are Wi-Fi-only by policy (`allowsCellularAccess = false`), so the state reads "Waiting for
+Wi-Fi" and its detail, the Voice Models caption and the onboarding install page all say that a
+download on cellular waits for Wi-Fi (PA-21, IOS-08). An active task separately reports no progress after 20 seconds. `iosModelProgress_<id>` exposes
 exact `durable logical catalog bytes / catalog bytes` while transfer is incomplete. The visible
 detail derives its percentage and byte counts from that same presentation value, alongside
 smoothed speed, ETA, retry reason, and verified-file reuse. Transfer completion replaces the

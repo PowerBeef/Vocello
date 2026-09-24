@@ -113,9 +113,15 @@ import QwenVoiceCore
         IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.queued", defaultValue: "Queued",
                comment: "Settings and model management presentation; no change to stored identities.")
     }
-    static var waitingForNetwork: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.waitingForNetwork", defaultValue: "Waiting for Network",
-               comment: "Settings and model management presentation; no change to stored identities.")
+    /// Model downloads never use cellular (`allowsCellularAccess = false` in
+    /// `IOSModelDownloadCoordinator`), so the waiting state names Wi-Fi (PA-21, IOS-08).
+    static var waitingForWiFi: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.waitingForWiFi", defaultValue: "Waiting for Wi-Fi",
+               comment: "Model download status: the transfer is paused until the phone is on Wi-Fi. Model downloads never use cellular data.")
+    }
+    static var downloadsNeedWiFi: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.downloadsNeedWiFi", defaultValue: "Models download over Wi-Fi only. On cellular, a download waits until you're back on Wi-Fi.",
+               comment: "Explains before and during a model download that models download over Wi-Fi only; on cellular the download waits. Presentation only.")
     }
     static var finishing: String {
         IOSAppLanguage.shared.localized(localized: "vocello.settings.polish.finishing", defaultValue: "Finishing",

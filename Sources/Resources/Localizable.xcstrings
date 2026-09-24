@@ -4375,6 +4375,72 @@
         }
       }
     },
+    "vocello.settings.polish.downloadsNeedWiFi": {
+      "comment": "Explains before and during a model download that models download over Wi-Fi only; on cellular the download waits. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Models download over Wi-Fi only. On cellular, a download waits until you're back on Wi-Fi."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les modèles se téléchargent uniquement en Wi-Fi. Sur le réseau cellulaire, le téléchargement attend votre retour en Wi-Fi."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los modelos solo se descargan por Wi-Fi. Con datos móviles, la descarga espera hasta que vuelvas a conectarte a una red Wi-Fi."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modelle werden nur über WLAN geladen. Über Mobilfunk wartet ein Download, bis du wieder mit einem WLAN verbunden bist."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I modelli si scaricano solo tramite Wi-Fi. Con la rete cellulare, il download attende finché non torni su una rete Wi-Fi."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os modelos são baixados somente por Wi-Fi. Na rede celular, o download aguarda até você voltar a uma rede Wi-Fi."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型仅通过无线局域网下载。使用蜂窝网络时，下载会等待你重新连接无线局域网。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "モデルはWi-Fi経由でのみダウンロードされます。モバイル通信中は、Wi-Fiに接続するまでダウンロードが待機します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "모델은 Wi-Fi로만 다운로드됩니다. 셀룰러 연결 중에는 Wi-Fi에 다시 연결될 때까지 다운로드가 대기합니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Модели загружаются только по Wi-Fi. В сотовой сети загрузка ждёт, пока вы снова не подключитесь к Wi-Fi."
+          }
+        }
+      }
+    },
     "vocello.settings.polish.noModelFiles": {
       "comment": "Settings polish; localized display only. Preserve placeholders and stored model/variation identities.",
       "extractionState": "manual",
@@ -5563,68 +5629,68 @@
         }
       }
     },
-    "vocello.settings.polish.waitingForNetwork": {
-      "comment": "Settings polish; localized display only. Preserve placeholders and stored model/variation identities.",
+    "vocello.settings.polish.waitingForWiFi": {
+      "comment": "Model download status: the transfer is paused until the phone is on Wi-Fi. Model downloads never use cellular data.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Waiting for Network"
+            "value": "Waiting for Wi-Fi"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "En attente du réseau"
+            "value": "En attente du Wi-Fi"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Esperando conexión"
+            "value": "Esperando Wi-Fi"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Warten auf Netzwerk"
+            "value": "Warten auf WLAN"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "In attesa della rete"
+            "value": "In attesa del Wi-Fi"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aguardando rede"
+            "value": "Aguardando Wi-Fi"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "等待网络"
+            "value": "等待无线局域网"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "ネットワークを待機中"
+            "value": "Wi-Fiを待機中"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "네트워크 대기 중"
+            "value": "Wi-Fi 대기 중"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ожидание сети"
+            "value": "Ожидание Wi-Fi"
           }
         }
       }

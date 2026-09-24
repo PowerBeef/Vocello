@@ -713,7 +713,7 @@ struct IOSModelRow: View {
         case .installed: return IOSAppLanguage.shared.presentation.status(.ready)
         case .available: return IOSSettingsText.notInstalled
         case .queued: return IOSSettingsText.queued
-        case .waitingForConnectivity: return IOSSettingsText.waitingForNetwork
+        case .waitingForConnectivity: return IOSSettingsText.waitingForWiFi
         case .downloading: return transferIsComplete ? IOSSettingsText.finishing : IOSSettingsText.downloading
         case .retrying: return transferIsComplete ? IOSSettingsText.finishing : IOSSettingsText.retrying
         case .verifying: return IOSSettingsText.verifying
@@ -800,7 +800,7 @@ struct IOSModelRow: View {
             modelProgressPresentation(.transfer(
                 durableBytes: downloaded,
                 catalogBytes: total,
-                suffix: IOSSettingsText.waitingForNetwork,
+                suffix: IOSSettingsText.downloadsNeedWiFi,
                 text: IOSAppLanguage.shared.presentation,
                 formatBytes: IOSSettingsFormatters.fileSize
             ))

@@ -199,6 +199,15 @@ private struct IOSOnboardingInstallPage: View {
                 .frame(maxWidth: 320)
                 .padding(.top, 14)
 
+            // IOS-08: a first download on cellular waits for Wi-Fi; say so up front.
+            Text(IOSSettingsText.downloadsNeedWiFi)
+                .iosScaledFont(size: 13, relativeTo: .footnote)
+                .foregroundStyle(Theme.Text.tertiary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 320)
+                .padding(.top, 10)
+
             VStack(alignment: .leading, spacing: 14) {
                 IOSOnboardingModelHint(
                     tint: Theme.Brand.modeCustom,

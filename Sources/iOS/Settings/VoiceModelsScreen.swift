@@ -56,6 +56,13 @@ struct VoiceModelsScreen: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 4)
 
+                    // IOS-08: downloads are Wi-Fi-only by policy; say so before one starts.
+                    Label(IOSSettingsText.downloadsNeedWiFi, systemImage: "wifi")
+                        .font(.caption)
+                        .foregroundStyle(Theme.Text.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 4)
+
                     IOSSettingsSection(title: IOSSettingsText.overview) {
                         IOSSettingsValueRow(
                             symbol: readyModelCount == TTSModel.all.count

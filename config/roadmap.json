@@ -678,20 +678,6 @@
       "unparkWhen": "A device window for the isolated-rerun and prerequisite-fixture evidence (the controllable-clock clause is AV-15)."
     },
     {
-      "id": "AV-15",
-      "plan": "autonomous-validation-remediation-2026-08",
-      "title": "Download scheduling tests drive a controllable clock",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "HuggingFaceDownloader's throttle windows take an injected clock instead of ProcessInfo.systemUptime and ModelDownloadChunkSchedulingTests advance it deterministically without sleeping, while one real-throttle integration proof remains; the deterministic macOS test lane runs the suite in under a second.",
-      "sourceOfTruth": [
-        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
-        "Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift"
-      ],
-      "updated": "2026-09-13",
-      "notes": "Split out of AV-09 on 2026-09-13 so the device-independent work is not parked with it. Today the downloader gates on fixed 0.25 s and 0.5 s windows against ProcessInfo.systemUptime and the tests sleep real time; no clock injection exists."
-    },
-    {
       "id": "ISR-04",
       "plan": "ios-generation-startup-reliability-2026-08",
       "title": "Complete staged exact-request characterization",
@@ -1326,21 +1312,6 @@
         "scripts/supply_chain_contract.py"
       ],
       "notes": "External audit CI-01, verified worse on 2026-09-22: three stacked release blockers. The package, compile-ios and archive-ios jobs install numpy but run supply_chain_contract --installed native, which also checks pytest and pytest-xdist (pinned since 25a895ed); package also runs --installed release, whose asc only archive-ios installs; and the macos-26 image now ships gh 2.100.0 against the exact 2.96.0 pin (7261bfbc hit the same drift). release.yml hard-codes Xcode_26.6 three times and duplicates the tool install; a comment says timeout-minutes is 90 while the job allows 150. 2026-09-22: release jobs moved onto the composite action with a release-tools input (a SHA-pinned gh; the pinned asc was removed by maintainer decision) and release-rehearsal.yml was added; closes when the first rehearsal is green and the altool upload check is done.",
-      "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
-    },
-    {
-      "id": "PA-06",
-      "title": "Routing cost and derived-artifact gaps",
-      "status": "planned",
-      "gate": "A Tests/VocelloMacUITests-only change no longer runs the full macOS test and TSan lanes; refresh_derived_artifacts validate_all checks every registered artifact; SwiftLint is pinned or reported when missing; nightly and cache-owner text describe TSan as blocking.",
-      "sourceOfTruth": [
-        "scripts/ci/classify_changes.py",
-        "scripts/development_workflow.py",
-        "scripts/refresh_derived_artifacts.py",
-        "config/toolchain.json"
-      ],
-      "notes": "UI-test sources route to the swift lane although neither macos-tests nor macos-tsan compiles UI bundles (local check already compiles them separately). A clean-tree check routes every lane. validate_all omits the README-charts check its registry lists. SwiftLint is unpinned and silently skipped when missing, unlike shellcheck. nightly.yml's header and the macos-tsan cache owner still say TSan is scheduled-only although it is blocking on push since 2026-09-14. Also: Sources/Resources/third_party_attributions.json (attribution_manifest.py rebuild) is neither registered in refresh_derived_artifacts.py (dev.sh regen) nor refused by the generated-file guard; only the contract gate catches a stale copy.",
       "plan": "project-audit-2026-09",
       "updated": "2026-09-22"
     },

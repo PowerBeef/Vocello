@@ -3976,6 +3976,45 @@
         "commit:788204fc",
         "file:Tests/VocelloCoreTests/CLIExecutionTests.swift"
       ]
+    },
+    {
+      "id": "AV-15",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "Download scheduling tests drive a controllable clock",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "HuggingFaceDownloader's throttle windows take an injected clock instead of ProcessInfo.systemUptime and ModelDownloadChunkSchedulingTests advance it deterministically without sleeping, while one real-throttle integration proof remains; the deterministic macOS test lane runs the suite in under a second.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift"
+      ],
+      "updated": "2026-09-24",
+      "notes": "Closed 2026-09-24. DownloadStateRegistry and the delegate ingress gate read time through an internal ProgressClock (process uptime by default, unchanged in production); ModelDownloadChunkSchedulingTests step the publication throttle, speed-sample window and stall threshold deterministically instead of sleeping, and one real-clock proof remains. The suite runs 37 tests in 0.32 s on the M6 deterministic lane.",
+      "evidence": [
+        "commit:5cc4e8b9",
+        "commit:9a77dd5c",
+        "file:Tests/VocelloCoreTests/ModelDownloadChunkSchedulingTests.swift"
+      ]
+    },
+    {
+      "id": "PA-06",
+      "title": "Routing cost and derived-artifact gaps",
+      "status": "done",
+      "gate": "A Tests/VocelloMacUITests-only change no longer runs the full macOS test and TSan lanes; refresh_derived_artifacts validate_all checks every registered artifact; SwiftLint is pinned or reported when missing; nightly and cache-owner text describe TSan as blocking.",
+      "sourceOfTruth": [
+        "scripts/ci/classify_changes.py",
+        "scripts/development_workflow.py",
+        "scripts/refresh_derived_artifacts.py",
+        "config/toolchain.json"
+      ],
+      "notes": "Closed 2026-09-24. XCUITest-only changes route to a macos_ui lane: the macOS job compiles the UI bundles (--gate) but skips the deterministic suites, darwin-only pytest and TSan; iOS UI-test sources route to ios alone; a clean tree routes no lane locally and points at --since. refresh_derived_artifacts validate runs every registered check (the README charts were skipped) and refresh rebuilds whatever an upstream rebuild stales in one pass; third_party_attributions.json is registered and guarded. SwiftLint 0.65.1 is SHA-pinned (portable_swiftlint.zip; digest re-verified by the lead against the release asset) and dev.sh lint reports a missing or unpinned SwiftLint instead of skipping. nightly.yml and the macos-tsan cache owner describe TSan as blocking. Known gap kept: the Python lane does not run for Tests/ changes although two scripts tests read UI-test sources (the nightly full suite covers them).",
+      "plan": "project-audit-2026-09",
+      "updated": "2026-09-24",
+      "evidence": [
+        "commit:c5524bf2",
+        "commit:3ba5e409",
+        "file:scripts/tests/test_classify_changes.py"
+      ]
     }
   ]
 }

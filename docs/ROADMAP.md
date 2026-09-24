@@ -14,7 +14,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | --- | --- | --- | --- |
 | `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
 | `audit-remediation-2026-09` | active | backend-and-platform | 0/12 (0%) |
-| `autonomous-validation-remediation-2026-08` | active | release-qa | 10/17 (59%) |
+| `autonomous-validation-remediation-2026-08` | active | release-qa | 11/17 (65%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 17/26 (65%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
@@ -22,7 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 20/31 (65%) |
+| `project-audit-2026-09` | active | backend-and-platform | 21/31 (68%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -164,7 +164,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `AV-09` | parked | P2 — make stateful physical-device lanes independently repeatable | — |
 | `AV-13` | planned | XCUITest coverage for the identifiers never exercised (78 macOS, 34 iOS) | — |
 | `AV-14` | parked | re-baseline the benchmark harness under the standard RTF definition (consent-bound runs) | — |
-| `AV-15` | planned | Download scheduling tests drive a controllable clock | — |
 | `AV-17` | parked | First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs) | — |
 
 ### Open items in detail
@@ -186,9 +185,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 - **`AV-14`** (parked) — re-baseline the benchmark harness under the standard RTF definition (consent-bound runs).
   gate: After the 2026-09-12 harness fixes: (1) run `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` and re-save `benchmarks/baselines/mac-gate-bench.json` from a three-take run so it carries `rtfDefinition`, `rtfMAD`, n=3 and the host OS/Xcode identity; (2) one canonical `scripts/ui_test.sh macos benchmark` and one `scripts/ui_test.sh ios benchmark` run publish the first records with `run.rtfDefinition`, validate the provenance-bound optimization label, the iOS cell-length check and the sleep hold; (3) one macOS and one iOS `perf` run re-derive the warn-only thresholds under the clipped window arithmetic and the macOS environment row; (4) repin `scripts/generate_readme_charts.py` and the website chart to the new canonical macOS record. (5) one macOS `scripts/macos_test.sh lang-bench --subset quick` run publishes the first whisper-verified (`focused`, single-family) macOS language record and exercises the producer on generated audio under the host-quiet preflight. Each run needs explicit consent (model download, phone).
   unparkWhen: All current production models are Ready on the paired phone, then run the iOS benchmark and perf lanes; macOS clauses remain complete.
-
-- **`AV-15`** (planned) — Download scheduling tests drive a controllable clock.
-  gate: HuggingFaceDownloader's throttle windows take an injected clock instead of ProcessInfo.systemUptime and ModelDownloadChunkSchedulingTests advance it deterministically without sleeping, while one real-throttle integration proof remains; the deterministic macOS test lane runs the suite in under a second.
 
 - **`AV-17`** (parked) — First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs).
   gate: On mac-mini-m6-16gb (live `publish_benchmark_history.py verify-hardware --platform macos` PASS): (1) QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate, then re-save benchmarks/baselines/mac-gate-bench.json from a three-take run; (2) one clean scripts/ui_test.sh macos benchmark publishes the first canonical M6 ui-generation record, and in the same commit RTF_RECORD, the charts, README prose and the website medians, record id and headline are repinned to it; (3) counted scripts/ui_test.sh macos perf sessions re-derive config/ui-perf-thresholds.json with calibrationProfile mac-mini-m6-16gb; (4) scripts/macos_test.sh memory publishes the first M6 memory-qualification record after a maintainer decision on keeping retained-memory-v1 (5% of 16 GiB) or adopting a floor-anchored v2; (5) the delivery evaluator's compact qualification runs repeat on M6; (6) decide whether a forced floor8GBMac diagnostic lane covers the 8 GB support floor. M2 records are never rewritten or compared.
@@ -449,7 +445,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `PA-05` | in-flight | Release path works end to end and is rehearsed | — |
-| `PA-06` | planned | Routing cost and derived-artifact gaps | — |
 | `PA-08` | planned | Consolidate duplicated platform logic and misleading names | — |
 | `PA-10` | in-flight | Release signing is isolated from dispatch and build inputs | — |
 | `PA-16` | planned | Speech-tokenizer attention honors the model's sliding windows | — |
@@ -464,9 +459,6 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-05`** (in-flight) — Release path works end to end and is rehearsed.
   gate: release.yml selects Xcode and installs every pinned tool (numpy, pytest, pytest-xdist, gh) through .github/actions/native-toolchain, a secrets-free ad-hoc release rehearsal workflow runs release.sh and the packaged-DMG verification on a schedule and on release-input changes and is green, and the TestFlight upload command is confirmed supported by the pinned Xcode.
-
-- **`PA-06`** (planned) — Routing cost and derived-artifact gaps.
-  gate: A Tests/VocelloMacUITests-only change no longer runs the full macOS test and TSan lanes; refresh_derived_artifacts validate_all checks every registered artifact; SwiftLint is pinned or reported when missing; nightly and cache-owner text describe TSan as blocking.
 
 - **`PA-08`** (planned) — Consolidate duplicated platform logic and misleading names.
   gate: Each consolidation lands separately with unchanged identifiers and behavior: one download driver seam, one observation model for the model managers, one Mac player card, root models constructed once, generateVoiceDesign renamed for the all-mode loop, OWNERSHIP.json lists MLXAudioMark, and the Cmd-6 menu title matches its destination.

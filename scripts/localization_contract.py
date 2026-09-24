@@ -294,8 +294,12 @@ def _validate_typed_presentation(root: Path) -> None:
             "IOSAppLanguage.shared.presentation.referenceAudioRequired",
             "IOSAppLanguage.shared.presentation.generationFailureMessage",
         ),
+        # The coordinator reads the platform owner it is given (IOSAppLanguage on
+        # iOS, MacInterfaceText on macOS); iOS is the default (PA-20).
         Path("Sources/iOS/Studio/StudioGenerationCoordinator.swift"): (
-            "IOSAppLanguage.shared.presentation.cancellationCouldNotFinish",
+            "{ IOSAppLanguage.shared.presentation }",
+            "presentation().cancellationCouldNotFinish",
+            "presentation().announceGenerationFailed",
         ),
         Path("Sources/iOS/IOSSettingsViews.swift"): (
             "IOSAppLanguage.shared.presentation.status(.ready)",

@@ -79,6 +79,18 @@ final class VocelloPresentationTextTests: XCTestCase {
         XCTAssertEqual(text.generationFailureMessage(TTSEngineError.unsupportedRequest("Host copy")), "Host copy")
     }
 
+    /// PA-20 (IOS-12): one short VoiceOver sentence per generation state change.
+    func testGenerationAnnouncementsAreShortCompleteSentences() {
+        let text = VocelloPresentationText()
+        XCTAssertEqual(text.announceGenerationStarted, "Generating take.")
+        XCTAssertEqual(text.announceTakeReady, "Take ready.")
+        XCTAssertEqual(text.announceGenerationStopped, "Generation stopped.")
+        XCTAssertEqual(text.announceGenerationFailed("Try again."), "Generation failed. Try again.")
+        let french = VocelloPresentationText(localization: VocelloLocalization(bundle: Bundle(for: Self.self), language: "fr"))
+        XCTAssertEqual(french.announceTakeReady, "Prise prête.")
+        XCTAssertEqual(french.announceGenerationFailed("Détail."), "Échec de la génération. Détail.")
+    }
+
     /// PA-20 (MAC-10): sizes and dates follow the interface language, not the process locale.
     func testFormattersFollowTheInterfaceLanguage() {
         let bundle = Bundle(for: Self.self)

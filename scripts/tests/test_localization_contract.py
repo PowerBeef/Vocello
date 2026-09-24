@@ -120,7 +120,9 @@ class LocalizationContractTests(unittest.TestCase):
                 "IOSAppLanguage.shared.presentation.generationFailureMessage\n"
             ),
             "Sources/iOS/Studio/StudioGenerationCoordinator.swift": (
-                "IOSAppLanguage.shared.presentation.cancellationCouldNotFinish\n"
+                "{ IOSAppLanguage.shared.presentation }\n"
+                "presentation().cancellationCouldNotFinish\n"
+                "presentation().announceGenerationFailed\n"
             ),
             "Sources/iOS/IOSSettingsViews.swift": "IOSAppLanguage.shared.presentation.status(.ready)\n",
             "Sources/iOSSupport/Services/IOSModelProgressPresentation.swift": (

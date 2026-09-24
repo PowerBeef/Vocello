@@ -644,6 +644,29 @@ struct VocelloPresentationText: Sendable {
         )
     }
 
+    // MARK: VoiceOver generation announcements (PA-20, IOS-12)
+
+    var announceGenerationStarted: String {
+        localization.string(localized: "vocello.presentation.announceGenerationStarted", defaultValue: "Generating take.",
+               comment: "VoiceOver announcement when a Studio take or long-form project starts generating.")
+    }
+
+    var announceTakeReady: String {
+        localization.string(localized: "vocello.presentation.announceTakeReady", defaultValue: "Take ready.",
+               comment: "VoiceOver announcement when a Studio take or project is ready to play.")
+    }
+
+    func announceGenerationFailed(_ message: String) -> String {
+        localization.format(localization.string(localized: "vocello.presentation.announceGenerationFailed",
+            defaultValue: "Generation failed. %1$@",
+            comment: "VoiceOver announcement when Studio generation failed; %1$@ is the localized error."), message)
+    }
+
+    var announceGenerationStopped: String {
+        localization.string(localized: "vocello.presentation.announceGenerationStopped", defaultValue: "Generation stopped.",
+               comment: "VoiceOver announcement when Studio generation was stopped.")
+    }
+
     /// Representative plural contract. Product surfaces can adopt the same
     /// pattern without concatenating independently localized fragments.
     func readyModelCount(_ count: Int) -> String {

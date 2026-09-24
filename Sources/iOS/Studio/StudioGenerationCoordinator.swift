@@ -1,3 +1,4 @@
+import Accessibility
 import Foundation
 import Observation
 import QwenVoiceCore
@@ -51,6 +52,10 @@ final class StudioGenerationCoordinator {
     /// Notice for work the foreground exit stopped (PA-15), shown once the user is back.
     private var backgroundNotice = IOSBackgroundInterruptionNoticeState()
 
+    /// Copy in the platform's interface language: `IOSAppLanguage` on iOS,
+    /// `MacInterfaceText` on macOS (PA-20).
+    @ObservationIgnored private let presentation: @MainActor () -> VocelloPresentationText
+
     var activeAttempt: StudioGenerationAttemptToken? {
         attemptAuthority.currentToken
     }
@@ -75,16 +80,20 @@ final class StudioGenerationCoordinator {
     var backgroundInterruptionNoticeMessage: String? {
         switch backgroundNotice.presented {
         case .singleTakeDiscarded:
-            return IOSAppLanguage.shared.presentation.backgroundTakeStopped
+            return presentation().backgroundTakeStopped
         case .longFormStopped:
-            return IOSAppLanguage.shared.presentation.backgroundLongFormStopped
+            return presentation().backgroundLongFormStopped
         case nil:
             return nil
         }
     }
 
-    init(mode: GenerationMode) {
+    init(
+        mode: GenerationMode,
+        presentation: @escaping @MainActor () -> VocelloPresentationText = { IOSAppLanguage.shared.presentation }
+    ) {
         self.mode = mode
+        self.presentation = presentation
     }
 
     /// Marks a generation attempt as started. Clears any prior error.
@@ -99,6 +108,7 @@ final class StudioGenerationCoordinator {
         lastCompletedOutput = nil
         liveItem = live
         isGenerating = true
+        StudioGenerationAnnouncer.post(presentation().announceGenerationStarted)
         return attempt
     }
 
@@ -161,6 +171,7 @@ final class StudioGenerationCoordinator {
         guard attemptAuthority.completeCancellation(attempt) else { return false }
         errorMessage = nil
         clearTerminalState()
+        StudioGenerationAnnouncer.post(presentation().announceGenerationStopped)
         return true
     }
 
@@ -175,10 +186,12 @@ final class StudioGenerationCoordinator {
         // The error explains the failed barrier; a background notice claiming
         // the work stopped cleanly would contradict it.
         backgroundNotice.clear()
-        errorMessage = IOSAppLanguage.shared.presentation.cancellationCouldNotFinish(
-            details: error.localizedDescription
+        let message = presentation().cancellationCouldNotFinish(
+            details: presentation().generationFailureMessage(error)
         )
+        errorMessage = message
         clearTerminalState()
+        StudioGenerationAnnouncer.post(presentation().announceGenerationFailed(message))
         return true
     }
 
@@ -203,6 +216,7 @@ final class StudioGenerationCoordinator {
         guard attemptAuthority.finishGeneration(attempt) else { return false }
         lastCompletedOutput = item
         clearTerminalState()
+        StudioGenerationAnnouncer.post(presentation().announceTakeReady)
         return true
     }
 
@@ -215,6 +229,7 @@ final class StudioGenerationCoordinator {
         guard attemptAuthority.finishGeneration(attempt) else { return false }
         errorMessage = message
         clearTerminalState()
+        StudioGenerationAnnouncer.post(presentation().announceGenerationFailed(message))
         return true
     }
 
@@ -239,5 +254,17 @@ final class StudioGenerationCoordinator {
     /// The user acknowledged the notice.
     func dismissBackgroundInterruptionNotice() {
         backgroundNotice.clear()
+    }
+}
+
+/// VoiceOver announcements for Studio generation state changes (PA-20, IOS-12):
+/// one per transition of an attempt (started, take ready, failed, stopped),
+/// never for progress, so a long take or project is not narrated. Focus stays
+/// where it is; the announcement tells a VoiceOver user what changed off-screen.
+@MainActor
+enum StudioGenerationAnnouncer {
+    static func post(_ message: String) {
+        guard !message.isEmpty else { return }
+        AccessibilityNotification.Announcement(message).post()
     }
 }

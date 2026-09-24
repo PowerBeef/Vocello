@@ -39,9 +39,11 @@ final class MacAppModel {
 
     /// Per-mode generation lifecycle (attempt-scoped terminal state), one
     /// per Studio mode like the iOS `AppModel`.
-    let customCoordinator = StudioGenerationCoordinator(mode: .custom)
-    let designCoordinator = StudioGenerationCoordinator(mode: .design)
-    let cloneCoordinator = StudioGenerationCoordinator(mode: .clone)
+    /// Their copy (errors, notices, VoiceOver announcements) follows the Mac
+    /// interface language, not the iOS owner compiled alongside (PA-20).
+    let customCoordinator = StudioGenerationCoordinator(mode: .custom, presentation: { MacInterfaceText.presentation })
+    let designCoordinator = StudioGenerationCoordinator(mode: .design, presentation: { MacInterfaceText.presentation })
+    let cloneCoordinator = StudioGenerationCoordinator(mode: .clone, presentation: { MacInterfaceText.presentation })
     /// The last designed take that can still become a saved voice; it lives
     /// beside the coordinator so leaving Voice Design keeps both or neither.
     var designSavedVoiceCandidate: VoiceDesignSavedVoiceCandidate?

@@ -127,11 +127,10 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     /// `TTSEngineFrontendState.latestEvent` field) that read the
     /// "what state is the engine in right now" view of generation
     /// activity. **NOT** the chunk-delivery transport — that role
-    /// moved to the `events` `AsyncStream` below to fix the audit
-    /// Finding #1 race where `EngineServiceHost`'s
-    /// `objectWillChange.sink` slot-sampler could overwrite a
-    /// chunk before it was published, silently dropping the last
-    /// audio chunk of every streaming generation.
+    /// belongs to the `events` `AsyncStream` below: a single published
+    /// slot can be overwritten before a sampler reads it, which once
+    /// dropped the last audio chunk of every streaming generation
+    /// (audit Finding #1, in the since-retired XPC service host).
     @Published public private(set) var latestEvent: GenerationEvent?
 
     /// One bounded stream is allocated for each caller-minted generation ID.
@@ -427,7 +426,6 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
 
     private enum ModelOperationKind: String {
         case generation
-        case batchGeneration
         case explicitLoad
         case explicitUnload
         case proactiveLoad
@@ -437,7 +435,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
 
         var isGeneration: Bool {
             switch self {
-            case .generation, .batchGeneration:
+            case .generation:
                 return true
             case .explicitLoad, .explicitUnload, .proactiveLoad, .proactivePrewarm, .clonePriming,
                  .diagnosticCodecReplay:
@@ -1194,110 +1192,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         defer { finishModelOperation(id: operationID) }
         return try await generate(
             request,
-            allowsBatchRequest: false,
             cancellationIngress: cancellationIngress
         )
-    }
-
-    public func generateBatch(
-        _ requests: [GenerationRequest],
-        progressHandler: (@MainActor (Double?, String) -> Void)? = nil
-    ) async throws -> [GenerationResult] {
-        let requests = requests.map { request in
-            request.generationID == nil ? request.withGenerationID(UUID()) : request
-        }
-        let cancellationIngress = GenerationCancellationIngress()
-        let gate = GenerationTaskStartGate()
-        let task = Task { @MainActor [self] in
-            await gate.wait()
-            try Task.checkCancellation()
-            return try await performGenerateBatch(
-                requests,
-                progressHandler: progressHandler,
-                cancellationIngress: cancellationIngress
-            )
-        }
-        let registration: ActiveGenerationCoordinator.Registration
-        do {
-            registration = try await activeGenerationCoordinator.register(
-                cancel: { reason in
-                    cancellationIngress.request(reason)
-                    task.cancel()
-                },
-                waitForTermination: { _ = await task.result }
-            )
-        } catch {
-            task.cancel()
-            await gate.open()
-            _ = await task.result
-            throw error
-        }
-        await gate.open()
-        if Task.isCancelled {
-            task.cancel()
-        }
-        do {
-            let results = try await withTaskCancellationHandler(
-                operation: { try await task.value },
-                onCancel: {
-                    cancellationIngress.request(.user)
-                    task.cancel()
-                }
-            )
-            await activeGenerationCoordinator.finish(registration)
-            return results
-        } catch {
-            await activeGenerationCoordinator.finish(registration)
-            throw error
-        }
-    }
-
-    private func performGenerateBatch(
-        _ requests: [GenerationRequest],
-        progressHandler: (@MainActor (Double?, String) -> Void)?,
-        cancellationIngress: GenerationCancellationIngress
-    ) async throws -> [GenerationResult] {
-        try ensureInitialized()
-        guard !requests.isEmpty else { return [] }
-        let operationID = try await beginUserModelOperation(.batchGeneration)
-        defer { finishModelOperation(id: operationID) }
-        cancelIdleUnload()
-        let firstKey = generationSessionKey(for: requests[0])
-        guard requests.allSatisfy({ generationSessionKey(for: $0) == firstKey }) else {
-            throw MLXTTSEngineError.unsupportedRequest(
-                "Batch generation requires one model, mode, language, speaker/design, and clone reference session."
-            )
-        }
-
-        var results: [GenerationResult] = []
-        results.reserveCapacity(requests.count)
-        for (index, request) in requests.enumerated() {
-            try Task.checkCancellation()
-            progressHandler?(
-                Double(index) / Double(max(requests.count, 1)),
-                "Generating item \(index + 1)/\(requests.count)"
-            )
-            let result = try await generate(
-                request,
-                allowsBatchRequest: true,
-                cancellationIngress: cancellationIngress
-            )
-            results.append(result)
-            clearGenerationActivity()
-        }
-        progressHandler?(1.0, "Done")
-        if let trimLevel = NativeMemoryPolicyResolver.postBatchTrimLevel() {
-            await runtime.trimMemory(level: trimLevel, reason: "post_batch_low_ram")
-            if trimLevel == .hardTrim {
-                clonePreparationState = .idle
-            }
-        }
-        scheduleIdleUnloadIfNeeded(
-            modelID: requests[0].modelID,
-            mode: requests[0].mode,
-            isBatch: true
-        )
-        return results
     }
 
     public func cancelActiveGeneration(reason: GenerationCancellationReason) async throws {
@@ -1306,7 +1202,6 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
 
     private func generate(
         _ request: GenerationRequest,
-        allowsBatchRequest: Bool,
         cancellationIngress: GenerationCancellationIngress
     ) async throws -> GenerationResult {
         try ensureInitialized()
@@ -1317,14 +1212,12 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             throw MLXTTSEngineError.unsupportedRequest(error.localizedDescription)
         }
         cancelIdleUnload()
-        if !allowsBatchRequest {
-            let supportDecision = supportDecision(for: request)
-            guard case .supported = supportDecision else {
-                throw MLXTTSEngineError.unsupportedRequest(
-                    supportDecision.unsupportedReason
-                        ?? "The requested generation path is not supported by the native MLX engine."
-                )
-            }
+        let decision = supportDecision(for: request)
+        guard case .supported = decision else {
+            throw MLXTTSEngineError.unsupportedRequest(
+                decision.unsupportedReason
+                    ?? "The requested generation path is not supported by the native MLX engine."
+            )
         }
 
         let deliveryGenerationID = request.generationID ?? UUID()
@@ -1367,7 +1260,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             scheduleIdleUnloadIfNeeded(
                 modelID: request.modelID,
                 mode: request.mode,
-                isBatch: allowsBatchRequest || request.batchTotal != nil
+                isBatch: request.batchTotal != nil
             )
             return annotated
         } catch {
@@ -1453,7 +1346,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                     scheduleIdleUnloadIfNeeded(
                         modelID: request.modelID,
                         mode: request.mode,
-                        isBatch: allowsBatchRequest || request.batchTotal != nil
+                        isBatch: request.batchTotal != nil
                     )
                     return annotated
                 } catch {
@@ -1809,33 +1702,6 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             telemetrySummary: result.telemetrySummary,
             audioQC: result.audioQC
         )
-    }
-
-    private func generationSessionKey(for request: GenerationRequest) -> GenerationSessionKey {
-        let nativeLanguage: String? = {
-            guard case .custom(let speakerID, _) = request.payload else { return nil }
-            return modelRegistry.allSpeakers.first {
-                $0.id.caseInsensitiveCompare(speakerID) == .orderedSame
-            }?.nativeLanguage
-        }()
-        let resolved = GenerationSemantics.resolvedDeliveryInstruction(
-            for: request,
-            speakerNativeLanguage: nativeLanguage
-        )
-        let finalInstruction: String?
-        if let capabilities = modelRegistry.model(id: request.modelID)?.qwen3Capabilities {
-            finalInstruction = GenerationSemantics.qwen3PromptAssembly(
-                for: request,
-                capabilities: capabilities,
-                speakerNativeLanguage: nativeLanguage
-            ).instruct
-        } else {
-            finalInstruction = resolved.instruction
-        }
-        return GenerationSemantics.generationSessionIdentity(
-            for: request,
-            resolvedCustomInstruction: finalInstruction
-        ).sessionKey
     }
 
     public func listPreparedVoices() async throws -> [PreparedVoice] {

@@ -1,59 +1,30 @@
 import Foundation
 
-/// Process-portable override for the resolved `NativeDeviceMemoryClass`.
+/// Diagnostic override for the resolved `NativeDeviceMemoryClass`.
 ///
 /// `NativeMemoryPolicyResolver.deviceClass()` normally reads real
 /// `ProcessInfo.physicalMemory`, so a high-memory dev Mac always resolves to
 /// `highMemoryMac` — where the memory-pressure monitor never starts and the
-/// constrained-tier policy (tight caches, post-batch hard trim, idle unload) is
-/// never exercised. This gate lets a benchmark **force** a tier so those code
-/// paths run (and pressure becomes measurable) without special hardware.
+/// constrained-tier policy (tight caches, idle unload) is never exercised.
+/// This gate lets a benchmark **force** a tier so those code paths run (and
+/// pressure becomes measurable) without special hardware.
 ///
-/// Mirrors `TelemetryGate`'s cross-process design (and, like it, is plain runtime
-/// — **never `#if DEBUG`**, which is dead code in this single-Release-config repo):
-/// - The **app process** reads `QWENVOICE_FORCE_MEMORY_CLASS` from the environment.
-/// - The environment does not cross to the engine process (XPC service / iOS
-///   extension), so the app ships its forced class over the `initialize` IPC
-///   handshake and the engine host latches it via `applyHandshakeForcedClass(_:)`.
+/// Plain runtime — **never `#if DEBUG`**, which is dead code in this
+/// single-Release-config repo. Every host (macOS app, iOS app, `vocello` CLI)
+/// runs the engine in-process, so the process reads
+/// `QWENVOICE_FORCE_MEMORY_CLASS` itself through `RuntimeDebugGate`.
 ///
-/// Off by default: unset env + no handshake ⇒ `resolvedForcedClass == nil` ⇒
+/// Off by default: unset env ⇒ `resolvedForcedClass == nil` ⇒
 /// `deviceClass()` returns the real, physical-memory-derived tier (no behavior
 /// change).
 public enum NativeDeviceClassGate {
     private static let environmentKey = "QWENVOICE_FORCE_MEMORY_CLASS"
 
-    /// The forced class as seen from the **app process**: parsed from the
-    /// environment once per process. `nil` when unset/unrecognized.
-    public static let appProcessForcedClass: NativeDeviceMemoryClass? = {
+    /// The forced class for this process, parsed from the environment once per
+    /// process. `nil` when unset or unrecognized ⇒ use the real tier.
+    public static let resolvedForcedClass: NativeDeviceMemoryClass? = {
         parse(RuntimeDebugGate.value(for: environmentKey))
     }()
-
-    /// Wire-friendly raw value the app ships over the handshake: the forced class
-    /// rawValue, or `""` when unset.
-    public static var appProcessForcedClassRawValue: String {
-        appProcessForcedClass?.rawValue ?? ""
-    }
-
-    private static let lock = NSLock()
-    nonisolated(unsafe) private static var handshakeForcedClass: NativeDeviceMemoryClass?
-
-    /// Called by an engine-process host with the app's forced class (the `""`
-    /// sentinel — or an unrecognized value — is ignored). One-way latch.
-    public static func applyHandshakeForcedClass(_ raw: String) {
-        guard let forced = parse(raw) else { return }
-        lock.lock()
-        defer { lock.unlock() }
-        handshakeForcedClass = forced
-    }
-
-    /// The effective forced class for this process: the env value (app process)
-    /// or the handshake latch (engine process). `nil` ⇒ use the real tier.
-    public static var resolvedForcedClass: NativeDeviceMemoryClass? {
-        if let appProcessForcedClass { return appProcessForcedClass }
-        lock.lock()
-        defer { lock.unlock() }
-        return handshakeForcedClass
-    }
 
     /// Accepts the `NativeDeviceMemoryClass` rawValues
     /// (`floor_8gb_mac` / `mid_16gb_mac` / `high_memory_mac` / `iphone_pro`) plus a

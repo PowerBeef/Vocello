@@ -38,6 +38,9 @@ packages:
   MLXSwift:
     url: https://github.com/ml-explore/mlx-swift.git
     exactVersion: "0.31.6"
+  # No product target links the HuggingFace product (owned sources import no
+  # HuggingFace module). The owned package depends on it; this exact pin moves in
+  # lockstep with Packages/VocelloQwen3Core/Package.swift.
   SwiftHuggingFace:
     url: https://github.com/huggingface/swift-huggingface.git
     exactVersion: "0.9.0"
@@ -232,8 +235,6 @@ targets:
         product: VocelloQwen3Core
       - package: MLXSwift
         product: MLX
-      - package: SwiftHuggingFace
-        product: HuggingFace
 
   # Headless Swift CLI over the in-process engine (QwenVoiceCore). User-facing
   # generation without the UI + the deterministic driver for benchmarks/perf
@@ -276,8 +277,6 @@ targets:
         product: VocelloQwen3Core
       - package: MLXSwift
         product: MLX
-      - package: SwiftHuggingFace
-        product: HuggingFace
 
   QwenVoiceCore:
     type: framework.static
@@ -304,8 +303,6 @@ targets:
         product: VocelloQwen3Core
       - package: MLXSwift
         product: MLX
-      - package: SwiftHuggingFace
-        product: HuggingFace
 
   QwenVoiceBackendCore:
     type: framework.static
@@ -401,8 +398,6 @@ targets:
         product: VocelloQwen3Core
       - package: MLXSwift
         product: MLX
-      - package: SwiftHuggingFace
-        product: HuggingFace
 
   # Pure logic unit tests for QwenVoiceCore language/model-delivery semantics and
   # platform-neutral iOS policies (no models, no network, no Simulator, no XPC).

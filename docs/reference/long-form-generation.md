@@ -38,8 +38,8 @@ segmenter's historical threshold, kept so routing behavior is unchanged) into a 
    Fast QC, standard streaming telemetry, app-layer timeline rows, and live segment preview
    (auto-play-gated; the request-local `suppressStreamingPreview` flag remains available for silent
    contexts). Batch markers are never sent; the legacy XPC `generateBatch` route was retired
-   2026-07-24 (the in-process engine batch API remains available, while the CLI now owns per-item
-   result accounting).
+   2026-07-24 and the caller-less in-process engine batch API was removed on 2026-09-24 (the CLI
+   `batch` command loops single takes and owns per-item result accounting).
 3. **Bounded assembly.** `BoundedLongFormAssembler` joins the persisted PCM16 segment WAVs in fixed
    blocks (bounded gain, edge trim/fade over verified non-speech, declared pauses, atomic publish)
    and the joined output passes its own duration-aware Fast QC with the plan's pause budget.

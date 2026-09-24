@@ -64,13 +64,12 @@ resolved once per process:
 | Source | Effect |
 |---|---|
 | `QWENVOICE_DEBUG=1` (env) | On in any process that inherits it (e.g. `./scripts/build.sh run`). |
-| App-to-engine `initialize` handshake | Relays the app's resolved environment mode to the macOS engine; `TelemetryGate.applyHandshakeMode(_:)` latches a non-off mode. There is no persisted Settings tap-toggle. |
+| In-process latch | `vocello bench` latches its `--telemetry` mode through `TelemetryGate.applyHandshakeMode(_:)` (a non-off mode only). There is no persisted Settings tap-toggle. |
 | `QWENVOICE_NATIVE_TELEMETRY_MODE=lightweight\|verbose` (aliases: `light`, `full`, `deep`) | Forces sampling/persistence on regardless of the gate. |
 
 The engine runs **in process on macOS and iOS** (the macOS XPC service was retired on 2026-09-15 and the
-iOS ExtensionKit extension earlier; see [`ARCHITECTURE.md`](../ARCHITECTURE.md)). The engine does not
-automatically inherit the app's resolved mode; the initialize handshake
-carries it. Telemetry opt-in is distinct from production-affecting overrides, which additionally
+iOS ExtensionKit extension earlier; see [`ARCHITECTURE.md`](../ARCHITECTURE.md)), so it reads the
+host process's own environment; no handshake relays a mode. Telemetry opt-in is distinct from production-affecting overrides, which additionally
 require the registered internal-diagnostics build capability and debug gate. Do not claim that
 all telemetry code is compiled out of distributed binaries.
 
@@ -119,7 +118,7 @@ values without retaining raw launch input. Never add an undocumented environment
 | Env | Effect |
 |---|---|
 | `QWENVOICE_SUPPRESS_WARMUP=1` | Skips proactive prewarm/clone‑priming so the first generation records its own **cold** load (`MacGenerationWarmupCoordinator`). App‑process only. |
-| `QWENVOICE_FORCE_MEMORY_CLASS=floor_8gb_mac` | Forces the device-memory tier (`NativeDeviceClassGate`), propagated to the engine over `initialize`. Runs constrained-tier code paths for diagnostic comparison. See §11 "Memory and pressure interpretation". Accepts the `NativeDeviceMemoryClass` raw values + aliases `8gb`/`16gb`. |
+| `QWENVOICE_FORCE_MEMORY_CLASS=floor_8gb_mac` | Forces the device-memory tier (`NativeDeviceClassGate`), read in-process by the engine's host. Runs constrained-tier code paths for diagnostic comparison. See §11 "Memory and pressure interpretation". Accepts the `NativeDeviceMemoryClass` raw values + aliases `8gb`/`16gb`. |
 | `QWENVOICE_MAC_WARM_GATE=off\|records\|enforce` | macOS warm‑admission gate (`MacWarmupAdmissionPolicy`): defers **proactive** warms while the app‑process kernel pressure level is soft/hardTrim on floor/mid tiers. Default `enforce` (validated 2026‑06‑09); `records` logs verdicts without blocking; user generations are never gated. Events land in the app layer's `native-events.jsonl`. |
 | `QVOICE_TALKER_KV_QUANT=8\|4` | **Dev-only** opt‑in talker KV‑cache quantization (QuantizedKVCache, group 64). Measured (P4, §H): clone/long −271 MB physFoot but **−8.6% RTF** — not shipped on any tier; insurance knob only. Never combined with `QVOICE_TALKER_KV_WINDOW`. |
 | `QVOICE_IOS_MLX_CACHE_LIMIT_MB=<n>` | **Dev-only** override of the MLX `Memory.cacheLimit` for the iPhone tier. Useful for sweeps; production uses the tier default. |
@@ -152,7 +151,7 @@ Core types (all in `Sources/QwenVoiceCore/` unless noted):
 
 | Type | Role |
 |---|---|
-| `TelemetryGate` | Master on/off, per process; handshake latch. |
+| `TelemetryGate` | Master on/off, per process; in-process mode latch (`vocello bench`). |
 | `NativeTelemetryRecorder` | Per‑generation stage timeline (`mark(stage:)`). The generation telemetry session begins before model preparation and shares one clock across load, prewarm, synthesis, finalize, trim, cancellation, and failure. |
 | `NativeTelemetrySampler` | Background memory/timing sampler → `TelemetrySummary` + raw `[TelemetrySample]`. |
 | `GenerationTelemetryRecord` | One durable row per layer (`engine` / `app`; `engine-service` only in records before 2026-09-15). |
@@ -411,7 +410,7 @@ where time goes; use **Instruments signposts** (see [`benchmarking-procedure.md`
     stamped by `NativeEngineRuntime.recordMemoryPressureObserved` the instant the
     `DispatchSource` event arrives. Always recorded — it takes no prewarm slot.
   - `memory_trim` — the **trim action** taken in response (`metadata.level` + `reason`, e.g.
-    `macos_memory_pressure_hardTrim`, `post_batch_low_ram`). Written by
+    `macos_memory_pressure_hardTrim`). Written by
     `NativeEngineRuntime.trimMemory`; skipped if the prewarm slot is contended, hence the
     separate always‑on `memory_pressure` mark above.
 
@@ -560,11 +559,11 @@ RAM usage (physFoot/RSS/peak‑GPU + the per‑stage GPU block) is captured on *
 high‑memory dev Mac they read `0`.
 
 `QWENVOICE_FORCE_MEMORY_CLASS` (accepts `floor_8gb_mac`/`mid_16gb_mac`/`high_memory_mac`/`iphone_pro`,
-or aliases `8gb`/`16gb`/`high`/`iphone`) is read in the app process and **propagated to the engine over the
-`initialize` handshake** (the same path as `telemetryMode`).
+or aliases `8gb`/`16gb`/`high`/`iphone`) is read in-process by whichever host runs the engine (the
+app or `vocello bench --force-class`).
 When selected by the canonical diagnostic procedure, it makes the engine run the floor-tier code
 paths: the pressure monitor **starts**, caches are tight,
-single‑gen clears + post‑batch hard trims fire, and idle‑unload is aggressive. Every engine row stamps
+single‑gen clears fire, and idle‑unload is aggressive. Every engine row stamps
 `notes.deviceClass`, so the summarizer header shows `tier: floor_8gb_mac ⚠ forced` — never mistake a
 forced run for native‑tier data.
 

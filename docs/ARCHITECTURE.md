@@ -93,7 +93,7 @@ graph TD
 
     QwenVoiceCore --> MLXAudio
     QwenVoiceCore --> MLXSwift
-    QwenVoiceCore --> SwiftHuggingFace
+    MLXAudio --> SwiftHuggingFace
 ```
 
 (SPM products are also linked directly by the apps and the CLI where
@@ -182,7 +182,7 @@ Resolved versions (`QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
 | **mlx-swift-lm** | `3.31.4` | LM utilities (through the owned Qwen3 core package). The 3.x major externalized the Hub/Tokenizers implementations, which is why swift-transformers is now a direct dependency. |
 | **VocelloQwen3Core** | owned package derived from `mlx-audio-swift` `v0.1.2` | Stable first-party `VocelloQwen3Core` facade for model-bundle, capability, sampling, memory, synthesis, terminal, cancellation, and diagnostic contracts. Compatibility-preserved `MLXAudioCore`, `MLXAudioCodecs`, and `MLXAudioTTS` modules remain implementation surfaces for Qwen3-TTS load, tokenize, and decode. |
 | **GRDB.swift** | `7.10.0` | SQLite for local `history.sqlite`. |
-| **SwiftHuggingFace** | `0.9.0` | Hugging Face hub client, linked by `project.yml`; owned sources download through `HuggingFaceDownloader` (`URLSession`) and import no `HuggingFace` module. |
+| **SwiftHuggingFace** | `0.9.0` | Hugging Face hub client, a dependency of the owned package; `project.yml` declares the same exact pin but links it to no product target. Owned product sources download through `HuggingFaceDownloader` (`URLSession`) and import no `HuggingFace` module. |
 | **swift-transformers** | `1.3.3` | Hub/Tokenizers implementation — a **direct**, exact-pinned dependency of `MLXAudioTTS`; the owned package manifest and resolved graph are authoritative. |
 | swift-jinja | `2.4.2` | Chat/template formatting (transitive via swift-transformers). |
 | yyjson | `0.12.0` | JSON parsing (transitive via swift-transformers). |
@@ -408,16 +408,15 @@ Custom/Design/Clone proof, clean Phase 0 controls, and the canonical matrices al
 device into `NativeDeviceMemoryClass` and resolves an `NativeMemoryPolicy` per
 tier + mode + batch. Classification: iPhone → `.iPhonePro`; Mac ≤10 GB →
 `.floor8GBMac`; ≤24 GB → `.mid16GBMac`; else `.highMemoryMac`. Diagnostic override
-`QWENVOICE_FORCE_MEMORY_CLASS` is read in-process through `RuntimeDebugGate`, so it applies only in an
-internal diagnostics build with the `QWENVOICE_DEBUG` master gate enabled (the old engine-process
-handshake latch in `NativeDeviceClassGate` no longer has a caller).
+`QWENVOICE_FORCE_MEMORY_CLASS` is read in-process through `RuntimeDebugGate` (`NativeDeviceClassGate`),
+so it applies only in an internal diagnostics build with the `QWENVOICE_DEBUG` master gate enabled.
 
-| Tier (`NativeDeviceMemoryClass`) | MLX cache | Clone slots | Idle-unload | Token clear cadence | Post-batch trim |
-| --- | --- | --- | --- | --- | --- |
-| `.floor8GBMac` | 256 MB | 1 | 120 s | 50 | `.hardTrim` |
-| `.mid16GBMac` | 512 MB | 8 | 600 s | 50 | — |
-| `.highMemoryMac` | 1 GB | 16 | never (`nil`) | 200 | — |
-| `.iPhonePro` | 128 MB* | 1 | 30 s | 50 | — |
+| Tier (`NativeDeviceMemoryClass`) | MLX cache | Clone slots | Idle-unload | Token clear cadence |
+| --- | --- | --- | --- | --- |
+| `.floor8GBMac` | 256 MB | 1 | 120 s | 50 |
+| `.mid16GBMac` | 512 MB | 8 | 600 s | 50 |
+| `.highMemoryMac` | 1 GB | 16 | never (`nil`) | 200 |
+| `.iPhonePro` | 128 MB* | 1 | 30 s | 50 |
 
 \* iPhone cache default 128 MB, diagnostically overridable with
 `QVOICE_IOS_MLX_CACHE_LIMIT_MB` only behind the internal capability and `QWENVOICE_DEBUG`.
@@ -974,7 +973,7 @@ values without retaining those values. Likewise,
 `@unchecked Sendable` and other unsafe concurrency declarations; unregistered exceptions fail
 `scripts/runtime_security_contract.py`. Registry schema v2 also requires a current review date and
 substantive removal condition for every exception and caps unreviewed growth at the registered 33
-`@unchecked Sendable` and 7 `nonisolated(unsafe)` declarations (`budget` in
+`@unchecked Sendable` and 6 `nonisolated(unsafe)` declarations (`budget` in
 `config/concurrency-safety.json`). The CPU-focused
 ThreadSanitizer subset is owned by `config/tsan-policy.json`; it covers the deterministic core
 while MLX/Metal runtime execution stays in its single-owner deterministic suite (the injectable XPC

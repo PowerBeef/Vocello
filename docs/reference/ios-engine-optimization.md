@@ -101,7 +101,7 @@ The device tier is resolved by `NativeMemoryPolicyResolver` (enum `NativeDeviceM
 `SemanticTypes.swift`: `floor8GBMac` / `mid16GBMac` / `highMemoryMac` / `iPhonePro`). On iPhone the
 tier is always `iPhonePro`; on Mac it's picked by RAM (`≤10 GB → floor`, `≤24 GB → mid`, else `high`).
 A forced class for testing comes from `QWENVOICE_FORCE_MEMORY_CLASS` (`NativeDeviceClassGate`,
-relayed to the engine over the `initialize` handshake; `vocello bench --force-class 8gb`).
+read in-process; `vocello bench --force-class 8gb`).
 
 The `iPhonePro` policy is the most aggressive tier (it shares the app's budget):
 

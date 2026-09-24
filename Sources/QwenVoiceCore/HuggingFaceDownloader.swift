@@ -234,30 +234,6 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
     }
 
-    struct DownloadStateManifest: Codable, Equatable {
-        let schemaVersion: Int
-        let repo: String
-        let revision: String
-        let targetFolder: String
-        let updatedAtUTC: String
-        let files: [FileEntry]
-
-        enum CodingKeys: String, CodingKey {
-            case schemaVersion = "schema_version"
-            case repo
-            case revision
-            case targetFolder = "target_folder"
-            case updatedAtUTC = "updated_at_utc"
-            case files
-        }
-
-        struct FileEntry: Codable, Equatable {
-            let path: String
-            let size: Int64
-            let sha256: String?
-        }
-    }
-
     struct DownloadedTemporaryFile: Sendable {
         let url: URL
         let statusCode: Int?
@@ -1202,15 +1178,14 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// Task-key -> relativePath for in-flight chunk tasks. On runs that carry a request
     /// identity, chunk tasks encode a range-qualified `ModelDownloadTaskIdentity` in
     /// their task description (schema v2), which also attributes their metrics; this
-    /// in-process map keeps attribution exact on the API path (`downloadRepo`, no
-    /// request identity) so `wireBytes` — delivery-evidence input — never under-counts
-    /// chunked payload as control-plane bytes. Entries are removed in
-    /// `didCompleteWithError`, after the metrics callback has consumed them.
+    /// in-process map keeps attribution exact on runs without a request identity so
+    /// `wireBytes` — delivery-evidence input — never under-counts chunked payload as
+    /// control-plane bytes. Entries are removed in `didCompleteWithError`, after the
+    /// metrics callback has consumed them.
     private let chunkTaskPathsBox = Mutex<[Int: String]>([:])
     private let state: DownloadStateRegistry
     private let delegateProgressGate = Mutex(ModelDownloadDelegateProgressGate())
     private let terminalEventSequencer = ModelDownloadDelegateTerminalSequencer()
-    private let apiBaseURL: URL
     private let resolveBaseURL: URL
     private let fileManagerBox: FileManagerBox
     private var fileManager: FileManager { fileManagerBox.value }
@@ -1338,42 +1313,6 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         return destination
     }
 
-    static func repoFiles(fromAPIData data: Data) throws -> [RepoFile] {
-        guard let items = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            throw DownloadError.apiError("Unexpected API response format")
-        }
-
-        return items.compactMap { item -> RepoFile? in
-            guard let type = item["type"] as? String, type == "file",
-                  let path = item["path"] as? String,
-                  path != ".gitattributes" else { return nil }
-
-            let size: Int64
-            let sha256: String?
-            if let lfs = item["lfs"] as? [String: Any] {
-                if let lfsSize = lfs["size"] as? Int64 {
-                    size = lfsSize
-                } else if let lfsSize = lfs["size"] as? Int {
-                    size = Int64(lfsSize)
-                } else {
-                    size = 0
-                }
-                sha256 = normalizedSHA256(lfs["oid"] as? String)
-            } else if let s = item["size"] as? Int64 {
-                size = s
-                sha256 = nil
-            } else if let s = item["size"] as? Int {
-                size = Int64(s)
-                sha256 = nil
-            } else {
-                size = 0
-                sha256 = nil
-            }
-
-            return RepoFile(path: path, size: size, sha256: sha256)
-        }
-    }
-
     static func downloadRequest(for url: URL, existingBytes: Int64) -> URLRequest {
         var request = URLRequest(url: url)
         if existingBytes > 0 {
@@ -1437,7 +1376,6 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         progressHandler: (@Sendable (RepositoryProgress) -> Void)?,
         sessionConfiguration: URLSessionConfiguration = .default,
         engineConfiguration: Configuration = Configuration(),
-        apiBaseURL: URL = URL(string: "https://huggingface.co/api/models")!,
         resolveBaseURL: URL = URL(string: "https://huggingface.co")!,
         fileManager: FileManager = .default,
         durableTemporaryDirectory: URL? = nil,
@@ -1454,7 +1392,6 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             repositoryProgressHandler: progressBox,
             lifecycleEventHandler: lifecycleBox
         )
-        self.apiBaseURL = apiBaseURL
         self.resolveBaseURL = resolveBaseURL
         self.fileManagerBox = FileManagerBox(fileManager)
         self.engineConfiguration = engineConfiguration
@@ -1495,26 +1432,6 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
     // MARK: - Public API
 
-    /// Download all files from a HuggingFace repo into `targetDir`.
-    /// Resolve the file list from the live HuggingFace API, then download + verify + install.
-    /// macOS + CLI path.
-    public func downloadRepo(repo: String, revision: String = "main", to targetDir: URL) async throws {
-        await state.resetForNewRepositoryDownload(preserveUnclaimedCompletions: isBackgroundSession)
-        do {
-            let files = try await listFiles(repo: repo, revision: revision)
-            _ = try await runDownload(
-                files: files,
-                repo: repo,
-                revision: revision,
-                targetDir: targetDir,
-                persistStateManifest: true
-            )
-        } catch {
-            if !isBackgroundSession { session.invalidateAndCancel() }
-            throw error
-        }
-    }
-
     /// Download + verify + install a pre-resolved catalog file list (no API call). The caller
     /// supplies each file with an optional validated `absoluteURL` (host-allowlist-enforced by the
     /// catalog) and a request identity so task metrics remain attributable to payload files on
@@ -1537,7 +1454,6 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             repo: repo,
             revision: revision,
             targetDir: targetDir,
-            persistStateManifest: false,
             requestIdentity: requestIdentity,
             explicitStagingRoot: explicitStagingRoot,
             installedFiles: installedFiles,
@@ -1545,14 +1461,13 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         )
     }
 
-    /// Shared staging → parallel download → SHA-256 verify → atomic install flow used by both
-    /// `downloadRepo` (API path) and `downloadFiles` (catalog path).
+    /// Staging → parallel download → SHA-256 verify → atomic install flow behind
+    /// `downloadFiles` (catalog path).
     private func runDownload(
         files: [RepoFile],
         repo: String,
         revision: String,
         targetDir: URL,
-        persistStateManifest: Bool,
         requestIdentity: ModelDownloadRequestIdentity? = nil,
         explicitStagingRoot: URL? = nil,
         installedFiles: [RepoFile]? = nil,
@@ -1663,18 +1578,6 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 ))
             }
         }
-        // The download-state manifest is the macOS resume-after-crash record; iOS keeps its own
-        // lightweight in-flight list, so the catalog path skips this.
-        if persistStateManifest {
-            try persistDownloadState(
-                repo: repo,
-                revision: revision,
-                targetDir: targetDir,
-                files: files,
-                stagingRoot: stagingRoot
-            )
-        }
-
         do {
             try await downloadAllFiles(
                 files,
@@ -1875,28 +1778,6 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 continue
             }
         }
-    }
-
-    // MARK: - Private: List Files
-
-    private func listFiles(repo: String, revision: String) async throws -> [RepoFile] {
-        let url = Self.repositoryTreeURL(apiBaseURL: apiBaseURL, repo: repo, revision: revision)
-
-        let (data, response) = try await session.data(from: url)
-
-        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            throw DownloadError.apiError("API returned HTTP \(http.statusCode)")
-        }
-
-        return try Self.repoFiles(fromAPIData: data)
-    }
-
-    static func repositoryTreeURL(apiBaseURL: URL, repo: String, revision: String) -> URL {
-        apiBaseURL
-            .appendingPathComponent(repo)
-            .appendingPathComponent("tree")
-            .appendingPathComponent(revision)
-            .appending(queryItems: [URLQueryItem(name: "recursive", value: "true")])
     }
 
     static func fileResolveURL(
@@ -3217,34 +3098,6 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 )
             }
         }
-    }
-
-    private func persistDownloadState(
-        repo: String,
-        revision: String,
-        targetDir: URL,
-        files: [RepoFile],
-        stagingRoot: URL
-    ) throws {
-        let manifest = DownloadStateManifest(
-            schemaVersion: 1,
-            repo: repo,
-            revision: revision,
-            targetFolder: targetDir.lastPathComponent,
-            updatedAtUTC: ISO8601DateFormatter().string(from: Date()),
-            files: files.map {
-                DownloadStateManifest.FileEntry(
-                    path: $0.path,
-                    size: $0.size,
-                    sha256: $0.sha256
-                )
-            }
-        )
-        let data = try JSONEncoder().encode(manifest)
-        try data.write(
-            to: stagingRoot.appendingPathComponent("download-state.json"),
-            options: .atomic
-        )
     }
 
     private func fileIsValid(at url: URL, expectedSize: Int64, sha256: String?) -> Bool {

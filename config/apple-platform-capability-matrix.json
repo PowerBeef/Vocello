@@ -8,14 +8,7 @@
         "Contents/Resources/backend",
         "Contents/Resources/python",
         "Contents/Resources/ffmpeg"
-      ],
-      "engineCapabilities": {
-        "supportsBatchGeneration": true,
-        "supportsAudioPreparation": false,
-        "supportsInteractivePrefetch": true,
-        "supportsMemoryTrim": false,
-        "supportsPreparedVoiceManagement": true
-      }
+      ]
     }
   },
   "iOS": {
@@ -26,13 +19,6 @@
       ],
       "booleanEntitlements": {
         "com.apple.developer.kernel.increased-memory-limit": true
-      },
-      "engineCapabilities": {
-        "supportsBatchGeneration": false,
-        "supportsAudioPreparation": false,
-        "supportsInteractivePrefetch": false,
-        "supportsMemoryTrim": false,
-        "supportsPreparedVoiceManagement": true
       }
     }
   }

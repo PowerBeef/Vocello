@@ -4,7 +4,7 @@
   "policy": "Every unchecked Sendable or nonisolated(unsafe) declaration in owned production Swift requires a registry entry, explicit owner, synchronization invariant, review date, removal condition, deterministic evidence where applicable, and room within the no-unreviewed-growth budget.",
   "budget": {
     "maximumUncheckedSendableDeclarations": 33,
-    "maximumNonisolatedUnsafeDeclarations": 7,
+    "maximumNonisolatedUnsafeDeclarations": 6,
     "reviewCadenceDays": 365
   },
   "sourceRoots": [
@@ -32,16 +32,6 @@
       "invariant": "All reads and writes occur while the process-local lock is held.",
       "reviewedAt": "2026-08-26",
       "removalCondition": "Remove when the diagnostic handshake can be immutable after process launch or isolated in a concurrency-checked actor without synchronous call-site regressions."
-    },
-    {
-      "source": "Sources/QwenVoiceCore/NativeDeviceClassGate.swift",
-      "names": [
-        "handshakeForcedClass"
-      ],
-      "owner": "NativeDeviceClassGate lock",
-      "invariant": "The handshake override is a lock-protected one-way latch.",
-      "reviewedAt": "2026-08-26",
-      "removalCondition": "Remove when the one-way device-class handshake becomes an immutable launch value or moves behind a concurrency-checked isolation boundary."
     },
     {
       "source": "Sources/QwenVoiceCore/BenchForceColdPolicy.swift",

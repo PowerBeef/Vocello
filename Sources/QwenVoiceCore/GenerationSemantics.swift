@@ -968,24 +968,6 @@ public enum GenerationSemantics {
         )
     }
 
-    public static func prewarmIdentityKey(
-        modelID: String,
-        mode: GenerationMode,
-        voice: String? = nil,
-        instruct: String? = nil,
-        refAudio: String? = nil,
-        refText: String? = nil
-    ) -> String {
-        prewarmIdentity(
-            modelID: modelID,
-            mode: mode,
-            voice: voice,
-            instruct: instruct,
-            refAudio: refAudio,
-            refText: refText
-        ).legacyKey
-    }
-
     public static func prewarmIdentity(
         modelID: String,
         mode: GenerationMode,
@@ -1058,18 +1040,12 @@ public enum GenerationSemantics {
         )
     }
 
-    /// Request-form prewarm identity key. For `.custom`, the key INCLUDES
-    /// the speaker and (normalized) delivery instruction, so that voice/
-    /// delivery changes invalidate the prewarm cache. The parameterized
-    /// `prewarmIdentityKey(modelID:mode:...)` above intentionally omits
-    /// those for the "stable model-level readiness" code paths — both
-    /// forms coexist by design with intentionally different semantics.
-    /// Live callers: NativeEngineRuntime, XPCNativeEngineClient,
-    /// GenerationSemanticsTests.
-    public static func prewarmIdentityKey(for request: GenerationRequest) -> String {
-        prewarmIdentity(for: request).legacyKey
-    }
-
+    /// Request-form prewarm identity. For `.custom`, it INCLUDES the speaker
+    /// and (normalized) delivery instruction, so that voice/delivery changes
+    /// invalidate the prewarm cache. The parameterized
+    /// `prewarmIdentity(modelID:mode:...)` above intentionally omits those for
+    /// the "stable model-level readiness" code paths — both forms coexist by
+    /// design with intentionally different semantics.
     public static func prewarmIdentity(
         for request: GenerationRequest,
         resolvedCustomInstruction: String? = nil

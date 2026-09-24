@@ -9,10 +9,9 @@ public struct RemoteErrorPayload: Error, Codable, Equatable, Sendable, Localized
     public let message: String
     public let domain: String?
     public let code: RemoteErrorCode
-    /// Curated subset of `NSError.userInfo` that survives the XPC hop — useful
-    /// for triaging support reports without leaking non-Sendable state across
-    /// the wire (Tier 3.2). Optional for schema compatibility with older
-    /// clients that did not emit this field.
+    /// Curated, redacted subset of `NSError.userInfo` — useful for triaging
+    /// support reports without carrying non-Sendable state (Tier 3.2).
+    /// Optional because older payloads did not emit this field.
     public let details: [String: String]?
 
     public init(
@@ -116,71 +115,4 @@ public enum EngineLifecycleState: String, Codable, Equatable, Sendable {
     case recovering
     case invalidated
     case failed
-}
-
-public struct EngineCapabilities: Codable, Equatable, Sendable {
-    public let supportsBatchGeneration: Bool
-    public let supportsAudioPreparation: Bool
-    public let supportsInteractivePrefetch: Bool
-    public let supportsMemoryTrim: Bool
-    public let supportsPreparedVoiceManagement: Bool
-
-    public init(
-        supportsBatchGeneration: Bool,
-        supportsAudioPreparation: Bool,
-        supportsInteractivePrefetch: Bool,
-        supportsMemoryTrim: Bool,
-        supportsPreparedVoiceManagement: Bool
-    ) {
-        self.supportsBatchGeneration = supportsBatchGeneration
-        self.supportsAudioPreparation = supportsAudioPreparation
-        self.supportsInteractivePrefetch = supportsInteractivePrefetch
-        self.supportsMemoryTrim = supportsMemoryTrim
-        self.supportsPreparedVoiceManagement = supportsPreparedVoiceManagement
-    }
-
-    public static let macOSXPCDefault = EngineCapabilities(
-        supportsBatchGeneration: true,
-        supportsAudioPreparation: false,
-        supportsInteractivePrefetch: true,
-        supportsMemoryTrim: false,
-        supportsPreparedVoiceManagement: true
-    )
-
-    public static let iOSExtensionDefault = EngineCapabilities(
-        supportsBatchGeneration: false,
-        supportsAudioPreparation: true,
-        supportsInteractivePrefetch: true,
-        supportsMemoryTrim: true,
-        supportsPreparedVoiceManagement: true
-    )
-}
-
-public enum QwenVoiceWireSchema {
-    public static let currentVersion = 2
-    public static let legacyMissingVersion = 1
-
-    public static func validate(version: Int, codingPath: [CodingKey]) throws {
-        guard version == currentVersion else {
-            throw DecodingError.dataCorrupted(
-                DecodingError.Context(
-                    codingPath: codingPath,
-                    debugDescription: "Unsupported QwenVoice wire schema version \(version)."
-                )
-            )
-        }
-    }
-}
-
-public enum QwenVoiceWireCodec {
-    private static let encoder = JSONEncoder()
-    private static let decoder = JSONDecoder()
-
-    public static func encode<T: Encodable>(_ value: T) throws -> Data {
-        try encoder.encode(value)
-    }
-
-    public static func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
-        try decoder.decode(T.self, from: data)
-    }
 }

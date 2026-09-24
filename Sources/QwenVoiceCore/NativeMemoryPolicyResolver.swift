@@ -15,8 +15,8 @@ public enum NativeMemoryPolicyResolver {
             #endif
         }()
     ) -> NativeDeviceMemoryClass {
-        // Benchmark override (opt-in env, propagated to the engine over the
-        // initialize handshake): force a tier so the constrained-tier code paths
+        // Diagnostic override (opt-in env, read in-process through
+        // `RuntimeDebugGate`): force a tier so the constrained-tier code paths
         // run and memory pressure is measurable on any hardware. nil ⇒ real tier.
         if let forced = NativeDeviceClassGate.resolvedForcedClass {
             return forced
@@ -198,17 +198,6 @@ public enum NativeMemoryPolicyResolver {
             return 8
         case .highMemoryMac:
             return 16
-        }
-    }
-
-    public static func postBatchTrimLevel(
-        deviceClass: NativeDeviceMemoryClass = deviceClass()
-    ) -> NativeMemoryTrimLevel? {
-        switch deviceClass {
-        case .floor8GBMac:
-            return .hardTrim
-        case .iPhonePro, .mid16GBMac, .highMemoryMac:
-            return nil
         }
     }
 

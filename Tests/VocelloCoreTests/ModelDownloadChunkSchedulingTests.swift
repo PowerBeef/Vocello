@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import XCTest
 
 @testable import QwenVoiceCore
@@ -7,7 +8,9 @@ import XCTest
 /// shrinking tail, the work-conserving chunk queue, the single-stream fallback
 /// adjustments, multi-task-per-file progress aggregation, speed-sample exclusion for
 /// bytes that never crossed the network this run, and out-of-order chunk assembly.
-/// Everything here is model-free and network-free.
+/// Everything here is model-free and network-free. The registry's progress windows
+/// (publication throttle, speed sample, stall threshold) step a manual clock; one test
+/// proves the production default against real uptime.
 final class ModelDownloadChunkSchedulingTests: XCTestCase {
     private typealias ChunkRange = HuggingFaceDownloader.ChunkRange
 
@@ -355,17 +358,75 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
             defer { lock.unlock() }
             return emissions.last
         }
+
+        var values: [HuggingFaceDownloader.RepositoryProgress] {
+            lock.lock()
+            defer { lock.unlock() }
+            return emissions
+        }
+    }
+
+    /// Manually stepped seconds for the registry's progress windows. It starts at an
+    /// arbitrary uptime and the tests step it in binary fractions, so the 0.25 s, 0.5 s
+    /// and 20 s window boundaries compare exactly.
+    private final class ManualProgressClock: Sendable {
+        private let seconds = Mutex<TimeInterval>(100)
+
+        var progressClock: HuggingFaceDownloader.ProgressClock {
+            HuggingFaceDownloader.ProgressClock(now: { self.seconds.withLock { $0 } })
+        }
+
+        func advance(by delta: TimeInterval) {
+            seconds.withLock { $0 += delta }
+        }
+    }
+
+    private func makeRegistry(
+        sink: ProgressSink,
+        clock: ManualProgressClock
+    ) -> HuggingFaceDownloader.DownloadStateRegistry {
+        HuggingFaceDownloader.DownloadStateRegistry(
+            repositoryProgressHandler: HuggingFaceDownloader.RepositoryProgressHandlerBox { sink.append($0) },
+            clock: clock.progressClock
+        )
     }
 
     private func makeDummyTask(session: URLSession) -> URLSessionDownloadTask {
         session.downloadTask(with: URL(string: "https://chunk-tests.invalid/blob")!)
     }
 
+    /// Registers `task` with a pending continuation and returns once the registration
+    /// has landed; the returned task ends when the registry resumes that continuation.
+    private func registerPendingTask(
+        _ task: URLSessionDownloadTask,
+        taskKey: Int,
+        in registry: HuggingFaceDownloader.DownloadStateRegistry
+    ) async -> Task<Void, Never> {
+        let registered = XCTestExpectation(description: "task \(taskKey) registered")
+        let completion = Task {
+            _ = try? await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<HuggingFaceDownloader.DownloadedTemporaryFile, Error>) in
+                Task {
+                    _ = await registry.register(
+                        taskKey: taskKey,
+                        task: task,
+                        destination: URL(string: "https://chunk-tests.invalid/blob")!,
+                        continuation: continuation,
+                        resumeDataURL: nil,
+                        fileIndex: 0
+                    )
+                    registered.fulfill()
+                }
+            }
+        }
+        await fulfillment(of: [registered], timeout: 1)
+        return completion
+    }
+
     func testMultipleTasksPerFileAggregateAndReconcileAtExpectedSize() async throws {
         let sink = ProgressSink()
-        let registry = HuggingFaceDownloader.DownloadStateRegistry(
-            repositoryProgressHandler: HuggingFaceDownloader.RepositoryProgressHandlerBox { sink.append($0) }
-        )
+        let clock = ManualProgressClock()
+        let registry = makeRegistry(sink: sink, clock: clock)
         let session = URLSession(configuration: .ephemeral)
         defer { session.invalidateAndCancel() }
         await registry.beginRepositoryDownload(totalBytes: 1_000, totalFiles: 1)
@@ -380,37 +441,23 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
                 start: index == 0 ? 0 : 500,
                 end: index == 0 ? 499 : 999
             ).encodedTaskDescription
-            let completion = Task {
-                _ = try? await withCheckedThrowingContinuation { (continuation: CheckedContinuation<HuggingFaceDownloader.DownloadedTemporaryFile, Error>) in
-                    Task {
-                        _ = await registry.register(
-                            taskKey: key,
-                            task: dummy,
-                            destination: URL(fileURLWithPath: "/tmp/chunk-\(key)"),
-                            continuation: continuation,
-                            resumeDataURL: nil,
-                            fileIndex: 0
-                        )
-                    }
-                }
-            }
+            let completion = await registerPendingTask(dummy, taskKey: key, in: registry)
             completions.append(completion)
         }
-        // Let both registrations land, and space the reports past the registry's 0.25 s
-        // publication throttle so each asserted emission actually publishes.
-        try await Task.sleep(for: .milliseconds(300))
-
+        // Step the clock a full 0.25 s publication window before each report so each
+        // asserted emission actually publishes.
+        clock.advance(by: 0.25)
         await registry.reportProgress(taskID: keys[0], totalBytesWritten: 300)
         var progress = try XCTUnwrap(sink.last)
         XCTAssertEqual(progress.downloadedBytes, 300)
 
-        try await Task.sleep(for: .milliseconds(300))
+        clock.advance(by: 0.25)
         await registry.reportProgress(taskID: keys[1], totalBytesWritten: 450)
         progress = try XCTUnwrap(sink.last)
         XCTAssertEqual(progress.downloadedBytes, 750, "task bytes must sum across a file's chunk tasks")
 
         // A retried chunk's monotonic guard: a lower report never regresses the counter.
-        try await Task.sleep(for: .milliseconds(300))
+        clock.advance(by: 0.25)
         await registry.reportProgress(taskID: keys[1], totalBytesWritten: 200)
         progress = try XCTUnwrap(sink.last)
         XCTAssertEqual(progress.downloadedBytes, 750)
@@ -428,9 +475,8 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
 
     func testReplacementTaskForSameRangeCannotDoubleCountLogicalBytes() async throws {
         let sink = ProgressSink()
-        let registry = HuggingFaceDownloader.DownloadStateRegistry(
-            repositoryProgressHandler: HuggingFaceDownloader.RepositoryProgressHandlerBox { sink.append($0) }
-        )
+        let clock = ManualProgressClock()
+        let registry = makeRegistry(sink: sink, clock: clock)
         let session = URLSession(configuration: .ephemeral)
         defer { session.invalidateAndCancel() }
         await registry.beginRepositoryDownload(totalBytes: 1_000, totalFiles: 1)
@@ -439,46 +485,28 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         func register(taskID: Int) async -> Task<Void, Never> {
             let task = makeDummyTask(session: session)
             task.taskDescription = identity.encodedTaskDescription
-            let registered = XCTestExpectation(description: "logical replacement task \(taskID) registered")
-            let completion = Task {
-                _ = try? await withCheckedThrowingContinuation {
-                    (continuation: CheckedContinuation<HuggingFaceDownloader.DownloadedTemporaryFile, Error>) in
-                    Task {
-                        _ = await registry.register(
-                            taskKey: taskID,
-                            task: task,
-                            destination: URL(string: "https://chunk-tests.invalid/blob")!,
-                            continuation: continuation,
-                            resumeDataURL: nil,
-                            fileIndex: 0
-                        )
-                        registered.fulfill()
-                    }
-                }
-            }
-            await fulfillment(of: [registered], timeout: 1)
-            return completion
+            return await registerPendingTask(task, taskKey: taskID, in: registry)
         }
 
         let firstCompletion = await register(taskID: 71)
-        // The registry intentionally coalesces UI progress publications to 4 Hz. Wait
-        // past that production throttle before each assertion so this test observes a
-        // newly published snapshot rather than the initial zero-byte snapshot.
-        try await Task.sleep(for: .milliseconds(300))
+        // The registry intentionally coalesces UI progress publications to 4 Hz. Step
+        // the clock a full window before each assertion so this test observes a newly
+        // published snapshot rather than the initial zero-byte snapshot.
+        clock.advance(by: 0.25)
         await registry.reportProgress(taskID: 71, totalBytesWritten: 300)
         XCTAssertEqual(try XCTUnwrap(sink.last).downloadedBytes, 300)
         await registry.resumeFailure(taskID: 71, error: HuggingFaceDownloader.DownloadError.cancelled)
         await firstCompletion.value
 
         let replacementCompletion = await register(taskID: 72)
-        try await Task.sleep(for: .milliseconds(300))
+        clock.advance(by: 0.25)
         await registry.reportProgress(taskID: 72, totalBytesWritten: 100)
         XCTAssertEqual(
             try XCTUnwrap(sink.last).downloadedBytes,
             300,
             "replacement callbacks below the durable logical slot must not add duplicate bytes"
         )
-        try await Task.sleep(for: .milliseconds(300))
+        clock.advance(by: 0.25)
         await registry.reportProgress(taskID: 72, totalBytesWritten: 400)
         XCTAssertEqual(try XCTUnwrap(sink.last).downloadedBytes, 400)
 
@@ -486,40 +514,168 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
         await replacementCompletion.value
     }
 
+    func testProgressPublicationCoalescesInsideTheQuarterSecondWindow() async {
+        let sink = ProgressSink()
+        let clock = ManualProgressClock()
+        let registry = makeRegistry(sink: sink, clock: clock)
+        await registry.beginRepositoryDownload(totalBytes: 1_000, totalFiles: 2)
+        XCTAssertEqual(sink.values.map(\.downloadedBytes), [0])
+
+        // Inside the window a routine byte report is coalesced...
+        clock.advance(by: 0.125)
+        await registry.reportPreexistingFileBytes(fileIndex: 0, bytes: 100)
+        XCTAssertEqual(sink.values.count, 1, "a report inside the 0.25 s window is coalesced")
+
+        // ...while a forced publication (a file boundary) is never held back.
+        await registry.reportFileCompleted(fileIndex: 1, expectedSize: 200, wasTransferred: false)
+        XCTAssertEqual(sink.values.map(\.downloadedBytes), [0, 300])
+
+        // The window restarts at every publication and opens after exactly 0.25 s.
+        clock.advance(by: 0.125)
+        await registry.reportPreexistingFileBytes(fileIndex: 0, bytes: 150)
+        XCTAssertEqual(sink.values.count, 2, "0.125 s after the forced publication is still inside the window")
+        clock.advance(by: 0.125)
+        await registry.reportPreexistingFileBytes(fileIndex: 0, bytes: 180)
+        XCTAssertEqual(sink.values.map(\.downloadedBytes), [0, 300, 380])
+    }
+
+    func testSpeedIsSampledOnlyAcrossTheHalfSecondWindowAndSmoothed() async throws {
+        let sink = ProgressSink()
+        let clock = ManualProgressClock()
+        let registry = makeRegistry(sink: sink, clock: clock)
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        await registry.beginRepositoryDownload(totalBytes: 1_000, totalFiles: 1)
+        let task = makeDummyTask(session: session)
+        task.taskDescription = chunkIdentity(start: 0, end: 999).encodedTaskDescription
+        let completion = await registerPendingTask(task, taskKey: 5, in: registry)
+
+        // Inside the 0.5 s window bytes publish without a speed sample or an ETA.
+        clock.advance(by: 0.25)
+        await registry.reportProgress(taskID: 5, totalBytesWritten: 100)
+        var progress = try XCTUnwrap(sink.last)
+        XCTAssertEqual(progress.downloadedBytes, 100)
+        XCTAssertNil(progress.bytesPerSecond)
+        XCTAssertNil(progress.estimatedSecondsRemaining)
+
+        // At the window the first sample is the raw rate since the baseline: 300 B / 0.5 s.
+        clock.advance(by: 0.25)
+        await registry.reportProgress(taskID: 5, totalBytesWritten: 300)
+        progress = try XCTUnwrap(sink.last)
+        XCTAssertEqual(progress.bytesPerSecond, 600)
+        XCTAssertEqual(try XCTUnwrap(progress.estimatedSecondsRemaining), 700.0 / 600.0, accuracy: 1e-9)
+
+        // Later samples are smoothed toward the previous rate: 0.75 x 600 + 0.25 x 1,000.
+        clock.advance(by: 0.5)
+        await registry.reportProgress(taskID: 5, totalBytesWritten: 800)
+        progress = try XCTUnwrap(sink.last)
+        XCTAssertEqual(progress.bytesPerSecond, 700)
+        XCTAssertEqual(try XCTUnwrap(progress.estimatedSecondsRemaining), 200.0 / 700.0, accuracy: 1e-9)
+
+        await registry.resumeFailure(taskID: 5, error: HuggingFaceDownloader.DownloadError.cancelled)
+        await completion.value
+    }
+
     func testSkippedFilesAndResumedPartialsNeverInflateMeasuredSpeed() async throws {
         let sink = ProgressSink()
-        let registry = HuggingFaceDownloader.DownloadStateRegistry(
-            repositoryProgressHandler: HuggingFaceDownloader.RepositoryProgressHandlerBox { sink.append($0) }
-        )
+        let clock = ManualProgressClock()
+        let registry = makeRegistry(sink: sink, clock: clock)
         await registry.beginRepositoryDownload(totalBytes: 2_000, totalFiles: 3)
 
         // Cross the 0.5 s speed-sample window, then complete a file that was already
         // valid on disk: its 1,000 bytes must not register as network throughput.
-        try await Task.sleep(for: .milliseconds(700))
+        clock.advance(by: 0.75)
         await registry.reportFileCompleted(fileIndex: 0, expectedSize: 1_000, wasTransferred: false)
         var progress = try XCTUnwrap(sink.last)
         XCTAssertNil(progress.bytesPerSecond, "a skipped file must not produce a speed sample")
 
         // A genuinely transferred completion afterward measures only its own bytes:
-        // 500 bytes over >=0.7 s is under 750 B/s, while a leaked skip baseline would
-        // fold the earlier 1,000 bytes in and more than triple that.
-        try await Task.sleep(for: .milliseconds(700))
+        // 500 bytes over the 1.5 s since the baseline is 333 B/s, while a leaked skip
+        // baseline would fold the earlier 1,000 bytes in and read 1,000 B/s.
+        clock.advance(by: 0.75)
         await registry.reportFileCompleted(fileIndex: 1, expectedSize: 500, wasTransferred: true)
         progress = try XCTUnwrap(sink.last)
-        let measured = try XCTUnwrap(progress.bytesPerSecond)
-        XCTAssertGreaterThan(measured, 0)
-        XCTAssertLessThan(measured, 750, "skipped bytes leaked into the speed sample")
+        XCTAssertEqual(progress.bytesPerSecond, 333, "skipped bytes leaked into the speed sample")
+    }
+
+    func testHeartbeatReportsAStallOnlyAfterTwentySecondsWithoutProgress() async throws {
+        let sink = ProgressSink()
+        let clock = ManualProgressClock()
+        let registry = makeRegistry(sink: sink, clock: clock)
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        await registry.beginRepositoryDownload(totalBytes: 1_000, totalFiles: 2)
+        // One live transfer on file 0; the stall check needs an active task.
+        let task = makeDummyTask(session: session)
+        task.taskDescription = chunkIdentity(start: 0, end: 499).encodedTaskDescription
+        let completion = await registerPendingTask(task, taskKey: 9, in: registry)
+
+        // The registry's own heartbeat task also ticks (in real time) against this clock
+        // and state, so each step below publishes the same way whichever tick checks first.
+        clock.advance(by: 19.5)
+        await registry.emitHeartbeatIfNeeded()
+        XCTAssertFalse(sink.values.contains { $0.isStalled }, "19.5 s without progress is not a stall")
+
+        clock.advance(by: 0.5)
+        await registry.emitHeartbeatIfNeeded()
+        var progress = try XCTUnwrap(sink.last)
+        XCTAssertTrue(progress.isStalled, "20 s without progress reads as stalled")
+        XCTAssertEqual(progress.phase, .downloading)
+
+        // Transferred bytes clear the stall (a forced publication) and restart the window.
+        clock.advance(by: 0.25)
+        await registry.reportFileCompleted(fileIndex: 1, expectedSize: 200)
+        progress = try XCTUnwrap(sink.last)
+        XCTAssertFalse(progress.isStalled)
+        XCTAssertEqual(progress.downloadedBytes, 200)
+        clock.advance(by: 19.5)
+        await registry.emitHeartbeatIfNeeded()
+        XCTAssertFalse(try XCTUnwrap(sink.last).isStalled)
+
+        // Only the downloading phase can stall: verification produces no bytes by design.
+        await registry.setPhase(.verifying)
+        clock.advance(by: 20)
+        await registry.emitHeartbeatIfNeeded()
+        XCTAssertFalse(try XCTUnwrap(sink.last).isStalled)
+        XCTAssertEqual(try XCTUnwrap(sink.last).phase, .verifying)
+
+        await registry.finishRepositoryDownload()
+        await registry.resumeFailure(taskID: 9, error: HuggingFaceDownloader.DownloadError.cancelled)
+        await completion.value
+    }
+
+    /// The one real-time proof: the registry's default clock is the process uptime, so
+    /// the production throttle reopens after a real quarter second. Every other
+    /// registry test steps a manual clock.
+    func testDefaultClockThrottlesPublicationAgainstRealUptime() async throws {
+        let sink = ProgressSink()
+        let registry = HuggingFaceDownloader.DownloadStateRegistry(
+            repositoryProgressHandler: HuggingFaceDownloader.RepositoryProgressHandlerBox { sink.append($0) }
+        )
+        let beforeBegin = ProcessInfo.processInfo.systemUptime
+        await registry.beginRepositoryDownload(totalBytes: 100, totalFiles: 1)
+        await registry.reportPreexistingFileBytes(fileIndex: 0, bytes: 10)
+        // Coalescing is asserted only when both calls provably fell inside the window,
+        // so a host that stalled past it cannot fail the proof.
+        if ProcessInfo.processInfo.systemUptime - beforeBegin < 0.25 {
+            XCTAssertEqual(
+                sink.values.map(\.downloadedBytes),
+                [0],
+                "a report inside the real 0.25 s window is coalesced"
+            )
+        }
+        try await Task.sleep(for: .milliseconds(300))
+        await registry.reportPreexistingFileBytes(fileIndex: 0, bytes: 20)
+        XCTAssertEqual(try XCTUnwrap(sink.last).downloadedBytes, 20, "the window reopens on real uptime")
+        await registry.finishRepositoryDownload()
     }
 
     func testCleanRetryPublishesLowerExactDurableTotal() async throws {
         let sink = ProgressSink()
-        let registry = HuggingFaceDownloader.DownloadStateRegistry(
-            repositoryProgressHandler: HuggingFaceDownloader.RepositoryProgressHandlerBox {
-                sink.append($0)
-            }
-        )
+        let clock = ManualProgressClock()
+        let registry = makeRegistry(sink: sink, clock: clock)
         await registry.beginRepositoryDownload(totalBytes: 100, totalFiles: 1)
-        try await Task.sleep(for: .milliseconds(300))
+        clock.advance(by: 0.25)
         await registry.reportPreexistingFileBytes(fileIndex: 0, bytes: 80)
         XCTAssertEqual(try XCTUnwrap(sink.last).downloadedBytes, 80)
 

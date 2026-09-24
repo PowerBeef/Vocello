@@ -320,6 +320,16 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
     }
 
+    /// Monotonic seconds behind the registry's progress windows: the 0.25 s publication
+    /// throttle, the 0.5 s speed-sample window and the 20 s stall threshold. Production
+    /// reads the process uptime; tests inject a manual source and step it without
+    /// sleeping.
+    struct ProgressClock: Sendable {
+        let now: @Sendable () -> TimeInterval
+
+        static let processUptime = ProgressClock(now: { ProcessInfo.processInfo.systemUptime })
+    }
+
     actor DownloadStateRegistry {
         private var isCancelled = false
         // Per-task handle so concurrent files can each be cancelled independently.
@@ -342,6 +352,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         private var reusedVerifiedBytesByFile: [Int: Int64] = [:]
         private let repositoryProgressHandler: RepositoryProgressHandlerBox?
         private let lifecycleEventHandler: LifecycleEventHandlerBox?
+        private let clock: ProgressClock
         private var repositoryTotalBytes: Int64 = 0
         private var repositoryTotalFiles = 0
         private var repositoryCompletedFiles = 0
@@ -389,10 +400,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
         init(
             repositoryProgressHandler: RepositoryProgressHandlerBox?,
-            lifecycleEventHandler: LifecycleEventHandlerBox? = nil
+            lifecycleEventHandler: LifecycleEventHandlerBox? = nil,
+            clock: ProgressClock = .processUptime
         ) {
             self.repositoryProgressHandler = repositoryProgressHandler
             self.lifecycleEventHandler = lifecycleEventHandler
+            self.clock = clock
         }
 
         func resetForNewRepositoryDownload(preserveUnclaimedCompletions: Bool) {
@@ -463,7 +476,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             logicalSlotBytes.removeAll()
             logicalSlotFileIndex.removeAll()
             self.phase = phase
-            let now = ProcessInfo.processInfo.systemUptime
+            let now = clock.now()
             lastProgressAdvanceTime = now
             lastSpeedSampleTime = now
             // Reused verified bytes are progress, not network throughput.
@@ -734,7 +747,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             let previousLogicalBytes = logicalSlotBytes[logicalSlot] ?? 0
             let updatedLogicalBytes = max(previousLogicalBytes, updatedTaskBytes)
             let delta = updatedLogicalBytes - previousLogicalBytes
-            let now = ProcessInfo.processInfo.systemUptime
+            let now = clock.now()
             guard delta != 0 else {
                 // A range retry restarts its task from zero beneath the failed attempt's
                 // bytes in the same logical slot. The wire is live, so it is not a stall.
@@ -846,7 +859,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 )
             }
             if wasTransferred {
-                let now = ProcessInfo.processInfo.systemUptime
+                let now = clock.now()
                 applySpeedMeasurement(now: now, totalDownloaded: repositoryDownloadedBytes, advancedDelta: expectedSize - liveForFile)
             } else {
                 lastSpeedSampleBytes += expectedSize - liveForFile
@@ -992,11 +1005,13 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             }
         }
 
-        private func emitHeartbeatIfNeeded() {
+        /// One heartbeat tick's stall check against the injected clock. Internal so tests
+        /// can drive the 20 s threshold directly instead of waiting on real ticks.
+        func emitHeartbeatIfNeeded() {
             guard repositoryProgressHandler != nil else { return }
             guard !activeCancellations.isEmpty else { return }
 
-            let now = ProcessInfo.processInfo.systemUptime
+            let now = clock.now()
             guard phase == .downloading,
                   let lastProgressAdvanceTime,
                   now - lastProgressAdvanceTime >= 20 else {
@@ -1007,7 +1022,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
         private func emitRepositoryProgress(isStalled: Bool, force: Bool = false) {
             let downloaded = min(repositoryDownloadedBytes, repositoryTotalBytes)
-            let now = ProcessInfo.processInfo.systemUptime
+            let now = clock.now()
             let phaseChanged = lastPublishedPhase != phase
             let reachedCompletion = repositoryTotalBytes > 0
                 && downloaded == repositoryTotalBytes

@@ -141,6 +141,48 @@ struct IOSForegroundExitState: Equatable, Sendable {
     }
 }
 
+/// When the History database may hold SQLite locks (IOS-11).
+///
+/// History lives in the App Group container, and iOS terminates an app that is
+/// suspended while holding a lock on a shared file (0xDEAD10CC). The database is
+/// suspended only once the app is about to be suspended: it left the foreground
+/// without a background-time grant, or that grant ended (completed or expired)
+/// while the app is still in the background. Work the grant covers, such as a
+/// long-form acceptance awaited by the cancellation barrier, finishes first. The
+/// database resumes as soon as the scene is active again, and the app then
+/// reconciles History so a write the suspension deferred commits.
+struct IOSHistoryDatabaseSuspensionState: Equatable, Sendable {
+    enum Transition: Equatable, Sendable {
+        case suspend
+        case resume
+    }
+
+    private(set) var isSuspended = false
+
+    /// The scene left the foreground; `holdsBackgroundTime` is whether a grant is running.
+    mutating func enterBackground(holdsBackgroundTime: Bool) -> Transition? {
+        holdsBackgroundTime ? nil : suspend()
+    }
+
+    /// The background-time grant ended. Suspends only while still backgrounded.
+    mutating func backgroundTimeEnded(isBackgrounded: Bool) -> Transition? {
+        isBackgrounded ? suspend() : nil
+    }
+
+    /// The scene is active again.
+    mutating func returnToForeground() -> Transition? {
+        guard isSuspended else { return nil }
+        isSuspended = false
+        return .resume
+    }
+
+    private mutating func suspend() -> Transition? {
+        guard !isSuspended else { return nil }
+        isSuspended = true
+        return .suspend
+    }
+}
+
 /// Keeps the screen awake while a generation runs, without taking over an
 /// idle-timer hold someone else (the headless diagnostics runner) placed.
 ///

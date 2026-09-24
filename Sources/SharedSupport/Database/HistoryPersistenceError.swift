@@ -54,11 +54,20 @@ struct HistoryPersistenceError: LocalizedError, Equatable, Sendable {
             return typed.replacingOperation(operation)
         }
 
+        let nsError = error as NSError
+        // IOS-11: a suspended History database refuses new locks with
+        // SQLITE_ABORT and interrupts a running statement with SQLITE_INTERRUPT;
+        // SQLite has rolled the transaction back. That is transient, never damage
+        // or a failed upgrade: nothing changed, and a retry after resume succeeds
+        // (an interrupted append stays in the outbox until it does).
+        if isInterruption(nsError) {
+            return HistoryPersistenceError(operation: operation, failure: .locked)
+        }
+
         if operation == .migrate {
             return HistoryPersistenceError(operation: operation, failure: .migrationFailed)
         }
 
-        let nsError = error as NSError
         if nsError.domain == NSCocoaErrorDomain {
             switch CocoaError.Code(rawValue: nsError.code) {
             case .fileWriteOutOfSpace:
@@ -106,5 +115,17 @@ struct HistoryPersistenceError: LocalizedError, Equatable, Sendable {
             return HistoryPersistenceError(operation: operation, failure: .permissionDenied)
         }
         return HistoryPersistenceError(operation: operation, failure: .unavailable)
+    }
+
+    /// GRDB's `DatabaseError` bridges to this domain with the extended SQLite
+    /// result code, whose low byte is the primary code.
+    static let sqliteErrorDomain = "GRDB.DatabaseError"
+    private static let sqliteAbort = 4
+    private static let sqliteInterrupt = 9
+
+    private static func isInterruption(_ error: NSError) -> Bool {
+        guard error.domain == sqliteErrorDomain else { return false }
+        let primary = error.code & 0xFF
+        return primary == sqliteAbort || primary == sqliteInterrupt
     }
 }

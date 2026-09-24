@@ -199,6 +199,15 @@ release of that exit completes, on return or on expiry. Returning to `.active` d
 background release and shows the notice above. The screen stays awake while a generation or
 long-form run is active. The decisions live in `IOSBackgroundGenerationPolicy`.
 
+History's SQLite database lives in the App Group container, where holding a lock while suspended
+terminates the app (0xDEAD10CC). The queue observes GRDB's suspension notifications (IOS-11):
+`IOSHistoryDatabaseSuspensionState` suspends it when the app leaves the foreground without a
+background-time grant, or when that grant ends while the app is still backgrounded, so work the
+grant covers finishes first. A write that meets the suspension rolls back and is classified as a
+transient `.locked` failure, never as damage; a short-form take stays in `history-outbox/`, and
+returning to `.active` resumes the database and reconciles History so it commits. A long-form
+acceptance that meets it fails closed through its journal exactly as a crash would.
+
 Short-form Built-in, Design, and Clone takes share one execution boundary in
 `IOSSingleTakeGenerationExecutor`. Views construct the exact mode request and perform any
 mode-specific preparation (including Clone priming), then the executor singularly owns frontend

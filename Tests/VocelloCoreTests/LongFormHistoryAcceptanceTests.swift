@@ -240,6 +240,56 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         XCTAssertThrowsError(try GenerationHistoryPersistenceOutcome.unableToQueue.requireSavedLongFormSegment())
     }
 
+    // MARK: - Suspension (IOS-11)
+
+    /// Suspension before the acceptance: nothing is prepared, the prior project
+    /// is untouched, and the same candidate is accepted once History resumes.
+    func testSuspensionBeforeAcceptanceChangesNothingAndTheCandidateStaysAcceptable() async throws {
+        let f = try fixture(suspendable: true)
+        NotificationCenter.default.post(name: Database.suspendNotification, object: nil)
+        do {
+            _ = try await f.store.commit(f.input, using: f.queue)
+            XCTFail("A suspended database must refuse the acceptance")
+        } catch {
+            XCTAssertEqual(error as? LongFormAcceptanceError, .recoveryRequired)
+        }
+        XCTAssertTrue(try journalURLs(f.store).isEmpty)
+        XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), f.oldManifest)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath))
+        NotificationCenter.default.post(name: Database.resumeNotification, object: nil)
+
+        XCTAssertEqual(try rowCount(f.queue), 1)
+        let saved = try await f.store.commit(f.input, using: f.queue)
+        XCTAssertNotNil(saved.id)
+        XCTAssertEqual(try rowCount(f.queue), 4)
+        XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), try f.input.manifest.canonicalJSONData())
+    }
+
+    /// Suspension inside the acceptance transaction: SQLite rolls the rows back,
+    /// recovery fails closed while suspended, and after resume the journal
+    /// restores the prior project. No partial project is ever readable.
+    func testSuspensionInsideAcceptanceRollsBackAndRecoveryRestoresThePriorProject() throws {
+        let f = try fixture(suspendable: true)
+        defer { NotificationCenter.default.post(name: Database.resumeNotification, object: nil) }
+        XCTAssertThrowsError(try f.queue.write { db in
+            try f.store.prepare(f.input, in: db)
+            NotificationCenter.default.post(name: Database.suspendNotification, object: nil)
+            _ = try f.store.saveRows(f.input, in: db)
+        }) { error in
+            XCTAssertEqual(HistoryPersistenceError.classify(error, operation: .write).failure, .locked)
+        }
+        XCTAssertEqual(try journalURLs(f.store).count, 1, "The journal survives for recovery")
+        XCTAssertThrowsError(try f.queue.write { db in try f.store.reconcile(in: db) })
+        XCTAssertEqual(try journalURLs(f.store).count, 1, "Recovery never runs half-way while suspended")
+
+        NotificationCenter.default.post(name: Database.resumeNotification, object: nil)
+        try f.queue.write { db in try f.store.reconcile(in: db) }
+        XCTAssertTrue(try journalURLs(f.store).isEmpty)
+        XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), f.oldManifest)
+        XCTAssertEqual(try rowCount(f.queue), 1)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: f.oldJoined.path))
+    }
+
     private struct Fixture: Sendable {
         let store: LongFormHistoryAcceptanceStore
         let queue: DatabaseQueue
@@ -257,11 +307,18 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         return try FileManager.default.contentsOfDirectory(at: store.rootURL, includingPropertiesForKeys: nil)
     }
 
-    private func fixture(qcPassed: Bool = true, nonFiniteDuration: Bool = false, joinedQCPassed: Bool = true) throws -> Fixture {
+    private func fixture(
+        qcPassed: Bool = true,
+        nonFiniteDuration: Bool = false,
+        joinedQCPassed: Bool = true,
+        suspendable: Bool = false
+    ) throws -> Fixture {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         roots.append(root)
-        let queue = try DatabaseQueue()
+        var configuration = Configuration()
+        configuration.observesSuspensionNotifications = suspendable
+        let queue = try DatabaseQueue(configuration: configuration)
         try GenerationMigrations.makeMigrator().migrate(queue)
         let plan = try LongFormPlanner.plan(
             spokenTextPlan: SpokenTextPlanner.plan(originalText: "First sentence. Second sentence."),

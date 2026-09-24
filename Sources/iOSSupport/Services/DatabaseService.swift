@@ -39,9 +39,18 @@ final class DatabaseService: @unchecked Sendable {
     }
 
     private static func openQueue(at path: String) throws -> DatabaseQueue {
+        // IOS-11: on iPhone the database lives in the App Group container, and
+        // iOS terminates an app that is suspended while holding a lock on a
+        // shared file (0xDEAD10CC). The app suspends the queue just before it can
+        // be suspended itself (`suspendForAppSuspension()`); a write that meets
+        // the suspension rolls back with a transient `.locked` failure, and a
+        // short-form take stays in the outbox until the reconcile after resume
+        // commits it. macOS never posts the notifications.
+        var configuration = Configuration()
+        configuration.observesSuspensionNotifications = true
         let queue: DatabaseQueue
         do {
-            queue = try DatabaseQueue(path: path)
+            queue = try DatabaseQueue(path: path, configuration: configuration)
         } catch {
             throw HistoryPersistenceError.classify(error, operation: .initialize)
         }
@@ -55,6 +64,17 @@ final class DatabaseService: @unchecked Sendable {
 
     func reopenIfNeeded() throws {
         _ = try store.reopenIfNeeded()
+    }
+
+    /// IOS-11: History stops taking SQLite locks and interrupts a running
+    /// statement. Posted only when the app is about to be suspended.
+    static func suspendForAppSuspension() {
+        NotificationCenter.default.post(name: Database.suspendNotification, object: nil)
+    }
+
+    /// The app is active again; History may take locks again.
+    static func resumeAfterAppSuspension() {
+        NotificationCenter.default.post(name: Database.resumeNotification, object: nil)
     }
 
     // MARK: - CRUD

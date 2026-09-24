@@ -13,6 +13,7 @@ final class IOSBackgroundGenerationController {
     private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
     private var screenAwakeHold = IOSGenerationScreenAwakeHold()
     private var exitState = IOSForegroundExitState()
+    private var historySuspension = IOSHistoryDatabaseSuspensionState()
 
     func attach(_ appModel: AppModel) {
         self.appModel = appModel
@@ -31,6 +32,9 @@ final class IOSBackgroundGenerationController {
         if requestsBackgroundTime {
             beginBackgroundTime()
         }
+        // IOS-11: with no grant (none requested, or the system refused one) the
+        // app can be suspended at any moment, so History stops taking locks now.
+        apply(historySuspension.enterBackground(holdsBackgroundTime: backgroundTask != .invalid))
         return epoch
     }
 
@@ -40,9 +44,13 @@ final class IOSBackgroundGenerationController {
     }
 
     /// The scene is active again: supersede any in-flight exit and give the grant back.
-    func returnToForeground() {
+    /// Returns `true` when History was resumed, so the caller reconciles it and a
+    /// write the suspension deferred commits now.
+    @discardableResult
+    func returnToForeground() -> Bool {
         exitState.returnToForeground()
         endBackgroundTime()
+        return apply(historySuspension.returnToForeground())
     }
 
     /// A runtime release finished; ends the grant only when nothing of the
@@ -55,6 +63,7 @@ final class IOSBackgroundGenerationController {
             followUpReleaseExecutes: followUpReleaseExecutes,
             pendingReleaseReason: pendingReleaseReason
         ) else { return }
+        suspendHistoryIfBackgrounded()
         endBackgroundTime()
     }
 
@@ -63,8 +72,30 @@ final class IOSBackgroundGenerationController {
         backgroundTask = UIApplication.shared.beginBackgroundTask(
             withName: "vocello.generation.foreground-exit"
         ) { [weak self] in
-            // Expiration: give the grant back; suspension proceeds.
+            // Expiration: History stops taking locks, then the grant goes back;
+            // suspension proceeds.
+            self?.suspendHistoryIfBackgrounded()
             self?.endBackgroundTime()
+        }
+    }
+
+    /// The grant is ending; before it goes back, History stops taking locks
+    /// unless the user is already back.
+    private func suspendHistoryIfBackgrounded() {
+        apply(historySuspension.backgroundTimeEnded(isBackgrounded: exitState.isBackgrounded))
+    }
+
+    @discardableResult
+    private func apply(_ transition: IOSHistoryDatabaseSuspensionState.Transition?) -> Bool {
+        switch transition {
+        case .suspend:
+            DatabaseService.suspendForAppSuspension()
+            return false
+        case .resume:
+            DatabaseService.resumeAfterAppSuspension()
+            return true
+        case nil:
+            return false
         }
     }
 

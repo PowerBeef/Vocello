@@ -185,8 +185,11 @@ struct QVoiceiOSApp: App {
             // PA-15: the user is back, so an in-flight foreground exit never
             // requests its release, a release still deferred for it must never
             // fire, and background time is no longer needed. Tell the user what
-            // the exit stopped.
-            backgroundGeneration.returnToForeground()
+            // the exit stopped. IOS-11: History takes locks again, and a write the
+            // suspension deferred commits now.
+            if backgroundGeneration.returnToForeground() {
+                reconcilePendingHistory()
+            }
             runtimeReleaseCoordinator.cancelPendingRelease(
                 reason: IOSBackgroundGenerationPolicy.releaseReason
             )

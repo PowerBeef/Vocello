@@ -302,6 +302,42 @@ final class IOSBackgroundGenerationPolicyTests: XCTestCase {
         XCTAssertEqual(notice.presented, .longFormStopped)
     }
 
+    // MARK: - History database suspension (IOS-11)
+
+    func testHistorySuspendsAtOnceWithoutBackgroundTimeAndResumesOnReturn() {
+        var state = IOSHistoryDatabaseSuspensionState()
+
+        XCTAssertEqual(state.enterBackground(holdsBackgroundTime: false), .suspend)
+        XCTAssertTrue(state.isSuspended)
+        XCTAssertNil(state.backgroundTimeEnded(isBackgrounded: true), "Suspending twice posts once")
+        XCTAssertEqual(state.returnToForeground(), .resume)
+        XCTAssertNil(state.returnToForeground(), "Resuming twice posts once")
+    }
+
+    func testHistoryStaysWritableWhileTheGrantRunsAndSuspendsWhenItEnds() {
+        var state = IOSHistoryDatabaseSuspensionState()
+
+        XCTAssertNil(
+            state.enterBackground(holdsBackgroundTime: true),
+            "Work the grant covers, such as a long-form acceptance behind the barrier, finishes first"
+        )
+        XCTAssertFalse(state.isSuspended)
+        XCTAssertEqual(state.backgroundTimeEnded(isBackgrounded: true), .suspend)
+        XCTAssertEqual(state.returnToForeground(), .resume)
+    }
+
+    func testReturningBeforeTheGrantEndsNeverSuspendsHistory() {
+        var state = IOSHistoryDatabaseSuspensionState()
+
+        XCTAssertNil(state.enterBackground(holdsBackgroundTime: true))
+        XCTAssertNil(state.returnToForeground())
+        XCTAssertNil(
+            state.backgroundTimeEnded(isBackgrounded: false),
+            "A release that completes after the return never suspends History"
+        )
+        XCTAssertFalse(state.isSuspended)
+    }
+
     func testNoticeCopyUsesTheCatalogEnglishSource() {
         XCTAssertEqual(
             VocelloPresentationText.backgroundTakeStopped,

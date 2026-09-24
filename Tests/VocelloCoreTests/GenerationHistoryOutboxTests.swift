@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 import XCTest
 
 final class GenerationHistoryOutboxTests: XCTestCase {
@@ -308,6 +309,65 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: directory.path))
         XCTAssertEqual(result.snapshot.pendingAudioRemovalCount, 0)
         XCTAssertEqual(result.snapshot.pendingCount, 1)
+    }
+
+    // MARK: - Suspension (IOS-11)
+
+    /// A take whose database write meets a suspended History database is
+    /// deferred, never dropped or reported as damage: it stays in the outbox and
+    /// the reconcile after resume commits it once.
+    func testSuspendedDatabaseDefersTheTakeAndTheReconcileAfterResumeCommitsIt() async throws {
+        let fixture = try makeFixture()
+        var configuration = Configuration()
+        configuration.observesSuspensionNotifications = true
+        let queue = try DatabaseQueue(configuration: configuration)
+        try GenerationMigrations.makeMigrator().migrate(queue)
+        let coordinator = GenerationHistoryRecoveryCoordinator(
+            store: fixture.store,
+            commitGeneration: { _, generation in
+                do {
+                    return try await queue.write { db in
+                        if let existing = try Generation
+                            .filter(Generation.Columns.audioPath == generation.audioPath)
+                            .fetchOne(db) {
+                            return existing
+                        }
+                        var copy = generation
+                        try copy.insert(db)
+                        return copy
+                    }
+                } catch {
+                    throw HistoryPersistenceError.classify(error, operation: .write)
+                }
+            },
+            fetchAllGenerations: { try await queue.read { try Generation.fetchAll($0) } },
+            deleteAllGenerations: { _ = try await queue.write { try Generation.deleteAll($0) } },
+            referencedAudioPaths: { paths in
+                let rows = try await queue.read { try Generation.fetchAll($0) }
+                return Set(rows.map(\.audioPath)).intersection(paths)
+            }
+        )
+        let entry = try fixture.store.enqueue(fixture.generation, operation: .append)
+
+        NotificationCenter.default.post(name: Database.suspendNotification, object: nil)
+        do {
+            _ = try await coordinator.commit(entry)
+            XCTFail("A suspended database must refuse the write")
+        } catch {
+            XCTAssertEqual(error as? GenerationHistoryOutboxError, .databaseUnavailable)
+        }
+        XCTAssertEqual(fixture.store.scan().entries.map(\.id), [entry.id], "The take stays queued")
+        let whileSuspended = await coordinator.reconcile()
+        XCTAssertTrue(whileSuspended.committed.isEmpty)
+        XCTAssertEqual(whileSuspended.snapshot.pendingCount, 1)
+        XCTAssertEqual(whileSuspended.snapshot.issueCount, 0, "Suspension is not damage")
+        NotificationCenter.default.post(name: Database.resumeNotification, object: nil)
+
+        let resumed = await coordinator.reconcile()
+        XCTAssertEqual(resumed.committed.map(\.audioPath), [fixture.generation.audioPath])
+        XCTAssertEqual(resumed.snapshot, .empty)
+        let rows = try await queue.read { try Generation.fetchCount($0) }
+        XCTAssertEqual(rows, 1)
     }
 
     private func makeAudio(

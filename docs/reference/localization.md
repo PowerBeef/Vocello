@@ -22,7 +22,7 @@ sourceOfTruth:
 ---
 # Localization architecture
 
-English is the source language. The main catalog contains 951 entries with complete English, French,
+English is the source language. Every main catalog entry carries complete English, French,
 Spanish, German, Italian, Brazilian Portuguese (`pt-BR`), Simplified Chinese (`zh-Hans`), Japanese,
 Korean and Russian translations, including Settings/purchase copy, enrollment transcription
 states, storage recovery, model terminal states, onboarding, tab labels and primary Studio actions.

@@ -4,7 +4,9 @@
 The verdict logic consumes already-analyzed metric dicts, so these tests need
 no NumPy and no audio files: they exercise the expectation semantics directly.
 """
+import math
 import os
+import random
 import sys
 import unittest
 
@@ -15,7 +17,8 @@ from delivery_quality_gate import (
     delivery_features,
     evaluate_delivery,
     evaluate_neutral_cohort,
-    leave_one_out_robust_z,
+    leave_one_out_studentized_residual,
+    student_t_two_sided_p,
 )
 from prosody_profile import (
     SCHEMA_VERSION,
@@ -129,35 +132,88 @@ class DeliveryGateTests(unittest.TestCase):
         self.assertFalse(verdict["passed"])
         self.assertIn("pitch_spread_exceeded", verdict["flags"])
 
-    def test_neutral_outlier_fires_at_n4_where_the_population_z_could_not(self):
-        # With the candidate inside a population SD, |z| <= sqrt(n - 1) = 1.73
-        # at n = 4, so the 2.5 bound could never fire (audit #105).
+    def test_binding_outlier_check_stays_on_the_calibrated_population_z(self):
+        # The candidate sits inside the population SD, so |z| <= sqrt(n - 1)
+        # = 1.73 at n = 4 and the calibrated 2.5 bound cannot fire (audit #105).
+        # The leave-one-out score reports the take without gating it.
         cohort = [metrics(f0=148.0, clip="a.wav"), metrics(f0=149.0, clip="b.wav"),
                   metrics(f0=150.0, clip="c.wav"), metrics(f0=175.0, clip="d.wav")]
         verdict = evaluate_neutral_cohort(cohort)
-        self.assertEqual(verdict["flags"], ["arousal_outlier"])
-        self.assertEqual(verdict["outliers"], ["d.wav"])
-        self.assertGreater(verdict["metrics"]["max_abs_z"], 2.5)
-        self.assertEqual(verdict["outlierAlgorithm"], "leave-one-out-median-mad-v1")
+        self.assertTrue(verdict["passed"], verdict["flags"])
+        self.assertEqual(verdict["outlierAlgorithm"], "population-z-v1")
+        self.assertLessEqual(verdict["metrics"]["max_abs_z"], math.sqrt(3))
+        report = verdict["leaveOneOutOutlier"]
+        self.assertIs(report["reportOnly"], True)
+        self.assertEqual(report["algorithm"], "leave-one-out-studentized-t-v1")
+        self.assertEqual((report["candidate"], report["degreesOfFreedom"]), ("d.wav", 2))
+        self.assertGreater(report["maxAbsScore"], 20.0)
+        self.assertLess(report["bonferroniPValue"], 0.01)
 
     def test_neutral_outlier_at_n8(self):
         steady = [metrics(f0=148.0 + 0.5 * i, clip=f"s{i}.wav") for i in range(8)]
         verdict = evaluate_neutral_cohort(steady)
         self.assertTrue(verdict["passed"], verdict["flags"])
         self.assertLess(verdict["metrics"]["max_abs_z"], 2.5)
+        self.assertEqual(verdict["leaveOneOutOutlier"]["bonferroniPValue"], 1.0)
         wandering = steady[:7] + [metrics(f0=170.0, clip="w.wav")]
         verdict = evaluate_neutral_cohort(wandering)
         self.assertEqual(verdict["outliers"], ["w.wav"])
         self.assertIn("arousal_outlier", verdict["flags"])
+        self.assertEqual(verdict["leaveOneOutOutlier"]["candidate"], "w.wav")
+        self.assertLess(verdict["leaveOneOutOutlier"]["bonferroniPValue"], 1e-4)
+
+    def test_student_t_tail_matches_tabulated_critical_values(self):
+        # Two-sided 5% critical values of Student's t.
+        for statistic, degrees in ((12.706, 1), (4.303, 2), (3.182, 3), (2.776, 4),
+                                   (2.571, 5), (2.447, 6), (2.365, 7), (2.228, 10)):
+            self.assertAlmostEqual(student_t_two_sided_p(statistic, degrees), 0.05, places=3)
+        self.assertEqual(student_t_two_sided_p(0.0, 3), 1.0)
+        self.assertEqual(student_t_two_sided_p(float("inf"), 3), 0.0)
+        with self.assertRaises(ValueError):
+            student_t_two_sided_p(1.0, 0)
 
     def test_leave_one_out_score_handles_exact_agreement(self):
-        self.assertEqual(leave_one_out_robust_z([1.0, 1.0, 1.0, 1.0], 3), 0.0)
-        self.assertEqual(leave_one_out_robust_z([1.0, 1.0, 1.0, 2.0], 3), float("inf"))
-        self.assertAlmostEqual(leave_one_out_robust_z([1.0, 2.0, 3.0, 5.0], 3), 3.0 / 1.4826)
+        self.assertEqual(leave_one_out_studentized_residual([1.0, 1.0, 1.0, 1.0], 3), 0.0)
+        self.assertEqual(leave_one_out_studentized_residual([1.0, 1.0, 1.0, 2.0], 3), float("inf"))
+        self.assertAlmostEqual(
+            leave_one_out_studentized_residual([1.0, 2.0, 3.0, 5.0], 3), 3.0 / math.sqrt(4.0 / 3.0)
+        )
+        self.assertIsNone(leave_one_out_studentized_residual([1.0, 2.0], 1))
         verdict = evaluate_neutral_cohort([metrics(clip=f"{i}.wav") for i in range(3)]
                                           + [metrics(f0=160.0, clip="x.wav")])
-        self.assertEqual(verdict["outliers"], ["x.wav"])
-        self.assertIsNone(verdict["metrics"]["max_abs_z"])
+        self.assertTrue(verdict["passed"], verdict["flags"])
+        report = verdict["leaveOneOutOutlier"]
+        self.assertEqual(report["candidate"], "x.wav")
+        self.assertIsNone(report["maxAbsScore"])
+        self.assertEqual(report["bonferroniPValue"], 0.0)
+
+    def test_healthy_cohorts_pass_at_the_calibrated_rate(self):
+        """Seeded null simulation (audit #105 review): healthy cohorts of four to
+        eight takes pass the binding check as often as they did under the
+        calibrated statistic (never below eight takes, where it cannot fire), and
+        the report-only family-wise p-value is calibrated near its nominal 5%."""
+        rng = random.Random(20260925)
+        trials = 1000
+        for size in range(4, 9):
+            failed = flagged = 0
+            for _ in range(trials):
+                # Healthy: independent normal arousal proxies (only the F0 range
+                # varies, so the pitch and rate spreads stay in bounds).
+                cohort = [metrics(range_hz=60.0 + 8.0 * rng.gauss(0.0, 1.0), clip=f"{i}.wav")
+                          for i in range(size)]
+                verdict = evaluate_neutral_cohort(cohort)
+                self.assertTrue(set(verdict["flags"]) <= {"arousal_outlier"}, verdict["flags"])
+                failed += not verdict["passed"]
+                flagged += verdict["leaveOneOutOutlier"]["bonferroniPValue"] < 0.05
+            with self.subTest(size=size):
+                if size <= 7:
+                    self.assertEqual(failed, 0)
+                else:
+                    self.assertLessEqual(failed / trials, 0.02)
+                # The leave-one-out median/MAD score this replaced crossed 2.5 in
+                # 58-82% of these cohorts; the studentized score stays near 5%.
+                self.assertGreater(flagged / trials, 0.02)
+                self.assertLess(flagged / trials, 0.08)
 
     def test_neutral_cohort_too_small_is_failure_class(self):
         verdict = evaluate_neutral_cohort([metrics(), metrics()])

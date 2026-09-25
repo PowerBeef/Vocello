@@ -222,7 +222,7 @@ def language_plan(
     *, matrix: Path, corpus: Path, run_id: str = "lang-ios", seed: int | None = None
 ) -> dict:
     if seed is None:
-        seed = publisher.stable_default_seed({"mode": "custom", "scriptLang": "french"})
+        seed = publisher.stable_default_seed({"mode": "custom", "scriptLang": "french", "uiHint": "auto"})
     plan = {
         "schemaVersion": 1,
         "runID": run_id,
@@ -2092,6 +2092,39 @@ class PublisherTests(unittest.TestCase):
             cells, takes("a" * 64, "d" * 64, "b" * 64, "c" * 64, "c" * 64, seeds=(7, 6, 8, 9, 9)))
         with self.assertRaises(publisher.PublicationError):
             publisher.validate_equivalent_outputs(cells, takes("a" * 64, "a" * 64, "b" * 64, "c" * 64, "e" * 64))
+
+    def test_auto_is_an_independent_sample_bound_to_the_pinned_prompt(self) -> None:
+        """Audit #86 part 2: pinned and Auto takes of one group draw different
+        seeds, and the shared resolved prompt digest proves Auto resolution."""
+        pinned = {"mode": "custom", "scriptLang": "english", "uiHint": "english"}
+        auto = {"mode": "custom", "scriptLang": "english", "uiHint": "auto"}
+        self.assertNotEqual(publisher.stable_default_seed(pinned), publisher.stable_default_seed(auto))
+        self.assertEqual(publisher.LANGUAGE_SEED_POLICY, "sha256-v2-mode-script-language-auto-63bit")
+        takes = [
+            {"cellID": "custom-en-pinned", "promptEquivalenceGroup": "custom-english-v1",
+             "seed": publisher.stable_default_seed(pinned)},
+            {"cellID": "custom-en-auto", "promptEquivalenceGroup": "custom-english-v1",
+             "seed": publisher.stable_default_seed(auto)},
+        ]
+
+        def sentinels(auto_digest: str) -> dict:
+            return {
+                "custom-en-pinned": {"promptDigestScope": "resolved", "resolvedPromptAssemblyDigest": "a" * 64},
+                "custom-en-auto": {"promptDigestScope": "resolved", "resolvedPromptAssemblyDigest": auto_digest},
+            }
+
+        rows = {"custom-en-pinned": {"notes": {}}, "custom-en-auto": {"notes": {}}}
+        publisher.validate_prompt_equivalence(planned_takes=takes, sentinels=sentinels("a" * 64), rows_by_cell=rows)
+        with self.assertRaisesRegex(publisher.PublicationError, "custom-english-v1 is inconsistent"):
+            publisher.validate_prompt_equivalence(
+                planned_takes=takes, sentinels=sentinels("b" * 64), rows_by_cell=rows)
+        # Different seeds are not one audio: their digests are never compared.
+        publisher.validate_equivalent_outputs(
+            [{"id": "custom-en-pinned", "promptEquivalenceGroup": "custom-english-v1"},
+             {"id": "custom-en-auto", "promptEquivalenceGroup": "custom-english-v1"}],
+            [{"seed": take["seed"], "output": {"fileDigest": digest}}
+             for take, digest in zip(takes, ("c" * 64, "d" * 64))],
+        )
 
     def test_the_negative_control_is_an_accuracy_control_voted_per_channel(self) -> None:
         """Audit #42: the control must fail on accuracy by two-family consensus;

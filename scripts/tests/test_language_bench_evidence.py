@@ -179,8 +179,20 @@ class LanguageBenchEvidenceTests(unittest.TestCase):
         self.assertTrue(all(isinstance(take["seed"], int) for take in first["takes"]))
         self.assertTrue(all(take["samplingVariation"] == "expressive" for take in first["takes"]))
         by_cell = {take["cellID"]: take for take in first["takes"]}
-        self.assertEqual(by_cell["custom-en-pinned"]["seed"], by_cell["custom-en-auto"]["seed"])
-        self.assertEqual(by_cell["custom-fr-pinned"]["seed"], by_cell["custom-fr-auto"]["seed"])
+        # Seed identity v2 (audit #86 part 2): an Auto take is an independent
+        # sample with its own seed; the pinned take keeps its v1 seed, and the
+        # plan declares the v2 policy.
+        self.assertEqual(first["seedPolicy"], "sha256-v2-mode-script-language-auto-63bit")
+        self.assertNotEqual(by_cell["custom-en-pinned"]["seed"], by_cell["custom-en-auto"]["seed"])
+        self.assertNotEqual(by_cell["custom-fr-pinned"]["seed"], by_cell["custom-fr-auto"]["seed"])
+        v1_identity = hashlib.sha256(b"language-bench-seed-v1|custom|english").digest()[:8]
+        self.assertEqual(
+            by_cell["custom-en-pinned"]["seed"], int.from_bytes(v1_identity, "big") & ((1 << 63) - 1),
+        )
+        self.assertEqual(
+            by_cell["custom-en-pinned"]["promptEquivalenceGroup"],
+            by_cell["custom-en-auto"]["promptEquivalenceGroup"],
+        )
         self.assertEqual(by_cell["custom-en-pinned"]["customSpeakerID"], "aiden")
         self.assertEqual(by_cell["design-en-pinned"]["uiHint"], "english")
         self.assertIsNone(by_cell["design-en-pinned"]["customSpeakerID"])

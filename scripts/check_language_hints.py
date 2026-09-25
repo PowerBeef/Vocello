@@ -260,7 +260,9 @@ def main() -> int:
                 if not isinstance(prompt_digest, str) or len(prompt_digest) != 64:
                     failures.append(f"{child_id}: missing resolved prompt-assembly digest")
                 else:
-                    equivalence.setdefault((group, expected_seed), []).append((child_id, prompt_digest))
+                    # Keyed by group alone (seed identity v2, audit #86): the
+                    # prompt carries no seed, and an Auto take draws its own.
+                    equivalence.setdefault(group, []).append((child_id, prompt_digest))
             if not finish_ok(row):
                 failures.append(f"{child_id}: finishReason={row.get('finishReason')!r}")
             verdict = qc_verdict(row)
@@ -273,14 +275,14 @@ def main() -> int:
         extra = sorted(set(by_generation) - expected_generation_ids)
         if extra:
             failures.append(f"unexpected current-run generation rows: {', '.join(extra)}")
-        for (group, seed), members in sorted(equivalence.items()):
+        for group, members in sorted(equivalence.items()):
             if len(members) < 2:
-                failures.append(f"prompt equivalence group {group} seed {seed} has fewer than two takes")
+                failures.append(f"prompt equivalence group {group} has fewer than two takes")
                 continue
             digests = {digest for _identity, digest in members}
             if len(digests) != 1:
                 failures.append(
-                    f"prompt equivalence group {group} seed {seed} differs across "
+                    f"prompt equivalence group {group} differs across "
                     + ", ".join(identity for identity, _digest in members)
                 )
     else:

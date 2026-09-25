@@ -60,7 +60,10 @@ from benchmark_memory import (  # noqa: E402
     UNOBSERVED_GAP_POLICY_KEY,
     qualify_memory_rows,
 )
-from language_bench_evidence import stable_default_seed  # noqa: E402
+from language_bench_evidence import (  # noqa: E402
+    LANGUAGE_SEED_POLICY,
+    stable_default_seed,
+)
 from lib.language_metrics import (  # noqa: E402
     ACCURACY_METRIC_VERSION,
     CHANNEL_CONSENSUS_ALGORITHM,
@@ -98,7 +101,6 @@ ASR_REQUIRED_PASS_COUNT = 3
 # WER v2 (audit #43, 2026-09-25): new records gate the segmentation-aware word
 # rate and keep publishing the v1 rate beside it; lib.language_metrics owns it.
 LANGUAGE_ACCURACY_METRIC_VERSION = ACCURACY_METRIC_VERSION
-LANGUAGE_SEED_POLICY = "sha256-v1-mode-script-language-63bit"
 LANGUAGE_SAMPLING_VARIATION = "expressive"
 SAFE_LOCALE = re.compile(r"^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$")
 SAFE_CUSTOM_SPEAKER = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
@@ -2373,12 +2375,14 @@ def validate_language_mode_fixture_identity(
 
 
 def validate_equivalent_outputs(cells: list[dict[str, Any]], takes: list[dict[str, Any]]) -> None:
-    """Pinned and Auto takes of one prompt-equivalence group are one audio (audit #86).
+    """Group members that share a seed are one audio (audit #86 part 1).
 
-    The cells of a group share the resolved prompt and the seed, so on
-    deterministic MLX their WAVs are byte-identical; that is the deliberate proof
-    that Auto resolved to the pinned language. Every group member that publishes
-    a file digest must publish the same one.
+    Members of one prompt-equivalence group share the resolved prompt; those
+    that also share a seed produce byte-identical WAVs on deterministic MLX, so
+    every such member that publishes a file digest must publish the same one.
+    Since seed identity v2 (part 2) a normal plan's Auto take draws its own
+    seed and is an independent sample; the shared prompt digest
+    (`validate_prompt_equivalence`) proves Auto resolution instead.
     """
     grouped: dict[tuple[str, int], dict[str, str]] = {}
     for cell, take in zip(cells, takes):
@@ -2402,7 +2406,8 @@ def validate_prompt_equivalence(
     sentinels: dict[str, dict[str, Any]],
     rows_by_cell: dict[str, dict[str, Any]],
 ) -> None:
-    grouped: dict[tuple[str, int], list[tuple[str, str]]] = {}
+    # Keyed by group alone (seed identity v2): the prompt carries no seed.
+    grouped: dict[str, list[tuple[str, str]]] = {}
     for take in planned_takes:
         group = take.get("promptEquivalenceGroup")
         if not isinstance(group, str):
@@ -2420,14 +2425,13 @@ def validate_prompt_equivalence(
         engine_digest = notes.get("resolvedPromptAssemblyDigest") if isinstance(notes, dict) else None
         if engine_digest is not None and engine_digest != digest:
             raise PublicationError(f"language cell {cell_id} prompt digest disagrees across layers")
-        seed = uint64_value(take.get("seed"))
-        if seed is None:
+        if uint64_value(take.get("seed")) is None:
             raise PublicationError(f"language cell {cell_id} prompt group lacks a seed")
-        grouped.setdefault((group, seed), []).append((cell_id, digest))
-    for (group, seed), members in grouped.items():
+        grouped.setdefault(group, []).append((cell_id, digest))
+    for group, members in grouped.items():
         if len(members) < 2 or len({digest for _, digest in members}) != 1:
             raise PublicationError(
-                f"language prompt-equivalence group {group} seed {seed} is inconsistent"
+                f"language prompt-equivalence group {group} is inconsistent"
             )
 
 

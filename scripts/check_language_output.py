@@ -454,7 +454,9 @@ def main() -> int:
     if plan_failure:
         failures.append(f"invalid run plan/evidence: {plan_failure}")
 
-    equivalence: dict[tuple[str, int | None], list[tuple[str, str]]] = {}
+    # Keyed by group alone (seed identity v2, audit #86): the resolved prompt
+    # carries no seed, and a normal plan's Auto take draws its own seed.
+    equivalence: dict[str, list[tuple[str, str]]] = {}
     for cell in expected:
         cell_id = cell.get("cellID", cell.get("id"))
         identity = cell.get("childRunID", cell_id)
@@ -500,9 +502,7 @@ def main() -> int:
                 if not isinstance(prompt_digest, str) or len(prompt_digest) != 64:
                     failures.append(f"{identity}: missing resolved prompt-assembly digest")
                 else:
-                    equivalence.setdefault((group, cell.get("seed")), []).append(
-                        (identity, prompt_digest)
-                    )
+                    equivalence.setdefault(group, []).append((identity, prompt_digest))
         verification = record.get("outputVerification")
         if not isinstance(verification, dict):
             failures.append(
@@ -548,13 +548,13 @@ def main() -> int:
             f"pass={passed}{' (expected failure confirmed)' if expect_failure and not passed else ''}"
         )
 
-    for (group, seed), members in sorted(equivalence.items()):
+    for group, members in sorted(equivalence.items()):
         if len(members) < 2:
-            failures.append(f"prompt equivalence group {group} seed {seed} has fewer than two takes")
+            failures.append(f"prompt equivalence group {group} has fewer than two takes")
             continue
         if len({digest for _identity, digest in members}) != 1:
             failures.append(
-                f"prompt equivalence group {group} seed {seed} differs across "
+                f"prompt equivalence group {group} differs across "
                 + ", ".join(identity for identity, _digest in members)
             )
 

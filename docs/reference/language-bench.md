@@ -33,9 +33,10 @@ normalized characters. Design always receives the known target language explicit
 native-language speaker where the Qwen speaker contract provides one (Chinese `vivian`, Japanese
 `ono_anna`); the remaining languages use the contract's stable `aiden` fixture.
 
-The paired Custom pinned/Auto cells intentionally generate the same prompt with the same speaker,
-seed, and sampling policy. They prove that Auto resolves equivalently to the pinned hint; they are
-not independent audio samples. Likewise, the three sequential Speech recognitions prove that the
+The paired Custom pinned/Auto cells intentionally generate the same prompt with the same speaker
+and sampling policy; the shared resolved prompt digest proves that Auto resolves equivalently to the
+pinned hint. Since seed identity v2 (2026-09-25) the Auto cell draws its own seed, so its audio is an
+independent sample rather than a byte copy of the pinned take. Likewise, the three sequential Speech recognitions prove that the
 on-device recognizer reproduced one transcript for one WAV. They do not provide three statistically
 independent accuracy observations. The 18 positive output cells (plus the expected-fail negative
 control) remain strict per-cell multilingual smoke acceptance, not a population estimate of
@@ -160,13 +161,17 @@ Per cell the driver sets:
 
 Before the first launch, the driver atomically writes `language-run-plan.json` with one-based take
 indexes, child run IDs, cells, prompt-equivalence groups, seeds, and sampling variation. Normal
-quick/full matrices use one stable seed per mode/script language; pinned and Auto Custom cells for
-the same script intentionally share both prompt assembly and seed so the hint is the controlled
-variable. Their audio is therefore byte-identical on deterministic MLX, and publication checks it:
-every take publishes `output.fileDigest` (macOS from the engine's WAV digest since 2026-09-25, iOS
-from the sentinel), and a prompt-equivalence group whose members published different digests for
-one seed is refused (audit #86; the committed iOS records' eight groups replay identical). Making
-Auto an independent sample is a maintainer decision. The plan also freezes the corpus-owned Custom speaker and one shared Design delivery
+quick/full matrices use seed identity v2 (`seedPolicy: sha256-v2-mode-script-language-auto-63bit`;
+audit #86 part 2, the maintainer delegated the decision to the audit's recommendation on
+2026-09-25): a pinned cell keeps its v1 seed per mode/script language, and an Auto cell draws its own
+seed, so Auto is an independent sample. The pinned and Auto Custom cells of one script still share
+the resolved prompt assembly, and every gate (`check_language_hints.py`, `check_language_output.py`,
+the publisher) requires the members of a prompt-equivalence group to share that digest whatever
+their seeds: the prompt, not the audio, proves Auto resolution. Every take publishes
+`output.fileDigest` (macOS from the engine's WAV digest since 2026-09-25, iOS from the sentinel), and
+group members that share a seed (a diagnostic cohort's pinned and Auto takes at one explicit seed)
+must publish one digest (audit #86 part 1; the committed iOS records' eight groups replay
+identical). The iOS rerun that shows the Auto takes' own verdicts is the part-3 device run. The plan also freezes the corpus-owned Custom speaker and one shared Design delivery
 instruction; the shared Design fixture keeps language as the controlled variable and preserves one
 typed fixture identity for the model across the matrix.
 The diagnostic cohort is seed-major and evaluates exactly three cells across five fixed

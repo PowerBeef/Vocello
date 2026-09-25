@@ -107,11 +107,23 @@ def validate_seeds(cohort: dict[str, Any] | None) -> list[int | None]:
     return seeds
 
 
+# Seed identity v2 (audit #86 part 2; decided 2026-09-25 by the audit's
+# recommendation): an Auto cell draws its own seed, so its audio is an
+# independent sample instead of a byte copy of the pinned take. Auto resolution
+# stays proven by the resolved prompt digest, which the pinned and Auto takes of
+# one prompt-equivalence group must share (the prompt carries no seed). Pinned
+# cells keep their v1 seeds, so pinned takes stay comparable with earlier runs.
+LANGUAGE_SEED_POLICY = "sha256-v2-mode-script-language-auto-63bit"
+LEGACY_LANGUAGE_SEED_POLICY = "sha256-v1-mode-script-language-63bit"
+COHORT_SEED_POLICY = "explicit-cohort-v1"
+
+
 def stable_default_seed(cell: dict[str, Any]) -> int:
-    """One stable take per normal cell, paired for pinned/Auto comparisons."""
-    identity = (
-        f"language-bench-seed-v1|{cell.get('mode')}|{cell.get('scriptLang')}"
-    ).encode("utf-8")
+    """One stable take per normal cell; an Auto cell has its own (seed identity v2)."""
+    identity_text = f"language-bench-seed-v1|{cell.get('mode')}|{cell.get('scriptLang')}"
+    if cell.get("uiHint", "auto") == "auto":
+        identity_text = f"language-bench-seed-v2|{cell.get('mode')}|{cell.get('scriptLang')}|auto"
+    identity = identity_text.encode("utf-8")
     # Keep the generated UInt64 within signed-JSON interoperability range while
     # still retaining 63 deterministic bits of seed entropy.
     return int.from_bytes(hashlib.sha256(identity).digest()[:8], "big") & ((1 << 63) - 1)
@@ -236,8 +248,9 @@ def build_plan(
             raise EvidenceError(f"prompt equivalence group {group!r} has fewer than two cells")
 
     takes: list[dict[str, Any]] = []
-    # Seed-major ordering keeps pinned/Auto comparisons adjacent for the exact
-    # same RNG seed. This ordering is declared before any generation executes.
+    # A cohort is seed-major: pinned/Auto comparisons stay adjacent at the exact
+    # same explicit RNG seed. A normal plan seeds each cell by seed identity v2.
+    # This ordering is declared before any generation executes.
     take_pairs: list[tuple[int, int, dict[str, Any]]] = []
     if cohort is None:
         take_pairs = [
@@ -306,7 +319,7 @@ def build_plan(
         "corpusDigest": file_digest(corpus_path),
         "cohortID": cohort.get("id") if cohort is not None else None,
         "cohortDigest": file_digest(cohort_path) if cohort_path is not None else None,
-        "seedPolicy": "explicit-cohort-v1" if cohort is not None else "sha256-v1-mode-script-language-63bit",
+        "seedPolicy": COHORT_SEED_POLICY if cohort is not None else LANGUAGE_SEED_POLICY,
         "samplingVariation": "expressive",
         "promptEquivalenceGroups": selected_groups,
         "requireEveryTakePass": bool(cohort.get("requireEveryTakePass", True)) if cohort else True,
@@ -333,8 +346,7 @@ def validate_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:
     if plan.get("samplingVariation") != "expressive":
         raise EvidenceError("language run plan must use expressive sampling")
     expected_seed_policy = (
-        "explicit-cohort-v1" if kind == "diagnosticCohort"
-        else "sha256-v1-mode-script-language-63bit"
+        COHORT_SEED_POLICY if kind == "diagnosticCohort" else LANGUAGE_SEED_POLICY
     )
     if plan.get("seedPolicy") != expected_seed_policy:
         raise EvidenceError("language run plan has an invalid seed policy")

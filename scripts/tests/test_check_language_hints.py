@@ -44,7 +44,10 @@ def write_fixture(diag: str, run_id: str) -> None:
                     "benchRunID": run_id,
                     "benchCell": cell_id,
                     "languageHint": hint,
-                    "samplingSeed": str(stable_default_seed({"mode": mode, "scriptLang": script_lang})),
+                    "samplingSeed": str(stable_default_seed({
+                        "mode": mode, "scriptLang": script_lang,
+                        "uiHint": "auto" if cell_id.endswith("-auto") else hint,
+                    })),
                     "samplingVariation": "expressive",
                 },
                 "audioQC": {"verdict": "pass"},

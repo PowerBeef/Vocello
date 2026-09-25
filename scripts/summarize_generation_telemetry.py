@@ -377,8 +377,12 @@ def prosody_for_delivery(prosody_rows, mode, model_id, delivery):
     ]
     if not rows:
         return None
+    # `prosodyEffect` is the instructed take's absolute expressiveness (audit
+    # #9); only `pairedProsodyEffect` is the effect against the paired neutral.
+    # A sidecar written before the paired key existed shows no effect.
+    paired = [r["pairedProsodyEffect"] for r in rows if "pairedProsodyEffect" in r]
     return {
-        "effect": med(r["prosodyEffect"] for r in rows),
+        "effect": med(paired) if len(paired) == len(rows) else None,
         "dF0Std": med(r["dF0Std"] for r in rows),
         "dRateCV": med(r["dRateCV"] for r in rows),
         "dPauseRatio": med(r["dPauseRatio"] for r in rows),
@@ -1651,8 +1655,9 @@ def main():
             if has_prosody:
                 p = prosody_for_delivery(prosody_rows, mode, model_id, delivery)
                 if p:
+                    effect = "-" if p["effect"] is None else f"{p['effect']:+.2f}"
                     base += (
-                        f" {p['n']:>5} {p['effect']:>+8.2f} {p['dF0Std']:>+7.2f} "
+                        f" {p['n']:>5} {effect:>8} {p['dF0Std']:>+7.2f} "
                         f"{p['dRateCV']:>+8.3f} {p['dPauseRatio']:>+8.3f} {p['dRoughness']:>+7.3f}"
                     )
                 else:
@@ -1799,8 +1804,9 @@ def main():
     )
     if prosody_rows:
         print(
-            "Delivery prosody: prosEff = signed prosody-effect score vs paired neutral "
-            "(+F0 dynamics +rate variability -pauses +roughness). Requires `vocello bench --delivery`."
+            "Delivery prosody: prosEff = paired prosody effect (pairedProsodyEffect): the "
+            "weighted instructed-minus-neutral deltas (+F0 dynamics +rate variability -pauses "
+            "+roughness); '-' for a sidecar that predates it. Requires `vocello bench --delivery`."
         )
 
     if args.merged:

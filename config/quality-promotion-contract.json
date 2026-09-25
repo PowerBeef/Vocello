@@ -226,7 +226,7 @@
           "*#delivery-*"
         ],
         "metricKeys": [
-          "deliveryProsodyEffect"
+          "deliveryPairedProsodyEffect"
         ]
       }
     },
@@ -247,7 +247,7 @@
           "*#delivery-*"
         ],
         "metricKeys": [
-          "deliveryProsodyEffect"
+          "deliveryPairedProsodyEffect"
         ]
       }
     },

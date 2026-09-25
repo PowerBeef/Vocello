@@ -912,6 +912,20 @@ def test_mimi_decoder_breakdown_aggregation():
         assert md["totalMS"] == 8
 
 
+def test_delivery_prosody_effect_column_is_the_paired_effect():
+    """audit #9: the column labelled 'vs paired neutral' must never show the
+    legacy absolute prosodyEffect."""
+    row = {
+        "mode": "custom", "model": "m", "delivery": "happy.strong",
+        "prosodyEffect": 9.1, "pairedProsodyEffect": 0.4,
+        "dF0Std": 1.0, "dRateCV": 0.01, "dPauseRatio": -0.02, "dRoughness": 0.01,
+    }
+    summary = sgt.prosody_for_delivery([row, dict(row, pairedProsodyEffect=0.6)], "custom", "m", "happy.strong")
+    assert summary["effect"] == 0.5
+    legacy = {key: value for key, value in row.items() if key != "pairedProsodyEffect"}
+    assert sgt.prosody_for_delivery([legacy], "custom", "m", "happy.strong")["effect"] is None
+
+
 def load_tests(_loader, _tests, _pattern):
     """Expose function-style tests to the repository's unittest-only gate."""
     suite = unittest.TestSuite()

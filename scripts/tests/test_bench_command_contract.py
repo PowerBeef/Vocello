@@ -359,6 +359,37 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
         self.assertIn("f0_std_hz", gate["metrics"])
         self.assertEqual(len(analyzer.call_args_list), 2)
 
+    def test_paired_prosody_effect_uses_the_deltas_and_the_legacy_key_is_kept(self) -> None:
+        neutral = "custom_pro_custom_speed_medium_warm_0.wav"
+        delivery = "custom_pro_custom_speed_medium_warm_d-happy.strong_0.wav"
+        takes = [
+            self.take(1, "neutral-current", neutral, delivery=None),
+            self.take(2, "delivery-current", delivery, delivery="happy.strong"),
+        ]
+        self.write_manifest(takes)
+        self.write_engine_rows(takes)
+        with mock.patch.object(prosody, "analyze", side_effect=self.metrics):
+            row = prosody.analyze_run(self.diagnostics, self.manifest)[0]
+        # Deltas of the fixture pair: +10 Hz F0 std, +0.1 rate CV, -0.1 pause
+        # ratio, +0.05 roughness; with the built-in divisors (10, 0.1, 0.05,
+        # 0.05) each term contributes 1, 1, 2 and 1.
+        self.assertEqual(
+            (row["dF0Std"], row["dRateCV"], row["dPauseRatio"], row["dRoughness"]),
+            (10.0, 0.1, -0.1, 0.05),
+        )
+        self.assertEqual(row["pairedProsodyEffect"], 5.0)
+        # Exactly reproducible from the deltas the row (and a record) publishes.
+        self.assertEqual(
+            row["pairedProsodyEffect"],
+            round(prosody.prosody_effect({
+                "f0_std_hz": row["dF0Std"], "rate_cv": row["dRateCV"],
+                "pause_ratio": row["dPauseRatio"], "energy_roughness": row["dRoughness"],
+            }), 2),
+        )
+        # The legacy key keeps its historical meaning: the instructed take's
+        # absolute expressiveness (30/10 + 0.4/0.1 - 0.1/0.05 + 0.25/0.05).
+        self.assertEqual(row["prosodyEffect"], 10.0)
+
     def test_quality_gate_flags_ride_the_sidecar_row(self) -> None:
         neutral = "custom_pro_custom_speed_medium_warm_0.wav"
         delivery = "custom_pro_custom_speed_medium_warm_d-calm.normal_0.wav"

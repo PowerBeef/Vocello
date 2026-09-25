@@ -409,6 +409,16 @@ def analyze_run(
         neutral_metrics = analyze(neutral["path"])
         if "error" in instructed_metrics or "error" in neutral_metrics:
             raise ValueError(f"prosody analysis failed for current output {delivery['name']}")
+        deltas = {
+            "dF0Std": round(instructed_metrics["f0_std_hz"] - neutral_metrics["f0_std_hz"], 2),
+            "dRateCV": round(instructed_metrics["rate_cv"] - neutral_metrics["rate_cv"], 3),
+            "dPauseRatio": round(
+                instructed_metrics["pause_ratio"] - neutral_metrics["pause_ratio"], 3
+            ),
+            "dRoughness": round(
+                instructed_metrics["energy_roughness"] - neutral_metrics["energy_roughness"], 3
+            ),
+        }
         results.append(
             {
                 "runID": run_id,
@@ -434,12 +444,11 @@ def analyze_run(
                 "deliveryWav": delivery["name"],
                 "neutralWav": neutral["name"],
                 "durationSec": instructed_metrics["durationSec"],
-                "dF0Std": round(instructed_metrics["f0_std_hz"] - neutral_metrics["f0_std_hz"], 2),
-                "dRateCV": round(instructed_metrics["rate_cv"] - neutral_metrics["rate_cv"], 3),
-                "dPauseRatio": round(instructed_metrics["pause_ratio"] - neutral_metrics["pause_ratio"], 3),
-                "dRoughness": round(
-                    instructed_metrics["energy_roughness"] - neutral_metrics["energy_roughness"], 3
-                ),
+                **deltas,
+                # Legacy key, kept byte-compatible: this is the instructed
+                # take's ABSOLUTE expressiveness (the formula over its own
+                # metrics), published as deliveryProsodyEffect since the
+                # delivery bench began. It is not a paired effect (audit #9).
                 "prosodyEffect": round(
                     prosody_effect(
                         {
@@ -447,6 +456,22 @@ def analyze_run(
                             for key in ("f0_std_hz", "rate_cv", "pause_ratio", "energy_roughness")
                         },
                         profile,
+                    ),
+                    2,
+                ),
+                # The paired effect prosody_effect() is defined on: the same
+                # formula over the instructed-minus-neutral deltas above. It is
+                # computed from the rounded deltas this row publishes, so a
+                # record reproduces it exactly from its deliveryD* metrics.
+                "pairedProsodyEffect": round(
+                    prosody_effect(
+                        {
+                            "f0_std_hz": deltas["dF0Std"],
+                            "rate_cv": deltas["dRateCV"],
+                            "pause_ratio": deltas["dPauseRatio"],
+                            "energy_roughness": deltas["dRoughness"],
+                        },
+                        resolved_profile,
                     ),
                     2,
                 ),

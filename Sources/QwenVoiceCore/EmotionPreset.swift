@@ -517,15 +517,21 @@ public struct EmotionPreset: Identifiable, Sendable {
     // against a 0.250 chance floor: 1.11x chance, i.e. the model emits
     // essentially one acoustic output for all four.
     //
-    // The tempting fix -- rewrite the copy -- is ruled out by the same run.
-    // Mean prosodyEffect is uncorrelated with separability (dramatic 8.2,
-    // excited 8.9, happy 9.5, whole set 6.5-9.5), so these instructions were not
-    // under-driving; every preset moves prosody hard and they all move it along
-    // the same axis. That is the arousal axis saturating, which the research
-    // corpus reports as ~91% classifiable against ~55% for valence -- and
-    // valence is the only thing separating happy from excited. `dramatic` sat
-    // nearest to `neutral` (d=1.07, the smallest distance in the matrix): a
-    // large prosodic effect that is not legible as the thing it names.
+    // The tempting fix -- rewrite the copy -- is not supported by the same run.
+    // The "mean prosodyEffect" figures once cited here (dramatic 8.2, excited
+    // 8.9, happy 9.5, whole set 6.5-9.5) were each instructed take's absolute
+    // expressiveness, not an effect against its paired neutral (audit #9,
+    // 2026-09-25), so they say nothing about under-driving. The paired effect
+    // over the committed delivery records' deltas (published as
+    // deliveryPairedProsodyEffect since 2026-09-25) has medians of about +1.1
+    // for dramatic, +1.5 for excited and +0.3 for happy against -0.1 for
+    // neutral: the high-arousal presets do move prosody, and the separability
+    // result above shows they move it along the same axis. That is the arousal
+    // axis saturating, which the research corpus reports as ~91% classifiable
+    // against ~55% for valence -- and valence is the only thing separating
+    // happy from excited. `dramatic` sat nearest to `neutral` (d=1.07, the
+    // smallest distance in the matrix): a prosodic effect that is not legible
+    // as the thing it names.
     //
     // Do NOT reintroduce either preset on the strength of rewritten copy alone.
     // DP-3 (long vs short form), DP-4 (prosodic null), DP-5 (merge form), and

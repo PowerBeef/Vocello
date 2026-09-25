@@ -873,6 +873,7 @@ class PublisherTests(unittest.TestCase):
                 "dF0Std": 6.4,
                 "dRateCV": 0.03,
                 "prosodyEffect": 1.2,
+                "pairedProsodyEffect": 0.8,
             }
             if gate is not None:
                 row["qualityGate"] = gate
@@ -888,7 +889,9 @@ class PublisherTests(unittest.TestCase):
         # Paired deltas and adherence measurements are banked for calibration.
         self.assertEqual(clean[1][0]["metrics"]["deliveryDF0StdHz"], 6.4)
         self.assertEqual(clean[1][0]["metrics"]["deliveryDRateCV"], 0.03)
+        # The legacy key is published unchanged beside the paired effect.
         self.assertEqual(clean[1][0]["metrics"]["deliveryProsodyEffect"], 1.2)
+        self.assertEqual(clean[1][0]["metrics"]["deliveryPairedProsodyEffect"], 0.8)
         self.assertEqual(clean[1][0]["metrics"]["deliveryPitchShiftSemitones"], 0.9)
         self.assertEqual(clean[1][0]["metrics"]["deliveryArousalScore"], 1.7)
 

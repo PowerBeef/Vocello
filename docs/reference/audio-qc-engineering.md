@@ -673,7 +673,12 @@ pitch/cadence and transcript accuracy. [SpeechBERTScore evaluation](https://www.
 bounded v3 engine; `longform_carryover_probe.py` records that version. The standalone adherence
 bench was removed on 2026-09-12: `vocello bench --delivery` plus `bench_delivery_prosody.py` own
 paired adherence, and `prosody_profile.py` owns the prosody-effect and arousal weights.
-Legacy keys remain, including raw-voiced RMS/count measured during the shared anchor pass.
+Legacy keys remain, including raw-voiced RMS/count measured during the shared anchor pass, and the
+delivery records' `deliveryProsodyEffect`: on every record that carries it, it is the instructed
+take's absolute expressiveness (the prosody-effect formula over its own metrics), not an effect
+against the paired neutral. The paired effect, the same formula over the published `deliveryD*`
+deltas, is `deliveryPairedProsodyEffect` (records since 2026-09-25) and is what the quality
+promotion contract requires (audit #9).
 Histogram percentiles and the shared cadence definition are explicitly versioned changes, not
 byte-equivalent old scores. Original v1 reports and baseline source remain historical; the resource
 bundle retains before/after reports from `917856c3`. No full frame matrix remains in either caller.

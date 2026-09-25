@@ -847,6 +847,18 @@ class BenchmarkHistoryTests(unittest.TestCase):
             with self.subTest(count=count), self.assertRaises(history.HistoryError):
                 self.publish(candidate, candidate["run"]["id"])
 
+    def test_paired_prosody_effect_publishes_beside_the_legacy_key(self) -> None:
+        record = record_fixture(run_id="paired-prosody-fixture", kind="engine-generation")
+        record["takes"][0]["metrics"].update({
+            "deliveryDF0StdHz": 10.0, "deliveryDRateCV": 0.1,
+            "deliveryDPauseRatio": -0.1, "deliveryDRoughness": 0.05,
+            "deliveryProsodyEffect": 10.0, "deliveryPairedProsodyEffect": 5.0,
+        })
+        published = json.loads(self.publish(record, "paired-prosody").read_text())
+        metrics = published["takes"][0]["metrics"]
+        self.assertEqual(metrics["deliveryPairedProsodyEffect"], 5.0)
+        self.assertEqual(metrics["deliveryProsodyEffect"], 10.0)
+
     def test_sampled_peak_below_the_exact_mlx_peak_is_reported_not_fatal(self) -> None:
         record = record_fixture(
             run_id="peak-miss-fixture",

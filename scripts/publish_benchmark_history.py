@@ -943,7 +943,11 @@ def fold_delivery_prosody(
             "dRateCV": "deliveryDRateCV",
             "dPauseRatio": "deliveryDPauseRatio",
             "dRoughness": "deliveryDRoughness",
+            # Legacy key, never reinterpreted: the instructed take's absolute
+            # expressiveness, despite its name (audit #9).
             "prosodyEffect": "deliveryProsodyEffect",
+            # The paired effect over the deltas above (records since 2026-09-25).
+            "pairedProsodyEffect": "deliveryPairedProsodyEffect",
         }
         for source, target in paired_mapping.items():
             if (value := finite_number(matches[0].get(source))) is not None:

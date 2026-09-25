@@ -419,7 +419,11 @@ METRIC_KEYS = {
     "flatEnvelopeRoughnessThreshold", "flatRateCVThreshold",
     "maximumPauseThresholdSeconds", "maximumPauseRatioThreshold",
     "deliveryDF0StdHz", "deliveryDRateCV", "deliveryDPauseRatio",
-    "deliveryDRoughness", "deliveryProsodyEffect",
+    # deliveryProsodyEffect is the instructed take's ABSOLUTE expressiveness on
+    # every record that carries it (its name notwithstanding); the paired
+    # instructed-minus-neutral effect is deliveryPairedProsodyEffect, published
+    # beside it since 2026-09-25 (audit #9).
+    "deliveryDRoughness", "deliveryProsodyEffect", "deliveryPairedProsodyEffect",
     "deliveryPitchShiftSemitones", "deliveryArousalScore",
     # ui-perf (UI-7): per-scenario SwiftUI frame-health evidence from the
     # in-app display-link probe, joined by scripts/check_macos_ui_perf.py.

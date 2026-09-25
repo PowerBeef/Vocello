@@ -852,6 +852,22 @@ Useful flags:
 | `--run-id ID` | Reject rows from other benchmark runs. |
 | `--evidence-manifest PATH` | Select the manifest's exact ordered generations and cells. |
 
+**Between-run noise before the gate MAD changes (audit #106, 2026-09-25).** Three MADs of one
+run's five warm takes measure within-run noise; drift between runs of identical source is what a
+false regression is made of. Following the audit's recommendation (the maintainer delegated the
+decision), `scripts/estimate_between_run_noise.py` estimates it from committed records (`--records
+benchmarks/runs/engine-generation --label mac-gate-bench`) or a governed baseline's `seededRuns`
+(`--baseline benchmarks/baselines/mac-gate-bench.json`, which agree exactly): for every group of
+clean runs sharing the gate identity and one commit it reports each metric's run medians, their
+relative range and MAD beside the median within-run 3-MAD threshold, and replays the gate
+leave-one-run-out with the summarizer's own `pooled_cells` and `compare_summaries`, so a flagged
+metric is a false regression on identical source. It never edits a threshold; a gate-MAD change
+needs at least four identical-source runs on the canonical host (each left-out run then faces a
+pool of three, the gate's minimum). Replayed on the three M6 seed runs of the current baseline
+(848e140a): between-run RTF range 0.46 % against 3 within-run MADs of 0.20 %, physical footprint
+1.93 % against 0.69 %, `mlxPeakMB` 0.001 %; no false regression, because the floors (5 %, 30 %,
+2 %) dominate; three runs are not enough to change the rule.
+
 ### 6.2 Headline table columns
 
 | Column | Source | Notes |

@@ -2608,6 +2608,88 @@ class PublisherTests(unittest.TestCase):
             with self.assertRaisesRegex(publisher.PublicationError, "ordered matrix"):
                 publisher.memory_retention_evidence(results, reordered, "macos")
 
+    def test_retained_memory_v2_reports_mlx_growth_and_gates_only_once_calibrated(self) -> None:
+        policy = json.loads(publisher.MEMORY_POLICY_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(policy["retainedMemoryV2"]["calibration"]["macos"]["status"], "uncalibrated")
+        takes = []
+        index = 1
+        for mode in ("custom", "design", "clone"):
+            if mode != "clone":
+                takes.append({
+                    "takeIndex": index, "mode": mode, "cell": f"{mode}/speed/medium/cold#0",
+                    "variant": "speed", "length": "medium",
+                    "metrics": {"physicalFootprintEndMB": 3000.0, "mlxEndActiveMB": 1500.0},
+                })
+                index += 1
+            for repetition in range(3):
+                takes.append({
+                    "takeIndex": index, "mode": mode,
+                    "cell": f"{mode}/speed/medium/retained#{repetition}",
+                    "variant": "speed", "length": "medium",
+                    "metrics": {
+                        "physicalFootprintEndMB": 3000.0,
+                        # Clone keeps 30 MB more MLX memory after every take.
+                        "mlxEndActiveMB": 1800.0 + (30.0 * repetition if mode == "clone" else 0.0),
+                    },
+                })
+                index += 1
+        results = {"seed": 19790615, "memoryQualification": {"policyID": "retained-memory-v1"}}
+        policy_path = self.root / "memory-policy.json"
+
+        def evidence_with(mutate=None, platform: str = "macos", candidate_takes=takes):
+            candidate = copy.deepcopy(policy)
+            if mutate is not None:
+                mutate(candidate["retainedMemoryV2"])
+            policy_path.write_text(json.dumps(candidate), encoding="utf-8")
+            with mock.patch.object(publisher, "MEMORY_POLICY_PATH", policy_path):
+                return publisher.memory_retention_evidence(results, candidate_takes, platform)[0]
+
+        uncalibrated = evidence_with()["retainedMemoryV2"]
+        self.assertEqual(uncalibrated, {
+            "policyID": "retained-memory-v2",
+            "metric": "withinModeRetainedMLXActiveGrowth",
+            "calibration": "uncalibrated",
+            "growthByModeMB": {"custom": 0.0, "design": 0.0, "clone": 60.0},
+            "maximumRetainedGrowthMB": 60.0,
+        })
+
+        def calibrate(limit: float):
+            def apply(block: dict) -> None:
+                block["calibration"]["macos"] = {
+                    "status": "calibrated", "calibrationRunID": "mac-memory-calibration-fixture",
+                    "growthLimitMBByMode": {"custom": limit, "design": limit, "clone": limit},
+                }
+            return apply
+
+        calibrated = evidence_with(calibrate(64.0))["retainedMemoryV2"]
+        self.assertEqual(calibrated["calibration"], "calibrated")
+        self.assertTrue(calibrated["passed"])
+        with self.assertRaisesRegex(publisher.PublicationError, "exceeds its calibrated bound in: clone"):
+            evidence_with(calibrate(50.0))
+        # The iPhone entry stays uncalibrated whatever the Mac declares.
+        ios_takes = [take for take in takes if "/cold#" not in take["cell"]]
+        self.assertEqual(
+            evidence_with(calibrate(50.0), platform="ios", candidate_takes=ios_takes)
+            ["retainedMemoryV2"]["calibration"],
+            "uncalibrated",
+        )
+
+        drifts = {
+            "stages": lambda block: block.update({"endOfTakeStages": ["after_stream"]}),
+            "bound-while-uncalibrated": lambda block: block["calibration"]["macos"][
+                "growthLimitMBByMode"].update({"custom": 10.0}),
+            "calibrated-without-bounds": lambda block: block["calibration"]["macos"].update(
+                {"status": "calibrated", "calibrationRunID": "fixture"}
+            ),
+        }
+        for name, mutate in drifts.items():
+            with self.subTest(drift=name), self.assertRaises(publisher.PublicationError):
+                evidence_with(mutate)
+        missing = copy.deepcopy(takes)
+        missing[2]["metrics"].pop("mlxEndActiveMB")
+        with self.assertRaisesRegex(publisher.PublicationError, "end-of-take MLX evidence"):
+            evidence_with(candidate_takes=missing)
+
     def test_prosody_calibration_retains_aggregate_accuracy_and_thresholds(self) -> None:
         profile = self.root / "profile.json"
         thresholds = {

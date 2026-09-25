@@ -143,7 +143,7 @@ SECTION_KEYS = {
         "memoryContractVersion", "memoryQualified", "sampleSidecarCount",
         "sampleSidecarsDigest", "memoryPolicyID", "retentionMetric",
         "retentionThresholdFraction", "maximumRetainedGrowthMB",
-        "maximumRetainedGrowthFraction", "retentionPassed",
+        "maximumRetainedGrowthFraction", "retentionPassed", "retainedMemoryV2",
         "streamingTelemetryV9SidecarCount", "streamingTelemetryV9SidecarsDigest",
         "streamingTelemetryV9PublicationReadyCount",
     },
@@ -278,6 +278,7 @@ SCHEMA_REQUIRED_KEYS = {
         "sampleSidecarCount", "sampleSidecarsDigest",
         "memoryPolicyID", "retentionMetric", "retentionThresholdFraction",
         "maximumRetainedGrowthMB", "maximumRetainedGrowthFraction", "retentionPassed",
+        "retainedMemoryV2",
         "streamingTelemetryV9SidecarCount", "streamingTelemetryV9SidecarsDigest",
         "streamingTelemetryV9PublicationReadyCount",
     },
@@ -311,6 +312,7 @@ V2_ONLY_EVIDENCE_KEYS = {
     "memoryContractVersion", "memoryQualified", "sampleSidecarCount", "sampleSidecarsDigest",
     "memoryPolicyID", "retentionMetric", "retentionThresholdFraction",
     "maximumRetainedGrowthMB", "maximumRetainedGrowthFraction", "retentionPassed",
+    "retainedMemoryV2",
     "streamingTelemetryV9SidecarCount", "streamingTelemetryV9SidecarsDigest",
     "streamingTelemetryV9PublicationReadyCount",
 }
@@ -404,6 +406,10 @@ METRIC_KEYS = {
     # memory pressure (records since 2026-09-25; older records fold it into
     # the pressure level and the soft-trim warning).
     "policyCacheClearCount",
+    # retained-memory-v2 (records since 2026-09-25): MLX active and cache memory
+    # at the end of the take (after the routine post-generation cache clear,
+    # else after the stream).
+    "mlxEndActiveMB", "mlxEndCacheMB",
     # Memory contract v2 (records since 2026-09-25): the longest unobserved gap
     # in the process's one memory series, the sampled Metal peak's shortfall
     # against the exact MLX peak, and the kernel ledgers when the sampler read
@@ -1499,7 +1505,7 @@ def selected_evidence_digest(record: dict[str, Any]) -> str:
         for key in (
             "sampleSidecarsDigest", "memoryPolicyID", "retentionMetric",
             "retentionThresholdFraction", "maximumRetainedGrowthMB",
-            "maximumRetainedGrowthFraction", "retentionPassed",
+            "maximumRetainedGrowthFraction", "retentionPassed", "retainedMemoryV2",
         ):
             if key in evidence:
                 payload[key] = evidence[key]
@@ -1777,6 +1783,7 @@ def build_record(manifest_path: Path) -> dict[str, Any]:
         "memoryContractVersion", "memoryQualified", "sampleSidecarCount", "sampleSidecarsDigest",
         "memoryPolicyID", "retentionMetric", "retentionThresholdFraction",
         "maximumRetainedGrowthMB", "maximumRetainedGrowthFraction", "retentionPassed",
+        "retainedMemoryV2",
     ):
         if key not in evidence and key in outer:
             evidence[key] = outer[key]
@@ -2853,6 +2860,10 @@ def validate_record(
         expected_fraction = float(growth_mb) / (float(record["hardware"]["memoryBytes"]) / 1_048_576)
         if not math.isclose(float(observed), expected_fraction, rel_tol=1e-6, abs_tol=1e-9):
             raise HistoryError("memory qualification growth fraction does not match hardware RAM")
+        if "retainedMemoryV2" in evidence:
+            validate_retained_memory_v2(evidence["retainedMemoryV2"], takes)
+    elif "retainedMemoryV2" in evidence:
+        raise HistoryError("retainedMemoryV2 belongs only to a memory-qualification record")
     if evidence.get("rawTelemetryDigest") == "not-applicable":
         raise HistoryError(f"{kind} requires a selected-evidence digest")
     require_digest(evidence.get("selectedEvidenceDigest"), "evidence.selectedEvidenceDigest", allow_na=False)
@@ -2999,6 +3010,61 @@ def validate_all(
 
 def markdown_escape(value: Any) -> str:
     return str(value).replace("|", "\\|")
+
+
+RETAINED_MEMORY_V2_MODES = ("custom", "design", "clone")
+
+
+def validate_retained_memory_v2(block: Any, takes: list[dict[str, Any]]) -> None:
+    """retained-memory-v2 evidence must recompute from the takes' end-of-take MLX values."""
+    if not isinstance(block, dict):
+        raise HistoryError("retainedMemoryV2 must be an object")
+    calibration = block.get("calibration")
+    growth_by_mode = block.get("growthByModeMB")
+    if (
+        block.get("policyID") != "retained-memory-v2"
+        or block.get("metric") != "withinModeRetainedMLXActiveGrowth"
+        or calibration not in {"uncalibrated", "calibrated"}
+        or not isinstance(growth_by_mode, dict)
+        or set(growth_by_mode) != set(RETAINED_MEMORY_V2_MODES)
+    ):
+        raise HistoryError("retainedMemoryV2 identity is invalid")
+    for mode in RETAINED_MEMORY_V2_MODES:
+        ends = [
+            (take.get("metrics") or {}).get("mlxEndActiveMB")
+            for take in takes
+            if take.get("mode") == mode and "/retained#" in str(take.get("cell"))
+        ]
+        if len(ends) < 2 or not all(
+            isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+            for value in ends
+        ):
+            raise HistoryError(f"retainedMemoryV2 mode {mode} lacks end-of-take MLX values")
+        expected = max(0.0, max(float(value) for value in ends[1:]) - float(ends[0]))
+        if not math.isclose(float(growth_by_mode[mode]), expected, rel_tol=0, abs_tol=1e-6):
+            raise HistoryError(f"retainedMemoryV2 growth for {mode} does not match its takes")
+    if not math.isclose(
+        float(block.get("maximumRetainedGrowthMB", -1)), max(float(value) for value in growth_by_mode.values()),
+        rel_tol=0, abs_tol=1e-6,
+    ):
+        raise HistoryError("retainedMemoryV2 maximum does not match its modes")
+    limits = block.get("growthLimitMBByMode")
+    if calibration == "uncalibrated":
+        if limits is not None or "passed" in block:
+            raise HistoryError("an uncalibrated retainedMemoryV2 declares no bound and no verdict")
+        return
+    if (
+        not isinstance(limits, dict)
+        or set(limits) != set(RETAINED_MEMORY_V2_MODES)
+        or block.get("passed") is not True
+        or any(
+            not isinstance(limits[mode], (int, float)) or isinstance(limits[mode], bool)
+            or not float(limits[mode]) > 0
+            or float(growth_by_mode[mode]) > float(limits[mode])
+            for mode in RETAINED_MEMORY_V2_MODES
+        )
+    ):
+        raise HistoryError("a calibrated retainedMemoryV2 must pass every mode's bound")
 
 
 def validate_memory_contract_v2_take(metrics: dict[str, Any]) -> None:

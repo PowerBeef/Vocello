@@ -48,6 +48,7 @@ from lib.audio_qc import (  # noqa: E402
 from lib.audio_qc import history_record_schema_version as shared_record_schema_version  # noqa: E402
 
 from benchmark_memory import (  # noqa: E402
+    MLX_END_OF_TAKE_STAGES,
     MemoryEvidenceError,
     REQUIRED_TELEMETRY_SCHEMA,
     qualify_memory_rows,
@@ -1250,6 +1251,11 @@ def memory_retention_evidence(
             "memory qualification policy is missing: config/memory-qualification-policy.json"
         )
     policy = load_json(MEMORY_POLICY_PATH)
+    if not isinstance(policy, dict):
+        raise PublicationError("memory qualification policy must be an object")
+    # retained-memory-v2 is declared beside v1 and reported on the same run.
+    retained_v2_policy = policy.get(RETAINED_MEMORY_V2_KEY)
+    policy = {key: value for key, value in policy.items() if key != RETAINED_MEMORY_V2_KEY}
     required_policy = {
         "schemaVersion": 1,
         "policyID": "retained-memory-v1",
@@ -1323,14 +1329,103 @@ def memory_retention_evidence(
         raise PublicationError(
             f"retained-memory growth {growth_fraction:.3%} exceeds policy threshold {threshold:.3%}"
         )
-    return ({
+    evidence: dict[str, Any] = {
         "memoryPolicyID": policy["policyID"],
         "retentionMetric": policy["metric"],
         "retentionThresholdFraction": threshold,
         "maximumRetainedGrowthMB": maximum_growth_mb,
         "maximumRetainedGrowthFraction": growth_fraction,
         "retentionPassed": True,
-    }, digest_file(MEMORY_POLICY_PATH))
+    }
+    if retained_v2_policy is not None:
+        evidence[RETAINED_MEMORY_V2_KEY] = retained_memory_v2_evidence(
+            retained_v2_policy, policy, takes, platform
+        )
+    return evidence, digest_file(MEMORY_POLICY_PATH)
+
+
+RETAINED_MEMORY_V2_KEY = "retainedMemoryV2"
+RETAINED_MEMORY_V2_ID = "retained-memory-v2"
+RETAINED_MEMORY_V2_METRIC = "withinModeRetainedMLXActiveGrowth"
+
+
+def retained_memory_v2_limits(
+    declaration: Any, modes: list[str], platform: str
+) -> dict[str, float] | None:
+    """The per-mode MLX growth bounds for a platform; None while uncalibrated."""
+    if not isinstance(declaration, dict) or declaration.get("policyID") != RETAINED_MEMORY_V2_ID:
+        raise PublicationError("memory qualification policy has no valid retained-memory-v2 block")
+    if (
+        declaration.get("metric") != RETAINED_MEMORY_V2_METRIC
+        or declaration.get("endOfTakeStages") != list(MLX_END_OF_TAKE_STAGES)
+    ):
+        raise PublicationError("retained-memory-v2 metric or end-of-take stages drifted")
+    calibration = declaration.get("calibration")
+    entry = calibration.get(platform) if isinstance(calibration, dict) else None
+    if not isinstance(entry, dict) or not isinstance(entry.get("growthLimitMBByMode"), dict):
+        raise PublicationError(f"retained-memory-v2 has no {platform} calibration entry")
+    limits = entry["growthLimitMBByMode"]
+    if set(limits) != set(modes):
+        raise PublicationError("retained-memory-v2 limits do not name exactly the policy modes")
+    status = entry.get("status")
+    if status == "uncalibrated":
+        if any(value is not None for value in limits.values()) or entry.get("calibrationRunID") is not None:
+            raise PublicationError("an uncalibrated retained-memory-v2 entry declares a bound")
+        return None
+    if status != "calibrated" or not isinstance(entry.get("calibrationRunID"), str):
+        raise PublicationError("retained-memory-v2 calibration status is invalid")
+    bounds = {mode: finite_number(limits[mode]) for mode in modes}
+    if any(value is None or value <= 0 for value in bounds.values()):
+        raise PublicationError("a calibrated retained-memory-v2 entry needs a positive bound per mode")
+    return {mode: float(value) for mode, value in bounds.items() if value is not None}
+
+
+def retained_memory_v2_evidence(
+    declaration: Any,
+    policy: dict[str, Any],
+    takes: list[dict[str, Any]],
+    platform: str,
+) -> dict[str, Any]:
+    """Within-mode MLX active growth after each retained take (audit #25/#26).
+
+    retained-memory-v1 compares the physical footprint at the end of each
+    retained take against 5% of RAM: leaks under about 205 MB per take pass on
+    the Mac, and on a tier without the post-generation clear the value also
+    holds the MLX cache. v2 reads the MLX active memory at the end of each take
+    (after the clear when the tier runs one), which excludes the cache, and
+    gates each mode's growth only against a bound calibrated from a consented
+    run; until then it is reported as uncalibrated and gates nothing.
+    """
+    modes = list(policy["modes"])
+    limits = retained_memory_v2_limits(declaration, modes, platform)
+    growth_by_mode: dict[str, float] = {}
+    for mode in modes:
+        ends = [
+            finite_number((take.get("metrics") or {}).get("mlxEndActiveMB"))
+            for take in takes
+            if take.get("mode") == mode and "/retained#" in str(take.get("cell"))
+        ]
+        if len(ends) != policy["repetitionsPerMode"] or any(value is None for value in ends):
+            raise PublicationError(
+                f"memory qualification mode {mode} lacks end-of-take MLX evidence for retained-memory-v2"
+            )
+        growth_by_mode[mode] = max(0.0, max(float(value) for value in ends[1:]) - float(ends[0]))
+    evidence: dict[str, Any] = {
+        "policyID": RETAINED_MEMORY_V2_ID,
+        "metric": RETAINED_MEMORY_V2_METRIC,
+        "calibration": "uncalibrated" if limits is None else "calibrated",
+        "growthByModeMB": growth_by_mode,
+        "maximumRetainedGrowthMB": max(growth_by_mode.values()),
+    }
+    if limits is not None:
+        exceeded = sorted(mode for mode in modes if growth_by_mode[mode] > limits[mode])
+        if exceeded:
+            raise PublicationError(
+                "retained-memory-v2 MLX growth exceeds its calibrated bound in: " + ", ".join(exceeded)
+            )
+        evidence["growthLimitMBByMode"] = limits
+        evidence["passed"] = True
+    return evidence
 
 
 def minimal_take(index: int, cell: str, row: dict[str, Any]) -> dict[str, Any]:

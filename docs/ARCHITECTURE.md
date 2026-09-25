@@ -1075,7 +1075,9 @@ from a literal.
 
 Retained-memory qualification is separate from Instruments profiling. The versioned
 `retained-memory-v1` policy runs fixed Custom→Design→Clone Speed/medium sequences and limits
-within-mode first-to-last retained-take physical-footprint growth to 5% of physical RAM. Successful lanes
+within-mode first-to-last retained-take physical-footprint growth to 5% of physical RAM; the same run
+reports `retained-memory-v2`, within-mode growth of the end-of-take MLX active memory, which gates only
+once a consented run calibrates its per-mode bounds. Successful lanes
 publish `memory-qualification`; `profile --kind memory` records exact-PID CPU Profiler,
 Allocations, VM Tracker, and signposts. iOS MetricKit daily aggregates are bounded, local-only field
 diagnostics and are never attributed to a benchmark take.

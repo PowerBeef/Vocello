@@ -371,13 +371,18 @@ class PublisherRoundTripTests(unittest.TestCase):
         cells = [(f"take-{index}", cell) for index, cell in enumerate(cells, start=1)]
         self.assertEqual(len(cells), 11)
         # The memory lane runs seeded, and the engine stamps its own receipt on
-        # every row; a take is published as seeded only when they agree.
-        self.v8_engine_rows(
-            diagnostics, run_id, cells, ios=False,
-            mutate=lambda row: row["notes"].update(
-                {"samplingSeed": "19790615", "samplingSeedSource": "requested"}
-            ),
-        )
+        # every row; a take is published as seeded only when they agree. Each
+        # row also carries the engine's per-stage MLX map, whose post-trim
+        # snapshot retained-memory-v2 reads.
+        def seeded_with_mlx_stages(row: dict) -> None:
+            row["notes"].update({"samplingSeed": "19790615", "samplingSeedSource": "requested"})
+            take = int(str(row["generationID"]).rsplit("-", 1)[-1])
+            row["mlxMemoryByStage"] = {
+                "after_stream": {"activeMB": 1900.0 + take, "cacheMB": 300.0, "peakMB": 2200.0},
+                "after_generation_trim": {"activeMB": 1800.0 + take, "cacheMB": 0.0, "peakMB": 2200.0},
+            }
+
+        self.v8_engine_rows(diagnostics, run_id, cells, ios=False, mutate=seeded_with_mlx_stages)
         results = self.bench_results(
             diagnostics / "bench-results.json", run_id, cells, outputs,
             seed=19_790_615,
@@ -398,6 +403,30 @@ class PublisherRoundTripTests(unittest.TestCase):
         record, _size = publish_through_registry(manifest)
         self.assertEqual(record["run"]["kind"], "memory-qualification")
         self.assertTrue(record["evidence"]["retentionPassed"])
+        # retained-memory-v2 reports beside v1 from the post-trim MLX snapshot:
+        # each mode's three retained takes grow by 2 MB (take-N adds N MB).
+        retained_v2 = record["evidence"]["retainedMemoryV2"]
+        self.assertEqual(retained_v2["calibration"], "uncalibrated")
+        self.assertEqual(retained_v2["growthByModeMB"], {"custom": 2.0, "design": 2.0, "clone": 2.0})
+        self.assertNotIn("growthLimitMBByMode", retained_v2)
+        self.assertEqual(record["takes"][1]["metrics"]["mlxEndActiveMB"], 1802.0)
+        self.assertEqual(record["takes"][1]["metrics"]["mlxEndCacheMB"], 0.0)
+        # The registry recomputes the block from the takes and holds a
+        # calibrated block to its bounds.
+        tampered = copy.deepcopy(retained_v2)
+        tampered["growthByModeMB"]["clone"] = 0.0
+        exceeded = {
+            **retained_v2, "calibration": "calibrated", "passed": True,
+            "growthLimitMBByMode": {"custom": 1.0, "design": 1.0, "clone": 1.0},
+        }
+        undeclared_bound = {**retained_v2, "growthLimitMBByMode": {"custom": 9.0}}
+        for block in (tampered, exceeded, undeclared_bound):
+            with self.assertRaises(history.HistoryError):
+                history.validate_retained_memory_v2(block, record["takes"])
+        history.validate_retained_memory_v2(
+            {**exceeded, "growthLimitMBByMode": {"custom": 4.0, "design": 4.0, "clone": 4.0}},
+            record["takes"],
+        )
 
     def test_macos_engine_manifest_publishes(self) -> None:
         run_id = "macos-engine-roundtrip-20260920"

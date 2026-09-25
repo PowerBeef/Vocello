@@ -218,6 +218,18 @@ class ProfileCaptureContractTests(unittest.TestCase):
         self.assertEqual(policy["seed"], 19790615)
         self.assertEqual(policy["retentionThresholdFractionOfPhysicalMemory"], 0.05)
         self.assertEqual(policy["expectedTakeCounts"], {"macos": 11, "ios": 9})
+        # retained-memory-v2 rides the same run matrix under its own ID and has
+        # no bound until a consented run calibrates one (audit #25/#26).
+        retained_v2 = policy["retainedMemoryV2"]
+        self.assertEqual(retained_v2["policyID"], "retained-memory-v2")
+        for platform in ("macos", "ios"):
+            entry = retained_v2["calibration"][platform]
+            if entry["status"] == "uncalibrated":
+                self.assertIsNone(entry["calibrationRunID"])
+                self.assertEqual(set(entry["growthLimitMBByMode"].values()), {None})
+            else:
+                self.assertEqual(entry["status"], "calibrated")
+                self.assertIsInstance(entry["calibrationRunID"], str)
 
     def test_ios_memory_wait_terminates_on_bounded_failure_marker(self) -> None:
         ios = (REPO / "scripts" / "ios_device.sh").read_text(encoding="utf-8")

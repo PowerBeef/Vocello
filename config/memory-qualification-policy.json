@@ -15,5 +15,35 @@
   "expectedTakeCounts": {
     "macos": 11,
     "ios": 9
+  },
+  "retainedMemoryV2": {
+    "policyID": "retained-memory-v2",
+    "metric": "withinModeRetainedMLXActiveGrowth",
+    "description": "Reported beside retained-memory-v1 on the same run matrix. Each retained take publishes the MLX active and cache memory at its end (the snapshot after the routine post-generation cache clear, or after the stream on a tier that runs none) and the graphics-tagged footprint ledger at its end. Growth within a mode is the highest later retained take's MLX active memory minus the first's. It gates only once calibrated: until then every growthLimitMB is null and the record says uncalibrated.",
+    "endOfTakeStages": [
+      "after_generation_trim",
+      "after_stream"
+    ],
+    "calibration": {
+      "requirement": "One consented memory-qualification run per platform on its canonical host sets each mode's bound from that run's within-mode MLX growth noise; a maintainer records it here with the run ID.",
+      "macos": {
+        "status": "uncalibrated",
+        "calibrationRunID": null,
+        "growthLimitMBByMode": {
+          "custom": null,
+          "design": null,
+          "clone": null
+        }
+      },
+      "ios": {
+        "status": "uncalibrated",
+        "calibrationRunID": null,
+        "growthLimitMBByMode": {
+          "custom": null,
+          "design": null,
+          "clone": null
+        }
+      }
+    }
   }
 }

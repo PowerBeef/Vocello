@@ -340,7 +340,9 @@ It runs the policy-owned Custom→Design→Clone Speed/medium sequence with thre
 `retained#0...2` takes per mode (plus the CLI's genuine Custom/Design cold takes) in one process.
 Those retained takes still report their actual engine warm state. Policy
 `retained-memory-v1` compares the first and last completed retained-take footprint within each mode;
-the maximum positive growth must stay at or below 5% of physical RAM. Intended cross-mode model
+the maximum positive growth must stay at or below 5% of physical RAM. `retained-memory-v2` (MLX
+active growth at the end of each take) is reported beside it and stays uncalibrated, gating nothing,
+until a consented run sets its bounds (`telemetry-and-benchmarking.md`). Intended cross-mode model
 residency is diagnostic and is not mislabeled as a leak. A PASS creates a
 `memory-qualification` record; a generation, memory, QC, or retention failure leaves only local
 artifacts.

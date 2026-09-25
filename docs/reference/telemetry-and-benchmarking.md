@@ -501,6 +501,17 @@ diagnostic unless a future runner proves an explicit full unload. These PASS-onl
 `memory-qualification` kind; `profile --kind memory` remains the distinct Allocations + VM Tracker
 Instruments lane.
 
+Since 2026-09-25 the same run also reports policy `retained-memory-v2`
+(`config/memory-qualification-policy.json` `retainedMemoryV2`; `evidence.retainedMemoryV2` on the
+record). v1 lets a leak of up to about 205 MB per take pass on the Mac (307 MB on the iPhone), and on
+a tier without the post-generation cache clear its end value includes the MLX cache. Each take now
+publishes `mlxEndActiveMB`/`mlxEndCacheMB` from the MLX snapshot after that clear (else after the
+stream) and, when sampled, `graphicsFootprintEndMB`; v2's metric is each mode's growth of
+`mlxEndActiveMB` from the first retained take to the highest later one. It gates per mode only
+against a bound calibrated from a consented memory run on the platform's canonical host. Until a
+maintainer records that bound and its run ID, both platforms are `uncalibrated`: the record reports
+the growth with no bound and no verdict, and v1 alone decides publication.
+
 On iOS, MetricKit's delayed daily aggregate is a complementary field signal. The app persists only
 a bounded privacy-reduced memory/exit summary; raw payload JSON, call stacks, identifiers, and paths
 are not retained for this purpose. After an explicit device pull,

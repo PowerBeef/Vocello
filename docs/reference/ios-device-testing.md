@@ -731,7 +731,9 @@ One persistent app/engine process executes three medium Speed takes for Custom, 
 Clone (nine total). The terminal sentinel is written only after all output/QC/telemetry proofs pass.
 Policy `retained-memory-v1` compares first-to-last retained-take footprint growth within each mode and allows
 at most 5% of physical RAM; cross-mode residency is diagnostic because different models are
-intentionally loaded. A PASS creates `memory-qualification`, while any generation, memory,
+intentionally loaded. `retained-memory-v2` (MLX active growth at the end of each take) is reported
+beside it and gates nothing until a consented run calibrates it. A PASS creates
+`memory-qualification`, while any generation, memory,
 retention, output, or crash failure leaves tracked history unchanged.
 
 ### Clone-conditioning semantic acceptance

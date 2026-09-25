@@ -44,6 +44,9 @@ KERNEL_LEDGER_TOLERANCE_MB = 1.0
 # the graphics-tagged footprint.
 KERNEL_PEAK_SAMPLE_KEY = "kernelPhysFootprintPeakMB"
 GRAPHICS_SAMPLE_KEY = "graphicsFootprintMB"
+# The end-of-take MLX snapshot (retained-memory-v2), in order of preference:
+# after the routine post-generation cache clear, else after the stream.
+MLX_END_OF_TAKE_STAGES = ("after_generation_trim", "after_stream")
 # The iPhone memory bands, declared once for the app's shipping budget policy
 # and this publication gate (audit V-4; a Swift test pins the Swift side).
 IOS_MEMORY_BUDGET_POLICY_PATH = (
@@ -913,6 +916,8 @@ def _validate_layer(
             raise MemoryEvidenceError(
                 f"generation {generation_id}: MLX stage count/names are inconsistent"
             )
+        if (end_of_take := _mlx_end_of_take(row, generation_id)) is not None:
+            metrics["mlxEndActiveMB"], metrics["mlxEndCacheMB"] = end_of_take
     if platform == "ios":
         budget = [used + available for used, available in zip(footprint, headroom, strict=True)]
         utilization = [used / total if total > 0 else 0.0 for used, total in zip(footprint, budget, strict=True)]
@@ -930,6 +935,27 @@ def _validate_layer(
     )
 
 
+
+
+def _mlx_end_of_take(row: dict[str, Any], generation_id: str) -> tuple[float, float] | None:
+    """MLX active and cache memory at the end of a take (retained-memory-v2).
+
+    The snapshot after the routine post-generation cache clear when the tier
+    runs one, otherwise the one after the stream; None when the row has
+    neither (older or failed rows).
+    """
+    stages = row.get("mlxMemoryByStage")
+    if not isinstance(stages, dict):
+        return None
+    for stage in MLX_END_OF_TAKE_STAGES:
+        snapshot = stages.get(stage)
+        if isinstance(snapshot, dict):
+            location = f"{generation_id}.mlxMemoryByStage.{stage}"
+            return (
+                _finite(snapshot.get("activeMB"), f"{location}.activeMB"),
+                _finite(snapshot.get("cacheMB"), f"{location}.cacheMB"),
+            )
+    return None
 
 
 def _maximum_gap_ms(uptimes: Iterable[int]) -> float:
@@ -1122,6 +1148,9 @@ def qualify_take_memory(
             "mlxActivePeakMB": engine.metrics["mlxActivePeakMB"],
             "mlxCachePeakMB": engine.metrics["mlxCachePeakMB"],
         })
+        for key in ("mlxEndActiveMB", "mlxEndCacheMB"):
+            if key in engine.metrics:
+                metrics[key] = engine.metrics[key]
 
     target_ms = float(metrics["samplerTargetIntervalMS"])
     gap_ms = float(metrics["samplerMaximumUnobservedGapMS"])

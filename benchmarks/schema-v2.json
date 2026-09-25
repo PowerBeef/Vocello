@@ -354,6 +354,45 @@
         "retentionPassed": {
           "const": true
         },
+        "retainedMemoryV2": {
+          "additionalProperties": false,
+          "description": "retained-memory-v2, reported beside retained-memory-v1 on memory-qualification records since 2026-09-25: within-mode growth of the MLX active memory at the end of each retained take. It gates only once calibrated: an uncalibrated block carries no bound and no verdict.",
+          "properties": {
+            "policyID": {
+              "const": "retained-memory-v2"
+            },
+            "metric": {
+              "const": "withinModeRetainedMLXActiveGrowth"
+            },
+            "calibration": {
+              "enum": [
+                "uncalibrated",
+                "calibrated"
+              ]
+            },
+            "growthByModeMB": {
+              "type": "object"
+            },
+            "maximumRetainedGrowthMB": {
+              "minimum": 0,
+              "type": "number"
+            },
+            "growthLimitMBByMode": {
+              "type": "object"
+            },
+            "passed": {
+              "const": true
+            }
+          },
+          "required": [
+            "policyID",
+            "metric",
+            "calibration",
+            "growthByModeMB",
+            "maximumRetainedGrowthMB"
+          ],
+          "type": "object"
+        },
         "streamingTelemetryV9SidecarCount": {
           "minimum": 0,
           "type": "integer"

@@ -19,7 +19,9 @@ import os
 /// benchmark's current-take identity (`BenchRunContext`: the macOS runner
 /// rewrites it before each take). Rows stamp `samplingSeedPolicy`, and the
 /// lane checkers recompute each take's seed from its cell, so a take that ran
-/// under another seed fails validation.
+/// under another seed fails validation. Only while this gated knob is on does
+/// the benchmark's take identity (`QVOICE_MAC_BENCH_CELL` and the current-take
+/// file, otherwise observability-only) select output: the seed.
 public enum BenchSeedPolicy {
     public static let policyEnvironmentKey = "QWENVOICE_BENCH_SEED_POLICY"
     public static let cellScheduleEnvironmentKey = "QWENVOICE_BENCH_SEED_CELLS"
@@ -42,7 +44,10 @@ public enum BenchSeedPolicy {
     /// The active policy name, or nil when the knob is absent, unknown or not
     /// honoured by this build.
     public static var activePolicy: String? {
-        policy(environment: ProcessInfo.processInfo.environment)
+        // A distributed build never reads the knob, so it never copies the
+        // process environment for it on the generation path either.
+        guard RuntimeDebugGate.internalDiagnosticsAvailable else { return nil }
+        return policy(environment: ProcessInfo.processInfo.environment)
     }
 
     static func policy(
@@ -78,6 +83,7 @@ public enum BenchSeedPolicy {
     /// policy seed replaces any requested seed: a benchmark take measures its
     /// cell, never a draft's pinned seed.
     public static func applying(to request: GenerationRequest) -> GenerationRequest {
+        guard RuntimeDebugGate.internalDiagnosticsAvailable else { return request }
         let environment = ProcessInfo.processInfo.environment
         guard policy(environment: environment) != nil else { return request }
         let cell: String?

@@ -198,23 +198,33 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
     /// typing it a key at a time (audit #31: about 1,450 keystrokes a run), and
     /// leaves a script that already matches alone. Both happen before the take's
     /// submit, outside every measured window. The general pasteboard's previous
-    /// text is put back once the paste has landed.
+    /// items, every type of each, are put back once the paste has landed.
     private func pasteScript(_ text: String) {
         let editor = element("textInput_textEditor")
         if (editor.value as? String) != text {
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: editor, timeout: 20))
             let pasteboard = NSPasteboard.general
-            let previous = pasteboard.string(forType: .string)
+            let saved: [NSPasteboardItem] = (pasteboard.pasteboardItems ?? []).map { item in
+                let copy = NSPasteboardItem()
+                for type in item.types {
+                    if let data = item.data(forType: type) {
+                        copy.setData(data, forType: type)
+                    }
+                }
+                return copy
+            }
+            defer {
+                pasteboard.clearContents()
+                if !saved.isEmpty {
+                    pasteboard.writeObjects(saved)
+                }
+            }
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
             editor.typeKey("a", modifierFlags: .command)
             editor.typeKey("v", modifierFlags: .command)
             _ = VocelloUIWait.settles("pasted script to land", timeout: 10) {
                 editor.value as? String == text
-            }
-            pasteboard.clearContents()
-            if let previous {
-                pasteboard.setString(previous, forType: .string)
             }
         }
         XCTAssertTrue(VocelloUIWait.condition("script to match entered text", timeout: 10) {

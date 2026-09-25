@@ -179,6 +179,21 @@ jobs:
       - name: Validate the bundled iOS model catalog
         run: ./scripts/check_ios_catalog.sh
 
+      # release.yml's archive-ios uploads with `xcrun altool --upload-app ... -t ios
+      # --apiKey --apiIssuer`; confirm the pinned Xcode still ships that command and
+      # those options, without credentials (PA-05).
+      - name: Confirm the pinned Xcode supports the TestFlight upload command
+        run: |
+          set -euo pipefail
+          help="$(xcrun altool --help 2>&1 || true)"
+          for option in --upload-app --apiKey --apiIssuer; do
+            if ! grep -q -- "$option" <<<"$help"; then
+              echo "::error::xcrun altool in the pinned Xcode does not list $option (release.yml TestFlight upload)"
+              exit 1
+            fi
+          done
+          echo "altool supports --upload-app with API-key authentication: $(xcrun altool --version 2>&1 | tail -1)"
+
   report:
     name: Open or refresh the rehearsal issue
     needs: [macos-package, ios-release-prerequisites]

@@ -370,8 +370,10 @@ def build_manifest(
     app_rows: list[dict],
     *,
     optimization: str,
+    memory_qualification: tuple | None = None,
 ) -> dict:
-    memory_evidence, memory_run = qualify_memory_rows(
+    # The gate already qualified these rows; reuse its result (audit #21).
+    memory_evidence, memory_run = memory_qualification or qualify_memory_rows(
         rows=engine_rows,
         diagnostics=diagnostics,
         platform="ios",
@@ -769,9 +771,10 @@ def main() -> int:
             continue
         failures.extend(validate_v7_frontend(row))
 
+    memory_qualification = None
     if not failures:
         try:
-            qualify_memory_rows(
+            memory_qualification = qualify_memory_rows(
                 rows=engine_rows,
                 diagnostics=args.diagnostics,
                 platform="ios",
@@ -803,6 +806,7 @@ def main() -> int:
             engine_rows,
             app_rows,
             optimization=optimization,
+            memory_qualification=memory_qualification,
         )
         write_json_atomic(args.evidence_manifest, manifest)
         print(f"evidence={args.evidence_manifest}")

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "policyID": "macos-ui-stall-gate-provisional-250ms",
+  "statistic": "maximumDelayedHeartbeatMS",
+  "maximumAllowed": 250,
+  "definition": "No main-thread heartbeat in any gated take of the macOS UI benchmark is delayed more than maximumAllowed milliseconds. The statistic is each take's maximumDelayedHeartbeatMS from MainThreadStallWatchdog (a 100 ms heartbeat, so a stall of D ms reads between D-100 and D), including the censored lower bound of any heartbeat still queued when the take ended (frontend heartbeatDelayDefinition completedAndCensoredPending). Gated takes are those scripts/check_macos_ui_bench.py stall_gate_applies selects: the floor tier always, every other Mac tier when it is the host's native tier.",
+  "calibrationProfile": "mac-mini-m6-16gb",
+  "calibrationStatus": "provisional",
+  "calibrationRuns": [],
+  "basis": "Maintainer decision 2026-09-25 (benchmark and telemetry audit #6). Replaces the zero-tolerance delayedHeartbeatCount50 gate, which 419 of 464 canonical M2 takes (90.3%) would have failed, with Apple's 250 ms hang threshold. The limit is provisional (uncalibrated) until one exploratory scripts/ui_test.sh macos benchmark on mac-mini-m6-16gb records the per-take distribution the checker prints; the statistic and limit are then re-declared here with calibrationStatus calibrated and that run in calibrationRuns."
+}

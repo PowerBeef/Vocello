@@ -1201,19 +1201,26 @@ validate_macos_ui_perf() {
 validate_macos_benchmark() {
   local diagnostics="$HOME/Library/Application Support/QwenVoice-Debug/diagnostics"
   local evidence="$out/benchmark-evidence.json"
-  local status=1
-  for _ in {1..60}; do
-    if python3 "$ROOT_DIR/scripts/check_macos_ui_bench.py" "$diagnostics" \
+  local status deadline=$((SECONDS + 10))
+  # The engine runs in the app, which has exited before validation, so the
+  # rows are final: validate once. Only the checker's distinct "rows not yet
+  # present" outcome (75) is retried, for about ten seconds (audit #21). The
+  # stall gate reads config/macos-ui-stall-gate.json, and every take must have
+  # run the Speed variant (audit #6, #17).
+  while :; do
+    status=0
+    python3 "$ROOT_DIR/scripts/check_macos_ui_bench.py" "$diagnostics" \
         --run-id "$run_id" --modes "$modes" --lengths "$lengths" --warm "$warm" \
         --label "${label:-$run_id}" --evidence-manifest "$evidence" \
         --build-provenance "$out/last-build.json" \
         --crash-delta-passed \
+        --stall-contract "$ROOT_DIR/config/macos-ui-stall-gate.json" \
+        --variant speed \
         --playback-capture-dir "$out/playback-capture" \
         --outputs-dir "$HOME/Library/Application Support/QwenVoice-Debug/outputs" \
-        >"$out/benchmark-gate.txt" 2>&1; then
-      status=0
-      break
-    fi
+        >"$out/benchmark-gate.txt" 2>&1 || status=$?
+    (( status == 75 && SECONDS < deadline )) || break
+    note "benchmark rows not yet present; validating again"
     sleep 1
   done
   cat "$out/benchmark-gate.txt" >&2
@@ -1514,6 +1521,13 @@ WAV
   fi
   ensure_mac_runner_signature
   [[ "$lane" != "benchmark" && "$lane" != "smoke" ]] || prepare_runner_for_playback_capture
+  if [[ "$lane" == "benchmark" || "$lane" == "perf" ]]; then
+    # The preflight ran before build-for-testing; let the build's own load
+    # settle before the first measured take, and re-apply the quiet-host rule
+    # (audit #28, V-8).
+    settle_host_load "ui-$platform-$lane" 90 \
+      || die "$platform $lane needs a quiet host after the build (load within 2x cores, no memory pressure)"
+  fi
   arm_mac_crash_marker
   required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test-without-building \
     -project "$PROJECT" -scheme VocelloMacUI -configuration Release \

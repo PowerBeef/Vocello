@@ -506,6 +506,7 @@
           "scripts/ui_test.sh",
           "config/quality-promotion-contract.json",
           "config/memory-qualification-policy.json",
+          "config/macos-ui-stall-gate.json",
           "config/ui-perf-thresholds*.json"
         ],
         "requiredEvidence": [

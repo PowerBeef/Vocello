@@ -3,13 +3,16 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import io
 import json
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -184,7 +187,10 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         malformed_layer: str | None = None,
         evidence: bool = False,
         extra_args: list[str] | None = None,
+        in_process=None,
     ) -> subprocess.CompletedProcess[str]:
+        """Run the checker on a fixture; `in_process` is the imported checker
+        module to call directly (so a test can observe it) instead of a subprocess."""
         self.last_manifest = None
         with tempfile.TemporaryDirectory() as temp:
             diagnostics = Path(temp)
@@ -271,12 +277,18 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
                     "fixture",
                 ])
             command.extend(extra_args or [])
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
+            if in_process is not None:
+                output = io.StringIO()
+                with mock.patch.object(sys, "argv", command[1:]), contextlib.redirect_stdout(output):
+                    status = in_process.main()
+                result = subprocess.CompletedProcess(command, status, output.getvalue(), "")
+            else:
+                result = subprocess.run(
+                    command,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
             if manifest_path.is_file():
                 self.last_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             return result
@@ -399,7 +411,10 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.last_manifest["historyRecord"]["hardware"]["profileID"], canonical[0])
 
-    def run_with_stalls(self, device_class: str | None, *, forced: bool = False, stalls: int = 2):
+    def run_with_stalls(
+        self, device_class: str | None, *, forced: bool = False, stalls: int = 2,
+        maximum_ms: int = 300, extra_args: list[str] | None = None, evidence: bool = False,
+    ):
         def set_device_class(rows: list[dict]) -> None:
             for row in rows:
                 if device_class is not None:
@@ -407,31 +422,164 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
                 row["notes"]["deviceClassForced"] = "true" if forced else "false"
 
         def add_stalls(layers: dict[str, list[dict]]) -> None:
-            layers["app"][0]["frontendMetrics"]["delayedHeartbeatCount50"] = stalls
+            frontend = layers["app"][0]["frontendMetrics"]
+            frontend["delayedHeartbeatCount50"] = stalls
+            frontend["delayedHeartbeatCount250"] = 1 if maximum_ms > 250 else 0
+            frontend["maximumDelayedHeartbeatMS"] = maximum_ms
 
-        return self.run_checker(self.expected_order, set_device_class, add_stalls)
+        return self.run_checker(
+            self.expected_order, set_device_class, add_stalls, extra_args=extra_args, evidence=evidence,
+        )
+
+    def write_stall_contract(self, directory: Path, **overrides) -> Path:
+        contract = json.loads((ROOT / "config" / "macos-ui-stall-gate.json").read_text(encoding="utf-8"))
+        contract.update(overrides)
+        path = directory / "stall-contract.json"
+        path.write_text(json.dumps(contract), encoding="utf-8")
+        return path
 
     def test_main_thread_stall_gate_covers_every_native_mac_tier(self) -> None:
         # Engine rows stamp the raw NativeDeviceMemoryClass value; the case name is accepted too.
         for device_class in ("mid_16gb_mac", "mid16GBMac", "high_memory_mac", "floor_8gb_mac", "floor8GBMac"):
             with self.subTest(device_class=device_class):
                 result = self.run_with_stalls(device_class)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn("delayedHeartbeatCount50 2 > 0", result.stdout + result.stderr)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         with self.subTest("mid16GBMac without stalls"):
-            result = self.run_with_stalls("mid_16gb_mac", stalls=0)
+            result = self.run_with_stalls("mid_16gb_mac", stalls=0, maximum_ms=0)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_delayed_heartbeats_within_the_provisional_limit_pass(self) -> None:
+        """audit #6: the old zero tolerance on 50 ms heartbeats failed 90% of M2 takes."""
+        result = self.run_with_stalls("mid_16gb_mac", stalls=4, maximum_ms=250, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        stall = self.last_manifest["stallGate"]
+        self.assertEqual(
+            (stall["gatedTakeCount"], stall["median"], stall["p90"], stall["maximum"], stall["takesAboveLimit"]),
+            (5, 0, 250, 250, 0),
+        )
 
     def test_main_thread_stall_gate_skips_forced_non_floor_tiers_only(self) -> None:
         result = self.run_with_stalls("mid_16gb_mac", forced=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         # The floor tier stays gated even when forced, as before.
         result = self.run_with_stalls("floor8GBMac", forced=True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("delayedHeartbeatCount50 2 > 0", result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         # Rows without a Mac tier are not gated.
         result = self.run_with_stalls(None)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_the_contract_owns_the_statistic_and_limit(self) -> None:
+        # Two heartbeats over 50 ms, none over 250 ms: the shipped contract passes them,
+        # a contract declaring the old zero tolerance on the 50 ms count does not.
+        result = self.run_with_stalls("mid_16gb_mac", stalls=2, maximum_ms=120)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        with tempfile.TemporaryDirectory() as temporary:
+            strict = self.write_stall_contract(
+                Path(temporary), statistic="delayedHeartbeatCount50", maximumAllowed=0,
+            )
+            result = self.run_with_stalls(
+                "mid_16gb_mac", stalls=2, maximum_ms=120, extra_args=["--stall-contract", str(strict)],
+            )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+
+    def test_a_contract_for_another_profile_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            other = self.write_stall_contract(Path(temporary), calibrationProfile="mac-mini-m2-8gb")
+            result = self.run_with_stalls(
+                "mid_16gb_mac", stalls=0, maximum_ms=0, extra_args=["--stall-contract", str(other)],
+            )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+
+    def test_a_malformed_stall_contract_is_refused(self) -> None:
+        if str(ROOT / "scripts") not in sys.path:
+            sys.path.insert(0, str(ROOT / "scripts"))
+        import check_macos_ui_bench as checker
+
+        shipped = checker.load_stall_contract(checker.DEFAULT_STALL_CONTRACT)
+        self.assertEqual((shipped["statistic"], shipped["maximumAllowed"]), ("maximumDelayedHeartbeatMS", 250))
+        with tempfile.TemporaryDirectory() as temporary:
+            for overrides in (
+                {"statistic": "uiStallCount50"},
+                {"maximumAllowed": -1},
+                {"maximumAllowed": True},
+                {"calibrationStatus": "calibrated", "calibrationRuns": []},
+                {"calibrationProfile": ""},
+            ):
+                with self.subTest(overrides=overrides):
+                    broken = self.write_stall_contract(Path(temporary), **overrides)
+                    with self.assertRaises(checker.StallContractError):
+                        checker.load_stall_contract(broken)
+                    result = self.run_with_stalls(
+                        "mid_16gb_mac", stalls=0, maximum_ms=0, extra_args=["--stall-contract", str(broken)],
+                    )
+                    self.assertEqual(result.returncode, 1)
+
+    def test_the_evidence_manifest_names_the_stall_contract(self) -> None:
+        result = self.run_with_stalls("mid_16gb_mac", stalls=1, maximum_ms=90, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        stall = self.last_manifest["stallGate"]
+        self.assertEqual(stall["policyID"], "macos-ui-stall-gate-provisional-250ms")
+        self.assertEqual((stall["statistic"], stall["maximumAllowed"]), ("maximumDelayedHeartbeatMS", 250))
+        self.assertEqual((stall["calibrationStatus"], stall["calibrationProfile"]), ("provisional", "mac-mini-m6-16gb"))
+        self.assertEqual((stall["gatedTakeCount"], stall["maximum"], stall["takesAboveLimit"]), (5, 90, 0))
+        self.assertNotIn("stallGate", self.last_manifest["historyRecord"]["run"])
+
+    def test_rows_not_yet_present_exit_apart_from_deterministic_failures(self) -> None:
+        """audit #6/#21: the lane retries only the "rows not yet present" outcome."""
+        def drop_last_app_row(layers: dict[str, list[dict]]) -> None:
+            layers["app"].pop()
+
+        def drop_last_engine_take(layers: dict[str, list[dict]]) -> None:
+            for key in ("engine", "app", "merged"):
+                layers[key].pop()
+
+        for name, mutate in (("app", drop_last_app_row), ("engine", drop_last_engine_take)):
+            with self.subTest(layer=name):
+                result = self.run_checker(self.expected_order, mutate_layers=mutate)
+                self.assertEqual(result.returncode, 75, result.stdout + result.stderr)
+
+        def fail_audio_qc(rows: list[dict]) -> None:
+            rows[0]["audioQC"] = {"verdict": "fail", "flags": ["fixture"]}
+
+        result = self.run_checker(self.expected_order, fail_audio_qc)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+
+    def test_every_take_must_run_the_declared_variant(self) -> None:
+        """audit #17: the M6 tier recommends Quality first; the benchmark measures Speed."""
+        def one_quality_take(layers: dict[str, list[dict]]) -> None:
+            layers["engine"][1]["modelRuntimeIdentity"]["modelVariant"] = "quality"
+
+        def every_take_quality(layers: dict[str, list[dict]]) -> None:
+            for row in layers["engine"]:
+                row["modelRuntimeIdentity"]["modelVariant"] = "quality"
+
+        result = self.run_checker(self.expected_order, mutate_layers=one_quality_take)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        result = self.run_checker(self.expected_order, mutate_layers=every_take_quality)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        result = self.run_checker(
+            self.expected_order, mutate_layers=every_take_quality, extra_args=["--variant", "quality"],
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_the_manifest_reuses_the_gate_memory_qualification(self) -> None:
+        """audit #21: a passing run qualifies its memory once, not twice."""
+        if str(ROOT / "scripts") not in sys.path:
+            sys.path.insert(0, str(ROOT / "scripts"))
+        import check_macos_ui_bench as checker
+
+        calls: list[int] = []
+        original = checker.qualify_memory_rows
+
+        def counting(**kwargs):
+            calls.append(1)
+            return original(**kwargs)
+
+        with mock.patch.object(checker, "qualify_memory_rows", side_effect=counting):
+            result = self.run_checker(self.expected_order, evidence=True, in_process=checker)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(len(calls), 1)
+        self.assertIsNotNone(self.last_manifest)
 
     def test_missing_correlated_layer_row_fails_without_evidence(self) -> None:
         def remove_app_row(layers: dict[str, list[dict]]) -> None:

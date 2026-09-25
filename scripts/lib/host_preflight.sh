@@ -8,6 +8,7 @@
 # operator does not spend a 20-minute run to learn that the host was busy.
 #
 #   require_quiet_host <lane>
+#   settle_host_load <lane> <max-seconds>   (after the lane's own build)
 #
 # Refuses (exit 1) when the 1-minute load average exceeds twice the core count
 # or the kernel reports memory pressure above normal
@@ -75,4 +76,36 @@ require_quiet_host() {
     fi
     echo "==> [host] $lane: load1m=${load:-?} cores=$cores memoryPressureLevel=$level" >&2
     return 0
+}
+
+# settle_host_load <lane> <max-seconds>
+#
+# A timing lane's own build-for-testing loads the host right before the first
+# take, after `require_quiet_host` already passed (audit #28, V-8). Wait up to
+# <max-seconds> for the 1-minute load to fall within the core count (the
+# per-take limit above which a timing take counts as loaded), then apply the
+# ordinary `require_quiet_host` rule, which still refuses a busy host.
+settle_host_load() {
+    local lane="${1:-}" max_seconds="${2:-0}" waited=0 load cores
+    if [ -z "$lane" ]; then
+        echo "error: settle_host_load needs a lane identifier" >&2
+        return 2
+    fi
+    case "$max_seconds" in ''|*[!0-9]*) max_seconds=0 ;; esac
+    while :; do
+        load="$(sysctl -n vm.loadavg 2>/dev/null | tr -d '{}' | awk '{print $1}')"
+        cores="$(sysctl -n hw.ncpu 2>/dev/null)"
+        case "$cores" in ''|*[!0-9]*) cores=1 ;; esac
+        if [ "$(awk -v value="${load:-0}" 'BEGIN { printf "%d", value * 100 }')" -le $(( cores * 100 )) ]; then
+            break
+        fi
+        if [ "$waited" -ge "$max_seconds" ]; then
+            echo "==> [host] $lane: load1m=${load:-?} is still above the $cores-core per-take limit after ${waited}s; the quiet-host rule decides" >&2
+            break
+        fi
+        sleep 5
+        waited=$(( waited + 5 ))
+    done
+    [ "$waited" -eq 0 ] || echo "==> [host] $lane: waited ${waited}s for the load to settle" >&2
+    require_quiet_host "$lane"
 }

@@ -121,6 +121,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   measurement that fails the offending takes to the Swift QC, with a test; listening sets are never
   the ongoing control.
   Prompt comparisons use a run-time frozen holdout judged by `scripts/delivery_promotion_decision.py`.
+- **UI timing gates are declared.** The macOS UI benchmark's stall gate takes its statistic, limit and
+  calibration profile from `config/macos-ui-stall-gate.json` (provisionally no heartbeat delayed more
+  than 250 ms, uncalibrated until one exploratory M6 run calibrates it); every take runs the Speed variant.
 - **Consent-bound lanes.** `scripts/ui_test.sh`, `scripts/ios_device.sh`, `scripts/macos_test.sh
   memory|lang-bench` and `release.yml` run only on explicit request, in the lead session, with no
   parallel agent active. Timing lanes refuse to start on a busy host (`require_quiet_host` in

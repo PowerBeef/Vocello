@@ -531,6 +531,18 @@ and its digest, and the gate copies its optimization level into `toolchain.optim
 re-hashing that executable. Never add the crash-delta assertion to a manual command unless the
 caller actually captured and compared the pre/post crash snapshots.
 
+The lane also passes `--stall-contract config/macos-ui-stall-gate.json --variant speed`. The stall
+contract names the gate's statistic, its limit and the profile it is calibrated for; today it is the
+provisional "no heartbeat delayed more than 250 ms" on `mac-mini-m6-16gb`, uncalibrated until one
+exploratory M6 run records the per-take distribution the checker prints (median, p90, maximum, takes
+above the limit, censored heartbeats) and the contract is re-declared `calibrated` with that run. A
+contract naming another profile than the registry's canonical one fails the gate. Every take must
+have run the declared variant (Speed), whatever the tier recommends. The engine runs in the app,
+which has exited before validation, so the lane validates once and retries only the checker's
+distinct "rows not yet present" exit (75), for about ten seconds. Timing lanes also let the load of
+their own build settle (up to 90 s, down to the core count) and re-apply the quiet-host rule after
+build-for-testing, before the first take.
+
 **One-time machine setup:** configure Xcode UI-test runner signing, build the native test host, and
 install the required models.
 

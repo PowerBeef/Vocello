@@ -1079,6 +1079,8 @@ def default_inputs(record: dict[str, Any]) -> dict[str, Any]:
         REPO_ROOT / "config" / "memory-qualification-policy.json",
         # The iPhone memory bands benchmark_memory.py gates published evidence on.
         REPO_ROOT / "config" / "ios-memory-budget-policy.json",
+        # The macOS UI benchmark's stall gate statistic and limit (audit #6).
+        REPO_ROOT / "config" / "macos-ui-stall-gate.json",
     ]
     corpus_paths = [
         REPO_ROOT / "Tests" / "UIAutomationSupport" / "VocelloUIAutomationSupport.swift",

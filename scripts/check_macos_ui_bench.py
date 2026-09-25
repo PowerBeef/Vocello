@@ -39,6 +39,22 @@ from lib import jsonio  # noqa: E402
 DEFAULT_MODES = ["custom", "design", "clone"]
 DEFAULT_LENGTHS = ["short", "medium", "long"]
 DEFAULT_WARM = 3
+# The canonical UI benchmark measures the Speed variant; the tier's own
+# recommendation (Quality first on the M6) must never leak into its numbers.
+DEFAULT_VARIANT = "speed"
+MODEL_VARIANTS = ("speed", "quality", "compact_speed", "compact_quality")
+# The stall gate's statistic, limit and calibration profile (audit #6).
+DEFAULT_STALL_CONTRACT = SCRIPT_DIR.parent / "config" / "macos-ui-stall-gate.json"
+# Each gateable statistic and where an app row carries it: the typed v8
+# frontend key, its deprecated frontend alias, then the raw watchdog counter.
+STALL_STATISTICS = {
+    "maximumDelayedHeartbeatMS": ("maximumDelayedHeartbeatMS", "mainThreadMaximumStallMS", "uiMaxStallMS"),
+    "delayedHeartbeatCount250": ("delayedHeartbeatCount250", "mainThreadStallCount250MS", "uiStallCount250"),
+    "delayedHeartbeatCount50": ("delayedHeartbeatCount50", "mainThreadStallCount50MS", "uiStallCount50"),
+}
+# Some rows or layer files are not there yet (sysexits EX_TEMPFAIL). The lane
+# retries only this outcome, briefly; every other failure is deterministic.
+ROWS_NOT_YET_PRESENT_EXIT = 75
 THERMAL_RANK = {"unknown": -1, "nominal": 0, "fair": 1, "serious": 2, "critical": 3}
 TRIM_SEVERITY = {"softTrim": 1, "hardTrim": 2, "fullUnload": 3}
 # NativeDeviceMemoryClass Mac tiers. Engine rows stamp `notes.deviceClass` with
@@ -51,11 +67,12 @@ MAC_DEVICE_CLASSES = {
 
 
 def stall_gate_applies(notes: dict) -> bool:
-    """Whether the 50 ms main-thread stall gate covers one engine row.
+    """Whether the main-thread stall gate covers one engine row.
 
     The 8 GB floor tier is always gated, forced or native, as before. Every
     other Mac tier (the canonical Mac mini M6 runs `mid16GBMac`) is gated when
     it is the host's native tier; a forced tier is a diagnostic simulation.
+    What the gate measures and allows lives in `config/macos-ui-stall-gate.json`.
     """
     device = MAC_DEVICE_CLASSES.get(str(notes.get("deviceClass") or ""))
     if device is None:
@@ -63,6 +80,79 @@ def stall_gate_applies(notes: dict) -> bool:
     if device == "floor8GBMac":
         return True
     return str(notes.get("deviceClassForced", "false")).lower() != "true"
+
+
+class StallContractError(ValueError):
+    pass
+
+
+def load_stall_contract(path: Path) -> dict:
+    """The stall gate's declared statistic, limit and calibration profile (audit #6).
+
+    A provisional contract gates on its statistic like a calibrated one; the
+    status only says whether an M6 run has calibrated the limit yet.
+    """
+    try:
+        contract = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise StallContractError(f"unreadable stall contract {path}: {error}") from None
+    if not isinstance(contract, dict) or contract.get("schemaVersion") != 1:
+        raise StallContractError(f"unsupported stall contract: {path}")
+    if contract.get("statistic") not in STALL_STATISTICS:
+        raise StallContractError(
+            f"stall contract statistic must be one of {', '.join(sorted(STALL_STATISTICS))}: {path}"
+        )
+    limit = contract.get("maximumAllowed")
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
+        raise StallContractError(f"stall contract maximumAllowed must be a non-negative integer: {path}")
+    for key in ("policyID", "calibrationProfile", "definition"):
+        if not isinstance(contract.get(key), str) or not contract[key].strip():
+            raise StallContractError(f"stall contract needs a {key}: {path}")
+    runs = contract.get("calibrationRuns")
+    if not isinstance(runs, list) or not all(isinstance(run, str) and run for run in runs):
+        raise StallContractError(f"stall contract calibrationRuns must list run IDs: {path}")
+    status = contract.get("calibrationStatus")
+    if status not in {"provisional", "calibrated"}:
+        raise StallContractError(f"stall contract calibrationStatus must be provisional or calibrated: {path}")
+    if status == "calibrated" and not runs:
+        raise StallContractError(f"a calibrated stall contract names the runs that calibrated it: {path}")
+    return contract
+
+
+def stall_statistic_value(app_row: dict, statistic: str):
+    """The row's value for the contract's statistic, or None when it carries none."""
+    frontend = app_row.get("frontendMetrics") or {}
+    counters = app_row.get("counters") or {}
+    typed, alias, counter = STALL_STATISTICS[statistic]
+    for value in (frontend.get(typed), frontend.get(alias), counters.get(counter)):
+        if value is not None:
+            return value
+    return None
+
+
+def stall_gate_summary(contract: dict, observed: list[tuple[str, int]], censored: int) -> dict:
+    """What the gate saw, for calibration: the per-take distribution of the statistic."""
+    values = sorted(value for _, value in observed)
+
+    def quantile(fraction: float):
+        if not values:
+            return None
+        return values[min(len(values) - 1, int(round(fraction * (len(values) - 1))))]
+
+    limit = contract["maximumAllowed"]
+    return {
+        "policyID": contract["policyID"],
+        "statistic": contract["statistic"],
+        "maximumAllowed": limit,
+        "calibrationProfile": contract["calibrationProfile"],
+        "calibrationStatus": contract["calibrationStatus"],
+        "gatedTakeCount": len(values),
+        "takesAboveLimit": sum(1 for value in values if value > limit),
+        "median": quantile(0.5),
+        "p90": quantile(0.9),
+        "maximum": values[-1] if values else None,
+        "censoredHeartbeatCount": censored,
+    }
 
 
 def is_digest(value) -> bool:
@@ -639,8 +729,11 @@ def build_manifest(
     outputs_dir: Path | None = None,
     app_bundle_relative_path: str | None = None,
     capture_results: dict[int, dict] | None = None,
+    memory_qualification: tuple | None = None,
+    stall_gate: dict | None = None,
 ) -> dict:
-    memory_evidence, memory_run = qualify_memory_rows(
+    # The gate already qualified these rows; reuse its result (audit #21).
+    memory_evidence, memory_run = memory_qualification or qualify_memory_rows(
         rows=engine_rows,
         diagnostics=diagnostics,
         platform="macos",
@@ -851,6 +944,9 @@ def build_manifest(
         # The bundle the lane built and drove; the record step hashes its
         # executables instead of assuming an arena.
         **({"appBundleRelativePath": app_bundle_relative_path} if app_bundle_relative_path else {}),
+        # The stall contract this run was judged under and what it observed
+        # (run artifact only; the tracked record stays on its allowlist).
+        **({"stallGate": stall_gate} if stall_gate else {}),
         "historyRecord": history_record,
     }
 
@@ -877,7 +973,14 @@ def main() -> int:
     parser.add_argument("--lengths", default=",".join(DEFAULT_LENGTHS))
     parser.add_argument("--warm", type=int, default=DEFAULT_WARM)
     parser.add_argument("--run-id", default="", help="select only notes.benchRunID rows")
-    parser.add_argument("--max-delayed-heartbeats-50", type=int, default=0)
+    parser.add_argument(
+        "--stall-contract", type=Path, default=DEFAULT_STALL_CONTRACT, metavar="PATH",
+        help="the stall gate's statistic, limit and calibration profile (config/macos-ui-stall-gate.json)",
+    )
+    parser.add_argument(
+        "--variant", choices=MODEL_VARIANTS, default=DEFAULT_VARIANT,
+        help="the model variant every take must have run (default: speed)",
+    )
     parser.add_argument("--since-recorded", default="")
     parser.add_argument("--label", default="")
     parser.add_argument("--evidence-manifest", type=Path, metavar="PATH")
@@ -926,6 +1029,11 @@ def main() -> int:
         lengths = parse_list(args.lengths, DEFAULT_LENGTHS)
     except ValueError as error:
         parser.error(str(error))
+    try:
+        stall_contract = load_stall_contract(args.stall_contract)
+    except StallContractError as error:
+        print(f"FAIL: {error}")
+        return 1
 
     expected_cell_order = expected_cells(modes, lengths, args.warm)
     expected = len(expected_cell_order)
@@ -950,6 +1058,24 @@ def main() -> int:
     valid_engine_ids = [value for value in engine_ids if isinstance(value, str) and value]
     engine_id_set = set(valid_engine_ids)
     merged_rows = [row for row in loaded["merged"] if row.get("generationID") in engine_id_set]
+
+    # Rows that are simply not there yet: a missing layer file, fewer engine
+    # rows than the matrix, or an engine take whose app or merged row has not
+    # landed. Only this outcome is worth a short retry (audit #6, #21).
+    rows_pending: list[str] = [f"{layer} file absent" for layer, path in paths.items() if not path.is_file()]
+    if len(engine_rows) < expected:
+        rows_pending.append(f"engine rows {len(engine_rows)} of {expected}")
+    for layer, rows in (("app", app_rows), ("merged", merged_rows)):
+        missing = engine_id_set - {row.get("generationID") for row in rows}
+        if missing:
+            rows_pending.append(f"{layer} rows missing for {len(missing)} engine take(s)")
+
+    if stall_contract["calibrationProfile"] != canonical_macos_profile_id():
+        failures.append(
+            f"stall contract {stall_contract['policyID']} names calibration profile "
+            f"{stall_contract['calibrationProfile']!r}, not the canonical macOS profile "
+            f"{canonical_macos_profile_id()!r}; re-declare it for this host"
+        )
 
     if len(engine_rows) != expected:
         failures.append(f"engine rows {len(engine_rows)} != expected {expected}")
@@ -997,8 +1123,16 @@ def main() -> int:
                 failures.append(f"generation {row.get('generationID', '?')} has no typed backend metrics")
             if identity.get("resolvedModelID") != row.get("modelID"):
                 failures.append(f"generation {row.get('generationID', '?')} has mismatched typed model identity")
-            if exact_model_variant(identity, row) is None:
+            variant = exact_model_variant(identity, row)
+            if variant is None:
                 failures.append(f"generation {row.get('generationID', '?')} has no exact model variant")
+            elif variant != args.variant:
+                # The tier may recommend another variant (Quality first on
+                # the M6); the benchmark's label claims only the declared one.
+                failures.append(
+                    f"generation {row.get('generationID', '?')} ran the {variant} variant, "
+                    f"not the declared {args.variant} variant"
+                )
             if not isinstance(identity.get("runtimeProfileSignature"), str) or not identity["runtimeProfileSignature"]:
                 failures.append(f"generation {row.get('generationID', '?')} has no typed runtime profile signature")
             if not isinstance(identity.get("modelRepository"), str) or "/" not in identity["modelRepository"]:
@@ -1045,26 +1179,40 @@ def main() -> int:
                 f"app generation {row.get('generationID', '?')} requires telemetry schema "
                 f"v{REQUIRED_TELEMETRY_SCHEMA} or newer for memory qualification"
             )
+    # The stall gate (audit #6): the contract names the statistic and limit.
+    statistic = stall_contract["statistic"]
+    stall_limit = stall_contract["maximumAllowed"]
+    stall_observed: list[tuple[str, int]] = []
+    censored_heartbeats = 0
     for engine_row in engine_rows:
         gid = engine_row.get("generationID")
         if not stall_gate_applies(engine_row.get("notes") or {}):
             continue
-        app_row = app_by_id.get(gid) or {}
-        counters = app_row.get("counters") or {}
-        frontend = app_row.get("frontendMetrics") or {}
-        stalls = frontend.get("delayedHeartbeatCount50", frontend.get("mainThreadStallCount50MS"))
-        if stalls is None:
-            stalls = counters.get("uiStallCount50")
-        if stalls is not None and not isinstance(stalls, int):
-            failures.append(f"app generation {gid or '?'} has invalid 50 ms stall counter={stalls!r}")
-        elif isinstance(stalls, int) and stalls > args.max_delayed_heartbeats_50:
+        app_row = app_by_id.get(gid)
+        if app_row is None:
+            continue  # the missing app row is already a failure above
+        value = stall_statistic_value(app_row, statistic)
+        if value is None:
+            failures.append(f"app generation {gid or '?'} has no {statistic} for the stall gate")
+            continue
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            failures.append(f"app generation {gid or '?'} has invalid {statistic}={value!r}")
+            continue
+        stall_observed.append((str(gid), value))
+        censored = (app_row.get("frontendMetrics") or {}).get("censoredHeartbeatCount")
+        if isinstance(censored, int) and not isinstance(censored, bool) and censored > 0:
+            censored_heartbeats += censored
+        if value > stall_limit:
             failures.append(
-                f"delayedHeartbeatCount50 {stalls} > {args.max_delayed_heartbeats_50} (generation {gid})"
+                f"{statistic} {value} > {stall_limit} (generation {gid}; "
+                f"stall contract {stall_contract['policyID']}, {stall_contract['calibrationStatus']})"
             )
+    stall_gate = stall_gate_summary(stall_contract, stall_observed, censored_heartbeats)
 
+    memory_qualification = None
     if not failures:
         try:
-            qualify_memory_rows(
+            memory_qualification = qualify_memory_rows(
                 rows=engine_rows,
                 diagnostics=args.diag_dir,
                 platform="macos",
@@ -1088,10 +1236,20 @@ def main() -> int:
         f"macOS UI bench gate: expected={expected} engine={len(engine_rows)} "
         f"app={len(app_rows)} merged={len(merged_rows)}"
     )
+    print(
+        f"stall gate {stall_gate['policyID']} ({stall_gate['calibrationStatus']} on "
+        f"{stall_gate['calibrationProfile']}): {statistic} <= {stall_limit} over "
+        f"{stall_gate['gatedTakeCount']} gated take(s); median={stall_gate['median']} "
+        f"p90={stall_gate['p90']} max={stall_gate['maximum']} "
+        f"above={stall_gate['takesAboveLimit']} censoredHeartbeats={censored_heartbeats}"
+    )
     if failures:
         print("FAIL:")
         for item in failures:
             print(f"  - {item}")
+        if rows_pending:
+            print(f"ROWS NOT YET PRESENT: {'; '.join(rows_pending)}")
+            return ROWS_NOT_YET_PRESENT_EXIT
         return 1
 
     if args.evidence_manifest:
@@ -1111,6 +1269,8 @@ def main() -> int:
             outputs_dir=args.outputs_dir,
             app_bundle_relative_path=app_bundle_relative_path,
             capture_results=capture_results,
+            memory_qualification=memory_qualification,
+            stall_gate=stall_gate,
         )
         write_json_atomic(args.evidence_manifest, manifest)
         print(f"evidence={args.evidence_manifest}")

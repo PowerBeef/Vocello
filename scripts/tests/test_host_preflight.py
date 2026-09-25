@@ -16,9 +16,9 @@ LIB = ROOT / "scripts/lib/host_preflight.sh"
 
 def run_preflight(
     *, load: str, cores: str, level: str, env: dict[str, str] | None = None,
-    cwd: Path | None = None,
+    cwd: Path | None = None, command: str = "require_quiet_host fixture-lane",
 ) -> subprocess.CompletedProcess:
-    """Run `require_quiet_host` against a fake `sysctl` that answers with the given values."""
+    """Run `require_quiet_host` (or `command`) against a fake `sysctl` answering the given values."""
     with tempfile.TemporaryDirectory() as temporary:
         shim = Path(temporary) / "sysctl"
         shim.write_text(
@@ -39,7 +39,7 @@ def run_preflight(
         environment.pop("ROOT_DIR", None)
         environment.update(env or {})
         return subprocess.run(
-            ["bash", "-c", f". '{LIB}'; require_quiet_host fixture-lane"],
+            ["bash", "-c", f". '{LIB}'; {command}"],
             capture_output=True, text=True, env=environment, check=False,
             cwd=cwd or temporary,
         )
@@ -107,6 +107,18 @@ class HostPreflightTests(unittest.TestCase):
             allowed = run_preflight(load="0.50", cores="8", level="1", cwd=repo,
                                     env={"QVOICE_ALLOW_BUSY_HOST": "1"})
             self.assertEqual(allowed.returncode, 0, allowed.stderr)
+
+    def test_settle_hands_the_host_to_the_quiet_host_rule(self) -> None:
+        """audit #28/V-8: after the lane's build, the bounded settle ends in the
+        ordinary rule: within twice the core count continues, above it refuses."""
+        for load, expected in (("3.20", 0), ("12.00", 0), ("17.00", 1)):
+            with self.subTest(load=load):
+                result = run_preflight(load=load, cores="8", level="1",
+                                       command="settle_host_load fixture-lane 0")
+                self.assertEqual(result.returncode, expected, result.stderr)
+        pressured = run_preflight(load="0.50", cores="8", level="2",
+                                  command="settle_host_load fixture-lane 0")
+        self.assertEqual(pressured.returncode, 1)
 
     def test_lane_identifier_is_required(self) -> None:
         result = subprocess.run(

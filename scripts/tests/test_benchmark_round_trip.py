@@ -370,7 +370,14 @@ class PublisherRoundTripTests(unittest.TestCase):
             cells.extend(f"{mode}/speed/medium/retained#{index}" for index in range(3))
         cells = [(f"take-{index}", cell) for index, cell in enumerate(cells, start=1)]
         self.assertEqual(len(cells), 11)
-        self.v8_engine_rows(diagnostics, run_id, cells, ios=False)
+        # The memory lane runs seeded, and the engine stamps its own receipt on
+        # every row; a take is published as seeded only when they agree.
+        self.v8_engine_rows(
+            diagnostics, run_id, cells, ios=False,
+            mutate=lambda row: row["notes"].update(
+                {"samplingSeed": "19790615", "samplingSeedSource": "requested"}
+            ),
+        )
         results = self.bench_results(
             diagnostics / "bench-results.json", run_id, cells, outputs,
             seed=19_790_615,

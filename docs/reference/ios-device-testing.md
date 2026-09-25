@@ -696,9 +696,9 @@ scripts/ios_device.sh profile --kind memory --keep-trace custom:speed:
 This keeps CPU Profiler and correlated `os_signpost` data while adding Allocations and VM Tracker in
 the same exact-PID trace, and forces verbose run-scoped samples. New publishable device runs require
 telemetry schema v8 and evidence manifest v2: exact start/periodic/boundary/stop sidecars, summary
-agreement, zero capture failures, and at least 95% sampler coverage. Critical pressure, an app memory
-warning/exit, `hardTrim`, or `fullUnload` fails publication; guarded pressure, `softTrim`, or 95–<100%
-coverage is explicit warning evidence. The exception is the routine post-generation cache clear the
+agreement, zero capture failures, and no gap between samples above twice the sampler cadence. Critical
+pressure, an app memory warning/exit, `hardTrim`, or `fullUnload` fails publication; guarded pressure
+or `softTrim` is explicit warning evidence. The exception is the routine post-generation cache clear the
 iPhone tier runs after every take (source `post-generation`, reason `post_generation_cache_clear`):
 since 2026-09-25 it is counted as `policyCacheClearCount` with no pressure level and no warning.
 The record retains footprint/resident start, end, delta, and peak; compressed/GPU peaks; minimum

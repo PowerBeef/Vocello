@@ -37,6 +37,10 @@ SCRIPT_DIRECTORY = Path(__file__).resolve().parent
 if str(SCRIPT_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIRECTORY))
 from build_output_policy import load_policy
+from benchmark_memory import (  # noqa: E402
+    KERNEL_LEDGER_TOLERANCE_MB,
+    MAXIMUM_UNOBSERVED_GAP_TARGET_MULTIPLE,
+)
 from lib import rtf as rtf_semantics
 from lib import jsonio  # noqa: E402
 from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
@@ -400,6 +404,15 @@ METRIC_KEYS = {
     # memory pressure (records since 2026-09-25; older records fold it into
     # the pressure level and the soft-trim warning).
     "policyCacheClearCount",
+    # Memory contract v2 (records since 2026-09-25): the longest unobserved gap
+    # in the process's one memory series, the sampled Metal peak's shortfall
+    # against the exact MLX peak, and the kernel ledgers when the sampler read
+    # them (a process-lifetime footprint high-water mark, 1 when it rose inside
+    # the take so it is the take's exact peak, the sampled footprint's shortfall
+    # against it, and the graphics-tagged footprint at the take's end).
+    "samplerMaximumUnobservedGapMS", "gpuPeakCaptureMissMB",
+    "kernelPhysFootprintPeakMB", "kernelPhysFootprintPeakExact",
+    "footprintPeakCaptureMissMB", "graphicsFootprintEndMB",
     "loadAverage1M", "freeStorageBytes", "uptimeSeconds", "lowPowerMode",
     "chunksReceived", "continuityFailures", "underruns", "startBufferDepth",
     # Independent (whisper-family) recognition of language takes, since 2026-09-12.
@@ -487,6 +500,16 @@ IOS_MEMORY_REQUIRED_METRICS = {
 MACOS_UI_MEMORY_REQUIRED_METRICS = {
     "alignedProcessSampleCount", "alignedProcessSampleCoverage",
     "alignedEngineSampleCoverage", "alignedAppSampleCoverage",
+}
+# Memory contract v1 records keep their meaning (95% coverage; macOS UI totals
+# from uptime-paired app and engine samples). Contract v2 gives one process one
+# series: it gates on the longest unobserved gap and publishes each take's
+# sampled-peak shortfall against the exact high-water marks, and it never
+# carries the v1 pairing metrics.
+MEMORY_CONTRACT_VERSIONS = frozenset({1, 2})
+MEMORY_V2_REQUIRED_METRICS = {"samplerMaximumUnobservedGapMS", "gpuPeakCaptureMissMB"}
+KERNEL_LEDGER_METRICS = {
+    "kernelPhysFootprintPeakMB", "kernelPhysFootprintPeakExact", "footprintPeakCaptureMissMB",
 }
 
 SENSITIVE_KEY_PARTS = {
@@ -1528,6 +1551,13 @@ def comparison_key(record: dict[str, Any]) -> str:
     ttfc_definition = record["run"].get("ttfcDefinition")
     if ttfc_definition:
         comparable_identity["ttfcDefinition"] = ttfc_definition
+    # The memory aggregation marker: a contract-v2 series (one per process)
+    # never shares a lineage with a v1 aggregate (macOS UI v1 summed two
+    # samplers of one process), whatever the harness paths hash. Contract v1
+    # records keep their keys byte-identical (no key).
+    memory_contract = record["evidence"].get("memoryContractVersion")
+    if isinstance(memory_contract, int) and not isinstance(memory_contract, bool) and memory_contract >= 2:
+        comparable_identity["memoryContractVersion"] = memory_contract
     return sha256_bytes(canonical_bytes(comparable_identity))
 
 
@@ -2541,27 +2571,33 @@ def validate_record(
                     "startup windows must be complete, non-negative and sum to excludedStartupMS"
                 )
         if version >= 2 and run["kind"] in MEMORY_QUALIFIED_KINDS:
+            memory_contract = record["evidence"].get("memoryContractVersion")
             required_memory = set(MEMORY_REQUIRED_METRICS)
             if run["platform"] == "ios":
                 required_memory |= IOS_MEMORY_REQUIRED_METRICS
-            if run["kind"] == "ui-generation" and run["platform"] == "macos":
+            if memory_contract == 1 and run["kind"] == "ui-generation" and run["platform"] == "macos":
                 required_memory |= MACOS_UI_MEMORY_REQUIRED_METRICS
+            if memory_contract == 2:
+                required_memory |= MEMORY_V2_REQUIRED_METRICS
             if missing := sorted(required_memory - set(take["metrics"])):
                 raise HistoryError(
                     "memory-qualified take metrics are incomplete: " + ", ".join(missing)
                 )
             metrics = take["metrics"]
-            if not 0.95 <= float(metrics["samplerCoverage"]) <= 1:
-                raise HistoryError("memory sampler coverage is outside [0.95, 1]")
-            for coverage_key in (
-                "alignedProcessSampleCoverage",
-                "alignedEngineSampleCoverage",
-                "alignedAppSampleCoverage",
-            ):
-                if coverage_key in metrics and not 0.95 <= float(metrics[coverage_key]) <= 1:
-                    raise HistoryError(
-                        f"{coverage_key} is outside the qualified range [0.95, 1]"
-                    )
+            if memory_contract == 2:
+                validate_memory_contract_v2_take(metrics)
+            else:
+                if not 0.95 <= float(metrics["samplerCoverage"]) <= 1:
+                    raise HistoryError("memory sampler coverage is outside [0.95, 1]")
+                for coverage_key in (
+                    "alignedProcessSampleCoverage",
+                    "alignedEngineSampleCoverage",
+                    "alignedAppSampleCoverage",
+                ):
+                    if coverage_key in metrics and not 0.95 <= float(metrics[coverage_key]) <= 1:
+                        raise HistoryError(
+                            f"{coverage_key} is outside the qualified range [0.95, 1]"
+                        )
             if any(metrics[key] != 0 for key in (
                 "samplerCaptureFailureCount", "memoryWarningCount", "memoryExitCount",
             )):
@@ -2776,7 +2812,11 @@ def validate_record(
     kind = run["kind"]
     memory_contract_applies = version >= 2 and kind in MEMORY_QUALIFIED_KINDS
     if memory_contract_applies:
-        if evidence.get("memoryContractVersion") != 1 or evidence.get("memoryQualified") is not True:
+        if (
+            evidence.get("memoryContractVersion") not in MEMORY_CONTRACT_VERSIONS
+            or isinstance(evidence.get("memoryContractVersion"), bool)
+            or evidence.get("memoryQualified") is not True
+        ):
             raise HistoryError("record lacks the benchmark memory qualification contract")
         require_digest(
             evidence.get("sampleSidecarsDigest"), "evidence.sampleSidecarsDigest", allow_na=False
@@ -2959,6 +2999,46 @@ def validate_all(
 
 def markdown_escape(value: Any) -> str:
     return str(value).replace("|", "\\|")
+
+
+def validate_memory_contract_v2_take(metrics: dict[str, Any]) -> None:
+    """Contract v2 take metrics: one series, a bounded gap and consistent peak fidelity."""
+    if pairing := sorted(MACOS_UI_MEMORY_REQUIRED_METRICS & set(metrics)):
+        raise HistoryError(
+            "memory contract v2 gives one process one series and carries no pairing metrics: "
+            + ", ".join(pairing)
+        )
+    if not 0 <= float(metrics["samplerCoverage"]) <= 1:
+        raise HistoryError("memory sampler coverage is outside [0, 1]")
+    gap = float(metrics["samplerMaximumUnobservedGapMS"])
+    target = float(metrics["samplerTargetIntervalMS"]) if "samplerTargetIntervalMS" in metrics else 0.0
+    if target <= 0 or gap < 0 or gap > MAXIMUM_UNOBSERVED_GAP_TARGET_MULTIPLE * target + 1e-9:
+        raise HistoryError(
+            "memory-qualified take left the process unobserved for more than "
+            f"{MAXIMUM_UNOBSERVED_GAP_TARGET_MULTIPLE:g}x its sampler cadence"
+        )
+    expected_miss = max(0.0, float(metrics["mlxPeakMB"]) - float(metrics["peakGPUAllocatedMB"]))
+    if not math.isclose(float(metrics["gpuPeakCaptureMissMB"]), expected_miss, rel_tol=0, abs_tol=1e-6):
+        raise HistoryError("gpuPeakCaptureMissMB does not match mlxPeakMB and peakGPUAllocatedMB")
+    present = KERNEL_LEDGER_METRICS & set(metrics)
+    if present:
+        exact = metrics.get("kernelPhysFootprintPeakExact")
+        if "kernelPhysFootprintPeakMB" not in metrics or exact not in (0, 1):
+            raise HistoryError("the kernel footprint ledger metrics are incomplete")
+        kernel_peak = float(metrics["kernelPhysFootprintPeakMB"])
+        sampled_peak = float(metrics["peakPhysicalFootprintMB"])
+        if kernel_peak + KERNEL_LEDGER_TOLERANCE_MB < sampled_peak:
+            raise HistoryError("the kernel footprint ledger peak is below the sampled footprint peak")
+        if (exact == 1) != ("footprintPeakCaptureMissMB" in metrics) or (
+            exact == 1
+            and not math.isclose(
+                float(metrics["footprintPeakCaptureMissMB"]),
+                max(0.0, kernel_peak - sampled_peak), rel_tol=0, abs_tol=1e-6,
+            )
+        ):
+            raise HistoryError(
+                "footprintPeakCaptureMissMB belongs only to an exact kernel peak and must match it"
+            )
 
 
 def memory_contract_status(record: dict[str, Any]) -> str:

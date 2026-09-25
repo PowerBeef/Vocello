@@ -5,11 +5,19 @@ Raw sampler sidecars are intentionally untracked.  This module validates the
 exact sidecars selected by a benchmark, derives a small allowlisted summary,
 and returns digests that bind the tracked record to those raw samples.
 
-iOS is a single-process engine/app runtime, and so is macOS since 2026-09-15.
-Older macOS records came from separate engine-service and app processes, so
-macOS aggregate peaks are calculated only from samples whose
-absolute uptime timestamps can be paired within one sampling cadence.  It is
-never valid to add independent process maxima.
+Memory contract v2 (since 2026-09-25): one process gets one memory series.
+iOS is a single-process engine/app runtime, and so is macOS since 2026-09-15:
+the macOS app-layer and engine-layer samplers both read the one hosting
+process, so their samples are merged into one series (never summed) and the
+app sidecar adds its samples, its coverage and its submit/terminal order.  A
+take qualifies when no gap between consecutive samples exceeds twice the
+sampler cadence, and each take publishes how far its sampled peaks fell short
+of the exact high-water marks (the MLX allocator's per-request peak and, when
+the sampler read it, the kernel's physical-footprint ledger peak).
+
+Contract v1 records (before 2026-09-25) summed uptime-paired app and engine
+samples and required 95% periodic coverage; they are never rewritten and the
+history validator keeps judging them by those rules.
 """
 
 from __future__ import annotations
@@ -22,10 +30,20 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-MEMORY_CONTRACT_VERSION = 1
+MEMORY_CONTRACT_VERSION = 2
 REQUIRED_TELEMETRY_SCHEMA = 8
-MINIMUM_COVERAGE = 0.95
-PERFECT_COVERAGE = 1.0
+# Timer health (contract v2): the longest stretch in which the process's memory
+# went unobserved, between any two consecutive samples of its one series, may
+# not exceed this multiple of the sampler's target interval.
+MAXIMUM_UNOBSERVED_GAP_TARGET_MULTIPLE = 2.0
+# The kernel footprint ledger peak and the sampled footprint come from the same
+# task_info call; a ledger peak below a sample (beyond rounding) is a broken read.
+KERNEL_LEDGER_TOLERANCE_MB = 1.0
+# Optional per-sample kernel ledgers read from the same task_vm_info call as
+# the footprint: the process-lifetime physical-footprint high-water mark and
+# the graphics-tagged footprint.
+KERNEL_PEAK_SAMPLE_KEY = "kernelPhysFootprintPeakMB"
+GRAPHICS_SAMPLE_KEY = "graphicsFootprintMB"
 # The iPhone memory bands, declared once for the app's shipping budget policy
 # and this publication gate (audit V-4; a Swift test pins the Swift side).
 IOS_MEMORY_BUDGET_POLICY_PATH = (
@@ -525,6 +543,9 @@ class LayerEvidence:
     samples: tuple[dict[str, Any], ...]
     metrics: dict[str, float | int]
     warnings: tuple[str, ...]
+    # Per-sample kernel ledgers, in sample order; empty when not sampled.
+    kernel_peaks: tuple[float, ...] = ()
+    graphics: tuple[float, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -580,6 +601,12 @@ def _validate_layer(
     headroom: list[float] = []
     implied_limits: list[float] = []
     total_ram: list[float] = []
+    uptimes: list[int] = []
+    # Optional exact kernel ledgers (samplers since 2026-09-25): all or none.
+    kernel_peaks: list[float] = []
+    graphics: list[float] = []
+    kernel_present = any(KERNEL_PEAK_SAMPLE_KEY in sample for sample in samples)
+    graphics_present = any(GRAPHICS_SAMPLE_KEY in sample for sample in samples)
     periodic_count = 0
     boundary_count = 0
     for index, sample in enumerate(samples):
@@ -591,6 +618,16 @@ def _validate_layer(
         if elapsed < previous_elapsed or uptime < previous_uptime:
             raise MemoryEvidenceError(f"{prefix}: sample clocks are not monotonic")
         previous_elapsed, previous_uptime = elapsed, uptime
+        uptimes.append(uptime)
+        if kernel_present:
+            kernel_peaks.append(_finite(
+                sample.get(KERNEL_PEAK_SAMPLE_KEY), f"{prefix}.{KERNEL_PEAK_SAMPLE_KEY}"
+            ))
+            # A lifetime high-water mark never falls.
+            if len(kernel_peaks) > 1 and kernel_peaks[-1] + 1e-6 < kernel_peaks[-2]:
+                raise MemoryEvidenceError(f"{prefix}: the kernel footprint ledger peak fell")
+        if graphics_present:
+            graphics.append(_finite(sample.get(GRAPHICS_SAMPLE_KEY), f"{prefix}.{GRAPHICS_SAMPLE_KEY}"))
         kind = sample.get("kind")
         if kind not in {"start", "periodic", "boundary", "stop"}:
             raise MemoryEvidenceError(f"{prefix}: invalid sample kind {kind!r}")
@@ -791,14 +828,10 @@ def _validate_layer(
     target_ns = _finite(summary.get("targetIntervalNS"), f"{generation_id}.targetIntervalNS", minimum=1)
     elapsed_opportunities = max(0, int((previous_elapsed - int(samples[0]["capturedElapsedNS"])) // target_ns))
     expected = max(periodic_count + missed, elapsed_opportunities)
+    # Deadlines honoured: informational since contract v2, which gates on the
+    # longest unobserved gap of the process's series instead (audit #66).
     coverage = 1.0 if expected == 0 else min(1.0, periodic_count / expected)
-    if coverage + 1e-12 < MINIMUM_COVERAGE:
-        raise MemoryEvidenceError(
-            f"generation {generation_id} {layer}: sampler coverage {coverage:.3%} is below 95%"
-        )
     warnings: list[str] = []
-    if coverage + 1e-12 < PERFECT_COVERAGE:
-        warnings.append("memory.sampler.coverage")
 
     def match(summary_key: str, actual: float) -> None:
         value = _finite(summary.get(summary_key), f"{generation_id}.{summary_key}")
@@ -816,6 +849,18 @@ def _validate_layer(
     if platform == "ios":
         match("headroomMinMB", min(headroom))
         match("totalDeviceRAMMB", min(total_ram))
+    # The typed summary repeats the ledgers when the sampler read them.
+    for summary_key, values, pick in (
+        ("kernelPhysFootprintPeakStartMB", kernel_peaks, 0),
+        ("kernelPhysFootprintPeakMB", kernel_peaks, -1),
+        ("graphicsFootprintEndMB", graphics, -1),
+    ):
+        if summary_key in summary:
+            if not values:
+                raise MemoryEvidenceError(
+                    f"generation {generation_id} {layer}: {summary_key} has no sampled ledger"
+                )
+            match(summary_key, values[pick])
 
     max_gpu_recommended = max(gpu_recommended)
     gpu_ratio = max(gpu_ratios)
@@ -844,6 +889,7 @@ def _validate_layer(
         "samplerMissedDeadlineCount": missed,
         "samplerCoverage": coverage,
         "samplerTargetIntervalMS": target_ns / 1_000_000,
+        "samplerMaximumUnobservedGapMS": _maximum_gap_ms(uptimes),
     }
     if layer == "engine":
         mlx_fields = {
@@ -878,147 +924,72 @@ def _validate_layer(
             "impliedProcessLimitMB": min(implied_limits),
             "totalDeviceRAMMB": min(total_ram),
         })
-    return LayerEvidence(layer, digest, tuple(samples), metrics, tuple(warnings))
+    return LayerEvidence(
+        layer, digest, tuple(samples), metrics, tuple(warnings),
+        tuple(kernel_peaks), tuple(graphics),
+    )
 
 
-def _aligned_macos_metrics(engine: LayerEvidence, app: LayerEvidence) -> dict[str, float | int]:
-    engine_samples = list(engine.samples)
-    app_samples = list(app.samples)
-    if not engine_samples or not app_samples:
-        raise MemoryEvidenceError("macOS aggregate memory evidence has an empty layer")
-    cadence_ns = int(max(
-        float(engine.metrics["samplerTargetIntervalMS"]),
-        float(app.metrics["samplerTargetIntervalMS"]),
-    ) * 1_000_000)
-    # Pair within one declared cadence using the shared absolute uptime clock.
-    # Pairing is based on absolute uptime. Reuse is intentional: lifecycle
-    # boundary samples make the two layers uneven, so each sample is associated
-    # with the nearest sample in the other layer and duplicate pairs are then
-    # removed. Aggregate peaks still come only from real same-window pairs.
-    overlap_start = max(
-        int(engine_samples[0]["capturedUptimeNS"]), int(app_samples[0]["capturedUptimeNS"])
+
+
+def _maximum_gap_ms(uptimes: Iterable[int]) -> float:
+    """The longest interval, in ms, between two consecutive samples of one series."""
+    ordered = sorted(uptimes)
+    return max(
+        (later - earlier for earlier, later in zip(ordered, ordered[1:])), default=0
+    ) / 1_000_000
+
+
+def _process_identifier(row: dict[str, Any] | None) -> int | None:
+    value = row.get("processIdentifier") if isinstance(row, dict) else None
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        return None
+    return value
+
+
+def _one_process_series(
+    engine: LayerEvidence, app: LayerEvidence
+) -> tuple[dict[str, float | int], list[float], list[float]]:
+    """One memory series for the one process both macOS layers sampled (contract v2).
+
+    Since 2026-09-15 the engine runs inside the app process, so the app-layer
+    and engine-layer samplers are two readers of one process: every value is
+    the whole process, and adding them would count it twice (audit #1/#2).
+    The series is the union of both layers' samples in absolute-uptime order,
+    a duplicate uptime kept once (the engine's), so it spans the app's
+    submit-to-terminal window. Returns the series metrics and its kernel
+    ledgers in the same order.
+    """
+    entries = sorted(
+        (int(sample["capturedUptimeNS"]), order, index)
+        for order, layer in enumerate((engine, app))
+        for index, sample in enumerate(layer.samples)
     )
-    overlap_end = min(
-        int(engine_samples[-1]["capturedUptimeNS"]), int(app_samples[-1]["capturedUptimeNS"])
-    )
-    if overlap_end < overlap_start:
-        raise MemoryEvidenceError("macOS app/engine memory sidecars have no active overlap")
-    engine_overlap = [
-        (index, sample) for index, sample in enumerate(engine_samples)
-        if overlap_start <= int(sample["capturedUptimeNS"]) <= overlap_end
-    ]
-    app_overlap = [
-        (index, sample) for index, sample in enumerate(app_samples)
-        if overlap_start <= int(sample["capturedUptimeNS"]) <= overlap_end
-    ]
-    if not engine_overlap or not app_overlap:
-        raise MemoryEvidenceError("macOS app/engine memory sidecars have no overlap samples")
-    pair_indexes: set[tuple[int, int]] = set()
-    # A generation's app sampler starts just before the XPC engine sampler and
-    # stops just after it.  Keep the denominator limited to the true active
-    # overlap, but allow the nearest same-generation sample from either edge as
-    # a pairing candidate when it is still within one cadence.  Excluding that
-    # edge sample makes sub-millisecond startup skew look like a 500 ms hole:
-    # the next periodic app sample can land a few milliseconds beyond the
-    # cadence even though both samplers captured the boundary successfully.
-    all_engine = list(enumerate(engine_samples))
-    all_app = list(enumerate(app_samples))
-    for engine_index, engine_sample in engine_overlap:
-        engine_time = int(engine_sample["capturedUptimeNS"])
-        app_index, candidate = min(
-            all_app,
-            key=lambda item: abs(int(item[1]["capturedUptimeNS"]) - engine_time),
-        )
-        if abs(int(candidate["capturedUptimeNS"]) - engine_time) <= cadence_ns:
-            pair_indexes.add((engine_index, app_index))
-    for app_index, app_sample in app_overlap:
-        app_time = int(app_sample["capturedUptimeNS"])
-        engine_index, candidate = min(
-            all_engine,
-            key=lambda item: abs(int(item[1]["capturedUptimeNS"]) - app_time),
-        )
-        if abs(int(candidate["capturedUptimeNS"]) - app_time) <= cadence_ns:
-            pair_indexes.add((engine_index, app_index))
-    pairs = [
-        (engine_samples[engine_index], app_samples[app_index])
-        for engine_index, app_index in sorted(
-            pair_indexes,
-            key=lambda item: (
-                max(
-                    int(engine_samples[item[0]]["capturedUptimeNS"]),
-                    int(app_samples[item[1]]["capturedUptimeNS"]),
-                ),
-                item,
-            ),
-        )
-    ]
-    if not pairs:
-        raise MemoryEvidenceError("macOS app/engine memory sidecars have no uptime-aligned samples")
-    engine_overlap_indexes = {index for index, _ in engine_overlap}
-    app_overlap_indexes = {index for index, _ in app_overlap}
-    paired_engine_indexes = {
-        engine_index for engine_index, _ in pair_indexes
-        if engine_index in engine_overlap_indexes
-    }
-    paired_app_indexes = {
-        app_index for _, app_index in pair_indexes
-        if app_index in app_overlap_indexes
-    }
-    engine_coverage = len(paired_engine_indexes) / max(1, len(engine_overlap))
-    app_coverage = len(paired_app_indexes) / max(1, len(app_overlap))
-    paired_coverage = min(engine_coverage, app_coverage)
-    if paired_coverage + 1e-12 < MINIMUM_COVERAGE:
+    layers = (engine, app)
+    series: list[tuple[int, LayerEvidence, int]] = []
+    seen: set[int] = set()
+    for uptime, order, index in entries:
+        if uptime in seen:
+            continue
+        seen.add(uptime)
+        series.append((uptime, layers[order], index))
+    samples = [layer.samples[index] for _, layer, index in series]
+    uptimes = [uptime for uptime, _, _ in series]
+    resident = [float(sample["residentMB"]) for sample in samples]
+    footprint = [float(sample["physFootprintMB"]) for sample in samples]
+    compressed = [float(sample["compressedMB"]) for sample in samples]
+    gpu = [float(sample["gpuAllocatedMB"]) for sample in samples]
+    recommended = [float(sample["gpuRecommendedWorkingSetMB"]) for sample in samples]
+    reference = max(recommended)
+    if any(
+        not math.isclose(value, reference, rel_tol=0.01, abs_tol=1.0) for value in recommended
+    ):
+        # A device-wide recommendation: both readers must report the same one.
         raise MemoryEvidenceError(
-            f"macOS app/engine aligned-sample coverage {paired_coverage:.3%} is below 95%"
+            "macOS app/engine Metal recommended working-set limits disagree"
         )
-    resident = [
-        float(engine_sample["residentMB"]) + float(app_sample["residentMB"])
-        for engine_sample, app_sample in pairs
-    ]
-    footprint = [
-        float(engine_sample["physFootprintMB"]) + float(app_sample["physFootprintMB"])
-        for engine_sample, app_sample in pairs
-    ]
-    compressed = [
-        float(engine_sample["compressedMB"]) + float(app_sample["compressedMB"])
-        for engine_sample, app_sample in pairs
-    ]
-    gpu = [
-        float(engine_sample["gpuAllocatedMB"]) + float(app_sample["gpuAllocatedMB"])
-        for engine_sample, app_sample in pairs
-    ]
-    gpu_recommended: list[float] = []
-    for engine_sample, app_sample in pairs:
-        engine_recommended = float(engine_sample["gpuRecommendedWorkingSetMB"])
-        app_recommended = float(app_sample["gpuRecommendedWorkingSetMB"])
-        if not math.isclose(
-            engine_recommended, app_recommended, rel_tol=0.01, abs_tol=1.0
-        ):
-            raise MemoryEvidenceError(
-                "macOS app/engine Metal recommended working-set limits disagree"
-            )
-        # This is a device-wide recommendation, not a per-process allowance;
-        # summing it would double the denominator and understate GPU pressure.
-        gpu_recommended.append(min(engine_recommended, app_recommended))
-    gpu_ratios = [
-        allocated / recommended
-        for allocated, recommended in zip(gpu, gpu_recommended, strict=True)
-    ]
     peak_index = max(range(len(footprint)), key=footprint.__getitem__)
-    aligned_times = [
-        max(
-            int(engine_sample["capturedUptimeNS"]),
-            int(app_sample["capturedUptimeNS"]),
-        )
-        for engine_sample, app_sample in pairs
-    ]
-    first_time = aligned_times[0]
-    peak_time = aligned_times[peak_index]
-    return {
-        "alignedProcessSampleCount": len(pairs),
-        "alignedProcessSampleCoverage": paired_coverage,
-        "alignedEngineSampleCoverage": engine_coverage,
-        "alignedAppSampleCoverage": app_coverage,
+    metrics: dict[str, float | int] = {
         "residentStartMB": resident[0],
         "residentEndMB": resident[-1],
         "residentDeltaMB": resident[-1] - resident[0],
@@ -1029,10 +1000,55 @@ def _aligned_macos_metrics(engine: LayerEvidence, app: LayerEvidence) -> dict[st
         "peakPhysicalFootprintMB": max(footprint),
         "peakCompressedMB": max(compressed),
         "peakGPUAllocatedMB": max(gpu),
-        "gpuRecommendedWorkingSetMB": min(gpu_recommended),
-        "gpuWorkingSetUsageRatioPeak": max(gpu_ratios),
-        "memoryTimeToPeakMS": (peak_time - first_time) / 1_000_000,
+        "gpuRecommendedWorkingSetMB": reference,
+        "gpuWorkingSetUsageRatioPeak": max(
+            allocated / limit for allocated, limit in zip(gpu, recommended, strict=True)
+        ),
+        "memoryTimeToPeakMS": (uptimes[peak_index] - uptimes[0]) / 1_000_000,
+        "samplerMaximumUnobservedGapMS": _maximum_gap_ms(uptimes),
     }
+    kernel = (
+        [layer.kernel_peaks[index] for _, layer, index in series] if engine.kernel_peaks else []
+    )
+    graphics = [layer.graphics[index] for _, layer, index in series] if engine.graphics else []
+    return metrics, kernel, graphics
+
+
+def _apply_peak_fidelity(
+    metrics: dict[str, float | int],
+    kernel: list[float],
+    graphics: list[float],
+    generation_id: str,
+) -> None:
+    """Measure the sampled peaks against the exact high-water marks (contract v2).
+
+    Metal-allocated memory is never below MLX's active memory, so a sampled
+    Metal peak below the exact per-request `mlxPeakMB` proves the sampler
+    missed the take's peak; `gpuPeakCaptureMissMB` says by how much (0 when it
+    caught it). When the sampler read the kernel's physical-footprint ledger,
+    its lifetime high-water mark is published beside the sampled peak: exact
+    for the take when it rose inside the take's window, otherwise only an upper
+    bound set earlier in the process. A ledger peak below a sampled footprint
+    is a broken read and fails qualification; a miss is reported, never failed.
+    """
+    metrics["gpuPeakCaptureMissMB"] = max(
+        0.0, float(metrics["mlxPeakMB"]) - float(metrics["peakGPUAllocatedMB"])
+    )
+    if kernel:
+        kernel_peak = max(kernel)
+        sampled_peak = float(metrics["peakPhysicalFootprintMB"])
+        if kernel_peak + KERNEL_LEDGER_TOLERANCE_MB < sampled_peak:
+            raise MemoryEvidenceError(
+                f"generation {generation_id}: the kernel footprint ledger peak "
+                f"{kernel_peak:.1f} MB is below the sampled footprint peak {sampled_peak:.1f} MB"
+            )
+        exact = kernel_peak > min(kernel)
+        metrics["kernelPhysFootprintPeakMB"] = kernel_peak
+        metrics["kernelPhysFootprintPeakExact"] = 1 if exact else 0
+        if exact:
+            metrics["footprintPeakCaptureMissMB"] = max(0.0, kernel_peak - sampled_peak)
+    if graphics:
+        metrics["graphicsFootprintEndMB"] = graphics[-1]
 
 
 def qualify_take_memory(
@@ -1056,9 +1072,25 @@ def qualify_take_memory(
     )
     layers = [engine]
     metrics = dict(engine.metrics)
+    kernel = list(engine.kernel_peaks)
+    graphics = list(engine.graphics)
     if platform == "macos" and require_app_layer:
         if not isinstance(app_row, dict) or app_row.get("generationID") != generation_id:
             raise MemoryEvidenceError(f"generation {generation_id}: missing matching macOS app row")
+        engine_pid = _process_identifier(row)
+        app_pid = _process_identifier(app_row)
+        if engine_pid is None or app_pid is None:
+            raise MemoryEvidenceError(
+                f"generation {generation_id}: macOS memory evidence needs both layers' "
+                "process identifier"
+            )
+        if engine_pid != app_pid:
+            # The engine runs in the app process; two processes would need a
+            # system-level measure this contract does not claim.
+            raise MemoryEvidenceError(
+                f"generation {generation_id}: app PID {app_pid} and engine PID {engine_pid} "
+                "differ; one process has one memory series"
+            )
         app = _validate_layer(
             row=app_row,
             layer="app",
@@ -1066,8 +1098,17 @@ def qualify_take_memory(
             platform=platform,
         )
         layers.append(app)
-        metrics = _aligned_macos_metrics(engine, app)
-        # Keep layer-level coverage/capture health without conflating layer peaks.
+        if (
+            bool(engine.kernel_peaks) != bool(app.kernel_peaks)
+            or bool(engine.graphics) != bool(app.graphics)
+        ):
+            raise MemoryEvidenceError(
+                f"generation {generation_id}: the app and engine layers sampled different "
+                "kernel ledgers"
+            )
+        metrics, kernel, graphics = _one_process_series(engine, app)
+        # Layer-level capture health stays per layer; the peaks come only from
+        # the one process series above.
         metrics.update({
             "samplerSampleCount": sum(int(layer.metrics["samplerSampleCount"]) for layer in layers),
             "samplerPeriodicSampleCount": sum(int(layer.metrics["samplerPeriodicSampleCount"]) for layer in layers),
@@ -1076,13 +1117,21 @@ def qualify_take_memory(
             "samplerMissedDeadlineCount": sum(int(layer.metrics["samplerMissedDeadlineCount"]) for layer in layers),
             "samplerCoverage": min(float(layer.metrics["samplerCoverage"]) for layer in layers),
             "samplerTargetIntervalMS": max(float(layer.metrics["samplerTargetIntervalMS"]) for layer in layers),
-            # MLX accounting is process-local to the engine service and must
-            # survive the replacement of process-memory metrics by aligned
-            # app+engine aggregates.
+            # MLX accounting is the engine's own allocator counter.
             "mlxPeakMB": engine.metrics["mlxPeakMB"],
             "mlxActivePeakMB": engine.metrics["mlxActivePeakMB"],
             "mlxCachePeakMB": engine.metrics["mlxCachePeakMB"],
         })
+
+    target_ms = float(metrics["samplerTargetIntervalMS"])
+    gap_ms = float(metrics["samplerMaximumUnobservedGapMS"])
+    if gap_ms > MAXIMUM_UNOBSERVED_GAP_TARGET_MULTIPLE * target_ms + 1e-9:
+        raise MemoryEvidenceError(
+            f"generation {generation_id}: the process memory went unobserved for "
+            f"{gap_ms:.1f} ms, more than {MAXIMUM_UNOBSERVED_GAP_TARGET_MULTIPLE:g}x the "
+            f"{target_ms:g} ms sampler cadence"
+        )
+    _apply_peak_fidelity(metrics, kernel, graphics, generation_id)
 
     events = _memory_warnings_and_failures(row)
     pressure_warnings = list(events.warnings)
@@ -1106,12 +1155,6 @@ def qualify_take_memory(
             f"generation {generation_id}: " + "; ".join(sorted(set(pressure_failures)))
         )
     warnings = sorted(set(pressure_warnings).union(*(layer.warnings for layer in layers)))
-    if (
-        platform == "macos"
-        and require_app_layer
-        and float(metrics["alignedProcessSampleCoverage"]) < PERFECT_COVERAGE
-    ):
-        warnings = sorted(set(warnings).union({"memory.alignment.coverage"}))
     if platform == "ios":
         # The app's own shipping bands: critical fails publication, guarded warns.
         bands = load_ios_memory_budget()

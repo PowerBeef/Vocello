@@ -37,11 +37,12 @@ ENGINE_BOUNDARY_NAMES = [
 
 def samples(
     *, role: str, boundaries: list[str], ios: bool, footprint: float = 3000.0,
-    headroom: float = 3000.0, uptime_offset: int = 0,
+    headroom: float = 3000.0, uptime_offset: int = 0, kernel_ledgers: bool = False,
 ) -> list[dict]:
     kinds = [("start", None)] + [("boundary", name) for name in boundaries]
     kinds += [("periodic", None), ("stop", None)]
     result = []
+    lifetime_peak = 0.0
     for index, (kind, boundary) in enumerate(kinds):
         elapsed = index * 40_000_000
         allocated = 2000.0 + index
@@ -70,6 +71,12 @@ def samples(
         if ios:
             sample["headroomMB"] = headroom - index
             sample["impliedProcessLimitMB"] = sample["physFootprintMB"] + sample["headroomMB"]
+        if kernel_ledgers:
+            # The kernel's lifetime high-water mark: never below a reading and
+            # never falling; the graphics ledger follows the Metal allocation.
+            lifetime_peak = max(lifetime_peak, sample["physFootprintMB"])
+            sample["kernelPhysFootprintPeakMB"] = lifetime_peak
+            sample["graphicsFootprintMB"] = allocated - 100
         result.append(sample)
     return result
 
@@ -156,6 +163,8 @@ def row(generation_id: str, sample_rows: list[dict], *, layer: str, ios: bool) -
     return {
         "schemaVersion": 8,
         "generationID": generation_id,
+        # macOS hosts the engine in the app process: both layers name one PID.
+        "processIdentifier": 4242,
         "summary": summary,
         "memoryMetrics": memory_metrics,
         "backendMetrics": {"stages": []},
@@ -266,30 +275,117 @@ class MemoryEvidenceTests(unittest.TestCase):
         )
         self.assertEqual(qualified[0].status, "qualified")
 
-    def test_periodic_coverage_warns_above_95_percent_and_fails_below_it(self) -> None:
-        engine, base = self.ios_fixture()
-        periodic = next(item for item in base if item["kind"] == "periodic")
-        extras = []
-        for offset in range(1, 20):
-            sample = copy.deepcopy(periodic)
-            sample["capturedElapsedNS"] += offset * 1_000_000
-            sample["capturedUptimeNS"] += offset * 1_000_000
-            sample["tMS"] = sample["capturedElapsedNS"] // 1_000_000
-            extras.append(sample)
-        sidecar = base[:-1] + extras + base[-1:]
-        warning_row = row(engine["generationID"], sidecar, layer="engine", ios=True)
-        warning_row["summary"]["missedPeriodicDeadlineCount"] = 1
+    def test_missed_deadlines_are_informational_under_contract_v2(self) -> None:
+        # Coverage counts deadlines honoured, not whether the peak was seen
+        # (audit #66): two missed deadlines with no long gap still qualify.
+        engine, sidecar = self.ios_fixture()
+        engine["summary"]["missedPeriodicDeadlineCount"] = 2
         self.write_sidecar("engine", engine["generationID"], sidecar)
-        qualified, _ = qualify_memory_rows(
-            rows=[warning_row], diagnostics=self.root, platform="ios"
+        qualified, aggregate = qualify_memory_rows(
+            rows=[engine], diagnostics=self.root, platform="ios"
         )
-        self.assertEqual(qualified[0].status, "qualifiedWithWarnings")
-        self.assertIn("memory.sampler.coverage", qualified[0].warnings)
+        self.assertEqual(aggregate["memoryContractVersion"], 2)
+        self.assertEqual(qualified[0].status, "qualified")
+        self.assertLess(qualified[0].metrics["samplerCoverage"], 1.0)
+        self.assertEqual(qualified[0].metrics["samplerMissedDeadlineCount"], 2)
+        self.assertEqual(qualified[0].metrics["samplerMaximumUnobservedGapMS"], 40.0)
 
-        failed_row = copy.deepcopy(warning_row)
-        failed_row["summary"]["missedPeriodicDeadlineCount"] = 2
-        with self.assertRaisesRegex(MemoryEvidenceError, "below 95%"):
-            qualify_memory_rows(rows=[failed_row], diagnostics=self.root, platform="ios")
+    def test_an_unobserved_gap_above_twice_the_cadence_fails(self) -> None:
+        engine, base = self.ios_fixture()
+
+        def with_stop_after(gap_ms: int) -> dict:
+            sidecar = copy.deepcopy(base)
+            before_stop = sidecar[-2]
+            stop = sidecar[-1]
+            stop["capturedElapsedNS"] = before_stop["capturedElapsedNS"] + gap_ms * 1_000_000
+            stop["capturedUptimeNS"] = before_stop["capturedUptimeNS"] + gap_ms * 1_000_000
+            stop["tMS"] = stop["capturedElapsedNS"] // 1_000_000
+            fixture = row(engine["generationID"], sidecar, layer="engine", ios=True)
+            self.write_sidecar("engine", engine["generationID"], sidecar)
+            return fixture
+
+        # The fixture's cadence is 500 ms: a 1,000 ms gap is the bound.
+        qualified, _ = qualify_memory_rows(
+            rows=[with_stop_after(1_000)], diagnostics=self.root, platform="ios"
+        )
+        self.assertEqual(qualified[0].metrics["samplerMaximumUnobservedGapMS"], 1_000.0)
+        with self.assertRaisesRegex(MemoryEvidenceError, "unobserved for 1001.0 ms"):
+            qualify_memory_rows(
+                rows=[with_stop_after(1_001)], diagnostics=self.root, platform="ios"
+            )
+
+    def test_peak_fidelity_reports_the_miss_against_the_exact_mlx_peak(self) -> None:
+        engine, sidecar = self.ios_fixture()
+        self.write_sidecar("engine", engine["generationID"], sidecar)
+        qualified, _ = qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")
+        metrics = qualified[0].metrics
+        # Sampled Metal peak 2,019 MB against the exact MLX peak of 2,200 MB.
+        self.assertEqual(metrics["peakGPUAllocatedMB"], 2019.0)
+        self.assertEqual(metrics["gpuPeakCaptureMissMB"], 181.0)
+        self.assertEqual(qualified[0].status, "qualified")
+        self.assertNotIn("kernelPhysFootprintPeakMB", metrics)
+
+        engine["memoryMetrics"]["mlxCumulativePeakMB"] = 1500.0
+        qualified, _ = qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")
+        self.assertEqual(qualified[0].metrics["gpuPeakCaptureMissMB"], 0.0)
+
+    def test_kernel_ledger_peak_is_exact_when_it_rose_inside_the_take(self) -> None:
+        sidecar = samples(
+            role="engine", boundaries=ENGINE_BOUNDARIES, ios=True, kernel_ledgers=True
+        )
+        # A 300 MB spike between two samples: the sampler misses it, the ledger does not.
+        for sample in sidecar[10:]:
+            sample["kernelPhysFootprintPeakMB"] = 3400.0
+        engine = row("generation-kernel", sidecar, layer="engine", ios=True)
+        engine["summary"].update({
+            "kernelPhysFootprintPeakStartMB": 3000.0,
+            "kernelPhysFootprintPeakMB": 3400.0,
+            "graphicsFootprintEndMB": sidecar[-1]["graphicsFootprintMB"],
+        })
+        self.write_sidecar("engine", engine["generationID"], sidecar)
+        qualified, _ = qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")
+        metrics = qualified[0].metrics
+        self.assertEqual(metrics["peakPhysicalFootprintMB"], 3000.0 + len(sidecar) - 1)
+        self.assertEqual(metrics["kernelPhysFootprintPeakMB"], 3400.0)
+        self.assertEqual(metrics["kernelPhysFootprintPeakExact"], 1)
+        self.assertEqual(
+            metrics["footprintPeakCaptureMissMB"], 3400.0 - metrics["peakPhysicalFootprintMB"]
+        )
+        self.assertEqual(metrics["graphicsFootprintEndMB"], sidecar[-1]["graphicsFootprintMB"])
+
+        # A lifetime peak set before the take is only an upper bound: no miss claimed.
+        for sample in sidecar:
+            sample["kernelPhysFootprintPeakMB"] = 5000.0
+        upper = row("generation-kernel-upper", sidecar, layer="engine", ios=True)
+        self.write_sidecar("engine", upper["generationID"], sidecar)
+        qualified, _ = qualify_memory_rows(rows=[upper], diagnostics=self.root, platform="ios")
+        self.assertEqual(qualified[0].metrics["kernelPhysFootprintPeakExact"], 0)
+        self.assertNotIn("footprintPeakCaptureMissMB", qualified[0].metrics)
+
+    def test_inconsistent_kernel_ledgers_fail_closed(self) -> None:
+        base = samples(role="engine", boundaries=ENGINE_BOUNDARIES, ios=True, kernel_ledgers=True)
+        mutations = {
+            "below a sampled footprint": lambda rows: [
+                sample.__setitem__("kernelPhysFootprintPeakMB", 2000.0) for sample in rows
+            ],
+            "falls": lambda rows: rows[-1].__setitem__("kernelPhysFootprintPeakMB", 1.0),
+            "missing on one sample": lambda rows: rows[3].pop("kernelPhysFootprintPeakMB"),
+            "graphics missing on one sample": lambda rows: rows[3].pop("graphicsFootprintMB"),
+        }
+        for label, mutate in mutations.items():
+            with self.subTest(label=label):
+                sidecar = copy.deepcopy(base)
+                mutate(sidecar)
+                engine = row("generation-kernel-bad", sidecar, layer="engine", ios=True)
+                self.write_sidecar("engine", engine["generationID"], sidecar)
+                with self.assertRaises(MemoryEvidenceError):
+                    qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")
+        # The typed summary must repeat the sampled ledger exactly.
+        engine = row("generation-kernel-summary", base, layer="engine", ios=True)
+        engine["summary"]["kernelPhysFootprintPeakMB"] = 1.0
+        self.write_sidecar("engine", engine["generationID"], base)
+        with self.assertRaisesRegex(MemoryEvidenceError, "kernelPhysFootprintPeakMB"):
+            qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")
 
     def test_each_required_engine_boundary_is_checked_from_the_raw_sidecar(self) -> None:
         engine, original = self.ios_fixture()
@@ -628,35 +724,170 @@ class MemoryEvidenceTests(unittest.TestCase):
         with self.assertRaises(MemoryEvidenceError):
             qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")
 
-    def test_macos_ui_uses_aligned_app_and_engine_samples_not_independent_peaks(self) -> None:
-        generation_id = "generation-macos-001"
-        engine_samples = samples(role="engine", boundaries=ENGINE_BOUNDARIES, ios=False, footprint=2500)
+    def macos_pair(
+        self, generation_id: str, *, engine_times_ms: list[int] | None = None,
+        app_times_ms: list[int] | None = None, kernel_ledgers: bool = False,
+    ) -> tuple[dict, list[dict], dict, list[dict]]:
+        """Two sidecars of one process: the app sampler brackets the engine's."""
+        base_uptime = 10_000_000_000
+        engine_samples = samples(
+            role="engine", boundaries=ENGINE_BOUNDARIES, ios=False, footprint=2500,
+            kernel_ledgers=kernel_ledgers,
+        )
         app_samples = samples(
             role="app", boundaries=["app_submit", "app_terminal"], ios=False,
-            footprint=200, uptime_offset=10_000_000,
+            footprint=2500, kernel_ledgers=kernel_ledgers,
         )
-        # Put each layer's individual peak at opposite ends. The combined peak
-        # must come from an aligned pair, never max(engine)+max(app).
-        engine_samples[0]["physFootprintMB"] = 1000
-        engine_samples[-1]["physFootprintMB"] = 3000
-        app_samples[0]["physFootprintMB"] = 900
-        app_samples[-1]["physFootprintMB"] = 100
-        engine = row(generation_id, engine_samples, layer="engine", ios=False)
-        app = row(generation_id, app_samples, layer="app", ios=False)
-        self.write_sidecar("engine", generation_id, engine_samples)
-        self.write_sidecar("app", generation_id, app_samples)
-        qualified, aggregate = qualify_memory_rows(
+        # The app sampler's order: start, submit, periodic, terminal, stop.
+        app_samples = [app_samples[index] for index in (0, 1, 3, 2, 4)]
+        if kernel_ledgers:
+            lifetime_peak = 0.0
+            for sample in app_samples:
+                lifetime_peak = max(lifetime_peak, sample["physFootprintMB"])
+                sample["kernelPhysFootprintPeakMB"] = lifetime_peak
+        engine_times_ms = engine_times_ms or [10 + 40 * index for index in range(len(engine_samples))]
+        app_times_ms = app_times_ms or [0, 5, 400, 810, 820]
+        for layer_samples, times in ((engine_samples, engine_times_ms), (app_samples, app_times_ms)):
+            self.assertEqual(len(layer_samples), len(times))
+            for index, (sample, offset_ms) in enumerate(zip(layer_samples, times, strict=True)):
+                sample["capturedElapsedNS"] = index * 40_000_000
+                sample["capturedUptimeNS"] = base_uptime + offset_ms * 1_000_000
+                sample["tMS"] = index * 40
+        return (
+            row(generation_id, engine_samples, layer="engine", ios=False), engine_samples,
+            row(generation_id, app_samples, layer="app", ios=False), app_samples,
+        )
+
+    def qualify_macos(self, engine: dict, engine_samples: list[dict], app: dict, app_samples: list[dict]):
+        self.write_sidecar("engine", engine["generationID"], engine_samples)
+        self.write_sidecar("app", app["generationID"], app_samples)
+        return qualify_memory_rows(
             rows=[engine], app_rows=[app], diagnostics=self.root, platform="macos",
             require_app_layer=True,
         )
+
+    def test_same_process_layers_form_one_series_and_are_never_summed(self) -> None:
+        # Both samplers read the one hosting process (audit #1/#2): the peak is
+        # the largest single reading, never a sum of the two layers' readings.
+        engine, engine_samples, app, app_samples = self.macos_pair("generation-macos-001")
+        engine_samples[0]["physFootprintMB"] = 1000
+        engine_samples[-1]["physFootprintMB"] = 3000
+        app_samples[0]["physFootprintMB"] = 900
+        app_samples[2]["physFootprintMB"] = 2990
+        app_samples[-1]["physFootprintMB"] = 1100
+        engine = row(engine["generationID"], engine_samples, layer="engine", ios=False)
+        app = row(app["generationID"], app_samples, layer="app", ios=False)
+        qualified, aggregate = self.qualify_macos(engine, engine_samples, app, app_samples)
+        metrics = qualified[0].metrics
         self.assertEqual(aggregate["sampleSidecarCount"], 2)
-        self.assertLess(
-            qualified[0].metrics["peakPhysicalFootprintMB"],
-            max(item["physFootprintMB"] for item in engine_samples)
-            + max(item["physFootprintMB"] for item in app_samples),
+        self.assertEqual(aggregate["memoryContractVersion"], 2)
+        self.assertEqual(metrics["peakPhysicalFootprintMB"], 3000)
+        # The series spans the app's submit-to-terminal window.
+        self.assertEqual(metrics["physicalFootprintStartMB"], 900)
+        self.assertEqual(metrics["physicalFootprintEndMB"], 1100)
+        self.assertEqual(metrics["memoryTimeToPeakMS"], 770.0)
+        # Metal likewise: the largest single reading (engine 2,019 MB), not 2,019 + 2,004.
+        self.assertEqual(metrics["peakGPUAllocatedMB"], 2019.0)
+        self.assertEqual(metrics["gpuWorkingSetUsageRatioPeak"], 2019.0 / 5000.0)
+        self.assertEqual(metrics["mlxPeakMB"], 2200.0)
+        self.assertEqual(metrics["gpuPeakCaptureMissMB"], 181.0)
+        self.assertEqual(metrics["samplerSampleCount"], len(engine_samples) + len(app_samples))
+        for key in (
+            "alignedProcessSampleCount", "alignedProcessSampleCoverage",
+            "alignedEngineSampleCoverage", "alignedAppSampleCoverage",
+        ):
+            self.assertNotIn(key, metrics)
+        self.assertEqual(qualified[0].status, "qualified")
+
+    def test_realistic_in_process_readings_give_a_single_process_peak(self) -> None:
+        # Both layers read one footprint curve at interleaved times. The v1
+        # aggregate summed each uptime pair and reported about twice the peak.
+        engine, engine_samples, app, app_samples = self.macos_pair("generation-macos-curve")
+
+        def process_footprint(uptime_ms: int) -> float:
+            return 2000.0 + (400.0 if 395 <= uptime_ms <= 405 else uptime_ms / 10)
+
+        for layer_samples in (engine_samples, app_samples):
+            for sample in layer_samples:
+                uptime_ms = (sample["capturedUptimeNS"] - 10_000_000_000) // 1_000_000
+                sample["physFootprintMB"] = process_footprint(uptime_ms)
+                sample["residentMB"] = sample["physFootprintMB"] - 200
+        engine = row(engine["generationID"], engine_samples, layer="engine", ios=False)
+        app = row(app["generationID"], app_samples, layer="app", ios=False)
+        qualified, _ = self.qualify_macos(engine, engine_samples, app, app_samples)
+        # The app's periodic reading at 400 ms is the only one inside the spike.
+        self.assertEqual(qualified[0].metrics["peakPhysicalFootprintMB"], 2400.0)
+        self.assertLess(qualified[0].metrics["peakPhysicalFootprintMB"], 2 * 2000.0)
+
+    def test_duplicate_uptimes_are_counted_once(self) -> None:
+        engine, engine_samples, app, app_samples = self.macos_pair(
+            "generation-macos-duplicate", app_times_ms=[0, 10, 50, 810, 820],
         )
-        self.assertEqual(qualified[0].metrics["mlxPeakMB"], 2200.0)
-        self.assertGreater(qualified[0].metrics["gpuWorkingSetUsageRatioPeak"], 0)
+        # App readings at 10 and 50 ms share the engine's uptimes: the engine's are kept.
+        app_samples[1]["physFootprintMB"] = 9999
+        app_samples[2]["physFootprintMB"] = 9999
+        engine = row(engine["generationID"], engine_samples, layer="engine", ios=False)
+        app = row(app["generationID"], app_samples, layer="app", ios=False)
+        qualified, _ = self.qualify_macos(engine, engine_samples, app, app_samples)
+        self.assertLess(qualified[0].metrics["peakPhysicalFootprintMB"], 9999)
+
+    def test_one_series_gap_rule_uses_both_layers_readings(self) -> None:
+        # The engine sampler left 700 ms unobserved; the app sampler's reading
+        # at 400 ms observed the process in between, so the take qualifies.
+        engine_times = [10 + 5 * index for index in range(19)] + [900]
+        engine, engine_samples, app, app_samples = self.macos_pair(
+            "generation-macos-gap", engine_times_ms=engine_times,
+            app_times_ms=[0, 5, 400, 950, 960],
+        )
+        qualified, _ = self.qualify_macos(engine, engine_samples, app, app_samples)
+        self.assertEqual(qualified[0].metrics["samplerMaximumUnobservedGapMS"], 500.0)
+
+        engine, engine_samples, app, app_samples = self.macos_pair(
+            "generation-macos-gap-fail", engine_times_ms=engine_times,
+            app_times_ms=[0, 5, 10, 2000, 2010],
+        )
+        with self.assertRaisesRegex(MemoryEvidenceError, "unobserved for 1100.0 ms"):
+            self.qualify_macos(engine, engine_samples, app, app_samples)
+
+    def test_two_processes_or_a_missing_pid_never_qualify(self) -> None:
+        for label, engine_pid, app_pid, message in (
+            ("split", 4242, 4343, "app PID 4343 and engine PID 4242 differ"),
+            ("missing", 4242, None, "process identifier"),
+            ("invalid", True, 4242, "process identifier"),
+        ):
+            with self.subTest(label=label):
+                engine, engine_samples, app, app_samples = self.macos_pair(f"generation-pid-{label}")
+                engine["processIdentifier"] = engine_pid
+                if app_pid is None:
+                    app.pop("processIdentifier")
+                else:
+                    app["processIdentifier"] = app_pid
+                with self.assertRaisesRegex(MemoryEvidenceError, message):
+                    self.qualify_macos(engine, engine_samples, app, app_samples)
+
+    def test_one_series_kernel_ledgers_come_from_both_layers(self) -> None:
+        engine, engine_samples, app, app_samples = self.macos_pair(
+            "generation-macos-kernel", kernel_ledgers=True,
+        )
+        # The process-wide ledger read by the app at 810 ms caught a spike.
+        app_samples[3]["kernelPhysFootprintPeakMB"] = 3600.0
+        app_samples[4]["kernelPhysFootprintPeakMB"] = 3600.0
+        app = row(app["generationID"], app_samples, layer="app", ios=False)
+        qualified, _ = self.qualify_macos(engine, engine_samples, app, app_samples)
+        metrics = qualified[0].metrics
+        self.assertEqual(metrics["kernelPhysFootprintPeakMB"], 3600.0)
+        self.assertEqual(metrics["kernelPhysFootprintPeakExact"], 1)
+        self.assertEqual(metrics["footprintPeakCaptureMissMB"], 3600.0 - 2519.0)
+        self.assertEqual(metrics["graphicsFootprintEndMB"], app_samples[-1]["graphicsFootprintMB"])
+
+        engine, engine_samples, app, app_samples = self.macos_pair(
+            "generation-macos-kernel-mixed", kernel_ledgers=True,
+        )
+        for sample in app_samples:
+            sample.pop("kernelPhysFootprintPeakMB")
+            sample.pop("graphicsFootprintMB")
+        with self.assertRaisesRegex(MemoryEvidenceError, "different kernel ledgers"):
+            self.qualify_macos(engine, engine_samples, app, app_samples)
 
     def test_missing_app_boundary_fails_macos_ui_qualification(self) -> None:
         generation_id = "generation-macos-app-boundary"
@@ -690,139 +921,6 @@ class MemoryEvidenceTests(unittest.TestCase):
         self.write_sidecar("engine", generation_id, engine_samples)
         self.write_sidecar("app", generation_id, app_samples)
         with self.assertRaisesRegex(MemoryEvidenceError, "lifecycle boundary order"):
-            qualify_memory_rows(
-                rows=[engine], app_rows=[app], diagnostics=self.root,
-                platform="macos", require_app_layer=True,
-            )
-
-    def test_macos_alignment_coverage_warns_at_95_percent_and_fails_below(self) -> None:
-        generation_id = "generation-macos-alignment"
-        base_uptime = 10_000_000_000
-
-        def fixture(engine_times_ms: list[int]) -> tuple[dict, dict]:
-            engine_samples = samples(
-                role="engine", boundaries=ENGINE_BOUNDARIES, ios=False, footprint=2500
-            )
-            app_samples = samples(
-                role="app", boundaries=["app_submit", "app_terminal"],
-                ios=False, footprint=200,
-            )
-            self.assertEqual(len(engine_samples), len(engine_times_ms))
-            for sample, offset_ms in zip(engine_samples, engine_times_ms, strict=True):
-                sample["capturedUptimeNS"] = base_uptime + offset_ms * 1_000_000
-            for sample, offset_ms in zip(
-                app_samples, [0, 500, 1000, 1500, 3000], strict=True
-            ):
-                sample["capturedUptimeNS"] = base_uptime + offset_ms * 1_000_000
-            engine = row(generation_id, engine_samples, layer="engine", ios=False)
-            app = row(generation_id, app_samples, layer="app", ios=False)
-            self.write_sidecar("engine", generation_id, engine_samples)
-            self.write_sidecar("app", generation_id, app_samples)
-            return engine, app
-
-        engine, app = fixture(list(range(0, 1800, 100)) + [2200, 3000])
-        qualified, _ = qualify_memory_rows(
-            rows=[engine], app_rows=[app], diagnostics=self.root,
-            platform="macos", require_app_layer=True,
-        )
-        self.assertEqual(qualified[0].metrics["alignedProcessSampleCoverage"], 0.95)
-        self.assertEqual(qualified[0].metrics["alignedEngineSampleCoverage"], 0.95)
-        self.assertEqual(qualified[0].metrics["alignedAppSampleCoverage"], 1.0)
-        self.assertEqual(qualified[0].status, "qualifiedWithWarnings")
-        self.assertIn("memory.alignment.coverage", qualified[0].warnings)
-
-        engine, app = fixture(list(range(0, 1700, 100)) + [2100, 2300, 3000])
-        with self.assertRaisesRegex(MemoryEvidenceError, "below 95%"):
-            qualify_memory_rows(
-                rows=[engine], app_rows=[app], diagnostics=self.root,
-                platform="macos", require_app_layer=True,
-            )
-
-    def test_macos_alignment_uses_same_generation_edge_samples_within_cadence(self) -> None:
-        generation_id = "generation-macos-edge-alignment"
-        base_uptime = 10_000_000_000
-        engine_samples = samples(
-            role="engine", boundaries=ENGINE_BOUNDARIES, ios=False, footprint=2500
-        )
-        app_samples = samples(
-            role="app", boundaries=["app_submit", "app_terminal"],
-            ios=False, footprint=200,
-        )
-
-        # This mirrors a real short warm take: the app sampler starts 1 ms
-        # before the engine sampler, while its next periodic sample lands just
-        # beyond 500 ms from the initial engine boundary cluster.  The app's
-        # start sample is valid same-generation evidence and must be available
-        # to pair those engine samples even though it is just outside the
-        # strict overlap interval.
-        engine_times = list(range(1, 11)) + [522, 868, 1008, 1518] + list(range(1926, 1932))
-        self.assertEqual(len(engine_samples), len(engine_times))
-        app_times = [0, 0, 522, 1008, 1501, 2001, 2246, 2247]
-        periodic = copy.deepcopy(next(item for item in app_samples if item["kind"] == "periodic"))
-        app_samples = [copy.deepcopy(app_samples[0]), copy.deepcopy(app_samples[1])]
-        app_samples.extend(copy.deepcopy(periodic) for _ in range(4))
-        app_samples.extend([copy.deepcopy(app_samples[1]), copy.deepcopy(samples(
-            role="app", boundaries=["app_submit", "app_terminal"],
-            ios=False, footprint=200,
-        )[-1])])
-        app_samples[-2]["boundary"] = "app_terminal"
-        self.assertEqual(len(app_samples), len(app_times))
-
-        for index, (sample, offset_ms) in enumerate(zip(engine_samples, engine_times, strict=True)):
-            sample["capturedElapsedNS"] = index * 40_000_000
-            sample["capturedUptimeNS"] = base_uptime + offset_ms * 1_000_000
-            sample["tMS"] = index * 40
-        for index, (sample, offset_ms) in enumerate(zip(app_samples, app_times, strict=True)):
-            sample["capturedElapsedNS"] = index * 40_000_000
-            sample["capturedUptimeNS"] = base_uptime + offset_ms * 1_000_000
-            sample["tMS"] = index * 40
-
-        engine = row(generation_id, engine_samples, layer="engine", ios=False)
-        app = row(generation_id, app_samples, layer="app", ios=False)
-        self.write_sidecar("engine", generation_id, engine_samples)
-        self.write_sidecar("app", generation_id, app_samples)
-        qualified, _ = qualify_memory_rows(
-            rows=[engine], app_rows=[app], diagnostics=self.root,
-            platform="macos", require_app_layer=True,
-        )
-        self.assertEqual(qualified[0].metrics["alignedEngineSampleCoverage"], 1.0)
-        self.assertEqual(qualified[0].metrics["alignedAppSampleCoverage"], 1.0)
-        self.assertEqual(qualified[0].metrics["alignedProcessSampleCoverage"], 1.0)
-
-    def test_macos_alignment_rejects_reverse_asymmetric_app_coverage(self) -> None:
-        generation_id = "generation-macos-app-alignment"
-        base_uptime = 10_000_000_000
-        engine_samples = samples(
-            role="engine", boundaries=ENGINE_BOUNDARIES, ios=False, footprint=2500
-        )
-        engine_times = list(range(0, 100, 10)) + list(range(2910, 3010, 10))
-        self.assertEqual(len(engine_samples), len(engine_times))
-        for sample, offset_ms in zip(engine_samples, engine_times, strict=True):
-            sample["capturedUptimeNS"] = base_uptime + offset_ms * 1_000_000
-
-        template = samples(
-            role="app", boundaries=["app_submit", "app_terminal"],
-            ios=False, footprint=200,
-        )
-        periodic = copy.deepcopy(next(item for item in template if item["kind"] == "periodic"))
-        app_samples = [copy.deepcopy(template[0]), copy.deepcopy(template[1])]
-        for _ in range(20):
-            app_samples.append(copy.deepcopy(periodic))
-        app_samples.extend([copy.deepcopy(template[2]), copy.deepcopy(template[-1])])
-        app_times = [0, 10] + list(range(600, 2501, 100)) + [2990, 3000]
-        self.assertEqual(len(app_samples), len(app_times))
-        for index, (sample, offset_ms) in enumerate(zip(app_samples, app_times, strict=True)):
-            sample["capturedElapsedNS"] = index * 40_000_000
-            sample["capturedUptimeNS"] = base_uptime + offset_ms * 1_000_000
-            sample["tMS"] = index * 40
-        # This peak has no aligned engine sample and must never enter a publishable aggregate.
-        app_samples[len(app_samples) // 2]["physFootprintMB"] = 5000
-
-        engine = row(generation_id, engine_samples, layer="engine", ios=False)
-        app = row(generation_id, app_samples, layer="app", ios=False)
-        self.write_sidecar("engine", generation_id, engine_samples)
-        self.write_sidecar("app", generation_id, app_samples)
-        with self.assertRaisesRegex(MemoryEvidenceError, "below 95%"):
             qualify_memory_rows(
                 rows=[engine], app_rows=[app], diagnostics=self.root,
                 platform="macos", require_app_layer=True,

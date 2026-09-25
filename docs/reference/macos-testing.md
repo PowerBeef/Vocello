@@ -269,13 +269,13 @@ screenshots, and `.xcresult` remain untracked; publication never stages, commits
 
 New publishable generation runs use telemetry schema v8 and evidence manifest v2. Their exact
 `samples-<generationID>.jsonl` files must begin/end with one start/stop sample, contain the required
-load/stream/finalization boundaries, match summary counts, have zero capture failures, and retain at
-least 95% periodic coverage. macOS UI totals come from the app and engine samples of the one
-hosting process, paired by absolute uptime within one 500 ms cadence.
+load/stream/finalization boundaries, match summary counts, have zero capture failures, and leave no
+gap between samples above twice the sampler cadence. The app and engine samples of the one hosting
+process form one series in absolute-uptime order; they are never summed.
 Critical pressure, app memory warning/exit, `hardTrim`, or `fullUnload` fails publication, and so
 does a marking peak-equality breach (CP-2: within every take, no post-marking footprint sample may
 exceed the pre-marking peak beyond tolerance — `config/marking-peak-equality.json`). Guarded
-pressure, `softTrim`, or 95–<100% coverage publishes only as an explicit warning.
+pressure or `softTrim` publishes only as an explicit warning.
 
 The routine per-tier cache clear (a `trim-action` with source `post-generation` and reason
 `post_generation_cache_clear`, emitted after every take where `clearCacheAfterGeneration` is set)
@@ -306,15 +306,16 @@ scripts/macos_test.sh profile --kind memory --keep-trace custom:speed:
 The memory profile captures one cold long take so Allocations/VM Tracker include model-load and
 sustained-generation peaks. It uses Apple's Allocations template, which contains both memory tracks
 with automatic VM snapshots disabled; standalone VM Tracker auto-snapshots suspend the target and
-would legitimately lower its 500 ms sampler coverage. Publication verifies that setting from the
-captured trace and still enforces the unmodified 95% coverage floor. The default 180-second safety
+would legitimately blind its 500 ms sampler. Publication verifies that setting from the captured
+trace and still enforces the unobserved-gap gate unmodified. The default 180-second safety
 cap accommodates a cold long take, while target exit ends recording early. `scripts/macos_test.sh
 memory` owns the repeated retained-growth qualification.
 
 Both commands build the exact CLI, suspend one owned process, attach Instruments to that exact PID,
 resume it only after xctrace reports recording, and validate the exported trace table of contents.
 The memory lane enables verbose per-sample telemetry and remains PASS-only. Headless CLI profiles
-report the owning engine process; UI benchmarks use the uptime-aligned app+engine pairing.
+report the owning engine process; UI benchmarks merge the app and engine samples of their one
+process into one series.
 The tracer stage requires at least 5 GiB free for CPU profiles and 15 GiB for memory profiles before
 it launches the target. The prerequisite CLI build uses the shared 8 GiB development-build floor,
 so a complete CPU-profile command effectively requires 8 GiB; memory remains 15 GiB. After

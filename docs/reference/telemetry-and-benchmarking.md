@@ -448,12 +448,28 @@ where time goes; use **Instruments signposts** (see [`benchmarking-procedure.md`
 
 ### Publication-grade memory qualification
 
-Benchmark-evidence manifest v2 binds `memoryContractVersion: 1`, `memoryQualified: true`, the exact
-selected sidecar count/digest, and each take's `memoryStatus` plus sidecar digest. A sidecar must
-start/stop exactly once, have monotonic elapsed/uptime clocks, match all summary counts, report zero
-memory-capture failures, and retain at least 95% periodic coverage. Engine evidence includes
+Benchmark-evidence manifest v2 binds `memoryContractVersion: 2` (since 2026-09-25), `memoryQualified:
+true`, the exact selected sidecar count/digest, and each take's `memoryStatus` plus sidecar digest. A
+sidecar must start/stop exactly once, have monotonic elapsed/uptime clocks, match all summary counts
+and report zero memory-capture failures. Engine evidence includes
 preparation/model-load/session/final-WAV and first-output/terminal boundaries; app evidence includes
-`app_submit` and `app_terminal`. A 95–<100% coverage result is warning evidence.
+`app_submit` and `app_terminal`.
+
+Contract v2 judges each take's one memory series. Timer health: no gap between two consecutive
+samples may exceed twice the sampler's target interval (`samplerMaximumUnobservedGapMS`); a longer
+gap fails publication. Periodic coverage (`samplerCoverage`, `samplerMissedDeadlineCount`) is still
+published but no longer gates, because it counts deadlines honoured rather than whether the peak was
+seen. Peak fidelity: `gpuPeakCaptureMissMB` is how far the sampled Metal peak fell below the exact
+`mlxPeakMB` (0 when it caught it). When the sampler read the kernel ledgers (samplers since
+2026-09-25, from the same `task_vm_info` call), `kernelPhysFootprintPeakMB` is the process-lifetime
+footprint high-water mark at the take's end: `kernelPhysFootprintPeakExact` is 1 when it rose inside
+the take, so it is the take's exact peak and `footprintPeakCaptureMissMB` is the sampled peak's
+shortfall, and 0 when it is only an upper bound set earlier in the process; `graphicsFootprintEndMB`
+is the graphics-tagged footprint at the take's end. A ledger peak below a sampled footprint is a
+broken read and fails publication; a miss is reported, never failed. Records before 2026-09-25 are
+contract v1: they required at least 95% periodic coverage (95–<100% was warning evidence), and they
+keep that meaning. The contract version joins the comparison key from v2 on, so a v2 series never
+shares a lineage with a v1 aggregate.
 
 Critical pressure, `application_memory_warning`, a memory exit, `hardTrim`, or `fullUnload` fails
 publication. Guarded pressure or `softTrim` is `passedWithWarnings`, except the routine per-tier
@@ -462,9 +478,14 @@ counted as `policyCacheClearCount` with no pressure level and no warning. iOS ad
 physical footprint ≥5,200 MiB, minimum headroom <384 MiB, or Metal working-set ratio ≥0.8; footprint
 ≥4,500 MiB or headroom <768 MiB is a warning. These are the app's shipping budget bands, declared
 once in `config/ios-memory-budget-policy.json` (a Swift test pins `IOSMemoryBudgetPolicy` to it). The iOS record retains start/end/min headroom and peak
-process-budget utilization. macOS UI totals pair app and engine samples by absolute uptime within
-one sampler cadence (the larger of the two processes' target intervals: 500 ms on the 8 GB Mac and iPhone tiers, 250 ms on 16 GB, 100 ms above); they never add independent process maxima. Headless CLI/profile evidence reports
-only its owning engine process.
+process-budget utilization. One process has one memory series: the macOS app hosts the engine, so
+its app-layer and engine-layer samplers are two readers of that one process. A macOS UI take's
+series is the union of both layers' samples in absolute-uptime order (a duplicate uptime counted
+once), spanning the app's submit-to-terminal window; its values are never summed, and both rows must
+name the same process ID. The app sidecar contributes its samples, its coverage and its
+submit/terminal order. Contract-v1 macOS UI records (2026-09-15 to 2026-09-25) summed uptime-paired
+app and engine samples of that one process and so report about twice its memory; they are not
+rewritten. Headless CLI/profile evidence reports only its owning engine process.
 
 The separate `memory` commands run policy `retained-memory-v1`: fixed Custom→Design→Clone
 Speed/medium sequences with three retained takes per mode. Within each mode, first-to-last retained

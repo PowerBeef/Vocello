@@ -281,6 +281,22 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
                 self.last_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             return result
 
+    def test_in_process_memory_is_one_series_not_the_sum_of_two_samplers(self) -> None:
+        # Audit #1/#2: the app and engine samplers read the one hosting process;
+        # the published peak is that process's largest reading, never a sum.
+        result = self.run_checker(self.expected_order, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        record = self.last_manifest["historyRecord"]
+        self.assertEqual(record["evidence"]["memoryContractVersion"], 2)
+        self.assertEqual(record["evidence"]["sampleSidecarCount"], 2 * len(self.expected_order))
+        for index, take in enumerate(record["takes"], start=1):
+            metrics = take["metrics"]
+            engine_peak = 2500 + index + len(ENGINE_BOUNDARIES) + 2
+            self.assertEqual(metrics["peakPhysicalFootprintMB"], engine_peak)
+            self.assertNotIn("alignedProcessSampleCoverage", metrics)
+            self.assertIn("samplerMaximumUnobservedGapMS", metrics)
+            self.assertEqual(metrics["gpuPeakCaptureMissMB"], 2200.0 - metrics["peakGPUAllocatedMB"])
+
     def test_quality_identity_stamps_schema_v3(self) -> None:
         result = self.run_checker(self.expected_order, evidence=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

@@ -444,7 +444,8 @@ The macOS memory profile records one cold long take. This captures model-load pl
 allocation/VM peaks. The lane uses Apple's Allocations template for its Allocations and VM Tracker
 tracks because that template disables automatic VM snapshots; adding standalone VM Tracker to a
 Blank trace enables stop-the-world snapshots that create real holes in the target's 500 ms sampler.
-Publication verifies the captured template setting and retains the strict 95% floor. The memory
+Publication verifies the captured template setting and applies the same unobserved-gap gate as
+every memory-qualified take (no gap above twice the cadence). The memory
 profile's default 180-second safety cap is only a maximum; exact-target exit ends the recording
 early. The separate `scripts/macos_test.sh memory` lane owns repeated retained growth.
 
@@ -690,16 +691,20 @@ New publishable generation benchmarks require telemetry schema v8 and benchmark-
 v2. For every selected generation, the exact `engine/samples-*.jsonl` sidecar for that `generationID` must
 begin with one `start`, end with one `stop`, retain monotonic elapsed and absolute-uptime clocks,
 and contain the required preparation/model-load/session/first-output/final-WAV/terminal boundaries.
-iOS additionally requires finite headroom samples. macOS UI runs require a matching app sidecar;
-their total resident/footprint/compressed/GPU values use samples paired by absolute uptime within one
-500 ms cadence. Headless macOS CLI/profile runs remain owning-engine-process evidence. Never add
-independent process maxima.
+iOS additionally requires finite headroom samples. macOS UI runs require a matching app sidecar
+from the same process ID: the app hosts the engine, so both layers' samples form one series of that
+process in absolute-uptime order (memory contract v2) and are never summed. Headless macOS
+CLI/profile runs remain owning-engine-process evidence.
 
-Sidecar and summary counts must agree, capture failures must be zero, and periodic sampler coverage
-must be at least 95%. Coverage from 95% to below 100%, guarded pressure, or `softTrim` produces
+Sidecar and summary counts must agree, capture failures must be zero, and no gap between two
+consecutive samples of the series may exceed twice the sampler cadence. Each take also publishes
+how far its sampled peaks fell below the exact high-water marks (`gpuPeakCaptureMissMB` against
+`mlxPeakMB`, and the kernel footprint ledger when sampled). Guarded pressure or `softTrim` produces
 `passedWithWarnings`; the routine post-generation cache clear is counted as `policyCacheClearCount`
-instead (records since 2026-09-25). Coverage below 95%, critical pressure, an app memory warning/exit,
-`hardTrim`, or `fullUnload` fails publication and leaves tracked history unchanged. Manifest v2
+instead (records since 2026-09-25). A longer gap, a kernel ledger below a sample, critical pressure,
+an app memory warning/exit, `hardTrim`, or `fullUnload` fails publication and leaves tracked history
+unchanged. Contract-v1 records (before 2026-09-25) required at least 95% periodic coverage instead
+and summed uptime-paired macOS app and engine samples. Manifest v2
 binds `memoryContractVersion`, the selected sidecar count/digest, each take's memory status/digest,
 and bounded start/end/delta/peak, headroom/utilization, sampler, pressure, trim, warning, and exit
 metrics. Raw samples remain untracked.

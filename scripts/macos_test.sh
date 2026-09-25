@@ -439,7 +439,8 @@ cmd_profile() {
     # and configures VM Tracker with automatic snapshots disabled. Adding a
     # standalone VM Tracker instrument to a Blank trace enables stop-the-world
     # automatic snapshots, which can suspend the exact target for 1-2 seconds
-    # and make its honest 500 ms in-process sampler fall below the 95% gate.
+    # and leave its honest 500 ms in-process sampler blind for longer than the
+    # memory contract's unobserved-gap gate (twice the cadence) allows.
     instrument_args=(--template "$memory_template" --instrument "$cpu_instrument")
     capture_instruments="$cpu_instrument + $allocations_instrument + $vm_tracker_instrument + os_signpost"
   else
@@ -452,9 +453,9 @@ cmd_profile() {
   if [[ "$kind" == "memory" ]]; then
     # Retention has its own multi-take lane. The Instruments memory lane focuses
     # on one cold long take: this captures model-load and sustained-generation
-    # peaks while providing enough genuine 500 ms cadence opportunities for the
-    # strict 95% coverage gate. The Allocations template above avoids automatic
-    # VM snapshots rather than discounting profiler-induced sampler gaps.
+    # peaks under the same unobserved-gap gate as every memory-qualified take.
+    # The Allocations template above avoids automatic VM snapshots rather than
+    # discounting profiler-induced sampler gaps.
     profile_length="long"
     profile_warm="0"
   fi

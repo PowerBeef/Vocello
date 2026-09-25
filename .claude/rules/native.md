@@ -69,8 +69,9 @@ requested.
   ÷ audio seconds, lower is faster; `audioSecondsPerWallSecond` is the decode-loop speedup and is never
   called RTF. Wall time for any throughput figure comes from `ContinuousClock`, never `Date()`.
 - **Telemetry semantics are typed.** Since telemetry schema v8 (records stay v8; the streaming v9
-  projection is a digest-bound sidecar), frontend latency stops at playback scheduling; process
-  memory belongs to the process that measured it; a macOS UI benchmark is authoritative only when the app
+  projection is a digest-bound sidecar), frontend latency stops at playback scheduling; one process
+  has one memory series (the app layer is required for frontend timings; its samples of the hosting
+  process join that series, never a sum); a macOS UI benchmark is authoritative only when the app
   and engine layers are complete (the merged record names its required layers).
 
 ## macOS app (`Sources/QwenVoiceApp.swift`, `Sources/Views`, `ViewModels`, `Services`)
@@ -119,7 +120,8 @@ requested.
   `VoiceClipTranscriber.preparedVoiceEnrollmentMetadata(...)`.
 - **Entitlements.** App sandbox stays off for MLX; the app is the only entitled Mach-O;
   `config/macos-entitlement-policy.json` changes need a security review.
-- **Memory evidence pairs samples by uptime**; independent per-process maxima are not a system peak.
+- **Memory evidence is one series per process**: the app and engine samplers of the one hosting
+  process merge by absolute uptime and are never summed; a per-process maximum is not a system peak.
 
 ## iOS app (`Sources/iOS`, `Sources/iOSSupport`, `Tests/VocelloiOSLogicTests`)
 
@@ -145,8 +147,8 @@ requested.
 - **Hardware and memory.** `IOSDeviceSupport.isSupportedHardware` (iPhone 15 Pro and later) aligns with
   `scripts/ios_device_eligibility.py`; the `increased-memory-limit` entitlement stays; clone load profile
   follows the entitled limit. Publishable device evidence is memory-qualified (telemetry schema v8 or
-  newer, ≥95%
-  coverage, no critical pressure, warning, `hardTrim` or `fullUnload`).
+  newer, no unobserved sampler gap above twice the cadence, sampled peaks measured against the exact
+  high-water marks, no critical pressure, warning, `hardTrim` or `fullUnload`).
 - **Localization grows through typed catalog entries.** Dynamic copy belongs in `VocelloPresentationText`
   and `Localizable.xcstrings` with plural rules; formatted copy goes through `VocelloLocalization.format`
   or `IOSAppLanguage.format` so plural rules follow the interface language;

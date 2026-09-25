@@ -1219,6 +1219,105 @@ class BenchmarkHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(history.HistoryError, "alignedAppSampleCoverage"):
             self.publish(invalid, invalid["run"]["id"])
 
+    def memory_contract_v2_record(self, run_id: str) -> dict:
+        record = record_fixture(run_id=run_id)
+        record["schemaVersion"] = 2
+        record["evidence"].update({
+            "telemetrySchemaVersion": 8,
+            "memoryContractVersion": 2,
+            "memoryQualified": True,
+            "sampleSidecarCount": 2,
+            "sampleSidecarsDigest": "a" * 64,
+        })
+        take = record["takes"][0]
+        take["memoryStatus"] = "qualified"
+        take["sampleSidecarDigest"] = "b" * 64
+        take["playbackStartSource"] = "finalFile"
+        take["metrics"].update({key: 0.0 for key in history.MEMORY_REQUIRED_METRICS})
+        take["metrics"].update({
+            "samplerCoverage": 0.9,  # informational under contract v2
+            "samplerSampleCount": 10.0,
+            "samplerBoundarySampleCount": 8.0,
+            "samplerPeriodicSampleCount": 1.0,
+            "samplerTargetIntervalMS": 500.0,
+            "samplerMaximumUnobservedGapMS": 1000.0,
+            "gpuRecommendedWorkingSetMB": 4096.0,
+            "peakGPUAllocatedMB": 90.0,
+            "peakPhysicalFootprintMB": 300.0,
+            "mlxActivePeakMB": 100.0,
+            "mlxCachePeakMB": 10.0,
+            "mlxPeakMB": 110.0,
+            "gpuPeakCaptureMissMB": 20.0,
+            "kernelPhysFootprintPeakMB": 340.0,
+            "kernelPhysFootprintPeakExact": 1.0,
+            "footprintPeakCaptureMissMB": 40.0,
+            "graphicsFootprintEndMB": 80.0,
+        })
+        return record
+
+    def test_memory_contract_v2_takes_have_one_series_a_bounded_gap_and_peak_fidelity(self) -> None:
+        valid = self.memory_contract_v2_record("macos-ui-memory-contract-v2")
+        self.publish(valid, valid["run"]["id"])
+
+        def mutated(name: str, change) -> dict:
+            candidate = copy.deepcopy(valid)
+            candidate["run"]["id"] = f"macos-ui-memory-contract-v2-{name}"
+            change(candidate["takes"][0]["metrics"])
+            return candidate
+
+        cases = {
+            "pairing": (
+                lambda metrics: metrics.update({"alignedProcessSampleCoverage": 1.0}),
+                "carries no pairing metrics",
+            ),
+            "no-gap": (
+                lambda metrics: metrics.pop("samplerMaximumUnobservedGapMS"),
+                "incomplete: samplerMaximumUnobservedGapMS",
+            ),
+            "long-gap": (
+                lambda metrics: metrics.update({"samplerMaximumUnobservedGapMS": 1000.5}),
+                "unobserved for more than 2x",
+            ),
+            "wrong-miss": (
+                lambda metrics: metrics.update({"gpuPeakCaptureMissMB": 0.0}),
+                "gpuPeakCaptureMissMB does not match",
+            ),
+            "ledger-below-sample": (
+                lambda metrics: metrics.update({
+                    "kernelPhysFootprintPeakMB": 250.0, "footprintPeakCaptureMissMB": 0.0,
+                }),
+                "ledger peak is below",
+            ),
+            "upper-bound-miss": (
+                lambda metrics: metrics.update({"kernelPhysFootprintPeakExact": 0.0}),
+                "belongs only to an exact kernel peak",
+            ),
+            "partial-ledger": (
+                lambda metrics: metrics.pop("kernelPhysFootprintPeakExact"),
+                "ledger metrics are incomplete",
+            ),
+        }
+        for name, (change, message) in cases.items():
+            candidate = mutated(name, change)
+            with self.subTest(case=name), self.assertRaisesRegex(history.HistoryError, message):
+                self.publish(candidate, candidate["run"]["id"])
+
+        unknown = copy.deepcopy(valid)
+        unknown["run"]["id"] = "macos-ui-memory-contract-v3"
+        unknown["evidence"]["memoryContractVersion"] = 3
+        with self.assertRaises(history.HistoryError):
+            self.publish(unknown, unknown["run"]["id"])
+
+    def test_memory_contract_v2_never_shares_a_lineage_with_v1(self) -> None:
+        record = self.memory_contract_v2_record("macos-ui-memory-lineage")
+        legacy = copy.deepcopy(record)
+        legacy["evidence"]["memoryContractVersion"] = 1
+        self.assertNotEqual(history.comparison_key(record), history.comparison_key(legacy))
+        # A v1 record's key is computed exactly as before the marker existed.
+        without = copy.deepcopy(legacy)
+        without["evidence"].pop("memoryContractVersion")
+        self.assertEqual(history.comparison_key(legacy), history.comparison_key(without))
+
     def test_nested_manifest_selects_only_current_run(self) -> None:
         payload = {
             "schemaVersion": 1,

@@ -92,8 +92,12 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   inconclusive (`GATE: INCONCLUSIVE`, exit 3), never as pass or fail. A timing take whose own one-minute
   load exceeded the core count marks its engine record exploratory.
 - **Memory-qualified publication.** Telemetry schema v8 or newer (records are v8; streaming v9 is a
-  digest-bound sidecar), manifest v2, exact sidecar digests, ≥95% coverage, zero capture failures, no
-  critical pressure, warning, `hardTrim` or `fullUnload`; 95–<100% coverage is `passedWithWarnings`. Marking evidence keeps the take peak
+  digest-bound sidecar), manifest v2, exact sidecar digests, memory contract v2 (one series per
+  process; no gap between samples above twice the sampler cadence; each take's sampled peaks
+  published against the exact high-water marks, MLX's per-request peak and the kernel footprint ledger
+  when sampled, a ledger below a sample failing), zero
+  capture failures, no critical pressure, warning, `hardTrim` or `fullUnload`; contract-v1 records keep
+  their ≥95% coverage rule. Marking evidence keeps the take peak
   (`config/marking-peak-equality.json`).
 - **Audio QA is autonomous.** Fixed seeds, byte-bound PCM QC, locale-locked full-WAV ASR and
   prosody/delivery evidence are required; listening is optional, has no lane, and never clears a

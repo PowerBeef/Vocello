@@ -73,6 +73,11 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
         row = self.review_row()
         report = review_automated_audio(row, 'instructed', 2.0)
         self.assertEqual(report['status'], 'pass')
+        # WER v2 moves pass/fail under the same evidence policy, so the review
+        # names the scoring version it applied.
+        self.assertEqual(report['accuracyMetricVersion'], 'segmentation-aware-edit-rate-v2')
+        self.assertTrue(all(r['accuracyMetricVersion'] == 'segmentation-aware-edit-rate-v2'
+                            for r in report['recognitions']))
         self.assertFalse(report['humanListeningRequired'])
         self.assertEqual(report['perceptualQuality'], 'not-established')
         self.assertNotIn(row['referenceText'], json.dumps(report))
@@ -187,6 +192,9 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
         self.assertEqual(first["rowCount"], 2)
         self.assertEqual(first["canonicalizationIdentity"], canonicalization_identity(RESAMPLER_VERSION))
         self.assertEqual(len(first["composerSHA256"]), 64)
+        # The shared metrics that score every recognition bind the report too.
+        self.assertIn("lib/language_metrics.py", first["reviewDependencies"])
+        self.assertEqual(first["accuracyMetricVersion"], "segmentation-aware-edit-rate-v2")
         self.assertEqual(
             first["reportDigest"],
             digest({key: value for key, value in first.items() if key != "reportDigest"}),

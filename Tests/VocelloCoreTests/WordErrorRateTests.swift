@@ -814,7 +814,7 @@ final class WordErrorRateTests: XCTestCase {
         let gate = passing.languageASRGateResult(evidenceDigest: digest)
         XCTAssertEqual(gate.gate, .languageASR)
         XCTAssertEqual(gate.outcome, .pass)
-        XCTAssertEqual(gate.algorithmVersion, 4)
+        XCTAssertEqual(gate.algorithmVersion, 5)
         XCTAssertEqual(gate.evidenceDigest, digest)
         XCTAssertEqual(
             gate.measurements.first { $0.key == .consensusPassCount }?.value,
@@ -824,6 +824,28 @@ final class WordErrorRateTests: XCTestCase {
             gate.measurements.first { $0.key == .wordErrorRate }?.value,
             0
         )
+
+        // Gate v5 reports the rate its outcome reads: a word-boundary merge the
+        // v1 rate charges (0.4) is not what a passing WER v2 gate measured.
+        var merged = passing
+        merged.wordErrorRate = 0.4
+        merged.accuracyValue = 0.05
+        let mergedGate = merged.languageASRGateResult()
+        XCTAssertEqual(mergedGate.outcome, .pass)
+        XCTAssertEqual(
+            mergedGate.measurements.first { $0.key == .wordErrorRate }?.value,
+            0.05
+        )
+        // Chinese and Japanese gate on the character rate, under its own key.
+        var characters = passing
+        characters.accuracyMetric = .characterErrorRate
+        characters.accuracyValue = 0.08
+        let characterGate = characters.languageASRGateResult()
+        XCTAssertEqual(
+            characterGate.measurements.first { $0.key == .characterErrorRate }?.value,
+            0.08
+        )
+        XCTAssertNil(characterGate.measurements.first { $0.key == .wordErrorRate })
 
         // Inconsistent recognition is unavailable evidence, not a measured speech defect.
         var failing = passing

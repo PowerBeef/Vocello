@@ -84,7 +84,10 @@ under it. Replayed offline over the 38 committed scored takes: the three German 
 CER 0.0, 2 substitutions and 2 deletions, so two character-identical merges of at most four words)
 score 0.0 under v2; no passing take can change verdict because the v2 distance never exceeds the v1
 distance; the two macOS accuracy controls (WER 0.5625) need their transcripts, which are not
-committed, so the next lang-bench measures them under v2.
+committed, so the next lang-bench measures them under v2. The app's `languageASR` quality gate
+reports the rate its outcome reads since gate composition 5 (the v2 word rate as `word_error_rate`,
+or the character rate as `character_error_rate`; through version 4 it reported the v1 word rate),
+and the delivery cascade records the `accuracyMetricVersion` it scored each recognition under.
 
 Each family's alignment also yields `longestDeletionRun`, the longest run of consecutive reference
 units the recognizer deleted on the primary metric's units (a match, substitution or insertion ends

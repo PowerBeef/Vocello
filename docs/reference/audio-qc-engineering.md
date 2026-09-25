@@ -982,8 +982,10 @@ generator, evaluator service, cloud processing or evaluator bundled into the app
 - `--review-evidence` optionally supplies **executed**, run-bound recognition receipts. It must
   cover exactly the plan's generation IDs. Each role binds the original WAV and script digest,
   full processed duration, locked and detected language, transcript, and runtime/model/config
-  digests. WER/CER is recomputed with the existing language checker and unchanged 0.15 threshold;
-  supplied scores are ignored. These processing receipts are evidence from trusted producers,
+  digests. WER/CER is recomputed with the shared language metrics and unchanged 0.15 threshold;
+  supplied scores are ignored. The word rate is WER v2 since 2026-09-25, which moves pass/fail
+  under the same evidence policy, so each review and the report record `accuracyMetricVersion`,
+  and `reviewDependencies` binds `lib/language_metrics.py`. These processing receipts are evidence from trusted producers,
   not cryptographic proof that a recognizer actually listened to every word.
 - At least two distinct supported ASR families must agree. Three Whisper/Apple repetitions are
   repeatability, not independent consensus. Wrong-language/partial/missing/drifted receipts or

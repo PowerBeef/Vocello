@@ -35,12 +35,20 @@ from delivery_compact_model_adapter import run_compact_adapter
 from delivery_evaluator import atomic_json
 from delivery_evaluator_v2 import evaluate_v2
 from delivery_temporal_features import analyze_temporal, paired_temporal_delta
-from lib.language_metrics import consensus as family_consensus, recognition_issues, score_recognition
+from lib.language_metrics import (
+    ACCURACY_METRIC_VERSION,
+    consensus as family_consensus,
+    recognition_issues,
+    score_recognition,
+)
 from prosody_quality_gate import evaluate_metrics
 import delivery_acoustic_reference as acoustic_reference
 
 
 SCHEMA_VERSION = 1
+# The evidence contract shared with `independent_asr.py`. How a recognition is
+# scored is recorded beside it as `accuracyMetricVersion` (WER v2 since
+# 2026-09-25), since it moves pass/fail without changing the evidence format.
 REVIEW_POLICY = "automated-evidence-1"
 REPO = Path(__file__).resolve().parents[1]
 GLOBAL_ANALYZER = REPO / "scripts/analyze_prosody.py"
@@ -117,6 +125,7 @@ def review_automated_audio(row: dict[str, Any], role: str, duration: float) -> d
         verdict = score_recognition(recognition, script=script, language=language)
         families.setdefault(verdict["modelFamily"], []).append(verdict["passed"])
         metrics.append({"modelFamily": verdict["modelFamily"], "metric": verdict["metric"],
+                        "accuracyMetricVersion": verdict["accuracyMetricVersion"],
                         "errorRate": verdict["errorRate"], "passed": verdict["passed"],
                         "provenance": recognition["provenance"]})
     agreement = family_consensus(families)
@@ -126,7 +135,8 @@ def review_automated_audio(row: dict[str, Any], role: str, duration: float) -> d
         language_status = "inconclusive"
     status = ("fail" if "fail" in (safety, language_status) else
               "pass" if (safety, language_status) == ("pass", "pass") else "inconclusive")
-    return {"policyID": REVIEW_POLICY, "status": status, "safety": safety,
+    return {"policyID": REVIEW_POLICY, "accuracyMetricVersion": ACCURACY_METRIC_VERSION,
+            "status": status, "safety": safety,
             "spokenContent": language_status, "recognitions": metrics,
             "independentASRFamilies": len(families), "reasons": sorted(set(reasons)),
             "humanListeningRequired": False, "perceptualQuality": "not-established",
@@ -693,12 +703,14 @@ def run_cascade(
         "schemaVersion": SCHEMA_VERSION,
         "kind": "local-delivery-cascade",
         "reviewPolicyID": REVIEW_POLICY,
+        "accuracyMetricVersion": ACCURACY_METRIC_VERSION,
         "humanListeningRequired": False,
         "promotionAuthority": False,
         "inputManifestDigest": manifest["manifestDigest"],
         "composerSHA256": file_sha256(CASCADE_SOURCE),
         "reviewDependencies": {name: file_sha256(REPO / 'scripts' / name) for name in
-                               ('check_language_output.py', 'prosody_quality_gate.py', 'prosody_profile.py')},
+                               ('check_language_output.py', 'lib/language_metrics.py',
+                                'prosody_quality_gate.py', 'prosody_profile.py')},
         "canonicalizationIdentity": canonicalization_identity(cache.resampler_version),
         "acousticReferenceBase": reference_status,
         "acousticReferenceComparatorSHA256": file_sha256(Path(acoustic_reference.__file__)),

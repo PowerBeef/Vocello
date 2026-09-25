@@ -18,7 +18,12 @@ enum GenerationOutputVerifier {
         /// three-pass rule on any passing gate. A skipped verification maps to
         /// `.unavailable` so a required gate can never silently disappear.
         /// Gate composition v4 distinguishes unavailable measurement from measured
-        /// rejection. Raw verifier v3, edit metrics, and retained reports are unchanged.
+        /// rejection. v5 (WER v2, audit #43) reports the rate the outcome reads:
+        /// `accuracyValue` under its own metric's key, the segmentation-aware word
+        /// rate as `word_error_rate` or the character rate (Chinese, Japanese) as
+        /// `character_error_rate`. Through v4 the gate reported the v1 word rate
+        /// whatever its outcome read. The verifier's `accuracyMetricVersion`
+        /// records which word rate the outcome used.
         func languageASRGateResult(evidenceDigest: String? = nil) -> GenerationQualityGateResult {
             let consensusPasses = recognition.consensusStatus == .consistent
                 ? recognition.repetitions.count
@@ -29,10 +34,14 @@ enum GenerationOutputVerifier {
                     value: Double(consensusPasses)
                 ),
             ]
-            if let wordErrorRate, wordErrorRate.isFinite {
+            if let accuracyValue, accuracyValue.isFinite {
+                let gatedKey: GenerationQualityMeasurementKey = switch accuracyMetric {
+                case .wordErrorRate: .wordErrorRate
+                case .characterErrorRate: .characterErrorRate
+                }
                 measurements.append(GenerationQualityMeasurement(
-                    key: .wordErrorRate,
-                    value: wordErrorRate
+                    key: gatedKey,
+                    value: accuracyValue
                 ))
             }
             // Any skipReason means evaluate stopped BEFORE scoring. This includes
@@ -52,7 +61,7 @@ enum GenerationOutputVerifier {
             return GenerationQualityGateResult(
                 gate: .languageASR,
                 outcome: outcome,
-                algorithmVersion: 4,
+                algorithmVersion: 5,
                 evidenceDigest: evidenceDigest,
                 measurements: measurements
             )

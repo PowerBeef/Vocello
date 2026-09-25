@@ -43,6 +43,8 @@ public enum GenerationQualityMeasurementKey: String, Codable, Hashable, Sendable
     case chunkCount = "chunk_count"
     case channelHighWaterFrames = "channel_high_water_frames"
     case wordErrorRate = "word_error_rate"
+    /// The language gate's character rate for Chinese and Japanese (gate v5).
+    case characterErrorRate = "character_error_rate"
     case consensusPassCount = "consensus_pass_count"
     case pitchRangeSemitones = "pitch_range_semitones"
     case boundaryDiscontinuity = "boundary_discontinuity"

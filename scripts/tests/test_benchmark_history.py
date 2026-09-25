@@ -298,6 +298,93 @@ def prosody_take(run_id: str) -> dict:
     }
 
 
+def fixed_runtime_hardware(platform: str, _profile: dict) -> dict:
+    """What the live host probes return, without running them.
+
+    `build_record` always probes the host (`swift -e` on the Mac, `devicectl`
+    for a paired iPhone) and `merge_missing` discards the answer whenever the
+    fixture already carries the key, so the unit tests never need the host:
+    the probes' own parsing is covered by `HostProbeParsingTests`."""
+    if platform == "macos":
+        return {
+            "osName": "macOS", "osVersion": "26.5.2", "osBuild": "25F84",
+            "thermalState": "nominal", "lowPowerMode": False, "transport": "local",
+            "loadAverage1M": 1.0, "freeStorageBytes": 1_000_000, "uptimeSeconds": 100.0,
+        }
+    return {
+        "osName": "iOS", "thermalState": "unknown", "lowPowerMode": None,
+        "transport": "physical-device",
+    }
+
+
+class HostProbeParsingTests(unittest.TestCase):
+    """The only host probes `build_record` runs, parsed from canned output."""
+
+    def test_mac_probe_parses_thermal_state_and_low_power(self) -> None:
+        answers = {
+            ("sw_vers", "-productName"): "macOS",
+            ("sw_vers", "-productVersion"): "26.6.2",
+            ("sw_vers", "-buildVersion"): "25G99",
+        }
+
+        def run_command(arguments: list[str], *, check: bool = True) -> str:
+            if arguments[0] == "swift":
+                return swift_answer
+            return answers[tuple(arguments)]
+
+        for swift_answer, thermal, low_power in (
+            ("2\n1", "serious", True),
+            ("0\n0", "nominal", False),
+            ("7\n0", "unknown", False),
+            ("", "unknown", False),
+        ):
+            with self.subTest(swift=swift_answer), mock.patch.object(history, "run_command", side_effect=run_command):
+                result = history.mac_runtime_hardware()
+            self.assertEqual(
+                (result["osName"], result["osVersion"], result["osBuild"]),
+                ("macOS", "26.6.2", "25G99"),
+            )
+            self.assertEqual(result["thermalState"], thermal)
+            self.assertIs(result["lowPowerMode"], low_power)
+            self.assertEqual(result["transport"], "local")
+            for key in ("loadAverage1M", "freeStorageBytes", "uptimeSeconds"):
+                self.assertIsInstance(result[key], (int, float))
+
+    def test_ios_probe_reads_exactly_one_matching_device(self) -> None:
+        profile = {"modelIdentifier": "iPhone18,1"}
+
+        def device(transport: str) -> dict:
+            return {
+                "deviceProperties": {"osVersionNumber": "26.6.1", "osBuildUpdate": "23G83"},
+                "connectionProperties": {"transportType": transport},
+            }
+
+        def fake_devicectl(devices: list[dict], returncode: int = 0):
+            def run(command, **_kwargs):
+                self.assertIn("iPhone18,1", " ".join(command))
+                output = Path(command[command.index("--json-output") + 1])
+                output.write_text(json.dumps({"result": {"devices": devices}}), encoding="utf-8")
+                return SimpleNamespace(returncode=returncode)
+
+            return run
+
+        base = {"osName": "iOS", "thermalState": "unknown", "lowPowerMode": None}
+        for name, devices, returncode, expected in (
+            ("wired", [device("wired")], 0,
+             {**base, "transport": "wired", "osVersion": "26.6.1", "osBuild": "23G83"}),
+            ("network", [device("localNetwork")], 0,
+             {**base, "transport": "local-network", "osVersion": "26.6.1", "osBuild": "23G83"}),
+            ("other-transport", [device("bluetooth")], 0,
+             {**base, "transport": "physical-device", "osVersion": "26.6.1", "osBuild": "23G83"}),
+            ("ambiguous", [device("wired"), device("wired")], 0, {**base, "transport": "physical-device"}),
+            ("failed", [device("wired")], 1, {**base, "transport": "physical-device"}),
+        ):
+            with self.subTest(name=name), mock.patch.object(
+                history.subprocess, "run", side_effect=fake_devicectl(devices, returncode)
+            ):
+                self.assertEqual(history.ios_runtime_hardware(profile), expected)
+
+
 @unittest.skipUnless(sys.platform == "darwin", "publishing a record binds the macOS host hardware (mac_runtime_hardware)")
 class BenchmarkHistoryTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -311,6 +398,8 @@ class BenchmarkHistoryTests(unittest.TestCase):
             mock.patch.object(history, "RUNS_ROOT", self.runs),
             mock.patch.object(history, "SCHEMA_PATH", self.schema),
             mock.patch.object(history, "HISTORY_PATH", self.index),
+            # Never query the host (or a paired iPhone) from a unit test.
+            mock.patch.object(history, "default_runtime_hardware", side_effect=fixed_runtime_hardware),
         ]
         for patcher in self.patches:
             patcher.start()

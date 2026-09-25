@@ -115,7 +115,10 @@ recomputes the record digest without changing the captured run evidence.
 Comparison metadata is derived from all tracked records, not insertion order. `rebuild-index`
 reconciles each compatible clean run with its nearest earlier equivalent and updates the record
 digest when an earlier record arrives later through a merge; `rebuild-index --check` and ordinary CI
-reject stale comparison metadata.
+reject stale comparison metadata. New records key on what their kind measures
+(`scripts/lib/lineage_identity.py`: the lane's project.yml build settings, the take topology and a
+reviewed per-kind measurement version); `lineage-replay` recomputes that identity for committed
+records from their own source commits without writing anything.
 
 See [`docs/reference/benchmarking-procedure.md`](../docs/reference/benchmarking-procedure.md)
 for the operator runbook (workflows, preflight, reading results) and

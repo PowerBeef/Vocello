@@ -530,6 +530,25 @@
         "harnessHash": {
           "type": "string"
         },
+        "lineageContractVersion": {
+          "description": "Comparison-key composition version of the per-kind lineage identity (scripts/lib/lineage_identity.py). Optional: absent on legacy records, whose comparison key stays byte-identical; when present, the other three lineage fields are present too.",
+          "enum": [
+            1
+          ]
+        },
+        "lineageHarnessHash": {
+          "description": "SHA-256 over the harness path list of this record kind and platform. Provenance only: never part of the comparison key.",
+          "type": "string"
+        },
+        "lineageMeasurementVersion": {
+          "description": "Reviewed measurement version of this record kind and platform; bumped when a change alters what the kind measures.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "lineageProjectHash": {
+          "description": "SHA-256 of the project.yml build-settings subset the lane builds, or not-applicable.",
+          "type": "string"
+        },
         "matrixHash": {
           "type": "string"
         },

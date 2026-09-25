@@ -1530,7 +1530,8 @@ class BenchmarkHistoryTests(unittest.TestCase):
         rtf_delta = comparison["deltas"][second_take["cell"]]["rtf"]
         self.assertAlmostEqual(rtf_delta["absolute"], 0.2)
         self.assertAlmostEqual(rtf_delta["percent"], 10.0)
-        self.assertIn("RTF +10.0%", self.index.read_text())
+        # A one-take cell stores its delta but stays out of the trend (audit #71).
+        self.assertIn("vs macos-bench-20260712-120000: compatible", self.index.read_text())
 
     def test_new_records_store_only_the_trend_deltas(self) -> None:
         first = self._schema_v3_language_record("mac-lang-bench-20260712-130000")
@@ -2297,6 +2298,205 @@ class BenchmarkHistoryTests(unittest.TestCase):
         m6["hardware"].update(M6_HARDWARE)
         self.assertNotEqual(history.comparison_key(m2), history.comparison_key(m6))
         self.assertEqual(history.comparison_key(m2), history.comparison_key(copy.deepcopy(m2)))
+
+    def test_legacy_keys_stay_frozen_and_new_records_key_on_their_lineage(self) -> None:
+        # Audit #22/#23: legacy records keep their stored keys byte for byte.
+        frozen = json.loads((FROZEN_RECORDS / "macos-ui-generation-v3.json").read_text())
+        self.assertFalse(history.LINEAGE_INPUT_KEYS & set(frozen["inputs"]))
+        self.assertEqual(history.comparison_key(frozen), frozen["comparison"]["key"])
+        self.assertEqual(history.comparison_key(frozen), history.legacy_comparison_key(frozen))
+
+        published = json.loads(
+            self.publish(quality_v3_language_fixture("lineage-new-20260712"), "lineage-new").read_text()
+        )
+        inputs = published["inputs"]
+        self.assertEqual(inputs["lineageContractVersion"], history.lineage_identity.LINEAGE_CONTRACT_VERSION)
+        self.assertEqual(
+            inputs["lineageMeasurementVersion"],
+            history.lineage_identity.LINEAGE_MEASUREMENT_VERSIONS[("language", "macos")],
+        )
+        self.assertEqual(published["comparison"]["key"], history.lineage_v1_comparison_key(published))
+        self.assertNotEqual(published["comparison"]["key"], history.legacy_comparison_key(published))
+
+        # Schema v1 is frozen history: a v1 record is never stamped.
+        legacy = json.loads(self.publish(record_fixture(run_id="lineage-v1-20260712"), "lineage-v1").read_text())
+        self.assertFalse(history.LINEAGE_INPUT_KEYS & set(legacy["inputs"]))
+
+    def test_the_lineage_key_ignores_provenance_but_not_what_is_measured(self) -> None:
+        record = json.loads(
+            self.publish(quality_v3_language_fixture("lineage-key-20260712"), "lineage-key").read_text()
+        )
+        key = history.comparison_key(record)
+
+        def keyed(mutate) -> str:
+            candidate = copy.deepcopy(record)
+            mutate(candidate)
+            return history.comparison_key(candidate)
+
+        provenance = {
+            "whole-tree harness": lambda r: r["inputs"].update(harnessHash="0" * 64),
+            "whole-tree project": lambda r: r["inputs"].update(projectInputHash="0" * 64),
+            "product contract": lambda r: r["inputs"].update(contractHash="0" * 64),
+            "dependency lock": lambda r: r["inputs"].update(dependencyLockHash="0" * 64),
+            "kind harness files": lambda r: r["inputs"].update(lineageHarnessHash="0" * 64),
+            "app version labels": lambda r: r["toolchain"].update(appVersion="9.9.9", appBuild="99"),
+            "executable hashes": lambda r: r["toolchain"].update(executableHashes={"vocello": "0" * 64}),
+        }
+        for name, mutate in provenance.items():
+            with self.subTest(provenance=name):
+                self.assertEqual(keyed(mutate), key)
+
+        measured = {
+            "measurement version": lambda r: r["inputs"].update(
+                lineageMeasurementVersion=r["inputs"]["lineageMeasurementVersion"] + 1),
+            "project build settings": lambda r: r["inputs"].update(lineageProjectHash="0" * 64),
+            "topology": lambda r: [take.update(layers=[*take["layers"], "engine-service"]) for take in r["takes"]],
+            "model revision": lambda r: r["models"][0].update(revision="0" * 40),
+            "rtf definition": lambda r: r["run"].update(rtfDefinition="wall/audio"),
+            "optimization": lambda r: r["toolchain"].update(optimization="-Onone"),
+            "os build": lambda r: r["hardware"].update(osBuild="25Z99"),
+            "matrix": lambda r: r["inputs"].update(matrixHash="0" * 64),
+            "qc algorithm": lambda r: r["evidence"].update(qcAlgorithmVersion=99),
+        }
+        for name, mutate in measured.items():
+            with self.subTest(measured=name):
+                self.assertNotEqual(keyed(mutate), key)
+
+    def test_lineage_inputs_are_all_or_none_versioned_and_v2_only(self) -> None:
+        record = json.loads(
+            self.publish(quality_v3_language_fixture("lineage-valid-20260712"), "lineage-valid").read_text()
+        )
+        history.validate_record(record)
+        not_applicable_project = copy.deepcopy(record)
+        not_applicable_project["inputs"]["lineageProjectHash"] = "not-applicable"
+        history.validate_lineage_inputs(not_applicable_project)
+
+        invalid = {
+            "a missing field": lambda r: r["inputs"].pop("lineageMeasurementVersion"),
+            "an unknown contract version": lambda r: r["inputs"].update(lineageContractVersion=2),
+            "a boolean contract version": lambda r: r["inputs"].update(lineageContractVersion=True),
+            "a zero measurement version": lambda r: r["inputs"].update(lineageMeasurementVersion=0),
+            "a text measurement version": lambda r: r["inputs"].update(lineageMeasurementVersion="1"),
+            "an absent harness hash": lambda r: r["inputs"].update(lineageHarnessHash="not-applicable"),
+            "schema v1": lambda r: r.update(schemaVersion=1),
+            "a kind without a lineage": lambda r: r["run"].update(kind="prosody-calibration", platform="ios"),
+        }
+        for name, mutate in invalid.items():
+            candidate = copy.deepcopy(record)
+            mutate(candidate)
+            with self.subTest(case=name), self.assertRaises(history.HistoryError):
+                history.validate_lineage_inputs(candidate)
+
+        stamped_v1 = record_fixture(run_id="lineage-stamped-v1")
+        stamped_v1["inputs"].update({
+            key: record["inputs"][key] for key in history.LINEAGE_INPUT_KEYS
+        })
+        with self.assertRaises(history.HistoryError):
+            self.publish(stamped_v1, "lineage-stamped-v1")
+
+    def test_lineage_records_link_across_harness_edits_and_history_says_so(self) -> None:
+        def lineage_record(run_id: str, minute: int, harness: str, measurement: int = 1) -> dict:
+            record = quality_v3_language_fixture(run_id)
+            record["takes"][0]["generationID"] = f"generation-{run_id}"
+            record["run"]["startedAt"] = f"2026-07-12T12:{minute:02d}:00Z"
+            record["run"]["finishedAt"] = f"2026-07-12T12:{minute + 1:02d}:00Z"
+            record["inputs"].update({
+                "analysisProfileHash": "not-applicable",
+                "lineageContractVersion": 1,
+                "lineageMeasurementVersion": measurement,
+                "lineageHarnessHash": harness * 64,
+                "lineageProjectHash": "5" * 64,
+            })
+            return record
+
+        self.publish(lineage_record("lineage-a-20260712", 0, "a"), "lineage-a")
+        second = json.loads(self.publish(lineage_record("lineage-b-20260712", 10, "b"), "lineage-b").read_text())
+        self.assertEqual(second["comparison"]["baselineRunID"], "lineage-a-20260712")
+        self.assertIn("vs lineage-a-20260712: harness changed", self.index.read_text())
+        bumped = json.loads(
+            self.publish(lineage_record("lineage-c-20260712", 20, "b", measurement=2), "lineage-c").read_text()
+        )
+        self.assertIsNone(bumped["comparison"]["baselineRunID"])
+        history.validate_all()
+
+    def test_trend_reports_noise_and_the_ui_first_chunk_span(self) -> None:
+        def trend(rtf: list[float], ttfc: list[float]) -> str:
+            cells = [{"key": f"cell-{index}", "count": 3} for index in range(len(rtf))]
+            cells.append({"key": "cold", "count": 1})
+            deltas = {
+                f"cell-{index}": {
+                    "rtf": {"percent": rtf_value},
+                    "submitToFirstChunkMS": {"percent": ttfc_value},
+                }
+                for index, (rtf_value, ttfc_value) in enumerate(zip(rtf, ttfc))
+            }
+            # A single cold take is noise, however large its delta.
+            deltas["cold"] = {"rtf": {"percent": 90.0}, "submitToFirstChunkMS": {"percent": 90.0}}
+            record = {
+                "schemaVersion": 1,
+                "run": {"kind": "ui-generation", "rtfDefinition": "wall/audio"},
+                "inputs": {},
+                "cells": cells,
+                "comparison": {"baselineRunID": "base", "deltas": deltas},
+            }
+            return history.trend_summary(record)
+
+        self.assertEqual(
+            trend([1.0, 0.5, 2.0], [-1.0, 0.0, 1.0]),
+            "vs base: RTF +1.0% (within noise), TTFC +0.0% (within noise)",
+        )
+        self.assertEqual(
+            trend([6.0, 6.5, 7.0], [-9.0, -8.0, -10.0]),
+            "vs base: RTF +6.5% (slower), TTFC -9.0% (faster)",
+        )
+        # A wide spread between cells widens the band past the 5% floor.
+        self.assertIn("RTF +6.0% (within noise)", trend([6.0, 0.0, 12.0], [0.0, 0.0, 0.0]))
+
+    def test_lineage_replay_reads_each_record_at_its_own_source_commit(self) -> None:
+        project = (Path(history.REPO_ROOT) / "project.yml").read_text(encoding="utf-8")
+        recording = project.replace(
+            "preferredScreenCaptureFormat: screenshots", "preferredScreenCaptureFormat: screenRecording", 1,
+        )
+        self.assertNotEqual(project, recording)
+        commits = {
+            "1" * 40: {"project.yml": project, "scripts/ui_test.sh": "one"},
+            "2" * 40: {"project.yml": project, "scripts/ui_test.sh": "two"},
+            "3" * 40: {"project.yml": recording, "scripts/ui_test.sh": "two"},
+        }
+
+        class FakeReader:
+            def has_commit(self, commit: str) -> bool:
+                return commit in commits
+
+            def read(self, commit: str, path: str) -> bytes | None:
+                value = commits.get(commit, {}).get(path)
+                return value.encode("utf-8") if value is not None else None
+
+            def close(self) -> None:
+                pass
+
+        records = []
+        for index, commit in enumerate(["1" * 40, "2" * 40, "3" * 40, "4" * 40]):
+            record = record_fixture(run_id=f"replay-{index}")
+            record["run"]["classification"] = "canonical"
+            record["run"]["finishedAt"] = f"2026-07-1{index}T00:00:00Z"
+            record["source"]["commit"] = commit
+            record["comparison"]["baselineRunID"] = None
+            records.append((Path(f"replay-{index}.json"), record))
+        with mock.patch.object(history, "GitBlobReader", FakeReader):
+            report = history.lineage_replay(records, kind="ui-generation", platform="macos")
+        rows = report["records"]
+        # A harness-only edit keeps the lineage and is flagged; the scheme's
+        # screen-capture switch starts a new one; a missing commit cannot link.
+        self.assertEqual(rows[1]["lineageBaselineRunID"], "replay-0")
+        self.assertTrue(rows[1]["harnessChangedFromBaseline"])
+        self.assertIsNone(rows[2]["lineageBaselineRunID"])
+        self.assertEqual(rows[2]["changedFromPrevious"], ["project.yml subset"])
+        self.assertFalse(rows[3]["sourceAvailable"])
+        self.assertEqual(
+            (report["lineageLinkedCount"], report["legacyLinkedCount"], report["unavailableSourceCount"]),
+            (1, 0, 1),
+        )
 
     def test_registry_names_exactly_one_canonical_profile_per_platform(self) -> None:
         profiles = history.load_profiles()

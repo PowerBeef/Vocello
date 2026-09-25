@@ -1,0 +1,360 @@
+"""What each benchmark record kind measures: its lineage identity (audit #22, #23, #34).
+
+A record's comparison key decides which earlier record its deltas are taken
+from. Until 2026-09-25 every kind hashed one shared list of 45 harness files
+(the engine under test, the publisher and every other lane's probes included)
+and the whole of project.yml, so nearly any edit started a new lineage: 39 of
+48 comparable UI records had no baseline. Replaying file hashes over even a
+narrow per-kind list did no better (2 of 16 canonical macOS UI records): the
+harness files changed at almost every transition, for a moved consent toggle,
+a comment, an environment-gated diagnostic, a new telemetry field or new gate
+thresholds, none of which changes what a take measures.
+
+Records stamped with ``inputs.lineageContractVersion`` are therefore keyed on
+automatic structural guards plus one reviewed number per kind:
+
+- ``lineageProjectHash``: the build-settings subset of project.yml the lane
+  builds (global options, configs and settings, the lane's scheme, and every
+  built target's settings), so a scheme or compiler-setting change such as the
+  2026-07-23 screen-recording switch always starts a new lineage. Version
+  labels, file membership, target links and package pins stay out.
+- The topology (the take layer set, read from the takes), so in-process
+  records never share a lineage with the XPC era.
+- ``lineageMeasurementVersion``: the reviewed measurement version of the kind
+  and platform (``LINEAGE_MEASUREMENT_VERSIONS``). A change that alters what
+  the kind measures (an in-window driver action, a probe, the metric mapping
+  or aggregation) bumps it in the same change (.claude/rules/release.md). The
+  kind's path list (``LINEAGE_PATHS``) is the scope of that review.
+- ``lineageHarnessHash`` hashes that path list. It is provenance, not identity:
+  benchmarks/HISTORY.md marks a delta taken across a harness change.
+
+Engine sources and dependency pins stay out of every key: deltas exist to
+measure engine changes. The key composition of a published contract version is
+frozen; changing what the key reads bumps ``LINEAGE_CONTRACT_VERSION``. Legacy
+records carry no version and keep their stored keys byte for byte.
+
+Every function takes a ``read(path) -> bytes | None`` callable, so the same
+identity is computed from the working tree at publication and from Git objects
+when committed records are replayed offline.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from typing import Callable, Iterable
+
+LINEAGE_CONTRACT_VERSION = 1
+SUPPORTED_LINEAGE_CONTRACT_VERSIONS = frozenset({1})
+NOT_APPLICABLE = "not-applicable"
+
+Reader = Callable[[str], "bytes | None"]
+
+# The telemetry every generation lane publishes through: the per-take stamp,
+# the telemetry row, the memory sampler, the memory aggregation (one series per
+# process, audit #1) and the RTF/TTFC definitions.
+GENERATION_TELEMETRY = (
+    "Sources/QwenVoiceCore/BenchRunContext.swift",
+    "Sources/QwenVoiceCore/GenerationTelemetryRecord.swift",
+    "Sources/QwenVoiceCore/NativeTelemetrySampler.swift",
+    "scripts/benchmark_memory.py",
+    "scripts/lib/rtf.py",
+)
+# The shared XCUITest driver code that runs inside every measured UI window.
+UI_AUTOMATION = (
+    "Tests/UIAutomationSupport/VocelloPlaybackCaptureSupport.swift",
+    "Tests/UIAutomationSupport/VocelloUIAutomationSupport.swift",
+    "Tests/UIAutomationSupport/VocelloUIInteractionPolicy.swift",
+)
+# The app-side frontend timeline and the main-thread stall probe.
+APP_TIMELINE = (
+    "Sources/SharedSupport/Telemetry/AppGenerationTimeline.swift",
+    "Sources/SharedSupport/Telemetry/MainThreadStallWatchdog.swift",
+)
+# Headless CLI lanes (vocello bench, memory, lang-bench, profiles): the lane
+# script, its quiet-host preflight, the publisher that maps rows to take
+# metrics, and the bench command and matrix.
+MACOS_ENGINE_LANE = (
+    "scripts/macos_test.sh",
+    "scripts/lib/host_preflight.sh",
+    "scripts/publish_benchmark_history.py",
+    "Sources/VocelloCLI/BenchCommand.swift",
+    "Sources/QwenVoiceCore/BenchMatrixSpec.swift",
+    *GENERATION_TELEMETRY,
+)
+# Headless iPhone lanes: the device lane script, the in-app runner and the publisher.
+IOS_ENGINE_LANE = (
+    "scripts/ios_device.sh",
+    "scripts/publish_benchmark_history.py",
+    "Sources/iOS/IOSDeviceDiagnosticsRunner.swift",
+    "Sources/QwenVoiceCore/BenchMatrixSpec.swift",
+    *GENERATION_TELEMETRY,
+)
+# Delivery and prosody analysis whose outputs engine records publish per take.
+DELIVERY_ANALYSIS = (
+    "scripts/analyze_prosody.py",
+    "scripts/bench_delivery_prosody.py",
+    "scripts/clone_prosody_fidelity.py",
+    "scripts/delivery_quality_gate.py",
+    "scripts/delivery_separability.py",
+    "scripts/prosody_profile.py",
+    "scripts/prosody_quality_gate.py",
+)
+LANGUAGE_VERIFICATION = (
+    "scripts/check_language_hints.py",
+    "scripts/check_language_output.py",
+    "scripts/independent_asr.py",
+    "scripts/lib/language_metrics.py",
+)
+PROFILE_SUMMARY = ("scripts/lib/profile_trace_retention.py",)
+
+LINEAGE_PATHS: dict[tuple[str, str], tuple[str, ...]] = {
+    ("ui-generation", "macos"): (
+        "scripts/ui_test.sh",
+        "scripts/lib/host_preflight.sh",
+        "scripts/check_macos_ui_bench.py",
+        "scripts/lib/playback_capture.py",
+        *UI_AUTOMATION,
+        "Tests/VocelloMacUITests/VocelloMacUITestCase.swift",
+        "Tests/VocelloMacUITests/VocelloMacBenchmarkUITests.swift",
+        "Tests/VocelloMacUITests/VocelloPlaybackCaptureSession.swift",
+        *APP_TIMELINE,
+        *GENERATION_TELEMETRY,
+    ),
+    ("ui-generation", "ios"): (
+        "scripts/ui_test.sh",
+        "scripts/check_ios_ui_benchmark.py",
+        *UI_AUTOMATION,
+        "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSBenchmarkUITests.swift",
+        *APP_TIMELINE,
+        *GENERATION_TELEMETRY,
+    ),
+    # The ceilings in config/ui-perf-thresholds*.json judge a record; they do not
+    # shape what it measures, so they stay out of the identity (audit #34).
+    ("ui-perf", "macos"): (
+        "scripts/ui_test.sh",
+        "scripts/lib/host_preflight.sh",
+        "scripts/check_macos_ui_perf.py",
+        "Sources/Services/UIPerfFrameProbe.swift",
+        "Sources/Services/UIPerfHistorySeeder.swift",
+        "Sources/SharedSupport/Telemetry/MainThreadStallWatchdog.swift",
+        *UI_AUTOMATION,
+        "Tests/VocelloMacUITests/VocelloMacUITestCase.swift",
+        "Tests/VocelloMacUITests/VocelloMacPerfUITests.swift",
+    ),
+    ("ui-perf", "ios"): (
+        "scripts/ui_test.sh",
+        "scripts/check_ios_ui_perf.py",
+        "Sources/iOSSupport/Services/IOSUIPerfFrameProbe.swift",
+        "Sources/iOSSupport/Services/IOSUIPerfHistorySeeder.swift",
+        "Sources/SharedSupport/Telemetry/MainThreadStallWatchdog.swift",
+        *UI_AUTOMATION,
+        "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
+        "Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift",
+    ),
+    ("engine-generation", "macos"): (*MACOS_ENGINE_LANE, *DELIVERY_ANALYSIS),
+    ("engine-generation", "ios"): IOS_ENGINE_LANE,
+    ("memory-qualification", "macos"): (
+        *MACOS_ENGINE_LANE, "config/memory-qualification-policy.json",
+    ),
+    ("memory-qualification", "ios"): (
+        *IOS_ENGINE_LANE,
+        "config/memory-qualification-policy.json",
+        "config/ios-memory-budget-policy.json",
+    ),
+    ("language", "macos"): (*MACOS_ENGINE_LANE, *LANGUAGE_VERIFICATION),
+    ("language", "ios"): (*IOS_ENGINE_LANE, *LANGUAGE_VERIFICATION),
+    ("instrument-profile", "macos"): (*MACOS_ENGINE_LANE, *PROFILE_SUMMARY),
+    ("instrument-profile", "ios"): (*IOS_ENGINE_LANE, *PROFILE_SUMMARY),
+    # Calibration analyzes a labeled corpus; it builds and launches nothing.
+    ("prosody-calibration", "macos"): (
+        "scripts/analyze_prosody.py",
+        "scripts/prosody_calibration.py",
+        "scripts/prosody_profile.py",
+        "scripts/publish_benchmark_history.py",
+    ),
+}
+
+# Kinds that generate no speech from a prompt corpus: ui-perf replays seeded
+# history, and its stored corpusHash is the default hash of the CLI bench matrix
+# and UI driver files, which says nothing about what a ui-perf record measures.
+CORPUS_FREE_KINDS = frozenset({"ui-perf"})
+
+# The reviewed measurement version of each kind and platform. Bump one when a
+# change alters what that kind measures (release.md "Records measure what they
+# claim"); a bump starts a new lineage and never rewrites a stored key.
+LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {key: 1 for key in LINEAGE_PATHS}
+
+# (scheme, extra root targets) whose project.yml subset each lane builds;
+# None when the lane builds nothing.
+LINEAGE_PROJECT_SCOPES: dict[tuple[str, str], tuple[str | None, tuple[str, ...]] | None] = {
+    ("ui-generation", "macos"): ("VocelloMacUI", ()),
+    ("ui-perf", "macos"): ("VocelloMacUI", ()),
+    ("ui-generation", "ios"): ("VocelloiOSUI", ()),
+    ("ui-perf", "ios"): ("VocelloiOSUI", ()),
+    **{
+        (kind, "macos"): (None, ("VocelloCLI",))
+        for kind in ("engine-generation", "memory-qualification", "language", "instrument-profile")
+    },
+    **{
+        (kind, "ios"): ("VocelloiOS", ())
+        for kind in ("engine-generation", "memory-qualification", "language", "instrument-profile")
+    },
+    ("prosody-calibration", "macos"): None,
+}
+
+PROJECT_FILE = "project.yml"
+# Global project.yml blocks that set how every target builds. `packages` (the
+# dependency pins) is engine, like the Package.resolved lock: out of the key.
+PROJECT_GLOBAL_BLOCKS = ("options", "configs", "settings")
+# Target sub-blocks that describe file membership or the link graph rather
+# than how the target builds; `dependencies` is still followed to find targets.
+PROJECT_TARGET_EXCLUDED_BLOCKS = frozenset({"sources", "resources", "dependencies"})
+# Version labels: bumping a release never changes what a lane measures.
+PROJECT_VERSION_LABELS = frozenset({"MARKETING_VERSION", "CURRENT_PROJECT_VERSION"})
+
+_YAML_KEY_RE = re.compile(r"^( *)([A-Za-z0-9_.$()-]+):(?:[ \t]|$)")
+_YAML_TARGET_DEPENDENCY_RE = re.compile(r"^ *- *target: *([A-Za-z0-9_.-]+) *$")
+
+
+def has_lineage(kind: str, platform: str) -> bool:
+    return (kind, platform) in LINEAGE_PATHS
+
+
+def content_hash(paths: Iterable[str], read: Reader) -> str:
+    """SHA-256 over (path, file SHA-256) pairs in path order; missing files are skipped.
+
+    The same construction as benchmark_history.hash_existing_files."""
+    digest = hashlib.sha256()
+    found = False
+    for path in sorted(set(paths)):
+        data = read(path)
+        if data is None:
+            continue
+        found = True
+        digest.update(path.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(data).hexdigest().encode("ascii"))
+    return digest.hexdigest() if found else NOT_APPLICABLE
+
+
+def yaml_lines(text: str) -> list[tuple[tuple[str, ...], str]]:
+    """(key path, line) for every significant line of a block-style YAML document.
+
+    A line belongs to the innermost mapping key that encloses it; a key line
+    belongs to its own key. Blank and comment-only lines are dropped. This is
+    the subset project.yml uses (block mappings and lists, no anchors), read
+    without a YAML dependency."""
+    stack: list[tuple[int, str]] = []
+    entries: list[tuple[tuple[str, ...], str]] = []
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        match = _YAML_KEY_RE.match(raw)
+        if match:
+            while stack and stack[-1][0] >= indent:
+                stack.pop()
+            stack.append((indent, match.group(2)))
+        else:
+            # A list item or continuation belongs to the key it is nested under,
+            # including a list written at its parent key's own indent.
+            while stack and stack[-1][0] > indent:
+                stack.pop()
+        entries.append((tuple(key for _, key in stack), raw.rstrip()))
+    return entries
+
+
+def _block(entries: list[tuple[tuple[str, ...], str]], prefix: tuple[str, ...]) -> list[str]:
+    return [
+        line for path, line in entries
+        if path[:len(prefix)] == prefix and not (PROJECT_VERSION_LABELS & set(path))
+    ]
+
+
+def _child_keys(entries: list[tuple[tuple[str, ...], str]], prefix: tuple[str, ...]) -> list[str]:
+    return sorted({
+        path[len(prefix)] for path, _ in entries
+        if len(path) > len(prefix) and path[:len(prefix)] == prefix
+    })
+
+
+def project_targets(
+    entries: list[tuple[tuple[str, ...], str]], scheme: str | None, roots: Iterable[str],
+) -> list[str]:
+    """The scheme's build targets plus the roots, closed over `- target:` dependencies."""
+    pending = list(roots)
+    if scheme:
+        pending.extend(_child_keys(entries, ("schemes", scheme, "build", "targets")))
+    targets: set[str] = set()
+    while pending:
+        name = pending.pop()
+        if name in targets:
+            continue
+        targets.add(name)
+        for line in _block(entries, ("targets", name, "dependencies")):
+            if match := _YAML_TARGET_DEPENDENCY_RE.match(line):
+                pending.append(match.group(1))
+    return sorted(targets)
+
+
+def project_subset(
+    project_text: str, scheme: str | None, roots: Iterable[str],
+) -> list[list[object]]:
+    """[block name, normalized lines] for the build-settings subset a lane builds."""
+    entries = yaml_lines(project_text)
+    blocks: list[list[object]] = [[name, _block(entries, (name,))] for name in PROJECT_GLOBAL_BLOCKS]
+    if scheme:
+        blocks.append([f"schemes.{scheme}", _block(entries, ("schemes", scheme))])
+    for target in project_targets(entries, scheme, roots):
+        lines = [
+            line for path, line in entries
+            if path[:2] == ("targets", target)
+            and not (len(path) > 2 and path[2] in PROJECT_TARGET_EXCLUDED_BLOCKS)
+            and not (PROJECT_VERSION_LABELS & set(path))
+        ]
+        blocks.append([f"targets.{target}", lines])
+    return blocks
+
+
+def project_subset_hash(project_text: str | None, scheme: str | None, roots: Iterable[str]) -> str:
+    if project_text is None:
+        return NOT_APPLICABLE
+    encoded = json.dumps(
+        project_subset(project_text, scheme, roots), sort_keys=True, separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    return hashlib.sha256(encoded.encode("ascii")).hexdigest()
+
+
+def lineage_inputs(kind: str, platform: str, read: Reader) -> dict[str, object] | None:
+    """The stored lineage fields for a new record, or None for a kind without a lineage."""
+    paths = LINEAGE_PATHS.get((kind, platform))
+    if paths is None:
+        return None
+    scope = LINEAGE_PROJECT_SCOPES.get((kind, platform))
+    if scope is None:
+        project_hash = NOT_APPLICABLE
+    else:
+        project = read(PROJECT_FILE)
+        project_hash = project_subset_hash(
+            project.decode("utf-8") if project is not None else None, scope[0], scope[1],
+        )
+    return {
+        "lineageContractVersion": LINEAGE_CONTRACT_VERSION,
+        "lineageMeasurementVersion": LINEAGE_MEASUREMENT_VERSIONS[(kind, platform)],
+        "lineageHarnessHash": content_hash(paths, read),
+        "lineageProjectHash": project_hash,
+    }
+
+
+def topology(takes: Iterable[object]) -> list[str]:
+    """The sorted layer set the takes were measured across (XPC era: engine-service too)."""
+    layers: set[str] = set()
+    for take in takes:
+        if isinstance(take, dict) and isinstance(take.get("layers"), list):
+            layers.update(str(layer) for layer in take["layers"])
+    return sorted(layers)

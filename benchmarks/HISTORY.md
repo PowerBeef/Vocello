@@ -12,10 +12,18 @@ lower is faster, below 1.0 is faster than real time. Records published since 202
 `run.rtfDefinition: "wall/audio"` and measure the engine request span (prepare entry to the
 final WAV write, minus model load and prewarm). Older records stored the inverted decode-loop
 speedup (audio ÷ decode seconds, higher is faster) under `rtf`; they are never rewritten. The
-RTF column below shows a standard value for every record: measured for new records, and
-`~`-prefixed when derived from the legacy take's app submit→completed span (or the inverse of
-its end-to-end speedup for CLI records). The two lineages never share a comparison key, and
-trend percentages carry their direction in words.
+RTF column below shows a standard value for every record, the median over all of its takes
+(cold takes included): measured for new records, and `~`-prefixed when derived from the legacy
+take's app submit→completed span (or the inverse of its end-to-end speedup for CLI records).
+The two lineages never share a comparison key.
+
+A **trend** compares a record with the nearest earlier record of its comparison key: each term
+is the median of the per-cell median deltas over cells with at least three takes, and reads
+"within noise" unless it exceeds max(5%, 3 × the median absolute deviation of those cell
+deltas); otherwise its direction is given in words. TTFC is the engine's first-chunk latency,
+or the app's submit→first-chunk span for UI records. Records keyed by a lineage contract
+(`inputs.lineageContractVersion`) note "harness changed" when their harness files differ
+from the baseline's.
 
 ## engine-generation / ios / iphone-17-pro / config `1f7856b56aef`
 
@@ -130,7 +138,7 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-07 | [`macos-engine-20260807-023057-5275b724`](runs/engine-generation/macos-engine-20260807-023057-5275b724.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.99 | `46da18acdcd5` | `08537b5694f6` | baseline | marking-qc-marked |
-| 2026-08-07 | [`macos-engine-20260807-023242-fce41fcb`](runs/engine-generation/macos-engine-20260807-023242-fce41fcb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.90 | `517e69ea0617` | `08537b5694f6` | vs macos-engine-20260807-023057-5275b724: RTF +10.2% (faster), TTFC +0.2%, RAM +0.0% | marking-qc-off |
+| 2026-08-07 | [`macos-engine-20260807-023242-fce41fcb`](runs/engine-generation/macos-engine-20260807-023242-fce41fcb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.90 | `517e69ea0617` | `08537b5694f6` | vs macos-engine-20260807-023057-5275b724: compatible | marking-qc-off |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `08613eaf0dca`
 
@@ -511,8 +519,8 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-20 | [`macos-engine-20260720-052534-b9dcb26d`](runs/engine-generation/macos-engine-20260720-052534-b9dcb26d.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.08 | `0d4eac8b336b` | `817164bfb96c` | baseline | phase0-cli-control-1 |
-| 2026-07-20 | [`macos-engine-20260720-052721-ebbbbda7`](runs/engine-generation/macos-engine-20260720-052721-ebbbbda7.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.06 | `0d4eac8b336b` | `817164bfb96c` | vs macos-engine-20260720-052534-b9dcb26d: RTF +2.1% (faster), TTFC -5.8%, RAM -0.4% | phase0-cli-control-2 |
-| 2026-07-20 | [`macos-engine-20260720-052856-845cd043`](runs/engine-generation/macos-engine-20260720-052856-845cd043.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.08 | `0d4eac8b336b` | `817164bfb96c` | vs macos-engine-20260720-052721-ebbbbda7: RTF +0.3% (faster), TTFC -1.3%, RAM +2.4% | phase0-cli-control-3 |
+| 2026-07-20 | [`macos-engine-20260720-052721-ebbbbda7`](runs/engine-generation/macos-engine-20260720-052721-ebbbbda7.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.06 | `0d4eac8b336b` | `817164bfb96c` | vs macos-engine-20260720-052534-b9dcb26d: RTF -0.2% (within noise), TTFC +0.4% (within noise), RAM -2.3% (within noise) | phase0-cli-control-2 |
+| 2026-07-20 | [`macos-engine-20260720-052856-845cd043`](runs/engine-generation/macos-engine-20260720-052856-845cd043.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.08 | `0d4eac8b336b` | `817164bfb96c` | vs macos-engine-20260720-052721-ebbbbda7: RTF +0.3% (within noise), TTFC +0.2% (within noise), RAM +2.4% (within noise) | phase0-cli-control-3 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `82fb367e35d8`
 
@@ -712,8 +720,8 @@ trend percentages carry their direction in words.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-29 | [`macos-engine-20260729-004519-0d30c659`](runs/engine-generation/macos-engine-20260729-004519-0d30c659.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | ~0.95 | `311c3d0be053` dirty | `excluded` | baseline | phase0-cli-control-3 |
 | 2026-07-29 | [`macos-engine-20260729-005023-933281cb`](runs/engine-generation/macos-engine-20260729-005023-933281cb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.94 | `39a7117d5b51` | `b7cc29f8a00b` | baseline | phase0-cli-control-1 |
-| 2026-07-29 | [`macos-engine-20260729-005146-c1c5642e`](runs/engine-generation/macos-engine-20260729-005146-c1c5642e.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.95 | `39a7117d5b51` | `b7cc29f8a00b` | vs macos-engine-20260729-005023-933281cb: RTF -0.2% (slower), TTFC +0.2%, RAM -3.4% | phase0-cli-control-2 |
-| 2026-07-29 | [`macos-engine-20260729-005310-2d7d3580`](runs/engine-generation/macos-engine-20260729-005310-2d7d3580.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.96 | `39a7117d5b51` | `b7cc29f8a00b` | vs macos-engine-20260729-005146-c1c5642e: RTF +1.8% (faster), TTFC -0.7%, RAM +3.2% | phase0-cli-control-3 |
+| 2026-07-29 | [`macos-engine-20260729-005146-c1c5642e`](runs/engine-generation/macos-engine-20260729-005146-c1c5642e.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.95 | `39a7117d5b51` | `b7cc29f8a00b` | vs macos-engine-20260729-005023-933281cb: RTF -0.2% (within noise), TTFC +0.3% (within noise), RAM -2.8% (within noise) | phase0-cli-control-2 |
+| 2026-07-29 | [`macos-engine-20260729-005310-2d7d3580`](runs/engine-generation/macos-engine-20260729-005310-2d7d3580.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.96 | `39a7117d5b51` | `b7cc29f8a00b` | vs macos-engine-20260729-005146-c1c5642e: RTF +0.9% (within noise), TTFC -0.7% (within noise), RAM +3.6% (within noise) | phase0-cli-control-3 |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `b7f0e4ef0127`
 
@@ -786,7 +794,7 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-02 | [`mac-gate-bench-20260902-013854-f39c1c91`](runs/engine-generation/mac-gate-bench-20260902-013854-f39c1c91.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | ~0.70 | `fd3bb5d343ea` | `c4e849dcb35b` | baseline | mac-gate-bench |
-| 2026-09-02 | [`mac-gate-bench-20260902-015022-591814fe`](runs/engine-generation/mac-gate-bench-20260902-015022-591814fe.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | ~0.69 | `1fffa64de385` | `c4e849dcb35b` | vs mac-gate-bench-20260902-013854-f39c1c91: RTF +1.5% (faster), TTFC +2.0%, RAM +3.4% | mac-gate-bench |
+| 2026-09-02 | [`mac-gate-bench-20260902-015022-591814fe`](runs/engine-generation/mac-gate-bench-20260902-015022-591814fe.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | ~0.69 | `1fffa64de385` | `c4e849dcb35b` | vs mac-gate-bench-20260902-013854-f39c1c91: compatible | mac-gate-bench |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `c8340ad4e716`
 
@@ -937,7 +945,7 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-23 | [`macos-engine-20260723-063922-c8b277f3`](runs/engine-generation/macos-engine-20260723-063922-c8b277f3.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 4 | ~0.54 | `34ed607cc810` | `ff23c88710ac` | baseline | p7-e2-app-open |
-| 2026-07-23 | [`macos-engine-20260723-065023-8fcdd4fb`](runs/engine-generation/macos-engine-20260723-065023-8fcdd4fb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 4 | ~0.55 | `34ed607cc810` | `ff23c88710ac` | vs macos-engine-20260723-063922-c8b277f3: RTF -0.3% (slower), TTFC +18.0%, RAM -0.1% | p7-mst-cli |
+| 2026-07-23 | [`macos-engine-20260723-065023-8fcdd4fb`](runs/engine-generation/macos-engine-20260723-065023-8fcdd4fb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 4 | ~0.55 | `34ed607cc810` | `ff23c88710ac` | vs macos-engine-20260723-063922-c8b277f3: RTF -0.9% (within noise), TTFC +37.9% (slower), RAM -0.4% (within noise) | p7-mst-cli |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `ff3d5167376d`
 
@@ -1030,7 +1038,7 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-02 | [`ios-memory-qualification-20260802-004313-87bfe92e`](runs/memory-qualification/ios-memory-qualification-20260802-004313-87bfe92e.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | — | `b6b2a028f1eb` | `dcec19b63f13` | baseline | ios-memory-qualification-20260802-004313-87bfe92e |
-| 2026-08-02 | [`ios-memory-qualification-20260802-004801-03ebafe1`](runs/memory-qualification/ios-memory-qualification-20260802-004801-03ebafe1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | — | `b6b2a028f1eb` | `dcec19b63f13` | vs ios-memory-qualification-20260802-004313-87bfe92e: RTF +6.8% (faster), TTFC -2.3%, RAM -9.4% | ios-memory-qualification-20260802-004801-03ebafe1 |
+| 2026-08-02 | [`ios-memory-qualification-20260802-004801-03ebafe1`](runs/memory-qualification/ios-memory-qualification-20260802-004801-03ebafe1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 9 | — | `b6b2a028f1eb` | `dcec19b63f13` | vs ios-memory-qualification-20260802-004313-87bfe92e: RTF +6.8% (faster), TTFC -2.3% (within noise), RAM -9.4% (lower) | ios-memory-qualification-20260802-004801-03ebafe1 |
 | 2026-08-02 | [`ios-memory-qualification-20260802-011251-9bddb00a`](runs/memory-qualification/ios-memory-qualification-20260802-011251-9bddb00a.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | — | `b6b2a028f1eb` dirty | `excluded` | baseline | ios-memory-qualification-20260802-011251-9bddb00a |
 | 2026-08-02 | [`ios-memory-qualification-20260802-011551-dba9b94f`](runs/memory-qualification/ios-memory-qualification-20260802-011551-dba9b94f.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 9 | — | `b6b2a028f1eb` dirty | `excluded` | baseline | ios-memory-qualification-20260802-011551-dba9b94f |
 
@@ -1124,7 +1132,7 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-20 | [`ios-xcui-benchmark-20260720-061732-10df7fd1`](runs/ui-generation/ios-xcui-benchmark-20260720-061732-10df7fd1.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.64 | `0d4eac8b336b` | `35a3b94d3ba6` | baseline | phase0-ios-control-1 |
-| 2026-07-20 | [`ios-xcui-benchmark-20260720-063420-e0258f45`](runs/ui-generation/ios-xcui-benchmark-20260720-063420-e0258f45.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.63 | `0d4eac8b336b` | `35a3b94d3ba6` | vs ios-xcui-benchmark-20260720-061732-10df7fd1: RTF -0.2% (slower), RAM -0.2% | phase0-ios-control-2 |
+| 2026-07-20 | [`ios-xcui-benchmark-20260720-063420-e0258f45`](runs/ui-generation/ios-xcui-benchmark-20260720-063420-e0258f45.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.63 | `0d4eac8b336b` | `35a3b94d3ba6` | vs ios-xcui-benchmark-20260720-061732-10df7fd1: RTF -0.2% (within noise), TTFC -0.3% (within noise), RAM -0.1% (within noise) | phase0-ios-control-2 |
 | 2026-07-20 | [`ios-xcui-benchmark-20260720-164844-5f6e9240`](runs/ui-generation/ios-xcui-benchmark-20260720-164844-5f6e9240.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | ~0.63 | `0d4eac8b336b` dirty | `excluded` | baseline | phase0-ios-control-3 |
 
 ## ui-generation / ios / iphone-17-pro / config `410479be8ae2`
@@ -1157,7 +1165,7 @@ trend percentages carry their direction in words.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-31 | [`ios-xcui-benchmark-20260731-065816-cb5e674e`](runs/ui-generation/ios-xcui-benchmark-20260731-065816-cb5e674e.json) | focused | exploratory | passedWithWarnings | qualified-with-warnings | 32 | ~0.58 | `ffffa2aac134` dirty | `excluded` | baseline | phase0-ios-control-1 |
 | 2026-07-31 | [`ios-xcui-benchmark-20260731-071308-d5e0496f`](runs/ui-generation/ios-xcui-benchmark-20260731-071308-d5e0496f.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.59 | `b2d4aaec0fd0` | `6edf7d8d8975` | baseline | phase0-ios-control-1 |
-| 2026-07-31 | [`ios-xcui-benchmark-20260731-182050-19550c08`](runs/ui-generation/ios-xcui-benchmark-20260731-182050-19550c08.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.58 | `93768bed57f8` | `6edf7d8d8975` | vs ios-xcui-benchmark-20260731-071308-d5e0496f: RTF +0.7% (faster), RAM +1.4% | phase0-ios-control-2 |
+| 2026-07-31 | [`ios-xcui-benchmark-20260731-182050-19550c08`](runs/ui-generation/ios-xcui-benchmark-20260731-182050-19550c08.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.58 | `93768bed57f8` | `6edf7d8d8975` | vs ios-xcui-benchmark-20260731-071308-d5e0496f: RTF +0.7% (within noise), TTFC -0.3% (within noise), RAM +1.4% (within noise) | phase0-ios-control-2 |
 
 ## ui-generation / ios / iphone-17-pro / config `79dc6d4371e7`
 
@@ -1266,8 +1274,8 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-29 | [`macos-xcui-benchmark-20260729-015937-cd85b2d5`](runs/ui-generation/macos-xcui-benchmark-20260729-015937-cd85b2d5.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.70 | `3331eecfdcdb` | `0c3160232d0e` | baseline | phase0-ui-control-1 |
-| 2026-07-29 | [`macos-xcui-benchmark-20260729-020753-75d2ec7b`](runs/ui-generation/macos-xcui-benchmark-20260729-020753-75d2ec7b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.71 | `3331eecfdcdb` | `0c3160232d0e` | vs macos-xcui-benchmark-20260729-015937-cd85b2d5: RTF +0.8% (faster), RAM -0.0% | phase0-ui-control-2 |
-| 2026-07-29 | [`macos-xcui-benchmark-20260729-021554-659b10be`](runs/ui-generation/macos-xcui-benchmark-20260729-021554-659b10be.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.73 | `3331eecfdcdb` | `0c3160232d0e` | vs macos-xcui-benchmark-20260729-020753-75d2ec7b: RTF -0.9% (slower), RAM -0.3% | phase0-ui-control-3 |
+| 2026-07-29 | [`macos-xcui-benchmark-20260729-020753-75d2ec7b`](runs/ui-generation/macos-xcui-benchmark-20260729-020753-75d2ec7b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.71 | `3331eecfdcdb` | `0c3160232d0e` | vs macos-xcui-benchmark-20260729-015937-cd85b2d5: RTF +0.3% (within noise), TTFC +0.2% (within noise), RAM -0.0% (within noise) | phase0-ui-control-2 |
+| 2026-07-29 | [`macos-xcui-benchmark-20260729-021554-659b10be`](runs/ui-generation/macos-xcui-benchmark-20260729-021554-659b10be.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~0.73 | `3331eecfdcdb` | `0c3160232d0e` | vs macos-xcui-benchmark-20260729-020753-75d2ec7b: RTF -0.4% (within noise), TTFC -0.1% (within noise), RAM +0.0% (within noise) | phase0-ui-control-3 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `0fc6cb69cd79`
 
@@ -1286,8 +1294,8 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-20 | [`macos-xcui-benchmark-20260720-053624-f2eb6d13`](runs/ui-generation/macos-xcui-benchmark-20260720-053624-f2eb6d13.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.34 | `0d4eac8b336b` | `126311b505ce` | baseline | phase0-ui-control-1 |
-| 2026-07-20 | [`macos-xcui-benchmark-20260720-054551-6b71dc9b`](runs/ui-generation/macos-xcui-benchmark-20260720-054551-6b71dc9b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.28 | `0d4eac8b336b` | `126311b505ce` | vs macos-xcui-benchmark-20260720-053624-f2eb6d13: RTF -0.4% (slower), RAM -3.4% | phase0-ui-control-2 |
-| 2026-07-20 | [`macos-xcui-benchmark-20260720-055506-11eb8550`](runs/ui-generation/macos-xcui-benchmark-20260720-055506-11eb8550.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.34 | `0d4eac8b336b` | `126311b505ce` | vs macos-xcui-benchmark-20260720-054551-6b71dc9b: RTF +0.0% (faster), RAM +0.2% | phase0-ui-control-3 |
+| 2026-07-20 | [`macos-xcui-benchmark-20260720-054551-6b71dc9b`](runs/ui-generation/macos-xcui-benchmark-20260720-054551-6b71dc9b.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.28 | `0d4eac8b336b` | `126311b505ce` | vs macos-xcui-benchmark-20260720-053624-f2eb6d13: RTF -1.4% (within noise), TTFC +1.3% (within noise), RAM -1.2% (within noise) | phase0-ui-control-2 |
+| 2026-07-20 | [`macos-xcui-benchmark-20260720-055506-11eb8550`](runs/ui-generation/macos-xcui-benchmark-20260720-055506-11eb8550.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 32 | ~1.34 | `0d4eac8b336b` | `126311b505ce` | vs macos-xcui-benchmark-20260720-054551-6b71dc9b: RTF -0.0% (within noise), TTFC -0.2% (within noise), RAM -0.7% (within noise) | phase0-ui-control-3 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `12ab6e459f65`
 
@@ -1349,7 +1357,7 @@ trend percentages carry their direction in words.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-23 | [`macos-xcui-benchmark-20260723-054315-9b6f267b`](runs/ui-generation/macos-xcui-benchmark-20260723-054315-9b6f267b.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.76 | `3a4378534195` | `3bd86418d3bc` | baseline | macos-xcui-benchmark-20260723-054315-9b6f267b |
 | 2026-07-23 | [`macos-xcui-benchmark-20260723-081659-e4a216aa`](runs/ui-generation/macos-xcui-benchmark-20260723-081659-e4a216aa.json) | canonical | exploratory | passedWithWarnings | qualified-with-warnings | 29 | ~0.57 | `f7ee0d006e3a` dirty | `excluded` | baseline | macos-xcui-benchmark-20260723-081659-e4a216aa |
-| 2026-07-23 | [`macos-xcui-benchmark-20260723-083313-d02005ae`](runs/ui-generation/macos-xcui-benchmark-20260723-083313-d02005ae.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.57 | `b6f11211da85` | `3bd86418d3bc` | vs macos-xcui-benchmark-20260723-054315-9b6f267b: RTF +34.3% (faster), RAM -2.1% | macos-xcui-benchmark-20260723-083313-d02005ae |
+| 2026-07-23 | [`macos-xcui-benchmark-20260723-083313-d02005ae`](runs/ui-generation/macos-xcui-benchmark-20260723-083313-d02005ae.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.57 | `b6f11211da85` | `3bd86418d3bc` | vs macos-xcui-benchmark-20260723-054315-9b6f267b: RTF +33.6% (faster), TTFC -20.6% (faster), RAM -2.1% (within noise) | macos-xcui-benchmark-20260723-083313-d02005ae |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `3cf35519d4d3`
 
@@ -1374,7 +1382,7 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-16 | [`macos-xcui-benchmark-20260916-002319-0abd5326`](runs/ui-generation/macos-xcui-benchmark-20260916-002319-0abd5326.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | 0.77 | `c54b8dff3fea` | `4bafacb97dfa` | baseline | macos-xcui-benchmark-20260916-002319-0abd5326 |
-| 2026-09-16 | [`macos-xcui-benchmark-20260916-014846-5892b77c`](runs/ui-generation/macos-xcui-benchmark-20260916-014846-5892b77c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | 0.81 | `2be20f0cec2d` | `4bafacb97dfa` | vs macos-xcui-benchmark-20260916-002319-0abd5326: RTF +6.4% (slower), RAM -2.1% | macos-xcui-benchmark-20260916-014846-5892b77c |
+| 2026-09-16 | [`macos-xcui-benchmark-20260916-014846-5892b77c`](runs/ui-generation/macos-xcui-benchmark-20260916-014846-5892b77c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | 0.81 | `2be20f0cec2d` | `4bafacb97dfa` | vs macos-xcui-benchmark-20260916-002319-0abd5326: compatible | macos-xcui-benchmark-20260916-014846-5892b77c |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `54c3c1bb6bba`
 
@@ -1436,7 +1444,7 @@ trend percentages carry their direction in words.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-14 | [`macos-xcui-benchmark-20260914-051814-db6af858`](runs/ui-generation/macos-xcui-benchmark-20260914-051814-db6af858.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | 0.60 | `f069cee85b9d` | `8b07cae23f49` | baseline | pc02-corpus-2 |
-| 2026-09-14 | [`macos-xcui-benchmark-20260914-055243-dfa37630`](runs/ui-generation/macos-xcui-benchmark-20260914-055243-dfa37630.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | 0.60 | `468664669c5e` | `8b07cae23f49` | vs macos-xcui-benchmark-20260914-051814-db6af858: RTF +1.1% (slower), RAM -0.9% | pc02-corpus-3 |
+| 2026-09-14 | [`macos-xcui-benchmark-20260914-055243-dfa37630`](runs/ui-generation/macos-xcui-benchmark-20260914-055243-dfa37630.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | 0.60 | `468664669c5e` | `8b07cae23f49` | vs macos-xcui-benchmark-20260914-051814-db6af858: RTF +0.9% (within noise), TTFC +1.0% (within noise), RAM -0.9% (within noise) | pc02-corpus-3 |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `8d727e051825`
 

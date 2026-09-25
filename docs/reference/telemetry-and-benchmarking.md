@@ -688,8 +688,12 @@ the `--check` form rejects any unreconciled record.
 
 For trustworthy deltas: use the same canonical hardware, keep it quiet, watch thermals, keep cold
 and warm separate, and compare medians/IQR from equivalent matrices. The generated comparison key
-enforces equivalence and selects the nearest earlier compatible clean run. A performance delta does
-not automatically fail a benchmark whose own correctness gates passed.
+enforces equivalence and selects the nearest earlier compatible clean run; new records key on what
+their kind measures (`scripts/lib/lineage_identity.py`, see benchmarking-procedure.md), legacy
+records keep their stored keys byte for byte. The HISTORY trend takes the median per-cell delta over
+cells with at least three takes and reads "within noise" below max(5%, 3 × the median absolute
+deviation of the cell deltas); UI records trend on the app's submit→first-chunk span. A performance
+delta does not automatically fail a benchmark whose own correctness gates passed.
 
 ### Guarding output quality
 

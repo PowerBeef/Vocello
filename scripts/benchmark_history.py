@@ -42,6 +42,7 @@ from benchmark_memory import (  # noqa: E402
 )
 from lib import rtf as rtf_semantics
 from lib import jsonio  # noqa: E402
+from lib import lineage_identity  # noqa: E402
 from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
 
 
@@ -97,6 +98,14 @@ MATRIX_SCOPES = {"canonical", "focused", "partial", "instrumented"}
 LISTENING_STATUSES = {"pass", "fail", "not-performed"}
 QC_VERDICTS = {"pass", "warn"}
 
+# The per-kind lineage identity (lib/lineage_identity.py, audit #22): optional
+# inputs, schema v2 and later, all four or none. When present the comparison
+# key reads them instead of the whole-tree projectInputHash/harnessHash.
+LINEAGE_INPUT_KEYS = {
+    "lineageContractVersion", "lineageMeasurementVersion", "lineageHarnessHash",
+    "lineageProjectHash",
+}
+
 TOP_LEVEL_KEYS = {
     "schemaVersion", "run", "hardware", "source", "toolchain", "inputs",
     "models", "evidence", "takes", "cells", "comparison", "listening", "digest",
@@ -132,6 +141,7 @@ SECTION_KEYS = {
     "inputs": {
         "contractHash", "dependencyLockHash", "projectInputHash", "harnessHash",
         "matrixHash", "corpusHash", "analysisProfileHash",
+        *LINEAGE_INPUT_KEYS,
     },
     "evidence": {
         "manifestDigest", "validatorSchemaVersion", "telemetrySchemaVersion",
@@ -271,7 +281,7 @@ SCHEMA_REQUIRED_KEYS = {
     "hardware": SECTION_KEYS["hardware"],
     "source": SECTION_KEYS["source"],
     "toolchain": SECTION_KEYS["toolchain"],
-    "inputs": SECTION_KEYS["inputs"],
+    "inputs": SECTION_KEYS["inputs"] - LINEAGE_INPUT_KEYS,
     "evidence": SECTION_KEYS["evidence"] - {
         "trace", "languageVerification", "memoryContractVersion", "memoryQualified",
         "sampleSidecarCount", "sampleSidecarsDigest",
@@ -344,6 +354,7 @@ def schema_property_keys(version: int) -> dict[str, set[str]]:
     properties = {name: set(keys) for name, keys in SCHEMA_PROPERTY_KEYS.items()}
     if version == 1:
         properties["run"] -= V2_ONLY_RUN_KEYS
+        properties["inputs"] -= LINEAGE_INPUT_KEYS
         properties["evidence"] -= V2_ONLY_EVIDENCE_KEYS
         properties["comparison"] -= {"deltaMetrics"}   # legacy records never declare it
         properties["take"] -= V2_ONLY_TAKE_KEYS | V3_ONLY_TAKE_KEYS
@@ -648,6 +659,34 @@ def validate_runtime_policy(run: dict[str, Any]) -> None:
         raise HistoryError("run.runtimePolicy device class does not match the platform")
 
 
+def validate_lineage_inputs(record: dict[str, Any]) -> None:
+    """Check the optional lineage identity: schema v2+, all four fields, known versions."""
+    inputs = record["inputs"]
+    present = LINEAGE_INPUT_KEYS & set(inputs)
+    if not present:
+        return
+    if present != LINEAGE_INPUT_KEYS:
+        raise HistoryError(
+            "inputs lineage identity must name lineageContractVersion, lineageMeasurementVersion, "
+            "lineageHarnessHash and lineageProjectHash together"
+        )
+    if record.get("schemaVersion", 1) < 2:
+        raise HistoryError("schema-v1 records cannot carry a lineage identity")
+    version = inputs["lineageContractVersion"]
+    if (
+        not isinstance(version, int) or isinstance(version, bool)
+        or version not in lineage_identity.SUPPORTED_LINEAGE_CONTRACT_VERSIONS
+    ):
+        raise HistoryError(f"inputs.lineageContractVersion is unsupported: {version!r}")
+    if not lineage_identity.has_lineage(record["run"]["kind"], record["run"]["platform"]):
+        raise HistoryError("this record kind and platform define no lineage identity")
+    measurement = inputs["lineageMeasurementVersion"]
+    if not isinstance(measurement, int) or isinstance(measurement, bool) or measurement < 1:
+        raise HistoryError("inputs.lineageMeasurementVersion must be a positive integer")
+    require_digest(inputs["lineageHarnessHash"], "inputs.lineageHarnessHash", allow_na=False)
+    require_digest(inputs["lineageProjectHash"], "inputs.lineageProjectHash")
+
+
 def load_schema_contract(version: int | None = None) -> dict[str, Any]:
     """Parse one history schema and prove it matches the executable allowlist.
 
@@ -707,6 +746,11 @@ def load_schema_contract(version: int | None = None) -> dict[str, Any]:
         if set(policy_properties.get("deviceClass", {}).get("enum", [])) != RUNTIME_DEVICE_CLASSES:
             raise HistoryError(
                 "benchmark schema run.runtimePolicy.deviceClass enum drifted from the executable validator"
+            )
+        lineage_versions = definitions["inputs"]["properties"]["lineageContractVersion"].get("enum", [])
+        if set(lineage_versions) != lineage_identity.SUPPORTED_LINEAGE_CONTRACT_VERSIONS:
+            raise HistoryError(
+                "benchmark schema inputs.lineageContractVersion enum drifted from the executable validator"
             )
     if set(definitions["listening"]["properties"]["status"].get("enum", [])) != LISTENING_STATUSES:
         raise HistoryError("benchmark schema listening statuses drifted from the executable validator")
@@ -1035,7 +1079,7 @@ def default_inputs(record: dict[str, Any]) -> dict[str, Any]:
         REPO_ROOT / "Sources" / "QwenVoiceCore" / "BenchMatrixSpec.swift",
         REPO_ROOT / "Sources" / "VocelloCLI" / "BenchCommand.swift",
     ]
-    return {
+    inputs: dict[str, Any] = {
         "contractHash": hash_existing_files([REPO_ROOT / "Sources/Resources/qwenvoice_contract.json"]),
         "dependencyLockHash": hash_existing_files(package_locks),
         "projectInputHash": hash_existing_files([
@@ -1048,6 +1092,19 @@ def default_inputs(record: dict[str, Any]) -> dict[str, Any]:
         "corpusHash": hash_existing_files(corpus_paths),
         "analysisProfileHash": "not-applicable",
     }
+    # projectInputHash and harnessHash stay recorded as provenance; new schema-v2+
+    # records are keyed on the narrower per-kind lineage identity instead (audit #22).
+    if int(record.get("schemaVersion", SCHEMA_VERSION)) >= 2:
+        lineage = lineage_identity.lineage_inputs(run["kind"], run["platform"], read_repository_file)
+        if lineage is not None:
+            inputs.update(lineage)
+    return inputs
+
+
+def read_repository_file(relative: str) -> bytes | None:
+    """A tracked input's bytes from the working tree, or None when it does not exist."""
+    path = REPO_ROOT / relative
+    return path.read_bytes() if path.is_file() else None
 
 
 def mac_runtime_hardware() -> dict[str, Any]:
@@ -1516,6 +1573,74 @@ def selected_evidence_digest(record: dict[str, Any]) -> str:
 
 
 def comparison_key(record: dict[str, Any]) -> str:
+    """The comparison lineage key: the legacy key, or the frozen composition of the
+    record's lineage contract version (lib/lineage_identity.py, audit #22).
+
+    A published version's composition never changes: a new identity field or a
+    changed meaning bumps LINEAGE_CONTRACT_VERSION and adds a branch here."""
+    version = record["inputs"].get("lineageContractVersion")
+    if version is None:
+        return legacy_comparison_key(record)
+    if version == 1:
+        return lineage_v1_comparison_key(record)
+    raise HistoryError(f"inputs.lineageContractVersion is unsupported: {version!r}")
+
+
+def lineage_v1_comparison_key(record: dict[str, Any]) -> str:
+    return sha256_bytes(canonical_bytes(lineage_v1_identity(record)))
+
+
+def lineage_v1_identity(record: dict[str, Any]) -> dict[str, Any]:
+    """Lineage contract v1: what the record kind measures, not the whole tree.
+
+    Against the legacy key it drops what does not change a measurement: the app
+    version labels, the product contract (the models are keyed exactly below),
+    the dependency lock and the whole-tree projectInputHash/harnessHash (engine
+    and harness churn). It adds the kind's reviewed measurement version, the
+    build-settings subset of project.yml its lane builds and the topology (the
+    take layer set). lineageHarnessHash is provenance only (HISTORY marks it)."""
+    inputs = record["inputs"]
+    return {
+        "lineageContractVersion": 1,
+        "lineageMeasurementVersion": inputs["lineageMeasurementVersion"],
+        "kind": record["run"]["kind"],
+        "platform": record["run"]["platform"],
+        "matrixScope": record["run"]["matrixScope"],
+        "hardware": record["hardware"]["profileID"],
+        "os": [record["hardware"].get("osVersion"), record["hardware"].get("osBuild")],
+        "toolchain": [
+            record["toolchain"].get("xcodeBuild"), record["toolchain"].get("sdkVersion"),
+            record["toolchain"].get("optimization"),
+        ],
+        "matrixHash": inputs["matrixHash"],
+        "inputIdentity": [
+            inputs.get("lineageProjectHash"),
+            None if record["run"]["kind"] in lineage_identity.CORPUS_FREE_KINDS
+            else inputs.get("corpusHash"),
+            inputs.get("analysisProfileHash"),
+        ],
+        "topology": lineage_identity.topology(record.get("takes", [])),
+        "models": [
+            [
+                model.get("mode"), model.get("modelID"), model.get("variant"),
+                model.get("quantization"), model.get("revision"), model.get("artifactVersion"),
+                model.get("integrityDigest"), model.get("runtimeProfileSignature"),
+                model.get("fixtureDigest"),
+            ]
+            for model in record.get("models", [])
+        ],
+        "evidenceContract": [
+            record.get("schemaVersion"), record["evidence"].get("validatorSchemaVersion"),
+            record["evidence"].get("telemetrySchemaVersion"),
+            record["evidence"].get("qcAlgorithmVersion"),
+        ],
+        "rtfDefinition": record["run"].get("rtfDefinition"),
+        "ttfcDefinition": record["run"].get("ttfcDefinition"),
+    }
+
+
+def legacy_comparison_key(record: dict[str, Any]) -> str:
+    """The key of every record without a lineage contract version; frozen byte for byte."""
     comparable_identity = {
         "kind": record["run"]["kind"],
         "platform": record["run"]["platform"],
@@ -2374,6 +2499,8 @@ def validate_record(
             allowed = allowed - V2_ONLY_EVIDENCE_KEYS
         if version == 1 and section == "run":
             allowed = allowed - V2_ONLY_RUN_KEYS
+        if version == 1 and section == "inputs":
+            allowed = allowed - LINEAGE_INPUT_KEYS
         reject_unknown_keys(payload, allowed, section)
 
     run = record["run"]
@@ -2458,10 +2585,11 @@ def validate_record(
         validate_safe_scalar(key, "toolchain.executableHashes key")
         require_digest(digest, f"toolchain.executableHashes.{key}")
 
-    for key in SECTION_KEYS["inputs"]:
+    for key in sorted(SECTION_KEYS["inputs"] - LINEAGE_INPUT_KEYS):
         if key not in record["inputs"]:
             raise HistoryError(f"inputs is missing: {key}")
         require_digest(record["inputs"][key], f"inputs.{key}")
+    validate_lineage_inputs(record)
 
     models = record.get("models")
     if not isinstance(models, list):
@@ -3246,32 +3374,215 @@ def print_sampled_peak_report(report: dict[str, Any]) -> None:
         )
 
 
-def trend_summary(record: dict[str, Any]) -> str:
+class GitBlobReader:
+    """Read committed files through one `git cat-file --batch` process (read-only)."""
+
+    def __init__(self) -> None:
+        self.process = subprocess.Popen(
+            ["git", "cat-file", "--batch"], cwd=REPO_ROOT,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        )
+
+    def _object(self, name: str) -> tuple[bytes, bytes] | None:
+        assert self.process.stdin is not None and self.process.stdout is not None
+        self.process.stdin.write(f"{name}\n".encode("utf-8"))
+        self.process.stdin.flush()
+        header = self.process.stdout.readline().split()
+        if len(header) != 3:
+            return None   # "<name> missing" or "<name> ambiguous"
+        data = self.process.stdout.read(int(header[2]))
+        self.process.stdout.read(1)   # the object's terminating newline
+        return header[1], data
+
+    def has_commit(self, commit: str) -> bool:
+        found = self._object(commit)
+        return found is not None and found[0] == b"commit"
+
+    def read(self, commit: str, path: str) -> bytes | None:
+        found = self._object(f"{commit}:{path}")
+        return found[1] if found is not None and found[0] == b"blob" else None
+
+    def close(self) -> None:
+        if self.process.stdin is not None:
+            self.process.stdin.close()
+        self.process.wait()
+
+
+LINEAGE_REPLAY_INPUT_NAMES = ("project.yml subset", "corpus", "analysis profile")
+
+
+def lineage_identity_changes(previous: dict[str, Any], current: dict[str, Any]) -> list[str]:
+    """Names of the lineage identity parts that differ between two records."""
+    changed = []
+    for name in current:
+        if current[name] == previous.get(name):
+            continue
+        if name == "inputIdentity":
+            changed.extend(
+                label for label, before, after in zip(
+                    LINEAGE_REPLAY_INPUT_NAMES, previous.get(name) or [], current[name],
+                ) if before != after
+            )
+        else:
+            changed.append(name)
+    return sorted(changed)
+
+
+def lineage_replay(
+    records: list[tuple[Path, dict[str, Any]]], *, kind: str, platform: str,
+    classification: str | None = "canonical",
+) -> dict[str, Any]:
+    """Offline replay of the current lineage contract over committed records.
+
+    Each record's lineage identity is recomputed from its own source commit's
+    files (Git objects, read-only; the reviewed measurement version at its
+    current value), then linked the way rebuild-index links: to the nearest
+    earlier comparable record with the same key. A record whose source commit
+    is not in the local repository cannot be replayed and links to nothing.
+    Nothing is written; stored keys are untouched."""
+    if not lineage_identity.has_lineage(kind, platform):
+        raise HistoryError(f"{kind}/{platform} defines no lineage identity")
+    selected = sorted(
+        (
+            record for _, record in records
+            if record["run"]["kind"] == kind and record["run"]["platform"] == platform
+            and (classification is None or record["run"]["classification"] == classification)
+            and record_is_comparable(record)
+        ),
+        key=lambda item: (item["run"]["finishedAt"], item["run"]["id"]),
+    )
+    reader = GitBlobReader()
+    try:
+        replayed: list[tuple[dict[str, Any], dict[str, Any] | None, str | None]] = []
+        for record in selected:
+            commit = record["source"]["commit"]
+            if not reader.has_commit(commit):
+                replayed.append((record, None, None))
+                continue
+            lineage = lineage_identity.lineage_inputs(
+                kind, platform, lambda path, commit=commit: reader.read(commit, path),
+            )
+            assert lineage is not None
+            candidate = {**record, "inputs": {**record["inputs"], **lineage}}
+            replayed.append((record, lineage_v1_identity(candidate), str(lineage["lineageHarnessHash"])))
+    finally:
+        reader.close()
+    rows: list[dict[str, Any]] = []
+    for index, (record, identity, harness) in enumerate(replayed):
+        key = sha256_bytes(canonical_bytes(identity)) if identity is not None else None
+        earlier = [
+            position for position in range(index)
+            if key is not None and rows[position]["lineageKey"] == key
+        ]
+        previous = replayed[index - 1][1] if index else None
+        rows.append({
+            "runID": record["run"]["id"],
+            "finishedAt": record["run"]["finishedAt"],
+            "commit": record["source"]["commit"],
+            "sourceAvailable": identity is not None,
+            "lineageKey": key,
+            "lineageBaselineRunID": rows[earlier[-1]]["runID"] if earlier else None,
+            "harnessChangedFromBaseline": bool(earlier) and replayed[earlier[-1]][2] != harness,
+            "legacyBaselineRunID": record["comparison"].get("baselineRunID"),
+            "changedFromPrevious": (
+                lineage_identity_changes(previous, identity)
+                if previous is not None and identity is not None else []
+            ),
+        })
+    return {
+        "kind": kind, "platform": platform, "classification": classification,
+        "lineageContractVersion": lineage_identity.LINEAGE_CONTRACT_VERSION,
+        "recordCount": len(rows),
+        "unavailableSourceCount": sum(1 for row in rows if not row["sourceAvailable"]),
+        "lineageLinkedCount": sum(1 for row in rows if row["lineageBaselineRunID"]),
+        "legacyLinkedCount": sum(1 for row in rows if row["legacyBaselineRunID"]),
+        "records": rows,
+    }
+
+
+def print_lineage_replay(report: dict[str, Any]) -> None:
+    scope = report["classification"] or "comparable"
+    print(
+        f"lineage replay ({report['kind']}/{report['platform']}, {scope}, contract "
+        f"v{report['lineageContractVersion']}): {report['lineageLinkedCount']} of "
+        f"{report['recordCount']} records link to an earlier record "
+        f"(legacy keys: {report['legacyLinkedCount']}; source commit unavailable: "
+        f"{report['unavailableSourceCount']})"
+    )
+    for row in report["records"]:
+        if not row["sourceAvailable"]:
+            print(f"  {row['finishedAt'][:10]} {row['runID'][-8:]} source commit {row['commit'][:10]} unavailable")
+            continue
+        baseline = row["lineageBaselineRunID"]
+        link = f"baseline {baseline[-8:]}" if baseline else "no baseline"
+        if row["harnessChangedFromBaseline"]:
+            link += " (harness changed)"
+        changed = ", ".join(row["changedFromPrevious"]) or "-"
+        print(
+            f"  {row['finishedAt'][:10]} {row['runID'][-8:]} key {row['lineageKey'][:12]} "
+            f"{link} | changed from previous: {changed}"
+        )
+
+
+# A trend term names a direction only when the median per-cell delta clears the
+# noise band, max(5 %, 3 x the median absolute deviation of the per-cell deltas);
+# below it the term reads "within noise". Cells with fewer than three takes
+# (single cold takes) stay out of the trend (audit #71).
+TREND_NOISE_FLOOR_PERCENT = 5.0
+TREND_NOISE_MAD_MULTIPLIER = 3.0
+TREND_MINIMUM_CELL_TAKES = 3
+# The first-chunk latency each kind's trend reads: UI takes carry the app's
+# submit-to-first-chunk span, not the engine's ttfcMS.
+TREND_TTFC_METRIC = {"ui-generation": "submitToFirstChunkMS"}
+
+
+def trend_direction(term: str, percent: float, record: dict[str, Any]) -> str:
+    if term == "RTF":
+        # Standard RTF: lower is faster. Legacy speedup: higher is faster.
+        faster = percent < 0 if rtf_semantics.is_standard(record) else percent > 0
+        return "faster" if faster else "slower"
+    if term == "TTFC":
+        return "faster" if percent < 0 else "slower"
+    return "lower" if percent < 0 else "higher"
+
+
+def trend_summary(record: dict[str, Any], baseline_record: dict[str, Any] | None = None) -> str:
     comparison = record["comparison"]
     baseline = comparison.get("baselineRunID")
     if not baseline:
         return "baseline"
-    collected: dict[str, list[float]] = {"rtf": [], "ttfcMS": []}
+    terms = {"RTF": "rtf", "TTFC": TREND_TTFC_METRIC.get(record["run"]["kind"], "ttfcMS")}
     if record.get("schemaVersion", 0) >= 2 and memory_contract_status(record).startswith("qualified"):
-        collected["peakPhysicalFootprintMB"] = []
-    for metrics in comparison.get("deltas", {}).values():
-        if not isinstance(metrics, dict):
+        terms["RAM"] = "peakPhysicalFootprintMB"
+    take_counts = {
+        cell.get("key"): cell.get("count", 0)
+        for cell in record.get("cells", []) if isinstance(cell, dict)
+    }
+    collected: dict[str, list[float]] = {term: [] for term in terms}
+    for cell_key, metrics in comparison.get("deltas", {}).items():
+        if not isinstance(metrics, dict) or take_counts.get(cell_key, 0) < TREND_MINIMUM_CELL_TAKES:
             continue
-        for name in collected:
-            value = metrics.get(name)
+        for term, metric in terms.items():
+            value = metrics.get(metric)
             if isinstance(value, dict) and isinstance(value.get("percent"), (int, float)):
-                collected[name].append(float(value["percent"]))
+                collected[term].append(float(value["percent"]))
     parts = []
-    labels = {"rtf": "RTF", "ttfcMS": "TTFC", "peakPhysicalFootprintMB": "RAM"}
-    for name, values in collected.items():
-        if values:
-            percent = statistics.median(values)
-            part = f"{labels[name]} {percent:+.1f}%"
-            if name == "rtf" and percent:
-                # Standard RTF: lower is faster. Legacy speedup: higher is faster.
-                faster = percent < 0 if rtf_semantics.is_standard(record) else percent > 0
-                part += " (faster)" if faster else " (slower)"
-            parts.append(part)
+    for term, values in collected.items():
+        if not values:
+            continue
+        percent = statistics.median(values)
+        spread = statistics.median(abs(value - percent) for value in values)
+        band = max(TREND_NOISE_FLOOR_PERCENT, TREND_NOISE_MAD_MULTIPLIER * spread)
+        direction = "within noise" if abs(percent) < band else trend_direction(term, percent, record)
+        parts.append(f"{term} {percent:+.1f}% ({direction})")
+    # A lineage-keyed record links across harness edits its reviewers judged not
+    # to change the measurement; the reader still sees that the harness moved.
+    harness = record["inputs"].get("lineageHarnessHash")
+    if (
+        harness is not None and baseline_record is not None
+        and baseline_record["inputs"].get("lineageHarnessHash") != harness
+    ):
+        parts.append("harness changed")
     suffix = ", ".join(parts) if parts else "compatible"
     return f"vs {baseline}: {suffix}"
 
@@ -3299,12 +3610,21 @@ def render_history(records: list[tuple[Path, dict[str, Any]]]) -> str:
         "`run.rtfDefinition: \"wall/audio\"` and measure the engine request span (prepare entry to the",
         "final WAV write, minus model load and prewarm). Older records stored the inverted decode-loop",
         "speedup (audio ÷ decode seconds, higher is faster) under `rtf`; they are never rewritten. The",
-        "RTF column below shows a standard value for every record: measured for new records, and",
-        "`~`-prefixed when derived from the legacy take's app submit→completed span (or the inverse of",
-        "its end-to-end speedup for CLI records). The two lineages never share a comparison key, and",
-        "trend percentages carry their direction in words.",
+        "RTF column below shows a standard value for every record, the median over all of its takes",
+        "(cold takes included): measured for new records, and `~`-prefixed when derived from the legacy",
+        "take's app submit→completed span (or the inverse of its end-to-end speedup for CLI records).",
+        "The two lineages never share a comparison key.",
+        "",
+        "A **trend** compares a record with the nearest earlier record of its comparison key: each term",
+        "is the median of the per-cell median deltas over cells with at least three takes, and reads",
+        "\"within noise\" unless it exceeds max(5%, 3 × the median absolute deviation of those cell",
+        "deltas); otherwise its direction is given in words. TTFC is the engine's first-chunk latency,",
+        "or the app's submit→first-chunk span for UI records. Records keyed by a lineage contract",
+        "(`inputs.lineageContractVersion`) note \"harness changed\" when their harness files differ",
+        "from the baseline's.",
         "",
     ]
+    by_run_id = {record["run"]["id"]: record for _, record in records}
     if not grouped:
         lines.extend(["_No structured benchmark runs have been recorded yet._", ""])
         return "\n".join(lines)
@@ -3334,7 +3654,9 @@ def render_history(records: list[tuple[Path, dict[str, Any]]]) -> str:
                     sha=source["commit"][:12],
                     memory=memory_contract_status(record),
                     dirty=" dirty" if source["dirty"] else "", comparison=comparable,
-                    trend=markdown_escape(trend_summary(record)),
+                    trend=markdown_escape(trend_summary(
+                        record, by_run_id.get(comparison.get("baselineRunID") or ""),
+                    )),
                     label=markdown_escape(run["label"]),
                 )
             )
@@ -3486,6 +3808,18 @@ def parse_arguments(argv: list[str]) -> argparse.Namespace:
     )
     peak_parser.add_argument("--json", action="store_true", help="print the report as JSON")
 
+    replay_parser = subparsers.add_parser(
+        "lineage-replay",
+        help="read-only replay of the current lineage contract over committed records",
+    )
+    replay_parser.add_argument("--kind", default="ui-generation")
+    replay_parser.add_argument("--platform", default="macos", choices=sorted(PLATFORMS))
+    replay_parser.add_argument(
+        "--classification", default="canonical",
+        help="replay only this classification ('any' for every comparable record)",
+    )
+    replay_parser.add_argument("--json", action="store_true", help="print the report as JSON")
+
     annotate_parser = subparsers.add_parser("annotate", help="attach a listening verdict")
     annotate_parser.add_argument("--run-id", required=True)
     annotate_parser.add_argument("--listening", choices=sorted(LISTENING_STATUSES), required=True)
@@ -3531,6 +3865,15 @@ def main(argv: list[str] | None = None) -> int:
                 print(json.dumps(report, indent=2, sort_keys=True))
             else:
                 print_sampled_peak_report(report)
+        elif args.command == "lineage-replay":
+            replay = lineage_replay(
+                read_all_records(), kind=args.kind, platform=args.platform,
+                classification=None if args.classification == "any" else args.classification,
+            )
+            if args.json:
+                print(json.dumps(replay, indent=2, sort_keys=True))
+            else:
+                print_lineage_replay(replay)
         elif args.command == "rebuild-index":
             rebuild_index(check=args.check)
             print("benchmark history index: PASS" if args.check else "benchmark history index rebuilt")

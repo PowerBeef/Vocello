@@ -878,10 +878,18 @@ regression signal:
 The speedup figures above are the inverted pre-cutover measure (audio ÷ decode seconds, higher is
 faster); headline standard `rtf` values live in generated `HISTORY.md` and are never compared with them.
 
-Tracked comparison keys include the exact optimization identity, executable UUID/hash, toolchain,
-source inputs, model identity, matrix, and hardware profile. Consequently a historical `-Onone`
-record cannot become the baseline for a new `-O` record; the first clean optimized record reports
-an explicit no-baseline state.
+Tracked comparison keys include the exact optimization identity, toolchain, OS, model identity,
+matrix, and hardware profile (executable hashes are provenance, never identity). Legacy records
+also key on whole-tree project and harness hashes. Records stamped with a lineage contract
+(`inputs.lineageContractVersion`, `scripts/lib/lineage_identity.py`) key instead on what their kind
+measures: the project.yml build settings its lane builds, the take topology (the layer set) and the
+kind's reviewed measurement version. Harness and engine edits therefore keep a lineage (HISTORY
+marks "harness changed"), while a scheme, compiler-setting, topology, model or definition change
+starts a new one; a change that alters what a kind measures bumps its measurement version.
+`python3 scripts/benchmark_history.py lineage-replay [--kind K --platform P]` replays the current
+contract over committed records from their own source commits, read-only. Consequently a
+historical `-Onone` record cannot become the baseline for a new `-O` record; the first clean
+optimized record reports an explicit no-baseline state.
 
 The gate rejects legacy metric-only baseline arrays because they cannot prove whether they came
 from `-Onone` or `-O`; a reviewed baseline replacement must be generated from an exact successful

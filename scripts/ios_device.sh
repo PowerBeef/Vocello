@@ -888,21 +888,21 @@ probe_device_run_file() {
     >/dev/null 2>&1
 }
 
-# device_poll_step WAITED [PREDICTED]
-# Seconds until the next marker probe (audit #87). Without a prediction every
-# probe follows the legacy 10 s timer. With one, the first probe lands at the
-# predicted end of the take, so no probe competes with most of the generation,
-# and later probes follow every QVOICE_IOS_POLL_INTERVAL_SECONDS (default 3), so
-# a finished take is seen within seconds instead of up to 10. PREDICTED 0 probes
-# at once (the take already ended). Both values are provisional: a measured lane
-# tunes them.
+# device_poll_step PROBES [PREDICTED]
+# Seconds until the next marker probe, given how many probes the wait has made
+# (audit #87). Without a prediction every probe follows the legacy 10 s timer.
+# With one, the first probe lands at the predicted end of the take, so no probe
+# competes with most of the generation, and later probes follow every
+# QVOICE_IOS_POLL_INTERVAL_SECONDS (default 3), so a finished take is seen
+# within seconds instead of up to 10. PREDICTED 0 probes at once (the take
+# already ended). Both values are provisional: a measured lane tunes them.
 device_poll_step() {
-  local waited="$1" predicted="${2:-}"
+  local probes="$1" predicted="${2:-}"
   local interval="${QVOICE_IOS_POLL_INTERVAL_SECONDS:-3}"
   [[ "$interval" =~ ^[1-9][0-9]*$ ]] || interval=3
   if [[ ! "$predicted" =~ ^[0-9]+$ ]]; then
     printf '10\n'
-  elif (( waited == 0 )); then
+  elif (( probes == 0 )); then
     printf '%s\n' "$predicted"
   else
     printf '%s\n' "$interval"
@@ -928,10 +928,13 @@ predicted_take_seconds() {
 wait_device_diagnostics_sentinel() {
   local run_id="$1" timeout="${2:-300}" dest="$3" dev="${4:-}" target_pid="${5:-}"
   local predicted="${6:-}"
-  local waited=0 sentinel="" exited=0 wait_started=$SECONDS step
+  local waited=0 sentinel="" exited=0 wait_started=$SECONDS step probes=0
   while (( waited < timeout )); do
     if (( exited == 0 )); then
-      step="$(device_poll_step "$waited" "$predicted")"
+      # Count probes, not seconds: a first step of 0 (PREDICTED 0) must not
+      # keep every later step at 0.
+      step="$(device_poll_step "$probes" "$predicted")"
+      probes=$((probes + 1))
       sleep "$step"
       waited=$((waited + step))
     fi

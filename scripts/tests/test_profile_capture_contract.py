@@ -277,6 +277,7 @@ class ProfileCaptureContractTests(unittest.TestCase):
 
     def run_device_wait(
         self, function: str, run_id: str, *, marker: str | None, exits: bool,
+        predicted: str | None = None,
     ) -> tuple[subprocess.CompletedProcess[str], list[str]]:
         """Run one iOS wait helper against stubbed devicectl calls. The marker
         appears on the second probe of it; `exits` makes the exact PID vanish."""
@@ -313,11 +314,13 @@ class ProfileCaptureContractTests(unittest.TestCase):
                 [
                     "bash", "-c",
                     "set -euo pipefail; " + stubs + wait
-                    + f"\n{function} \"$1\" 60 \"$2\" fixture-device 4242",
+                    + f"\n{function} \"$1\" 60 \"$2\" fixture-device 4242"
+                    + (f" {predicted}" if predicted is not None else ""),
                     "test", run_id, str(dest),
                 ],
                 text=True,
                 capture_output=True,
+                timeout=60,
             )
             log = calls.read_text(encoding="utf-8").splitlines() if calls.exists() else []
         return completed, log
@@ -364,6 +367,19 @@ class ProfileCaptureContractTests(unittest.TestCase):
             self.poll_steps(("predicted_take_seconds", "30"), ("predicted_take_seconds", "''")),
             ["24"],
         )
+
+    def test_a_zero_prediction_probes_at_once_then_at_the_interval(self) -> None:
+        # The profile's post-recording wait predicts 0: the first probe is
+        # immediate and later ones advance the clock, so a missing sentinel
+        # still reaches the timeout instead of probing forever.
+        completed, calls = self.run_device_wait(
+            "wait_device_diagnostics_sentinel", "ios-wait-zero", marker=None, exits=False,
+            predicted="0",
+        )
+        self.assertEqual(completed.returncode, 1, completed.stderr)
+        self.assertIn("no sentinel after 60s", completed.stderr)
+        # One immediate probe, then one every 3 s up to 60 s.
+        self.assertEqual(calls.count("probe device-diagnostics-done.json"), 21)
 
     def test_ios_waits_poll_only_their_markers_and_pull_the_tree_once(self) -> None:
         for function, marker in (

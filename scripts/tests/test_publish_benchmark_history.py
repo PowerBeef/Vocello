@@ -2250,6 +2250,26 @@ class PublisherTests(unittest.TestCase):
         with self.assertRaisesRegex(publisher.PublicationError, "custom-english-v1 is inconsistent"):
             publisher.validate_prompt_equivalence(
                 planned_takes=takes, sentinels=sentinels("b" * 64), rows_by_cell=rows)
+        # The Mac writes no sentinel: its engine rows carry the same digest, and
+        # every group member must carry it and agree (BT-05 review).
+        cells = [
+            {"id": "custom-en-pinned", "promptEquivalenceGroup": "custom-english-v1"},
+            {"id": "custom-en-auto", "promptEquivalenceGroup": "custom-english-v1"},
+            {"id": "design-en-pinned"},
+        ]
+
+        def engine_rows(auto_digest: str | None) -> list[dict]:
+            auto_notes = {} if auto_digest is None else {"resolvedPromptAssemblyDigest": auto_digest}
+            return [{"notes": {"resolvedPromptAssemblyDigest": "a" * 64}},
+                    {"notes": auto_notes}, {"notes": {}}]
+
+        publisher.validate_engine_prompt_equivalence(cells, engine_rows("a" * 64))
+        with self.assertRaisesRegex(publisher.PublicationError, "custom-english-v1 is inconsistent"):
+            publisher.validate_engine_prompt_equivalence(cells, engine_rows("b" * 64))
+        with self.assertRaisesRegex(publisher.PublicationError, "custom-en-auto engine row lacks"):
+            publisher.validate_engine_prompt_equivalence(cells, engine_rows(None))
+        with self.assertRaisesRegex(publisher.PublicationError, "inconsistent"):
+            publisher.validate_engine_prompt_equivalence(cells[:1], engine_rows("a" * 64)[:1])
         # Different seeds are not one audio: their digests are never compared.
         publisher.validate_equivalent_outputs(
             [{"id": "custom-en-pinned", "promptEquivalenceGroup": "custom-english-v1"},

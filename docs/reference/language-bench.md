@@ -297,7 +297,11 @@ brief (`--voice-brief`), at the plan's seed-identity-v2 seed (`--seed`, `--varia
 and a lane-owned brief, so macOS and iPhone takes were not comparable. The engine row names its
 Custom speaker (`notes.customSpeakerID`) and its Design brief's digest (the typed fixture digest),
 and the publisher (`--plan`) refuses a macOS verification whose rows do not match the plan's seed,
-variation and fixture, or that has no plan; the plan's fixtures and seed policy enter the analysis
+variation and fixture, or that has no plan. Each Custom and Design row also carries
+`notes.resolvedPromptAssemblyDigest`, the request-resolved prompt digest the iPhone sentinel records
+(one definition, `GenerationSemantics.promptAssemblyDigest`): the Auto take draws its own seed, so
+the publisher proves Auto resolution on the Mac by requiring every member of a prompt-equivalence
+group to carry that digest and share it; the plan's fixtures and seed policy enter the analysis
 profile. The hint gate reads `~/Library/Application Support/QwenVoice-Debug/diagnostics/` with
 `QWENVOICE_DEBUG=1`. Apple Speech is **not**
 available to the CLI (TCC). Spoken content is instead verified after every CLI process has exited by
@@ -310,8 +314,8 @@ decode), decodes each take with the language locked to the expected language,
 detects the language from the first 30 s, and reports what it measured: the decoded sample count (the
 processed duration the publisher checks against the WAV), the per-take recognition time without model
 load or warm-up (`modelLoadSeconds` and `warmupSeconds` are reported once per launch; the language
-lineage's measurement version is 3 since WER v2, the per-channel vote, the Auto seed and the corpus
-fixtures, none of which a published record carries yet) and whisper's worst no-speech probability and
+lineage's measurement version is 3 since WER v2, the per-channel vote, the Auto seed, the corpus
+fixtures and the macOS prompt digest, none of which a published record carries yet) and whisper's worst no-speech probability and
 mean log probability, published as `independentMaximumNoSpeechProbability` and
 `independentMeanAverageLogProbability`. The publisher re-scores every transcript against the corpus with the same
 15 % edit-rate gate (whisper-small's character error rate on Chinese and Japanese sits close to that

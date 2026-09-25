@@ -154,38 +154,65 @@ final class SpokenTextPlanningTests: XCTestCase {
         XCTAssertGreaterThan(plan.transformationCount, 0)
         let assembly = GenerationSemantics.qwen3PromptAssembly(
             for: request,
-            capabilities: Qwen3TTSModelCapabilities(
-                modelSize: .pro1b7,
-                familyType: .customVoice,
-                supportsInstructionControl: true,
-                supportsVoiceClone: false,
-                supportsXVectorOnlyClone: false,
-                requiresSpeakerEncoder: false,
-                tokenizerProfile: Qwen3TTSTokenizerProfile(
-                    name: "qwen3",
-                    sampleRateHz: 24_000,
-                    frameRateHz: 12.5,
-                    decoderQuantizers: 16,
-                    encoderValidQuantizers: 8,
-                    encoderConfiguredQuantizers: 8,
-                    codebookSize: 2_048,
-                    semanticCodebookSize: 4_096
-                ),
-                generationDefaults: Qwen3TTSGenerationDefaultsProfile(
-                    checkpointMaxNewTokens: nil,
-                    wrapperFallbackMaxNewTokens: 2_048,
-                    appPolicyMaxNewTokens: 2_048,
-                    temperature: 0.9,
-                    topP: 1,
-                    topK: 50,
-                    doSample: true,
-                    repetitionPenalty: 1.05,
-                    source: .appPolicy
-                ),
-                artifactAvailability: .publicArtifact
-            ),
+            capabilities: Self.customCapabilities,
             spokenText: plan.spokenText
         )
         XCTAssertEqual(assembly.text, plan.spokenText)
     }
+
+    /// Seed identity v2: an Auto language take draws its own seed, so the
+    /// request-resolved prompt digest, which the engine row and the iPhone
+    /// sentinel both stamp, is what proves Auto resolved to the pinned language.
+    func testAutoAndPinnedRequestsOfOneScriptShareOnePromptDigest() throws {
+        func digest(_ hint: Qwen3SupportedLanguage) throws -> String {
+            let request = GenerationRequest(
+                mode: .custom,
+                modelID: "pro_custom_speed",
+                text: "Le train a quitté la gare à l'aube.",
+                outputPath: "/tmp/unused.wav",
+                shouldStream: true,
+                languageHint: hint.rawValue,
+                payload: .custom(speakerID: "aiden", deliveryStyle: nil),
+                seed: hint == .auto ? 2 : 1
+            )
+            return try XCTUnwrap(GenerationSemantics.promptAssemblyDigest(
+                GenerationSemantics.qwen3PromptAssembly(for: request, capabilities: Self.customCapabilities)
+            ))
+        }
+        let pinned = try digest(.french)
+        XCTAssertEqual(pinned.count, 64)
+        XCTAssertEqual(try digest(.auto), pinned)
+        XCTAssertNotEqual(try digest(.english), pinned)
+    }
+
+    private static let customCapabilities = Qwen3TTSModelCapabilities(
+        modelSize: .pro1b7,
+        familyType: .customVoice,
+        supportsInstructionControl: true,
+        supportsVoiceClone: false,
+        supportsXVectorOnlyClone: false,
+        requiresSpeakerEncoder: false,
+        tokenizerProfile: Qwen3TTSTokenizerProfile(
+            name: "qwen3",
+            sampleRateHz: 24_000,
+            frameRateHz: 12.5,
+            decoderQuantizers: 16,
+            encoderValidQuantizers: 8,
+            encoderConfiguredQuantizers: 8,
+            codebookSize: 2_048,
+            semanticCodebookSize: 4_096
+        ),
+        generationDefaults: Qwen3TTSGenerationDefaultsProfile(
+            checkpointMaxNewTokens: nil,
+            wrapperFallbackMaxNewTokens: 2_048,
+            appPolicyMaxNewTokens: 2_048,
+            temperature: 0.9,
+            topP: 1,
+            topK: 50,
+            doSample: true,
+            repetitionPenalty: 1.05,
+            source: .appPolicy
+        ),
+        artifactAvailability: .publicArtifact
+    )
 }

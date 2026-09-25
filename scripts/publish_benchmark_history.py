@@ -2455,8 +2455,10 @@ def validate_equivalent_outputs(cells: list[dict[str, Any]], takes: list[dict[st
     that also share a seed produce byte-identical WAVs on deterministic MLX, so
     every such member that publishes a file digest must publish the same one.
     Since seed identity v2 (part 2) a normal plan's Auto take draws its own
-    seed and is an independent sample; the shared prompt digest
-    (`validate_prompt_equivalence`) proves Auto resolution instead.
+    seed and is an independent sample, so this compares nothing in a normal
+    run. The shared resolved prompt digest proves Auto resolution instead: the
+    iPhone sentinel's (`validate_prompt_equivalence`) and, on the Mac, which
+    writes no sentinel, the engine row's (`validate_engine_prompt_equivalence`).
     """
     grouped: dict[tuple[str, int], dict[str, str]] = {}
     for cell, take in zip(cells, takes):
@@ -2471,6 +2473,39 @@ def validate_equivalent_outputs(cells: list[dict[str, Any]], takes: list[dict[st
             raise PublicationError(
                 f"language prompt-equivalence group {group} seed {seed} produced different audio: "
                 + ", ".join(sorted(members))
+            )
+
+
+def validate_engine_prompt_equivalence(
+    cells: list[dict[str, Any]], rows: list[dict[str, Any]],
+) -> None:
+    """The Mac's proof that an Auto take resolved to its pinned twin's prompt.
+
+    Since seed identity v2 an Auto take draws its own seed, so its audio no
+    longer matches the pinned take's, and the macOS lane writes no sentinel.
+    The engine stamps each Custom and Design row with the digest of its
+    request-resolved prompt assembly (`notes.resolvedPromptAssemblyDigest`,
+    the definition the iPhone sentinel records), and every member of a
+    prompt-equivalence group must carry one and agree with the others.
+    """
+    grouped: dict[str, list[tuple[str, str]]] = {}
+    for cell, row in zip(cells, rows):
+        group = cell.get("promptEquivalenceGroup")
+        if not isinstance(group, str) or not group:
+            continue
+        cell_id = str(cell.get("id"))
+        notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+        digest = notes.get("resolvedPromptAssemblyDigest")
+        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            raise PublicationError(
+                f"language cell {cell_id} engine row lacks a resolved prompt digest"
+            )
+        grouped.setdefault(group, []).append((cell_id, digest))
+    for group, members in sorted(grouped.items()):
+        if len(members) < 2 or len({digest for _, digest in members}) != 1:
+            raise PublicationError(
+                f"language prompt-equivalence group {group} is inconsistent: "
+                + ", ".join(cell_id for cell_id, _ in members)
             )
 
 
@@ -3147,6 +3182,9 @@ def language_command(args: argparse.Namespace) -> Path:
             wav_digest = (row.get("notes") or {}).get("samplingWAVDigest")
             if is_sha256(wav_digest):
                 take["output"]["fileDigest"] = wav_digest
+        # The Auto take's own seed leaves no shared audio to compare, so the
+        # engine rows' resolved prompt digests prove Auto resolution (BT-05).
+        validate_engine_prompt_equivalence(cells, selected)
     if ios_plan:
         validate_prompt_equivalence(
             planned_takes=planned_takes,

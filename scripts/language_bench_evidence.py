@@ -110,9 +110,11 @@ def validate_seeds(cohort: dict[str, Any] | None) -> list[int | None]:
 # Seed identity v2 (audit #86 part 2; decided 2026-09-25 by the audit's
 # recommendation): an Auto cell draws its own seed, so its audio is an
 # independent sample instead of a byte copy of the pinned take. Auto resolution
-# stays proven by the resolved prompt digest, which the pinned and Auto takes of
-# one prompt-equivalence group must share (the prompt carries no seed). Pinned
-# cells keep their v1 seeds, so pinned takes stay comparable with earlier runs.
+# is proven by the resolved prompt digest instead, which the pinned and Auto
+# takes of one prompt-equivalence group must share (the prompt carries no seed):
+# the iPhone sentinel records it, and on the Mac, which writes no sentinel, the
+# engine row does (`notes.resolvedPromptAssemblyDigest`). Pinned cells keep
+# their v1 seeds, so pinned takes stay comparable with earlier runs.
 LANGUAGE_SEED_POLICY = "sha256-v2-mode-script-language-auto-63bit"
 LEGACY_LANGUAGE_SEED_POLICY = "sha256-v1-mode-script-language-63bit"
 COHORT_SEED_POLICY = "explicit-cohort-v1"

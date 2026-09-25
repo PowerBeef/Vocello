@@ -258,8 +258,9 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # load and warm-up, and the processed duration is the decoded sample count.
     # 3 (2026-09-25): the sampler change; and (audit #42/#43) the word gate
     # reads WER v2 (segmentation-aware) and each verdict channel is voted per
-    # family; the Auto seed (#86) and the macOS corpus fixtures (#88) ride this
-    # version because no record carries it yet.
+    # family; the Auto seed (#86), the macOS corpus fixtures (#88) and the
+    # engine-row prompt digest that proves Auto resolution on the Mac (BT-05
+    # review) ride this version because no record carries it yet.
     ("language", "macos"): 3,
     # 3 (2026-09-25, audit #87, #42/#43 and the sampler change): the iPhone lang-bench
     # probes each take's sentinel first at its predicted end, then every 3 s,

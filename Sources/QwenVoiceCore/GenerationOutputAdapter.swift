@@ -2517,6 +2517,12 @@ struct StreamingExecutionContext: Sendable {
                 tierNotes["samplingSeedPolicy"] = seedPolicy
             }
         }
+        // The request-resolved prompt digest (Custom and Design), the one the
+        // iPhone sentinel records; language publication compares it across a
+        // prompt-equivalence group on the Mac.
+        if let promptDigest = effectiveStringFlags["resolved_prompt_assembly_digest"] {
+            tierNotes["resolvedPromptAssemblyDigest"] = promptDigest
+        }
         if let talkerTopK = effectiveStringFlags["sampling_talker_top_k"] {
             tierNotes["samplingTalkerTopK"] = talkerTopK
         }

@@ -683,7 +683,11 @@ enum IOSDeviceDiagnosticsRunner {
                 capabilities: capabilities
             )
             record.resolvedLanguageHint = prompt.language
-            record.resolvedPromptAssemblyDigest = try digest(prompt)
+            // One definition with the engine row's note (`promptAssemblyDigest`).
+            guard let promptDigest = GenerationSemantics.promptAssemblyDigest(prompt) else {
+                throw DiagnosticsError("the resolved prompt assembly could not be digested")
+            }
+            record.resolvedPromptAssemblyDigest = promptDigest
             record.promptDigestScope = spec.mode == .clone
                 ? "request_without_resolved_clone_transcript"
                 : "resolved"

@@ -696,6 +696,18 @@ public enum GenerationSemantics {
         }
     }
 
+    /// SHA-256 (lowercase hex) of a prompt assembly's sorted-key JSON: the
+    /// `resolvedPromptAssemblyDigest` that the iPhone diagnostics sentinel and
+    /// the engine telemetry row both stamp from
+    /// `qwen3PromptAssembly(for:capabilities:)`, so one request has one digest
+    /// in every layer. Nil only if the assembly cannot be encoded.
+    public static func promptAssemblyDigest(_ prompt: Qwen3PromptAssembly) -> String? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let data = try? encoder.encode(prompt) else { return nil }
+        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+
     public static func resolvedDeliveryInstruction(
         for request: GenerationRequest,
         speakerNativeLanguage: String?,

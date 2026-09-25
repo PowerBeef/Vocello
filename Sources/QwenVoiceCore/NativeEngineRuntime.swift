@@ -872,6 +872,25 @@ actor NativeEngineRuntime {
         stringFlags["sampling_effective_seed"] = String(samplingConfiguration.effectiveSeed)
         stringFlags["sampling_talker_top_k"] = String(samplingConfiguration.talker.topK)
         stringFlags["sampling_subtalker_top_k"] = String(samplingConfiguration.subtalker.topK)
+        // The request-resolved prompt digest the iPhone diagnostics sentinel also
+        // stamps, for Custom and Design: an Auto language take draws its own seed
+        // (seed identity v2), so matching its pinned twin's prompt digest is what
+        // proves Auto resolved to the pinned language on the Mac, where no
+        // sentinel exists. Clone prompts depend on a resolved transcript and stay
+        // out.
+        switch request.payload {
+        case .custom, .design:
+            if let promptDigest = GenerationSemantics.promptAssemblyDigest(
+                GenerationSemantics.qwen3PromptAssembly(
+                    for: request,
+                    capabilities: descriptorCapabilities
+                )
+            ) {
+                stringFlags["resolved_prompt_assembly_digest"] = promptDigest
+            }
+        case .clone:
+            break
+        }
 
         if loadResult.didLoad {
             timingOverridesMS["load_model"] = loadStartedAt.elapsedMilliseconds

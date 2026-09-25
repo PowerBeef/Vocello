@@ -93,8 +93,18 @@ CELL_MINIMUM_TAKES = 5
 # leave-one-out median/MAD score was rejected: with three to seven other takes
 # its MAD is biased low, and a seeded null simulation put a take above 2.5 in
 # 58-82% of healthy cohorts of four to eight takes.
+#
+# Its flag threshold (2026-09-25; the maintainer delegated the decision to the
+# audit's recommendation): a cohort-wise Bonferroni alpha of 0.05 marks the
+# candidate `flagged`, report only. The alpha is the nominal family-wise rate
+# the null simulation reproduces, not a bound calibrated on delivery evidence,
+# so the flag never enters `passed`, `flags` or a downstream outcome until a
+# calibration (a labeled cohort set with known unstable takes, judged under the
+# audio-QC threshold-change authority) sets `bindsVerdict`.
 COHORT_OUTLIER_ALGORITHM = "population-z-v1"
 LEAVE_ONE_OUT_OUTLIER_ALGORITHM = "leave-one-out-studentized-t-v1"
+LEAVE_ONE_OUT_REPORT_ALPHA = 0.05
+LEAVE_ONE_OUT_ALPHA_STATUS = "report-only-uncalibrated"
 
 # Flags that mean the verdict could not be computed (mapped to a distinct
 # "unavailable" outcome downstream, mirroring the prosody sidecar contract).
@@ -454,7 +464,11 @@ def leave_one_out_studentized_residual(values, index):
 
 
 def leave_one_out_outlier_report(values, clips):
-    """The report-only leave-one-out outlier block (audit #105); never gates."""
+    """The report-only leave-one-out outlier block (audit #105); never gates.
+
+    `flagged` compares the Bonferroni p-value with the report-only alpha; it
+    is a diagnostic until calibration evidence exists (`bindsVerdict` false).
+    """
     degrees = len(values) - 2
     report = {
         "reportOnly": True,
@@ -463,6 +477,10 @@ def leave_one_out_outlier_report(values, clips):
         "candidate": None,
         "maxAbsScore": None,
         "bonferroniPValue": None,
+        "alpha": LEAVE_ONE_OUT_REPORT_ALPHA,
+        "alphaStatus": LEAVE_ONE_OUT_ALPHA_STATUS,
+        "bindsVerdict": False,
+        "flagged": False,
     }
     if degrees < 1:
         return report
@@ -475,6 +493,7 @@ def leave_one_out_outlier_report(values, clips):
         # None when the other takes agree exactly and this one departs from them.
         "maxAbsScore": round(magnitude, 3) if math.isfinite(magnitude) else None,
         "bonferroniPValue": float(f"{family_wise:.4g}"),
+        "flagged": family_wise < LEAVE_ONE_OUT_REPORT_ALPHA,
     })
     return report
 

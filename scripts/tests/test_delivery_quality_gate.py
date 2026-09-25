@@ -9,14 +9,17 @@ import os
 import random
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import delivery_quality_gate as gate_module  # noqa: E402
 from delivery_quality_gate import (
     ANALYSIS_FAILURE_FLAGS,
     DELIVERY_GATE_ALGORITHM_VERSION,
     delivery_features,
     evaluate_delivery,
     evaluate_neutral_cohort,
+    leave_one_out_outlier_report,
     leave_one_out_studentized_residual,
     student_t_two_sided_p,
 )
@@ -148,6 +151,26 @@ class DeliveryGateTests(unittest.TestCase):
         self.assertEqual((report["candidate"], report["degreesOfFreedom"]), ("d.wav", 2))
         self.assertGreater(report["maxAbsScore"], 20.0)
         self.assertLess(report["bonferroniPValue"], 0.01)
+        # The report-only alpha flags the candidate; the flag binds nothing
+        # until calibration evidence exists, so the cohort still passes.
+        self.assertEqual((report["alpha"], report["alphaStatus"]), (0.05, "report-only-uncalibrated"))
+        self.assertIs(report["flagged"], True)
+        self.assertIs(report["bindsVerdict"], False)
+        self.assertNotIn("arousal_outlier", verdict["flags"])
+
+    def test_leave_one_out_flag_follows_the_report_alpha_and_never_binds(self):
+        steady = [metrics(f0=148.0 + 0.5 * i, clip=f"s{i}.wav") for i in range(6)]
+        report = evaluate_neutral_cohort(steady)["leaveOneOutOutlier"]
+        self.assertIs(report["flagged"], False)
+        # No score without two other takes, so nothing to flag.
+        self.assertIs(leave_one_out_outlier_report([1.0, 9.0], ["a.wav", "b.wav"])["flagged"], False)
+        for p_value, flagged in ((0.04, True), (0.06, False), (0.2, False)):
+            with self.subTest(p_value=p_value), mock.patch.object(
+                gate_module, "student_t_two_sided_p", return_value=p_value / 6
+            ):
+                verdict = evaluate_neutral_cohort(steady)
+                self.assertIs(verdict["leaveOneOutOutlier"]["flagged"], flagged)
+                self.assertTrue(verdict["passed"], verdict["flags"])
 
     def test_neutral_outlier_at_n8(self):
         steady = [metrics(f0=148.0 + 0.5 * i, clip=f"s{i}.wav") for i in range(8)]
@@ -204,7 +227,7 @@ class DeliveryGateTests(unittest.TestCase):
                 verdict = evaluate_neutral_cohort(cohort)
                 self.assertTrue(set(verdict["flags"]) <= {"arousal_outlier"}, verdict["flags"])
                 failed += not verdict["passed"]
-                flagged += verdict["leaveOneOutOutlier"]["bonferroniPValue"] < 0.05
+                flagged += verdict["leaveOneOutOutlier"]["flagged"]
             with self.subTest(size=size):
                 if size <= 7:
                     self.assertEqual(failed, 0)

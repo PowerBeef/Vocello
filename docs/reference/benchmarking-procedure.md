@@ -386,8 +386,13 @@ leave-one-out residual (`leave-one-out-studentized-t-v1`: the take against the m
 others), which follows Student's t with n−2 degrees of freedom for a healthy cohort, with its
 candidate take and Bonferroni family-wise p-value. A seeded null simulation keeps it near 5% at
 p < 0.05, where a leave-one-out median/MAD score crossed 2.5 in 58-82% of healthy cohorts of four
-to eight takes. Choosing its cohort-wise alpha, and so making it binding, is a maintainer decision
-under the audio-QC threshold-change authority. The clone lane
+to eight takes. Since 2026-09-25 (the maintainer delegated the decision to the audit's
+recommendation) a cohort-wise Bonferroni alpha of 0.05 marks the candidate `flagged`, with
+`alphaStatus: report-only-uncalibrated` and `bindsVerdict: false`: 0.05 is the nominal family-wise
+rate the null simulation reproduces, not a bound calibrated on delivery evidence, so the flag never
+enters `passed`, `flags` or any outcome. Making it binding needs calibration evidence under the
+audio-QC threshold-change authority: a labeled set of cohorts with known unstable takes, judged on
+an untouched confirmation cohort. The clone lane
 and SER column stay advisory; the clone lane reports AUC and equal error rate with seeded 95%
 intervals whenever it has controls (`bandCalibrationReady` needs at least eight). Since
 2026-09-25 (audit #103 part 1, decided by the audit's recommendation) its default plan generates

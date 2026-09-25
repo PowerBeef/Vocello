@@ -2159,6 +2159,9 @@ cmd_profile() {
   local history_record="$ROOT_DIR/benchmarks/runs/instrument-profile/$run_id.json"
   local retention_policy="summaryOnly"
   (( keep_trace == 0 )) || retention_policy="keptExplicitly"
+  # xctrace cannot export a memory profile's allocation and VM tables, so its
+  # trace is the only memory evidence and is kept by default (audit #69).
+  [[ "$kind" != "memory" || "$retention_policy" != "summaryOnly" ]] || retention_policy="keptByDefault"
   local launch_json="$artifacts/launch.json"
   local dest="$artifacts/device-diagnostics"
   mkdir -p "$artifacts"
@@ -2305,8 +2308,8 @@ PY
   trap - EXIT
   PROFILE_TRACE_ACTIVE=0
   PROFILE_TRACE_DEVICE_CLEANUP=""
-  if (( keep_trace )); then
-    note "trace retained explicitly → $trace"
+  if [[ "$retention_policy" != "summaryOnly" ]]; then
+    note "trace retained ($retention_policy) → $trace"
     note "analyze: open in Instruments, or use optional: xcprof analyze \"$trace\""
     printf '%s\n' "$trace"
   else

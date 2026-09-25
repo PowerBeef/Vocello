@@ -1071,7 +1071,8 @@
         "retentionPolicy": {
           "enum": [
             "summaryOnly",
-            "keptExplicitly"
+            "keptExplicitly",
+            "keptByDefault"
           ]
         },
         "validated": {

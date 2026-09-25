@@ -87,7 +87,7 @@ class ProfileTraceRetentionTests(unittest.TestCase):
                     "traceDigest": trace_digest,
                     "originalEphemeralPath": original,
                     "retentionPolicy": policy,
-                    "rawTraceRetained": policy == "keptExplicitly",
+                    "rawTraceRetained": policy in {"keptExplicitly", "keptByDefault"},
                 },
                 sort_keys=True,
             )
@@ -102,7 +102,7 @@ class ProfileTraceRetentionTests(unittest.TestCase):
                 "path": summary.relative_to(root).as_posix(),
                 "digest": summary_digest,
             },
-            "rawTraceRetained": policy == "keptExplicitly",
+            "rawTraceRetained": policy in {"keptExplicitly", "keptByDefault"},
             "retentionPolicy": policy,
             "captureSettingsDigest": "b" * 64,
         }
@@ -220,6 +220,35 @@ class ProfileTraceRetentionTests(unittest.TestCase):
             marker = json.loads((artifacts / "profile-retention.json").read_text())
             self.assertEqual(marker["retentionPolicy"], "keptExplicitly")
             self.assertTrue(marker["rawTraceRetained"])
+
+    def test_memory_profile_keeps_its_trace_by_default_and_only_memory_may(self) -> None:
+        # xctrace cannot export a memory profile's allocation and VM tables, so
+        # its trace is kept by default (audit #69); a CPU profile never is.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for platform, run_id, kind, expected in (
+                ("macos", "mac-memory-profile-20260925-000000-0badcafe", "memory", 0),
+                ("ios", "ios-cpu-profile-20260925-000000-0badf00d", "cpu", 1),
+            ):
+                with self.subTest(kind=kind):
+                    artifacts, trace = self.profile_artifacts(root, platform, run_id)
+                    summary, history = self.publication_proof(
+                        root, artifacts, trace, "keptByDefault"
+                    )
+                    self.run_helper(
+                        root, "finalize-success", "--platform", platform, "--kind", kind,
+                        "--artifact-dir", str(artifacts), "--trace", str(trace),
+                        "--policy", "keptByDefault", "--summary-artifact", str(summary),
+                        "--history-record", str(history), expected=expected,
+                    )
+                    self.assertTrue(trace.is_dir())
+                    marker_path = artifacts / "profile-retention.json"
+                    if kind == "memory":
+                        marker = json.loads(marker_path.read_text())
+                        self.assertEqual(marker["retentionPolicy"], "keptByDefault")
+                        self.assertTrue(marker["rawTraceRetained"])
+                    else:
+                        self.assertFalse(marker_path.exists())
 
     def test_stale_summary_digest_cannot_authorize_trace_deletion(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

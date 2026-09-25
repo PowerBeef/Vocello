@@ -41,6 +41,12 @@ COMPACTED_METADATA_FILES = {
     "profile-summary.json",
     "trace-toc.xml",
 }
+# Successful-profile retention policies. A memory profile keeps its raw trace
+# by default: xctrace cannot export its allocation and VM tables, so the trace
+# is the profile's only memory evidence (audit #69). A CPU profile keeps one
+# only on an explicit --keep-trace.
+SUCCESS_RETENTION_POLICIES = ("summaryOnly", "keptExplicitly", "keptByDefault")
+RETAINED_SUCCESS_POLICIES = frozenset({"keptExplicitly", "keptByDefault"})
 RUN_ID_RE = re.compile(
     r"^(?P<platform>mac|ios)-(?:(?P<kind>cpu|memory)-)?profile-"
     r"(?P<timestamp>[0-9]{8}-[0-9]{6})-(?P<nonce>[0-9a-f]{8})$"
@@ -448,7 +454,9 @@ def cmd_finalize_success(args: argparse.Namespace) -> int:
     frozen_trace = trace_record(history_record, "benchmark evidence historyRecord")
     expected_original = safe_relative(args.trace, root)
     expected_summary = safe_relative(summary, root)
-    expected_retained = args.policy == "keptExplicitly"
+    if args.policy == "keptByDefault" and args.kind != "memory":
+        raise RetentionError("only a memory profile keeps its raw trace by default")
+    expected_retained = args.policy in RETAINED_SUCCESS_POLICIES
     summary_artifact = tracked_trace.get("summaryArtifact")
     expected_summary_digest = digest_file(summary)
     if tracked_trace.get("originalEphemeralPath") != expected_original:
@@ -488,7 +496,7 @@ def cmd_finalize_success(args: argparse.Namespace) -> int:
         retained = False
     else:
         if not args.trace.is_dir():
-            raise RetentionError("--keep-trace requested but the raw trace is missing")
+            raise RetentionError("the raw trace to retain is missing")
         retained = True
     manifest = retention_manifest(
         root=root, artifact_dir=artifact_dir, trace=args.trace,
@@ -647,7 +655,7 @@ def build_parser() -> argparse.ArgumentParser:
     finalize = subparsers.add_parser("finalize-success")
     add_profile_arguments(finalize)
     finalize.add_argument(
-        "--policy", choices=("summaryOnly", "keptExplicitly"), required=True
+        "--policy", choices=SUCCESS_RETENTION_POLICIES, required=True
     )
     finalize.add_argument("--summary-artifact", type=Path, required=True)
     finalize.add_argument("--history-record", type=Path, required=True)

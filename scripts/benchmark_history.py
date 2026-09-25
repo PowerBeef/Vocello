@@ -2133,6 +2133,8 @@ def validate_trace_retention(record: dict[str, Any], trace: dict[str, Any]) -> N
     expected_raw_retained = {
         "summaryOnly": False,
         "keptExplicitly": True,
+        # Memory profiles since 2026-09-25 (audit #69).
+        "keptByDefault": True,
     }.get(retention_policy)
     if expected_raw_retained is None:
         raise HistoryError("trace retentionPolicy is unsupported")

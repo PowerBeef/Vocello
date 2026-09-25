@@ -688,9 +688,6 @@ For allocation and VM evidence, use the Instruments memory profile:
 
 ```sh
 scripts/ios_device.sh profile --kind memory custom:speed:
-
-# Retain the raw trace only when it must be reopened in Instruments.
-scripts/ios_device.sh profile --kind memory --keep-trace custom:speed:
 ```
 
 This keeps CPU Profiler and correlated `os_signpost` data while adding Allocations and VM Tracker in
@@ -707,8 +704,10 @@ counters. iPhone admission is also strict, on the app's own
 shipping budget bands (`config/ios-memory-budget-policy.json`): physical footprint ≥5,200 MiB,
 minimum headroom <384 MiB, or Metal working-set ratio ≥0.8 fails; footprint ≥4,500 MiB or
 headroom <768 MiB warns. The lane requires 15 GiB free before device launch. After validation and
-history publication, the raw trace is discarded by default while its digest/settings/extracted
-summary and retention status remain in compact evidence; `--keep-trace` opts into local retention.
+history publication the memory profile keeps its raw trace by default (retention policy
+`keptByDefault`), because xctrace cannot export its allocation and VM tables and the trace is its only
+memory evidence; its digest/settings/extracted summary and retention status remain in compact
+evidence. A CPU profile discards its raw trace unless `--keep-trace` opts into local retention.
 Raw traces and sample rows remain untracked.
 
 Device builds require 10 GiB of host free space before compilation (the same floor as the generic

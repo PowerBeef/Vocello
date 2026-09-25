@@ -33,6 +33,10 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 HISTORY_SCRIPT = ROOT / "scripts" / "benchmark_history.py"
 MEMORY_POLICY_PATH = ROOT / "config" / "memory-qualification-policy.json"
+# A successful profile's raw-trace policy: removed after publication, kept on an
+# explicit --keep-trace, or kept by default for a memory profile (audit #69).
+TRACE_RETENTION_POLICIES = ("summaryOnly", "keptExplicitly", "keptByDefault")
+RETAINED_TRACE_POLICIES = frozenset({"keptExplicitly", "keptByDefault"})
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
@@ -3645,9 +3649,12 @@ def write_trace_summary_artifact(
     """
 
     retention_policy = getattr(args, "retention_policy", "summaryOnly")
-    if retention_policy not in {"summaryOnly", "keptExplicitly"}:
+    if retention_policy not in TRACE_RETENTION_POLICIES:
         raise PublicationError(f"unsupported trace retention policy: {retention_policy!r}")
     profile_kind = getattr(args, "profile_kind", "cpu")
+    if retention_policy == "keptByDefault" and profile_kind != "memory":
+        raise PublicationError("only a memory profile keeps its raw trace by default")
+    raw_trace_retained = retention_policy in RETAINED_TRACE_POLICIES
     template = Path(args.template).name
     capture_settings = {
         "profileKind": profile_kind,
@@ -3684,7 +3691,7 @@ def write_trace_summary_artifact(
         # Intended durable state after successful history publication. The
         # runner retains the raw trace and writes failure metadata if any later
         # validation/publication step fails before this policy is finalized.
-        "rawTraceRetained": retention_policy == "keptExplicitly",
+        "rawTraceRetained": raw_trace_retained,
         "captureSettings": capture_settings,
         "captureSettingsDigest": capture_settings_digest,
         "validated": True,
@@ -3697,7 +3704,7 @@ def write_trace_summary_artifact(
             "path": summary_reference,
             "digest": digest_file(summary_path),
         },
-        "rawTraceRetained": retention_policy == "keptExplicitly",
+        "rawTraceRetained": raw_trace_retained,
         "retentionPolicy": retention_policy,
         "captureSettings": capture_settings,
         "captureSettingsDigest": capture_settings_digest,
@@ -4110,7 +4117,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     profile.add_argument("--target-pid", type=int)
     profile.add_argument("--profile-kind", choices=("cpu", "memory"), default="cpu")
     profile.add_argument(
-        "--retention-policy", choices=("summaryOnly", "keptExplicitly"),
+        "--retention-policy", choices=TRACE_RETENTION_POLICIES,
         default="summaryOnly",
     )
     profile.add_argument("--summary-artifact", type=Path)
@@ -4130,7 +4137,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     ios_profile.add_argument("--target-pid", type=int)
     ios_profile.add_argument("--profile-kind", choices=("cpu", "memory"), default="cpu")
     ios_profile.add_argument(
-        "--retention-policy", choices=("summaryOnly", "keptExplicitly"),
+        "--retention-policy", choices=TRACE_RETENTION_POLICIES,
         default="summaryOnly",
     )
     ios_profile.add_argument("--summary-artifact", type=Path)

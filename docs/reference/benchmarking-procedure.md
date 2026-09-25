@@ -436,8 +436,8 @@ scripts/macos_test.sh profile custom:speed:
 
 scripts/macos_test.sh profile --kind memory custom:speed:
 
-# Only when the raw document must be reopened in Instruments:
-scripts/macos_test.sh profile --kind memory --keep-trace custom:speed:
+# Only when a CPU profile's raw document must be reopened in Instruments:
+scripts/macos_test.sh profile --keep-trace custom:speed:
 ```
 
 The macOS memory profile records one cold long take. This captures model-load plus sustained
@@ -469,8 +469,10 @@ The profiler launches or attaches to the exact target PID, requires a successful
 validates the trace through `xctrace export --toc`; there is no blind startup sleep. For the app path,
 attach to the exact `Vocello` PID while generating via UI. Traces remain untracked. On
 success the registry retains the digest, settings, extracted summary, original ephemeral path, and
-retention policy, then the runner removes the raw trace. Pass `--keep-trace` to retain it
-explicitly. The same complete retention validation applies to schema-v2 records and quality-bearing
+retention policy, then the runner removes a CPU profile's raw trace; pass `--keep-trace` to retain
+it explicitly. A memory profile keeps its raw trace by default (`keptByDefault`): xctrace cannot
+export its allocation and VM tables, so the trace is its only memory evidence. The same complete
+retention validation applies to schema-v2 records and quality-bearing
 schema-v3 records; neither a schema downgrade nor omission of quality evidence is allowed to repair
 a failed publication. Verify a source repair in a new run while preserving the original failure.
 The tracer stage requires at least 5 GiB free for CPU profiles and 15 GiB for memory
@@ -937,7 +939,7 @@ an automated gate and does not authorize overriding a deterministic failure or w
 | `…/outputs/bench-archive/<runID>/` | Durable per-run evidence for every `--delivery` run: all take WAVs plus `bench-results.json`, `bench-prosody.json`, `bench-quality-composed.json`. Fail-closed for required files, written before the sidecar analysis; unbounded, prune manually. Successful diagnostics run dirs are cleaned after publication, so multi-run scoring reads from this archive ([`delivery-harness.md`](delivery-harness.md) §3) |
 | `<run-artifact-dir>/benchmark-evidence.json` | Atomic run-scoped validator selection and verdict used for publication |
 | `build/**/*.xcresult`, screenshots | UI evidence retained locally under bounded lane retention |
-| `build/**/profiles/` | Compact local profile summaries; raw `*.trace` is success-ephemeral unless `--keep-trace` was explicit |
+| `build/**/profiles/` | Compact local profile summaries; a CPU profile's raw `*.trace` is success-ephemeral unless `--keep-trace` was explicit, a memory profile's is kept by default (prune manually) |
 
 Auto-pruned: `generations.jsonl` ~8 MB cap; verbose sidecars newest-48 / 64 MB for ad-hoc
 diagnostics. `vocello bench --telemetry verbose` sizes the sidecar budget to its own plan before any

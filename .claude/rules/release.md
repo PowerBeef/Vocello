@@ -82,7 +82,8 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
 - **Evidence retention.** Only qualified privacy-safe PASS records enter `benchmarks/runs/` (≤ 256 KB
   each, strict allowlist), then `benchmarks/HISTORY.md` is regenerated. Raw JSONL, WAV, screenshots,
   xcresult and traces stay untracked; publication never stages, commits or pushes. Successful profiles
-  publish their digest and summary before the raw trace is deleted (`--keep-trace` is explicit).
+  publish their digest and summary first; a CPU profile's raw trace is then deleted (`--keep-trace` is
+  explicit), while a memory profile keeps its trace by default (`keptByDefault`).
 - **Records measure what they claim.** `rtf` is wall ÷ audio (lower is faster) and every RTF-bearing record
   since 2026-09-12 declares `run.rtfDefinition` (`ui-perf` and `prosody-calibration` publish no RTF); legacy records are never rewritten and never share a comparison
   key with new ones. `toolchain.optimization` comes from the build receipt (`last-build.json`, executable

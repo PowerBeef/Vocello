@@ -296,11 +296,11 @@ single-process/crash-delta checks; it does not claim the benchmark's per-take te
 # CPU/signpost profile (default)
 scripts/macos_test.sh profile custom:speed:
 
-# CPU + Allocations + VM Tracker + signposts
+# CPU + Allocations + VM Tracker + signposts (keeps its raw trace by default)
 scripts/macos_test.sh profile --kind memory custom:speed:
 
-# Explicit diagnostic exception: retain the raw Instruments document.
-scripts/macos_test.sh profile --kind memory --keep-trace custom:speed:
+# Explicit diagnostic exception: retain a CPU profile's raw Instruments document.
+scripts/macos_test.sh profile --keep-trace custom:speed:
 ```
 
 The memory profile captures one cold long take so Allocations/VM Tracker include model-load and
@@ -319,9 +319,11 @@ process into one series.
 The tracer stage requires at least 5 GiB free for CPU profiles and 15 GiB for memory profiles before
 it launches the target. The prerequisite CLI build uses the shared 8 GiB development-build floor,
 so a complete CPU-profile command effectively requires 8 GiB; memory remains 15 GiB. After
-successful trace validation and history publication, the raw trace is
+successful trace validation and history publication, a CPU profile's raw trace is
 deleted by default; the record retains its digest, capture settings, extracted summary, original
-ephemeral path, and retention status. `--keep-trace` is the explicit diagnostic exception. A
+ephemeral path, and retention status. `--keep-trace` is the explicit diagnostic exception. A memory
+profile keeps its raw trace by default (`keptByDefault`, several GB; prune it by hand), because
+xctrace cannot export its allocation and VM tables and the trace is its only memory evidence. A
 failure retains only the newest raw failure for that platform/profile kind. Sidecars and retained
 diagnostics remain under `build/` and untracked.
 

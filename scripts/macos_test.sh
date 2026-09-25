@@ -497,6 +497,9 @@ cmd_profile() {
   local history_record="$ROOT_DIR/benchmarks/runs/instrument-profile/$run_id.json"
   local retention_policy="summaryOnly"
   (( keep_trace == 0 )) || retention_policy="keptExplicitly"
+  # xctrace cannot export a memory profile's allocation and VM tables, so its
+  # trace is the only memory evidence and is kept by default (audit #69).
+  [[ "$kind" != "memory" || "$retention_policy" != "summaryOnly" ]] || retention_policy="keptByDefault"
   local target_pid_file="$artifacts/target.pid"
   mkdir -p "$runtime"
   ln -s "$(debug_models_dir)" "$runtime/models"
@@ -647,8 +650,8 @@ cmd_profile() {
     || die "profile was published but raw-trace retention finalization failed; run routine cleanup"
   trap - EXIT
   PROFILE_TRACE_ACTIVE=0
-  if (( keep_trace )); then
-    note "trace retained explicitly → $trace"
+  if [[ "$retention_policy" != "summaryOnly" ]]; then
+    note "trace retained ($retention_policy) → $trace"
     note "analyze: open in Instruments, or use optional: xcprof analyze \"$trace\""
   else
     note "validated summary → $profile_summary"

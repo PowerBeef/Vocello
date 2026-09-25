@@ -1888,6 +1888,18 @@ class BenchmarkHistoryTests(unittest.TestCase):
         explicit["evidence"]["trace"]["rawTraceRetained"] = True
         self.publish(explicit, "profile-memory-retention-kept")
 
+        # A memory profile keeps its raw trace by default (audit #69).
+        by_default = copy.deepcopy(explicit)
+        by_default["run"]["id"] = "profile-memory-retention-default"
+        by_default["evidence"]["rawTelemetryDigest"] = "3" * 64
+        by_default["evidence"]["trace"]["retentionPolicy"] = "keptByDefault"
+        self.publish(by_default, "profile-memory-retention-default")
+        discarded = copy.deepcopy(by_default)
+        discarded["run"]["id"] = "profile-memory-retention-default-discarded"
+        discarded["evidence"]["trace"]["rawTraceRetained"] = False
+        with self.assertRaisesRegex(history.HistoryError, "conflicts with its retentionPolicy"):
+            self.publish(discarded, discarded["run"]["id"])
+
         for label, mutate, message in (
             (
                 "missing",

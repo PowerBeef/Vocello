@@ -400,8 +400,10 @@ checked-in `VocelloCLI` and `VocelloiOSLogic` templates; project-input validatio
 or stale result. Supported commands therefore use explicit schemes and managed DerivedData rather
 than leaking state through scheme-less `-target` invocations.
 
-Exact-PID Allocations traces can grow by multiple gigabytes during one cold model run, so successful
-profiles publish compact evidence and discard the raw trace unless `--keep-trace` is explicit. Use
+Successful CPU profiles publish compact evidence and discard the raw trace unless `--keep-trace` is
+explicit. Memory profiles keep theirs by default, because it is their only allocation and VM
+evidence, and an exact-PID Allocations trace can grow by multiple gigabytes during one cold model
+run: prune kept memory traces by hand. Use
 `scripts/clean_build_caches.sh` for a read-only inventory and `--routine --dry-run` for the bounded
 cleanup preview. Inventory reports filesystem free space, automatically eligible bytes, blocked
 evidence, and failed-profile bytes that require explicit acknowledgement. `--routine` removes

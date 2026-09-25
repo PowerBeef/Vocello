@@ -615,7 +615,8 @@ Schema-v1 history remains readable; new records publish as schema v3 when every 
 quality-registry identity and as schema v2 otherwise (`ui-perf` records are v2), and memory-qualified (v2+)
 records are never mixed into memory trends with v1. Raw telemetry, audio, screenshots, result bundles, and traces remain untracked. A successful
 profile record captures the original trace digest/path, capture settings, extracted summary, and
-retention policy; the raw trace is discarded after publication unless `--keep-trace` was explicit. Registry
+retention policy; a CPU profile's raw trace is discarded after publication unless `--keep-trace` was
+explicit, and a memory profile keeps its trace by default (`keptByDefault`). Registry
 validation is deterministic CI work, but model/device/UI execution is not an ordinary CI or
 packaging gate.
 

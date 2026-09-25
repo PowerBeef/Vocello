@@ -1058,6 +1058,10 @@ def default_inputs(record: dict[str, Any]) -> dict[str, Any]:
         REPO_ROOT / "Tests" / "VocelloMacUITests" / "VocelloMacBenchmarkUITests.swift",
         REPO_ROOT / "Tests" / "VocelloMacUITests" / "VocelloMacPerfUITests.swift",
         REPO_ROOT / "Tests" / "VocelloiOSUITests" / "VocelloiOSBenchmarkUITests.swift",
+        # The base test cases whose navigation and launch code runs inside the
+        # measured takes and windows (audit V-3).
+        REPO_ROOT / "Tests" / "VocelloMacUITests" / "VocelloMacUITestCase.swift",
+        REPO_ROOT / "Tests" / "VocelloiOSUITests" / "VocelloiOSUITestCase.swift",
         # ui-perf (UI-7 macOS, IUI-6 iOS): the frame probes, history seeders,
         # gate checkers, perf test classes, and per-platform threshold
         # contracts shape published frame-health evidence.

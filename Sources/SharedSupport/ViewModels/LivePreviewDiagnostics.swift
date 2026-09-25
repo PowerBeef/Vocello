@@ -18,7 +18,10 @@ import QwenVoiceCore
 enum LivePreviewDiagnostics {
     private static let environmentKey = "QWENVOICE_LIVE_PREVIEW_DIAGNOSTICS"
 
-    static var isEnabled: Bool {
+    /// Read once per process: the launch environment cannot change, and the
+    /// chunk path calls this per event, where rebuilding the environment
+    /// dictionary each time was pure overhead (audit #83).
+    static let isEnabled: Bool = {
         let value = RuntimeDebugGate.value(for: environmentKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
@@ -26,7 +29,7 @@ enum LivePreviewDiagnostics {
         case "1", "true", "yes", "on": return true
         default: return false
         }
-    }
+    }()
 
     /// Record a lifecycle event on a chunk URL (enter / decode_failed /
     /// delete). Writes one formatted line to stdout if diagnostics are on.

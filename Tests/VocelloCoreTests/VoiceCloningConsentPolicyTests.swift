@@ -444,6 +444,9 @@ final class VoiceCloningConsentPolicyTests: XCTestCase {
 
         let cloneRequest = request(.clone)
         await assertRefusedAsync(.generation) { _ = try await cli.generate(cloneRequest) }
+        await assertRefusedAsync(.generation) {
+            try await cli.primeCloneReference(modelID: "pro_clone_speed", reference: self.reference)
+        }
         await assertRefusedAsync(.enrollment) {
             _ = try await cli.enrollPreparedVoice(
                 name: "PA17", audioPath: self.reference.audioPath, transcript: "Hello."
@@ -467,6 +470,9 @@ final class VoiceCloningConsentPolicyTests: XCTestCase {
         defer { cli.engine.stop() }
 
         await assertReachesEngine { _ = try await cli.generate(self.request(.clone)) }
+        await assertReachesEngine {
+            try await cli.primeCloneReference(modelID: "pro_clone_speed", reference: self.reference)
+        }
         await assertReachesEngine {
             _ = try await cli.enrollPreparedVoice(
                 name: "PA17", audioPath: self.reference.audioPath, transcript: "Hello."

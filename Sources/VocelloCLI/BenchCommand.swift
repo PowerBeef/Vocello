@@ -494,9 +494,7 @@ enum BenchCommand {
                 if mode == .clone, memoryQualification == nil {
                     try await runtime.engine.loadModel(id: modelID)
                     if case .clone(let reference) = payload {
-                        try await runtime.engine.ensureCloneReferencePrimed(
-                            modelID: modelID, reference: reference
-                        )
+                        try await runtime.primeCloneReference(modelID: modelID, reference: reference)
                     }
                 }
 

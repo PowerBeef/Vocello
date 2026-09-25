@@ -20,8 +20,9 @@ struct CLIRuntime {
     let registry: ContractBackedModelRegistry
     let dataDirectory: URL
     /// PA-17: the invocation's recorded voice-cloning consent (`--confirm-consent`).
-    /// Generation and enrollment go through `generate(_:)` / `enrollPreparedVoice`
-    /// below, never straight to `engine`, so the core policy refuses them first.
+    /// Generation, clone-reference priming and enrollment go through `generate(_:)`,
+    /// `primeCloneReference` and `enrollPreparedVoice` below, never straight to
+    /// `engine`, so the core policy refuses them first.
     let voiceCloningConsent: VoiceCloningConsentPolicy
 
     static func bootstrap(
@@ -56,6 +57,14 @@ struct CLIRuntime {
     func generate(_ request: GenerationRequest) async throws -> GenerationResult {
         try voiceCloningConsent.admitGeneration(request)
         return try await engine.generate(request)
+    }
+
+    /// Clone-reference priming conditions the engine on a reference voice, so it is
+    /// refused like clone generation without recorded consent (as the apps'
+    /// `AnyTTSEngineBackend` refuses it).
+    func primeCloneReference(modelID: String, reference: CloneReference) async throws {
+        try voiceCloningConsent.admit(.generation)
+        try await engine.ensureCloneReferencePrimed(modelID: modelID, reference: reference)
     }
 
     /// Every CLI saved-voice enrollment: refused without recorded consent.

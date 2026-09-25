@@ -165,6 +165,11 @@ targets:
           - "Resources/**/*.whl"
           - "Resources/**/__pycache__/**"
           - "Resources/**/*.pyc"
+          - "InfoPlist.xcstrings"
+      # PA-20 (MAC-11): the microphone and Speech purpose strings in every
+      # interface language, bundled explicitly like the iOS permission catalog.
+      - path: Sources/InfoPlist.xcstrings
+        buildPhase: resources
       # The iOS engine-hosting stack is the reference implementation (maintainer
       # decision 2026-09-14, plan macos-ios-convergence-2026-09): the macOS app
       # compiles these iOS files by path and hosts MLXTTSEngine in-process on the

@@ -7,6 +7,7 @@ sourceOfTruth:
   - project.yml
   - Sources/Resources/Localizable.xcstrings
   - Sources/iOS/InfoPlist.xcstrings
+  - Sources/InfoPlist.xcstrings
   - Sources/iOS/IOSRootNavigationModels.swift
   - Sources/SharedSupport/Services/VocelloPresentationText.swift
   - Sources/SharedSupport/Services/VoiceDesignBriefCatalog.swift
@@ -25,8 +26,8 @@ English is the source language. The main catalog contains 951 entries with compl
 Spanish, German, Italian, Brazilian Portuguese (`pt-BR`), Simplified Chinese (`zh-Hans`), Japanese,
 Korean and Russian translations, including Settings/purchase copy, enrollment transcription
 states, storage recovery, model terminal states, onboarding, tab labels and primary Studio actions.
-The iOS permission catalog supplies microphone and Speech purpose strings separately, as required
-by the system. The expanded migration covers secondary sheets, recording and enrollment warnings,
+The iOS and macOS permission catalogs supply the microphone and Speech purpose strings separately,
+as required by the system. The expanded migration covers secondary sheets, recording and enrollment warnings,
 History filters/actions/recovery, player controls, download transfer details, long-form progress,
 displayed language/preset names and additional accessibility descriptions. Catalog completeness is
 **not whole-app acceptance**: rendered layouts and indirect errors from shared/system services
@@ -81,6 +82,9 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
   positional reordering is allowed. The French many form retains the existing plural wording.
 - `Sources/iOS/InfoPlist.xcstrings` owns only the two system purpose-string translations. English
   must match the declared Info.plist text. It is explicitly included in the iOS resources phase.
+  Since PA-20 `Sources/InfoPlist.xcstrings` does the same for the macOS app's `Sources/Info.plist`
+  (excluded from the `Sources` glob and listed as a `buildPhase: resources` source), and the
+  validator checks both catalogs.
 - `IOSInterfaceText` supplies iOS-only onboarding/navigation/Studio, enrollment, History/player,
   warning and display-only language/preset copy; `IOSSettingsText`
   supplies Settings copy. These presentation owners never assemble generation requests.

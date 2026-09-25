@@ -27,6 +27,11 @@ settings:
 targets:
   VocelloCLI:
     type: tool
+  QwenVoice:
+    type: application
+    sources:
+      - path: Sources/InfoPlist.xcstrings
+        buildPhase: resources
   VocelloiOS:
     type: application
     sources:
@@ -95,12 +100,13 @@ class LocalizationContractTests(unittest.TestCase):
         )
         purposes = {"NSMicrophoneUsageDescription": "Record locally.",
                     "NSSpeechRecognitionUsageDescription": "Transcribe locally."}
-        (self.root / "Sources/iOS/Info.plist").write_bytes(plistlib.dumps(purposes))
-        (self.root / "Sources/iOS/InfoPlist.xcstrings").write_text(json.dumps({
-            "sourceLanguage": "en", "version": "1.0",
-            "strings": {key: {"localizations": {
-                locale: {"stringUnit": {"state": "translated", "value": value}}
-                for locale in localization_contract.REQUIRED_LOCALES}} for key, value in purposes.items()}}))
+        for catalog_path, info_path, _ in localization_contract.PERMISSION_CATALOGS:
+            (self.root / info_path).write_bytes(plistlib.dumps(purposes))
+            (self.root / catalog_path).write_text(json.dumps({
+                "sourceLanguage": "en", "version": "1.0",
+                "strings": {key: {"localizations": {
+                    locale: {"stringUnit": {"state": "translated", "value": value}}
+                    for locale in localization_contract.REQUIRED_LOCALES}} for key, value in purposes.items()}}))
         presentation = "\n".join(
             f'let key_{index} = String(localized: "{key}")'
             for index, key in enumerate(sorted(localization_contract.REQUIRED_KEYS))
@@ -311,11 +317,27 @@ class LocalizationContractTests(unittest.TestCase):
             localization_contract.validate(self.root)
 
     def test_permission_translation_preserves_source_and_is_bundled(self) -> None:
-        path = self.root / "Sources/iOS/InfoPlist.xcstrings"
-        catalog = json.loads(path.read_text())
-        catalog["strings"]["NSMicrophoneUsageDescription"]["localizations"]["en"]["stringUnit"]["value"] = "Different claim"
-        path.write_text(json.dumps(catalog))
-        with self.assertRaisesRegex(localization_contract.ContractError, "purpose string"):
+        for catalog_path, _, _ in localization_contract.PERMISSION_CATALOGS:
+            with self.subTest(catalog=catalog_path.as_posix()):
+                path = self.root / catalog_path
+                original = path.read_text()
+                catalog = json.loads(original)
+                catalog["strings"]["NSMicrophoneUsageDescription"]["localizations"]["en"]["stringUnit"]["value"] = "Different claim"
+                path.write_text(json.dumps(catalog))
+                with self.assertRaisesRegex(localization_contract.ContractError, "purpose string"):
+                    localization_contract.validate(self.root)
+                path.write_text(original)
+
+    def test_macos_permission_catalog_is_required_and_bundled(self) -> None:
+        project = self.root / "project.yml"
+        original = project.read_text(encoding="utf-8")
+        project.write_text(original.replace(
+            "      - path: Sources/InfoPlist.xcstrings\n        buildPhase: resources\n", ""), encoding="utf-8")
+        with self.assertRaisesRegex(localization_contract.ContractError, "QwenVoice must explicitly bundle"):
+            localization_contract.validate(self.root)
+        project.write_text(original, encoding="utf-8")
+        (self.root / "Sources/InfoPlist.xcstrings").unlink()
+        with self.assertRaisesRegex(localization_contract.ContractError, "missing"):
             localization_contract.validate(self.root)
 
     def test_missing_setting_catalog_or_resource_fails(self) -> None:

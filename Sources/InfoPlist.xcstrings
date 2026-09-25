@@ -1,0 +1,138 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSMicrophoneUsageDescription": {
+      "comment": "macOS system microphone permission for locally recording a cloning reference. Do not imply cloud recording.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello records reference clips for voice cloning. Audio never leaves your Mac."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello enregistre des clips de référence pour le clonage vocal. L’audio ne quitte jamais votre Mac."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello graba clips de referencia para clonar voces. El audio nunca sale de tu Mac."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello nimmt Referenzclips zum Klonen von Stimmen auf. Das Audio verlässt deinen Mac nie."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello registra clip di riferimento per la clonazione vocale. L’audio non lascia mai il tuo Mac."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello grava referências para clonagem de voz. O áudio nunca sai do seu Mac."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 会录制参考音频用于声音克隆。音频始终保留在你的 Mac 上。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello はボイスクローン用の参照音声を録音します。音声がこの Mac の外に送られることはありません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello는 음성 복제에 사용할 참조 오디오를 녹음합니다. 오디오는 Mac 밖으로 전송되지 않습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello записывает образцы для клонирования голоса. Аудио никогда не покидает ваш Mac."
+          }
+        }
+      }
+    },
+    "NSSpeechRecognitionUsageDescription": {
+      "comment": "macOS system Speech permission for on-device reference transcription. Do not imply remote transcription.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello transcribes reference clips on-device to pre-fill transcripts. Nothing is sent to Apple or anyone else."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello transcrit les clips de référence sur l’appareil pour préremplir les transcriptions. Rien n’est envoyé à Apple ni à qui que ce soit."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello transcribe los clips de referencia en el dispositivo para rellenar las transcripciones. No se envía nada a Apple ni a nadie más."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello transkribiert Referenzclips auf dem Gerät, um Transkripte vorauszufüllen. Nichts wird an Apple oder andere gesendet."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello trascrive le clip di riferimento sul dispositivo per precompilare le trascrizioni. Nulla viene inviato ad Apple o ad altri."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello transcreve as referências no dispositivo para preencher as transcrições. Nada é enviado à Apple nem a ninguém."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 在设备上转写参考音频，以预先填写文字稿。不会向 Apple 或其他任何人发送任何内容。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello は参照音声をデバイス上で書き起こし、文字起こしをあらかじめ入力します。Apple やほかの誰にも送信されません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello는 기기에서 참조 오디오를 받아써 대본을 미리 채웁니다. Apple이나 다른 누구에게도 전송되지 않습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello расшифровывает образцы на устройстве, чтобы заранее заполнить текст. Ничего не отправляется ни Apple, ни кому-либо ещё."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

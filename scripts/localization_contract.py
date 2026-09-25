@@ -151,22 +151,31 @@ def _validate_translations(entry: dict[str, Any], key: str, locales=REQUIRED_LOC
                 raise ContractError(f"{key} {locale} {category} format arguments differ from English")
 
 
+# System permission prompts, one catalog per app (PA-20 added the macOS one, MAC-11):
+# (catalog, Info.plist it translates, target that must bundle it explicitly).
+PERMISSION_CATALOGS = (
+    (Path("Sources/iOS/InfoPlist.xcstrings"), Path("Sources/iOS/Info.plist"), "VocelloiOS"),
+    (Path("Sources/InfoPlist.xcstrings"), Path("Sources/Info.plist"), "QwenVoice"),
+)
+
+
 def _validate_permission_catalog(root: Path) -> None:
-    path = Path("Sources/iOS/InfoPlist.xcstrings")
-    catalog = _read_json(root, path)
-    info = plistlib.loads(_read_text(root, Path("Sources/iOS/Info.plist")).encode())
     required = {"NSMicrophoneUsageDescription", "NSSpeechRecognitionUsageDescription"}
-    if catalog.get("sourceLanguage") != "en" or catalog.get("version") != "1.0":
-        raise ContractError("permission catalog must use English source and version 1.0")
-    if set(catalog.get("strings", {})) != required:
-        raise ContractError("permission catalog must contain exactly the two declared purpose strings")
-    for key, entry in catalog["strings"].items():
-        _validate_translations(entry, key, _bundled_catalog_locales(_read_json(root, CATALOG)))
-        if entry["localizations"]["en"]["stringUnit"]["value"] != info[key]:
-            raise ContractError(f"{key} must preserve the Info.plist purpose string")
-    body = _target_body(_read_text(root, Path("project.yml")), "VocelloiOS")
-    if "- path: Sources/iOS/InfoPlist.xcstrings\n        buildPhase: resources" not in body:
-        raise ContractError("VocelloiOS must explicitly bundle the permission catalog")
+    manifest = _read_text(root, Path("project.yml"))
+    for path, info_path, target in PERMISSION_CATALOGS:
+        catalog = _read_json(root, path)
+        info = plistlib.loads(_read_text(root, info_path).encode())
+        if catalog.get("sourceLanguage") != "en" or catalog.get("version") != "1.0":
+            raise ContractError(f"{path} must use English source and version 1.0")
+        if set(catalog.get("strings", {})) != required:
+            raise ContractError(f"{path} must contain exactly the two declared purpose strings")
+        for key, entry in catalog["strings"].items():
+            _validate_translations(entry, key, _bundled_catalog_locales(_read_json(root, CATALOG)))
+            if entry["localizations"]["en"]["stringUnit"]["value"] != info[key]:
+                raise ContractError(f"{key} in {path} must preserve the Info.plist purpose string")
+        body = _target_body(manifest, target)
+        if f"- path: {path.as_posix()}\n        buildPhase: resources" not in body:
+            raise ContractError(f"{target} must explicitly bundle the permission catalog {path}")
 
 
 class ContractError(ValueError):

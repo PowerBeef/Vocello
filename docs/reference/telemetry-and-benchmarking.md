@@ -293,7 +293,7 @@ authoritative list.** Representative keys (prefix `qwen_…`):
 | `qwen_stream_decoder_total` | Streaming audio decoder (codec → waveform). |
 | `qwen_stream_step_eval_total` | `eval(...)` flush after each forward step (GPU dispatch; under the default `.pipelined` policy only the `asyncEval` enqueue). |
 | `qwen_stream_step_token_read_total` | The step's first blocking read, the sampled token: under `.pipelined` the host's wait for the step's GPU work (signpost `Token Read`). |
-| `qwen_stream_step_eval_wait_total` | The observed step wait: equals the token read under `.pipelined`, 0 under synchronous policies, whose wait stays inside the eval call. |
+| `qwen_stream_step_eval_wait_total` | The observed step wait: equals the token read under `.pipelined`; 0 under synchronous policies, whose wait stays inside the eval call, and under `.deferred`, whose token read itself dispatches and waits for the work the token depends on. The v9 sidecar's derived `mlxMaterializationDurationNS` counts back this wait; rows and sidecars with that meaning carry output-adapter identity version 2. |
 | `qwen_stream_step_eos_read_total` | EOS‑flag readback (a GPU sync). |
 | `qwen_audio_chunk_eval_total` | Audio‑chunk evals: the assembly `asyncEval`, the pipelined flush (signpost `Audio Chunk Flush`) and the tail chunk. |
 | `qwen_token_loop_total` | Whole per‑token loop wall time. |
@@ -397,6 +397,13 @@ Caveats that still apply:
   `tokensPerSecond`. `qwen_token_loop_total` sums in-loop iterations only, so the two spans never
   isolate a decoder drain (the former `qwen_stream_decoder_drain_ms` key could not be positive and
   was removed on 2026-09-25).
+- **Token-loop rounding (BT-06, 2026-09-25)** — `qwen_token_loop_total` and the other hot-loop
+  totals are now summed unrounded and rounded once at export. Rows written before BT-06 summed
+  per-step rounded milliseconds: an error of up to 0.5 ms per step, near zero when step durations
+  jitter but systematic when they cluster. `decodeWallSeconds` and `decodeSpeedupX` (and the
+  `tokensPerSecond` fallback when a row has no `.info`) can therefore shift at that change by up to
+  0.5 ms x steps without an engine speedup; the gate's `tokps` reads `.info`'s own span and does
+  not move. Rows since then carry `streamingV9OutputAdapterVersion` 2 or later.
 - **Stage marks** — `streamGenerationEnded` closes before WAV finalize; do not compare
   `streamStartup→streamCompleted` to decode ms (finalize I/O inflates the old span).
 

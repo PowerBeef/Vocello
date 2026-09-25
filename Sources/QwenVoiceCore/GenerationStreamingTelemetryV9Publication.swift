@@ -10,7 +10,12 @@ import Foundation
 public enum GenerationStreamingTelemetryV9Publication: Sendable {
     public static let sidecarFileExtension = "streaming-telemetry-v9.json"
     public static let sessionIdentityVersion = 1
-    public static let outputAdapterIdentityVersion = 1
+    /// 2 (BT-06, audit #49/#62): under `.pipelined` the derived
+    /// `mlxMaterializationDurationNS`, `mlxEvaluationEnqueuedAtNS` and
+    /// `generatedAtNS` count back the observed step wait (the sampled-token
+    /// read) instead of a zero eval-minus-enqueue remainder. The bump marks rows
+    /// and sidecars written with that meaning; version 1 predates it.
+    public static let outputAdapterIdentityVersion = 2
 
     public enum PublicationError: Error, Equatable, Sendable {
         case validationFailed

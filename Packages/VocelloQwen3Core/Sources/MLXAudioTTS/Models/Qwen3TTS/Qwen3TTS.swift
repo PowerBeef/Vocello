@@ -21,10 +21,10 @@ private enum Qwen3Signposts {
     static let category = "generation"
     static let signposter = OSSignposter(subsystem: subsystem, category: category)
 
-    /// The same subsystem and category for per-step intervals emitted through
-    /// the allocation-free `os_signpost` entry point: `OSSignposter.beginInterval`
-    /// allocates an interval-state object on every call (V-2). Made once per
-    /// generation, outside the token loop.
+    /// The same subsystem and category for per-step and per-chunk intervals
+    /// emitted through the allocation-free `os_signpost` entry point:
+    /// `OSSignposter.beginInterval` allocates an interval-state object on every
+    /// call (V-2). Made once per generation, outside the token loop.
     static func makeStepLog() -> OSLog {
         OSLog(subsystem: subsystem, category: category)
     }
@@ -3553,7 +3553,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         // (Stage 1 P3); the plan owns its K/V buffers, so no KVCacheSimple is
         // allocated for the streaming CP.
         let codePredictorStepConstants = CodePredictorStepConstants()
-        let tokenReadLog = Qwen3Signposts.makeStepLog()
+        // The per-step and per-chunk intervals (`Token Read`, `Audio Chunk
+        // Flush`) go through this log's allocation-free entry point.
+        let stepSignpostLog = Qwen3Signposts.makeStepLog()
 
         if isStreaming {
             speechTokenizer.decoder.resetStreamingState()
@@ -3595,9 +3597,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             pendingMaterializedChunk = nil
             guard let materializedEventSink else { return }
             let flushEvalStartedAt = ContinuousClock.now
-            let flushSignpost = Qwen3Signposts.signposter.beginInterval("Audio Chunk Flush")
+            // Once per chunk under `.pipelined`: the allocation-free entry
+            // point, like `Token Read`, not `OSSignposter.beginInterval`.
+            os_signpost(.begin, log: stepSignpostLog, name: "Audio Chunk Flush")
             eval(pending.audioChunk)
-            Qwen3Signposts.signposter.endInterval("Audio Chunk Flush", flushSignpost)
+            os_signpost(.end, log: stepSignpostLog, name: "Audio Chunk Flush")
             // Flush wait lands in the running audio-chunk-eval totals (its
             // chunk's own delta closed at assembly; this shifts attribution by
             // at most one chunk in the diagnostic breakdown). Its own interval
@@ -3797,9 +3801,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             // exclusive `os_signpost` interval per step: no allocation and no
             // lock on the hot path.
             let tokenReadStartedAt = ContinuousClock.now
-            os_signpost(.begin, log: tokenReadLog, name: "Token Read")
+            os_signpost(.begin, log: stepSignpostLog, name: "Token Read")
             let tokenId = Int(nextToken[0, 0].item(Int32.self))
-            os_signpost(.end, log: tokenReadLog, name: "Token Read")
+            os_signpost(.end, log: stepSignpostLog, name: "Token Read")
             let tokenReadElapsed = tokenReadStartedAt.elapsed
             streamStepTokenReadTotal += tokenReadElapsed
             if streamStepEvalPolicy == .pipelined {

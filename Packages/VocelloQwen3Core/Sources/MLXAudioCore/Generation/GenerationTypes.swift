@@ -204,8 +204,11 @@ public struct ChunkSubstageTimings: Sendable, Hashable {
     /// The observed wait for the step's submitted GPU work: under `.pipelined`
     /// (the production default) the step's first blocking read, the sampled
     /// token read, after `asyncEval` enqueued the step (audit #49/#62). It is
-    /// not part of `streamStepEvalMS`. 0 under the other policies, whose wait
-    /// is not observed separately (see `streamStepEvalEnqueueMS`).
+    /// not part of `streamStepEvalMS`. 0 under the other policies: a
+    /// synchronous eval (`.full`, `.eosOnly`) keeps the wait inside the eval
+    /// call (see `streamStepEvalEnqueueMS`), and under `.deferred` the token
+    /// read itself dispatches and waits for the work the token depends on, so
+    /// that time stays in `qwen_stream_step_token_read_total`, not split out.
     public let streamStepEvalWaitMS: Double
     /// Time spent reading the EOS (end-of-speech) flag each forward
     /// step. Lives inside the per-token loop alongside the talker

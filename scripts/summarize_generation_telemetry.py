@@ -41,6 +41,7 @@ from pathlib import Path
 SCRIPT_DIRECTORY = Path(__file__).resolve().parent
 if str(SCRIPT_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIRECTORY))
+from lib import jsonio  # noqa: E402
 from lib import rtf as rtf_semantics  # noqa: E402
 
 DEFAULT_DIR = os.path.expanduser(
@@ -1135,7 +1136,7 @@ def load_baseline_migrations(path):
 BASELINE_SCHEMA_VERSION = 2
 
 
-def baseline_identity_from_evidence(payload):
+def baseline_identity_from_evidence(payload, *, require_device_class=True):
     """Return the performance-comparison identity from validated evidence.
 
     Source and executable digests are deliberately excluded: a regression
@@ -1144,6 +1145,11 @@ def baseline_identity_from_evidence(payload):
     matrix/corpus, and evidence semantics remain exact so unlike lanes can never
     compare. The device tier comes from the record's `run.runtimePolicy`
     provenance, which the publisher derives from the rows' own stamps.
+
+    Evidence from rows that predate the stamp has no `runtimePolicy`. Saving
+    always requires it; comparing with a baseline that predates the device-class
+    identity passes `require_device_class=False`, and the identity then leaves
+    the tier out, as that baseline does.
     """
     if not isinstance(payload, dict):
         raise ValueError("baseline identity requires an evidence manifest")
@@ -1164,16 +1170,19 @@ def baseline_identity_from_evidence(payload):
     if optimization not in {"-O", "-Onone"}:
         raise ValueError("baseline identity has an unsupported optimization")
     runtime_policy = run.get("runtimePolicy")
-    if not isinstance(runtime_policy, dict):
-        raise ValueError("baseline identity evidence has no runtimePolicy")
-    if runtime_policy.get("deviceClassForced") is not False:
-        raise ValueError("baseline identity evidence ran under a forced memory class")
+    device_class = {}
+    if runtime_policy is not None or require_device_class:
+        if not isinstance(runtime_policy, dict):
+            raise ValueError("baseline identity evidence has no runtimePolicy")
+        if runtime_policy.get("deviceClassForced") is not False:
+            raise ValueError("baseline identity evidence ran under a forced memory class")
+        device_class = {"deviceClass": runtime_policy.get("deviceClass")}
     identity = {
         "kind": run.get("kind"),
         "platform": run.get("platform"),
         "matrixScope": run.get("matrixScope"),
         "hardwareProfile": hardware.get("profileID"),
-        "deviceClass": runtime_policy.get("deviceClass"),
+        **device_class,
         **host_identity(),
         "optimization": optimization,
         "matrixHash": inputs.get("matrixHash"),
@@ -1273,6 +1282,11 @@ def baseline_document(cells, evidence_payload=None):
     }
 
 
+def baseline_bytes(document):
+    """The saved baseline's encoding: indent 2, key order kept, ASCII, newline."""
+    return (json.dumps(document, indent=2) + "\n").encode("utf-8")
+
+
 def baseline_rtf_definition(payload):
     """`wall/audio` for baselines saved since the RTF cutover, else legacy.
 
@@ -1314,6 +1328,10 @@ def baseline_cells(payload, *, current_identity=None, require_identity=False):
     if identity != comparable_current:
         raise ValueError("baseline optimization/topology identity differs from current evidence")
     return cells
+
+
+def baseline_declares_identity(payload):
+    return isinstance(payload, dict) and payload.get("identity") is not None
 
 
 def baseline_lacks_host_identity(payload):
@@ -1604,10 +1622,16 @@ def main():
             return 1
 
     if args.save_baseline:
-        summary = build_summary(cells)
-        with open(args.save_baseline, "w", encoding="utf-8") as f:
-            json.dump(baseline_document(summary, evidence_payload), f, indent=2)
-            f.write("\n")
+        # Build the whole document before touching the target: a refused
+        # identity must leave an existing (possibly committed) baseline intact.
+        try:
+            document = baseline_document(build_summary(cells), evidence_payload)
+            jsonio.atomic_json(
+                Path(args.save_baseline), document, mkdir=False, encoder=baseline_bytes,
+            )
+        except (OSError, ValueError) as error:
+            print(f"FAIL: baseline not saved to {args.save_baseline}: {error}")
+            return 1
 
     stamp = f"{today_str()} · {git_short_sha()}"
     if args.label:
@@ -1869,11 +1893,16 @@ def main():
         try:
             with open(args.compare_baseline, "r", encoding="utf-8") as f:
                 baseline_payload = json.load(f)
-            current_identity = (
-                baseline_identity_from_evidence(evidence_payload)
-                if evidence_payload is not None
-                else None
-            )
+            # An ad-hoc baseline declares no identity, so unless the caller
+            # requires one the evidence's identity is never needed.
+            current_identity = None
+            if evidence_payload is not None and (
+                args.require_baseline_identity or baseline_declares_identity(baseline_payload)
+            ):
+                current_identity = baseline_identity_from_evidence(
+                    evidence_payload,
+                    require_device_class=not baseline_lacks_device_class(baseline_payload),
+                )
             baseline = baseline_cells(
                 baseline_payload,
                 current_identity=current_identity,

@@ -334,6 +334,98 @@ def test_forced_memory_class_rows_are_never_saved_or_compared():
             assert sgt.main() == 0
 
 
+def _unstamped_evidence():
+    """Evidence from rows that predate the device-class stamp."""
+    evidence = _evidence()
+    evidence["historyRecord"]["run"].pop("runtimePolicy")
+    return evidence
+
+
+def _run_with_evidence(diag_dir, evidence, *arguments):
+    """Run the CLI with `evidence` as the selected manifest and a fixed host."""
+    argv = [
+        "summarize_generation_telemetry.py", diag_dir, "--engine-only",
+        "--evidence-manifest", "evidence.json", *arguments,
+    ]
+    with mock.patch.object(sys, "argv", argv), mock.patch.object(
+        sgt, "load_evidence_selection", return_value=(evidence, "", None, None)
+    ), mock.patch.object(
+        sgt, "host_identity", return_value={"osVersion": "26.6", "xcodeVersion": "26.6"}
+    ):
+        return sgt.main()
+
+
+def _telemetry_dir(tmp):
+    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "telemetry_variants.jsonl")
+    engine_dir = os.path.join(tmp, "engine")
+    os.makedirs(engine_dir)
+    shutil.copy(fixture_path, os.path.join(engine_dir, "generations.jsonl"))
+    return tmp
+
+
+def test_a_refused_identity_leaves_the_existing_baseline_intact():
+    with tempfile.TemporaryDirectory() as tmp:
+        diag_dir = _telemetry_dir(tmp)
+        baselines = os.path.join(tmp, "baselines")
+        os.makedirs(baselines)
+        baseline_path = os.path.join(baselines, "gate.json")
+        original = b'{\n  "schemaVersion": 2,\n  "committed": true\n}\n'
+        with open(baseline_path, "wb") as handle:
+            handle.write(original)
+        for evidence in (_unstamped_evidence(), _evidence(forced=True)):
+            assert _run_with_evidence(diag_dir, evidence, "--save-baseline", baseline_path) == 1
+            with open(baseline_path, "rb") as handle:
+                assert handle.read() == original
+            assert os.listdir(baselines) == ["gate.json"]
+        # Stamped evidence saves, in the encoding the committed baseline uses.
+        assert _run_with_evidence(diag_dir, _evidence(), "--save-baseline", baseline_path) == 0
+        with open(baseline_path, "rb") as handle:
+            saved = handle.read()
+        document = json.loads(saved)
+        assert document["identity"]["deviceClass"] == "floor_8gb_mac"
+        assert saved == (json.dumps(document, indent=2) + "\n").encode("utf-8")
+        assert list(document) == ["schemaVersion", "rtfDefinition", "identity", "cells"]
+        assert os.listdir(baselines) == ["gate.json"]
+
+
+def test_unstamped_evidence_compares_with_baselines_that_do_not_bind_the_tier():
+    with tempfile.TemporaryDirectory() as tmp:
+        diag_dir = _telemetry_dir(tmp)
+        ad_hoc = os.path.join(tmp, "ad-hoc.json")
+        with mock.patch.object(
+            sys, "argv", ["summarize_generation_telemetry.py", diag_dir, "--save-baseline", ad_hoc]
+        ):
+            assert sgt.main() == 0
+        # An ad-hoc baseline declares no identity, so the evidence needs none.
+        assert _run_with_evidence(diag_dir, _unstamped_evidence(), "--compare-baseline", ad_hoc) == 0
+        # ...unless the caller requires one.
+        assert _run_with_evidence(
+            diag_dir, _unstamped_evidence(), "--compare-baseline", ad_hoc, "--require-baseline-identity"
+        ) == 1
+
+        bound = os.path.join(tmp, "bound.json")
+        assert _run_with_evidence(diag_dir, _evidence(), "--save-baseline", bound) == 0
+        # A baseline that binds the tier refuses evidence that cannot prove it.
+        assert _run_with_evidence(
+            diag_dir, _unstamped_evidence(), "--compare-baseline", bound, "--require-baseline-identity"
+        ) == 1
+        # A baseline saved before the device-class identity compares without it,
+        # as it did before the stamp existed; forced evidence is still refused.
+        with open(bound, "r", encoding="utf-8") as handle:
+            legacy = json.load(handle)
+        legacy["identity"].pop("deviceClass")
+        legacy_path = os.path.join(tmp, "legacy.json")
+        with open(legacy_path, "w", encoding="utf-8") as handle:
+            json.dump(legacy, handle, indent=2)
+        for evidence in (_unstamped_evidence(), _evidence()):
+            assert _run_with_evidence(
+                diag_dir, evidence, "--compare-baseline", legacy_path, "--require-baseline-identity"
+            ) == 0
+        assert _run_with_evidence(
+            diag_dir, _evidence(forced=True), "--compare-baseline", legacy_path, "--require-baseline-identity"
+        ) == 1
+
+
 def test_governed_baseline_rejects_legacy_unidentified_metrics():
     try:
         sgt.baseline_cells([], current_identity={}, require_identity=True)

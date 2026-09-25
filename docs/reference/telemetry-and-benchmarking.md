@@ -404,7 +404,9 @@ where time goes; use **Instruments signposts** (see [`benchmarking-procedure.md`
 
 - **`mlxMemoryByStage`** — MLX GPU `active`/`cache`/`peak` MB captured at stage boundaries
   (`before_stream`, `first_chunk`, `after_stream`, `after_final_write`,
-  `after_generation_trim`, plus prepare/clone/prewarm stages). Shows GPU memory growth
+  `after_generation_trim`, `before_marking`/`after_marking` when marking runs, plus
+  prepare/clone/prewarm stages). `peak` is cumulative since the request began, so a stage raised
+  the request's high-water mark exactly when its peak exceeds the previous stage's. Shows GPU memory growth
   across the pipeline — key for restricted‑hardware tuning. Captured at boundaries only
   (a GPU snapshot is too costly per chunk).
 - **`summary`** (`TelemetrySummary`) — owning-process memory **curve** summary from the background

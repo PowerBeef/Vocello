@@ -46,18 +46,30 @@ def sidecar_rows(pre_peaks, mark_peaks, boundaries=True):
 
 
 class MarkingPeakEqualityTests(unittest.TestCase):
-    def run_checker(self, takes, *extra: str) -> int:
+    def run_checker(self, takes, *extra: str, mlx_peaks=None) -> int:
+        """`mlx_peaks` maps a take index to its (before, after) marking MLX
+        peaks, written as that take's engine row beside the sidecars."""
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
             engine = root / "runtime" / "diagnostics" / "engine"
             engine.mkdir(parents=True)
             record_takes = []
+            engine_rows = []
             for i, (cell, rows) in enumerate(takes):
                 gid = f"FIXTURE-{i}"
                 (engine / f"samples-{gid}.jsonl").write_text(
                     "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
                 record_takes.append(
                     {"cell": cell, "generationID": gid, "status": "success"})
+                if mlx_peaks and i in mlx_peaks:
+                    before, after = mlx_peaks[i]
+                    engine_rows.append({"generationID": gid, "mlxMemoryByStage": {
+                        "before_marking": {"activeMB": 900.0, "cacheMB": 50.0, "peakMB": before},
+                        "after_marking": {"activeMB": 900.0, "cacheMB": 0.0, "peakMB": after},
+                    }})
+            if engine_rows:
+                (engine / "generations.jsonl").write_text(
+                    "".join(json.dumps(r) + "\n" for r in engine_rows), encoding="utf-8")
             manifest = root / "benchmark-evidence.json"
             manifest.write_text(
                 json.dumps({"historyRecord": {"takes": record_takes}}),
@@ -77,6 +89,17 @@ class MarkingPeakEqualityTests(unittest.TestCase):
         # generation working set and adds hundreds of MB.
         rows = sidecar_rows(pre_peaks=[400, 858], mark_peaks=[1290])
         self.assertEqual(self.run_checker([("custom/cold#0", rows)]), 1)
+
+    def test_exact_mlx_peak_catches_a_spike_the_samples_miss(self) -> None:
+        # A brief marking spike that no tick landed on passes the sampled check,
+        # but MLX's cumulative peak rose across the marking pass (audit #67).
+        rows = sidecar_rows(pre_peaks=[400, 858], mark_peaks=[430])
+        self.assertEqual(self.run_checker([("custom/cold#0", rows)]), 0)
+        self.assertEqual(
+            self.run_checker([("custom/cold#0", rows)], mlx_peaks={0: (2200.0, 2400.0)}), 1)
+        # An unchanged peak, or one page of rounding, passes.
+        self.assertEqual(
+            self.run_checker([("custom/cold#0", rows)], mlx_peaks={0: (2200.0, 2200.015625)}), 0)
 
     def test_missing_boundaries_fail_closed(self) -> None:
         # QWENVOICE_MARKING=off: the seam captures no boundaries, so an

@@ -1926,6 +1926,10 @@ struct StreamingExecutionContext: Sendable {
             // marking-shaped telemetry as marking evidence.
             if let markingConfiguration, AudioMarkingPolicy.resolvedEnabled() {
                 await telemetrySampler?.captureBoundary("before_marking")
+                // The MLX peak is cumulative since the request began, so the
+                // marking pass raised the take's exact MLX high-water mark
+                // only if the after-marking peak exceeds this one (audit #67).
+                mlxMemorySnapshots["before_marking"] = NativeMemoryPolicyResolver.snapshot()
                 // Zero-peak ordering (the CP-2 gate's design): release the
                 // generation pass's allocator cache BEFORE the marking
                 // weights load, and drop the marking pass's own buffers
@@ -1941,6 +1945,7 @@ struct StreamingExecutionContext: Sendable {
                     throw Self.publicationMarkingError(error)
                 }
                 Memory.clearCache()
+                mlxMemorySnapshots["after_marking"] = NativeMemoryPolicyResolver.snapshot()
                 await telemetrySampler?.captureBoundary("after_marking")
             }
             await telemetrySampler?.captureBoundary("before_audio_qc")

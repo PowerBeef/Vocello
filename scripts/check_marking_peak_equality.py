@@ -40,6 +40,50 @@ def unwrap_record(document: dict) -> dict:
     return inner if isinstance(inner, dict) else document
 
 
+def engine_rows_by_id(engine_dir: Path) -> dict[str, dict]:
+    """The engine rows beside the sidecars, by generation ID ({} when absent)."""
+    path = engine_dir / "generations.jsonl"
+    if not path.is_file():
+        return {}
+    rows: dict[str, dict] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(row, dict) and isinstance(row.get("generationID"), str):
+            rows[row["generationID"]] = row
+    return rows
+
+
+def check_exact_mlx_peak(take: dict, row: dict | None, tolerance_mb: float,
+                         errors: list[str]) -> None:
+    """The exact check (audit #67): MLX's peak is cumulative since the request
+    began, so the marking pass raised the take's MLX high-water mark only if
+    the peak after marking exceeds the peak before it. A take whose engine row
+    predates the marking snapshots keeps only the sampled check below."""
+    label = f"{take.get('cell', take.get('mode', '?'))}"
+    stages = (row or {}).get("mlxMemoryByStage")
+    if not isinstance(stages, dict):
+        print(f"  {label:32} exact MLX check unavailable (no engine MLX stages)")
+        return
+    before = (stages.get("before_marking") or {}).get("peakMB")
+    after = (stages.get("after_marking") or {}).get("peakMB")
+    if not all(isinstance(value, (int, float)) and not isinstance(value, bool)
+               for value in (before, after)):
+        print(f"  {label:32} exact MLX check unavailable (no marking snapshots)")
+        return
+    verdict = "PASS" if after <= before + tolerance_mb else "FAIL"
+    print(f"  {label:32} MLX peak before marking {before:8.1f} MB  "
+          f"after {after:8.1f} MB  {verdict}")
+    if after > before + tolerance_mb:
+        errors.append(
+            f"{label}: the marking pass raised the take's exact MLX peak from "
+            f"{before:.1f} MB to {after:.1f} MB")
+
+
 def footprint(row: dict) -> float | None:
     for key in ("physFootprintMB", "residentMB"):
         value = row.get(key)
@@ -90,16 +134,17 @@ def check_take(take: dict, sidecar: Path, pct: float, floor: float,
 DEFAULT_POLICY = Path(__file__).resolve().parents[1] / "config" / "marking-peak-equality.json"
 
 
-def load_tolerances(policy_path: Path) -> tuple[float, float]:
-    """tolerancePercent and toleranceMB from the tracked policy; a missing or
-    malformed policy is a failure, never a silent default."""
+def load_tolerances(policy_path: Path) -> tuple[float, float, float]:
+    """tolerancePercent, toleranceMB and mlxPeakToleranceMB from the tracked
+    policy; a missing or malformed policy is a failure, never a silent default."""
     try:
         policy = json.loads(policy_path.read_text(encoding="utf-8"))
         percent = float(policy["tolerancePercent"])
         megabytes = float(policy["toleranceMB"])
+        mlx_megabytes = float(policy["mlxPeakToleranceMB"])
     except (OSError, ValueError, KeyError, TypeError) as error:
         raise SystemExit(f"marking peak equality: policy {policy_path} is unusable: {error}")
-    return percent, megabytes
+    return percent, megabytes, mlx_megabytes
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -119,7 +164,7 @@ def main(argv: list[str] | None = None) -> int:
                              "runtime/diagnostics/engine beside the manifest)")
     args = parser.parse_args(argv)
 
-    policy_percent, policy_mb = load_tolerances(args.policy)
+    policy_percent, policy_mb, mlx_tolerance_mb = load_tolerances(args.policy)
     if args.tolerance_percent is None:
         args.tolerance_percent = policy_percent
     if args.tolerance_mb is None:
@@ -134,11 +179,13 @@ def main(argv: list[str] | None = None) -> int:
              if t.get("status") in (None, "success", "passed", "passedWithWarnings")]
     if not takes:
         errors.append(f"{args.evidence}: no successful takes in the record")
+    engine_rows = engine_rows_by_id(sidecar_dir)
     for take in takes:
         gid = take.get("generationID")
         if not isinstance(gid, str) or not gid:
             errors.append(f"take {take.get('cell', '?')}: missing generationID")
             continue
+        check_exact_mlx_peak(take, engine_rows.get(gid), mlx_tolerance_mb, errors)
         check_take(take, sidecar_dir / f"samples-{gid}.jsonl",
                    args.tolerance_percent, args.tolerance_mb, errors)
 

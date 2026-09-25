@@ -274,7 +274,9 @@ gap between samples above twice the sampler cadence. The app and engine samples 
 process form one series in absolute-uptime order; they are never summed.
 Critical pressure, app memory warning/exit, `hardTrim`, or `fullUnload` fails publication, and so
 does a marking peak-equality breach (CP-2: within every take, no post-marking footprint sample may
-exceed the pre-marking peak beyond tolerance — `config/marking-peak-equality.json`). Guarded
+exceed the pre-marking peak beyond tolerance, and the exact MLX peak, cumulative since the request
+began, may not rise across the marking pass by more than one page —
+`config/marking-peak-equality.json`). Guarded
 pressure or `softTrim` publishes only as an explicit warning.
 
 The routine per-tier cache clear (a `trim-action` with source `post-generation` and reason

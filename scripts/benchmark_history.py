@@ -3645,6 +3645,19 @@ def trend_summary(record: dict[str, Any], baseline_record: dict[str, Any] | None
     return f"vs {baseline}: {suffix}"
 
 
+def history_classification(run: dict[str, Any]) -> str:
+    """The HISTORY classification cell. A forced or emulated memory tier keeps
+    the hardware profile's comparison key (lineage v1 never reads
+    run.runtimePolicy) and is never comparable, so its row names the tier it
+    ran under beside the classification instead of reading as that host's."""
+    policy = run.get("runtimePolicy")
+    if not isinstance(policy, dict) or policy.get("deviceClassForced") is not True:
+        return run["classification"]
+    simulated = policy.get("simulatedPhysicalMemoryMB")
+    tier = f"emulated {simulated} MB" if simulated else f"forced {policy['deviceClass']}"
+    return f"{run['classification']} ({tier})"
+
+
 def render_history(records: list[tuple[Path, dict[str, Any]]]) -> str:
     grouped: dict[tuple[str, str, str, str], list[dict[str, Any]]] = {}
     for _, record in records:
@@ -3707,7 +3720,7 @@ def render_history(records: list[tuple[Path, dict[str, Any]]]) -> str:
             lines.append(
                 "| {date} | [`{run_id}`]({relative}) | {scope} | {classification} | {status} | {memory} | {takes} | {rtf} | `{sha}`{dirty} | `{comparison}` | {trend} | {label} |".format(
                     date=run["finishedAt"].split("T", 1)[0], run_id=markdown_escape(run["id"]),
-                    relative=relative, scope=run["matrixScope"], classification=run["classification"],
+                    relative=relative, scope=run["matrixScope"], classification=history_classification(run),
                     status=run["status"], takes=len(record["takes"]),
                     rtf=rtf_semantics.format_rtf(rtf_value, rtf_derived),
                     sha=source["commit"][:12],

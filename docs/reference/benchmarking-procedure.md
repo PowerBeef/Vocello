@@ -121,10 +121,11 @@ host is the canonical profile.
 Records also capture current OS build, thermal/low-power state, sanitized transport, toolchain,
 executables, input/model fingerprints, and source state. A dirty success is `exploratory`, not a
 canonical trend point. Profiles and forced-memory-class diagnostics are not compared with normal
-timing records. Engine records published since 2026-09-25 also carry `run.runtimePolicy`
-(`deviceClass`, `deviceClassForced`), taken from the rows' own stamps, so a record proves which
-memory tier it measured; the validator refuses a native tier on the wrong platform and a forced
-tier on a comparable record, and the comparison key never includes the block.
+timing records. Engine and macOS UI benchmark records published since 2026-09-25 also carry
+`run.runtimePolicy` (`deviceClass`, `deviceClassForced`, and `simulatedPhysicalMemoryMB` on an
+emulated smaller Mac), taken from the rows' own stamps, so a record proves which memory tier it
+measured; the validator refuses a native tier on the wrong platform and a forced tier on a comparable
+record, and the comparison key never includes the block.
 
 ---
 
@@ -298,8 +299,16 @@ QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB=8 scripts/ui_test.sh macos benchmark --la
 
 Each is a consent-bound lane like its unemulated form. The rows stamp `deviceClassForced=true`,
 `simulatedPhysicalMemoryMB` and `simulatedMetalWorkingSetMB`; the publisher classifies every such
-record `exploratory` (never canonical, never comparable, never a baseline or a chart point) and an
-engine record's `run.runtimePolicy` names `simulatedPhysicalMemoryMB` beside the forced floor tier. The
+record `exploratory` (never canonical, never comparable, never a baseline or a chart point) and the
+record's `run.runtimePolicy`, on engine and macOS UI benchmark records alike, names
+`simulatedPhysicalMemoryMB` beside the forced floor tier. Lineage v1 never reads `run.runtimePolicy`,
+so an emulated or forced record stores the M6 profile's comparison key string, exactly as a forced
+class always has. It is still excluded from every comparison: it gets no baseline or deltas and is
+never another record's baseline. `benchmarks/HISTORY.md` lists it in the M6 section with the
+classification `exploratory (emulated 8192 MB)` (a forced class alone reads
+`exploratory (forced <tier>)`) and the comparison `excluded`. Giving these records a key of their own
+would change what the key reads, a `LINEAGE_CONTRACT_VERSION` bump that is the maintainer's decision
+(audit §4.4 item 5); a published key is never edited in place. The
 band paths reuse the store's existing knobs: `QVOICE_IOS_MEMORY_GUARD_FORCE_BAND=guarded` or
 `QVOICE_IOS_MEMORY_GUARD_FORCE_CRITICAL_ONCE=1`, which the UI benchmark lane also hands to the app. A
 forced band trims or unloads, which fails memory qualification by design, so such a run is a

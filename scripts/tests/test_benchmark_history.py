@@ -1127,7 +1127,20 @@ class BenchmarkHistoryTests(unittest.TestCase):
             },
         })
         emulated["takes"][0]["generationID"] = "generation-emulated"
-        self.publish(emulated, "policy-emulated")
+        emulated_record = json.loads(self.publish(emulated, "policy-emulated").read_text())
+        # Lineage v1 never reads the policy: an emulated record keeps the host's
+        # key string but is never comparable, and its HISTORY row names the tier.
+        self.assertEqual(emulated_record["comparison"]["key"], published["comparison"]["key"])
+        self.assertFalse(emulated_record["comparison"]["comparable"])
+        self.assertIsNone(emulated_record["comparison"].get("baselineRunID"))
+        rows = {
+            line.split("`")[1]: line for line in self.index.read_text(encoding="utf-8").splitlines()
+            if line.startswith("| ") and "`policy-" in line
+        }
+        self.assertIn("| exploratory (emulated 8192 MB) |", rows["policy-emulated-20260712"])
+        self.assertIn("| exploratory (forced mid_16gb_mac) |", rows["policy-forced-20260712"])
+        self.assertNotIn("forced", rows["policy-native-20260712"])
+        self.assertNotIn("emulated", rows["policy-native-20260712"])
 
         for name, policy in (
             ("wrong-platform", {"deviceClass": "iphone_pro", "deviceClassForced": False}),

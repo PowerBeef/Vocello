@@ -579,6 +579,13 @@ METRIC_KEYS = {
     # beside it since 2026-09-25 (audit #9).
     "deliveryDRoughness", "deliveryProsodyEffect", "deliveryPairedProsodyEffect",
     "deliveryPitchShiftSemitones", "deliveryArousalScore",
+    # Records since 2026-09-25 (audit #39): the remaining expectation-bound
+    # paired features, so a campaign re-judges its cells from records, and the
+    # count of the take's own adherence flags, which are diagnostics (the cell
+    # verdict warns as `delivery_cell:<flag>`).
+    "deliveryVoiceTensionScore", "deliveryVoiceBreathinessScore",
+    "deliveryVoicedFractionDelta", "deliveryTurningPointsDeltaPerSecond",
+    "deliveryTakeFlagCount",
     # ui-perf (UI-7): per-scenario SwiftUI frame-health evidence from the
     # in-app display-link probe, joined by scripts/check_macos_ui_perf.py.
     "uiHitchTimeMSPerS", "uiMaxGapMS", "uiP95GapMSApprox", "uiFramesDelivered",

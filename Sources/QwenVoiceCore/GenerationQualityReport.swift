@@ -11,6 +11,11 @@ public enum GenerationQualityOutcome: String, Codable, Hashable, Sendable {
     case warning
     case fail
     case unavailable
+    /// The gate ran but cannot observe what a pass would claim (audit #39/#41):
+    /// a delivery cell with too few takes to judge, or an analyzer with no
+    /// calibration evidence. It never blocks and never reads as `pass`: the
+    /// registry verdict of an otherwise passing report is `uncalibrated`.
+    case uncalibrated
 }
 
 public enum GenerationQualityGateID: String, CaseIterable, Codable, Hashable, Sendable {
@@ -244,8 +249,11 @@ public enum QualityGateRegistry {
             switch result.outcome {
             case .pass:
                 break
+            case .uncalibrated:
+                if outcome == .pass { outcome = .uncalibrated }
+                issues.append("quality_gate_uncalibrated.\(gate.rawValue)")
             case .warning:
-                if outcome == .pass { outcome = .warning }
+                if outcome == .pass || outcome == .uncalibrated { outcome = .warning }
                 issues.append("quality_gate_warning.\(gate.rawValue)")
             case .fail:
                 outcome = .fail

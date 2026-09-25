@@ -92,7 +92,7 @@ default `scripts/dev.sh py`, which selects the modules the dirty tree affects) r
 | `scripts/build_emotion_reference_bank.py` | Generate → score → select → enroll curated per-emotion VoiceDesign reference banks (design-then-clone) → [`emotion-reference-banks.md`](emotion-reference-banks.md) | `test_build_emotion_reference_bank.py` |
 | `scripts/emotion_advisory.py` | Advisory SER agreement column (pinned wav2vec2-XLSR checkpoint + revision); advisory-only, runs after the engine has exited from a local `.venv` (`python3 -m venv .venv && .venv/bin/pip install torch transformers`; see the script header); never CI, packaging or benchmark-history input | `test_emotion_advisory.py` |
 | `scripts/mos_advisory.py` | Advisory naturalness MOS-proxy column (UTMOSv2 pinned by commit + weights digest, CPU, relative signal only); advisory-only, runs after the engine has exited from the same `.venv` plus the pinned `utmosv2` install named in the script header; never CI, packaging or benchmark-history input | `test_mos_advisory.py` |
-| `scripts/delivery_quality_gate.py` | Per-preset delivery-adherence verdict + neutral-cohort dispersion, thresholds from the versioned prosody profile | `test_delivery_quality_gate.py` |
+| `scripts/delivery_quality_gate.py` | Per-preset delivery-adherence verdict (per take, diagnostic since gate v3; per cell, the adherence verdict, §5.1) + neutral-cohort dispersion, thresholds from the versioned prosody profile | `test_delivery_quality_gate.py` |
 | `scripts/delivery_statistics.py` | Library: Wilcoxon, Cohen's d_z, BCa bootstrap, Wilson, Benjamini-Hochberg, required-pairs power | `test_delivery_statistics.py` |
 | `scripts/delivery_matrix_report.py` | Matrix-level report over paired delivery rows | `test_delivery_matrix_report.py` |
 | `scripts/analyze_delivery.py` | Reference-free delivery acoustic analyzer (F0 median/range, syllable rate, duration, voicing) consumed by the bench sidecar | `test_analyze_delivery.py` |
@@ -825,6 +825,41 @@ the intended emotion. Its adherence summary has two deliberately separate denomi
 - **Acoustic adherence** additionally analyzes a preserved rejected WAV when one exists.
   This is diagnostic evidence for locating an erroneous product rejection; it never
   upgrades the product outcome or makes the run publishable.
+
+### 5.1 Cell-level adherence verdict (gate v3, audit #39, 2026-09-25)
+
+One noisy instructed/neutral pair per take was the adherence verdict: with floors at the
+calibration decile, per-take flags hit 460 of 902 committed takes and 96 of 108 records warned,
+so a regression was invisible. The maintainer delegated the decision to the audit's
+recommendation, and since delivery gate v3 the per-take flags are diagnostics (the record
+publishes their count, `deliveryTakeFlagCount`, never a warning) and the adherence verdict is
+the cell's: `evaluate_delivery_cell` in `scripts/delivery_quality_gate.py` judges every take of
+one cell (mode, model, speaker, length, preset and intensity) together. A required feature
+flags `cell_direction_miss_<feature>` when the cell's median signed effect is not positive and
+`cell_effect_weak_<feature>` when it sits below the floor; a supporting feature flags
+`cell_supporting_miss_<feature>` only when the median moves past the floor the opposite way.
+`paired_report` annotates each feature (exact Wilcoxon, BCa interval, Wilson direction
+win-rate); the annotations never decide. Fewer than five takes of a cell are `insufficient`.
+
+- **In a run**, `bench_delivery_prosody.py` attaches the cell verdict to every sidecar row
+  (`deliveryCellGate`). A single-seed run holds one take per cell, so its cells are
+  `insufficient`: the canonical composition reads `.uncalibrated` for them (never `pass`), and
+  the history publisher warns `delivery_cell:<flag>` only for a cell that was judged.
+- **Across seeds**, `delivery_matrix_report.py` reports `cellAdherence` beside the per-take
+  flag rate, from sidecars or from committed records (`--records benchmarks/runs
+  --label-prefix <campaign>`; records publish every expectation-bound paired feature since
+  this change). Offline replay of the committed campaigns on the features their records carry:
+  DP-22 (17 seeds x 16 cells) per-take flags on 102 of 272 takes, 0 of 16 cells warn; DP-23
+  per-take flags on 32 of 72 takes, 1 of 4 cells warns (Quality `happy.normal`: its median
+  pitch shift and pitch variation move down); DP-18 144 of 272 takes, 0 of 16 cells.
+- **Floors are provisional.** The cell verdict reads the per-take floors, which were measured
+  before the 2026-08-25 instruction rewrite (1a0d263d); every committed delivery record
+  predates it, so no committed evidence can re-derive them for the shipped copy (the DP-22
+  replay derives only two supporting entries from the four features its records carry). The
+  re-derivation is `delivery_matrix_report.py --emit-expectations` (required features at half
+  the observed median effect) over a pre-registered post-rewrite sweep, confirmed on an
+  untouched second sweep under the threshold-change authority; until then the verdict warns
+  and never fails.
 
 ## 6. Analyzer accuracy and authority boundary
 

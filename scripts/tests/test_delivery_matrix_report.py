@@ -213,6 +213,43 @@ class MatrixReportTests(unittest.TestCase):
         self.assertIsNotNone(report["separabilityHeldOutSpeaker"])
         self.assertTrue(report["speakerBalancedStatistics"])
 
+    def test_committed_records_replay_as_cells_with_their_per_take_flag_rate(self):
+        """Audit #39: a campaign of records is re-judged per cell from the paired
+        features its takes publish, beside the per-take flags it replaces."""
+        from delivery_matrix_report import cell_adherence, records_from_history
+
+        with tempfile.TemporaryDirectory() as directory:
+            paths = []
+            for seed in range(6):
+                shift = -0.3 if seed == 2 else -1.2 - 0.05 * seed  # one noisy seed
+                record = {
+                    "run": {"id": f"run-{seed}", "label": f"dp99-sweep-s{seed}"},
+                    "takes": [{
+                        "cell": "custom/speed/medium/warm#delivery-calm.normal",
+                        "variant": "speed",
+                        "metrics": {"deliveryPitchShiftSemitones": shift, "deliveryArousalScore": -2.0},
+                        "warnings": ["delivery_gate:delivery_supporting_miss_arousal_score"] if seed == 2 else [],
+                    }, {
+                        "cell": "custom/speed/medium/warm", "metrics": {}, "warnings": [],
+                    }],
+                }
+                path = Path(directory) / f"r{seed}.json"
+                path.write_text(json.dumps(record))
+                paths.append(str(path))
+            other = Path(directory) / "other.json"
+            other.write_text(json.dumps({"run": {"id": "x", "label": "unrelated"}, "takes": [{
+                "cell": "custom/speed/medium/warm#delivery-calm.normal", "metrics": {"deliveryArousalScore": 5.0},
+                "warnings": [],
+            }]}))
+            replayed = records_from_history([*paths, str(other)], ("dp99-sweep",))
+        self.assertEqual(len(replayed), 6)
+        self.assertEqual(replayed[0]["features"], {"pitch_shift_semitones": -1.2, "arousal_score": -2.0})
+        adherence = cell_adherence(replayed, builtin_profile())
+        cell = adherence["cells"]["speed:calm.normal"]
+        self.assertEqual((cell["status"], cell["takeCount"], cell["takesWithPerTakeFlags"]), ("pass", 6, 1))
+        self.assertEqual((adherence["judgedCells"], adherence["warnedCells"]), (1, 0))
+        self.assertEqual(adherence["takesWithPerTakeFlags"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

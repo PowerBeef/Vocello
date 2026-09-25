@@ -53,6 +53,7 @@ from lib.audio_qc import (  # noqa: E402
 )
 from lib.audio_qc import history_record_schema_version as shared_record_schema_version  # noqa: E402
 
+from delivery_quality_gate import CELL_ADHERENCE_ALGORITHM  # noqa: E402
 from benchmark_memory import (  # noqa: E402
     MLX_END_OF_TAKE_STAGES,
     MemoryEvidenceError,
@@ -1074,6 +1075,18 @@ def telemetry_output(row: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+# Delivery gate metric -> tracked take metric: the paired features the preset
+# expectations bind (audit #39 adds the last four).
+DELIVERY_FEATURE_METRICS = (
+    ("pitch_shift_semitones", "deliveryPitchShiftSemitones"),
+    ("arousal_score", "deliveryArousalScore"),
+    ("voice_tension_score", "deliveryVoiceTensionScore"),
+    ("voice_breathiness_score", "deliveryVoiceBreathinessScore"),
+    ("voiced_fraction_delta", "deliveryVoicedFractionDelta"),
+    ("turning_points_delta_per_sec", "deliveryTurningPointsDeltaPerSecond"),
+)
+
+
 def fold_delivery_prosody(
     result_takes: list[dict[str, Any]],
     takes: list[dict[str, Any]],
@@ -1182,16 +1195,30 @@ def fold_delivery_prosody(
             )
         gate_metrics = delivery_gate.get("metrics")
         if isinstance(gate_metrics, dict):
-            for source, target in (
-                ("pitch_shift_semitones", "deliveryPitchShiftSemitones"),
-                ("arousal_score", "deliveryArousalScore"),
-            ):
+            # Every expectation-bound paired feature, so a campaign re-judges
+            # its cells from records alone (audit #39); the delivery kind's
+            # measurement version moved with the added four.
+            for source, target in DELIVERY_FEATURE_METRICS:
                 if (value := finite_number(gate_metrics.get(source))) is not None:
                     tracked_take["metrics"][target] = value
-        if delivery_flags:
+        # Per-take adherence flags are diagnostics since gate v3 (audit #39):
+        # one noisy pair per take flagged most takes, so the flags are counted,
+        # never warned. The cell's verdict is the adherence warning.
+        tracked_take["metrics"]["deliveryTakeFlagCount"] = float(len(delivery_flags))
+        cell_gate = matches[0].get("deliveryCellGate")
+        if (
+            not isinstance(cell_gate, dict)
+            or cell_gate.get("algorithm") != CELL_ADHERENCE_ALGORITHM
+            or cell_gate.get("status") not in {"pass", "warn", "insufficient"}
+            or not isinstance(cell_gate.get("flags"), list)
+        ):
+            raise PublicationError(
+                f"delivery take {tracked_take['generationID']} lacks a cell adherence verdict"
+            )
+        if cell_gate["status"] == "warn":
             tracked_take["warnings"] = sorted(
                 set(tracked_take.get("warnings", []))
-                | {f"delivery_gate:{flag}" for flag in delivery_flags}
+                | {f"delivery_cell:{flag}" for flag in cell_gate["flags"]}
             )
             tracked_take["status"] = "passedWithWarnings"
 

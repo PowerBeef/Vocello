@@ -371,6 +371,13 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
         self.assertEqual(gate["flags"], [])
         self.assertIn("f0_std_hz", gate["metrics"])
         self.assertEqual(len(analyzer.call_args_list), 2)
+        # Gate v3 (audit #39): the row carries its cell's verdict; one take of
+        # a cell is too few to judge, so this run leaves it to the campaign.
+        cell = results[0]["deliveryCellGate"]
+        self.assertEqual(cell["algorithm"], "delivery-cell-adherence-v1")
+        self.assertEqual(cell["status"], "insufficient")
+        self.assertLessEqual(cell["takeCount"], 1)
+        self.assertEqual(results[0]["deliveryGate"]["algorithmVersion"], 3)
 
     def test_paired_prosody_effect_uses_the_deltas_and_the_legacy_key_is_kept(self) -> None:
         neutral = "custom_pro_custom_speed_medium_warm_0.wav"

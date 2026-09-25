@@ -48,7 +48,30 @@ from prosody_profile import (
 # v2 (2026-08-05): expectations may bind optional-analyzer features; a pair
 # whose analysis predates those keys skips them into the verdict's
 # `unavailableFeatures` list instead of failing `metrics_incomplete`.
-DELIVERY_GATE_ALGORITHM_VERSION = 2
+# v3 (2026-09-25, audit #39; decided by the audit's recommendation): the
+# per-take flags are diagnostics. One noisy instructed/neutral pair per take
+# flagged 460 of 902 takes and 96 of 108 records, so a regression was
+# invisible; the adherence verdict is now the cell's (`evaluate_delivery_cell`).
+DELIVERY_GATE_ALGORITHM_VERSION = 3
+
+# The cell-level adherence verdict (audit #39): every take of one delivery cell
+# (mode, model, speaker, length, preset and intensity) judged together.
+# A required feature's cell flags when the median signed effect is not
+# positive (direction) or sits below its floor (weak); a supporting feature's
+# when the median moves clearly the opposite way. `paired_report`
+# (delivery_statistics) annotates each feature with its exact Wilcoxon test,
+# BCa interval and Wilson direction win-rate; they never decide the verdict.
+# Floors are provisional: the per-take floors, measured before the 2026-08-25
+# instruction rewrite, until a pre-registered post-rewrite run re-derives them
+# (`scripts/delivery_matrix_report.py --emit-expectations`, half the observed
+# median effect) under the threshold-change authority. A single run rarely
+# holds `CELL_MINIMUM_TAKES` takes of a cell; the cross-seed report judges the
+# campaign's cells (`cellAdherence`).
+CELL_ADHERENCE_ALGORITHM = "delivery-cell-adherence-v1"
+CELL_FLOOR_STATUS = "provisional-per-take-floors"
+# Fewer takes than this give a cell verdict of `insufficient`: a median of one
+# or two noisy pairs is the per-take judgment again.
+CELL_MINIMUM_TAKES = 5
 
 # Neutral-cohort arousal outliers (audit #105).
 #
@@ -303,6 +326,85 @@ def evaluate_delivery(instructed_metrics, neutral_metrics, delivery_id, profile=
     )
     verdict["unavailableFeatures"] = unavailable
     return verdict
+
+
+def evaluate_delivery_cell(take_features, delivery_id, profile=None, *,
+                           minimum_takes=CELL_MINIMUM_TAKES):
+    """Cell-level adherence verdict over the paired features of one cell's takes.
+
+    `take_features` holds each take's `evaluate_delivery` metrics (the signed
+    paired features). Returns `status` pass, warn, insufficient (fewer than
+    `minimum_takes` takes carry the features) or unavailable (no expectation
+    covers the preset), the cell `flags`, and per-feature evidence. Warn-only:
+    the verdict never fails a take.
+    """
+    prof = profile if profile is not None else builtin_profile()
+    preset, intensity = _parse_delivery_id(delivery_id)
+    expectation = delivery_expectation(prof, preset)
+    verdict = {
+        "algorithm": CELL_ADHERENCE_ALGORITHM,
+        "deliveryID": delivery_id,
+        "floorStatus": CELL_FLOOR_STATUS,
+        "minimumTakes": minimum_takes,
+        "takeCount": len(take_features),
+    }
+    if expectation is None:
+        return {**verdict, "status": "unavailable", "flags": ["expectation_missing"], "features": {}}
+    from delivery_statistics import paired_report  # NumPy only when a cell is judged
+
+    factor = intensity_factor(prof, intensity)
+    flags = []
+    features = {}
+    judged_any = False
+    for feature, spec in sorted(expectation.items()):
+        signed = [
+            float(metrics[feature]) * spec["direction"]
+            for metrics in take_features
+            if isinstance(metrics, dict)
+            and isinstance(metrics.get(feature), (int, float))
+            and not isinstance(metrics.get(feature), bool)
+            and math.isfinite(float(metrics[feature]))
+        ]
+        if not signed:
+            continue
+        floor = spec["min_effect_normal"] * factor
+        median = statistics.median(signed)
+        report = paired_report(signed, [0.0] * len(signed), label=feature)
+        interval = report["confidenceInterval"]
+        judged = len(signed) >= minimum_takes
+        judged_any = judged_any or judged
+        features[feature] = {
+            "tier": spec["tier"],
+            "n": len(signed),
+            "floor": round(floor, 4),
+            "medianSignedEffect": round(median, 4),
+            "wilcoxonPValue": report["wilcoxon"]["pValue"],
+            "meanInterval": [round(interval["lower"], 4), round(interval["upper"], 4)] if interval else None,
+            "directionWinRate": round(report["winRate"]["rate"], 4) if report["winRate"] else None,
+            "judged": judged,
+        }
+        if not judged:
+            continue
+        if spec["tier"] == "required":
+            if median <= 0:
+                flags.append(f"cell_direction_miss_{feature}")
+            elif median < floor:
+                flags.append(f"cell_effect_weak_{feature}")
+        elif median < -floor:
+            flags.append(f"cell_supporting_miss_{feature}")
+    if not judged_any:
+        status = "insufficient"
+    else:
+        status = "warn" if flags else "pass"
+    return {**verdict, "status": status, "flags": flags, "features": features}
+
+
+def delivery_cell_key(row):
+    """The cell a delivery take belongs to: every pairing dimension but the seed."""
+    return (
+        row.get("mode"), row.get("model"), row.get("speakerID"),
+        row.get("length"), row.get("delivery"),
+    )
 
 
 def student_t_two_sided_p(statistic, degrees_of_freedom):

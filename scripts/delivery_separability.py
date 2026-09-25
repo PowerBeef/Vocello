@@ -663,6 +663,7 @@ def records_from_sidecar(rows, fallback_seed=None):
             "intensity": gate.get("intensity") or (intensity if separator else "normal"),
             "seed": seed,
             "speakerID": row.get("speakerID"),
+            "model": row.get("model"),
             "features": features,
             "deliveryPassed": gate.get("passed"),
             "deliveryFlags": list(gate.get("flags") or []),

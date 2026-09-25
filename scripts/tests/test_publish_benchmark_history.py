@@ -1139,11 +1139,14 @@ class PublisherTests(unittest.TestCase):
         clean_delivery_gate = {
             "passed": True,
             "flags": [],
-            "metrics": {"pitch_shift_semitones": 0.9, "arousal_score": 1.7},
+            "metrics": {"pitch_shift_semitones": 0.9, "arousal_score": 1.7,
+                        "voice_tension_score": 0.4, "voiced_fraction_delta": -0.01},
         }
+        insufficient_cell = {"algorithm": "delivery-cell-adherence-v1", "status": "insufficient", "flags": []}
 
         def fixture(
-            gate: object, delivery_gate: object = clean_delivery_gate
+            gate: object, delivery_gate: object = clean_delivery_gate,
+            cell_gate: object = insufficient_cell,
         ) -> tuple[list[dict], list[dict], list[dict]]:
             result_takes = [{
                 "generationID": "delivery-current",
@@ -1173,6 +1176,8 @@ class PublisherTests(unittest.TestCase):
                 row["qualityGate"] = gate
             if delivery_gate is not None:
                 row["deliveryGate"] = delivery_gate
+            if cell_gate is not None:
+                row["deliveryCellGate"] = cell_gate
             return result_takes, takes, [row]
 
         def fold(*arguments) -> None:
@@ -1191,6 +1196,10 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(clean[1][0]["metrics"]["deliveryPairedProsodyEffect"], 0.8)
         self.assertEqual(clean[1][0]["metrics"]["deliveryPitchShiftSemitones"], 0.9)
         self.assertEqual(clean[1][0]["metrics"]["deliveryArousalScore"], 1.7)
+        # Every expectation-bound feature is banked, so a campaign re-judges cells (audit #39).
+        self.assertEqual(clean[1][0]["metrics"]["deliveryVoiceTensionScore"], 0.4)
+        self.assertEqual(clean[1][0]["metrics"]["deliveryVoicedFractionDelta"], -0.01)
+        self.assertEqual(clean[1][0]["metrics"]["deliveryTakeFlagCount"], 0.0)
 
         flagged = fixture({"passed": False, "flags": ["monotone", "long_pause"]})
         fold(*flagged)
@@ -1200,16 +1209,24 @@ class PublisherTests(unittest.TestCase):
         )
         self.assertEqual(flagged[1][0]["status"], "passedWithWarnings")
 
+        # Gate v3 (audit #39): a take's own adherence flags are a diagnostic
+        # count; only its cell's verdict warns.
         adherence_flagged = fixture(
             {"passed": True, "flags": []},
             {"passed": False, "flags": ["delivery_effect_weak_rate_delta_hz"], "metrics": {}},
         )
         fold(*adherence_flagged)
-        self.assertEqual(
-            adherence_flagged[1][0]["warnings"],
-            ["delivery_gate:delivery_effect_weak_rate_delta_hz"],
+        self.assertEqual(adherence_flagged[1][0]["warnings"], [])
+        self.assertEqual(adherence_flagged[1][0]["status"], "passed")
+        self.assertEqual(adherence_flagged[1][0]["metrics"]["deliveryTakeFlagCount"], 1.0)
+        cell_warned = fixture(
+            {"passed": True, "flags": []}, clean_delivery_gate,
+            {"algorithm": "delivery-cell-adherence-v1", "status": "warn",
+             "flags": ["cell_direction_miss_pitch_shift_semitones"]},
         )
-        self.assertEqual(adherence_flagged[1][0]["status"], "passedWithWarnings")
+        fold(*cell_warned)
+        self.assertEqual(cell_warned[1][0]["warnings"], ["delivery_cell:cell_direction_miss_pitch_shift_semitones"])
+        self.assertEqual(cell_warned[1][0]["status"], "passedWithWarnings")
 
         for name, gate, delivery_gate in (
             ("missing", None, clean_delivery_gate),
@@ -1225,6 +1242,14 @@ class PublisherTests(unittest.TestCase):
         ):
             with self.subTest(name=name), self.assertRaises(publisher.PublicationError):
                 fold(*fixture(gate, delivery_gate))
+        for name, cell_gate in (
+            ("missing_cell_gate", None),
+            ("unavailable_cell_gate", {"algorithm": "delivery-cell-adherence-v1", "status": "unavailable",
+                                       "flags": ["expectation_missing"]}),
+            ("unknown_cell_algorithm", {"algorithm": "cell-v0", "status": "pass", "flags": []}),
+        ):
+            with self.subTest(name=name), self.assertRaises(publisher.PublicationError):
+                fold(*fixture({"passed": True, "flags": []}, clean_delivery_gate, cell_gate))
 
     def test_delivery_prosody_joins_by_generation_and_refuses_a_stale_sidecar(self) -> None:
         """Audit #104: the sidecar row is the take's own (generation ID, run ID)."""
@@ -1238,7 +1263,9 @@ class PublisherTests(unittest.TestCase):
             row = {"runID": "run-current", "generationID": "delivery-current", "mode": "custom",
                    "model": "pro_custom_speed", "delivery": "happy.strong",
                    "deliveryMetrics": {"f0_std_hz": 31.5}, "qualityGate": gate,
-                   "deliveryGate": {"passed": True, "flags": [], "metrics": {}}}
+                   "deliveryGate": {"passed": True, "flags": [], "metrics": {}},
+                   "deliveryCellGate": {"algorithm": "delivery-cell-adherence-v1",
+                                        "status": "insufficient", "flags": []}}
             row.update(row_overrides)
             return result_takes, takes, [row]
 

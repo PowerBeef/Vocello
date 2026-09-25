@@ -228,6 +228,9 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # name it moved for it; the others were already moved in the same batch.
     ("ui-generation", "macos"): 2,
     ("ui-generation", "ios"): 2,
+    # Also 2 for audit #39: delivery takes publish the remaining
+    # expectation-bound paired features and their per-take adherence flags as a
+    # diagnostic count; the cell verdict, not each take's flags, warns.
     ("engine-generation", "macos"): 2,
     ("memory-qualification", "macos"): 2,
     # 2 (2026-09-25, audit #12/#99): the CPU profile records three warm takes

@@ -1206,6 +1206,8 @@ enum BenchCommand {
             let deliveryWav: String
             let qualityGate: GenerationQualityComposition.ProsodySidecarGate
             let deliveryGate: GenerationQualityComposition.DeliverySidecarGate
+            /// The take's cell verdict (gate v3, audit #39); absent before it.
+            let deliveryCellGate: GenerationQualityComposition.DeliveryCellGate?
         }
         let entries = try JSONDecoder().decode(
             [SidecarEntry].self, from: Data(contentsOf: sidecarURL)
@@ -1272,7 +1274,8 @@ enum BenchCommand {
                         gate: entry.qualityGate, evidenceDigest: wavDigest
                     ),
                     .delivery: GenerationQualityComposition.deliveryEvidence(
-                        gate: entry.deliveryGate, evidenceDigest: wavDigest
+                        gate: entry.deliveryGate, cellGate: entry.deliveryCellGate,
+                        evidenceDigest: wavDigest
                     ),
                 ]
             )
@@ -1317,7 +1320,11 @@ enum BenchCommand {
             options: .atomic
         )
         let warned = verdicts.filter { $0.outcome == "warning" }.count
-        note("composed canonical quality: \(verdicts.count) delivery take(s), \(warned) warning(s) → bench-quality-composed.json")
+        let uncalibrated = verdicts.filter { $0.outcome == "uncalibrated" }.count
+        note(
+            "composed canonical quality: \(verdicts.count) delivery take(s), \(warned) warning(s), "
+                + "\(uncalibrated) uncalibrated → bench-quality-composed.json"
+        )
         if !failures.isEmpty {
             throw CLIError("composed canonical quality FAILED: \(failures.joined(separator: "; "))")
         }

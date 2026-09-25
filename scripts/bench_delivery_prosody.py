@@ -35,7 +35,12 @@ from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from delivery_quality_gate import evaluate_delivery
+from delivery_quality_gate import (
+    ANALYSIS_FAILURE_FLAGS,
+    delivery_cell_key,
+    evaluate_delivery,
+    evaluate_delivery_cell,
+)
 from prosody_profile import builtin_profile, load_profile, prosody_effect
 from prosody_quality_gate import evaluate_metrics
 
@@ -505,7 +510,34 @@ def analyze_run(
                 ),
             }
         )
+    attach_cell_verdicts(results, resolved_profile)
     return results
+
+
+def attach_cell_verdicts(results: list[dict[str, Any]], profile: dict[str, Any]) -> None:
+    """Give every row its cell's adherence verdict (audit #39).
+
+    The per-take `deliveryGate` flags stay as diagnostics; the verdict of the
+    cell (all of this run's takes sharing mode, model, speaker, length and
+    delivery) is the adherence verdict. A cell with fewer takes than the
+    minimum is `insufficient`: a campaign across seeds judges it
+    (`scripts/delivery_matrix_report.py`, `cellAdherence`).
+    """
+    cells: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
+    for row in results:
+        cells.setdefault(delivery_cell_key(row), []).append(row)
+    for rows in cells.values():
+        verdict = evaluate_delivery_cell(
+            [
+                row["deliveryGate"].get("metrics") or {}
+                for row in rows
+                if not set(row["deliveryGate"].get("flags") or []) & set(ANALYSIS_FAILURE_FLAGS)
+            ],
+            rows[0]["delivery"],
+            profile,
+        )
+        for row in rows:
+            row["deliveryCellGate"] = verdict
 
 
 def write_results(diagnostics_dir: Path, results: list[dict[str, Any]]) -> Path:

@@ -353,8 +353,10 @@ Adds instruct-bearing warm takes. The prosody analyzer reads the current run's i
 `bench-results.json` allowlist before the final summary, so older WAVs left by `--keep` cannot enter
 the delivery comparison; the summarizer then prints that current prosody block. Every delivery take
 also receives the per-preset adherence verdict (`deliveryGate` beside `qualityGate` in
-`bench-prosody.json`) and the run composes canonical-depth registry verdicts across all seven gates
-(`bench-quality-composed.json`).
+`bench-prosody.json`; a diagnostic since gate v3) and its cell's verdict (`deliveryCellGate`, the
+adherence verdict; [`delivery-harness.md`](delivery-harness.md) §5.1), and the run composes
+canonical-depth registry verdicts across all seven gates (`bench-quality-composed.json`; a cell too
+small to judge composes as `uncalibrated`).
 
 ### 4.6b Fidelity lanes (engine/artifact promotion battery)
 

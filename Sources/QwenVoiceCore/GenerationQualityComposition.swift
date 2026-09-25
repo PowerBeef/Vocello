@@ -103,6 +103,25 @@ public enum GenerationQualityComposition {
         }
     }
 
+    /// The cell-level adherence verdict of the take's cell, exactly as
+    /// `scripts/bench_delivery_prosody.py` writes it (`deliveryCellGate` beside
+    /// `deliveryGate`; `evaluate_delivery_cell` in
+    /// `scripts/delivery_quality_gate.py`, audit #39). Since gate v3 it is the
+    /// adherence verdict; the per-take flags are diagnostics.
+    public struct DeliveryCellGate: Codable, Sendable {
+        public let algorithm: String
+        /// `pass`, `warn`, `insufficient` (too few takes of the cell to judge)
+        /// or `unavailable` (no expectation covers the preset).
+        public let status: String
+        public let flags: [String]
+
+        public init(algorithm: String, status: String, flags: [String]) {
+            self.algorithm = algorithm
+            self.status = status
+            self.flags = flags
+        }
+    }
+
     /// Delivery-gate flags meaning the verdict could not be computed; they map
     /// to `.unavailable`, which the registry fails closed. Mirrors
     /// `ANALYSIS_FAILURE_FLAGS` in `scripts/delivery_quality_gate.py`.
@@ -112,20 +131,30 @@ public enum GenerationQualityComposition {
     ]
 
     /// Maps one sidecar delivery-adherence verdict into typed deep evidence
-    /// for the `.delivery` gate. Adherence flags (direction misses, weak
-    /// effects, supporting misses) are warnings — magnitudes were calibrated
-    /// 2026-08-05 from the banked paired seed matrix (gate algorithm v2), and
-    /// the rule deliberately stays warn-first — and only the analysis-failure
-    /// flags escalate to `.unavailable`. A v2 verdict may also list skipped
-    /// optional features in `unavailableFeatures`; that key is informational
-    /// and never changes the outcome.
+    /// for the `.delivery` gate. The per-take analysis-failure flags escalate to
+    /// `.unavailable`. With the cell verdict (gate v3, audit #39) the outcome is
+    /// the cell's: `pass`, `warn` → `.warning`, `insufficient` →
+    /// `.uncalibrated` (one run rarely holds enough takes of a cell; the
+    /// cross-seed report judges it), anything else `.unavailable`; the take's
+    /// own adherence flags are diagnostics and never change the outcome.
+    /// Without a cell verdict (a sidecar before v3) the per-take flags warn as
+    /// before. A verdict may also list skipped optional features in
+    /// `unavailableFeatures`; that key is informational.
     public static func deliveryEvidence(
         gate: DeliverySidecarGate,
+        cellGate: DeliveryCellGate? = nil,
         evidenceDigest: String? = nil
     ) -> GenerationQualityReportProducer.DeepGateEvidence {
         let outcome: GenerationQualityOutcome
         if !deliveryAnalysisFailureFlags.isDisjoint(with: gate.flags) {
             outcome = .unavailable
+        } else if let cellGate {
+            switch cellGate.status {
+            case "pass": outcome = .pass
+            case "warn": outcome = .warning
+            case "insufficient": outcome = .uncalibrated
+            default: outcome = .unavailable
+            }
         } else if gate.passed && gate.flags.isEmpty {
             outcome = .pass
         } else {
@@ -158,8 +187,9 @@ public enum GenerationQualityComposition {
     public static func rank(of outcome: GenerationQualityOutcome) -> Int {
         switch outcome {
         case .pass: return 0
-        case .warning: return 1
-        case .unavailable, .fail: return 2
+        case .uncalibrated: return 1
+        case .warning: return 2
+        case .unavailable, .fail: return 3
         }
     }
 }

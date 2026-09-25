@@ -320,11 +320,91 @@ final class GenerationQualityCompositionTests: XCTestCase {
     func testRankOrderingGuardsFastConsistency() {
         XCTAssertLessThan(
             GenerationQualityComposition.rank(of: .pass),
+            GenerationQualityComposition.rank(of: .uncalibrated)
+        )
+        XCTAssertLessThan(
+            GenerationQualityComposition.rank(of: .uncalibrated),
             GenerationQualityComposition.rank(of: .warning)
         )
         XCTAssertLessThan(
             GenerationQualityComposition.rank(of: .warning),
             GenerationQualityComposition.rank(of: .fail)
         )
+    }
+
+    // MARK: Cell-level delivery adherence (gate v3, audit #39)
+
+    private func cellGate(_ status: String, flags: [String] = []) -> GenerationQualityComposition.DeliveryCellGate {
+        GenerationQualityComposition.DeliveryCellGate(
+            algorithm: "delivery-cell-adherence-v1", status: status, flags: flags
+        )
+    }
+
+    func testTheCellVerdictDecidesAndPerTakeFlagsAreDiagnostics() {
+        let flagged = deliveryGate(passed: false, flags: ["delivery_supporting_miss_arousal_score"])
+        XCTAssertEqual(
+            GenerationQualityComposition.deliveryEvidence(gate: flagged, cellGate: cellGate("pass")).outcome,
+            .pass
+        )
+        XCTAssertEqual(
+            GenerationQualityComposition.deliveryEvidence(
+                gate: deliveryGate(passed: true),
+                cellGate: cellGate("warn", flags: ["cell_direction_miss_pitch_shift_semitones"])
+            ).outcome,
+            .warning
+        )
+        XCTAssertEqual(
+            GenerationQualityComposition.deliveryEvidence(gate: flagged, cellGate: cellGate("insufficient")).outcome,
+            .uncalibrated
+        )
+        XCTAssertEqual(
+            GenerationQualityComposition.deliveryEvidence(gate: flagged, cellGate: cellGate("unavailable")).outcome,
+            .unavailable
+        )
+        // A take whose own analysis failed stays unavailable whatever its cell says.
+        XCTAssertEqual(
+            GenerationQualityComposition.deliveryEvidence(
+                gate: deliveryGate(passed: false, flags: ["metrics_incomplete"]), cellGate: cellGate("pass")
+            ).outcome,
+            .unavailable
+        )
+    }
+
+    func testAnUncalibratedGateNeverReadsAsPassAndNeverBlocks() throws {
+        let digest = String(repeating: "a", count: 64)
+        func verdict(cell: String) throws -> QualityGateRegistryVerdict {
+            let report = GenerationQualityReportProducer.deepReport(
+                generationID: UUID(),
+                policy: GenerationQualityReportProducer.canonicalPolicy(requiresLanguageASR: false),
+                finishReason: .eos,
+                hitTokenCap: false,
+                audioQC: Self.cleanAudioQC(durationSeconds: 5.0),
+                wavDigest: digest,
+                usedStreaming: true,
+                chunkCount: 7,
+                audioChannel: nil,
+                deepEvidence: [
+                    .prosody: GenerationQualityComposition.prosodyEvidence(
+                        gate: gate(passed: true), evidenceDigest: digest
+                    ),
+                    .delivery: GenerationQualityComposition.deliveryEvidence(
+                        gate: deliveryGate(passed: true), cellGate: cellGate(cell), evidenceDigest: digest
+                    ),
+                ]
+            )
+            return try QualityGateRegistry.evaluate(report)
+        }
+        let insufficient = try verdict(cell: "insufficient")
+        XCTAssertEqual(insufficient.outcome, GenerationQualityOutcome.uncalibrated)
+        XCTAssertTrue(insufficient.issues.contains("quality_gate_uncalibrated.delivery"))
+        XCTAssertEqual(try verdict(cell: "warn").outcome, GenerationQualityOutcome.warning)
+        let cellGateJSON = """
+        {"algorithm": "delivery-cell-adherence-v1", "status": "insufficient", "flags": [],
+         "deliveryID": "angry.strong", "takeCount": 1, "minimumTakes": 5, "features": {}}
+        """
+        let decoded = try JSONDecoder().decode(
+            GenerationQualityComposition.DeliveryCellGate.self, from: Data(cellGateJSON.utf8)
+        )
+        XCTAssertEqual(decoded.status, "insufficient")
     }
 }

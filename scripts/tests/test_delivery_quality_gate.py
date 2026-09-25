@@ -312,7 +312,7 @@ class VoiceQualityFeatureTests(unittest.TestCase):
         verdict = evaluate_delivery(whispered, metrics(), "whisper.normal")
         self.assertTrue(verdict["passed"], verdict["flags"])
         self.assertEqual(verdict["unavailableFeatures"], ["voice_breathiness_score"])
-        self.assertEqual(verdict["algorithmVersion"], 2)
+        self.assertEqual(verdict["algorithmVersion"], DELIVERY_GATE_ALGORITHM_VERSION)
 
     def test_breathiness_required_evaluates_when_v3_block_present(self):
         neutral = voice_metrics()
@@ -360,6 +360,69 @@ class VoiceQualityFeatureTests(unittest.TestCase):
                 and specification["min_effect_normal"] == 0.0
                 for specification in features.values()
             ))
+
+
+class DeliveryCellAdherenceTests(unittest.TestCase):
+    """Audit #39: the adherence verdict is the cell's, not one noisy pair's."""
+
+    @staticmethod
+    def sad_takes(pitch_variation, arousal=None):
+        # sad.normal requires arousal -1 (floor 1.0) and pitch variation -1 (floor 4.3).
+        arousal = arousal if arousal is not None else [-2.0] * len(pitch_variation)
+        return [
+            {"pitch_variation_delta_hz": value, "arousal_score": score, "pause_ratio_delta": 0.01}
+            for value, score in zip(pitch_variation, arousal)
+        ]
+
+    def test_a_cell_whose_median_holds_passes_despite_noisy_takes(self):
+        from delivery_quality_gate import evaluate_delivery_cell
+        # Two of seven takes would flag per take (one wrong way, one weak), but
+        # the cell's median effect clears the floor.
+        takes = self.sad_takes([-8.0, -7.5, 2.0, -9.0, -3.0, -6.5, -8.2])
+        per_take = [
+            evaluate_delivery(metrics(std=25.0 + value), metrics(), "sad.normal")["flags"]
+            for value in (-8.0, -7.5, 2.0, -9.0, -3.0, -6.5, -8.2)
+        ]
+        self.assertGreater(sum(1 for flags in per_take if flags), 0)
+        verdict = evaluate_delivery_cell(takes, "sad.normal")
+        self.assertEqual(verdict["status"], "pass")
+        self.assertEqual(verdict["flags"], [])
+        self.assertEqual(verdict["algorithm"], "delivery-cell-adherence-v1")
+        feature = verdict["features"]["pitch_variation_delta_hz"]
+        self.assertEqual((feature["n"], feature["tier"], feature["judged"]), (7, "required", True))
+        self.assertAlmostEqual(feature["medianSignedEffect"], 7.5)
+        # paired_report annotations ride along and never decide.
+        self.assertIsNotNone(feature["wilcoxonPValue"])
+        self.assertEqual(len(feature["meanInterval"]), 2)
+
+    def test_a_cell_that_moved_the_wrong_way_or_too_little_warns(self):
+        from delivery_quality_gate import evaluate_delivery_cell
+        wrong = evaluate_delivery_cell(self.sad_takes([1.0, 2.0, -0.5, 3.0, 0.5]), "sad.normal")
+        self.assertEqual(wrong["status"], "warn")
+        self.assertIn("cell_direction_miss_pitch_variation_delta_hz", wrong["flags"])
+        weak = evaluate_delivery_cell(self.sad_takes([-2.0, -1.0, -3.0, -2.5, -1.5]), "sad.normal")
+        self.assertEqual(weak["flags"], ["cell_effect_weak_pitch_variation_delta_hz"])
+        # A supporting feature flags only a clear opposite move of the cell.
+        happy = [{"pitch_shift_semitones": value} for value in (-0.5, -0.2, -0.8, 0.1, -0.4)]
+        self.assertEqual(
+            evaluate_delivery_cell(happy, "happy.normal")["flags"],
+            ["cell_supporting_miss_pitch_shift_semitones"],
+        )
+
+    def test_too_few_takes_or_no_expectation_never_warn(self):
+        from delivery_quality_gate import CELL_MINIMUM_TAKES, evaluate_delivery_cell
+        self.assertEqual(CELL_MINIMUM_TAKES, 5)
+        few = evaluate_delivery_cell(self.sad_takes([1.0, 2.0]), "sad.normal")
+        self.assertEqual((few["status"], few["flags"]), ("insufficient", []))
+        self.assertFalse(few["features"]["pitch_variation_delta_hz"]["judged"])
+        uncovered = evaluate_delivery_cell([{"arousal_score": 1.0}] * 6, "excited.strong")
+        self.assertEqual((uncovered["status"], uncovered["flags"]), ("unavailable", ["expectation_missing"]))
+        # Missing and non-finite features are skipped, never judged.
+        skipped = evaluate_delivery_cell([{"arousal_score": float("nan")}] * 6, "sad.normal")
+        self.assertEqual(skipped["status"], "insufficient")
+
+    def test_the_per_take_gate_is_version_three(self):
+        self.assertEqual(DELIVERY_GATE_ALGORITHM_VERSION, 3)
 
 
 if __name__ == "__main__":

@@ -954,6 +954,14 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-06 | [`macos-engine-20260806-000045-08eda29d`](runs/engine-generation/macos-engine-20260806-000045-08eda29d.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.95 | `d8e31ffe4957` | `ff3d5167376d` | baseline | dp23-crosstier |
 
+## engine-generation / macos / mac-mini-m6-16gb / config `1be7d302eadb`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-09-25 | [`mac-gate-bench-20260925-171242-f0765b07`](runs/engine-generation/mac-gate-bench-20260925-171242-f0765b07.json) | focused | focused | passed | qualified | 6 | 0.27 | `848e140a24aa` | `1be7d302eadb` | baseline | mac-gate-bench |
+| 2026-09-25 | [`mac-gate-bench-20260925-172105-c3bfdf05`](runs/engine-generation/mac-gate-bench-20260925-172105-c3bfdf05.json) | focused | focused | passed | qualified | 6 | 0.26 | `848e140a24aa` | `1be7d302eadb` | vs mac-gate-bench-20260925-171242-f0765b07: RTF -0.5% (within noise), TTFC -0.4% (within noise), RAM +0.0% (within noise) | mac-gate-bench |
+| 2026-09-25 | [`mac-gate-bench-20260925-172329-a73cdc6a`](runs/engine-generation/mac-gate-bench-20260925-172329-a73cdc6a.json) | focused | focused | passed | qualified | 6 | 0.27 | `848e140a24aa` | `1be7d302eadb` | vs mac-gate-bench-20260925-172105-c3bfdf05: RTF +0.1% (within noise), TTFC -0.1% (within noise), RAM -1.9% (within noise) | mac-gate-bench |
+
 ## instrument-profile / ios / iphone-17-pro / config `1259c1914031`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

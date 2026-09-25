@@ -876,11 +876,11 @@ promote. With `--require-baseline-identity` (the gate passes it) an identity mis
 the gate reports BASELINE INVALID with the exact seed command for that run's paths; the gate's
 preflight predicts the same mismatch from the live host and the gate matrix before any build.
 
-The committed baseline is still bound to the retired `mac-mini-m2-8gb` host (macOS 26.6.2, Xcode
-26.6). It stays readable, but no gate compares against it any more: the seeded gate has a new
-matrix hash, and the identity now requires `osBuild`, `xcodeBuild` and `swiftVersion`, which it
-lacks. On any host the gate preflight therefore stops within seconds and names the seed command,
-until roadmap item AV-17 seeds the M6 baseline from at least three seeded gate runs.
+The committed baseline is the first canonical Mac mini M6 baseline (AV-17 step 1, 2026-09-25): three
+seeded gate runs from commit 848e140a on `mac-mini-m6-16gb` (`mid_16gb_mac`, macOS 27.0 26A428,
+Xcode 27.0 27A266a), whose between-run ranges were at most 0.7% for RTF, first chunk and tokens per
+second and 1.9% for footprint, so every threshold sits at its floor. A new OS or Xcode build number
+changes the identity and needs a re-seed; the retired M2 baseline stays in git history only.
 Markdown snapshots (`benchmarks/baseline-*.md`) remain the human-readable full-matrix references;
 diff them with `git diff`, not `--compare-baseline`.
 

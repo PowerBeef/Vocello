@@ -534,10 +534,20 @@ caller actually captured and compared the pre/post crash snapshots.
 The lane also passes `--stall-contract config/macos-ui-stall-gate.json --variant speed`. The stall
 contract names the gate's statistic, its limit and the profile it is calibrated for; today it is the
 provisional "no heartbeat delayed more than 250 ms" on `mac-mini-m6-16gb`, uncalibrated until one
-exploratory M6 run records the per-take distribution the checker prints (median, p90, maximum, takes
-above the limit, censored heartbeats) and the contract is re-declared `calibrated` with that run. A
-contract naming another profile than the registry's canonical one fails the gate. Every take must
-have run the declared variant (Speed), whatever the tier recommends. The engine runs in the app,
+exploratory M6 run records the per-take distribution and the contract is re-declared `calibrated`
+with that run. The checker prints that distribution to `benchmark-gate.txt` whether the run passes or
+fails: the summary (median, p90, maximum, takes above the limit, censored heartbeats) and every gated
+take's `cell=value`. Expect the calibration run to fail the gate: replayed on the 464 canonical M2
+takes, 250 ms fails 189 (40.7%) and all 16 runs, and the four 2026-09-14 runs have 16 to 23 of 29
+takes above it (per-run medians 295-353 ms). Whether a provisional contract should gate or only
+report is a maintainer decision to settle before AV-17 step 2. A contract naming another profile than
+the registry's canonical one fails the gate.
+
+Every take must have run the declared variant (Speed), whatever the tier recommends (the 16 GB tier
+recommends Quality). Before the first take the benchmark makes Speed the active variant of each
+measured mode through the visible toolbar switch (`<mode>_speedVariantButton`) and restores the
+original visible choice when the session ends; it never toggles "Prefer lower-memory models", which
+clears every stored choice. The checker still refuses any take that ran another variant. The engine runs in the app,
 which has exited before validation, so the lane validates once and retries only the checker's
 distinct "rows not yet present" exit (75), for about ten seconds. Timing lanes also let the load of
 their own build settle (up to 90 s, down to the core count) and re-apply the quiet-host rule after

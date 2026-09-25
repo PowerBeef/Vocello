@@ -346,6 +346,10 @@ def tracked_metrics(engine: dict, app: dict) -> dict[str, float | int]:
         "uiMaximumDelayedHeartbeatMS",
         frontend.get("maximumDelayedHeartbeatMS", frontend.get("mainThreadMaximumStallMS")),
     )
+    # Present only on rows whose heartbeat statistics include the censored
+    # lower bound of heartbeats still queued at session end (audit #18): its
+    # presence marks that definition in the tracked record.
+    add("censoredHeartbeatCount", frontend.get("censoredHeartbeatCount"))
     counters = app.get("counters") or {}
     timings = app.get("timingsMS") or {}
     add("delayedHeartbeatCount", frontend.get("delayedHeartbeatCount50", counters.get("delayedHeartbeatCount50")))

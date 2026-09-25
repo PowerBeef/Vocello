@@ -131,7 +131,11 @@ def stall_statistic_value(app_row: dict, statistic: str):
 
 
 def stall_gate_summary(contract: dict, observed: list[tuple[str, int]], censored: int) -> dict:
-    """What the gate saw, for calibration: the per-take distribution of the statistic."""
+    """What the gate saw, for calibration: the per-take distribution of the statistic.
+
+    `observed` is each gated take's (cell, value) in take order; `takes` keeps
+    them all, because calibrating the contract needs the whole distribution.
+    """
     values = sorted(value for _, value in observed)
 
     def quantile(fraction: float):
@@ -152,6 +156,7 @@ def stall_gate_summary(contract: dict, observed: list[tuple[str, int]], censored
         "p90": quantile(0.9),
         "maximum": values[-1] if values else None,
         "censoredHeartbeatCount": censored,
+        "takes": [{"cell": cell, "value": value} for cell, value in observed],
     }
 
 
@@ -598,6 +603,10 @@ def tracked_metrics(engine: dict, app: dict) -> dict[str, float | int]:
         "uiMaximumDelayedHeartbeatMS",
         frontend.get("maximumDelayedHeartbeatMS", frontend.get("mainThreadMaximumStallMS")),
     )
+    # Present only on rows whose heartbeat statistics include the censored
+    # lower bound of heartbeats still queued at session end (audit #18): its
+    # presence marks that definition in the tracked record.
+    add("censoredHeartbeatCount", frontend.get("censoredHeartbeatCount"))
     counters = app.get("counters") or {}
     timings = app.get("timingsMS") or {}
     add("delayedHeartbeatCount", frontend.get("delayedHeartbeatCount50", counters.get("delayedHeartbeatCount50")))
@@ -1184,9 +1193,10 @@ def main() -> int:
     stall_limit = stall_contract["maximumAllowed"]
     stall_observed: list[tuple[str, int]] = []
     censored_heartbeats = 0
-    for engine_row in engine_rows:
+    for index, engine_row in enumerate(engine_rows, start=1):
         gid = engine_row.get("generationID")
-        if not stall_gate_applies(engine_row.get("notes") or {}):
+        notes = engine_row.get("notes") or {}
+        if not stall_gate_applies(notes):
             continue
         app_row = app_by_id.get(gid)
         if app_row is None:
@@ -1198,7 +1208,8 @@ def main() -> int:
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             failures.append(f"app generation {gid or '?'} has invalid {statistic}={value!r}")
             continue
-        stall_observed.append((str(gid), value))
+        cell = notes.get("benchCell") if isinstance(notes.get("benchCell"), str) else f"take {index}"
+        stall_observed.append((cell, value))
         censored = (app_row.get("frontendMetrics") or {}).get("censoredHeartbeatCount")
         if isinstance(censored, int) and not isinstance(censored, bool) and censored > 0:
             censored_heartbeats += censored
@@ -1242,6 +1253,12 @@ def main() -> int:
         f"{stall_gate['gatedTakeCount']} gated take(s); median={stall_gate['median']} "
         f"p90={stall_gate['p90']} max={stall_gate['maximum']} "
         f"above={stall_gate['takesAboveLimit']} censoredHeartbeats={censored_heartbeats}"
+    )
+    # Every gated take's value, pass or fail: a failing run writes no manifest,
+    # so this output is all that records the distribution a calibration needs.
+    print(
+        f"stall gate takes ({statistic}): "
+        + (", ".join(f"{take['cell']}={take['value']}" for take in stall_gate["takes"]) or "none")
     )
     if failures:
         print("FAIL:")

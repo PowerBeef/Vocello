@@ -522,6 +522,9 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         self.assertEqual((stall["statistic"], stall["maximumAllowed"]), ("maximumDelayedHeartbeatMS", 250))
         self.assertEqual((stall["calibrationStatus"], stall["calibrationProfile"]), ("provisional", "mac-mini-m6-16gb"))
         self.assertEqual((stall["gatedTakeCount"], stall["maximum"], stall["takesAboveLimit"]), (5, 90, 0))
+        # The whole per-take distribution, in take order, for calibration.
+        self.assertEqual([take["cell"] for take in stall["takes"]], self.expected_order)
+        self.assertEqual(stall["takes"][0]["value"], 90)
         self.assertNotIn("stallGate", self.last_manifest["historyRecord"]["run"])
 
     def test_censored_heartbeats_are_gated_and_counted(self) -> None:
@@ -539,6 +542,11 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.last_manifest["stallGate"]["censoredHeartbeatCount"], 2)
         self.assertEqual(self.last_manifest["stallGate"]["maximum"], 180)
+        # The tracked take carries the marker of the censored definition; takes
+        # whose rows predate it carry no key at all.
+        takes = self.last_manifest["historyRecord"]["takes"]
+        self.assertEqual(takes[2]["metrics"]["censoredHeartbeatCount"], 2)
+        self.assertNotIn("censoredHeartbeatCount", takes[0]["metrics"])
 
     def test_rows_not_yet_present_exit_apart_from_deterministic_failures(self) -> None:
         """audit #6/#21: the lane retries only the "rows not yet present" outcome."""

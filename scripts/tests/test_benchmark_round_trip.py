@@ -178,19 +178,29 @@ def canonical_cells() -> list[str]:
     return cells
 
 
+def mark_censored_heartbeats(app_rows: list[dict]) -> None:
+    """App rows of the censored heartbeat definition (audit #18)."""
+    for row in app_rows:
+        row.setdefault("frontendMetrics", {}).update({
+            "censoredHeartbeatCount": 1, "heartbeatDelayDefinition": "completedAndCensoredPending",
+        })
+
+
 class UICheckerRoundTripTests(unittest.TestCase):
     def test_macos_ui_benchmark_manifest_publishes(self) -> None:
+        def realistic(layers: dict[str, list[dict]]) -> None:
+            make_rows_realistic(layers["engine"])
+            mark_censored_heartbeats(layers["app"])
+
         checker = mac_ui.CheckMacOSUIBenchmarkTests("run_checker")
-        result = checker.run_checker(
-            checker.expected_order,
-            mutate_layers=lambda layers: make_rows_realistic(layers["engine"]),
-            evidence=True,
-        )
+        result = checker.run_checker(checker.expected_order, mutate_layers=realistic, evidence=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         record, _size = publish_through_registry(checker.last_manifest, screenshots=True)
         self.assertEqual(record["run"]["kind"], "ui-generation")
         self.assertEqual(record["run"]["rtfDefinition"], "wall/audio")
         self.assertEqual(len(record["takes"]), len(checker.expected_order))
+        # The censored-definition marker survives into the tracked record.
+        self.assertTrue(all(take["metrics"]["censoredHeartbeatCount"] == 1 for take in record["takes"]))
 
     def test_canonical_macos_ui_benchmark_fits_the_record_cap(self) -> None:
         checker = mac_ui.CheckMacOSUIBenchmarkTests("run_checker")
@@ -214,6 +224,7 @@ class UICheckerRoundTripTests(unittest.TestCase):
         def upgrade(rows: list[dict], app_rows: list[dict], diagnostics: Path) -> None:
             original(rows, app_rows, diagnostics)
             make_rows_realistic(rows)
+            mark_censored_heartbeats(app_rows)
 
         checker = ios_ui.CheckIOSUIBenchmarkTests("run_checker")
         with mock.patch.object(ios_ui, "upgrade_rows_to_v8", side_effect=upgrade):
@@ -222,6 +233,7 @@ class UICheckerRoundTripTests(unittest.TestCase):
         record, _size = publish_through_registry(checker.last_manifest, screenshots=True)
         self.assertEqual(record["run"]["platform"], "ios")
         self.assertEqual(len(record["takes"]), len(checker.expected_order))
+        self.assertTrue(all(take["metrics"]["censoredHeartbeatCount"] == 1 for take in record["takes"]))
 
     def test_macos_ui_perf_manifest_publishes(self) -> None:
         fixture = mac_perf.UIPerfFixture("run_checker")

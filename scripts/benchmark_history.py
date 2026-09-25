@@ -398,6 +398,11 @@ METRIC_KEYS = {
     "peakPhysicalFootprintMB", "peakResidentMB", "peakCompressedMB",
     "peakGPUAllocatedMB", "minimumHeadroomMB", "memoryTrimCount", "maximumTrimLevel",
     "uiMaximumDelayedHeartbeatMS", "delayedHeartbeatCount", "heartbeatCoverage",
+    # Heartbeats still queued at the end of a take, counted by their lower
+    # bound (records since 2026-09-25, audit #18). Its presence marks that
+    # uiMaximumDelayedHeartbeatMS and delayedHeartbeatCount include them;
+    # records without it counted completed heartbeats only.
+    "censoredHeartbeatCount",
     "cpuUserSeconds", "cpuSystemSeconds", "pageFaults", "contextSwitches",
     "blockIOOperations", "samplerTargetIntervalMS", "samplerEffectiveMedianIntervalMS",
     "samplerMaximumLatenessMS", "samplerBoundarySampleCount", "samplerCaptureFailureCount",

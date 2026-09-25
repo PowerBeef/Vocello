@@ -1115,8 +1115,8 @@
         "config/delivery-evaluator-v2-contract.json"
       ],
       "unparkWhen": "The maintainer explicitly requests the M6 baseline runs and the production Mac models are Ready.",
-      "notes": "Canonical macOS benchmark host switched from mac-mini-m2-8gb to mac-mini-m6-16gb on 2026-09-22 (maintainer decision); published history starts a new series. Until (2) lands, the README and website keep the M2 figures from macos-xcui-benchmark-20260914-062114-379db820, labelled as measured on Mac mini M2 8 GB. No new timing, RAM or threshold claims.",
-      "updated": "2026-09-22"
+      "notes": "Canonical macOS benchmark host switched from mac-mini-m2-8gb to mac-mini-m6-16gb on 2026-09-22 (maintainer decision); published history starts a new series. Until (2) lands, the README and website keep the M2 figures from macos-xcui-benchmark-20260914-062114-379db820, labelled as measured on Mac mini M2 8 GB. No new timing, RAM or threshold claims. 2026-09-24: the first gate run on the M6 (mac-gate-20260924-231721) passed inputs, build, core and runtime tests and the crash check, then stopped at the bench: the benchmark model pro_custom_speed is not installed here (maintainer: scripts/macos_test.sh models ensure).",
+      "updated": "2026-09-24"
     },
     {
       "id": "AUD-01",
@@ -1161,7 +1161,7 @@
         "Sources/Views/Studio/MacVoiceDesignScreen.swift",
         "Sources/iOS/Studio/StudioGenerationCoordinator.swift"
       ],
-      "notes": "Revalidated 2026-09-18 (P2 policy/refactor): all three macOS Studio views construct generation Tasks, contrary to the native rule, but register them with StudioGenerationCoordinator, which owns cancellation and stale-attempt completion. This does not independently establish a critical race or unowned cancellation. Move construction across the existing boundary without changing request snapshots. See project-review-2026-09-18.md. 2026-09-24: the three macOS Studio screens hand an immutable plan to MacStudioSingleTakeRunner (start, cancel through the engine barrier), tested over the real coordinator with a fake engine; the moved code routes to platform-ui promotion evidence. Open: macOS smoke and the cancellation journey (consent-bound UI lanes), and the iOS Studio views still construct their generation tasks (IOSGenerationModeViews).",
+      "notes": "Revalidated 2026-09-18 (P2 policy/refactor): all three macOS Studio views construct generation Tasks, contrary to the native rule, but register them with StudioGenerationCoordinator, which owns cancellation and stale-attempt completion. This does not independently establish a critical race or unowned cancellation. Move construction across the existing boundary without changing request snapshots. See project-review-2026-09-18.md. 2026-09-24: the three macOS Studio screens hand an immutable plan to MacStudioSingleTakeRunner (start, cancel through the engine barrier), tested over the real coordinator with a fake engine; the moved code routes to platform-ui promotion evidence. Open: macOS smoke and the cancellation journey (consent-bound UI lanes), and the iOS Studio views still construct their generation tasks (IOSGenerationModeViews). 2026-09-24: the consented macOS smoke run (macos-xcui-smoke-20260925-025800-7d5e7232) did not reach any test: the runner timed out enabling Automation Mode, which needs authentication on the M6 (infrastructure; maintainer: sudo automationmodetool enable-automationmode-without-authentication, session unlocked). The lane now refuses this before building.",
       "plan": "audit-remediation-2026-09",
       "updated": "2026-09-24"
     },
@@ -1416,7 +1416,7 @@
       "id": "PA-31",
       "plan": "project-audit-2026-09",
       "title": "The engine store reports frontend state changes with the streaming engine",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "TTSEngineStore.snapshotUpdates fires once per applied frontend-state change with the streaming MLXTTSEngine, so the macOS warmup coordinator sees the engine's state: it cancels pending (undispatched) warmups while the engine is busy, never cancels its own dispatched warm for the states that warm publishes, invalidates a completed warm on a different loaded model or a failure (an idle unload sticks), and warms the latest intent after a stale warm; the maintainer approves the change to frozen TTSEngineStore behavior; the expected failure in TTSEngineStoreTests is removed in the same commit; macOS smoke passes.",
       "sourceOfTruth": [
@@ -1424,7 +1424,7 @@
         "Sources/Services/MacGenerationWarmupCoordinator.swift",
         "Tests/VocelloCoreTests/TTSEngineStoreTests.swift"
       ],
-      "notes": "Found by PA-19 on 2026-09-24. syncFromSnapshot returns for any event-streaming backend (and when no new chunk arrived) before it reaches snapshotUpdates.send, and MLXTTSEngine streams events, so on macOS ContentView's onReceive(snapshotChanges) never fires and MacGenerationWarmupCoordinator.observe never runs. The fix is to send the update above the streaming guard. TTSEngineStore behavior is frozen (native.md) apart from consent admission, and the fix changes macOS warmup timing, so it waits for a maintainer decision and a macOS smoke run. testSnapshotUpdatesFireForAnAppliedFrontendChange records the defect with a strict XCTExpectFailure naming this item. Maintainer approved the fix on 2026-09-24 (the TTSEngineStore freeze is lifted for this change only).",
+      "notes": "Found by PA-19 on 2026-09-24. syncFromSnapshot returns for any event-streaming backend (and when no new chunk arrived) before it reaches snapshotUpdates.send, and MLXTTSEngine streams events, so on macOS ContentView's onReceive(snapshotChanges) never fires and MacGenerationWarmupCoordinator.observe never runs. The fix is to send the update above the streaming guard. TTSEngineStore behavior is frozen (native.md) apart from consent admission, and the fix changes macOS warmup timing, so it waits for a maintainer decision and a macOS smoke run. testSnapshotUpdatesFireForAnAppliedFrontendChange records the defect with a strict XCTExpectFailure naming this item. Maintainer approved the fix on 2026-09-24 (the TTSEngineStore freeze is lifted for this change only). 2026-09-24: landed (f46aa2ee); its macOS smoke check waits on the same Automation Mode setup as AUD-03.",
       "updated": "2026-09-24"
     }
   ]

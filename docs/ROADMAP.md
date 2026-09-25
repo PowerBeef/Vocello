@@ -446,7 +446,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-25` | planned | Docs and tooling stay proportional | — |
 | `PA-26` | planned | Low-severity backlog from the external audit | — |
 | `PA-30` | in-flight | Leftovers from PA-21, PA-22 and AUD-05 | — |
-| `PA-31` | planned | The engine store reports frontend state changes with the streaming engine | — |
+| `PA-31` | in-flight | The engine store reports frontend state changes with the streaming engine | — |
 
 ### Open items in detail
 
@@ -480,7 +480,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-30`** (in-flight) — Leftovers from PA-21, PA-22 and AUD-05.
   gate: A failed History clear is never silent and a pending clear has its own banner copy on both platforms; a long-form acceptance interrupted by app suspension is retried after resume and keeps its audio, with copy that matches; a set-aside unreadable audio-removal list is reported once or can be discarded; the iPhone offers a one-time, confirmed removal of audio earlier clears left in its private storage (maintainer decision 2026-09-24: the Mac outputs folder stays untouched); the resident speech tokenizer gets an owner-scoped release (ENG-06) only with a device memory re-qualification.
 
-- **`PA-31`** (planned) — The engine store reports frontend state changes with the streaming engine.
+- **`PA-31`** (in-flight) — The engine store reports frontend state changes with the streaming engine.
   gate: TTSEngineStore.snapshotUpdates fires once per applied frontend-state change with the streaming MLXTTSEngine, so the macOS warmup coordinator sees the engine's state: it cancels pending (undispatched) warmups while the engine is busy, never cancels its own dispatched warm for the states that warm publishes, invalidates a completed warm on a different loaded model or a failure (an idle unload sticks), and warms the latest intent after a stale warm; the maintainer approves the change to frozen TTSEngineStore behavior; the expected failure in TTSEngineStoreTests is removed in the same commit; macOS smoke passes.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability

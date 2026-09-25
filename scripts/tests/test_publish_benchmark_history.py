@@ -3486,6 +3486,34 @@ class PublisherTests(unittest.TestCase):
                 require_complete_intervals=require_complete,
             )
 
+    def test_trace_toc_recorded_duration_is_the_run_summary_duration(self) -> None:
+        # The shape `xctrace export --toc` writes (Instruments 27.0, checked
+        # 2026-09-25 on a 1 s recording), with the device and process fields
+        # left out: the recorded duration in seconds, beside the requested
+        # time limit, which is not the duration (audit #96).
+        toc = publisher.ET.ElementTree(publisher.ET.fromstring(
+            "<trace-toc><run number='1'><info><target/><summary>"
+            "<start-date>2026-09-25T17:23:11.060-04:00</start-date>"
+            "<end-date>2026-09-25T17:23:12.704-04:00</end-date>"
+            "<duration>1.643773</duration><end-reason>Target app exited</end-reason>"
+            "<template-name>Time Profiler</template-name><recording-mode>Deferred</recording-mode>"
+            "<time-limit>3 seconds</time-limit></summary></info>"
+            "<processes/><data><table schema='time-profile'/></data></run></trace-toc>"
+        ))
+        self.assertEqual(publisher._toc_recorded_duration_seconds(toc), 1.644)
+        for body in (
+            "<trace-toc><run number='1'><info><summary><time-limit>90 seconds</time-limit>"
+            "</summary></info></run></trace-toc>",
+            "<trace-toc><run number='1'><info><summary><duration>n/a</duration>"
+            "</summary></info></run></trace-toc>",
+            "<trace-toc><run number='1'><info><summary><duration>0</duration>"
+            "</summary></info></run></trace-toc>",
+        ):
+            with self.subTest(body=body):
+                self.assertIsNone(publisher._toc_recorded_duration_seconds(
+                    publisher.ET.ElementTree(publisher.ET.fromstring(body))
+                ))
+
     def test_trace_summary_publishes_per_take_loop_interval_statistics(self) -> None:
         summary = self.extract_intervals()
         # The window row, the prewarm orphan and 3 steps of 36 + Token Read.

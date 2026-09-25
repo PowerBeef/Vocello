@@ -446,7 +446,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-16` | planned | Speech-tokenizer attention honors the model's sliding windows | — |
 | `PA-18` | in-flight | Public claims match what each download ships | — |
 | `PA-19` | in-flight | Orchestrators and the generate loop have unit coverage | — |
-| `PA-20` | planned | Accessibility and localization reach every surface | — |
+| `PA-20` | in-flight | Accessibility and localization reach every surface | — |
 | `PA-25` | planned | Docs and tooling stay proportional | — |
 | `PA-26` | planned | Low-severity backlog from the external audit | — |
 | `PA-30` | planned | Leftovers from PA-21, PA-22 and AUD-05 | — |
@@ -472,7 +472,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-19`** (in-flight) — Orchestrators and the generate loop have unit coverage.
   gate: TTSEngineStore, StudioGenerationCoordinator, the long-form runner, DatabaseService, the model managers and IOSExportGate run under unit tests with a fake engine; a tiny seeded random-weight talker and generate-loop test and a synthetic AudioSeal fixture run in CI.
 
-- **`PA-20`** (planned) — Accessibility and localization reach every surface.
+- **`PA-20`** (in-flight) — Accessibility and localization reach every surface.
   gate: macOS and iOS route computed English and typed errors through catalog keys with plural rules and the in-app locale, VoiceOver announces generation state changes, fixed fonts scale, timed banners with actions stay, and website text meets 4.5:1 contrast.
 
 - **`PA-25`** (planned) — Docs and tooling stay proportional.

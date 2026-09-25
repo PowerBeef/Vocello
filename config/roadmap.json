@@ -1372,16 +1372,16 @@
     {
       "id": "PA-20",
       "title": "Accessibility and localization reach every surface",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "macOS and iOS route computed English and typed errors through catalog keys with plural rules and the in-app locale, VoiceOver announces generation state changes, fixed fonts scale, timed banners with actions stay, and website text meets 4.5:1 contrast.",
       "sourceOfTruth": [
         "Sources/Services/MacInterfaceText.swift",
         "Sources/iOS/IOSGenerationModeViews.swift",
         "website/src/tokens.css"
       ],
-      "notes": "External audit MAC-06, MAC-07, MAC-10, MAC-11, IOS-12, IOS-13, IOS-14 and WEB-03, confirmed 2026-09-22: engine display strings and localizedDescription reach Mac UI in English; formatters follow the system locale; no macOS InfoPlist catalog; 0 VoiceOver announcements and a 6 s action banner on iOS; fixed-size fonts in the player and sheets; website secondary text at about 3.8:1. AUD-06 (modal exclusion) stays its own item. From PA-14 (2026-09-23): route the engine's English memory-pressure and runtime-failure copy (NativeEngineRuntime.swift, with maximumTokenLimit) through VocelloPresentationText / MacInterfaceText keyed on the typed failure code; Sources/QwenVoiceCore is outside localization_contract.py's scan roots.",
+      "notes": "External audit MAC-06, MAC-07, MAC-10, MAC-11, IOS-12, IOS-13, IOS-14 and WEB-03, confirmed 2026-09-22. AUD-06 (modal exclusion) stays its own item. 2026-09-24: typed engine failures (including clone-reference and read-permission cases) reach both apps in the interface language; engine display strings, sizes, dates and Mac counts follow it; iOS toasts, launch failure and default voice names use IOSAppLanguage; the macOS microphone and Speech prompts have an InfoPlist catalog; VoiceOver announces Studio state changes; the inline player, sheets and editors scale with Dynamic Type; the saved-voice banner with an action stays (and leaves when its voice is deleted); website secondary text meets AA. Open: raw localizedDescription on Mac History, downloads, batch restart and playback; iOS download, import and History errors; untyped engine errors fall back to English; multi-count \"X of Y\" plurals need catalog substitutions; a physical VoiceOver and Dynamic Type check (consent-bound).",
       "plan": "project-audit-2026-09",
-      "updated": "2026-09-23"
+      "updated": "2026-09-24"
     },
     {
       "id": "PA-25",

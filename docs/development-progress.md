@@ -33,9 +33,17 @@ Also closed September 24 without the phone: PA-22 (core storage and memory relie
 audio-session owner, startup Retry, drafts, Wi-Fi copy; iPhone History clear deletes its audio);
 their device checks are on AUD-02 and their leftovers on PA-30. Wave 1 of the unattended work
 (worktree agents plus adversarial review, verified natively by the lead): PA-07 and F-26 closed,
-PA-18 in flight (the AudioSeal upstream revision needs the maintainer; iPhone screenshots need a
-device lane); the rest of the plan below is
-unchanged (PA-16 needs an M6 gate-bench baseline first).
+PA-18 in flight (only the iPhone screenshots remain; the AudioSeal upstream was reconstructed from
+public metadata). Later waves, still without the phone: AUD-05 closed (bounded History pages,
+retried audio removals, and a clear-all bounded by the highest row id it saw, serialized and
+fail-closed after two adversarial reviews; leftovers on PA-30). AUD-03 (Mac Studio takes start in
+`MacStudioSingleTakeRunner`), PA-19 (orchestrator suites over fakes, a seeded talker generate loop,
+synthetic AudioSeal weights) and PA-20 (interface-language failures and formatters, macOS permission
+prompts, VoiceOver announcements, Dynamic Type, banner timing, website contrast) landed and stay in
+flight for their remaining surfaces and consent-bound lanes. PA-31 (engine-store snapshot updates
+never fire with the streaming engine) waits for a maintainer decision. Waiting on the maintainer:
+the phone (RF-13 exports, AUD-02, PA-18 screenshots), macOS smoke and cancellation lanes for AUD-03,
+the PA-16 M6 gate-bench baseline, PA-31, and the PA-30 Keep Audio Files decision.
 
 ### Current state (September 23)
 

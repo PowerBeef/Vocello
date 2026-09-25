@@ -4057,6 +4057,22 @@
       "notes": "Closed 2026-09-25 (maintainer decision 2026-09-24: unload after idle, warm by intent). The high-memory Mac now unloads after 30 minutes idle (floor 2, mid 10 unchanged) and answers kernel memory pressure (soft and hard trims, warm admission deferred under pressure) like the other tiers; navigation alone never warms (only entering Studio or generating does), and PA-31's coordinator keeps an idle unload from being undone. The engine now settles a cancelled cold prefetch and a cancelled clone prime through the runtime and re-arms idle unload, instead of reporting .idle over resident weights. Lifecycle tests cover the per-tier windows, both cancelled paths and navigation without intent. 1800 s is a policy value, not yet measured on real hardware. Leftover: a failed, non-cancelled model operation leaves weights resident with no idle unload (PA-32).",
       "plan": "audit-remediation-2026-09",
       "updated": "2026-09-25"
+    },
+    {
+      "id": "BT-02",
+      "plan": "benchmark-telemetry-audit-2026-09",
+      "title": "Engine gate and CLI bench ready for the M6 re-seed",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Offline comparator replay shows no false regression and flags a synthetic +6% RTF, a gate with a missing model stops within seconds with a finalized ledger, and the AV-17 session seeds the M6 baseline from at least 3 seeded runs on identical source with the thresholds printed.",
+      "sourceOfTruth": [
+        "scripts/macos_test.sh",
+        "scripts/summarize_generation_telemetry.py",
+        "Sources/VocelloCLI/BenchCommand.swift",
+        "benchmarks/baselines/mac-gate-bench.json"
+      ],
+      "notes": "Closed 2026-09-25. Audit #5 #11 #13 #14 #15 #19 #20 #27 #36 #53 #54 #55 #57 #58 #59 #63 V-5 V-6 V-7. Maintainer decisions 2026-09-25: five warm takes and a stricter per-take load limit. Landed 2026-09-25: a seeded gate with governed pooled seeding (at least three seeded runs on one clean commit) and identity read from the evidence, memory tier bound; five warm takes; spread-floored thresholds printed; a preflight that stops a missing model within seconds with a finalized ledger; INCONCLUSIVE from the busiest judged take and from low power; a take above the core count marks its engine record exploratory; Clone prewarm before the warm takes; no duplicate core tests or full pytest in the gate; the bench's telemetry-off arm truly off; the sidecar budget sized to the run; forced memory-class rows refused and a refused identity never truncates a baseline. The M6 re-seed landed as AV-17 step 1 (ce66096c: three seeded runs from 848e140a, thresholds printed); test_compare_baseline replays flag a synthetic +6% RTF with no false regression; a post-wave-8 compare passed (4de385ef).",
+      "updated": "2026-09-25"
     }
   ]
 }

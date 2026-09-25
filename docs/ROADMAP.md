@@ -15,7 +15,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
 | `audit-remediation-2026-09` | active | backend-and-platform | 3/12 (25%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 11/17 (65%) |
-| `benchmark-telemetry-audit-2026-09` | active | backend-and-platform | 0/6 (0%) |
+| `benchmark-telemetry-audit-2026-09` | active | backend-and-platform | 1/6 (17%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 17/26 (65%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
@@ -190,7 +190,6 @@ Narrative authority: [`docs/audits/2026-09-25-benchmark-telemetry-audit.md`](aud
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `BT-01` | in-flight | Trustworthy memory evidence | — |
-| `BT-02` | in-flight | Engine gate and CLI bench ready for the M6 re-seed | — |
 | `BT-03` | in-flight | UI benchmark and ui-perf lanes ready for the M6 | — |
 | `BT-04` | in-flight | Lineage identity, history and CI evidence tests | — |
 | `BT-05` | in-flight | Audio, language and delivery QC accuracy | — |
@@ -200,9 +199,6 @@ Narrative authority: [`docs/audits/2026-09-25-benchmark-telemetry-audit.md`](aud
 
 - **`BT-01`** (in-flight) — Trustworthy memory evidence.
   gate: Offline replay puts the 8 in-process macOS UI records near 1.0 (peak over mlxPeakMB), routine cache clears raise no warnings, every committed record reports a peak-missed count, and all legacy records still validate; the next consented memory lane shows the kernel peak at or above mlxPeakMB on every take.
-
-- **`BT-02`** (in-flight) — Engine gate and CLI bench ready for the M6 re-seed.
-  gate: Offline comparator replay shows no false regression and flags a synthetic +6% RTF, a gate with a missing model stops within seconds with a finalized ledger, and the AV-17 session seeds the M6 baseline from at least 3 seeded runs on identical source with the thresholds printed.
 
 - **`BT-03`** (in-flight) — UI benchmark and ui-perf lanes ready for the M6.
   gate: The first canonical M6 UI benchmark validates in one pass under a declared stall contract with every take on the Speed variant, and M6 perf records carry an M6 calibration profile rather than M2 verdicts.

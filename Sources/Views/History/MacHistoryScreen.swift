@@ -934,9 +934,11 @@ private extension MacHistoryScreen {
                 outcome = try await GenerationHistoryRecovery.clearAll(deleteAudio: deleteAudio)
             } catch {
                 await MainActor.run {
+                    // The same localized message as iOS for every refusal or
+                    // failure; the typed outbox errors are English-only (PA-30).
                     presentActionAlert(
                         title: MacInterfaceText.historyClearError,
-                        message: error.localizedDescription
+                        message: MacInterfaceText.presentation.historyClearFailedDetail
                     )
                     // A pending clear may have finished before this request
                     // failed, and the read decides whether the database itself

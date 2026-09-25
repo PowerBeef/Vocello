@@ -11635,6 +11635,72 @@
         }
       }
     },
+    "vocello.history.clear_failed_detail": {
+      "comment": "Alert message when clearing History was refused or failed part-way; nothing more is deleted, and History's banner offers Retry when an interrupted clear still has to finish.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History could not be cleared safely, so Vocello stopped without deleting anything more. If History shows that clearing did not finish, retry there."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’historique n’a pas pu être effacé en toute sécurité ; Vocello s’est donc arrêté sans rien supprimer de plus. Si l’historique indique que l’effacement n’est pas terminé, réessayez depuis l’historique."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo vaciar el historial de forma segura, así que Vocello se detuvo sin eliminar nada más. Si el historial indica que no se terminó de vaciar, reintenta desde allí."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Verlauf konnte nicht sicher geleert werden, daher hat Vocello angehalten, ohne weitere Inhalte zu löschen. Wenn der Verlauf anzeigt, dass das Leeren nicht abgeschlossen wurde, versuche es dort erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è stato possibile svuotare la cronologia in sicurezza, quindi Vocello si è fermato senza eliminare nient’altro. Se la cronologia indica che lo svuotamento non è stato completato, riprova da lì."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível limpar o histórico com segurança, então o Vocello parou sem excluir mais nada. Se o histórico mostrar que a limpeza não terminou, tente novamente por lá."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法安全地清空历史记录，因此 Vocello 已停止，未再删除任何内容。如果历史记录显示清空未完成，请在那里重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "履歴を安全に消去できなかったため、Vocello はそれ以上何も削除せずに停止しました。履歴に消去が完了していないと表示される場合は、そこで再試行してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기록을 안전하게 지울 수 없어 Vocello가 더 이상 아무것도 삭제하지 않고 중단했습니다. 기록에 지우기가 완료되지 않았다고 표시되면 그곳에서 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось безопасно очистить историю, поэтому Vocello остановился, больше ничего не удаляя. Если в истории указано, что очистка не завершена, повторите попытку там."
+          }
+        }
+      }
+    },
     "vocello.long_form.segment_history_failed": {
       "comment": "Successful segment synthesis is distinct from History persistence and whole-project acceptance.",
       "extractionState": "manual",

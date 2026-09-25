@@ -442,16 +442,17 @@ private struct IOSHistoryLibrarySection: View {
                     }
                 }
             } catch {
-                // The typed `GenerationHistoryOutboxError` copy says what was kept.
-                let message = error.localizedDescription
                 await MainActor.run {
                     // A pending clear may have finished before this request
                     // failed: read what remains, and let the recovery banner
                     // show what is still pending (AUD-05).
                     NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
                     loadPage(reconciling: false)
-                    // Never silent (PA-30), as on macOS.
-                    clearFailureMessage = message
+                    // Never silent (PA-30), as on macOS. One message for every
+                    // refusal or failure, in the interface language: the typed
+                    // outbox errors are English-only, and one speaks of
+                    // queueing a take.
+                    clearFailureMessage = IOSAppLanguage.shared.presentation.historyClearFailedDetail
                     isClearFailurePresented = true
                 }
             }

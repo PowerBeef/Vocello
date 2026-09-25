@@ -323,9 +323,10 @@ idempotent SQLite commit. Startup and History entry reconcile pending rows. If a
 uses a resumable database-first marker so a database failure cannot delete audio behind live rows.
 The banner states one notice chosen by `GenerationHistoryRecoverySnapshot.notice`: a clear that did
 not finish has its own copy (Retry resumes it) and no count is ever zero. A clear that is refused or
-fails shows an alert with the typed error (`historyClearFailedDismiss`). A removal list that could
-not be read is reported by its own notice until Retry from it discards the list; the audio it named
-is not deleted (PA-30).
+fails shows an alert (`historyClearFailedDismiss`) whose localized message, shared with macOS, says
+nothing more was deleted and to retry from the banner if the clear did not finish. A removal list
+that could not be read is reported by its own notice until Retry from it discards the list; the
+audio it named is not deleted (PA-30).
 If the outbox write itself fails, the app-wide `historyUnqueued_banner` offers
 `historyUnqueued_retry` and `historyUnqueued_export` while successful audio stays playable.
 That retry identity is app-session memory, not crash-safe recovery; export before quitting if

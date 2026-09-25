@@ -320,6 +320,12 @@ struct VocelloPresentationText: Sendable {
                comment: "History recovery banner detail for an interrupted clear; Retry resumes it and never removes takes saved after it started.")
     }
 
+    var historyClearFailedDetail: String {
+        localization.string(localized: "vocello.history.clear_failed_detail",
+               defaultValue: "History could not be cleared safely, so Vocello stopped without deleting anything more. If History shows that clearing did not finish, retry there.",
+               comment: "Alert message when clearing History was refused or failed part-way; nothing more is deleted, and History's banner offers Retry when an interrupted clear still has to finish.")
+    }
+
     var historyUnreadableAudioRemovals: String {
         localization.string(localized: "vocello.history.unreadable_audio_removals",
                defaultValue: "Vocello could not read its list of audio files from deleted takes, so it did not delete them. Retry to dismiss this notice.",

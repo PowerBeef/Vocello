@@ -399,7 +399,7 @@ def validate_audio_qc(value: Any, field: str) -> None:
         "cadence", "chunkQC",
         # QC v7 always encodes the step-burst count (and its start when found);
         # QC v8 adds the speaking-rate measure when the request text was known;
-        # QC v9 adds the clustered click events and their per-second rate.
+        # since 2026-09-25 (audit #85) the clustered click events and their rate.
         "stepBurstPeakCount", "stepBurstPeakStartMS",
         "speakingRateTextUnits", "secondsPerTextUnit",
         "clickEventCount", "lowEnergyClickEventCount", "clickEventsPerSecond",

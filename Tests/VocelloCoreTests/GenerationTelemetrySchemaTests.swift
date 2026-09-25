@@ -706,7 +706,7 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
             durationSeconds: 0.006,
             expectedPauseCount: 0
         )
-        XCTAssertEqual(report.algorithmVersion, 9)
+        XCTAssertEqual(report.algorithmVersion, 8)
         XCTAssertEqual(report.longestSilenceMS, 4)
         XCTAssertEqual(report.longestSilenceStartMS, 1)
 

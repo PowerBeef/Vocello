@@ -77,7 +77,7 @@ final class AudioQCStepBurstTests: XCTestCase {
         XCTAssertEqual(opening.stepBurstPeakStartMS, 2)
         XCTAssertTrue(opening.flags.contains("onset_step_burst"), "\(opening.flags)")
         XCTAssertEqual(opening.instabilityVerdict, .warn)
-        XCTAssertEqual(opening.algorithmVersion, 9)
+        XCTAssertEqual(opening.algorithmVersion, 8)
         // The same cluster at the plosive onset (150 ms) is recorded, not judged.
         let later = report(burstAtSample: 3_600)
         XCTAssertEqual(later.stepBurstPeakCount, 11)
@@ -100,14 +100,14 @@ final class AudioQCStepBurstTests: XCTestCase {
         XCTAssertNil(report.speakingRateTextUnits)
         XCTAssertNil(report.secondsPerTextUnit)
         XCTAssertNil(encoded?["secondsPerTextUnit"])
-        // Pre-v9 rows carry no clustered click events either.
+        // Rows before the clustered click events (audit #85) carry none either.
         XCTAssertNil(report.clickEventCount)
         XCTAssertNil(report.clickEventsPerSecond)
         XCTAssertNil(encoded?["clickEventCount"])
     }
 }
 
-/// v9 (audit #85): the click bound counts slew-limited samples as a fraction of
+/// Audit #85 (additive on QC v8): the click bound counts slew-limited samples as a fraction of
 /// the take, so its tolerance grew with take length (12 and 120 clamps per
 /// second at 24 kHz). The limiter now clusters clamped samples into events and
 /// the report publishes events per second, with a low-energy subcount.
@@ -155,7 +155,7 @@ final class AudioQCClickEventTests: XCTestCase {
         XCTAssertEqual(long.clickEventCount, 2)
         XCTAssertEqual(try XCTUnwrap(short.clickEventsPerSecond), 1.0, accuracy: 1e-9)
         XCTAssertEqual(try XCTUnwrap(long.clickEventsPerSecond), 0.1, accuracy: 1e-9)
-        XCTAssertEqual(short.algorithmVersion, 9)
+        XCTAssertEqual(short.algorithmVersion, 8, "observational fields leave the QC version")
         // Observational: no flag reads the events; the per-sample bound is unchanged.
         XCTAssertFalse(short.flags.contains("clicks"), "\(short.flags)")
     }
@@ -242,7 +242,7 @@ final class AudioQCSpeakingRateTests: XCTestCase {
 
     func testAnOrdinaryTakeReportsItsRateWithoutAFlag() throws {
         let qc = report(seconds: 6.5, text: Self.mediumScript)
-        XCTAssertEqual(qc.algorithmVersion, 9)
+        XCTAssertEqual(qc.algorithmVersion, 8)
         XCTAssertEqual(qc.speakingRateTextUnits, 91)
         XCTAssertEqual(try XCTUnwrap(qc.secondsPerTextUnit), 6.5 / 91, accuracy: 1e-12)
         XCTAssertFalse(qc.flags.contains("speaking_rate_slow"), "\(qc.flags)")

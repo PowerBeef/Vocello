@@ -2,9 +2,9 @@
 """Replay audio-QC evidence and screen failing bounds, under the threshold authority.
 
 Two Fast-QC measures carry no failing bound: the QC v8 speaking rate
-(`secondsPerTextUnit`, warn-only `speaking_rate_slow`, audit #10) and the QC v9
-clustered click events per second (observational, audit #85; the per-sample
-click fraction stays the bound). The maintainer delegated the open decisions to
+(`secondsPerTextUnit`, warn-only `speaking_rate_slow`, audit #10) and the
+clustered click events per second (observational, audit #85, additive on QC v8;
+the per-sample click fraction stays the bound). The maintainer delegated the open decisions to
 the audit's recommendations on 2026-09-25, and both recommendations route any
 failing bound through the threshold-change authority in
 `docs/reference/audio-qc-engineering.md`: an untouched confirmation cohort and
@@ -62,7 +62,7 @@ GENERATION_KINDS = frozenset({
 SPEAKING_RATE_CANDIDATE_FACTORS = (1.25, 1.5, 2.0)
 # Audio QC runs at the engine's fixed 24 kHz output rate.
 ENGINE_SAMPLE_RATE = 24_000
-# Clustered-click mirror of `PCM16StreamLimiter` (QC v9): the slew clamp, the
+# Clustered-click mirror of `PCM16StreamLimiter` (audit #85): the slew clamp, the
 # event gap, the envelope smoothing and the low-energy level.
 SLEW_CLAMP = 0.42
 CLICK_EVENT_GAP_SAMPLES = 240
@@ -298,7 +298,7 @@ def speaking_rate_report(rows: list[dict[str, Any]], bands: dict[str, dict[str, 
 # --------------------------------------------------------------------------- #
 
 def click_events(samples: Iterable[float]) -> dict[str, int]:
-    """Mirror of the QC v9 clustered click counter over published samples.
+    """Mirror of the audit-#85 clustered click counter over published samples.
 
     The limiter clamps a step above SLEW_CLAMP, so in the published WAV a
     clamped sample differs from its predecessor by the clamp (up to PCM16
@@ -395,7 +395,7 @@ def clicks_report(record_rows: list[dict[str, Any]], wav_rows: list[dict[str, An
     report: dict[str, Any] = {
         "schemaVersion": REPORT_SCHEMA,
         "measure": "clickEventsPerSecond",
-        "qcAlgorithmVersion": 9,
+        "qcAlgorithmVersion": 8,
         # The per-sample bound read as a rate at 24 kHz: its tolerance grows
         # with take length because it counts samples, not events (audit #85).
         "currentBoundAsClampedSamplesPerSecond": {

@@ -1077,12 +1077,13 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
     /// v8 relates the take's length to its text: it reports seconds per text
     /// unit and warns (`speaking_rate_slow`, instability) when a take runs on
     /// far past its script (`AudioSpeakingRateQC`). Warn-only; no v7 verdict
-    /// boundary moves. v9 (audit #85) counts slew-limited samples as clustered
-    /// click events, with a low-energy subcount and a per-second rate that does
-    /// not grow with take length. Observational only: no flag and no verdict
-    /// boundary moves; the per-sample click fraction stays the bound until a
-    /// per-second bound is qualified under the threshold-change authority.
-    public static let currentAlgorithmVersion = 9
+    /// boundary moves. The clustered click events (audit #85: slew-limited
+    /// samples as events, a low-energy subcount and a per-second rate that does
+    /// not grow with take length) join v8 additively: they are observational, no
+    /// flag or verdict boundary moves, and their presence marks them. The version
+    /// stays 8 because the gate's baseline identity binds it; a bump for fields
+    /// that change no verdict would force a re-seed of the M6 gate baseline.
+    public static let currentAlgorithmVersion = 8
 
     public enum Verdict: String, Hashable, Codable, Sendable {
         case pass
@@ -1144,9 +1145,10 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
     /// without request text (a persisted-file check or a chunk snapshot).
     public let speakingRateTextUnits: Int?
     public let secondsPerTextUnit: Double?
-    /// v9: slew-limited samples clustered into events (samples at most 10 ms
-    /// apart are one event), the events that start in a quiet input envelope,
-    /// and events per second of audio. nil before v9.
+    /// Audit #85 (additive on v8): slew-limited samples clustered into events
+    /// (samples at most 10 ms apart are one event), the events that start in a
+    /// quiet input envelope, and events per second of audio. nil on rows
+    /// written before 2026-09-25.
     public let clickEventCount: Int?
     public let lowEnergyClickEventCount: Int?
     public let clickEventsPerSecond: Double?

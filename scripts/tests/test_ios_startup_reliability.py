@@ -580,10 +580,10 @@ class IOSStartupReliabilityTests(unittest.TestCase):
                 with self.assertRaises(MODULE.ContractError):
                     MODULE.validate_audio_qc(malformed, "take.audioQC")
 
-    def test_audio_qc_accepts_v9_clustered_click_events(self):
-        # QC v9 (audit #85) encodes the clustered click events and their rate.
+    def test_audio_qc_accepts_the_clustered_click_events(self):
+        # Audit #85: QC v8 reports additionally encode the clustered click events and their rate.
         qc = {
-            "algorithmVersion": 9, "instabilityVerdict": "pass",
+            "algorithmVersion": 8, "instabilityVerdict": "pass",
             "writtenOutputVerdict": "pass", "verdict": "pass",
             "flags": [], "peak": 0.4, "clippedSamples": 0,
             "hotSamples": 0, "nonFiniteSamples": 0, "clickEvents": 7,

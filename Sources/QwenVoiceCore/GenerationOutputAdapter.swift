@@ -965,7 +965,7 @@ struct PCM16StreamLimiter: Sendable {
         // sees steps the slew limiter had to clamp.
         var stepBurstPeakCount = 0
         var stepBurstPeakStartSample: Int? = nil
-        // Clustered click events (QC v9, audit #85; observational): slew-limited
+        // Clustered click events (audit #85, additive on QC v8; observational): slew-limited
         // samples no more than `clickEventGapSamples` apart are one event, so a
         // seam that clamps a run of samples counts once and the count does not
         // grow with take length the way the per-sample fraction does. The
@@ -1012,7 +1012,7 @@ struct PCM16StreamLimiter: Sendable {
     // Absolute indices of the large output steps inside the trailing
     // step-burst window (bounded by the window length).
     private var recentLargeStepSamples: [Int] = []
-    // Click-event clustering state (QC v9), carried across `append` calls.
+    // Click-event clustering state (audit #85), carried across `append` calls.
     private var lastSlewLimitedSample: Int?
     private var clickEnvelope: Float = 0
     // Cross-`append` silence-run state (a dropout can span chunk boundaries).
@@ -2862,7 +2862,7 @@ struct StreamingExecutionContext: Sendable {
         let clippedFrac = Double(clipped) / Double(denom)
         let clickFrac = Double(clicks) / Double(denom)
         let hotFrac = Double(hot) / Double(denom)
-        // v9 (audit #85): clustered click events per second of audio, a rate
+        // Audit #85: clustered click events per second of audio, a rate
         // that does not grow with take length. Observational: the per-sample
         // fraction below stays the only click bound until a calibrated
         // per-second bound is qualified under the threshold-change authority.

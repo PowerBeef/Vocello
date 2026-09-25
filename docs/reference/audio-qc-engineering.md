@@ -811,15 +811,17 @@ confirmation cohort of at least 60 run-on and 60 ordinary takes whose labels com
 evidence (for example a two-family transcript that shows the repeated or extra words), then a
 reviewed Swift edit; the tool never reports a bound as qualified.
 
-### Clustered click events (QC v9, audit #85, 2026-09-25)
+### Clustered click events (audit #85, 2026-09-25)
 
 The click bound counts slew-limited samples as a fraction of the take (warn above 0.05 %, fail
 above 0.5 %), which at 24 kHz is 12 and 120 clamped samples per second, so its tolerance grows with
-take length and a seam that clamps several samples counts several times. QC v9 (`PCM16StreamLimiter`)
-also clusters clamped samples into events (samples at most 10 ms apart are one event), counts the
+take length and a seam that clamps several samples counts several times. The limiter
+(`PCM16StreamLimiter`) now also clusters clamped samples into events (samples at most 10 ms apart are one event), counts the
 events that start while the input envelope (about a 10 ms mean absolute level) sits below 0.02
 (about -34 dBFS) as low-energy, and reports `clickEventCount`, `lowEnergyClickEventCount` and
-`clickEventsPerSecond`, published as take metrics. They are observational: no flag reads them and
+`clickEventsPerSecond`, published as take metrics. They join QC algorithm v8 additively (their
+presence marks them): the version is part of the gate's baseline identity, so a bump for fields that
+move no verdict would force a consent-bound re-seed of the M6 gate baseline. They are observational: no flag reads them and
 the per-sample fraction stays the only click bound, as the audit recommends until the events are
 calibrated on the retained codec A/B takes (the decision was delegated to that recommendation on
 2026-09-25). `scripts/derive_audio_qc_bounds.py clicks` replays the committed records (273 of 3,778
@@ -829,9 +831,10 @@ per-second candidates; the result feeds this authority, never a bound directly.
 
 ### Threshold-change authority
 
-The Fast-QC cadence and dropout boundaries (`makeAudioQCReport`, algorithm v9; v7 added only the
-warn-only `onset_step_burst` flag, v8 only the warn-only `speaking_rate_slow` flag and v9 only the
-observational clustered click events, no cadence, dropout or click boundary moved) change only under
+The Fast-QC cadence and dropout boundaries (`makeAudioQCReport`, algorithm v8; v7 added only the
+warn-only `onset_step_burst` flag and v8 only the warn-only `speaking_rate_slow` flag, and the
+observational clustered click events joined v8 additively; no cadence, dropout or click boundary
+moved) change only under
 this policy, carried over verbatim on 2026-09-12 from the retired cadence contract,
 `audio-cadence-qc-contract.json` (in git history):
 

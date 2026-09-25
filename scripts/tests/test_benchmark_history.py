@@ -557,7 +557,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.assertEqual(published["cells"], [])
         self.assertEqual(published["comparison"]["derivedCells"], history.DERIVED_CELLS_VERSION)
         derived = history.record_cells(published)
-        self.assertEqual(derived, history.aggregate_cells(published["takes"]))
+        self.assertEqual(derived, history.aggregate_cells(published["takes"], history.cell_aggregate_version(published)))
         self.assertEqual(len(derived), 11)
         self.assertEqual(set(published["takes"][0]["metrics"]), metric_keys)
         self.assertEqual(set(derived[0]["statistics"]), metric_keys)
@@ -584,7 +584,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
 
         legacy = copy.deepcopy(published)
         legacy["comparison"].pop("derivedCells")
-        legacy["cells"] = history.aggregate_cells(legacy["takes"])
+        legacy["cells"] = history.aggregate_cells(legacy["takes"], history.cell_aggregate_version(legacy))
         self.assertEqual(history.record_cells(legacy), history.record_cells(published))
         # A derived-cells record compares against a legacy baseline cell by cell.
         self.assertEqual(
@@ -593,7 +593,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
         )
         for name, mutate in (
             ("stored-and-declared", lambda value: value.__setitem__(
-                "cells", history.aggregate_cells(value["takes"]))),
+                "cells", history.aggregate_cells(value["takes"], history.cell_aggregate_version(value)))),
             ("unknown-declaration", lambda value: value["comparison"].__setitem__(
                 "derivedCells", "aggregate-v2")),
             ("legacy-without-cells", lambda value: value["comparison"].pop("derivedCells")),

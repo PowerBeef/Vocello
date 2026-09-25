@@ -575,6 +575,166 @@ class PublisherTests(unittest.TestCase):
         self.assertNotIn("prewarmMS", metrics)
         self.assertNotIn("excludedStartupMS", publisher.row_metrics(engine_row("no-marks")))
 
+    def gate_results(self, diagnostics: Path, *, seed: int | None) -> Path:
+        results = diagnostics / "bench-results.json"
+        results.write_text(json.dumps({
+            "schemaVersion": 1, "runID": "run-one", "label": "fixture",
+            "startedAt": "2026-07-12T12:00:00Z", "finishedAt": "2026-07-12T12:01:00Z",
+            "telemetryMode": "verbose", "seed": seed, "streaming": True,
+            "executableSHA256": "a" * 64, "fixtureDigests": {},
+            "takes": [{
+                "takeIndex": 1, "generationID": "selected", "cell": "custom/speed/medium/warm#0",
+                "mode": "custom", "modelID": "pro_custom_speed", "variant": "speed",
+                "length": "medium", "warmState": "warm", "wallSeconds": 1.0,
+                "audioSeconds": 2.0, "firstChunkMS": 100, "outputFileName": "take.wav",
+            }],
+        }))
+        return results
+
+    def publish_gate_fixture(self, row: dict, *, seed: int | None, snapshot: Path) -> dict:
+        diagnostics = self.root / "diagnostics"
+        output_dir = self.root / "outputs"
+        diagnostics.mkdir(exist_ok=True)
+        self.make_wave(output_dir / "take.wav")
+        args = SimpleNamespace(
+            results=self.gate_results(diagnostics, seed=seed), run_id="run-one",
+            diagnostics=diagnostics, output_dir=output_dir, platform="macos",
+            artifact_dir=diagnostics, snapshot=snapshot, label="fixture",
+        )
+        captured, write_patch = self.capture_manifest()
+        with (
+            mock.patch.object(publisher, "load_engine_rows", return_value=[row]),
+            mock.patch.object(
+                publisher, "qualify_memory_rows",
+                return_value=([SimpleNamespace(
+                    generation_id="selected", metrics={}, sidecar_digest="f" * 64,
+                    status="qualified", warnings=(),
+                )], {
+                    "memoryContractVersion": 1, "memoryQualified": True,
+                    "sampleSidecarCount": 1, "sampleSidecarsDigest": "e" * 64,
+                    "digestPayload": [{"generationID": "selected", "digest": "f" * 64}],
+                }),
+            ),
+            mock.patch.object(publisher, "source_from_snapshot", return_value=source_fixture()),
+            mock.patch.object(publisher, "crash_delta_from_snapshot", return_value={"passed": True, "count": 0}),
+            self.hardware_patch(),
+            write_patch,
+        ):
+            publisher.engine_command(args)
+        return captured["manifest"]["historyRecord"]
+
+    def test_engine_publishes_the_seed_per_take_load_and_run_time_host_identity(self) -> None:
+        row = engine_row("selected")
+        row["notes"]["samplingSeed"] = "19790615"
+        row["summary"]["runEnvironment"] = {
+            "loadAverage1Minute": 3.25, "lowPowerModeEnabled": False, "thermalState": "nominal",
+            "uptimeSeconds": 100.0,
+        }
+        snapshot = self.root / "benchmark-source.json"
+        snapshot.write_text(json.dumps({
+            "schemaVersion": 1, "source": source_fixture(),
+            "crashEvidence": {"scope": "macos", "digests": []},
+            "host": {
+                "osVersion": "27.0", "osBuild": "26A100", "xcodeVersion": "27.0",
+                "xcodeBuild": "27A266a", "swiftVersion": "Apple Swift version 6.4",
+            },
+        }))
+        record = self.publish_gate_fixture(row, seed=19790615, snapshot=snapshot)
+        take = record["takes"][0]
+        self.assertEqual(take["seed"], 19790615)
+        self.assertEqual(take["metrics"]["loadAverage1M"], 3.25)
+        self.assertEqual(take["metrics"]["lowPowerMode"], 0.0)
+        self.assertEqual((record["hardware"]["osVersion"], record["hardware"]["osBuild"]), ("27.0", "26A100"))
+        self.assertEqual(record["toolchain"]["xcodeBuild"], "27A266a")
+        self.assertEqual(record["toolchain"]["optimization"], "-O")
+
+        # A take whose engine receipt names another seed cannot be published as seeded.
+        row["notes"]["samplingSeed"] = "42"
+        with self.assertRaisesRegex(publisher.PublicationError, "seed"):
+            self.publish_gate_fixture(row, seed=19790615, snapshot=snapshot)
+
+    def test_engine_without_a_seed_or_host_snapshot_publishes_as_before(self) -> None:
+        record = self.publish_gate_fixture(
+            engine_row("selected"), seed=None, snapshot=self.root / "missing-source.json",
+        )
+        self.assertNotIn("seed", record["takes"][0])
+        self.assertEqual(record["toolchain"], {"optimization": "-O"})
+        self.assertNotIn("osBuild", record["hardware"])
+
+    def test_gate_matrix_hash_reproduces_the_committed_unseeded_gate_record(self) -> None:
+        cells = publisher.bench_matrix_cells(["custom"], ["speed"], ["medium"], 3)
+        self.assertEqual(cells, [
+            "custom/speed/medium/cold#0", "custom/speed/medium/warm#0",
+            "custom/speed/medium/warm#1", "custom/speed/medium/warm#2",
+        ])
+        # inputs.matrixHash of mac-gate-bench-20260912-234613-c8f8a8c6, the last
+        # unseeded gate record, and of the committed gate baseline.
+        self.assertEqual(
+            publisher.engine_matrix_hash(cells, "verbose", True, None),
+            "2b93d8edbc798e8401ca1cad32c10d2968fc3d3bf596939d9e67afcad7d034a6",
+        )
+        self.assertNotEqual(
+            publisher.engine_matrix_hash(cells, "verbose", True, 19790615),
+            publisher.engine_matrix_hash(cells, "verbose", True, None),
+        )
+        self.assertEqual(
+            publisher.bench_matrix_cells(["clone"], ["speed"], ["short", "long"], 1),
+            ["clone/speed/short/warm#0", "clone/speed/long/warm#0"],
+        )
+
+    def test_expected_identity_predicts_the_gate_bench_identity(self) -> None:
+        host = {
+            "osVersion": "27.0", "osBuild": "26A100", "xcodeVersion": "27.0",
+            "xcodeBuild": "27A266a", "swiftVersion": "Apple Swift version 6.4",
+        }
+        output = self.root / "expected-identity.json"
+        args = SimpleNamespace(
+            platform="macos", modes="custom", variants="speed", lengths="medium", warm=3,
+            seed=19790615, telemetry_mode="verbose", no_stream=False, output=output,
+        )
+        with (
+            self.hardware_patch(),
+            mock.patch.object(publisher, "macos_host_identity", return_value=host),
+            mock.patch.object(publisher, "history_git_state", return_value=source_fixture()),
+        ):
+            publisher.expected_identity_command(args)
+        history = json.loads(output.read_text())["historyRecord"]
+        self.assertEqual(history["hardware"], {"profileID": "mac-mini-m6-16gb", "osVersion": "27.0", "osBuild": "26A100"})
+        self.assertEqual(history["toolchain"]["optimization"], "-O")
+        self.assertEqual(history["run"]["matrixScope"], "focused")
+        self.assertEqual(history["source"], {"commit": "a" * 40, "dirty": False})
+        cells = publisher.bench_matrix_cells(["custom"], ["speed"], ["medium"], 3)
+        self.assertEqual(
+            history["inputs"]["matrixHash"],
+            publisher.engine_matrix_hash(cells, "verbose", True, 19790615),
+        )
+
+    def test_macos_snapshot_records_the_run_time_host_identity(self) -> None:
+        responses = {
+            ("xcodebuild", "-version"): "Xcode 27.0\nBuild version 27A266a",
+            ("swiftc", "--version"): "Apple Swift version 6.4 (swiftlang-6.4)\nTarget: arm64-apple-macosx27.0",
+            ("sw_vers", "-productVersion"): "27.0",
+            ("sw_vers", "-buildVersion"): "26A100",
+        }
+        history = SimpleNamespace(
+            run_command=lambda arguments, **_kwargs: responses[tuple(arguments)],
+            HistoryError=RuntimeError,
+            git_state=source_fixture,
+        )
+        with mock.patch.object(publisher, "_load_history_module", return_value=history):
+            identity = publisher.macos_host_identity()
+            self.assertEqual(identity, {
+                "osVersion": "27.0", "osBuild": "26A100", "xcodeVersion": "27.0",
+                "xcodeBuild": "27A266a", "swiftVersion": "Apple Swift version 6.4 (swiftlang-6.4)",
+            })
+            macos = self.root / "macos" / "benchmark-source.json"
+            with mock.patch.object(publisher, "crash_digests", return_value=[]):
+                publisher.capture_snapshot(macos, "macos")
+                publisher.capture_snapshot(self.root / "none.json", "none")
+        self.assertEqual(publisher.snapshot_host_identity(macos), identity)
+        self.assertEqual(publisher.snapshot_host_identity(self.root / "none.json"), {})
+        self.assertEqual(publisher.snapshot_host_identity(self.root / "absent.json"), {})
+
     def test_engine_matrix_scope_is_canonical_only_for_the_full_speed_matrix(self) -> None:
         def take(cell: str, delivery: str | None = None) -> dict:
             return {"cell": cell, "delivery": delivery}

@@ -389,9 +389,58 @@ def crash_digests(scope: str, diagnostics: Path | None = None) -> list[str]:
     return sorted({digest_file(path) for path in candidates})
 
 
+HOST_IDENTITY_HARDWARE_KEYS = ("osVersion", "osBuild")
+HOST_IDENTITY_TOOLCHAIN_KEYS = ("xcodeVersion", "xcodeBuild", "swiftVersion")
+
+
+def macos_host_identity() -> dict[str, str]:
+    """OS and Xcode/Swift identity of the measuring Mac, captured with the run.
+
+    The probes and formatting are the registry's record-time ones
+    (`mac_runtime_hardware`, `default_toolchain`), taken before the run so the
+    evidence carries the identity of the host that measured it. A baseline built
+    from that evidence later never borrows a toolchain installed after the run,
+    and beta toolchains that share a marketing version stay apart (audit #14).
+    """
+    history = _load_history_module()
+    try:
+        xcode = history.run_command(["xcodebuild", "-version"]).splitlines()
+        swift = history.run_command(["swiftc", "--version"]).splitlines()
+        identity = {
+            "osVersion": history.run_command(["sw_vers", "-productVersion"]),
+            "osBuild": history.run_command(["sw_vers", "-buildVersion"]),
+            "xcodeVersion": xcode[0].removeprefix("Xcode ") if xcode else "",
+            "xcodeBuild": xcode[1].removeprefix("Build version ") if len(xcode) > 1 else "",
+            "swiftVersion": swift[0] if swift else "",
+        }
+    except history.HistoryError as error:
+        raise PublicationError(f"could not capture the host OS/toolchain identity: {error}") from error
+    if missing := sorted(key for key, value in identity.items() if not value):
+        raise PublicationError("host OS/toolchain identity is incomplete: " + ", ".join(missing))
+    return identity
+
+
+def snapshot_host_identity(snapshot_path: Path) -> dict[str, str]:
+    """The run-time host identity a macOS pre-run snapshot recorded, if any.
+
+    Older snapshots carry none; publication then leaves the fields to the
+    registry's record-time probes, and a governed baseline comparison refuses
+    the evidence rather than guess."""
+    if not snapshot_path.is_file():
+        return {}
+    host = load_json(snapshot_path).get("host")
+    if not isinstance(host, dict):
+        return {}
+    return {
+        key: value for key, value in host.items()
+        if key in (*HOST_IDENTITY_HARDWARE_KEYS, *HOST_IDENTITY_TOOLCHAIN_KEYS)
+        and isinstance(value, str) and value
+    }
+
+
 def capture_snapshot(output: Path, crash_scope: str, crash_diagnostics: Path | None = None) -> None:
     state = history_git_state()
-    atomic_json(output, {
+    payload: dict[str, Any] = {
         "schemaVersion": 1,
         "capturedAt": utc_now(),
         "source": state,
@@ -399,7 +448,10 @@ def capture_snapshot(output: Path, crash_scope: str, crash_diagnostics: Path | N
             "scope": crash_scope,
             "digests": crash_digests(crash_scope, crash_diagnostics),
         },
-    })
+    }
+    if crash_scope == "macos":
+        payload["host"] = macos_host_identity()
+    atomic_json(output, payload)
 
 
 def source_from_snapshot(snapshot_path: Path) -> dict[str, Any]:
@@ -1102,6 +1154,16 @@ def engine_take(
             f"generation {generation_id} has no measurable request wall time "
             "(engine row lacks realTimeFactor and a terminal stage mark)"
         )
+    # Each take's own host sample (its run environment at generation start),
+    # so a comparison judges the busiest measured take rather than only the
+    # first take's load (audit #54).
+    summary = row.get("summary") if isinstance(row.get("summary"), dict) else {}
+    environment = summary.get("runEnvironment")
+    if isinstance(environment, dict):
+        if (load := finite_number(environment.get("loadAverage1Minute"))) is not None:
+            result["metrics"]["loadAverage1M"] = load
+        if isinstance(environment.get("lowPowerModeEnabled"), bool):
+            result["metrics"]["lowPowerMode"] = 1.0 if environment["lowPowerModeEnabled"] else 0.0
     if duration is not None:
         result["durationSeconds"] = duration
     return result
@@ -1285,6 +1347,7 @@ def record_shell(
     memory_evidence: dict[str, Any] | None = None,
     ttfc_definition: str | None = None,
     runtime_policy: dict[str, Any] | None = None,
+    toolchain_identity: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     effective_label = label or run_id
     if ttfc_definition is not None and ttfc_definition not in rtf_semantics.TTFC_DEFINITIONS:
@@ -1342,7 +1405,7 @@ def record_shell(
             **({"classification": classification} if classification else {}),
             **({"runtimePolicy": runtime_policy} if runtime_policy is not None else {}),
         },
-        "toolchain": {"optimization": optimization},
+        "toolchain": {"optimization": optimization, **(toolchain_identity or {})},
         "hardware": {
             **verified_hardware,
             **runtime_hardware,
@@ -1407,6 +1470,80 @@ def write_and_record(
     return manifest_path
 
 
+def bench_matrix_cells(modes: list[str], variants: list[str], lengths: list[str], warm: int) -> list[str]:
+    """The ordered cells a plain `vocello bench` matrix runs (BenchCommand.swift).
+
+    Per mode and variant: one cold take on the medium length (the first length
+    when medium is absent) for every mode but Clone, then `warm` takes per
+    length. Delivery cells are not part of a plain matrix."""
+    cold_length = "medium" if "medium" in lengths else (lengths[0] if lengths else None)
+    cells: list[str] = []
+    for mode in modes:
+        for variant in variants:
+            if mode != "clone" and cold_length is not None:
+                cells.append(f"{mode}/{variant}/{cold_length}/cold#0")
+            for length in lengths:
+                cells.extend(f"{mode}/{variant}/{length}/warm#{repetition}" for repetition in range(warm))
+    return cells
+
+
+def engine_matrix_hash(cells: list[Any], telemetry_mode: Any, streaming: Any, seed: Any) -> str:
+    """`inputs.matrixHash` of an engine run: its ordered cells, telemetry mode,
+    streaming and sampling seed. The seed is part of the matrix, so seeding the
+    gate bench is a new baseline identity."""
+    return digest_bytes(canonical_bytes({
+        "cells": list(cells),
+        "telemetryMode": telemetry_mode,
+        "streaming": streaming,
+        "seed": seed,
+    }))
+
+
+def expected_identity_command(args: argparse.Namespace) -> Path:
+    """Partial evidence a gate preflight predicts before any build or take.
+
+    Everything the baseline identity binds that is knowable up front: the
+    verified hardware profile, the host OS and toolchain, the optimization the
+    gate builds, and the matrix hash of the exact bench it will run; plus the
+    source commit, which seeding must keep clean. Models, corpus and evidence
+    versions are only known once the takes exist."""
+    if args.platform != "macos":
+        raise PublicationError("expected-identity describes the macOS gate bench only")
+    if args.warm < 0:
+        raise PublicationError("--warm must be a non-negative whole number")
+    split = lambda value: [item for item in value.split(",") if item]  # noqa: E731
+    cells = bench_matrix_cells(split(args.modes), split(args.variants), split(args.lengths), args.warm)
+    if not cells:
+        raise PublicationError("the bench matrix is empty")
+    host = macos_host_identity()
+    source = history_git_state()
+    payload = {
+        "schemaVersion": 1,
+        "purpose": "gate-bench-preflight",
+        "historyRecord": {
+            "run": {
+                "kind": "engine-generation",
+                "platform": "macos",
+                "matrixScope": canonical_engine_matrix_scope([{"cell": cell} for cell in cells]),
+            },
+            "hardware": {
+                "profileID": verify_canonical_hardware("macos")["profileID"],
+                **{key: host[key] for key in HOST_IDENTITY_HARDWARE_KEYS},
+            },
+            "toolchain": {
+                "optimization": "-O",
+                **{key: host[key] for key in HOST_IDENTITY_TOOLCHAIN_KEYS},
+            },
+            "inputs": {
+                "matrixHash": engine_matrix_hash(cells, args.telemetry_mode, not args.no_stream, args.seed),
+            },
+            "source": {"commit": source.get("commit"), "dirty": source.get("dirty")},
+        },
+    }
+    atomic_json(args.output, payload)
+    return args.output
+
+
 def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation", trace: dict[str, Any] | None = None) -> Path:
     results = load_json(args.results)
     if results.get("schemaVersion") != 1 or results.get("runID") != args.run_id:
@@ -1445,6 +1582,18 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
         engine_take(index, result_take, row, args.output_dir, run_id=args.run_id)
         for index, (result_take, row) in enumerate(zip(result_takes, selected), start=1)
     ]
+    if seed is not None:
+        # `--seed` applies to every take; publish it on each take (the schema's
+        # take-level field) once the engine's own receipt agrees (audit #13).
+        for take, row in zip(takes, selected):
+            notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+            observed = notes.get("samplingSeed")
+            if observed is not None and str(observed) != str(seed):
+                raise PublicationError(
+                    f"generation {take['generationID']} sampled with seed {observed}, "
+                    f"not the requested {seed}"
+                )
+            take["seed"] = seed
     if selected_app:
         for take in takes:
             take["layers"] = ["engine", "app"]
@@ -1524,6 +1673,13 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
         optimization = validated_macos_cli_optimization(executed_sha256=executed)
     else:
         optimization = validated_ios_app_optimization()
+    # The OS and toolchain that measured this run, from its own pre-run snapshot,
+    # so the baseline identity never comes from tools installed later.
+    host = snapshot_host_identity(args.snapshot) if args.platform == "macos" else {}
+    runtime_hardware = {
+        **hardware_context(selected),
+        **{key: host[key] for key in HOST_IDENTITY_HARDWARE_KEYS if key in host},
+    }
     manifest = record_shell(
         kind=kind, platform=args.platform, run_id=args.run_id,
         label=str(results.get("label") or args.label or args.run_id),
@@ -1533,18 +1689,16 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
         qc_algorithm=qc_algorithm, trace=trace,
         inputs={
             "corpusHash": prompt_corpus_digest(selected),
-            "matrixHash": digest_bytes(canonical_bytes({
-                "cells": [take.get("cell") for take in result_takes],
-                "telemetryMode": telemetry_mode,
-                "streaming": streaming,
-                "seed": seed,
-            })),
+            "matrixHash": engine_matrix_hash(
+                [take.get("cell") for take in result_takes], telemetry_mode, streaming, seed,
+            ),
             "analysisProfileHash": (
                 memory_policy_digest if kind == "memory-qualification"
                 else analysis_profile_digest
             ),
         },
-        hardware=hardware_context(selected),
+        hardware=runtime_hardware,
+        toolchain_identity={key: host[key] for key in HOST_IDENTITY_TOOLCHAIN_KEYS if key in host},
         hardware_evidence=hardware_evidence,
         models=exact_models(args.platform, takes),
         crash_delta=crash_delta_from_snapshot(
@@ -3849,6 +4003,20 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     verify.add_argument("--run-id", help="iOS only: the run whose sentinel manifest to read")
 
+    expected = subparsers.add_parser(
+        "expected-identity",
+        help="write the baseline identity a macOS gate bench will have, before building or running it",
+    )
+    expected.add_argument("--platform", choices=("macos",), required=True)
+    expected.add_argument("--modes", required=True, help="comma list, as passed to vocello bench")
+    expected.add_argument("--variants", required=True, help="comma list, as passed to vocello bench")
+    expected.add_argument("--lengths", required=True, help="comma list, as passed to vocello bench")
+    expected.add_argument("--warm", type=int, required=True)
+    expected.add_argument("--seed", type=int, help="the bench's --seed, when it passes one")
+    expected.add_argument("--telemetry-mode", default="verbose")
+    expected.add_argument("--no-stream", action="store_true")
+    expected.add_argument("--output", type=Path, required=True)
+
     prosody = subparsers.add_parser("prosody", help="publish a successful calibration corpus")
     add_snapshot(prosody)
     prosody.add_argument("--results", type=Path, required=True)
@@ -3880,10 +4048,12 @@ def main(argv: list[str] | None = None) -> int:
             print(prosody_command(args))
         elif args.command == "verify-hardware":
             print(verify_hardware_command(args))
+        elif args.command == "expected-identity":
+            print(expected_identity_command(args))
         return 0
     except (PublicationError, OSError, ValueError, subprocess.SubprocessError) as error:
         print(f"benchmark publication: FAIL: {error}", file=sys.stderr)
-        if args.command not in {"snapshot", "verify-hardware"} and "repair:" not in str(error):
+        if args.command not in {"snapshot", "verify-hardware", "expected-identity"} and "repair:" not in str(error):
             print(f"repair: {shlex.join([sys.executable, str(Path(__file__).resolve()), *sys.argv[1:]])}", file=sys.stderr)
         return 1
 

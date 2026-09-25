@@ -33,11 +33,16 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import ast
 import fnmatch
+import functools
 import json
 import os
+from pathlib import Path
 import subprocess
 import sys
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 LANES = ("swift", "ios", "python", "research", "website", "workflows", "macos_ui")
 # The CI job whose success proves a lane ran; research shares the Python job and
@@ -97,23 +102,22 @@ BUILD_CONFIGS = ("config/build-output-policy.json", "config/apple-platform-capab
 # Validated on Linux by the contracts job; the macOS gate does not need them.
 ROADMAP_FILES = ("config/roadmap.json", "config/roadmap-archive.json")
 # The macOS job runs the compile, the deterministic bundles, the CLI identity
-# step, the UI-test bundle compile and the darwin-only pytest lane (test_benchmark_history); the contract
-# gate itself runs on Linux (MV-04), so only these scripts are its inputs.
-DARWIN_TEST_INPUTS = ("scripts/tests/test_benchmark_history.py", "scripts/tests/conftest.py",
-                      "scripts/benchmark_history.py", "scripts/lib/rtf.py", "scripts/lib/jsonio.py")
+# step and the UI-test bundle compile, nothing else: the contract gate (MV-04)
+# and every Python test, benchmark evidence and its validator included, run on
+# Linux. So only these drivers, and the scripts/ modules their Python imports
+# (followed by `python_import_closure`), are its inputs. The build-output
+# policy is loaded by every native build through scripts/lib/build_paths.sh,
+# which is how a shared library such as scripts/lib/jsonio.py reaches it.
 MACOS_LANE_SCRIPTS = ("scripts/macos_test.sh", "scripts/build.sh", "scripts/regenerate_project.sh",
                       "scripts/generate_cli_scheme.py", "scripts/generate_ios_logic_scheme.py",
                       "scripts/build_output_policy.py", "scripts/cli_version_contract.py",
                       "scripts/ci/restore_mtimes.py", "scripts/lib/xctest_summary.py",
-                      "scripts/lib/build_provenance.py", "scripts/lib/storage_preflight.py",
-                      "scripts/build_ui_test_bundles.sh")
+                      "scripts/lib/storage_preflight.py", "scripts/build_ui_test_bundles.sh")
 # Inputs of the iOS generic compile (and its UI-test bundle) besides the sources themselves.
 IOS_BUILD_SCRIPTS = ("scripts/build_foundation_targets.sh", "scripts/regenerate_project.sh",
                      "scripts/generate_cli_scheme.py", "scripts/generate_ios_logic_scheme.py",
                      "scripts/lib/ios_platform_preflight.py", "scripts/lib/storage_preflight.py",
                      "scripts/build_output_policy.py", "scripts/build_ui_test_bundles.sh")
-BENCHMARK_EVIDENCE_PREFIXES = ("benchmarks/runs/", "benchmarks/baselines/")
-BENCHMARK_EVIDENCE_FILES = ("benchmarks/HISTORY.md", "benchmarks/hardware-profiles.json")
 RESEARCH_PREFIXES = (
     "delivery_", "prosody_", "analyze_", "audio_", "ios_control_audit", "ios_startup_reliability",
     "check_language", "clone_", "emotion_", "mos_", "bench_", "run_local_delivery", "qualify_delivery",
@@ -132,13 +136,53 @@ def _is_workflow_input(path: str) -> bool:
     return path in WORKFLOW_INPUTS or path.startswith(WORKFLOW_PREFIXES)
 
 
-def _is_benchmark_evidence(path: str) -> bool:
-    return (path.startswith(BENCHMARK_EVIDENCE_PREFIXES) or path in BENCHMARK_EVIDENCE_FILES
-            or (path.startswith("benchmarks/schema-") and path.endswith(".json")))
+def _imported_script_modules(path: Path) -> set[Path]:
+    """The scripts/ and scripts/lib/ files one Python file imports.
+
+    Scripts reach their helpers as `from lib import jsonio`, `lib.jsonio` or,
+    after putting scripts/lib on sys.path, a bare `import jsonio`; imports
+    inside `try` blocks and functions count too."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, UnicodeDecodeError):
+        return set()
+    scripts = REPO_ROOT / "scripts"
+    names: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            if node.module == "lib":
+                names.extend(f"lib.{alias.name}" for alias in node.names)
+            else:
+                names.append(node.module)
+    found: set[Path] = set()
+    for name in names:
+        parts = name.split(".")
+        if parts[0] == "lib" and len(parts) > 1:
+            candidates = [scripts / "lib" / f"{parts[1]}.py"]
+        else:
+            candidates = [scripts / f"{parts[0]}.py", scripts / "lib" / f"{parts[0]}.py"]
+        found.update(candidate for candidate in candidates if candidate.is_file())
+    return found
+
+
+@functools.lru_cache(maxsize=None)
+def python_import_closure(entry_points: tuple[str, ...]) -> frozenset[str]:
+    """Repository-relative Python files the entry points load, themselves included."""
+    pending = [REPO_ROOT / entry for entry in entry_points if entry.endswith(".py")]
+    seen: set[Path] = set()
+    while pending:
+        current = pending.pop()
+        if current in seen or not current.is_file():
+            continue
+        seen.add(current)
+        pending.extend(_imported_script_modules(current) - seen)
+    return frozenset(path.relative_to(REPO_ROOT).as_posix() for path in seen)
 
 
 def _is_swift(path: str) -> bool:
-    """Inputs of the macOS job: the compile, its own driver scripts and the darwin-only pytest lane."""
+    """Inputs of the macOS job: the compile and its own driver scripts with their imports."""
     if path.startswith(MACOS_UI_TEST_SOURCES + IOS_UI_TEST_SOURCES):
         return False
     if path.startswith(("Sources/", "Tests/", "QwenVoice.xcodeproj/", "config/xcode-schemes/")):
@@ -150,18 +194,16 @@ def _is_swift(path: str) -> bool:
     # A Swift test pins the shipping iPhone memory bands to this contract (V-4).
     if path in (*BUILD_CONFIGS, "config/test-quarantine.json", "config/ios-memory-budget-policy.json"):
         return True
-    if path.startswith("scripts/tests/"):
-        return path in DARWIN_TEST_INPUTS or path.startswith("scripts/tests/fixtures/")
-    if path in DARWIN_TEST_INPUTS or path in MACOS_LANE_SCRIPTS:
+    if path in MACOS_LANE_SCRIPTS or path in python_import_closure(MACOS_LANE_SCRIPTS):
         return True
-    if path.startswith("scripts/lib/") and path.endswith(".sh"):
-        return True
-    return _is_benchmark_evidence(path)
+    return path.startswith("scripts/lib/") and path.endswith(".sh")
 
 
 def _is_ios(path: str) -> bool:
     """Inputs of the generic device-SDK compile."""
     if path in ("project.yml", *IOS_BUILD_SCRIPTS, *BUILD_CONFIGS) or path.endswith("Package.resolved"):
+        return True
+    if path in python_import_closure(IOS_BUILD_SCRIPTS):
         return True
     if path.startswith("QwenVoice.xcodeproj/") or (path.startswith("scripts/lib/") and path.endswith(".sh")):
         return True

@@ -1,11 +1,11 @@
 """Lane markers for the Python suite.
 
 Modules are marked by name, never moved: `research` covers the audio, delivery,
-prosody and device-analysis tooling that only changes when that research does;
-`darwin_only` covers modules that need the macOS host (they skip elsewhere).
-Push CI runs `-m "not research and not darwin_only"` on Linux, adds `-m research`
-when a research path changed, and runs `-m darwin_only` inside the macOS gate.
-Nightly runs everything.
+prosody and device-analysis tooling that only changes when that research does.
+Every module runs on Linux: host probes (the benchmark publisher's `swift -e`
+and `devicectl`) are mocked in the tests, so no module needs the macOS host.
+Push CI runs `-m "not research"` on Linux and adds `-m research` when a research
+path changed. Nightly runs everything.
 """
 from __future__ import annotations
 
@@ -22,7 +22,6 @@ if str(SCRIPTS) not in sys.path:  # modules loaded by path import `lib.*`
     sys.path.insert(0, str(SCRIPTS))
 
 ROOT = Path(__file__).resolve().parents[2]
-DARWIN_ONLY_MODULES = {"test_benchmark_history"}
 QUARANTINE = ROOT / "config/test-quarantine.json"
 
 
@@ -36,7 +35,6 @@ def _research_prefixes() -> tuple[str, ...]:
 
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "research: audio, delivery, prosody and device-analysis tooling")
-    config.addinivalue_line("markers", "darwin_only: needs the macOS host; skipped elsewhere")
 
 
 def _quarantined() -> set[str]:
@@ -56,5 +54,3 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         subject = module_name.removeprefix("test_")
         if any(subject.startswith(prefix) for prefix in prefixes):
             item.add_marker(pytest.mark.research)
-        if module_name in DARWIN_ONLY_MODULES:
-            item.add_marker(pytest.mark.darwin_only)

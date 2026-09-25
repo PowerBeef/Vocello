@@ -70,8 +70,7 @@ model catalog and host availability, iOS storage protection, supply chain, relea
 history, README charts, the text-level delivery and prosody contracts, the roadmap, the exact
 product-invariant greps in `scripts/repo_invariants.sh`, the privacy scan, and the Python suite.
 
-`--python all|darwin-only|selected|none` picks the Python lane: `all` (the default) runs the whole
-suite; `darwin-only` runs only the modules that need the macOS host (CI runs the rest on Linux);
+`--python all|selected|none` picks the Python lane: `all` (the default) runs the whole suite;
 `selected` runs the modules the dirty tree affects; `none` runs the contracts without the suite.
 `--local` is `selected` plus a refusal to run when `CI` or `GITHUB_ACTIONS` is set. This is also how
 `scripts/dev.sh check` gets its Python tests: it never calls pytest itself but runs
@@ -97,7 +96,8 @@ fails once an entry is 30 days old.
 pytest with `pytest-xdist` (`-n auto`), both pinned in `config/toolchain.json`. The whole suite runs
 in about 65 to 90 seconds on the development Mac (Mac mini M6). `scripts/tests/conftest.py` marks
 modules by name: `research` (audio, delivery, prosody and device-analysis tooling) runs when those
-paths change and nightly; `darwin_only` runs inside the macOS gate. Every run prints its slowest
+paths change and nightly. No module needs the macOS host: the benchmark publisher's host probes
+(`swift -e`, `devicectl`) are mocked in its tests, so every module runs on Linux. Every run prints its slowest
 tests; a test that outgrows its lane moves, it does not slow every push. `pytest.ini` already passes
 `-q`; adding another `-q` drops the summary line, so judge a run by pytest's exit code.
 
@@ -108,7 +108,7 @@ tests; a test that outgrows its lane moves, it does not slow every push. `pytest
 | `changes` | ubuntu | always | seconds |
 | `contracts` | ubuntu | always | about 1 min: the action-pin check (`supply_chain_contract.py`) first, then the complete deterministic contract gate (`check_project_inputs.sh --python none`: product contracts, invariants, privacy scan, work authority, benchmark history) |
 | `python` | ubuntu | Python paths, contracts, workflow files | 3 to 4 min: product and tooling tests; research tests when routed |
-| `macos-tests` | macos-26 | never on a pull request; Swift compile inputs, the lane's own scripts, build configs and benchmark evidence; also macOS XCUITest sources (`macos_ui`), which run only the bundle compile | cached DerivedData; darwin-only Python modules, macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s), then `build_ui_test_bundles.sh macos --gate` compiles the macOS XCUITest bundle in the same arena (build only) |
+| `macos-tests` | macos-26 | never on a pull request; Swift compile inputs, build configs, the lane's own scripts and the `scripts/` modules their Python imports; also macOS XCUITest sources (`macos_ui`), which run only the bundle compile | cached DerivedData; macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s), then `build_ui_test_bundles.sh macos --gate` compiles the macOS XCUITest bundle in the same arena (build only) |
 | `macos-tsan` | macos-26 | never on a pull request; the `swift` lane only (never `macos_ui`) | cached `macos-tsan` DerivedData; `scripts/macos_test.sh tsan`, the deterministic core bundles under ThreadSanitizer, blocking since 2026-09-14 (`config/tsan-policy.json`); 5 to 11 min on a second runner |
 | `ios-compile` | macos-26 | never on a pull request; iOS compile inputs | cached DerivedData; `build_foundation_targets.sh ios --incremental` at `-Onone` (`QVOICE_FOUNDATION_SWIFT_OPTIMIZATION`), then `build_ui_test_bundles.sh ios --gate` compiles the iOS XCUITest bundle unsigned in the same arena (build only) |
 | `website` | ubuntu | `website/` | about 1 min |
@@ -135,8 +135,7 @@ CLI version identity, `build_foundation_targets.sh ios --incremental`, `build_ui
 --gate`, the website supply-chain
 check and `npm --prefix website run check`. It is a superset rather than a byte-identical replay: it
 skips no lane by routing, and it runs the whole Python suite inside the gate in one process where CI
-splits it into `-m "not research and not darwin_only"` plus an optional `-m research` on Linux and
-`-m darwin_only` in the macOS job.
+splits it into `-m "not research"` plus an optional `-m research` on Linux.
 
 Only push CI's own inputs (`.github/workflows/ci.yml`, `.github/actions/**`,
 `scripts/ci/classify_changes.py`) force the three native lanes; the other workflow files route to

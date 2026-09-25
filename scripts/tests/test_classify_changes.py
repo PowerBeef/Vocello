@@ -229,7 +229,7 @@ class ClassificationTests(unittest.TestCase):
             "Sources/iOS/TTSEngineStore.swift": {"swift", "ios"},
             "Sources/Views/ContentView.swift": {"swift"},
             "scripts/lib/build_cache.sh": {"swift", "ios", "python"},
-            "scripts/lib/jsonio.py": {"swift", "python"},
+            "scripts/lib/jsonio.py": {"swift", "ios", "python"},
             "scripts/macos_test.sh": {"swift", "python"},
             "scripts/build_ui_test_bundles.sh": {"swift", "ios", "python"},
             "scripts/ui_test.sh": {"python"},
@@ -237,10 +237,10 @@ class ClassificationTests(unittest.TestCase):
             "config/test-quarantine.json": {"swift", "python"},
             "config/ios-memory-budget-policy.json": {"swift", "python"},
             "config/orchestration-contract.json": {"python"},
-            "scripts/tests/test_benchmark_history.py": {"swift", "python"},
-            "scripts/tests/conftest.py": {"swift", "python"},
-            "benchmarks/runs/ui-generation/x.json": {"swift", "python"},
-            "benchmarks/schema-v3.json": {"swift", "python"},
+            "scripts/tests/test_benchmark_history.py": {"python"},
+            "scripts/tests/conftest.py": {"python"},
+            "benchmarks/runs/ui-generation/x.json": {"python"},
+            "benchmarks/schema-v3.json": {"python"},
             "README.md": set(),
             "website/PRODUCT.md": {"website"},
             "config/toolchain.json": {"swift", "ios", "python"},
@@ -252,6 +252,29 @@ class ClassificationTests(unittest.TestCase):
         }
         for path, lanes in expected.items():
             self.assertEqual(self.lanes(path), lanes, path)
+
+    def test_evidence_fixtures_and_publication_code_skip_the_native_lanes(self) -> None:
+        # Audit #91: the macOS job runs no Python test and reads no benchmark
+        # evidence; the Linux contracts job validates every record on every push
+        # and the Python lane runs the registry tests.
+        for path in ("benchmarks/runs/engine-generation/x.json", "benchmarks/baselines/mac-gate-bench.json",
+                     "benchmarks/hardware-profiles.json", "benchmarks/schema-v2.json",
+                     "scripts/tests/fixtures/telemetry_variants.jsonl", "scripts/benchmark_history.py",
+                     "scripts/publish_benchmark_history.py", "scripts/lib/build_provenance.py",
+                     "scripts/lib/rtf.py"):
+            self.assertEqual(self.lanes(path) & {"swift", "ios", "macos_ui"}, set(), path)
+            self.assertIn("python", self.lanes(path), path)
+
+    def test_native_lanes_follow_the_imports_of_their_python_drivers(self) -> None:
+        # Every native build loads the build-output policy through
+        # scripts/lib/build_paths.sh; its library imports route with it.
+        for path in ("scripts/lib/build_artifact_retention.py", "scripts/lib/profile_trace_retention.py",
+                     "scripts/lib/jsonio.py"):
+            self.assertTrue({"swift", "ios"} <= self.lanes(path), path)
+        closure = MODULE.python_import_closure(MODULE.MACOS_LANE_SCRIPTS)
+        self.assertIn("scripts/build_output_policy.py", closure)
+        self.assertIn("scripts/lib/jsonio.py", closure)
+        self.assertNotIn("scripts/benchmark_history.py", closure)
 
     def test_xcuitest_only_sources_skip_the_swift_lane(self) -> None:
         # PA-06: no deterministic bundle or TSan subset compiles the XCUITest

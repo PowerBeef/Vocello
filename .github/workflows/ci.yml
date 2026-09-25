@@ -139,13 +139,12 @@ jobs:
       # The complete deterministic contract gate runs here on every push (MV-04):
       # product contracts, invariants, privacy scan, work authority and benchmark
       # history. None of it needs a Mac, so config/ and scripts/ changes no longer
-      # route to the macOS lane; only the darwin-only pytest modules stay there.
+      # route to the macOS lane.
       - name: Contract gate
         run: ./scripts/check_project_inputs.sh --python none
 
-  # The Python suite on Linux. Modules that need the macOS host (benchmark
-  # record publication binds Mac hardware) carry explicit skips and still run
-  # inside the macOS gate.
+  # The Python suite on Linux, every module included: the benchmark publisher's
+  # host probes are mocked in its tests, so nothing here needs the macOS host.
   python:
     name: Python tests (linux)
     needs: changes
@@ -170,7 +169,7 @@ jobs:
       - name: Product and tooling tests
         env:
           VOCELLO_QUARANTINE: "1"
-        run: python3 -m pytest -n auto -m "not research and not darwin_only"
+        run: python3 -m pytest -n auto -m "not research"
 
       - name: Research tooling tests
         if: needs.changes.outputs.research == 'true' || needs.changes.outputs.workflows == 'true'
@@ -238,12 +237,6 @@ jobs:
 
       - name: Regenerate Xcode project
         run: ./scripts/regenerate_project.sh --fast
-
-      - name: Darwin-only Python modules
-        if: needs.changes.outputs.swift == 'true'
-        env:
-          VOCELLO_QUARANTINE: "1"
-        run: python3 -m pytest -n auto -m darwin_only
 
       - name: Run deterministic macOS tests
         if: needs.changes.outputs.swift == 'true'

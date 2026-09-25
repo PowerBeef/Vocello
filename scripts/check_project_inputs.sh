@@ -4,8 +4,7 @@
 #
 #   ./scripts/check_project_inputs.sh                       complete gate (release, scripts/dev.sh ci)
 #   ./scripts/check_project_inputs.sh --local               same contracts; Python tests selected by the dirty tree
-#   ./scripts/check_project_inputs.sh --python darwin-only  same contracts; only the macOS-bound Python modules
-#                                                            (CI runs the rest on Linux)
+#   ./scripts/check_project_inputs.sh --python none         same contracts; no Python suite (CI runs it in its own job)
 #
 # Every check here is deterministic and needs no model, phone or UI. Anything
 # that asserts the wording of another script or workflow does not belong here.
@@ -22,7 +21,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --local) LOCAL_MODE=1; PYTHON_LANE=selected ;;
         --python) PYTHON_LANE="${2:-}"; shift ;;
-        *) echo "usage: ./scripts/check_project_inputs.sh [--local] [--python all|darwin-only|selected|none]" >&2; exit 2 ;;
+        *) echo "usage: ./scripts/check_project_inputs.sh [--local] [--python all|selected|none]" >&2; exit 2 ;;
     esac
     shift
 done
@@ -88,10 +87,9 @@ python3 "$SCRIPT_DIR/roadmap.py" render --check
 python3 "$SCRIPT_DIR/privacy_scan.py"
 
 # Python suite (pytest, parallel). selected: the modules the dirty tree affects;
-# darwin-only: the macOS-bound modules (push CI runs the rest on Linux); all: everything.
+# all: everything.
 case "$PYTHON_LANE" in
     selected) python3 "$SCRIPT_DIR/development_workflow.py" py ;;
-    darwin-only) python3 -m pytest -n auto -m darwin_only ;;
     none) echo "==> Python suite skipped by request" >&2 ;;
     all)
         if [[ "${QVOICE_GATES:-}" == "quick" && -z "${CI:-}${GITHUB_ACTIONS:-}" ]] \

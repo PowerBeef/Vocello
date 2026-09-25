@@ -27,7 +27,7 @@ usage: scripts/dev.sh <command>
                            (--since: also everything committed since REF, e.g. origin/main)
   lint                     git diff --check, privacy scan, shellcheck on changed shell
   contracts                product and repository contracts
-  py [--all | --lane product|research|darwin | tests...]
+  py [--all | --lane product|research | tests...]
                            Python tests via pytest (changed consumers by default)
   test [--only A,B | --all]  macOS XCTest bundles
   ios                      generic device-SDK compile (incremental)

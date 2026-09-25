@@ -343,7 +343,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("contracts", help="product and repository contracts (check_project_inputs.sh --local)")
     py = sub.add_parser("py", help="Python tests: changed consumers (default), --all, --lane, or explicit modules")
     py.add_argument("--all", action="store_true")
-    py.add_argument("--lane", choices=("product", "research", "darwin"), help="product = not research and not darwin_only")
+    py.add_argument("--lane", choices=("product", "research"), help="product = not research")
     py.add_argument("tests", nargs="*")
     test = sub.add_parser("test", help="macOS XCTest bundles: changed classes, --only, or --all")
     test.add_argument("--only", help="comma-separated XCTestCase classes")
@@ -384,7 +384,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.all:
                 run_commands(python_test_commands({"mode": "full", "tests": []}))
             elif args.lane:
-                marker = {"product": "not research and not darwin_only", "research": "research", "darwin": "darwin_only"}[args.lane]
+                marker = {"product": "not research", "research": "research"}[args.lane]
                 run_commands([[*PYTEST, "-m", marker]])
             elif args.tests:
                 run_commands([[*PYTEST, *args.tests]])

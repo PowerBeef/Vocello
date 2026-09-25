@@ -385,7 +385,6 @@ class HostProbeParsingTests(unittest.TestCase):
                 self.assertEqual(history.ios_runtime_hardware(profile), expected)
 
 
-@unittest.skipUnless(sys.platform == "darwin", "publishing a record binds the macOS host hardware (mac_runtime_hardware)")
 class BenchmarkHistoryTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()

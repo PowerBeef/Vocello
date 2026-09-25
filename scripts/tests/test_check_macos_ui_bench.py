@@ -524,6 +524,22 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         self.assertEqual((stall["gatedTakeCount"], stall["maximum"], stall["takesAboveLimit"]), (5, 90, 0))
         self.assertNotIn("stallGate", self.last_manifest["historyRecord"]["run"])
 
+    def test_censored_heartbeats_are_gated_and_counted(self) -> None:
+        """audit #18: a heartbeat still queued at the end of a take is a lower bound."""
+        def censored(layers: dict[str, list[dict]]) -> None:
+            for row in layers["engine"]:
+                row["notes"]["deviceClass"] = "mid_16gb_mac"
+            frontend = layers["app"][2]["frontendMetrics"]
+            frontend.update({
+                "maximumDelayedHeartbeatMS": 180, "delayedHeartbeatCount50": 2,
+                "censoredHeartbeatCount": 2, "heartbeatDelayDefinition": "completedAndCensoredPending",
+            })
+
+        result = self.run_checker(self.expected_order, mutate_layers=censored, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.last_manifest["stallGate"]["censoredHeartbeatCount"], 2)
+        self.assertEqual(self.last_manifest["stallGate"]["maximum"], 180)
+
     def test_rows_not_yet_present_exit_apart_from_deterministic_failures(self) -> None:
         """audit #6/#21: the lane retries only the "rows not yet present" outcome."""
         def drop_last_app_row(layers: dict[str, list[dict]]) -> None:

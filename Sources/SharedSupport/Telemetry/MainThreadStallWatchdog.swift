@@ -10,6 +10,13 @@ import Foundation
 /// serviced right now. Delayed heartbeats are bucketed at >50 ms (noticeable) and
 /// >250 ms (a visible hang per Apple's hang-detection threshold).
 ///
+/// A heartbeat still queued when the session ends is folded in as a censored
+/// observation: its delay is at least the time since it was sent, so that
+/// lower bound counts toward the thresholds and the maximum (audit #18; the
+/// frontend metrics name this `completedAndCensoredPending`). Before this,
+/// those heartbeats were dropped, which biased the maxima low exactly at the
+/// generation boundary, where the completion path runs on the main thread.
+///
 /// Lifecycle: `begin()`/`end()` are refcounted so overlapping generations
 /// (e.g. batch + single) share one timer. Callers only invoke it when
 /// `TelemetryGate` is on (same convention as `AppGenerationTimeline`), so
@@ -22,6 +29,8 @@ final class MainThreadStallWatchdog: @unchecked Sendable {
         let maximumDelayedHeartbeatMS: Int
         let scheduledHeartbeatCount: Int
         let completedHeartbeatCount: Int
+        /// Heartbeats still queued at `end()`, counted by their lower bound.
+        let censoredHeartbeatCount: Int
 
         var asCounters: [String: Int] {
             let coveragePPM = scheduledHeartbeatCount > 0
@@ -34,6 +43,8 @@ final class MainThreadStallWatchdog: @unchecked Sendable {
                 "heartbeatScheduledCount": scheduledHeartbeatCount,
                 "heartbeatCompletedCount": completedHeartbeatCount,
                 "heartbeatCoveragePPM": coveragePPM,
+                // Its presence marks the censored delay definition.
+                "censoredHeartbeatCount": censoredHeartbeatCount,
                 // Compatibility keys for v1-v6 readers. These describe sampled
                 // heartbeat delay, not an exhaustive count of main-thread stalls.
                 "uiStallCount50": delayedHeartbeatCount50,
@@ -57,6 +68,9 @@ final class MainThreadStallWatchdog: @unchecked Sendable {
     private var maximumDelayedHeartbeatMS = 0
     private var scheduledHeartbeatCount = 0
     private var completedHeartbeatCount = 0
+    /// Send instants of this session's heartbeats that have not run yet.
+    private var pendingSentAt: [UInt64: ContinuousClock.Instant] = [:]
+    private var nextHeartbeatID: UInt64 = 0
 
     init() {}
 
@@ -74,6 +88,7 @@ final class MainThreadStallWatchdog: @unchecked Sendable {
         maximumDelayedHeartbeatMS = 0
         scheduledHeartbeatCount = 0
         completedHeartbeatCount = 0
+        pendingSentAt.removeAll(keepingCapacity: true)
 
         let source = DispatchSource.makeTimerSource(queue: queue)
         source.schedule(deadline: .now() + .milliseconds(100), repeating: .milliseconds(100))
@@ -103,12 +118,22 @@ final class MainThreadStallWatchdog: @unchecked Sendable {
         timer?.cancel()
         timer = nil
         sessionToken &+= 1
+        // Heartbeats still queued behind the main thread are late by at least
+        // their age. The token bump drops their completions, so this lower
+        // bound is the only observation of them.
+        let now = ContinuousClock.now
+        let censoredHeartbeatCount = pendingSentAt.count
+        for sentAt in pendingSentAt.values {
+            recordDelayLocked(Self.milliseconds(from: sentAt, to: now))
+        }
+        pendingSentAt.removeAll(keepingCapacity: true)
         return Report(
             delayedHeartbeatCount50: delayedHeartbeatCount50,
             delayedHeartbeatCount250: delayedHeartbeatCount250,
             maximumDelayedHeartbeatMS: maximumDelayedHeartbeatMS,
             scheduledHeartbeatCount: scheduledHeartbeatCount,
-            completedHeartbeatCount: completedHeartbeatCount
+            completedHeartbeatCount: completedHeartbeatCount,
+            censoredHeartbeatCount: censoredHeartbeatCount
         )
     }
 
@@ -131,22 +156,38 @@ final class MainThreadStallWatchdog: @unchecked Sendable {
             return nil
         }
         scheduledHeartbeatCount += 1
+        nextHeartbeatID &+= 1
+        let heartbeatID = nextHeartbeatID
+        pendingSentAt[heartbeatID] = sentAt
         lock.unlock()
         return { [weak self] in
             guard let self else { return }
-            let latency = sentAt.duration(to: ContinuousClock.now)
-            let ms = Int(Double(latency.components.seconds) * 1_000
-                + Double(latency.components.attoseconds) / 1_000_000_000_000_000)
+            let ms = MainThreadStallWatchdog.milliseconds(from: sentAt, to: ContinuousClock.now)
             self.lock.lock()
             guard self.sessionToken == token, self.activeSessions > 0 else {
                 self.lock.unlock()
                 return
             }
+            self.pendingSentAt.removeValue(forKey: heartbeatID)
             self.completedHeartbeatCount += 1
-            if ms > 50 { self.delayedHeartbeatCount50 += 1 }
-            if ms > 250 { self.delayedHeartbeatCount250 += 1 }
-            if ms > self.maximumDelayedHeartbeatMS { self.maximumDelayedHeartbeatMS = ms }
+            self.recordDelayLocked(ms)
             self.lock.unlock()
         }
+    }
+
+    /// Callers hold `lock`.
+    private func recordDelayLocked(_ ms: Int) {
+        if ms > 50 { delayedHeartbeatCount50 += 1 }
+        if ms > 250 { delayedHeartbeatCount250 += 1 }
+        if ms > maximumDelayedHeartbeatMS { maximumDelayedHeartbeatMS = ms }
+    }
+
+    private static func milliseconds(
+        from start: ContinuousClock.Instant,
+        to end: ContinuousClock.Instant
+    ) -> Int {
+        let latency = start.duration(to: end)
+        return Int(Double(latency.components.seconds) * 1_000
+            + Double(latency.components.attoseconds) / 1_000_000_000_000_000)
     }
 }

@@ -94,6 +94,11 @@ public enum FrontendPlaybackStartSource: String, Codable, Sendable, Hashable {
 }
 
 public struct FrontendGenerationMetrics: Hashable, Codable, Sendable {
+    /// `heartbeatDelayDefinition` of rows whose delay statistics also count the
+    /// lower bound of heartbeats still queued when the session ended (audit #18).
+    /// Rows without the field counted completed heartbeats only.
+    public static let censoredHeartbeatDelayDefinition = "completedAndCensoredPending"
+
     public let submitToFirstChunkMS: Int?
     /// Submission to the point where playback was scheduled. This does not claim
     /// that acoustic output was independently observed.
@@ -107,6 +112,11 @@ public struct FrontendGenerationMetrics: Hashable, Codable, Sendable {
     public let scheduledHeartbeatCount: Int
     public let completedHeartbeatCount: Int
     public let heartbeatCoveragePPM: Int
+    /// Heartbeats still pending at session end, folded into the delay
+    /// statistics as censored lower bounds; nil on rows before audit #18.
+    public let censoredHeartbeatCount: Int?
+    /// What the delay statistics cover; nil means completed heartbeats only.
+    public let heartbeatDelayDefinition: String?
     public let playbackChunksReceived: Int
     public let playbackContinuityFailures: Int
     public let playbackUnderruns: Int
@@ -143,6 +153,8 @@ public struct FrontendGenerationMetrics: Hashable, Codable, Sendable {
         scheduledHeartbeatCount: Int = 0,
         completedHeartbeatCount: Int = 0,
         heartbeatCoveragePPM: Int = 0,
+        censoredHeartbeatCount: Int? = nil,
+        heartbeatDelayDefinition: String? = nil,
         playbackChunksReceived: Int = 0,
         playbackContinuityFailures: Int = 0,
         playbackUnderruns: Int = 0,
@@ -166,6 +178,8 @@ public struct FrontendGenerationMetrics: Hashable, Codable, Sendable {
         self.scheduledHeartbeatCount = scheduledHeartbeatCount
         self.completedHeartbeatCount = completedHeartbeatCount
         self.heartbeatCoveragePPM = heartbeatCoveragePPM
+        self.censoredHeartbeatCount = censoredHeartbeatCount
+        self.heartbeatDelayDefinition = heartbeatDelayDefinition
         self.playbackChunksReceived = playbackChunksReceived
         self.playbackContinuityFailures = playbackContinuityFailures
         self.playbackUnderruns = playbackUnderruns
@@ -188,6 +202,8 @@ public struct FrontendGenerationMetrics: Hashable, Codable, Sendable {
         case scheduledHeartbeatCount
         case completedHeartbeatCount
         case heartbeatCoveragePPM
+        case censoredHeartbeatCount
+        case heartbeatDelayDefinition
         case playbackChunksReceived
         case playbackContinuityFailures
         case playbackUnderruns
@@ -217,6 +233,8 @@ public struct FrontendGenerationMetrics: Hashable, Codable, Sendable {
         self.scheduledHeartbeatCount = try container.decodeIfPresent(Int.self, forKey: .scheduledHeartbeatCount) ?? 0
         self.completedHeartbeatCount = try container.decodeIfPresent(Int.self, forKey: .completedHeartbeatCount) ?? 0
         self.heartbeatCoveragePPM = try container.decodeIfPresent(Int.self, forKey: .heartbeatCoveragePPM) ?? 0
+        self.censoredHeartbeatCount = try container.decodeIfPresent(Int.self, forKey: .censoredHeartbeatCount)
+        self.heartbeatDelayDefinition = try container.decodeIfPresent(String.self, forKey: .heartbeatDelayDefinition)
         self.playbackChunksReceived = try container.decodeIfPresent(Int.self, forKey: .playbackChunksReceived) ?? 0
         self.playbackContinuityFailures = try container.decodeIfPresent(Int.self, forKey: .playbackContinuityFailures) ?? 0
         self.playbackUnderruns = try container.decodeIfPresent(Int.self, forKey: .playbackUnderruns) ?? 0
@@ -241,6 +259,8 @@ public struct FrontendGenerationMetrics: Hashable, Codable, Sendable {
         try container.encode(scheduledHeartbeatCount, forKey: .scheduledHeartbeatCount)
         try container.encode(completedHeartbeatCount, forKey: .completedHeartbeatCount)
         try container.encode(heartbeatCoveragePPM, forKey: .heartbeatCoveragePPM)
+        try container.encodeIfPresent(censoredHeartbeatCount, forKey: .censoredHeartbeatCount)
+        try container.encodeIfPresent(heartbeatDelayDefinition, forKey: .heartbeatDelayDefinition)
         try container.encode(playbackChunksReceived, forKey: .playbackChunksReceived)
         try container.encode(playbackContinuityFailures, forKey: .playbackContinuityFailures)
         try container.encode(playbackUnderruns, forKey: .playbackUnderruns)
@@ -472,6 +492,10 @@ public enum GenerationTelemetryCompatibilityAdapter {
             scheduledHeartbeatCount: counters["heartbeatScheduledCount"] ?? 0,
             completedHeartbeatCount: counters["heartbeatCompletedCount"] ?? counters["uiHeartbeats"] ?? 0,
             heartbeatCoveragePPM: counters["heartbeatCoveragePPM"] ?? 0,
+            // The watchdog reports this count only under the censored definition.
+            censoredHeartbeatCount: counters["censoredHeartbeatCount"],
+            heartbeatDelayDefinition: counters["censoredHeartbeatCount"] == nil
+                ? nil : FrontendGenerationMetrics.censoredHeartbeatDelayDefinition,
             playbackChunksReceived: counters["playbackChunksReceived"] ?? 0,
             playbackContinuityFailures: counters["playbackContinuityFailures"] ?? 0,
             playbackUnderruns: counters["playbackUnderruns"] ?? 0,

@@ -298,6 +298,36 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
         XCTAssertEqual(metrics.playbackMinimumQueuedAudioMS, 120)
     }
 
+    func testFrontendAdapterMarksTheCensoredHeartbeatDefinition() throws {
+        let censored = GenerationTelemetryCompatibilityAdapter.frontend(
+            timingsMS: [:],
+            counters: ["maximumDelayedHeartbeatMS": 420, "censoredHeartbeatCount": 3]
+        )
+        XCTAssertEqual(censored.censoredHeartbeatCount, 3)
+        XCTAssertEqual(
+            censored.heartbeatDelayDefinition,
+            FrontendGenerationMetrics.censoredHeartbeatDelayDefinition
+        )
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(censored)) as? [String: Any]
+        )
+        XCTAssertEqual(object["censoredHeartbeatCount"] as? Int, 3)
+        XCTAssertEqual(object["heartbeatDelayDefinition"] as? String, "completedAndCensoredPending")
+
+        // A legacy watchdog report (no censored count) keeps the old definition.
+        let legacy = GenerationTelemetryCompatibilityAdapter.frontend(
+            timingsMS: [:],
+            counters: ["maximumDelayedHeartbeatMS": 120]
+        )
+        XCTAssertNil(legacy.censoredHeartbeatCount)
+        XCTAssertNil(legacy.heartbeatDelayDefinition)
+        let legacyObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(legacy)) as? [String: Any]
+        )
+        XCTAssertNil(legacyObject["censoredHeartbeatCount"])
+        XCTAssertNil(legacyObject["heartbeatDelayDefinition"])
+    }
+
     func testPlaybackHealthTracksNormalDrainContinuityAndUnderrun() {
         var health = PlaybackHealthAccumulator()
         health.playbackScheduled(source: .liveStream, queuedChunks: 3, queuedAudioMS: 900)

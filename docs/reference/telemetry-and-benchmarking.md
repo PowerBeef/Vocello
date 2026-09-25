@@ -536,7 +536,12 @@ retroactively fail an individual take.
 The app watchdog uses generation-scoped session tokens so a late callback from a finished run
 cannot contaminate the next. It reports scheduled/completed heartbeat counts, coverage, delayed
 heartbeat counts at the configured thresholds, and the maximum observed delay. These are sampling
-statistics, not an exhaustive count of every main-thread stall.
+statistics, not an exhaustive count of every main-thread stall. Since 2026-09-25 a heartbeat still
+queued behind the main thread when the session ends counts as a censored observation: its age at
+`end()` is a lower bound on its delay and enters the thresholds and the maximum
+(`frontendMetrics.censoredHeartbeatCount`, `heartbeatDelayDefinition: completedAndCensoredPending`;
+rows without the field counted completed heartbeats only, which read low at the generation boundary).
+The macOS UI benchmark gates this statistic under `config/macos-ui-stall-gate.json`.
 
 App telemetry also records bounded playback health: chunks received, continuity failures,
 underruns, queued chunks/audio at playback scheduling, and minimum queue duration. This makes UI

@@ -17,6 +17,20 @@ last full copy at commit 25a895ed).
 
 ## Resume now
 
+### September 25, late — wave 8 landed; next is the M6 UI calibration run
+
+Wave 8 is on `main` with CI green (a00eb8d4, 2871108b): BT-03's floor-emulation knob, report-only
+stall limit, per-take load, pacing and seeds; BT-05's delivery-supervisor batch, the calibrated
+outlier verdict with a report-only leave-one-out score and the language evidence fixes; BT-06's
+token-read timer, rounded-once totals and per-take profile statistics. Every track had an
+adversarial review, swift-review and native verification. The post-wave-8 gate compare passes
+(4de385ef; timing 1.6-2.1% off the seeded runs, to measure with telemetry-overhead). Next, with the
+Mac unlocked (XCUITest refuses a locked session): the exploratory M6 `scripts/ui_test.sh macos
+benchmark` whose stall distribution the maintainer turns into a calibrated limit, then AV-17 steps
+2-6. PA-10: new Apple Distribution and Developer ID identities exist on the M6; the Developer ID
+pair stays at repository level (maintainer decision); the maintainer still creates the App Store
+profile, exports the new distribution `.p12` and moves the other 11 secrets into the environment.
+
 ### September 25, evening — benchmark audit and the first M6 gate baseline
 
 The maintainer asked for an in-depth audit of the benchmark harnesses and telemetry probes

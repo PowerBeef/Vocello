@@ -76,6 +76,7 @@
       "reviewedAt": "2026-08-26",
       "removalCondition": "Remove unchecked conformance when the iOS GRDB storage owner is fully actor-isolated or the database facade becomes a concurrency-checked immutable Sendable adapter.",
       "tests": [
+        "Tests/VocelloCoreTests/DatabaseServiceTests.swift",
         "Tests/VocelloCoreTests/HistoryPersistenceErrorTests.swift",
         "Tests/VocelloCoreTests/RecoverableStoreCoordinatorTests.swift"
       ]

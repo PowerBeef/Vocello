@@ -22,7 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 21/31 (68%) |
+| `project-audit-2026-09` | active | backend-and-platform | 21/32 (66%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -94,7 +94,7 @@ Narrative authority: [`docs/reference/project-review-2026-09-18.md`](reference/p
 | --- | --- | --- | --- |
 | `AUD-01` | parked | iOS launch and deep-link dead ends | — |
 | `AUD-02` | parked | One owner for the iOS audio session | — |
-| `AUD-03` | planned | Studio screens stop owning generation Tasks | — |
+| `AUD-03` | in-flight | Studio screens stop owning generation Tasks | — |
 | `AUD-04` | parked | Clone readiness reflects the context it actually has | — |
 | `AUD-06` | parked | iOS modals hide their background from VoiceOver | — |
 | `AUD-07` | parked | Verify recovery from an unverified StoreKit purchase | — |
@@ -114,7 +114,7 @@ Narrative authority: [`docs/reference/project-review-2026-09-18.md`](reference/p
   gate: Playback after a recording is audible on the phone; the shared player sets its category before playing; both AVAudioPlayer owners observe interruption and route change; iOS smoke covers record-then-play in one journey.
   unparkWhen: the paired iPhone is available and unlocked for a consented lane (CONV-20)
 
-- **`AUD-03`** (planned) — Studio screens stop owning generation Tasks.
+- **`AUD-03`** (in-flight) — Studio screens stop owning generation Tasks.
   gate: No Studio screen starts a generation Task; the actor-owned lifecycle owns cancellation and prewarm; macOS smoke and the cancellation journey pass unchanged.
 
 - **`AUD-04`** (parked) — Clone readiness reflects the context it actually has.
@@ -445,11 +445,12 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-10` | in-flight | Release signing is isolated from dispatch and build inputs | — |
 | `PA-16` | planned | Speech-tokenizer attention honors the model's sliding windows | — |
 | `PA-18` | in-flight | Public claims match what each download ships | — |
-| `PA-19` | planned | Orchestrators and the generate loop have unit coverage | — |
+| `PA-19` | in-flight | Orchestrators and the generate loop have unit coverage | — |
 | `PA-20` | planned | Accessibility and localization reach every surface | — |
 | `PA-25` | planned | Docs and tooling stay proportional | — |
 | `PA-26` | planned | Low-severity backlog from the external audit | — |
 | `PA-30` | planned | Leftovers from PA-21, PA-22 and AUD-05 | — |
+| `PA-31` | planned | The engine store reports frontend state changes with the streaming engine | — |
 
 ### Open items in detail
 
@@ -468,7 +469,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-18`** (in-flight) — Public claims match what each download ships.
   gate: README and website scope every feature claim to the build it names (AudioSeal marking, Article 50, seed pinning and the new UI marked as 3.0), facts match source (concurrent files, chart record, recommended variant), AudioSeal is attributed with the correct upstream revision, and the website sends basic security headers.
 
-- **`PA-19`** (planned) — Orchestrators and the generate loop have unit coverage.
+- **`PA-19`** (in-flight) — Orchestrators and the generate loop have unit coverage.
   gate: TTSEngineStore, StudioGenerationCoordinator, the long-form runner, DatabaseService, the model managers and IOSExportGate run under unit tests with a fake engine; a tiny seeded random-weight talker and generate-loop test and a synthetic AudioSeal fixture run in CI.
 
 - **`PA-20`** (planned) — Accessibility and localization reach every surface.
@@ -482,6 +483,9 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-30`** (planned) — Leftovers from PA-21, PA-22 and AUD-05.
   gate: A failed History clear is never silent and a pending clear has its own banner copy on both platforms; a long-form acceptance interrupted by app suspension is retried after resume and keeps its audio, with copy that matches; a set-aside unreadable audio-removal list is reported once or can be discarded; the maintainer decides whether audio kept by earlier Keep Audio Files clears is removed; the resident speech tokenizer gets an owner-scoped release (ENG-06) only with a device memory re-qualification.
+
+- **`PA-31`** (planned) — The engine store reports frontend state changes with the streaming engine.
+  gate: TTSEngineStore.snapshotUpdates fires once per applied frontend-state change with the streaming MLXTTSEngine, so the macOS warmup coordinator cancels pending warmups while the engine is busy and resets on idle, loaded or failed; the maintainer approves the change to frozen TTSEngineStore behavior; the expected failure in TTSEngineStoreTests is removed in the same commit; macOS smoke passes.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

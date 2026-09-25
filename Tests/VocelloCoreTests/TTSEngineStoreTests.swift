@@ -620,7 +620,7 @@ final class TTSEngineStoreTests: XCTestCase {
             store.loadState == .loaded(modelID: "pro_design")
         }
 
-        XCTExpectFailure("Known defect: syncFromSnapshot returns before snapshotUpdates.send on a plain state change")
+        XCTExpectFailure("PA-31: syncFromSnapshot returns before snapshotUpdates.send on a plain state change")
         await waitUntil("the snapshot bridge to report the change", timeout: .milliseconds(300)) {
             !recorder.snapshots.isEmpty
         }

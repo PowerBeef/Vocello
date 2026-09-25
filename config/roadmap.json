@@ -1152,7 +1152,7 @@
     {
       "id": "AUD-03",
       "title": "Studio screens stop owning generation Tasks",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "No Studio screen starts a generation Task; the actor-owned lifecycle owns cancellation and prewarm; macOS smoke and the cancellation journey pass unchanged.",
       "sourceOfTruth": [
         "Sources/Views/Studio/MacCustomVoiceScreen.swift",
@@ -1161,9 +1161,9 @@
         "Sources/Views/Studio/MacVoiceDesignScreen.swift",
         "Sources/iOS/Studio/StudioGenerationCoordinator.swift"
       ],
-      "notes": "Revalidated 2026-09-18 (P2 policy/refactor): all three macOS Studio views construct generation Tasks, contrary to the native rule, but register them with StudioGenerationCoordinator, which owns cancellation and stale-attempt completion. This does not independently establish a critical race or unowned cancellation. Move construction across the existing boundary without changing request snapshots. See project-review-2026-09-18.md.",
+      "notes": "Revalidated 2026-09-18 (P2 policy/refactor): all three macOS Studio views construct generation Tasks, contrary to the native rule, but register them with StudioGenerationCoordinator, which owns cancellation and stale-attempt completion. This does not independently establish a critical race or unowned cancellation. Move construction across the existing boundary without changing request snapshots. See project-review-2026-09-18.md. 2026-09-24: the three macOS Studio screens hand an immutable plan to MacStudioSingleTakeRunner (start, cancel through the engine barrier), tested over the real coordinator with a fake engine; the moved code routes to platform-ui promotion evidence. Open: macOS smoke and the cancellation journey (consent-bound UI lanes), and the iOS Studio views still construct their generation tasks (IOSGenerationModeViews).",
       "plan": "audit-remediation-2026-09",
-      "updated": "2026-09-18"
+      "updated": "2026-09-24"
     },
     {
       "id": "AUD-04",
@@ -1359,15 +1359,15 @@
     {
       "id": "PA-19",
       "title": "Orchestrators and the generate loop have unit coverage",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "TTSEngineStore, StudioGenerationCoordinator, the long-form runner, DatabaseService, the model managers and IOSExportGate run under unit tests with a fake engine; a tiny seeded random-weight talker and generate-loop test and a synthetic AudioSeal fixture run in CI.",
       "sourceOfTruth": [
         "Tests/VocelloCoreTests",
         "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests"
       ],
-      "notes": "External audit TEST-01, TEST-02 and TEST-03, verified 2026-09-22 with corrections: the 15% app-code figure omits the linked and tested QwenVoiceCore; the decoder and code predictor already run on tiny random weights. The real gaps are the named orchestrators (0 test references), the talker and generate loop, and the AudioSeal transform call site (2 of 3 parity tests skip in CI). May need a shared framework target for code compiled by path.",
+      "notes": "External audit TEST-01, TEST-02 and TEST-03, verified 2026-09-22 with corrections: the 15% app-code figure omits the linked and tested QwenVoiceCore; the decoder and code predictor already run on tiny random weights. The real gaps are the named orchestrators (0 test references), the talker and generate loop, and the AudioSeal transform call site (2 of 3 parity tests skip in CI). May need a shared framework target for code compiled by path. 2026-09-24: TTSEngineStore, StudioGenerationCoordinator, DatabaseService (real SQLite), IOSExportGate and the iPhone model inventory run over fakes in VocelloCoreTests; a tiny seeded talker drives the production generate loop and synthetic AudioSeal weights cover the marking transform in Qwen3RuntimeTests. Open: the long-form runner (needs an audio-player protocol, LivePreviewEstimate extracted, injected timeline and persistence), the macOS model manager with a downloader seam (its own test target: name collisions), IOSModelDownloadCoordinator. Defect found: PA-31.",
       "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
+      "updated": "2026-09-24"
     },
     {
       "id": "PA-20",
@@ -1423,6 +1423,21 @@
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
       ],
       "notes": "Split out 2026-09-24. Done 2026-09-24: the Clone reference picker shows a failed Saved Voices load with Retry; History suspends its GRDB queue before the app is suspended, and a write that meets the suspension leaves the take in the outbox for the reconcile after resume (IOS-11, adversarially reviewed). Open from the second History review: iOS keeps a failed clear's error where only an empty list shows it, and a pending clear falls through to the \"0 takes queued\" banner copy on both platforms; a suspension inside a long-form acceptance lets the next write roll it back and delete the new joined output while the copy says the audio was kept, and one before prepare orphans the candidate; a set-aside removal list counts as an issue forever. ENG-06 is latent: one model operation runs at a time today; a strict owner token can double the resident tokenizer on iOS (about 218 MB). Orphaned audio from earlier Keep Audio Files clears is user data.",
+      "updated": "2026-09-24"
+    },
+    {
+      "id": "PA-31",
+      "plan": "project-audit-2026-09",
+      "title": "The engine store reports frontend state changes with the streaming engine",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "TTSEngineStore.snapshotUpdates fires once per applied frontend-state change with the streaming MLXTTSEngine, so the macOS warmup coordinator cancels pending warmups while the engine is busy and resets on idle, loaded or failed; the maintainer approves the change to frozen TTSEngineStore behavior; the expected failure in TTSEngineStoreTests is removed in the same commit; macOS smoke passes.",
+      "sourceOfTruth": [
+        "Sources/iOS/TTSEngineStore.swift",
+        "Sources/Services/MacGenerationWarmupCoordinator.swift",
+        "Tests/VocelloCoreTests/TTSEngineStoreTests.swift"
+      ],
+      "notes": "Found by PA-19 on 2026-09-24. syncFromSnapshot returns for any event-streaming backend (and when no new chunk arrived) before it reaches snapshotUpdates.send, and MLXTTSEngine streams events, so on macOS ContentView's onReceive(snapshotChanges) never fires and MacGenerationWarmupCoordinator.observe never runs. The fix is to send the update above the streaming guard. TTSEngineStore behavior is frozen (native.md) apart from consent admission, and the fix changes macOS warmup timing, so it waits for a maintainer decision and a macOS smoke run. testSnapshotUpdatesFireForAnAppliedFrontendChange records the defect with a strict XCTExpectFailure naming this item.",
       "updated": "2026-09-24"
     }
   ]

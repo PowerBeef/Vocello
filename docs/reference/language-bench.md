@@ -284,8 +284,19 @@ Requires test models (`scripts/macos_test.sh models ensure`).
 scripts/macos_test.sh lang-bench --subset quick
 ```
 
-Uses `QWENVOICE_DEBUG=1`, `vocello generate --language … --seed … --out …`, and the hint gate
-against `~/Library/Application Support/QwenVoice-Debug/diagnostics/`. Apple Speech is **not**
+The lane writes the same immutable `language-run-plan.json` the iPhone lane follows
+(`scripts/language_bench_evidence.py plan`) and generates its takes in order (audit #88, the
+maintainer delegated the decision to the audit's recommendation on 2026-09-25): each Custom take
+speaks with its script language's corpus speaker (`vocello generate --speaker`, for example `vivian`
+for Chinese and `ono_anna` for Japanese) and each Design take with the corpus's one Voice Design
+brief (`--voice-brief`), at the plan's seed-identity-v2 seed (`--seed`, `--variation expressive`,
+`--language` for a pinned hint). Until then the lane spoke every language with the default speaker
+and a lane-owned brief, so macOS and iPhone takes were not comparable. The engine row names its
+Custom speaker (`notes.customSpeakerID`) and its Design brief's digest (the typed fixture digest),
+and the publisher (`--plan`) refuses a macOS verification whose rows do not match the plan's seed,
+variation and fixture, or that has no plan; the plan's fixtures and seed policy enter the analysis
+profile. The hint gate reads `~/Library/Application Support/QwenVoice-Debug/diagnostics/` with
+`QWENVOICE_DEBUG=1`. Apple Speech is **not**
 available to the CLI (TCC). Spoken content is instead verified after every CLI process has exited by
 `scripts/independent_asr.py`: the pinned `whisper-small` MLX model
 (`config/delivery-evaluator-v2-candidates.json`, `whisper-small-mlx`) is loaded and warmed once in a
@@ -296,7 +307,8 @@ decode), decodes each take with the language locked to the expected language,
 detects the language from the first 30 s, and reports what it measured: the decoded sample count (the
 processed duration the publisher checks against the WAV), the per-take recognition time without model
 load or warm-up (`modelLoadSeconds` and `warmupSeconds` are reported once per launch; the language
-lineage's measurement version is 2 from this change) and whisper's worst no-speech probability and
+lineage's measurement version is 3 since WER v2, the per-channel vote, the Auto seed and the corpus
+fixtures, none of which a published record carries yet) and whisper's worst no-speech probability and
 mean log probability, published as `independentMaximumNoSpeechProbability` and
 `independentMeanAverageLogProbability`. The publisher re-scores every transcript against the corpus with the same
 15 % edit-rate gate (whisper-small's character error rate on Chinese and Japanese sits close to that

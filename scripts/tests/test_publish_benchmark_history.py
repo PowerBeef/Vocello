@@ -260,6 +260,78 @@ def language_plan(
     return plan
 
 
+FIXTURE_DESIGN_INSTRUCTION = "A warm, friendly narrator with a calm, measured pace."
+
+
+def planned_language_run(
+    root: Path, *, run_id: str, cells: list[dict], scripts: dict[str, str],
+    speakers: dict[str, str] | None = None,
+) -> tuple[Path, Path, Path, dict]:
+    """A matrix, corpus and immutable plan for a macOS lane (audit #88).
+
+    Each cell names its mode (Custom by default) and script language; the plan
+    carries the corpus fixture and the seed-identity-v2 seed the lane uses.
+    """
+    matrix = root / f"{run_id}-matrix.json"
+    corpus = root / f"{run_id}-corpus.json"
+    matrix_cells = [
+        {"quick": True, "mode": "custom", "variant": "speed", **cell} for cell in cells
+    ]
+    matrix.write_text(json.dumps({"cells": matrix_cells}))
+    corpus.write_text(json.dumps({"languages": [
+        {
+            "id": language, "script": script,
+            "customSpeakerID": (speakers or {}).get(language, "aiden"),
+            "designInstruction": FIXTURE_DESIGN_INSTRUCTION,
+        }
+        for language, script in scripts.items()
+    ]}))
+    fixtures = publisher.language_corpus_fixtures(corpus)
+    takes = []
+    for index, cell in enumerate(matrix_cells, start=1):
+        fixture = fixtures[cell["scriptLang"]]
+        mode = cell["mode"]
+        take = {
+            "takeIndex": index, "seedIndex": None, "seed": publisher.stable_default_seed(cell),
+            "samplingVariation": "expressive", "cellID": cell["id"],
+            "childRunID": f"{run_id}--{cell['id']}", "mode": mode, "variant": cell["variant"],
+            "uiHint": cell.get("uiHint", "auto"), "scriptLang": cell["scriptLang"],
+            "expectedHint": cell["expectedHint"],
+            "customSpeakerID": fixture["customSpeakerID"] if mode == "custom" else None,
+            "designInstruction": fixture["designInstruction"] if mode == "design" else None,
+            "designInstructionDigest": fixture["designInstructionDigest"] if mode == "design" else None,
+            "promptEquivalenceGroup": cell.get("promptEquivalenceGroup"),
+            "skipOutputVerification": bool(cell.get("skipOutputVerification")),
+        }
+        if "expectedOutcome" in cell:
+            take["expectedOutcome"] = cell["expectedOutcome"]
+        takes.append(take)
+    plan = {
+        "schemaVersion": 1, "runID": run_id, "subset": "quick", "kind": "languageBenchmark",
+        "matrixDigest": publisher.digest_file(matrix), "corpusDigest": publisher.digest_file(corpus),
+        "cohortID": None, "cohortDigest": None, "seedPolicy": publisher.LANGUAGE_SEED_POLICY,
+        "samplingVariation": "expressive",
+        "promptEquivalenceGroups": sorted({
+            take["promptEquivalenceGroup"] for take in takes if take["promptEquivalenceGroup"]
+        }),
+        "requireEveryTakePass": True, "takeCount": len(takes), "takes": takes,
+    }
+    plan["planDigest"] = publisher.digest_bytes(publisher.canonical_bytes(plan))
+    plan_path = root / f"{run_id}-plan.json"
+    plan_path.write_text(json.dumps(plan))
+    return matrix, corpus, plan_path, plan
+
+
+def bind_row_to_plan(row: dict, planned_take: dict) -> dict:
+    """Stamp the notes the macOS engine writes for a planned take."""
+    row["mode"] = planned_take["mode"]
+    row["notes"]["samplingSeed"] = str(planned_take["seed"])
+    row["notes"]["samplingVariation"] = planned_take["samplingVariation"]
+    if planned_take["customSpeakerID"] is not None:
+        row["notes"]["customSpeakerID"] = planned_take["customSpeakerID"]
+    return row
+
+
 def language_sentinel(
     *, output_path: Path, seed: int = 42, verification: dict | None = None
 ) -> dict:
@@ -1926,28 +1998,27 @@ class PublisherTests(unittest.TestCase):
     def _publish_two_language_cells(self, *, english_provenance: dict | None = None,
                                     english_expected_outcome: str = "pass",
                                     english_transcript: str | None = None) -> dict:
-        matrix = self.root / "matrix.json"
-        corpus = self.root / "corpus.json"
-        matrix.write_text(json.dumps({"cells": [
-            {"id": "fr", "quick": True, "expectedHint": "french", "scriptLang": "french"},
-            {"id": "en", "quick": True, "expectedHint": "english", "scriptLang": "english",
-             "expectedOutcome": english_expected_outcome},
-        ]}))
         french = "un deux trois quatre cinq six sept huit"
         english = "one two three four five six seven eight"
-        corpus.write_text(json.dumps({"languages": [
-            {"id": "french", "script": french}, {"id": "english", "script": english},
-        ]}))
+        matrix, corpus, plan_path, plan = planned_language_run(
+            self.root, run_id="lang-run",
+            cells=[
+                {"id": "fr", "expectedHint": "french", "scriptLang": "french"},
+                {"id": "en", "expectedHint": "english", "scriptLang": "english",
+                 "expectedOutcome": english_expected_outcome},
+            ],
+            scripts={"french": french, "english": english},
+        )
         rows = []
         cells = {}
-        for cell_id, digest, language, script, provenance in (
+        for planned, (cell_id, digest, language, script, provenance) in zip(plan["takes"], (
             ("fr", "a" * 64, "french", french, None),
             ("en", "b" * 64, "english", english, english_provenance),
-        ):
+        )):
             row = engine_row(f"{cell_id}-id", run_id="lang-run", cell=cell_id)
             row["notes"]["languageHint"] = language
             row["notes"]["samplingWAVDigest"] = digest
-            rows.append(row)
+            rows.append(bind_row_to_plan(row, planned))
             cells[cell_id] = {
                 "generationID": f"{cell_id}-id", "audioSHA256": digest, "expectedLanguage": language,
                 "expectedOutcome": "pass",
@@ -1960,7 +2031,7 @@ class PublisherTests(unittest.TestCase):
             self.root / "independent-asr.json", run_id="lang-run", platform="macos", cells=cells,
         )
         args = SimpleNamespace(
-            matrix=matrix, corpus=corpus, subset="quick", diagnostics=self.root,
+            matrix=matrix, corpus=corpus, subset="quick", diagnostics=self.root, plan=plan_path,
             run_id="lang-run", output_gate="independent", recognitions=recognitions, platform="macos",
             started_at="2026-09-12T12:00:00Z", finished_at="2026-09-12T12:01:00Z",
             label="fixture", artifact_dir=self.root, snapshot=self.root / "snapshot.json",
@@ -2012,14 +2083,13 @@ class PublisherTests(unittest.TestCase):
         self.assertIn("more than one recognizer identity", str(raised.exception))
 
     def test_macos_language_publishes_a_single_whisper_witness_as_focused(self) -> None:
-        matrix = self.root / "matrix.json"
-        corpus = self.root / "corpus.json"
-        matrix.write_text(json.dumps({"cells": [
-            {"id": "fr", "quick": True, "expectedHint": "french", "scriptLang": "french"},
-        ]}))
         reference_script = "un deux trois quatre cinq six sept huit"
-        corpus.write_text(json.dumps({"languages": [{"id": "french", "script": reference_script}]}))
-        fr = engine_row("fr-id", run_id="lang-run", cell="fr")
+        matrix, corpus, plan_path, plan = planned_language_run(
+            self.root, run_id="lang-run",
+            cells=[{"id": "fr", "expectedHint": "french", "scriptLang": "french"}],
+            scripts={"french": reference_script},
+        )
+        fr = bind_row_to_plan(engine_row("fr-id", run_id="lang-run", cell="fr"), plan["takes"][0])
         fr["notes"]["languageHint"] = "french"
         fr["notes"]["samplingWAVDigest"] = "a" * 64
         recognitions = independent_evidence(
@@ -2034,7 +2104,7 @@ class PublisherTests(unittest.TestCase):
             }},
         )
         args = SimpleNamespace(
-            matrix=matrix, corpus=corpus, subset="quick", diagnostics=self.root,
+            matrix=matrix, corpus=corpus, subset="quick", diagnostics=self.root, plan=plan_path,
             run_id="lang-run", output_gate="independent", recognitions=recognitions, platform="macos",
             started_at="2026-09-12T12:00:00Z", finished_at="2026-09-12T12:01:00Z",
             label="fixture", artifact_dir=self.root, snapshot=self.root / "snapshot.json",
@@ -2076,6 +2146,38 @@ class PublisherTests(unittest.TestCase):
         self.assertNotIn("wordErrorRate", take["metrics"])
         self.assertNotIn("recognitionPassCount", take["metrics"])
         self.assertEqual(captured["manifest"]["historyRecord"]["inputs"].get("analysisProfileHash") is not None, True)
+        # Audit #88: the take carries the plan's seed-identity-v2 seed.
+        self.assertEqual(take["seed"], plan["takes"][0]["seed"])
+
+        # Audit #88: every engine row is bound to its planned corpus fixture;
+        # a row spoken by another speaker, at another seed or without the
+        # speaker note, a missing plan or a contradicting digest refuses.
+        for label, mutate_row, mutate_args in (
+            ("Custom speaker does not match the plan",
+             lambda row: row["notes"].__setitem__("customSpeakerID", "vivian"), None),
+            ("Custom speaker does not match the plan",
+             lambda row: row["notes"].pop("customSpeakerID"), None),
+            ("engine seed does not match the plan",
+             lambda row: row["notes"].__setitem__("samplingSeed", "42"), None),
+            ("requires the immutable run plan", None, lambda value: setattr(value, "plan", None)),
+            ("contradicts the run plan", None,
+             lambda value: setattr(value, "design_fixture_digest", "e" * 64)),
+        ):
+            drifted = copy.deepcopy(fr)
+            if mutate_row is not None:
+                mutate_row(drifted)
+            drift_args = copy.copy(args)
+            if mutate_args is not None:
+                mutate_args(drift_args)
+            with (
+                self.subTest(binding=label),
+                mock.patch.object(publisher, "load_engine_rows", return_value=[drifted]),
+                mock.patch.object(
+                    publisher, "qualify_memory_rows", return_value=qualified_memory_fixture(["fr-id"])
+                ),
+                self.assertRaisesRegex(publisher.PublicationError, label),
+            ):
+                publisher.language_command(drift_args)
 
         # A failing transcript, a wrong detected language, or audio bound to
         # other bytes each refuses publication; a supplied score never helps.

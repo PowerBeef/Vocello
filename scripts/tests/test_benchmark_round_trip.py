@@ -38,10 +38,12 @@ import test_check_ios_ui_perf as ios_perf  # noqa: E402
 import test_check_macos_ui_bench as mac_ui  # noqa: E402
 import test_check_macos_ui_perf as mac_perf  # noqa: E402
 from test_publish_benchmark_history import (  # noqa: E402
+    bind_row_to_plan,
     engine_row,
     independent_evidence,
     independent_recognition,
     ios_benchmark_app_row,
+    planned_language_run,
     source_fixture,
     upgrade_language_memory_row,
 )
@@ -607,16 +609,17 @@ class PublisherRoundTripTests(unittest.TestCase):
 
     def test_macos_language_manifest_publishes(self) -> None:
         run_id = "lang-roundtrip-20260920"
-        matrix = self.root / "matrix.json"
-        corpus = self.root / "corpus.json"
-        matrix.write_text(json.dumps({"cells": [
-            {"id": "fr", "quick": True, "expectedHint": "french", "scriptLang": "french"},
-        ]}), encoding="utf-8")
         script = "un deux trois quatre cinq six sept huit"
-        corpus.write_text(json.dumps({"languages": [{"id": "french", "script": script}]}), encoding="utf-8")
+        # The macOS lane publishes from its immutable plan (audit #88).
+        matrix, corpus, plan_path, plan = planned_language_run(
+            self.root, run_id=run_id,
+            cells=[{"id": "fr", "expectedHint": "french", "scriptLang": "french"}],
+            scripts={"french": script},
+        )
         diagnostics = self.root / "diagnostics"
 
         def language_notes(row: dict) -> None:
+            bind_row_to_plan(row, plan["takes"][0])
             row["notes"]["languageHint"] = "french"
             row["notes"]["samplingWAVDigest"] = "a" * 64
 
@@ -633,7 +636,7 @@ class PublisherRoundTripTests(unittest.TestCase):
             }},
         )
         args = SimpleNamespace(
-            matrix=matrix, corpus=corpus, subset="quick", diagnostics=diagnostics,
+            matrix=matrix, corpus=corpus, subset="quick", diagnostics=diagnostics, plan=plan_path,
             run_id=run_id, output_gate="independent", recognitions=recognitions, platform="macos",
             started_at=STARTED_AT, finished_at=FINISHED_AT, label="roundtrip",
             artifact_dir=self.root, snapshot=self.root / "snapshot.json",

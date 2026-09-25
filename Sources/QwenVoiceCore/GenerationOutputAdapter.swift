@@ -2587,7 +2587,12 @@ struct StreamingExecutionContext: Sendable {
             if let d = deliveryStyle?.trimmingCharacters(in: .whitespacesAndNewlines), !d.isEmpty {
                 tierNotes["deliveryInstructionChars"] = String(d.count)
             }
-        case .custom(_, let deliveryStyle):
+        case .custom(let speakerID, let deliveryStyle):
+            // The Built-in Voice speaker (a public catalog id), so a lane binds
+            // its planned speaker fixture to the row that spoke it (audit #88:
+            // the macOS lang-bench used one speaker for every language).
+            let speaker = speakerID.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !speaker.isEmpty { tierNotes["customSpeakerID"] = speaker }
             if let d = deliveryStyle?.trimmingCharacters(in: .whitespacesAndNewlines), !d.isEmpty {
                 tierNotes["deliveryInstructionChars"] = String(d.count)
             }

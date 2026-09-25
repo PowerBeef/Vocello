@@ -49,10 +49,6 @@ APP_BUNDLE="$QVOICE_BUILD_ROOT/$APP_NAME.app"
 APP_BINARY="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 DSYM_DIR="$QVOICE_SYMBOLS_MACOS"
 
-string_sha256() {
-  VALUE="$1" python3 -c 'import hashlib,os; print(hashlib.sha256(os.environ["VALUE"].encode()).hexdigest())'
-}
-
 capture_benchmark_source() {
   local artifacts="$1"
   python3 "$SCRIPT_DIR/publish_benchmark_history.py" snapshot \
@@ -956,41 +952,46 @@ PY
   local wav_dir="$artifacts/wav"
   mkdir -p "$wav_dir"
 
-  local cell_json cell_count=0 cell_fail=0 voice_brief="A clear, steady narrator with a natural conversational tone."
-  while IFS= read -r cell_json; do
-    [[ -n "$cell_json" ]] || continue
+  # The lane generates the immutable run plan's takes (audit #88), the same plan
+  # the iPhone lane follows: each cell's corpus fixture (its script language's
+  # native Built-in Voice speaker, the corpus's one Voice Design brief) and its
+  # seed-identity-v2 seed. The publisher binds every engine row to its planned
+  # take, so a take spoken by another speaker or seed refuses publication.
+  local plan="$artifacts/language-run-plan.json" planned_count
+  python3 "$SCRIPT_DIR/language_bench_evidence.py" plan --run-id "$run_id" \
+    --matrix "$matrix" --corpus "$corpus" --subset "$subset" --output "$plan" >/dev/null \
+    || die "lang-bench: the immutable language run plan could not be written"
+  planned_count="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["takeCount"])' "$plan")"
+
+  local take_line cell_count=0 cell_fail=0
+  while IFS= read -r take_line; do
+    [[ -n "$take_line" ]] || continue
     cell_count=$((cell_count + 1))
-    local cell_id mode variant ui_hint text seed
-    # One interpreter per cell: the fields arrive unit-separated on one line
-    # (scripts are single lines). The seed is the same stable per-cell seed the
-    # iOS plan uses, so a macOS take is reproducible and comparable.
-    IFS=$'\x1f' read -r cell_id mode variant ui_hint seed text < <(
-      ROOT_DIR="$ROOT_DIR" CELL="$cell_json" python3 - <<'PY'
-import json, os, sys
-sys.path.insert(0, os.path.join(os.environ["ROOT_DIR"], "scripts"))
-from language_bench_evidence import stable_default_seed
-cell = json.loads(os.environ["CELL"])
-print("\x1f".join([
-    cell["id"], cell["mode"], cell.get("variant", "speed"), cell.get("uiHint", "auto"),
-    str(stable_default_seed(cell)), cell["script"],
-]))
-PY
-    )
+    local cell_id mode variant ui_hint seed speaker_id design_brief text
+    # The fields arrive unit-separated on one line (scripts are single lines);
+    # the Custom speaker is empty for Design and the brief empty for Custom.
+    IFS=$'\x1f' read -r cell_id mode variant ui_hint seed speaker_id design_brief text <<<"$take_line"
     export QVOICE_MAC_BENCH_CELL="$cell_id"
     local -a generate_command=(
       "$QVOICE_BUILD_ROOT/vocello" generate --mode "$mode" --variant "$variant"
       --seed "$seed" --variation expressive --out "$wav_dir/$cell_id.wav"
     )
-    if [[ "$mode" == "design" ]]; then
-      generate_command+=(--voice-brief "$voice_brief")
-    elif [[ "$mode" != "custom" ]]; then
-      die "lang-bench cell $cell_id: unsupported mode '$mode'"
-    fi
+    case "$mode" in
+      custom)
+        [[ -n "$speaker_id" ]] || die "lang-bench cell $cell_id: the plan names no Custom speaker"
+        generate_command+=(--speaker "$speaker_id")
+        ;;
+      design)
+        [[ -n "$design_brief" ]] || die "lang-bench cell $cell_id: the plan names no Voice Design brief"
+        generate_command+=(--voice-brief "$design_brief")
+        ;;
+      *) die "lang-bench cell $cell_id: unsupported mode '$mode'" ;;
+    esac
     generate_command+=(--text "$text")
     if [[ "$ui_hint" != "auto" ]]; then
       generate_command+=(--language "$ui_hint")
     fi
-    note "lang-bench cell $cell_count: $cell_id ($mode/$variant, uiHint=$ui_hint)"
+    note "lang-bench cell $cell_count/$planned_count: $cell_id ($mode/$variant, uiHint=$ui_hint)"
     set +e
     # Scoped per generation: schema-v2 language publication requires the raw
     # v8 memory sidecar, while the caller's telemetry preference must survive.
@@ -1002,23 +1003,27 @@ PY
       warn "lang-bench cell $cell_id: vocello generate exit $st"
       cell_fail=$((cell_fail + 1))
     fi
-  done < <(python3 - "$matrix" "$corpus" "$subset" <<'PY'
+  done < <(python3 - "$plan" "$corpus" <<'PY'
 import json, sys
-matrix_path, corpus_path, subset = sys.argv[1:4]
-cells = json.load(open(matrix_path))["cells"]
-if subset == "quick":
-    cells = [c for c in cells if c.get("quick")]
-corpus = {e["id"]: e["script"] for e in json.load(open(corpus_path))["languages"]}
-for cell in cells:
-    cell = dict(cell)
-    cell["script"] = corpus[cell["scriptLang"]]
-    print(json.dumps(cell, ensure_ascii=False))
+plan_path, corpus_path = sys.argv[1:3]
+scripts = {entry["id"]: entry["script"] for entry in json.load(open(corpus_path))["languages"]}
+for take in json.load(open(plan_path))["takes"]:
+    fields = [
+        take["cellID"], take["mode"], take.get("variant", "speed"), take.get("uiHint", "auto"),
+        str(take["seed"]), take.get("customSpeakerID") or "", take.get("designInstruction") or "",
+        scripts[take["scriptLang"]],
+    ]
+    if any("\x1f" in field or "\n" in field for field in fields):
+        raise SystemExit(f"{take['cellID']}: a planned field contains a separator")
+    print("\x1f".join(fields))
 PY
 )
 
   unset QVOICE_MAC_BENCH_RUN_ID QVOICE_MAC_BENCH_CELL
 
   [[ "$cell_count" -gt 0 ]] || die "lang-bench: no cells for subset=$subset"
+  [[ "$cell_count" -eq "$planned_count" ]] \
+    || die "lang-bench: generated $cell_count of $planned_count planned takes"
 
   local hint_st=0
   python3 "$ROOT_DIR/scripts/check_language_hints.py" "$diag_root" \
@@ -1061,8 +1066,7 @@ PY
     --platform macos --run-id "$run_id" --diagnostics "$diag_root" \
     --matrix "$matrix" --corpus "$corpus" --subset "$subset" \
     --output-gate independent --recognitions "$artifacts/independent-asr.json" \
-    --started-at "$started_at" \
-    --design-fixture-digest "$(string_sha256 "$voice_brief")" --defer-record \
+    --plan "$plan" --started-at "$started_at" --defer-record \
     ${label:+--label "$label"} \
     || die "language benchmark passed but evidence validation failed; artifacts are preserved in $artifacts"
   python3 "$SCRIPT_DIR/summarize_generation_telemetry.py" "$diag_root" \

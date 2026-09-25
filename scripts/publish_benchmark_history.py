@@ -2401,6 +2401,53 @@ def validate_language_mode_fixture_identity(
     raise PublicationError(f"language cell {cell_id} has an unsupported planned mode fixture")
 
 
+def validate_macos_planned_row(
+    *,
+    cell_id: str,
+    planned_take: dict[str, Any],
+    engine_row: dict[str, Any],
+) -> None:
+    """Bind a macOS engine row to its immutable plan take (audit #88).
+
+    The macOS lane writes no per-take sentinel, so the engine row itself must
+    carry the planned seed, variation and corpus fixture: the Built-in Voice
+    speaker note for Custom, the typed fixture digest of the brief for Design.
+    Any drift, or a row that predates the speaker note, refuses publication.
+    """
+    notes = engine_row.get("notes") if isinstance(engine_row.get("notes"), dict) else {}
+    mode = planned_take.get("mode")
+    if engine_row.get("mode") != mode:
+        raise PublicationError(f"language cell {cell_id} telemetry mode does not match the plan")
+    seed = uint64_value(planned_take.get("seed"))
+    if seed is None or uint64_value(notes.get("samplingSeed")) != seed:
+        raise PublicationError(f"language cell {cell_id} engine seed does not match the plan")
+    if notes.get("samplingVariation") != planned_take.get("samplingVariation"):
+        raise PublicationError(f"language cell {cell_id} engine variation does not match the plan")
+    if mode == "custom":
+        speaker_id = planned_take.get("customSpeakerID")
+        if not isinstance(speaker_id, str) or SAFE_CUSTOM_SPEAKER.fullmatch(speaker_id) is None:
+            raise PublicationError(f"language cell {cell_id} has an invalid planned Custom fixture")
+        if notes.get("customSpeakerID") != speaker_id:
+            raise PublicationError(f"language cell {cell_id} Custom speaker does not match the plan")
+        return
+    if mode == "design":
+        instruction_digest = planned_take.get("designInstructionDigest")
+        identity = engine_row.get("modelRuntimeIdentity")
+        observed = (
+            identity.get("fixtureDigest") if isinstance(identity, dict) else None
+        ) or notes.get("fixtureDigest")
+        if (
+            not isinstance(instruction_digest, str)
+            or SAFE_DIGEST.fullmatch(instruction_digest) is None
+            or observed != instruction_digest
+        ):
+            raise PublicationError(
+                f"language cell {cell_id} Design fixture digest does not match the plan"
+            )
+        return
+    raise PublicationError(f"language cell {cell_id} has an unsupported planned mode fixture")
+
+
 def validate_equivalent_outputs(cells: list[dict[str, Any]], takes: list[dict[str, Any]]) -> None:
     """Group members that share a seed are one audio (audit #86 part 1).
 
@@ -2949,6 +2996,18 @@ def language_command(args: argparse.Namespace) -> Path:
     expected_ids = [str(cell.get("id")) for cell in cells]
     plan = load_language_plan(args, cells)
     planned_takes = plan.get("takes") if isinstance(plan, dict) else None
+    # iOS binds each take through its device sentinel; the macOS lane has none
+    # and binds the plan to the engine rows themselves (audit #88).
+    ios_plan = planned_takes is not None and args.platform == "ios"
+    if args.platform == "macos" and content_verified and planned_takes is None:
+        raise PublicationError(
+            "macOS language verification requires the immutable run plan that carries "
+            "each cell's corpus fixture"
+        )
+    if planned_takes is not None and getattr(args, "design_fixture_digest", None):
+        raise PublicationError(
+            "--design-fixture-digest contradicts the run plan's corpus-owned Design fixture"
+        )
     rows = [
         row for row in load_engine_rows(args.diagnostics)
         if (row.get("notes") or {}).get("benchRunID") == args.run_id
@@ -2957,7 +3016,7 @@ def language_command(args: argparse.Namespace) -> Path:
     selected_app: list[dict[str, Any]] = []
     sentinels: dict[str, dict[str, Any]] = {}
     selected_sentinel_paths: dict[str, Path] = {}
-    if planned_takes is not None:
+    if ios_plan:
         by_generation: dict[str, list[dict[str, Any]]] = {}
         for row in rows:
             by_generation.setdefault(str(row.get("generationID")), []).append(row)
@@ -3067,20 +3126,28 @@ def language_command(args: argparse.Namespace) -> Path:
         unexpected = sorted(set(by_cell) - set(expected_ids))
         if unexpected:
             raise PublicationError(f"language run has unexpected cells: {', '.join(unexpected)}")
+        if planned_takes is not None:
+            for cell, planned_take, row in zip(cells, planned_takes, selected):
+                validate_macos_planned_row(
+                    cell_id=str(cell["id"]), planned_take=planned_take, engine_row=row,
+                )
     takes = [minimal_take(index, cell_id, row) for index, (cell_id, row) in enumerate(zip(expected_ids, selected), start=1)]
-    if planned_takes is None:
-        # macOS runs have no immutable plan; the lane generates every cell with
-        # the stable per-cell seed and the hint gate has verified the telemetry.
-        for cell, row, take in zip(cells, selected, takes):
+    if not ios_plan:
+        # macOS takes follow the immutable plan's seeds (audit #88), bound to
+        # every engine row above; a plan-free hint-only run keeps a seed only
+        # when it is the cell's tracked seed.
+        for index, (cell, row, take) in enumerate(zip(cells, selected, takes)):
             observed = uint64_value((row.get("notes") or {}).get("samplingSeed"))
-            if observed is not None and observed == stable_default_seed(cell):
+            if planned_takes is not None:
+                take["seed"] = int(planned_takes[index]["seed"])
+            elif observed is not None and observed == stable_default_seed(cell):
                 take["seed"] = observed
             # The engine's digest of the published WAV (audit #86): macOS
             # language takes now name their audio as iOS takes do.
             wav_digest = (row.get("notes") or {}).get("samplingWAVDigest")
             if is_sha256(wav_digest):
                 take["output"]["fileDigest"] = wav_digest
-    if planned_takes is not None:
+    if ios_plan:
         validate_prompt_equivalence(
             planned_takes=planned_takes,
             sentinels=sentinels,
@@ -3098,7 +3165,7 @@ def language_command(args: argparse.Namespace) -> Path:
     validate_equivalent_outputs(cells, takes)
     asr_evidence: list[dict[str, Any]] = []
     if output_verified:
-        if planned_takes is None:
+        if not ios_plan:
             raise PublicationError("output verification publication requires an immutable run plan")
         for cell, planned_take, row, take in zip(cells, planned_takes, selected, takes):
             if cell.get("skipOutputVerification"):
@@ -3266,6 +3333,16 @@ def language_command(args: argparse.Namespace) -> Path:
                 "iOS language design cells must expose one consistent payload fixture digest"
             )
         fixture_digests["design"] = design_digests.pop()
+    elif planned_takes is not None:
+        # The plan owns the one corpus Design brief (audit #88).
+        planned_design = {
+            str(planned.get("designInstructionDigest"))
+            for planned in planned_takes if planned.get("mode") == "design"
+        }
+        if len(planned_design) > 1:
+            raise PublicationError("language run plan Design cells do not share one corpus brief")
+        if planned_design:
+            fixture_digests["design"] = planned_design.pop()
     elif getattr(args, "design_fixture_digest", None):
         fixture_digests["design"] = args.design_fixture_digest
     require_fixture_cross_check(takes, fixture_digests, source=f"{args.platform} language runner")

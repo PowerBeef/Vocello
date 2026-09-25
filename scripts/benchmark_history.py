@@ -384,6 +384,10 @@ METRIC_KEYS = {
     "alignedProcessSampleCoverage", "alignedEngineSampleCoverage",
     "alignedAppSampleCoverage", "mlxActivePeakMB", "mlxCachePeakMB", "mlxPeakMB",
     "impliedProcessLimitMB", "totalDeviceRAMMB",
+    # The routine per-tier post-generation MLX cache clear, counted apart from
+    # memory pressure (records since 2026-09-25; older records fold it into
+    # the pressure level and the soft-trim warning).
+    "policyCacheClearCount",
     "loadAverage1M", "freeStorageBytes", "uptimeSeconds", "lowPowerMode",
     "chunksReceived", "continuityFailures", "underruns", "startBufferDepth",
     # Independent (whisper-family) recognition of language takes, since 2026-09-12.
@@ -2471,6 +2475,11 @@ def validate_record(
                 raise HistoryError("memory-qualified take contains a capture failure or memory exit")
             if metrics["maximumPressureLevel"] > 1 or metrics["maximumTrimLevel"] > 1:
                 raise HistoryError("memory-qualified take reached a hard memory-pressure action")
+            if "policyCacheClearCount" in metrics and not (
+                float(metrics["policyCacheClearCount"]).is_integer()
+                and 0 <= metrics["policyCacheClearCount"] <= metrics["memoryTrimCount"]
+            ):
+                raise HistoryError("policyCacheClearCount must be a subset of memoryTrimCount")
             has_memory_warning = any(
                 warning.startswith("memory.") for warning in take.get("warnings", [])
             )

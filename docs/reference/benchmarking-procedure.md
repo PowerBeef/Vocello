@@ -684,7 +684,8 @@ independent process maxima.
 
 Sidecar and summary counts must agree, capture failures must be zero, and periodic sampler coverage
 must be at least 95%. Coverage from 95% to below 100%, guarded pressure, or `softTrim` produces
-`passedWithWarnings`. Coverage below 95%, critical pressure, an app memory warning/exit,
+`passedWithWarnings`; the routine post-generation cache clear is counted as `policyCacheClearCount`
+instead (records since 2026-09-25). Coverage below 95%, critical pressure, an app memory warning/exit,
 `hardTrim`, or `fullUnload` fails publication and leaves tracked history unchanged. Manifest v2
 binds `memoryContractVersion`, the selected sidecar count/digest, each take's memory status/digest,
 and bounded start/end/delta/peak, headroom/utilization, sampler, pressure, trim, warning, and exit

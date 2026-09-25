@@ -811,6 +811,42 @@ class BenchmarkHistoryTests(unittest.TestCase):
             with self.subTest(name=name), self.assertRaises(history.HistoryError):
                 self.publish(candidate, f"language-memory-v2-{name}")
 
+    def test_policy_cache_clear_count_is_optional_and_a_subset_of_trims(self) -> None:
+        def memory_record(run_id: str) -> dict:
+            record = record_fixture(run_id=run_id, kind="language")
+            record["schemaVersion"] = 2
+            record["evidence"].update({
+                "telemetrySchemaVersion": 8,
+                "memoryContractVersion": 1,
+                "memoryQualified": True,
+                "sampleSidecarCount": 1,
+                "sampleSidecarsDigest": "a" * 64,
+            })
+            take = record["takes"][0]
+            take["memoryStatus"] = "qualified"
+            take["sampleSidecarDigest"] = "b" * 64
+            take["metrics"].update({key: 0.0 for key in history.MEMORY_REQUIRED_METRICS})
+            take["metrics"].update({
+                "samplerCoverage": 1.0, "gpuRecommendedWorkingSetMB": 4096.0,
+                "memoryTrimCount": 1.0, "maximumTrimLevel": 1.0,
+            })
+            return record
+
+        # A routine clear with no pressure: qualified with no memory warning.
+        routine = memory_record("policy-clear-routine")
+        routine["takes"][0]["metrics"]["policyCacheClearCount"] = 1.0
+        published = json.loads(self.publish(routine, "policy-clear-routine").read_text())
+        self.assertEqual(published["takes"][0]["metrics"]["policyCacheClearCount"], 1.0)
+        self.assertEqual(published["takes"][0]["memoryStatus"], "qualified")
+        # A legacy-shaped take without the key still validates.
+        self.publish(memory_record("policy-clear-legacy"), "policy-clear-legacy")
+
+        for index, count in enumerate((2.0, -1.0, 0.5)):
+            candidate = memory_record(f"policy-clear-invalid-{index}")
+            candidate["takes"][0]["metrics"]["policyCacheClearCount"] = count
+            with self.subTest(count=count), self.assertRaises(history.HistoryError):
+                self.publish(candidate, candidate["run"]["id"])
+
     def test_schema_v3_generation_records_require_the_quality_identity(self) -> None:
         valid = quality_v3_language_fixture("language-quality-v3")
         path = self.publish(valid, "language-quality-v3")

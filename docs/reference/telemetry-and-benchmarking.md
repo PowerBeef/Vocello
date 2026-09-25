@@ -430,7 +430,9 @@ preparation/model-load/session/final-WAV and first-output/terminal boundaries; a
 `app_submit` and `app_terminal`. A 95–<100% coverage result is warning evidence.
 
 Critical pressure, `application_memory_warning`, a memory exit, `hardTrim`, or `fullUnload` fails
-publication. Guarded pressure or `softTrim` is `passedWithWarnings`. iOS additionally fails at
+publication. Guarded pressure or `softTrim` is `passedWithWarnings`, except the routine per-tier
+cache clear (source `post-generation`, reason `post_generation_cache_clear`): since 2026-09-25 it is
+counted as `policyCacheClearCount` with no pressure level and no warning. iOS additionally fails at
 physical footprint ≥5.2 GB, minimum headroom <384 MB, or Metal working-set ratio ≥0.8; footprint
 ≥4.5 GB or headroom <768 MB is a warning. The iOS record retains start/end/min headroom and peak
 process-budget utilization. macOS UI totals pair app and engine samples by absolute uptime within

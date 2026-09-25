@@ -97,6 +97,24 @@ ENGINE_TERMINAL_BOUNDARIES = frozenset({
 
 PRESSURE_LEVELS = {"none": 0, "softTrim": 1, "hardTrim": 2, "fullUnload": 3}
 PRESSURE_BANDS = {"healthy": 0, "guarded": 1, "critical": 2}
+# The per-tier policy (`clearCacheAfterGeneration`, the 8 GB Mac and the iPhone
+# Pro tiers) clears the MLX cache after every successful take and records it as
+# a soft trim.  That routine clear is not memory pressure: it is published as
+# `policyCacheClearCount` and raises neither the pressure level nor a warning.
+# Only this exact source and reason qualify; every other soft trim (kernel,
+# application, runtime budget relief, or a store trim whose reason merely
+# starts with "post_generation") still warns.
+POLICY_CACHE_CLEAR_SOURCE = "post-generation"
+POLICY_CACHE_CLEAR_REASON = "post_generation_cache_clear"
+
+
+def is_policy_cache_clear(level: str, source: str, reason: str) -> bool:
+    """True only for the routine per-tier post-generation MLX cache clear."""
+    return (
+        level == "softTrim"
+        and source == POLICY_CACHE_CLEAR_SOURCE
+        and reason == POLICY_CACHE_CLEAR_REASON
+    )
 MEMORY_EVENT_KINDS = frozenset({
     "pressure-signal",
     "application-warning",
@@ -286,15 +304,25 @@ def _stage_marks(row: dict[str, Any]) -> list[dict[str, Any]]:
     return [mark for mark in marks if isinstance(mark, dict)]
 
 
-def _memory_warnings_and_failures(
-    row: dict[str, Any],
-) -> tuple[list[str], list[str], int, int, int, int]:
+@dataclass(frozen=True)
+class MemoryEventSummary:
+    warnings: list[str]
+    failures: list[str]
+    pressure_event_count: int
+    maximum_pressure_level: int
+    trim_count: int
+    maximum_trim: int
+    policy_cache_clear_count: int
+
+
+def _memory_warnings_and_failures(row: dict[str, Any]) -> MemoryEventSummary:
     warnings: set[str] = set()
     failures: list[str] = []
     pressure_event_count = 0
     maximum_pressure_level = 0
     trim_count = 0
     maximum_trim = 0
+    policy_cache_clear_count = 0
 
     memory_metrics = row.get("memoryMetrics") if isinstance(row.get("memoryMetrics"), dict) else {}
     typed_events = memory_metrics.get("events") if isinstance(memory_metrics.get("events"), list) else []
@@ -307,8 +335,21 @@ def _memory_warnings_and_failures(
         if kind not in MEMORY_EVENT_KINDS:
             failures.append(f"unknown typed memory event kind {kind!r}")
             continue
-        typed_kind_counts[kind] = typed_kind_counts.get(kind, 0) + 1
         level = str(event.get("trimLevel") or "none")
+        policy_clear = kind == "trim-action" and is_policy_cache_clear(
+            level, str(event.get("source") or ""), str(event.get("reasonCode") or "")
+        )
+        # The cross-check below keeps routine clears apart from other trims, so
+        # a stage mark cannot turn a typed pressure trim into a routine one.
+        counted_kind = "policy-cache-clear" if policy_clear else kind
+        typed_kind_counts[counted_kind] = typed_kind_counts.get(counted_kind, 0) + 1
+        if policy_clear:
+            # Still a trim action (memoryTrimCount and maximumTrimLevel keep
+            # their meaning), but never pressure and never a warning.
+            policy_cache_clear_count += 1
+            trim_count += 1
+            maximum_trim = max(maximum_trim, PRESSURE_LEVELS[level])
+            continue
         maximum_pressure_level = max(
             maximum_pressure_level, PRESSURE_LEVELS.get(level, 0)
         )
@@ -367,6 +408,13 @@ def _memory_warnings_and_failures(
             elif level == "softTrim":
                 warnings.add("memory.pressure.soft_trim")
         elif stage == "memory_trim":
+            if is_policy_cache_clear(
+                level, str(metadata.get("source") or ""), str(metadata.get("reason") or "")
+            ):
+                stage_kind_counts["policy-cache-clear"] = stage_kind_counts.get(
+                    "policy-cache-clear", 0
+                ) + 1
+                continue
             stage_kind_counts["trim-action"] = stage_kind_counts.get("trim-action", 0) + 1
             if level in {"hardTrim", "fullUnload"}:
                 failures.append(f"memory trim reached {level}")
@@ -424,9 +472,14 @@ def _memory_warnings_and_failures(
             value = str(source.get(key) or "").lower()
             if value and any(token in value for token in ("memory", "jetsam", "oom")):
                 failures.append(f"{key} indicates a memory exit")
-    return (
-        sorted(warnings), failures, pressure_event_count, maximum_pressure_level,
-        trim_count, maximum_trim,
+    return MemoryEventSummary(
+        warnings=sorted(warnings),
+        failures=failures,
+        pressure_event_count=pressure_event_count,
+        maximum_pressure_level=maximum_pressure_level,
+        trim_count=trim_count,
+        maximum_trim=maximum_trim,
+        policy_cache_clear_count=policy_cache_clear_count,
     )
 
 
@@ -996,25 +1049,23 @@ def qualify_take_memory(
             "mlxCachePeakMB": engine.metrics["mlxCachePeakMB"],
         })
 
-    (
-        pressure_warnings, pressure_failures, pressure_event_count,
-        maximum_pressure_level, trim_count, maximum_trim,
-    ) = (
-        _memory_warnings_and_failures(row)
-    )
+    events = _memory_warnings_and_failures(row)
+    pressure_warnings = list(events.warnings)
+    pressure_failures = list(events.failures)
+    pressure_event_count = events.pressure_event_count
+    maximum_pressure_level = events.maximum_pressure_level
+    trim_count = events.trim_count
+    maximum_trim = events.maximum_trim
+    policy_cache_clear_count = events.policy_cache_clear_count
     if platform == "macos" and require_app_layer and app_row is not None:
-        (
-            app_warnings, app_failures, app_event_count, app_pressure_level,
-            app_trim_count, app_max_trim,
-        ) = (
-            _memory_warnings_and_failures(app_row)
-        )
-        pressure_warnings.extend(app_warnings)
-        pressure_failures.extend(app_failures)
-        pressure_event_count += app_event_count
-        maximum_pressure_level = max(maximum_pressure_level, app_pressure_level)
-        trim_count += app_trim_count
-        maximum_trim = max(maximum_trim, app_max_trim)
+        app_events = _memory_warnings_and_failures(app_row)
+        pressure_warnings.extend(app_events.warnings)
+        pressure_failures.extend(app_events.failures)
+        pressure_event_count += app_events.pressure_event_count
+        maximum_pressure_level = max(maximum_pressure_level, app_events.maximum_pressure_level)
+        trim_count += app_events.trim_count
+        maximum_trim = max(maximum_trim, app_events.maximum_trim)
+        policy_cache_clear_count += app_events.policy_cache_clear_count
     if pressure_failures:
         raise MemoryEvidenceError(
             f"generation {generation_id}: " + "; ".join(sorted(set(pressure_failures)))
@@ -1052,6 +1103,7 @@ def qualify_take_memory(
         "maximumPressureLevel": maximum_pressure_level,
         "memoryTrimCount": trim_count,
         "maximumTrimLevel": maximum_trim,
+        "policyCacheClearCount": policy_cache_clear_count,
         "memoryWarningCount": 0,
         "memoryExitCount": 0,
     })

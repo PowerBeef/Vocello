@@ -509,6 +509,80 @@ class MemoryEvidenceTests(unittest.TestCase):
                         rows=[candidate], diagnostics=self.root, platform="ios"
                     )
 
+    def policy_clear_fixture(self) -> dict:
+        boundaries = [
+            boundary for boundary in ENGINE_BOUNDARIES if boundary != "post_generation"
+        ]
+        terminal_index = boundaries.index("terminal_success")
+        boundaries[terminal_index:terminal_index] = [
+            "before_post_generation_trim", "post_generation_trim",
+        ]
+        sidecar = samples(role="engine", boundaries=boundaries, ios=True)
+        engine = row("generation-policy-clear", sidecar, layer="engine", ios=True)
+        self.write_sidecar("engine", engine["generationID"], sidecar)
+        engine["memoryMetrics"]["events"] = [{
+            "kind": "trim-action", "source": "post-generation",
+            "trimLevel": "softTrim", "reasonCode": "post_generation_cache_clear",
+        }]
+        engine["backendMetrics"]["stages"] = [{
+            "stage": "memory_trim",
+            "metadata": {
+                "level": "softTrim", "reason": "post_generation_cache_clear",
+                "source": "post-generation",
+            },
+        }]
+        return engine
+
+    def test_routine_policy_cache_clear_is_counted_but_is_not_pressure(self) -> None:
+        engine = self.policy_clear_fixture()
+        qualified, aggregate = qualify_memory_rows(
+            rows=[engine], diagnostics=self.root, platform="ios"
+        )
+        take = qualified[0]
+        self.assertEqual(take.status, "qualified")
+        self.assertEqual(take.warnings, ())
+        self.assertEqual(aggregate["status"], "qualified")
+        self.assertEqual(take.metrics["policyCacheClearCount"], 1)
+        self.assertEqual(take.metrics["maximumPressureLevel"], 0)
+        # Still a trim action: the legacy trim fields keep their meaning.
+        self.assertEqual(take.metrics["memoryTrimCount"], 1)
+        self.assertEqual(take.metrics["maximumTrimLevel"], 1)
+
+    def test_only_the_exact_policy_clear_escapes_the_soft_trim_warning(self) -> None:
+        # A kernel soft trim, a runtime (budget-relief) soft trim and a store
+        # trim whose reason only starts with post_generation all stay pressure.
+        variants = (
+            ("kernel", "memory_pressure_warning"),
+            ("runtime", "post_generation_cache_clear"),
+            ("post-generation", "post_generation_guarded"),
+        )
+        for source, reason in variants:
+            with self.subTest(source=source, reason=reason):
+                engine = self.policy_clear_fixture()
+                engine["memoryMetrics"]["events"][0].update(
+                    {"source": source, "reasonCode": reason}
+                )
+                engine["backendMetrics"]["stages"][0]["metadata"].update(
+                    {"source": source, "reason": reason}
+                )
+                qualified, _ = qualify_memory_rows(
+                    rows=[engine], diagnostics=self.root, platform="ios"
+                )
+                take = qualified[0]
+                self.assertEqual(take.status, "qualifiedWithWarnings")
+                self.assertIn("memory.pressure.soft_trim", take.warnings)
+                self.assertEqual(take.metrics["policyCacheClearCount"], 0)
+                self.assertEqual(take.metrics["maximumPressureLevel"], 1)
+                self.assertEqual(take.metrics["memoryTrimCount"], 1)
+
+    def test_policy_clear_typed_event_and_stage_mark_must_agree(self) -> None:
+        engine = self.policy_clear_fixture()
+        # The stage mark says pressure trim while the typed event says routine
+        # clear: the cross-check refuses rather than trusting either side.
+        engine["backendMetrics"]["stages"][0]["metadata"]["source"] = "kernel"
+        with self.assertRaises(MemoryEvidenceError):
+            qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")
+
     def test_macos_ui_uses_aligned_app_and_engine_samples_not_independent_peaks(self) -> None:
         generation_id = "generation-macos-001"
         engine_samples = samples(role="engine", boundaries=ENGINE_BOUNDARIES, ios=False, footprint=2500)

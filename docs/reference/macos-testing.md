@@ -259,10 +259,13 @@ does a marking peak-equality breach (CP-2: within every take, no post-marking fo
 exceed the pre-marking peak beyond tolerance — `config/marking-peak-equality.json`). Guarded
 pressure, `softTrim`, or 95–<100% coverage publishes only as an explicit warning.
 
-Do not infer an OS memory-pressure event from `memory.pressure.soft_trim` alone. Inspect the
-typed event's kind, source and reason: routine `post-generation` cache cleanup also emits a
-`trim-action` with reason `post_generation_cache_clear`. Keep the existing qualification warning
-and report its origin separately; zero pressure signals is not proof of leak freedom. Use the
+The routine per-tier cache clear (a `trim-action` with source `post-generation` and reason
+`post_generation_cache_clear`, emitted after every take where `clearCacheAfterGeneration` is set)
+is not memory pressure: records since 2026-09-25 count it as `policyCacheClearCount` (it stays in
+`memoryTrimCount`/`maximumTrimLevel`) and it raises neither the pressure level nor
+`memory.pressure.soft_trim`. Every other soft trim still warns. Older records fold the routine
+clear into that warning, so there `memory.pressure.soft_trim` alone is not an OS pressure event;
+zero pressure signals is not proof of leak freedom either. Use the
 policy-owned retained-memory lane below for bounded within-mode growth, rather than comparing
 unrelated peaks or interpreting initial model/cache residency as a leak.
 

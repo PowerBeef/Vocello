@@ -134,7 +134,9 @@ Never copy `build/` from another machine; rebuild it.
 - **Permissions.** Run `scripts/permissions_doctor.sh` and follow
   [`macos-permissions.md`](macos-permissions.md): the UI-test runner's System Audio Recording and
   Accessibility grants are added by hand in System Settings, and reading the privacy database needs
-  Full Disk Access for the terminal.
+  Full Disk Access for the terminal. macOS UI lanes also need Automation Mode without a password
+  prompt: run `sudo automationmodetool enable-automationmode-without-authentication` once, and keep
+  the session unlocked while a lane runs.
 - **Models.** The apps download the production catalog on first use into
   `~/Library/Application Support/QwenVoice`. Test fixtures come from `scripts/macos_test.sh models
   ensure` on explicit request; copying that folder from the old Mac also works.

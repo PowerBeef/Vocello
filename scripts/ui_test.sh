@@ -584,7 +584,19 @@ ensure_mac_runner_signature() {
 
 mac_ui_preflight() {
   local tcc_db="$HOME/Library/Application Support/com.apple.TCC/TCC.db"
-  local svc rows
+  local svc rows automation console
+  # XCUITest drives the app through macOS Automation Mode. Where enabling it
+  # needs authentication, an unattended run times out "enabling automation
+  # mode" after the build instead of testing; a locked session cannot be
+  # driven at all. Both fail here, before the build (docs/reference/macos-permissions.md).
+  automation="$(automationmodetool 2>/dev/null || true)"
+  if [[ "$automation" == *"Automation Mode is disabled"* && "$automation" == *"requires user authentication"* ]]; then
+    die "ui-preflight: macOS Automation Mode is off and needs authentication to turn on, so XCUITest would time out; run once on this Mac: sudo automationmodetool enable-automationmode-without-authentication"
+  fi
+  console="$(ioreg -n Root -d1 -a 2>/dev/null | plutil -extract IOConsoleUsers xml1 -o - - 2>/dev/null || true)"
+  if [[ "$console" == *"<key>CGSSessionScreenIsLocked</key>"*"<true/>"* ]]; then
+    die "ui-preflight: the login session is locked; XCUITest needs an unlocked session for the whole run"
+  fi
   for svc in kTCCServiceMicrophone kTCCServiceSpeechRecognition; do
     if ! rows="$(sqlite3 -readonly "$tcc_db" \
         "SELECT auth_value FROM access WHERE service='$svc' AND client='com.qwenvoice.app';" \

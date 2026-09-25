@@ -149,6 +149,13 @@ Configure its signing and test destination through the project and repository te
 screenshots need no separate screen-capture plugin route. These concerns are distinct from the
 application's microphone and speech permissions above.
 
+XCUITest drives the app through macOS Automation Mode. On a Mac where turning it on needs
+authentication (`automationmodetool` prints "requires user authentication"), an unattended lane
+times out "enabling automation mode" after its build. Once per machine, run
+`sudo automationmodetool enable-automationmode-without-authentication`. The login session must
+also stay unlocked for the whole run. The lane's `ui-preflight` step refuses both conditions before
+building.
+
 ### Accessibility, for pinning the window to a width (UIF-06)
 
 macOS XCUITest has no window-resize API, so the layout survey

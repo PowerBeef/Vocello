@@ -813,13 +813,9 @@ struct IOSVoiceDesignView: View {
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
+            // The banner carries an action, so it stays until the person uses or
+            // dismisses it, or starts a new take (PA-20, IOS-12; WCAG 2.2.1): no timer.
             .iosAppAnimation(Theme.Motion.miniPlayerSlide, value: savedDesignedResult)
-            .task(id: savedDesignedResult) {
-                guard savedDesignedResult != nil else { return }
-                try? await Task.sleep(for: .seconds(6))
-                guard !Task.isCancelled else { return }
-                savedDesignedResult = nil
-            }
     }
 
     // MARK: - Save designed voice → reuse in Clone
@@ -942,6 +938,19 @@ struct IOSVoiceDesignView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("design_savedVoice_useInClone")
+
+            Button {
+                savedDesignedResult = nil
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.Text.secondary)
+                    .frame(width: Theme.HitTarget.minimum, height: Theme.HitTarget.minimum)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(IOSInterfaceText.dismiss)
+            .accessibilityIdentifier("design_savedVoice_dismiss")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -1204,6 +1213,8 @@ struct IOSVoiceDesignView: View {
             waveformSeed: seed,
             estimatedAudioDuration: LivePreviewEstimate(text: promptText)?.estimatedAudioDuration ?? 0
         )) else { return }
+        // A new take replaces the previous take's saved-voice banner.
+        savedDesignedResult = nil
 
         let hooks = IOSStudioSingleTakeGenerationHooks(
             engine: ttsEngine,

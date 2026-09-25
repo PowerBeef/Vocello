@@ -2091,6 +2091,37 @@ class PublisherTests(unittest.TestCase):
         with self.assertRaises(publisher.PublicationError):
             publisher.validate_equivalent_outputs(cells, takes("a" * 64, "a" * 64, "b" * 64, "c" * 64, "e" * 64))
 
+    def test_the_negative_control_is_an_accuracy_control_voted_per_channel(self) -> None:
+        """Audit #42: the control must fail on accuracy by two-family consensus;
+        its language channel is reported only."""
+        script = "un deux trois quatre cinq six sept huit neuf dix onze douze"
+        english = "one two three four five six seven eight nine ten eleven twelve"
+
+        def evidence(apple: dict, *, transcript: str = english) -> dict:
+            return publisher.sanitized_independent_evidence(
+                cell={"id": "control", "expectedHint": "english", "expectedOutcome": "fail"},
+                engine_row={"generationID": "control-id"},
+                entry={"generationID": "control-id", "audioSHA256": "a" * 64, "recognitions": [
+                    independent_recognition(audio_sha256="a" * 64, script=script, transcript=transcript,
+                                            language="english"),
+                ]},
+                reference_script=script, expected_audio_sha256="a" * 64, duration_seconds=2.0,
+                apple_evidence=apple,
+            )
+
+        # Whisper hears English (language passes); Apple's locked check fails;
+        # both fail on accuracy: the accuracy channel agrees on the failure.
+        confirmed = evidence({"languagePass": False, "accuracyPass": False, "pass": False})
+        self.assertEqual(confirmed["channelConsensus"], {"language": "inconclusive", "accuracy": "fail"})
+        # A control Apple failed only on its language check is no longer confirmed.
+        with self.assertRaisesRegex(publisher.PublicationError, "per channel: accuracy=inconclusive"):
+            evidence({"languagePass": False, "accuracyPass": True, "pass": False})
+        # Nor one whose words both families recognized as the script.
+        with self.assertRaisesRegex(publisher.PublicationError, "accuracy=pass"):
+            evidence({"languagePass": True, "accuracyPass": True, "pass": True}, transcript=script)
+        # One witness: the accuracy failure alone confirms it; the channels are unpublished.
+        self.assertIsNone(evidence(None)["channelConsensus"])
+
     def test_a_skipped_phrase_under_the_gate_warns_but_never_fails(self) -> None:
         """Audit #84: two consecutive deleted words on a 17-word script pass the
         15 % gate; the take is published with the run and a warning."""
@@ -2193,6 +2224,11 @@ class PublisherTests(unittest.TestCase):
         })
         self.assertEqual(set(record["takes"][0]["detectedLanguages"]), {"apple-speech", "whisper"})
         self.assertEqual(record["takes"][0]["detectedLanguages"]["whisper"], "french")
+        # Per-channel consensus (audit #42): each channel voted by both families.
+        self.assertEqual(record["takes"][0]["channelConsensus"], {"language": "pass", "accuracy": "pass"})
+        self.assertEqual(verification["channelConsensusAlgorithm"], "per-channel-family-consensus-v1")
+        self.assertEqual(verification["channelVerdicts"], {"language": "pass", "accuracy": "pass"})
+        self.assertNotIn("negativeControlKind", verification)
         profile_takes = captured["manifest"]["historyRecord"]["inputs"]
         self.assertRegex(profile_takes["analysisProfileHash"], r"^[0-9a-f]{64}$")
 

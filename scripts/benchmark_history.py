@@ -46,7 +46,15 @@ from lib import lineage_identity  # noqa: E402
 from lib import bench_seed  # noqa: E402
 from lib import trace_cpu  # noqa: E402
 from lib import trace_intervals  # noqa: E402
-from lib.language_metrics import LANGUAGE_CHECK_KINDS  # noqa: E402
+from lib.language_metrics import (  # noqa: E402
+    CHANNEL_CONSENSUS_ALGORITHM,
+    CHANNEL_STATUSES,
+    LANGUAGE_CHANNELS,
+    LANGUAGE_CHECK_KINDS,
+    NEGATIVE_CONTROL_KIND,
+    channel_consensus,
+    run_channel_verdicts,
+)
 from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
 
 
@@ -184,7 +192,7 @@ TAKE_KEYS = {
     "streamingTelemetryV9SidecarDigest", "samplingPromotionPackaged", "samplingWAVDigest",
     "samplingSeedAgreement",
     "qualityRegistryOutcome", "qualityRegistryRequiredGates", "qualityRegistryIssues",
-    "detectedLanguages",
+    "detectedLanguages", "channelConsensus",
     # The first take after a cold take (audit #30); cell aggregate 2 leaves it
     # out of its cell's statistics.
     "followsColdTake",
@@ -249,6 +257,14 @@ LANGUAGE_VERIFICATION_KEYS = {
     # What each cited family's language check observes (records since
     # 2026-09-25, audit #42): lib.language_metrics.LANGUAGE_CHECK_KINDS.
     "languageCheckKinds",
+    # Per-channel consensus and the accuracy control (records since
+    # 2026-09-25, audit #42): lib.language_metrics.channel_consensus.
+    "negativeControlKind", "channelConsensusAlgorithm", "channelVerdicts",
+}
+# The per-family take metrics each verdict channel reads (audit #42).
+FAMILY_CHANNEL_METRICS = {
+    "apple-speech": {"language": "outputLanguagePass", "accuracy": "outputAccuracyPass"},
+    "whisper": {"language": "independentLanguagePass", "accuracy": "independentAccuracyPass"},
 }
 RECOGNITION_FAMILIES = ("apple-speech", "whisper", "sensevoice")
 # Records before 2026-09-12 carry no `families`; every one of them was verified
@@ -363,6 +379,8 @@ V2_ONLY_TAKE_KEYS = {
     # since 2026-09-25, audit #42), so a misattributed verdict is visible.
     "detectedLanguages",
     "followsColdTake",
+    # Each verdict channel's two-family consensus (records since 2026-09-25, audit #42).
+    "channelConsensus",
 }
 # Phase 13: the typed quality-registry identity is a v3 addition; v1/v2
 # records must reject it as unknown so historical documents stay immutable.
@@ -2267,6 +2285,67 @@ def language_families(record: dict[str, Any]) -> list[str]:
     return list(families)
 
 
+def validate_channel_consensus(
+    takes: list[dict[str, Any]],
+    language_verification: dict[str, Any] | None,
+    families: list[str],
+    negative_control_count: int,
+) -> None:
+    """Per-channel two-family consensus and the accuracy control (audit #42).
+
+    A take's `channelConsensus` must be the family rule applied to the
+    per-family verdicts it publishes, channel by channel, and must meet the
+    take's declared outcome; the run's `channelVerdicts` must follow from them.
+    """
+    verification = language_verification if isinstance(language_verification, dict) else {}
+    if "negativeControlKind" in verification and (
+        verification["negativeControlKind"] != NEGATIVE_CONTROL_KIND or negative_control_count == 0
+    ):
+        raise HistoryError("negativeControlKind must declare the accuracy control of a run that has one")
+    voted: list[tuple[dict[str, str], bool]] = []
+    for take in takes:
+        statuses = take.get("channelConsensus")
+        if statuses is None:
+            continue
+        if (
+            not isinstance(statuses, dict) or set(statuses) != set(LANGUAGE_CHANNELS)
+            or any(value not in CHANNEL_STATUSES for value in statuses.values())
+        ):
+            raise HistoryError("take.channelConsensus must give each channel a consensus status")
+        if "accuracyMetric" not in take or len(families) < 2 or any(
+            family not in FAMILY_CHANNEL_METRICS for family in families
+        ):
+            raise HistoryError("take.channelConsensus requires two cited families that scored the take")
+        metrics = take.get("metrics") or {}
+        family_channels: dict[str, dict[str, bool]] = {}
+        for family in families:
+            keys = FAMILY_CHANNEL_METRICS[family]
+            if any(metrics.get(keys[channel]) not in (0.0, 1.0) for channel in LANGUAGE_CHANNELS):
+                raise HistoryError("take.channelConsensus lacks a family's channel verdicts")
+            family_channels[family] = {
+                channel: metrics[keys[channel]] == 1.0 for channel in LANGUAGE_CHANNELS
+            }
+        expect_failure = take.get("expectedOutcome") == "fail"
+        agreement = channel_consensus(family_channels, expect_failure=expect_failure)
+        if agreement["statuses"] != statuses:
+            raise HistoryError("take.channelConsensus does not follow from its families' verdicts")
+        if agreement["outcome"] != "met":
+            raise HistoryError("take.channelConsensus does not meet the take's declared outcome")
+        voted.append((statuses, expect_failure))
+    has_run_verdict = "channelVerdicts" in verification or "channelConsensusAlgorithm" in verification
+    if not has_run_verdict:
+        if voted:
+            raise HistoryError("take.channelConsensus requires the run's channelVerdicts")
+        return
+    if (
+        verification.get("channelConsensusAlgorithm") != CHANNEL_CONSENSUS_ALGORITHM
+        or not voted
+        or len(voted) != sum(1 for take in takes if "accuracyMetric" in take)
+        or verification.get("channelVerdicts") != run_channel_verdicts(voted)
+    ):
+        raise HistoryError("channelVerdicts must follow from every scored take's channel consensus")
+
+
 def validate_machine_codes(values: Any, location: str) -> None:
     if not isinstance(values, list) or not all(
         isinstance(value, str) and SAFE_WARNING_RE.fullmatch(value) for value in values
@@ -2921,6 +3000,12 @@ def validate_record(
         raise HistoryError("generation benchmarks require at least one take")
     seen_generations: set[str] = set()
     negative_control_count = 0
+    declared_verification = record["evidence"].get("languageVerification")
+    # Records since 2026-09-25 declare the negative control an accuracy control
+    # (audit #42): it must fail on accuracy; its language check is reported only.
+    accuracy_control = isinstance(declared_verification, dict) and (
+        declared_verification.get("negativeControlKind") == NEGATIVE_CONTROL_KIND
+    )
     for position, take in enumerate(takes, start=1):
         if not isinstance(take, dict):
             raise HistoryError(f"takes[{position - 1}] must be an object")
@@ -3091,6 +3176,8 @@ def validate_record(
             )
             if negative_control and independent_passed:
                 raise HistoryError("negative-control take passed its independent verification")
+            if negative_control and accuracy_control and metrics["independentAccuracyPass"] != 0.0:
+                raise HistoryError("accuracy-control take passed its independent accuracy check")
             if not negative_control and not independent_passed:
                 raise HistoryError("independent recognition gate metrics are inconsistent")
         if "accuracyMetric" in take and "apple-speech" not in language_families(record):
@@ -3126,6 +3213,8 @@ def validate_record(
             output_passed = metrics["outputLanguagePass"] == 1.0 and metrics["outputAccuracyPass"] == 1.0
             if negative_control and output_passed:
                 raise HistoryError("negative-control take passed its in-app verification")
+            if negative_control and accuracy_control and metrics["outputAccuracyPass"] != 0.0:
+                raise HistoryError("accuracy-control take passed its in-app accuracy check")
             if not negative_control and not output_passed:
                 raise HistoryError("language accuracy gate metrics are inconsistent")
             count_keys = {
@@ -3235,6 +3324,7 @@ def validate_record(
             )
         ):
             raise HistoryError("take.detectedLanguages must map cited families to language names")
+    validate_channel_consensus(takes, language_verification, families, negative_control_count)
 
     cells = record.get("cells")
     if not isinstance(cells, list):

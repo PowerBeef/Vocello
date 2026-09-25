@@ -189,8 +189,22 @@ Apple Speech (text language detection over a transcript produced with the recogn
 expected locale, close to unfalsifiable for an anglicized take) and `audio-language-identification`
 for whisper (detection from the first 30 s of audio). Each language take publishes the language each
 family detected in `detectedLanguages`. On the negative control an English-locked whisper hears
-English and passes its language check; the control fails on accuracy alone. Per-channel consensus
-and re-declaring the control remain maintainer decisions.
+English and passes its language check; the control fails on accuracy alone.
+
+Consensus is per channel (audit #42; the maintainer delegated the decision to the audit's
+recommendation on 2026-09-25). A verdict has a `language` channel and an `accuracy` channel, and
+`scripts/lib/language_metrics.py` `channel_consensus` votes each one separately through the family
+rule, so two families that fail a take for different reasons no longer read as agreement and a
+channel the families split on is `inconclusive`. A take that must pass needs both channels to pass
+by consensus; the negative control is re-declared an **accuracy control**: it must fail the accuracy
+channel by consensus, and its language channel is reported only. A two-family record publishes each
+scored take's `channelConsensus` (`pass`, `fail` or `inconclusive` per channel) and the run's
+`languageVerification.channelVerdicts` (a channel is `pass` when every take that constrains it
+reached its expected status) with `channelConsensusAlgorithm: per-channel-family-consensus-v1`, and
+a run with a control declares `negativeControlKind: accuracy-control`. The history validator
+recomputes both from the per-family verdicts the takes publish. The cohort verdict
+(`independent_asr.py verdict`) applies the same rule and prints each take's channels. A second
+acoustic language detector would be research, not part of this rule.
 
 ### Validation and diagnostic snapshot (through 2026-07-16)
 
@@ -219,8 +233,9 @@ gate passed. That result establishes prerequisites only.
 
 Negative control `custom-fr-text-en-pinned` carries `expectedOutcome: "fail"`: the pinned English hint
 is sent over a French script, synthesis still speaks French today, and the cell passes only when the
-English-locked output verification ran and failed (on accuracy or language). A verification that
-passes means the model started honoring the pinned hint; a skipped verification is not a confirmed
+English-locked output verification ran and failed on accuracy (an accuracy control since
+2026-09-25; before, a failed language check alone also confirmed it). A verification that passes
+means the model started honoring the pinned hint; a skipped verification is not a confirmed
 control. Before 2026-09-12 this cell was hint-only and never measured its output. In a published
 record the control's take carries `expectedOutcome: "fail"` (a schema-v3 take key) and
 `scripts/benchmark_history.py` inverts its accuracy gate: the take is evidence only if its

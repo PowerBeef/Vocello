@@ -1,7 +1,7 @@
 """Language-verification metrics shared by every Python consumer.
 
 One tokenizer, one edit distance, one locale table, one threshold set and one
-family-consensus rule. `check_language_output.py`, `publish_benchmark_history.py`,
+family-consensus rule, applied per verdict channel. `check_language_output.py`, `publish_benchmark_history.py`,
 `run_local_delivery_cascade.py` and `independent_asr.py` import from here; the
 Swift `GenerationOutputVerifier` keeps its own implementation as the independent
 cross-check, and the fixtures in `scripts/tests/test_language_metrics.py` pin the
@@ -297,3 +297,98 @@ def consensus(family_votes: dict[str, list[bool]]) -> dict[str, Any]:
     else:
         reasons.append("independent-asr-disagreement")
     return {"status": status, "families": sorted(family_votes), "reasons": reasons}
+
+
+# Per-channel consensus (audit #42; decided 2026-09-25 by the audit's
+# recommendation). A language verdict has two channels that the families
+# observe differently: `language` (Apple Speech's transcript-language
+# consistency, whisper's audio language identification; LANGUAGE_CHECK_KINDS)
+# and `accuracy` (the edit rate of each family's own transcript). Each channel
+# is voted separately through `consensus`, so two families that fail a take for
+# different reasons no longer read as agreement, and families that disagree on
+# a channel leave that channel inconclusive.
+LANGUAGE_CHANNELS = ("language", "accuracy")
+CHANNEL_CONSENSUS_ALGORITHM = "per-channel-family-consensus-v1"
+CHANNEL_STATUSES = frozenset({"pass", "fail", "inconclusive"})
+# The negative control (a pinned hint over a script in another language) is an
+# accuracy control: it proves the accuracy channel sees wrong output. It no
+# longer claims to prove the language channel, which an English-locked whisper
+# passes on the anglicized control take; each family's detected language is
+# published beside it (`detectedLanguages`) and its language channel is
+# reported only.
+NEGATIVE_CONTROL_KIND = "accuracy-control"
+
+
+def expected_channel_outcomes(expect_failure: bool) -> dict[str, str]:
+    """The channels a take's declared outcome constrains, and their expected status."""
+    return {"accuracy": "fail"} if expect_failure else {"language": "pass", "accuracy": "pass"}
+
+
+def single_family_meets_expectation(
+    language_pass: bool, accuracy_pass: bool, *, expect_failure: bool,
+) -> bool:
+    """One witness against the take's declared outcome, channel by channel.
+
+    The accuracy control must fail on accuracy; its language check is reported
+    only. A take that must pass needs both channels."""
+    if expect_failure:
+        return accuracy_pass is False
+    return language_pass is True and accuracy_pass is True
+
+
+def channel_consensus(
+    family_channels: dict[str, dict[str, bool]], *, expect_failure: bool,
+) -> dict[str, Any]:
+    """Vote each channel through the family rule and judge the take's expectation.
+
+    `family_channels` maps a family to its `{"language": bool, "accuracy": bool}`
+    verdicts. `outcome` is `met` when every constrained channel reached its
+    expected status by consensus, `contradicted` when one reached the opposite
+    status, and `inconclusive` otherwise (one family, or disagreement).
+    """
+    channels: dict[str, dict[str, Any]] = {}
+    for channel in LANGUAGE_CHANNELS:
+        votes = {
+            family: [bool(verdicts[channel])]
+            for family, verdicts in sorted(family_channels.items())
+        }
+        channels[channel] = consensus(votes)
+    expected = expected_channel_outcomes(expect_failure)
+    statuses = {channel: channels[channel]["status"] for channel in LANGUAGE_CHANNELS}
+    if all(statuses[channel] == status for channel, status in expected.items()):
+        outcome = "met"
+    elif any(statuses[channel] not in {status, "inconclusive"} for channel, status in expected.items()):
+        outcome = "contradicted"
+    else:
+        outcome = "inconclusive"
+    return {
+        "algorithm": CHANNEL_CONSENSUS_ALGORITHM,
+        "families": sorted(family_channels),
+        "channels": channels,
+        "statuses": statuses,
+        "expected": expected,
+        "outcome": outcome,
+    }
+
+
+def run_channel_verdicts(takes: list[tuple[dict[str, str], bool]]) -> dict[str, str]:
+    """The run's verdict per channel from each take's channel statuses.
+
+    `takes` holds `(statuses, expect_failure)` per scored take. A channel is
+    `pass` when every take that constrains it reached its expected status,
+    `fail` when one reached the opposite status, and `inconclusive` otherwise
+    (or when no take constrains it)."""
+    verdicts: dict[str, str] = {}
+    for channel in LANGUAGE_CHANNELS:
+        observed = [
+            (statuses.get(channel), expected_channel_outcomes(expect_failure)[channel])
+            for statuses, expect_failure in takes
+            if channel in expected_channel_outcomes(expect_failure)
+        ]
+        if observed and all(status == expected for status, expected in observed):
+            verdicts[channel] = "pass"
+        elif any(status not in {expected, "inconclusive"} for status, expected in observed):
+            verdicts[channel] = "fail"
+        else:
+            verdicts[channel] = "inconclusive"
+    return verdicts

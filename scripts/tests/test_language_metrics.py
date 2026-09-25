@@ -247,5 +247,83 @@ class ConsensusTests(unittest.TestCase):
         self.assertEqual(metrics.consensus({"whisper": [], "apple-speech": [True]})["status"], "inconclusive")
 
 
+class ChannelConsensusTests(unittest.TestCase):
+    """Audit #42: each verdict channel is voted separately, and the negative
+    control is an accuracy control."""
+
+    PASS = {"language": True, "accuracy": True}
+
+    def test_two_families_passing_both_channels_meet_a_pass(self) -> None:
+        result = metrics.channel_consensus(
+            {"apple-speech": self.PASS, "whisper": self.PASS}, expect_failure=False)
+        self.assertEqual(result["statuses"], {"language": "pass", "accuracy": "pass"})
+        self.assertEqual(result["outcome"], "met")
+        self.assertEqual(result["algorithm"], metrics.CHANNEL_CONSENSUS_ALGORITHM)
+
+    def test_failures_for_different_reasons_are_not_agreement(self) -> None:
+        # Combined votes (both families "failed") would read as a consensus
+        # failure; per channel each channel is split, so nothing is agreed.
+        result = metrics.channel_consensus({
+            "apple-speech": {"language": False, "accuracy": True},
+            "whisper": {"language": True, "accuracy": False},
+        }, expect_failure=True)
+        self.assertEqual(result["statuses"], {"language": "inconclusive", "accuracy": "inconclusive"})
+        self.assertEqual(result["outcome"], "inconclusive")
+
+    def test_the_accuracy_control_constrains_accuracy_only(self) -> None:
+        # The audit's control take: whisper hears English (language passes) and
+        # both families fail on accuracy; Apple's locked language check fails.
+        result = metrics.channel_consensus({
+            "apple-speech": {"language": False, "accuracy": False},
+            "whisper": {"language": True, "accuracy": False},
+        }, expect_failure=True)
+        self.assertEqual(result["statuses"], {"language": "inconclusive", "accuracy": "fail"})
+        self.assertEqual(result["expected"], {"accuracy": "fail"})
+        self.assertEqual(result["outcome"], "met")
+        # A control both families transcribe correctly contradicts its expectation.
+        contradicted = metrics.channel_consensus(
+            {"apple-speech": self.PASS, "whisper": self.PASS}, expect_failure=True)
+        self.assertEqual(contradicted["outcome"], "contradicted")
+
+    def test_a_split_language_channel_leaves_a_pass_inconclusive(self) -> None:
+        result = metrics.channel_consensus({
+            "apple-speech": self.PASS, "whisper": {"language": False, "accuracy": True},
+        }, expect_failure=False)
+        self.assertEqual(result["statuses"], {"language": "inconclusive", "accuracy": "pass"})
+        self.assertEqual(result["outcome"], "inconclusive")
+        agreed_fail = metrics.channel_consensus({
+            "apple-speech": {"language": False, "accuracy": True},
+            "whisper": {"language": False, "accuracy": True},
+        }, expect_failure=False)
+        self.assertEqual(agreed_fail["outcome"], "contradicted")
+
+    def test_one_family_is_never_consensus(self) -> None:
+        result = metrics.channel_consensus({"whisper": self.PASS}, expect_failure=False)
+        self.assertEqual(result["statuses"], {"language": "inconclusive", "accuracy": "inconclusive"})
+        self.assertEqual(result["outcome"], "inconclusive")
+        self.assertTrue(metrics.single_family_meets_expectation(True, True, expect_failure=False))
+        self.assertFalse(metrics.single_family_meets_expectation(False, True, expect_failure=False))
+        self.assertTrue(metrics.single_family_meets_expectation(True, False, expect_failure=True))
+        self.assertFalse(metrics.single_family_meets_expectation(False, True, expect_failure=True))
+
+    def test_run_verdicts_follow_the_takes(self) -> None:
+        passing = {"language": "pass", "accuracy": "pass"}
+        control = {"language": "inconclusive", "accuracy": "fail"}
+        self.assertEqual(
+            metrics.run_channel_verdicts([(passing, False), (passing, False), (control, True)]),
+            {"language": "pass", "accuracy": "pass"},
+        )
+        self.assertEqual(
+            metrics.run_channel_verdicts([(passing, False), ({"language": "inconclusive", "accuracy": "pass"}, False)]),
+            {"language": "inconclusive", "accuracy": "pass"},
+        )
+        self.assertEqual(
+            metrics.run_channel_verdicts([(passing, False), ({"language": "pass", "accuracy": "pass"}, True)]),
+            {"language": "pass", "accuracy": "fail"},
+        )
+        # Only the control constrains nothing on the language channel.
+        self.assertEqual(metrics.run_channel_verdicts([(control, True)])["language"], "inconclusive")
+
+
 if __name__ == "__main__":
     unittest.main()

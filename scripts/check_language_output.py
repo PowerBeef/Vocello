@@ -302,14 +302,16 @@ def validate_structured_verification(
     if language_score is None or not 0 <= language_score <= 1:
         failures.append(f"{identity}: invalid languageMatchScore")
     if expect_failure:
-        # The control proves the harness can see a wrong-language output: the
-        # verification must have run (no skip) and failed on language or accuracy.
+        # The control is an accuracy control (audit #42, 2026-09-25): it proves
+        # the accuracy channel sees a wrong-language output, so the verification
+        # must have run (no skip) and failed on accuracy. Its language check is
+        # reported only: the recognizer runs locked to the expected locale.
         if verification.get("skipReason") is not None:
             failures.append(f"{identity}: negative control was skipped, not verified")
         if verification.get("pass") is not False:
             failures.append(f"{identity}: negative control did not fail verification")
-        if verification.get("languagePass") is not False and verification.get("accuracyPass") is not False:
-            failures.append(f"{identity}: negative control failed on neither language nor accuracy")
+        if verification.get("accuracyPass") is not False:
+            failures.append(f"{identity}: accuracy control did not fail on accuracy")
     else:
         if verification.get("languagePass") is not True or (
             language_score is not None and language_score < MIN_LANGUAGE_MATCH_SCORE

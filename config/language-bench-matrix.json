@@ -69,7 +69,7 @@
       "expectedHint": "english",
       "quick": true,
       "expectedOutcome": "fail",
-      "note": "negative control: a pinned English hint over a French script must fail output verification (the model still speaks French); the cell passes only when the English-locked verification ran and failed"
+      "note": "negative control, an accuracy control since 2026-09-25: a pinned English hint over a French script must fail the accuracy channel of output verification (the model still speaks French); the cell passes only when the English-locked verification ran and failed on accuracy, and its language check is reported only"
     },
     {
       "id": "custom-de-pinned",

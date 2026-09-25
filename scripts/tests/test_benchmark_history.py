@@ -833,6 +833,75 @@ class BenchmarkHistoryTests(unittest.TestCase):
         })
         self.publish(apple, "apple-control")
 
+    def test_two_family_records_publish_a_verdict_per_channel(self) -> None:
+        """Audit #42: each channel is voted separately; the control is an
+        accuracy control that must fail on accuracy by consensus."""
+        valid = self._schema_v3_language_record("channels-valid")
+        valid["evidence"]["languageVerification"] = {
+            **history.APPLE_SPEECH_VERIFICATION_IDENTITY,
+            "families": ["apple-speech", "whisper"],
+            "independentRecognitionAlgorithm": "mlx-whisper-locked-decode-v1",
+            "independentModelIdentitySHA256": "2" * 64,
+            "hintCellsPassed": 1, "hintCellsExpected": 1,
+            "outputCellsPassed": 1, "outputCellsExpected": 1, "negativeControlsConfirmed": 1,
+            "negativeControlKind": "accuracy-control",
+            "channelConsensusAlgorithm": "per-channel-family-consensus-v1",
+            "channelVerdicts": {"language": "inconclusive", "accuracy": "pass"},
+        }
+        # The audit's control take: whisper hears English, Apple's locked
+        # language check fails, and both families fail on accuracy.
+        valid["takes"][0].update({
+            "accuracyMetric": "wordErrorRate", "accuracyThreshold": 0.15, "expectedOutcome": "fail",
+            "channelConsensus": {"language": "inconclusive", "accuracy": "fail"},
+        })
+        valid["takes"][0]["metrics"].update({
+            "wordErrorRate": 0.5, "characterErrorRate": 0.5, "primaryAccuracyScore": 0.5,
+            "accuracyThreshold": 0.15, "languageMatchScore": 0.4, "outputLanguagePass": 0.0,
+            "outputAccuracyPass": 0.0, "referenceTokenCount": 8.0, "hypothesisTokenCount": 8.0,
+            "referenceCharacterCount": 32.0, "hypothesisCharacterCount": 32.0, "substitutions": 4.0,
+            "insertions": 0.0, "deletions": 0.0, "characterSubstitutions": 16.0,
+            "characterInsertions": 0.0, "characterDeletions": 0.0, "recognitionPassCount": 3.0,
+            "recognitionDurationSeconds": 0.3,
+            "independentWordErrorRate": 0.5625, "independentCharacterErrorRate": 0.23,
+            "independentPrimaryAccuracyScore": 0.5625, "independentLanguageMatchScore": 0.89,
+            "independentLanguagePass": 1.0, "independentAccuracyPass": 0.0,
+            "independentRecognitionDurationSeconds": 0.7,
+        })
+        self.publish(valid, "channels-valid")
+
+        verification = lambda record: record["evidence"]["languageVerification"]  # noqa: E731
+        mutations = {
+            "a channel status that does not follow from the families": lambda record: record["takes"][0].__setitem__(
+                "channelConsensus", {"language": "pass", "accuracy": "fail"}),
+            "a missing channel": lambda record: record["takes"][0].__setitem__(
+                "channelConsensus", {"accuracy": "fail"}),
+            "a run verdict that does not follow from the takes": lambda record: verification(record).__setitem__(
+                "channelVerdicts", {"language": "pass", "accuracy": "pass"}),
+            "per-take statuses without the run verdict": lambda record: (
+                verification(record).pop("channelVerdicts"), verification(record).pop("channelConsensusAlgorithm")),
+            "an unknown control kind": lambda record: verification(record).__setitem__(
+                "negativeControlKind", "language-control"),
+            "an accuracy control that passed in-app accuracy": lambda record: record["takes"][0]["metrics"].update({
+                "outputAccuracyPass": 1.0, "wordErrorRate": 0.0, "primaryAccuracyScore": 0.0,
+                "substitutions": 0.0, "characterSubstitutions": 0.0}),
+        }
+        for index, (label, mutate) in enumerate(mutations.items()):
+            record = copy.deepcopy(valid)
+            record["run"]["id"] = f"channels-invalid-{index}"
+            mutate(record)
+            with self.subTest(label=label), self.assertRaises(history.HistoryError):
+                self.publish(record, f"channels-invalid-{index}")
+
+        one_witness = copy.deepcopy(valid)
+        one_witness["run"]["id"] = "channels-one-witness"
+        verification(one_witness).update({
+            **history.INDEPENDENT_VERIFICATION_IDENTITY, "families": ["whisper"],
+        })
+        for key in history.LANGUAGE_ACCURACY_METRIC_KEYS - {"accuracyThreshold"}:
+            one_witness["takes"][0]["metrics"].pop(key, None)
+        with self.assertRaises(history.HistoryError):
+            self.publish(one_witness, "channels-one-witness")
+
     def test_language_evidence_added_by_the_audit_is_bounded(self) -> None:
         """Audit #42, #84, #89: check kinds, detected languages, deletion runs and
         whisper confidence are optional, but never malformed or misattributed."""

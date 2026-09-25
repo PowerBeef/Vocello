@@ -62,6 +62,7 @@ from benchmark_memory import (  # noqa: E402
 )
 from language_bench_evidence import stable_default_seed  # noqa: E402
 from lib.language_metrics import (  # noqa: E402
+    CHANNEL_CONSENSUS_ALGORITHM,
     DELETION_RUN_WARNING_LENGTH,
     LANGUAGE_CHECK_KINDS,
     INDEPENDENT_ASR_ALGORITHM,
@@ -71,13 +72,16 @@ from lib.language_metrics import (  # noqa: E402
     INDEPENDENT_REQUIRED_PASS_COUNT,
     MAX_ACCURACY_ERROR_RATE,
     MIN_LANGUAGE_MATCH_SCORE,
-    consensus as family_consensus,
+    NEGATIVE_CONTROL_KIND,
+    channel_consensus,
     is_sha256,
     locale_matches_expected_language,
     primary_accuracy_metric,
     recognition_issues,
     recomputed_accuracy,
+    run_channel_verdicts,
     score_recognition,
+    single_family_meets_expectation,
     text_sha256,
 )
 from lib import jsonio  # noqa: E402
@@ -2494,10 +2498,12 @@ def sanitized_asr_evidence(
             f"language cell {cell_id} failed output verification (skipped: {verification.get('skipReason')})"
         )
     if expect_failure:
-        # Negative control: the English-locked verification of a French take
-        # must have run and failed; a pass would mean the control is blind.
-        if boolean_fields["pass"] is not False or (
-            boolean_fields["languagePass"] is not False and boolean_fields["accuracyPass"] is not False
+        # Negative control, an accuracy control since 2026-09-25 (audit #42):
+        # the English-locked verification of a French take must have run and
+        # failed on accuracy. Its language check is reported, not required: a
+        # locked recognizer largely decides what language it "hears".
+        if boolean_fields["pass"] is not False or not single_family_meets_expectation(
+            boolean_fields["languagePass"], boolean_fields["accuracyPass"], expect_failure=True,
         ):
             raise PublicationError(f"language cell {cell_id} negative control did not fail verification")
     elif not all(boolean_fields.values()):
@@ -2809,21 +2815,33 @@ def sanitized_independent_evidence(
         )
     verdict = score_recognition(recognition, script=reference_script, language=expected_language)
     expect_failure = cell.get("expectedOutcome") == "fail"
-    votes: dict[str, list[bool]] = {"whisper": [verdict["passed"]]}
+    # Per-channel consensus (audit #42): each family votes its language and its
+    # accuracy verdict separately; the accuracy control constrains accuracy only.
+    family_channels: dict[str, dict[str, bool]] = {
+        "whisper": {"language": bool(verdict["languagePass"]), "accuracy": bool(verdict["accuracyPass"])},
+    }
     if apple_evidence is not None:
-        votes["apple-speech"] = [bool(apple_evidence.get("pass"))]
-    agreement = family_consensus(votes)
-    if len(votes) >= 2:
-        status = agreement["status"]
-        if status != ("fail" if expect_failure else "pass"):
-            raise PublicationError(
-                f"language cell {cell_id} recognizer families did not agree on a "
-                f"{'failure' if expect_failure else 'pass'}: {status} ({', '.join(agreement['reasons'])})"
+        family_channels["apple-speech"] = {
+            "language": bool(apple_evidence.get("languagePass")),
+            "accuracy": bool(apple_evidence.get("accuracyPass")),
+        }
+    agreement = channel_consensus(family_channels, expect_failure=expect_failure)
+    if len(family_channels) >= 2:
+        if agreement["outcome"] != "met":
+            detail = ", ".join(
+                f"{channel}={agreement['statuses'][channel]}" for channel in agreement["expected"]
             )
-    elif verdict["passed"] == expect_failure:
+            raise PublicationError(
+                f"language cell {cell_id} recognizer families did not agree on "
+                + ("the accuracy control's failure" if expect_failure else "a pass")
+                + f" per channel: {detail}"
+            )
+    elif not single_family_meets_expectation(
+        verdict["languagePass"], verdict["accuracyPass"], expect_failure=expect_failure,
+    ):
         raise PublicationError(
             f"language cell {cell_id} independent recognition "
-            + ("did not fail the negative control" if expect_failure else
+            + ("did not fail the accuracy control" if expect_failure else
                f"failed: {verdict['accuracyMetric']}={verdict['errorRate']:.3f} "
                f"detected={recognition.get('detectedLanguage')}")
         )
@@ -2850,6 +2868,8 @@ def sanitized_independent_evidence(
         "maximumNoSpeechProbability": _unit_interval(recognition.get("maximumNoSpeechProbability")),
         "meanAverageLogProbability": _nonpositive(recognition.get("meanAverageLogProbability")),
         "consensus": agreement,
+        # Published per take only when two families voted (audit #42).
+        "channelConsensus": dict(agreement["statuses"]) if len(family_channels) >= 2 else None,
         "provenance": dict(recognition["provenance"]),
     }
 
@@ -3135,6 +3155,8 @@ def language_command(args: argparse.Namespace) -> Path:
                 "independentLongestDeletionRun": float(evidence["longestDeletionRun"]),
             })
             record_detected_language(take, "whisper", evidence.get("detectedLanguage"))
+            if evidence.get("channelConsensus") is not None:
+                take["channelConsensus"] = evidence["channelConsensus"]
             flag_deletion_run(take, evidence["longestDeletionRun"], family="whisper",
                               negative_control=cell.get("expectedOutcome") == "fail")
             for source, target in (
@@ -3310,6 +3332,18 @@ def language_command(args: argparse.Namespace) -> Path:
         language_verification["languageCheckKinds"] = {
             family: LANGUAGE_CHECK_KINDS[family] for family in families
         }
+    if language_verification_counts["negativeControlsConfirmed"]:
+        # The control is an accuracy control (audit #42, 2026-09-25).
+        language_verification["negativeControlKind"] = NEGATIVE_CONTROL_KIND
+    channel_takes = [
+        (take["channelConsensus"], take.get("expectedOutcome") == "fail")
+        for take in takes if isinstance(take.get("channelConsensus"), dict)
+    ]
+    if len(families) >= 2 and channel_takes:
+        # Two families voted every scored take per channel: publish the run's
+        # verdict per channel beside the per-take statuses.
+        language_verification["channelConsensusAlgorithm"] = CHANNEL_CONSENSUS_ALGORITHM
+        language_verification["channelVerdicts"] = run_channel_verdicts(channel_takes)
     if independent_evidence and independent_provenance is not None:
         language_verification.update({
             "independentRecognitionAlgorithm": INDEPENDENT_ASR_ALGORITHM,

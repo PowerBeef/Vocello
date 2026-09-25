@@ -52,11 +52,12 @@ from lib.language_metrics import (  # noqa: E402
     INDEPENDENT_ASR_ALGORITHM,
     INDEPENDENT_RECOGNITION_SCHEMA,
     LANGUAGE_LOCALE_CODES,
-    consensus,
+    channel_consensus,
     edges_covered,
     is_sha256,
     recognition_issues,
     score_recognition,
+    single_family_meets_expectation,
     text_sha256,
 )
 
@@ -113,7 +114,8 @@ def _wav_duration_seconds(path: Path) -> float:
 def _row(*, row_id: str, generation_id: str, audio: Path, audio_sha256: str,
          expected_language: str, reference_text: str, expected_outcome: str = "pass",
          role: str | None = None, cell_id: str | None = None,
-         apple_speech_pass: bool | None = None) -> dict[str, Any]:
+         apple_speech_pass: bool | None = None,
+         apple_speech_channels: dict[str, bool] | None = None) -> dict[str, Any]:
     if not isinstance(reference_text, str) or not reference_text.strip():
         raise IndependentASRError(f"{row_id}: reference text is empty")
     if expected_language not in LANGUAGE_LOCALE_CODES:
@@ -135,6 +137,8 @@ def _row(*, row_id: str, generation_id: str, audio: Path, audio_sha256: str,
         entry["cellID"] = cell_id
     if apple_speech_pass is not None:
         entry["appleSpeechPass"] = apple_speech_pass
+    if apple_speech_channels is not None:
+        entry["appleSpeechChannels"] = dict(apple_speech_channels)
     return entry
 
 
@@ -234,6 +238,11 @@ def build_ios_manifest(*, diagnostics: Path, run_id: str, plan: Path, corpus: Pa
             raise IndependentASRError(f"{child}: corpus lacks scriptLang {take.get('scriptLang')!r}")
         verification = record.get("outputVerification")
         apple_pass = verification.get("pass") if isinstance(verification, dict) else None
+        # Each channel's in-app verdict, voted separately (audit #42).
+        apple_channels = {
+            "language": verification.get("languagePass"),
+            "accuracy": verification.get("accuracyPass"),
+        } if isinstance(verification, dict) else {}
         # Rows are keyed by the take's child run ID (audit #44): a diagnostic
         # cohort repeats each cell across seeds, which cell keys rejected as
         # duplicates and so kept whisper out of every cohort.
@@ -243,6 +252,9 @@ def build_ios_manifest(*, diagnostics: Path, run_id: str, plan: Path, corpus: Pa
             audio_sha256=declared, expected_language=str(take.get("expectedHint")),
             reference_text=script, expected_outcome=str(take.get("expectedOutcome", "pass")),
             apple_speech_pass=apple_pass if isinstance(apple_pass, bool) else None,
+            apple_speech_channels=apple_channels if apple_channels and all(
+                isinstance(value, bool) for value in apple_channels.values()
+            ) else None,
         ))
     return _manifest(rows, run_id=run_id, platform="ios",
                      generation_process_exited=generation_process_exited)
@@ -572,13 +584,15 @@ def witness_verdict(manifest: dict[str, Any], evidence: dict[str, Any]) -> dict[
     """Per-row family consensus for a lane that publishes no record (audit #44).
 
     Each row's whisper recognition is re-qualified and re-scored from its
-    transcript; when the manifest carries the in-app Apple Speech verdict, the
-    two families vote through the shared consensus rule. A row passes only when
-    the families agree on its expected outcome; with one family the result is
-    labelled one witness, never consensus. An unqualified recognition (a
-    truncated decode, an empty transcript, uncovered edges) is no witness at
-    all, as the publisher refuses it: its row is `unqualified` and never meets
-    its expectation, so a broken decode cannot confirm a negative control.
+    transcript; when the manifest carries the in-app Apple Speech channel
+    verdicts, the two families vote each channel (language, accuracy) through
+    the shared consensus rule (audit #42). A row passes only when the families
+    agree on every channel its expected outcome constrains (the negative
+    control is an accuracy control); with one family the result is labelled
+    one witness, never consensus. An unqualified recognition (a truncated
+    decode, an empty transcript, uncovered edges) is no witness at all, as the
+    publisher refuses it: its row is `unqualified` and never meets its
+    expectation, so a broken decode cannot confirm a negative control.
     """
     manifest = validate_manifest(manifest)
     cells = evidence.get("cells") if isinstance(evidence, dict) else None
@@ -597,24 +611,38 @@ def witness_verdict(manifest: dict[str, Any], evidence: dict[str, Any]) -> dict[
             duration_seconds=float(row["durationSeconds"]),
         )
         whisper = score_recognition(recognition, script=row["referenceText"], language=row["expectedLanguage"])
-        votes: dict[str, list[bool]] = {"whisper": [bool(whisper["passed"])]}
-        if isinstance(row.get("appleSpeechPass"), bool):
-            votes["apple-speech"] = [row["appleSpeechPass"]]
+        family_channels: dict[str, dict[str, bool]] = {
+            "whisper": {"language": bool(whisper["languagePass"]), "accuracy": bool(whisper["accuracyPass"])},
+        }
+        apple_channels = row.get("appleSpeechChannels")
+        if isinstance(apple_channels, dict) and all(
+            isinstance(apple_channels.get(channel), bool) for channel in ("language", "accuracy")
+        ):
+            family_channels["apple-speech"] = {
+                "language": apple_channels["language"], "accuracy": apple_channels["accuracy"],
+            }
         expected = "fail" if row.get("expectedOutcome") == "fail" else "pass"
-        agreement = consensus(votes)
+        agreement = channel_consensus(family_channels, expect_failure=expected == "fail")
         if issues:
             status, met = "unqualified", False
-        elif len(votes) >= 2:
-            status = agreement["status"]
-            met = status == expected
+        elif len(family_channels) >= 2:
+            # `pass` means the families agreed on the expected outcome per
+            # channel; `fail` that a channel contradicted it by consensus.
+            status = {"met": "pass", "contradicted": "fail"}.get(agreement["outcome"], "inconclusive")
+            met = agreement["outcome"] == "met"
         else:
             status = "one-witness"
-            met = votes["whisper"][0] == (expected == "pass")
+            met = single_family_meets_expectation(
+                whisper["languagePass"], whisper["accuracyPass"], expect_failure=expected == "fail",
+            )
         rows.append({
             "id": row["id"], "cellID": row.get("cellID", row["id"]), "expectedOutcome": expected,
-            "families": sorted(votes), "status": status, "expectationMet": met,
+            "families": sorted(family_channels), "status": status, "expectationMet": met,
+            "channels": agreement["statuses"],
             "whisperIssues": issues, "whisperErrorRate": whisper["errorRate"],
-            "reasons": agreement["reasons"],
+            "reasons": sorted({
+                reason for channel in agreement["channels"].values() for reason in channel["reasons"]
+            }),
         })
     families = sorted({family for row in rows for family in row["families"]})
     if any(row["status"] == "unqualified" for row in rows):

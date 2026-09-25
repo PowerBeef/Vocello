@@ -252,6 +252,24 @@ class CheckLanguageOutputTests(unittest.TestCase):
             skipped = subprocess.run(command, capture_output=True, text=True, check=False)
             self.assertNotEqual(skipped.returncode, 0)
 
+    def test_negative_control_is_an_accuracy_control(self) -> None:
+        """Audit #42: the control must fail on accuracy; a control that fails
+        only its (locked, near-unfalsifiable) language check is not confirmed,
+        and one that passes the language check while failing accuracy is."""
+        with open(CORPUS, encoding="utf-8") as handle:
+            scripts = {entry["id"]: entry["script"] for entry in json.load(handle)["languages"]}
+        failing = verification("english", script=scripts["french"], failing=True)
+        self.assertTrue(failing["languagePass"])
+        self.assertEqual(validate_structured_verification(
+            failing, "english", scripts["french"], "control", expect_failure=True,
+        ), [])
+        language_only = verification("english", script=scripts["french"])
+        language_only.update({"languagePass": False, "languageMatchScore": 0.1, "pass": False})
+        failures = validate_structured_verification(
+            language_only, "english", scripts["french"], "control", expect_failure=True,
+        )
+        self.assertEqual(failures, ["control: accuracy control did not fail on accuracy"])
+
 
     def test_cli_checks_separate_wav_duration_instead_of_trusting_pass(self) -> None:
         with tempfile.TemporaryDirectory() as diag:

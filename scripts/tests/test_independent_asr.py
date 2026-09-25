@@ -266,6 +266,7 @@ class IndependentASRTests(unittest.TestCase):
         self.assertIn("processed-duration-mismatch", verdict["rows"][0]["whisperIssues"])
         # Nor with the in-app family agreeing on the failure.
         manifest["rows"][0]["appleSpeechPass"] = False
+        manifest["rows"][0]["appleSpeechChannels"] = {"language": True, "accuracy": False}
         self.assertEqual(independent_asr.witness_verdict(manifest, evidence)["status"], "unqualified")
 
     def test_truncated_decode_is_a_processed_duration_mismatch(self) -> None:
@@ -433,7 +434,7 @@ class IndependentASRTests(unittest.TestCase):
         for take in plan["takes"]:
             sentinel = diagnostics / take["childRunID"] / "device-diagnostics-done.json"
             record = json.loads(sentinel.read_text())
-            record["outputVerification"] = {"pass": True}
+            record["outputVerification"] = {"pass": True, "languagePass": True, "accuracyPass": True}
             sentinel.write_text(json.dumps(record))
 
         with self.assertRaises(independent_asr.IndependentASRError):
@@ -450,6 +451,9 @@ class IndependentASRTests(unittest.TestCase):
         self.assertEqual(len({row["id"] for row in rows}), 15)
         self.assertEqual(len({row["cellID"] for row in rows}), 3)
         self.assertTrue(all(row["appleSpeechPass"] is True for row in rows))
+        self.assertTrue(all(
+            row["appleSpeechChannels"] == {"language": True, "accuracy": True} for row in rows
+        ))
 
         by_id = {row["id"]: row for row in rows}
         codes = {"english": "en", "french": "fr"}
@@ -480,14 +484,20 @@ class IndependentASRTests(unittest.TestCase):
         self.assertEqual(verdict["families"], ["apple-speech", "whisper"])
         self.assertEqual(verdict["rowCount"], 15)
 
-        # One family disagreeing on one take leaves the cohort inconclusive.
+        self.assertEqual(verdict["rows"][4]["channels"], {"language": "pass", "accuracy": "pass"})
+
+        # One family disagreeing on one channel of one take leaves the cohort
+        # inconclusive, and the row names the channel (audit #42).
         split = copy.deepcopy(manifest)
-        split["rows"][4]["appleSpeechPass"] = False
-        self.assertEqual(independent_asr.witness_verdict(split, evidence)["status"], "inconclusive")
+        split["rows"][4]["appleSpeechChannels"]["language"] = False
+        split_verdict = independent_asr.witness_verdict(split, evidence)
+        self.assertEqual(split_verdict["status"], "inconclusive")
+        self.assertEqual(split_verdict["rows"][4]["channels"], {"language": "inconclusive", "accuracy": "pass"})
         # Without the in-app verdicts the cohort rests on one witness, labelled so.
         alone = copy.deepcopy(manifest)
         for row in alone["rows"]:
             row.pop("appleSpeechPass")
+            row.pop("appleSpeechChannels")
         self.assertEqual(independent_asr.witness_verdict(alone, evidence)["status"], "one-witness")
 
     def test_cascade_manifest_carries_roles_and_review_evidence_shape(self) -> None:

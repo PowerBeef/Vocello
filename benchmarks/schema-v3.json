@@ -306,6 +306,18 @@
             "languageCheckKinds": {
               "description": "Records since 2026-09-25: what each cited family's language check observes (apple-speech: transcript-language consistency on its locked transcript; whisper: audio language identification).",
               "type": "object"
+            },
+            "negativeControlKind": {
+              "description": "Records since 2026-09-25 (audit #42): the negative control is an accuracy control; it must fail on accuracy and its language check is reported only.",
+              "const": "accuracy-control"
+            },
+            "channelConsensusAlgorithm": {
+              "description": "Records since 2026-09-25 (audit #42): each verdict channel (language, accuracy) is voted separately by two recognizer families.",
+              "const": "per-channel-family-consensus-v1"
+            },
+            "channelVerdicts": {
+              "description": "Records since 2026-09-25 (audit #42): the run's verdict per channel, derived from every scored take's channelConsensus.",
+              "type": "object"
             }
           },
           "required": [],
@@ -842,6 +854,10 @@
         },
         "cell": {
           "type": "string"
+        },
+        "channelConsensus": {
+          "description": "Language takes since 2026-09-25 (audit #42): each verdict channel's two-family consensus status (pass, fail or inconclusive).",
+          "type": "object"
         },
         "detectedLanguages": {
           "description": "Language takes since 2026-09-25: the language each cited recognizer family detected (Apple Speech from its locked transcript, whisper from the audio), so a misattributed verdict is visible.",

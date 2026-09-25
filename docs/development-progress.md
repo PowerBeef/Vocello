@@ -30,10 +30,11 @@ from the run-to-run spread. BT-01, BT-02 and BT-04 landed their code (memory con
 pooled gate, lineage contract v1); BT-03, BT-05 and BT-06 are partly landed. AV-17 step 1 is done:
 three seeded gate runs on one clean commit seeded the first canonical Mac mini M6 gate baseline
 (ce66096c). Wave 8 (worktree agents) covers BT-05's delivery-supervisor batch, the floor-emulation
-knob, the report-only stall gate and the remaining BT-03/BT-06 code items. Blocked on the
-maintainer: Automation Mode (the M6 UI runs that calibrate the stall gate and AV-17 steps 2–4),
-PA-10's GitHub settings, the clone-voice fixture enrollment, the PA-32 decision and every iPhone
-item.
+knob, the report-only stall gate and the remaining BT-03/BT-06 code items. The maintainer enabled
+Automation Mode without authentication (the M6 UI runs that calibrate the stall gate and AV-17
+steps 2–4 can run once wave 8 lands) and created PA-10's `release` environment (required reviewer,
+`v*` tags) and the `v*` tag ruleset. Still with the maintainer: copying the release secrets into
+the environment, the clone-voice fixture enrollment, the PA-32 decision and every iPhone item.
 
 ### Paused September 24 — resume at RF-13
 

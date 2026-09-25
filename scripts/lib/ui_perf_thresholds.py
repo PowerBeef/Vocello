@@ -4,6 +4,9 @@ The ceiling contracts (`config/ui-perf-thresholds.json`, `config/ui-perf-thresho
 name the hardware profile and display refresh interval they were derived on. A run on
 another profile or refresh rate gets one `uiperf.uncalibrated:<profile>` code instead
 of ceiling verdicts, so a faster host is never scored against a slower host's numbers.
+A contract whose scenarios or metrics changed meaning after its derivation names why in
+``calibrationStale``; its runs carry the same code until a derivation replaces it (a
+derived contract never carries the field).
 
 Ceilings come from counted ui-perf records: canonical records of one profile and one
 comparison lineage (one ``comparison.key``), so dirty or exploratory sessions and
@@ -63,6 +66,9 @@ def validate_calibration_fields(thresholds: dict[str, Any]) -> list[str]:
     footprint = thresholds.get("footprintGrowthCeilingMB")
     if footprint is not None and (isinstance(footprint, bool) or not isinstance(footprint, (int, float)) or footprint <= 0):
         problems.append("has a footprintGrowthCeilingMB that is not a positive number")
+    stale = thresholds.get("calibrationStale")
+    if stale is not None and (not isinstance(stale, str) or not stale.strip()):
+        problems.append("has a calibrationStale that is not a non-empty reason")
     return problems
 
 
@@ -72,11 +78,14 @@ def calibration(
     """Whether the contract's ceilings apply to a run on the canonical profile.
 
     Records publish only on the canonical profile, so the ceilings apply only when
-    the contract was derived there, at the refresh interval every scenario observed.
+    the contract was derived there, at the refresh interval every scenario observed,
+    and still describes what the scenarios measure (no ``calibrationStale``).
     """
     profile = thresholds["calibrationProfile"]
     expected_refresh = float(thresholds["calibrationRefreshIntervalMS"])
     reasons = []
+    if stale := thresholds.get("calibrationStale"):
+        reasons.append(f"ceilings are stale: {stale}")
     if profile != canonical_profile_id:
         reasons.append(f"ceilings calibrated on {profile}, canonical profile is {canonical_profile_id}")
     observed = sorted({round(float(value), 2) for value in refresh_intervals_ms})

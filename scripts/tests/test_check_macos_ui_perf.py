@@ -196,6 +196,22 @@ class UIPerfFixture(unittest.TestCase):
         self.assertEqual(report["status"], "passedWithWarnings")
         self.assertTrue(all(not row["thresholdWarnings"] for row in report["scenarios"]))
 
+    def test_a_stale_contract_is_uncalibrated_on_its_own_profile(self):
+        """A contract whose scenarios changed meaning since its derivation
+        (audit #32, #81) judges nothing until a derivation replaces it."""
+        self.thresholds.write_text(json.dumps({**self.contract, "calibrationStale": "new driver"}))
+        log = self.write_run(hitch_by_scenario={"idle-baseline": 50.0})
+        status, report = self.run_checker(log)
+        self.assertEqual(status, 0)
+        self.assertFalse(report["thresholds"]["calibrated"])
+        self.assertEqual(len(report["thresholds"]["uncalibratedReasons"]), 1)
+        self.assertEqual(report["thresholds"]["warnings"], ["uiperf.uncalibrated:mac-mini-m6-16gb"])
+        self.assertTrue(all(not row["thresholdWarnings"] for row in report["scenarios"]))
+        for invalid in ("", " ", 1, True, ["new driver"]):
+            self.thresholds.write_text(json.dumps({**self.contract, "calibrationStale": invalid}))
+            with self.subTest(stale=invalid), self.assertRaises(checker.GateError):
+                checker.load_thresholds(self.thresholds)
+
     def test_another_refresh_interval_is_uncalibrated(self):
         log = self.write_run(hitch_by_scenario={"idle-baseline": 50.0}, refresh_ms=8.333)
         status, report = self.run_checker(log)
@@ -577,6 +593,8 @@ class DerivationTests(unittest.TestCase):
         self.assertEqual(derived["calibrationProfile"], "mac-mini-m6-16gb")
         self.assertEqual(derived["derivationRule"], "spread-v1")
         self.assertEqual(len(derived["calibrationRuns"]), 3)
+        # A derivation replaces a stale contract with a fresh one.
+        self.assertNotIn("calibrationStale", derived)
         self.assertEqual(derived["confirmatoryScenarios"], self.base["confirmatoryScenarios"])
 
 

@@ -9,6 +9,7 @@
     "macos-xcui-perf-20260915-221935-636488c2",
     "macos-xcui-perf-20260915-222752-64610737"
   ],
+  "calibrationStale": "Since 2026-09-25 (audit #32, #33, #81) sidebar-navigation measures pure UI with a new driver (product warms suppressed, phased readiness polls, clicks and destination waits) and uiMaxGapMS is clipped to the measured window, so these ceilings judge quantities the scenarios no longer measure. Every run carries uiperf.uncalibrated:mac-mini-m2-8gb until AV-17 step 3 re-derives the contract from at least three counted M6 sessions of the new driver (--derive-thresholds writes a contract without this field).",
   "footprintGrowthCeilingMB": 250.0,
   "warnOnly": true,
   "confirmatoryScenarios": [

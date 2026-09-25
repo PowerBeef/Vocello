@@ -207,8 +207,13 @@ in [`config/ui-perf-thresholds.json`](../../config/ui-perf-thresholds.json)
 refresh interval its ceilings were derived on (`calibrationProfile`,
 `calibrationRefreshIntervalMS`); a run on any other, which today means every run on the canonical
 Mac mini M6 because the ceilings come from the retired M2, carries one
-`uiperf.uncalibrated:<profile>` code instead of ceiling verdicts. Roadmap item AV-17 step 3
-re-derives them from at least three counted M6 sessions:
+`uiperf.uncalibrated:<profile>` code instead of ceiling verdicts. A contract whose scenarios changed
+meaning after its derivation names why in `calibrationStale`, and its runs carry the same code on
+any profile: the committed M2 ceilings are stale since 2026-09-25, when sidebar-navigation became
+pure UI with a new driver (warms suppressed, phased polls) and `uiMaxGapMS` became clipped to the
+window (audit #32, #33, #81), so no one may carry them over to the M6 by changing the profile.
+Roadmap item AV-17 step 3 re-derives them from at least three counted M6 sessions of the new driver
+(a derived contract never carries `calibrationStale`):
 `python3 scripts/check_macos_ui_perf.py --derive-thresholds <run IDs...> --write
 config/ui-perf-thresholds.json` (rule `spread-v1`: per confirmatory scenario, max(1.3 × the
 median, the median + 3 × the run-to-run range), which is the median times max(1.3, 1 + 3 × the

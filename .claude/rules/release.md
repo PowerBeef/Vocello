@@ -127,8 +127,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   calibration profile from `config/macos-ui-stall-gate.json`; a provisional limit only reports, and only
   a contract calibrated with its run IDs fails a run. ui-perf ceilings stay warn-only; a
   recalibration derives them from the run-to-run spread of at least three counted runs with a 1.25-1.3x
-  floor, and a run off the contract's calibration profile or refresh interval carries
-  `uiperf.uncalibrated:<profile>` instead of ceiling verdicts.
+  floor, and a run off the contract's calibration profile or refresh interval, or under a contract
+  marked `calibrationStale` after its scenarios changed meaning, carries `uiperf.uncalibrated:<profile>`
+  instead of ceiling verdicts.
 - **Consent-bound lanes.** `scripts/ui_test.sh`, `scripts/ios_device.sh`, `scripts/macos_test.sh
   memory|lang-bench` and `release.yml` run only on explicit request, in the lead session, with no
   parallel agent active. Timing lanes refuse to start on a busy host (`require_quiet_host` in

@@ -157,6 +157,17 @@ class PythonSelectionTests(unittest.TestCase):
         self.assertIn("scripts/tests/test_analyze_prosody.py", selection["tests"])
         self.assertIn("scripts/tests/test_delivery_temporal_features.py", selection["tests"])
 
+    def test_benchmark_contracts_select_the_registry_tests(self) -> None:
+        for path in ("benchmarks/schema-v3.json", "benchmarks/hardware-profiles.json"):
+            with self.subTest(path=path):
+                selection = MODULE.python_test_selection([path])
+                self.assertEqual(selection["mode"], "selected")
+                self.assertIn("scripts/tests/test_benchmark_history.py", selection["tests"])
+        # Published records are evidence, not tooling inputs.
+        self.assertEqual(
+            MODULE.python_test_selection(["benchmarks/runs/ui-generation/x.json"])["mode"], "none"
+        )
+
     def test_unknown_input_and_shared_tooling_fall_back_to_the_full_suite(self) -> None:
         self.assertEqual(MODULE.python_test_selection(["scripts/tests/nonexistent_helper.py"])["mode"], "full")
         self.assertEqual(MODULE.python_test_selection(["scripts/lib/build_paths.sh"])["mode"], "full")

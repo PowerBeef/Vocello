@@ -95,8 +95,11 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
     root = root or ROOT
     agent_inputs = [p for p in paths if p.startswith(".claude/")
                     and p.endswith((".json", ".md", ".py", ".sh"))]
+    # Top-level benchmark contracts (record schemas, hardware profiles) are read
+    # by the registry tests; published records under benchmarks/runs/ are not.
     inputs = [p for p in paths if p.startswith(("scripts/", "config/"))
-              or p in {"project.yml", "Package.resolved"}] + agent_inputs
+              or p in {"project.yml", "Package.resolved"}
+              or (p.startswith("benchmarks/") and p.count("/") == 1 and p.endswith(".json"))] + agent_inputs
     if any(p.startswith(FULL_PYTHON_PATTERNS) for p in paths):
         return {"mode": "full", "tests": [], "reason": "shared tooling changed"}
     modules = sorted(root.glob("scripts/tests/**/test_*.py"))

@@ -1179,20 +1179,6 @@
       "unparkWhen": "the paired iPhone is available and unlocked for a consented lane (CONV-20)"
     },
     {
-      "id": "AUD-05",
-      "title": "History persistence, and what History shows",
-      "status": "planned",
-      "gate": "Audio-file deletion failures have a visible, recoverable outcome; filesystem reconciliation holds the database queue only as required to preserve recovery integrity; History offers bounded pages with access to the complete archive.",
-      "sourceOfTruth": [
-        "Sources/iOSSupport/Services/DatabaseService.swift",
-        "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift",
-        "Sources/iOS/History/HistoryScreen.swift"
-      ],
-      "notes": "Revalidated 2026-09-18: P1 silent audio unlink after row deletion, P2 unbounded reads and filesystem work in recovery transactions. iOS already surfaces database deletion errors; only the audio unlink is try?. Indexed idempotency and off-main macOS deletion remain repaired. Preserve fail-closed journal recovery while reducing contention; test unlink/database failures and paging without silently capping the archive. Prior UI-query timeout is historical, not rerun here. See project-review-2026-09-18.md.",
-      "plan": "audit-remediation-2026-09",
-      "updated": "2026-09-18"
-    },
-    {
       "id": "AUD-06",
       "title": "iOS modals hide their background from VoiceOver",
       "status": "parked",
@@ -1426,16 +1412,17 @@
     {
       "id": "PA-30",
       "plan": "project-audit-2026-09",
-      "title": "Leftovers from PA-21 and PA-22",
+      "title": "Leftovers from PA-21, PA-22 and AUD-05",
       "status": "planned",
       "blockedBy": [],
-      "gate": "The Studio Clone reference picker shows a saved-voice load failure with Retry; History writes survive app suspension (GRDB suspension notifications) behind an adversarial review of the recovery path; the maintainer decides whether audio kept by earlier Keep Audio Files clears is removed; the resident speech tokenizer gets an owner-scoped release (ENG-06) only with a device memory re-qualification.",
+      "gate": "A failed History clear is never silent and a pending clear has its own banner copy on both platforms; a long-form acceptance interrupted by app suspension is retried after resume and keeps its audio, with copy that matches; a set-aside unreadable audio-removal list is reported once or can be discarded; the maintainer decides whether audio kept by earlier Keep Audio Files clears is removed; the resident speech tokenizer gets an owner-scoped release (ENG-06) only with a device memory re-qualification.",
       "sourceOfTruth": [
-        "Sources/iOS/Sheets/IOSBottomSheets.swift",
-        "Sources/iOSSupport/Services/DatabaseService.swift",
+        "Sources/iOS/History/HistoryScreen.swift",
+        "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift",
+        "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
       ],
-      "notes": "Split out 2026-09-24. IOS-11 (partly confirmed): History is a plain DatabaseQueue in the App Group with no suspension handling; a suspended write would reach HistoryPersistenceError.classify and RecoverableStoreCoordinator, a data-loss path. ENG-06 is latent: the speech tokenizer is adopted across engines, safe today because one model operation runs at a time; a strict owner token can double the resident tokenizer on iOS (about 218 MB). Orphaned audio from earlier Keep Audio Files clears is user data.",
+      "notes": "Split out 2026-09-24. Done 2026-09-24: the Clone reference picker shows a failed Saved Voices load with Retry; History suspends its GRDB queue before the app is suspended, and a write that meets the suspension leaves the take in the outbox for the reconcile after resume (IOS-11, adversarially reviewed). Open from the second History review: iOS keeps a failed clear's error where only an empty list shows it, and a pending clear falls through to the \"0 takes queued\" banner copy on both platforms; a suspension inside a long-form acceptance lets the next write roll it back and delete the new joined output while the copy says the audio was kept, and one before prepare orphans the candidate; a set-aside removal list counts as an issue forever. ENG-06 is latent: one model operation runs at a time today; a strict owner token can double the resident tokenizer on iOS (about 218 MB). Orphaned audio from earlier Keep Audio Files clears is user data.",
       "updated": "2026-09-24"
     }
   ]

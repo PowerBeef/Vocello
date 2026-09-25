@@ -4015,6 +4015,21 @@
         "commit:3ba5e409",
         "file:scripts/tests/test_classify_changes.py"
       ]
+    },
+    {
+      "id": "AUD-05",
+      "title": "History persistence, and what History shows",
+      "status": "done",
+      "gate": "Audio-file deletion failures have a visible, recoverable outcome; filesystem reconciliation holds the database queue only as required to preserve recovery integrity; History offers bounded pages with access to the complete archive.",
+      "sourceOfTruth": [
+        "Sources/iOSSupport/Services/DatabaseService.swift",
+        "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
+        "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift",
+        "Sources/iOS/History/HistoryScreen.swift"
+      ],
+      "notes": "Closed 2026-09-24. Deletion: a delete whose audio cannot be removed says so and keeps the path on a durable removal list every reconcile retries (regular files only, never a path a row or queued take uses); clear-all hands its audio to that list before its marker retires and counts only what stays listed. Contention: with no long-form journal pending, History reads are read transactions. Paging: both platforms read bounded pages (filter and search reach every row) with Show More. Data-loss fix after two adversarial reviews: the clear marker records the highest row id it saw and a resume deletes only rows up to it (ids are AUTOINCREMENT, tested on real SQLite); a clear with a marker pending finishes it, then clears what is visible; a keep-files request never escalates; the clear read fails rather than withholding long-form rows; a marker from before the bound is abandoned. Leftovers moved to PA-30.",
+      "plan": "audit-remediation-2026-09",
+      "updated": "2026-09-24"
     }
   ]
 }

@@ -13,7 +13,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
-| `audit-remediation-2026-09` | active | backend-and-platform | 0/12 (0%) |
+| `audit-remediation-2026-09` | active | backend-and-platform | 1/12 (8%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 11/17 (65%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 17/26 (65%) |
@@ -96,7 +96,6 @@ Narrative authority: [`docs/reference/project-review-2026-09-18.md`](reference/p
 | `AUD-02` | parked | One owner for the iOS audio session | — |
 | `AUD-03` | planned | Studio screens stop owning generation Tasks | — |
 | `AUD-04` | parked | Clone readiness reflects the context it actually has | — |
-| `AUD-05` | planned | History persistence, and what History shows | — |
 | `AUD-06` | parked | iOS modals hide their background from VoiceOver | — |
 | `AUD-07` | parked | Verify recovery from an unverified StoreKit purchase | — |
 | `AUD-08` | planned | Make the logging half of the privacy invariant a gate | — |
@@ -121,9 +120,6 @@ Narrative authority: [`docs/reference/project-review-2026-09-18.md`](reference/p
 - **`AUD-04`** (parked) — Clone readiness reflects the context it actually has.
   gate: Define which clone-context states permit on-demand preparation; required preparation failures produce a visible outcome; regression tests preserve the requested transcript/reference through optional prime failure and verify any deliberate fallback.
   unparkWhen: the paired iPhone is available and unlocked for a consented lane (CONV-20)
-
-- **`AUD-05`** (planned) — History persistence, and what History shows.
-  gate: Audio-file deletion failures have a visible, recoverable outcome; filesystem reconciliation holds the database queue only as required to preserve recovery integrity; History offers bounded pages with access to the complete archive.
 
 - **`AUD-06`** (parked) — iOS modals hide their background from VoiceOver.
   gate: With a panel presented, VoiceOver focus cannot reach a control behind it.
@@ -453,7 +449,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-20` | planned | Accessibility and localization reach every surface | — |
 | `PA-25` | planned | Docs and tooling stay proportional | — |
 | `PA-26` | planned | Low-severity backlog from the external audit | — |
-| `PA-30` | planned | Leftovers from PA-21 and PA-22 | — |
+| `PA-30` | planned | Leftovers from PA-21, PA-22 and AUD-05 | — |
 
 ### Open items in detail
 
@@ -484,8 +480,8 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-26`** (planned) — Low-severity backlog from the external audit.
   gate: Every Low and Info finding in the external audit that no other item covers is fixed or declined with a reason, section by section.
 
-- **`PA-30`** (planned) — Leftovers from PA-21 and PA-22.
-  gate: The Studio Clone reference picker shows a saved-voice load failure with Retry; History writes survive app suspension (GRDB suspension notifications) behind an adversarial review of the recovery path; the maintainer decides whether audio kept by earlier Keep Audio Files clears is removed; the resident speech tokenizer gets an owner-scoped release (ENG-06) only with a device memory re-qualification.
+- **`PA-30`** (planned) — Leftovers from PA-21, PA-22 and AUD-05.
+  gate: A failed History clear is never silent and a pending clear has its own banner copy on both platforms; a long-form acceptance interrupted by app suspension is retried after resume and keeps its audio, with copy that matches; a set-aside unreadable audio-removal list is reported once or can be discarded; the maintainer decides whether audio kept by earlier Keep Audio Files clears is removed; the resident speech tokenizer gets an owner-scoped release (ENG-06) only with a device memory re-qualification.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

@@ -266,6 +266,33 @@ done
   so a failed take stays in the planned denominator instead of silently dropping the
   whole speaker/seed unit or being replaced with a friendlier seed.
 
+#### Sweep cost: `--no-cold` and the batching design (audit #104, 2026-09-25)
+
+The maintainer delegated the decision to the audit's recommendation (join on generation and run,
+which landed earlier; a no-cold mode; a design note before any batching).
+
+- **`--no-cold`.** Every invocation ran the Custom/Design cold take that the plain timing matrix
+  needs, but no delivery analysis pairs it: about 11.5 % of sweep time, 9-10 % wasted.
+  `vocello bench … --delivery … --no-cold` (a bare flag; it requires `--delivery`) skips it and
+  loads the model explicitly instead, so the neutral and instructed takes all run on a resident
+  model and stay `warm`. The run has no `cold#0` cell, so its matrix hash never matches a timing
+  matrix, and `bench-results.json` records `coldTakes: false` (absent otherwise). Its first warm
+  take may carry first-generation warm-up the cold take used to absorb: a no-cold run is a delivery
+  sweep, not a timing benchmark. `custom_delivery_matrix.py run --no-cold` passes it to every unit
+  and records `coldTakes: false` in the plan; a resume that changes it is refused.
+- **Batching (design, not implemented).** A sweep still pays, per seed, one process start, the
+  runtime bootstrap, and an unload and reload per mode and variant. A batched sweep would take
+  `--seeds a,b,c` in one process and, per mode and variant, load once and then run seed-major: for
+  each seed its neutral warm take(s) and its instructed takes, all stamped with that seed. Pairing
+  never crosses a seed. Each seed would still write its own sub-run (`<runID>--s<seed>`) with its own
+  `bench-results.json`, prosody sidecar and publication, so one seed stays the unit every tool
+  (the sidecar join, `delivery_matrix_report.py`, the history validator) already reads, and a
+  batch-level manifest is never publishable. A failed seed is recorded and the batch continues only
+  under `--continue-delivery-failures`, as a unit does today. Before building it, the next
+  pre-registered sweep should record the per-seed bootstrap and reload time from the bench stamps;
+  batching is worth its complexity only if that overhead is a material share of the sweep once the
+  cold take is gone.
+
 For the complete Built-in Voice speaker roster, prefer the autonomous runner:
 
 ```sh

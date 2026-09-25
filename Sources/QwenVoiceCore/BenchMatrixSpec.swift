@@ -92,15 +92,17 @@ public enum BenchMatrixSpec {
     /// takes per length and one take per delivery cell (Custom/Design only), plus
     /// one TTFC probe per mode × variant. Mirrors `BenchCommand.run`'s loops; the
     /// full default matrix (three modes, two variants, three lengths, warm 3) is 58.
+    /// A delivery sweep run with `--no-cold` (audit #104) plans no cold take.
     public static func plannedGenerationCount(
         modes: [String],
         variantCount: Int,
         lengths: [String],
         warm: Int,
         deliveryCellCount: Int,
-        ttfcProbe: Bool
+        ttfcProbe: Bool,
+        coldTakes: Bool = true
     ) -> Int {
-        let hasColdLength = !lengths.isEmpty
+        let hasColdLength = coldTakes && !lengths.isEmpty
         let perVariant = modes.reduce(0) { count, mode in
             let instructable = mode != "clone"
             return count

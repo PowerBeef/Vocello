@@ -368,5 +368,33 @@ class CustomDeliveryMatrixTests(unittest.TestCase):
             )
 
 
+class NoColdSweepTests(unittest.TestCase):
+    """Audit #104: a unit may skip the unpaired cold take; the plan records it."""
+
+    def test_the_bench_command_carries_no_cold_only_when_asked(self) -> None:
+        import subprocess
+        from unittest import mock
+
+        import custom_delivery_matrix as matrix
+
+        class Failed:
+            returncode = 1
+            stdout = ""
+            stderr = "stop after the command is captured"
+
+        for no_cold in (False, True):
+            with tempfile.TemporaryDirectory() as directory, \
+                    mock.patch.object(subprocess, "run", return_value=Failed()) as run:
+                with self.assertRaises(MatrixError):
+                    matrix.run_unit(
+                        binary=Path("/usr/bin/true"), data_dir=Path(directory), output=Path(directory),
+                        speaker="aiden", seed=7, deliveries=DELIVERIES, env={}, no_cold=no_cold,
+                    )
+                command = run.call_args.args[0]
+                self.assertEqual("--no-cold" in command, no_cold)
+                if no_cold:
+                    self.assertEqual(command[-1], "--no-cold")
+
+
 if __name__ == "__main__":
     unittest.main()

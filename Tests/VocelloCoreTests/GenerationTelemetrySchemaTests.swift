@@ -245,6 +245,16 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
             deliveryCellCount: 3,
             ttfcProbe: true
         ), 12)
+        // A --no-cold delivery sweep (audit #104) plans no cold take.
+        XCTAssertEqual(BenchMatrixSpec.plannedGenerationCount(
+            modes: ["custom", "clone"],
+            variantCount: 1,
+            lengths: ["medium"],
+            warm: 3,
+            deliveryCellCount: 3,
+            ttfcProbe: true,
+            coldTakes: false
+        ), 11)
     }
 
     private func sidecarCount(in appSupportDirectory: URL) throws -> Int {

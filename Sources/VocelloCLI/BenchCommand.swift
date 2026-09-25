@@ -122,6 +122,9 @@ enum BenchCommand {
         /// Present for new manifests. Non-empty values are permitted only for
         /// the explicit no-summary diagnostic continuation route.
         let deliveryFailures: [BenchDeliveryFailure]
+        /// `false` only for a `--no-cold` delivery sweep (audit #104); absent
+        /// otherwise, so every other manifest keeps its bytes.
+        let coldTakes: Bool?
     }
 
     /// Declares the exact retained-memory protocol selected by the caller. The
@@ -315,6 +318,14 @@ enum BenchCommand {
         if continueDeliveryFailures, deliveryItems.isEmpty {
             throw CLIError("--continue-delivery-failures requires --delivery")
         }
+        // Audit #104: a delivery sweep never pairs the cold take, which cost about
+        // 11.5 % of sweep time. `--no-cold` skips it and loads the model instead,
+        // so the neutral and instructed takes stay warm. A timing matrix keeps its
+        // cold cell, so the mode needs --delivery.
+        let noCold = args.flag("no-cold")
+        if noCold, deliveryItems.isEmpty {
+            throw CLIError("--no-cold is a delivery-sweep mode and requires --delivery")
+        }
         if continueDeliveryFailures, !noSummary {
             throw CLIError("--continue-delivery-failures requires --no-summary")
         }
@@ -344,7 +355,8 @@ enum BenchCommand {
                 lengths: lengths,
                 warm: warm,
                 deliveryCellCount: deliveryItems.count,
-                ttfcProbe: ttfc
+                ttfcProbe: ttfc,
+                coldTakes: !noCold
             )
             guard let sidecarBudget = GenerationTelemetrySidecarBudget.benchRun(
                 plannedSidecars: plannedGenerations
@@ -458,8 +470,13 @@ enum BenchCommand {
                 // generate loads inside the call (records warmState=cold).
                 try await runtime.engine.unloadModel()
 
+                // A --no-cold delivery sweep loads the model without a cold take,
+                // so its first take is warm like the others (audit #104).
+                if mode != .clone, noCold {
+                    try await runtime.engine.loadModel(id: modelID)
+                }
                 // Cold sample (Custom/Design only — Clone is warm-by-design).
-                if mode != .clone, let coldLen {
+                if mode != .clone, !noCold, let coldLen {
                     let coldText = try requiredText(for: coldLen)
                     total += 1
                     let cell = "\(mode.rawValue)/\(variantStr.lowercased())/\(coldLen)/cold#0"
@@ -615,7 +632,8 @@ enum BenchCommand {
                 memoryQualification: memoryQualification,
                 takes: takeResults,
                 referenceFailures: referenceFailures,
-                deliveryFailures: deliveryFailures
+                deliveryFailures: deliveryFailures,
+                coldTakes: noCold ? false : nil
             ),
             artifactDirectory: historyArtifactDir
         )
@@ -1644,6 +1662,9 @@ enum BenchCommand {
           --warm         warm reps per (cell × length); default 3. Zero is
                          allowed for a Custom/Design cold-only diagnostic;
                          Clone and --delivery require at least one warm take.
+          --no-cold      (with --delivery) skip the Custom/Design cold take a
+                         delivery sweep never pairs; the model is loaded first
+                         so every take stays warm
           --voice        (clone) saved voice name; default \(defaultCloneVoice)
           --confirm-consent  required when clone is in --modes: confirms you own or
                          have permission to clone the saved voice

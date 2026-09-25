@@ -1182,6 +1182,7 @@ def run_unit(
     seed: int,
     deliveries: list[dict],
     env: dict[str, str],
+    no_cold: bool = False,
 ) -> Path:
     key = unit_key(speaker, seed)
     unit_dir = output / "units" / key
@@ -1225,6 +1226,9 @@ def run_unit(
         "--continue-delivery-failures",
         "--quiet",
     ]
+    if no_cold:
+        # Audit #104: the unpaired cold take is skipped (a bare flag, placed last).
+        command.append("--no-cold")
     atomic_json(status_path, {"state": "running", "startedAt": utc_now(), "command": command[1:]})
     log_path = status_path.parent / "bench.log"
     try:
@@ -1354,6 +1358,10 @@ def main() -> None:
         default="shipped",
         help="explicit production or registered debug instruction arm",
     )
+    run_parser.add_argument(
+        "--no-cold", action="store_true",
+        help="skip each unit's unpaired cold take (vocello bench --no-cold, audit #104)",
+    )
     report_parser = subparsers.add_parser("report", help="validate existing sidecars and report")
     report_parser.add_argument("--output", type=Path, required=True)
     compare_parser = subparsers.add_parser(
@@ -1405,6 +1413,7 @@ def main() -> None:
             "designation": "exploratory",
             "instructionSet": args.instruction_set,
             "warmNeutralRepetitions": 2,
+            "coldTakes": not args.no_cold,
             "seeds": seeds,
             "speakers": speakers,
             "deliveries": deliveries,
@@ -1418,6 +1427,9 @@ def main() -> None:
             ):
                 if existing.get(key) != plan.get(key):
                     raise MatrixError(f"resume refused: matrix plan changed at {key}")
+            # Plans before audit #104 always ran the cold take.
+            if existing.get("coldTakes", True) != plan["coldTakes"]:
+                raise MatrixError("resume refused: matrix plan changed at coldTakes")
             plan = existing
         else:
             atomic_json(plan_path, plan)
@@ -1439,6 +1451,7 @@ def main() -> None:
                     seed=seed,
                     deliveries=deliveries,
                     env=env,
+                    no_cold=not plan.get("coldTakes", True),
                 )
         build_aggregate(output, plan)
         print(output / "custom-delivery-matrix-report.json")

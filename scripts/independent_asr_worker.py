@@ -12,9 +12,12 @@ What a row reports is measured, not copied from its inputs (audit #89):
 
 - ``decodedSampleCount`` is the length of the PCM the recognizer actually read
   (16 kHz), so the producer's processed duration can disagree with the WAV.
-- The model loads and a warm-up detection runs once before any row is timed;
-  ``wallSeconds`` is per-row recognition only and ``modelLoadSeconds`` and
-  ``warmupSeconds`` are reported once for the job.
+- The model loads once, and a warm-up on one second of silence runs every path
+  a timed row uses (a language detection, then one full transcription with the
+  job's decode options and a locked language, which pays for the decode loop
+  and the tokenizer) before any row is timed; ``wallSeconds`` is per-row
+  recognition only and ``modelLoadSeconds`` and ``warmupSeconds`` are reported
+  once for the job.
 - Every segment keeps whisper's no-speech probability and average log
   probability.
 
@@ -58,8 +61,10 @@ def read_wav16k(path: Path) -> Any:
 class Recognizer:
     """One loaded, warmed whisper model; rows are timed only after warm-up."""
 
-    def __init__(self, model_dir: Path, decode: dict[str, Any]) -> None:
+    def __init__(self, model_dir: Path, decode: dict[str, Any], *,
+                 warmup_language: str | None = None) -> None:
         import mlx.core as mx
+        import mlx_whisper
         from mlx_whisper.audio import N_SAMPLES, log_mel_spectrogram, pad_or_trim
         from mlx_whisper.transcribe import ModelHolder
 
@@ -77,20 +82,17 @@ class Recognizer:
             pad_or_trim(mx.array(audio), N_SAMPLES), n_mels=self.model.dims.n_mels,
         ).astype(self.dtype)
         started = time.monotonic()
-        # Warm the encoder and the first decoder step on silence so the first
-        # timed row does not pay for kernel compilation.
+        # Warm on silence exactly what a timed row runs: the encoder and one
+        # decoder step (language detection), then a full transcription with the
+        # same options and a locked language (the KV-cache decode loop and the
+        # tokenizer), so the first timed row pays for no first use.
         import numpy as np
-        self.model.detect_language(self._segment(np.zeros(SAMPLE_RATE_HZ, dtype=np.float32)))
+        silence = np.zeros(SAMPLE_RATE_HZ, dtype=np.float32)
+        self.model.detect_language(self._segment(silence))
+        mlx_whisper.transcribe(silence, **self._options(warmup_language or "en"))
         self.warmup_seconds = time.monotonic() - started
 
-    def recognize(self, audio: Any, language: str | None) -> dict[str, Any]:
-        import mlx_whisper
-
-        started = time.monotonic()
-        # Language identification reads the first 30 s exactly as upstream
-        # Whisper does: pad or trim the *audio* to 30 s, then its log-mel.
-        _tokens, probabilities = self.model.detect_language(self._segment(audio))
-        detected = max(probabilities, key=probabilities.get)
+    def _options(self, language: str | None) -> dict[str, Any]:
         options: dict[str, Any] = {
             "path_or_hf_repo": str(self.model_dir),
             "temperature": float(self.decode.get("temperature", 0.0)),
@@ -101,7 +103,17 @@ class Recognizer:
         }
         if language is not None:
             options["language"] = language
-        result = mlx_whisper.transcribe(audio, **options)
+        return options
+
+    def recognize(self, audio: Any, language: str | None) -> dict[str, Any]:
+        import mlx_whisper
+
+        started = time.monotonic()
+        # Language identification reads the first 30 s exactly as upstream
+        # Whisper does: pad or trim the *audio* to 30 s, then its log-mel.
+        _tokens, probabilities = self.model.detect_language(self._segment(audio))
+        detected = max(probabilities, key=probabilities.get)
+        result = mlx_whisper.transcribe(audio, **self._options(language))
         segments = [
             {
                 "start": float(item.get("start", 0.0)),
@@ -130,7 +142,10 @@ def run_job(job: dict[str, Any]) -> dict[str, Any]:
     rows = job.get("rows")
     if not isinstance(rows, list) or not rows:
         raise WorkerError("worker job has no rows")
-    recognizer = Recognizer(Path(str(job["weights"])).parent, job.get("decodeOptions") or {})
+    recognizer = Recognizer(
+        Path(str(job["weights"])).parent, job.get("decodeOptions") or {},
+        warmup_language=rows[0].get("language"),
+    )
     output = []
     for row in rows:
         audio = read_pcm16(Path(str(row["pcmPath"])))
@@ -160,7 +175,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             if args.weights is None or args.audio is None:
                 raise WorkerError("worker needs --job or --weights with --audio")
-            recognizer = Recognizer(Path(args.weights).parent, {})
+            recognizer = Recognizer(Path(args.weights).parent, {}, warmup_language=args.language)
             payload = {
                 **recognizer.recognize(read_wav16k(args.audio), args.language),
                 "modelLoadSeconds": recognizer.model_load_seconds,

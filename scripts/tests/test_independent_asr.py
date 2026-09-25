@@ -294,8 +294,8 @@ class IndependentASRTests(unittest.TestCase):
         events: list = []
 
         class FakeRecognizer:
-            def __init__(self, model_dir, decode) -> None:
-                events.append(("load", model_dir.name, decode))
+            def __init__(self, model_dir, decode, *, warmup_language=None) -> None:
+                events.append(("load", model_dir.name, decode, warmup_language))
                 self.model_load_seconds, self.warmup_seconds = 1.5, 0.2
 
             def recognize(self, audio, language):
@@ -311,7 +311,8 @@ class IndependentASRTests(unittest.TestCase):
         ]}
         with mock.patch.object(worker, "Recognizer", FakeRecognizer):
             output = worker.run_job(job)
-        self.assertEqual(events, [("load", self.root.name, {"fp16": True}),
+        # The warm-up decodes in the first row's locked language.
+        self.assertEqual(events, [("load", self.root.name, {"fp16": True}, "en"),
                                   ("row", 480, "en"), ("row", 960, "fr")])
         self.assertEqual((output["modelLoadSeconds"], output["warmupSeconds"]), (1.5, 0.2))
         self.assertEqual([row["decodedSampleCount"] for row in output["rows"]], [480, 960])

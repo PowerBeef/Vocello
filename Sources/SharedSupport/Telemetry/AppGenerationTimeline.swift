@@ -24,6 +24,11 @@ final class AppGenerationTimeline {
         /// be placed on this row's timeline without guessing the click-to-submit
         /// latency of the UI driver. Correlation only, never a throughput figure.
         let submittedAtEpochMS: Int
+        /// The benchmark take identity at submit (audit #74). The runner moves
+        /// the shared current-take file to the next take once this take has
+        /// completed, which can precede this row's write, so the row keeps the
+        /// identity its take was submitted under instead of re-reading the file.
+        let benchNotes: [String: String]
         var firstChunkAt: ContinuousClock.Instant?
         var playbackScheduledAt: ContinuousClock.Instant?
         var mode: String?
@@ -58,9 +63,11 @@ final class AppGenerationTimeline {
         }
         let telemetryMode = TelemetryGate.appProcessIntendedMode
         let memorySampler = Self.makeAppMemorySampler(mode: telemetryMode)
+        let benchNotes = BenchRunContext.telemetryNotes()
         marksByID[key] = Marks(
             submittedAt: clock.now,
             submittedAtEpochMS: Int((Date().timeIntervalSince1970 * 1000).rounded()),
+            benchNotes: benchNotes,
             mode: mode,
             memorySampler: memorySampler,
             telemetryMode: telemetryMode
@@ -126,7 +133,7 @@ final class AppGenerationTimeline {
             timingsMS: timingsMS,
             counters: counters,
             notes: currentTaskQOSNotes()
-                .merging(BenchRunContext.telemetryNotes()) { current, _ in current },
+                .merging(marks?.benchNotes ?? BenchRunContext.telemetryNotes()) { current, _ in current },
             frontendMetrics: GenerationTelemetryCompatibilityAdapter.frontend(
                 timingsMS: timingsMS,
                 counters: counters,
@@ -264,7 +271,7 @@ final class AppGenerationTimeline {
         }
 
         let notes = currentTaskQOSNotes()
-            .merging(BenchRunContext.telemetryNotes()) { current, _ in current }
+            .merging(marks?.benchNotes ?? BenchRunContext.telemetryNotes()) { current, _ in current }
         let appMemorySummary = await finishAppMemoryCapture(
             marks: marks,
             generationID: key

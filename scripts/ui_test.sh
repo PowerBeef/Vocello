@@ -1202,6 +1202,10 @@ validate_macos_benchmark() {
   local diagnostics="$HOME/Library/Application Support/QwenVoice-Debug/diagnostics"
   local evidence="$out/benchmark-evidence.json"
   local status deadline=$((SECONDS + 10))
+  # Per-take harness phases the runner printed (audit #31): monotonic offsets
+  # around the measured windows, kept beside the run as take-phases.jsonl.
+  grep -o 'VOCELLO_BENCH_TAKE_PHASES={.*}' "$out/xcodebuild.log" 2>/dev/null \
+    | sed 's/^VOCELLO_BENCH_TAKE_PHASES=//' >"$out/take-phases.jsonl" || true
   # The engine runs in the app, which has exited before validation, so the
   # rows are final: validate once. Only the checker's distinct "rows not yet
   # present" outcome (75) is retried, for about ten seconds (audit #21). The

@@ -463,6 +463,26 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("classification", self.last_manifest["historyRecord"]["run"])
 
+    def test_an_app_row_must_name_its_engine_rows_take(self) -> None:
+        """audit #74: a layer that read the current-take file late names the next take."""
+        def stamp(layers: dict[str, list[dict]]) -> None:
+            for app_row, engine_row in zip(layers["app"], layers["engine"], strict=True):
+                for key in ("benchTakeIndex", "benchCell"):
+                    app_row["notes"][key] = engine_row["notes"][key]
+
+        result = self.run_checker(self.expected_order, mutate_layers=stamp)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        def late_read(layers: dict[str, list[dict]]) -> None:
+            stamp(layers)
+            layers["app"][1]["notes"].update({
+                "benchTakeIndex": layers["engine"][2]["notes"]["benchTakeIndex"],
+                "benchCell": layers["engine"][2]["notes"]["benchCell"],
+            })
+
+        result = self.run_checker(self.expected_order, mutate_layers=late_read)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+
     def run_with_stalls(
         self, device_class: str | None, *, forced: bool = False, stalls: int = 2,
         maximum_ms: int = 300, extra_args: list[str] | None = None, evidence: bool = False,

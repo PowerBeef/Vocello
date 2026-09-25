@@ -598,6 +598,15 @@ distinct "rows not yet present" exit (75), for about ten seconds. Timing lanes a
 their own build settle (up to 90 s, down to the core count) and re-apply the quiet-host rule after
 build-for-testing, before the first take.
 
+Every take plays out before the next begins, with a half-second tail, whether or not the played-audio
+capture is live, so the idle gap between takes never depends on the recording grant (audit #74). The
+app row keeps the take identity it was submitted under, and the checker refuses a run whose app and
+engine rows name different takes. The runner prints each take's harness phases (monotonic offsets
+from the take's start: manifest published, session ready, script entered, submit, completion seen,
+playback ended, settled, end) and the lane keeps them as `take-phases.jsonl` beside the run, so
+per-take harness overhead is measured rather than inferred (audit #31); they time the harness around
+the measured windows, never inside them.
+
 **One-time machine setup:** configure Xcode UI-test runner signing, build the native test host, and
 install the required models.
 

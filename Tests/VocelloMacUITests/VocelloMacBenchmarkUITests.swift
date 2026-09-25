@@ -78,6 +78,7 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
         var preparedMode: VocelloUIBenchMatrix.Mode?
         for (offset, take) in takes.enumerated() {
             let takeIndex = offset + 1
+            let phases = VocelloBenchTakePhases(takeIndex: takeIndex, cell: take.cellID)
             guard publishCurrentTakeManifest(
                 runID: runID,
                 takeIndex: takeIndex,
@@ -86,6 +87,7 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
             ) else {
                 return
             }
+            phases.mark("manifestReadyMS")
 
             let previous = offset > 0 ? takes[offset - 1] : nil
             let requiresNewSession = offset == 0
@@ -107,27 +109,41 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
                 prepare(mode: take.mode)
                 preparedMode = take.mode
             }
+            phases.relaunched = requiresNewSession
+            phases.mark("sessionReadyMS")
 
             XCTContext.runActivity(named: "Take \(takeIndex): \(take.cellID)") { _ in
                 replaceScript(with: take.text)
+                phases.mark("scriptReadyMS")
                 capture?.beginTake(index: takeIndex, cell: take.cellID, warmState: take.warmState.rawValue)
                 generateAndWaitForCompletion(
                     mode: take.mode,
                     timeout: timeout(for: take),
-                    onBeforeGenerate: { capture?.markSubmit() },
+                    onBeforeGenerate: {
+                        phases.mark("submitMS")
+                        capture?.markSubmit()
+                    },
                     onAfterGenerateClick: { capture?.markSubmitReturned() }
                 )
+                phases.mark("completedMS")
+                // Every take plays out before the next begins, whether or not the
+                // capture is live (audit #74): the idle gap before the next take,
+                // and so its pacing, never depends on the recording grant.
+                let playbackEnded = waitForPlaybackToFinish(timeout: timeout(for: take))
+                phases.mark("playbackEndedMS")
                 if let capture, !capture.isIdle {
-                    // Let the take play out; the tap stops once the captured audio
-                    // itself has been quiet for half a second after the player stopped.
-                    let playbackEnded = waitForPlaybackToFinish(timeout: timeout(for: take))
+                    // The tap stops once the captured audio itself has been quiet
+                    // for half a second after the player stopped.
                     _ = VocelloUIWait.condition("captured audio to fall silent after playback", timeout: 5) {
                         capture.capturedAudioIsQuiet(forLast: 0.5)
                     }
                     capture.endTake(playbackEnded: playbackEnded)
                 } else {
-                    capture?.endTake(playbackEnded: false)
+                    capture?.endTake(playbackEnded: playbackEnded)
+                    // The same half-second tail the capture's quiet check waits.
+                    _ = XCTWaiter.wait(for: [XCTestExpectation(description: "post-playback settle")], timeout: 0.5)
                 }
+                phases.mark("settledMS")
 
                 if take.warmState == .cold || offset == 0 || offset == takes.count - 1 {
                     VocelloUIScreenshot.attach(
@@ -136,6 +152,8 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
                     )
                 }
             }
+            phases.mark("endMS")
+            phases.emit()
         }
     }
 
@@ -189,5 +207,51 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
     private func sanitized(_ value: String) -> String {
         value.replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: "#", with: "-")
+    }
+}
+
+/// Per-take harness phases (audit #31): monotonic offsets in milliseconds from
+/// the start of each take's loop iteration (manifest published, session ready,
+/// script entered, submit, completion seen, playback ended, settled, end),
+/// printed as one `VOCELLO_BENCH_TAKE_PHASES=` JSON line that
+/// `scripts/ui_test.sh` keeps as `take-phases.jsonl`. They time the harness
+/// around the measured windows, never inside them, so per-take overhead is
+/// measured rather than inferred. `startEpochMS` only correlates the line
+/// with other evidence.
+@MainActor
+private final class VocelloBenchTakePhases {
+    private let clock = ContinuousClock()
+    private let start: ContinuousClock.Instant
+    private let startEpochMS: Int64
+    private let takeIndex: Int
+    private let cell: String
+    private var offsetsMS: [String: Int] = [:]
+    var relaunched = false
+
+    init(takeIndex: Int, cell: String) {
+        start = clock.now
+        startEpochMS = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+        self.takeIndex = takeIndex
+        self.cell = cell
+    }
+
+    func mark(_ phase: String) {
+        offsetsMS[phase] = Int((start.duration(to: clock.now) / .milliseconds(1)).rounded())
+    }
+
+    func emit() {
+        var payload: [String: Any] = [
+            "takeIndex": takeIndex,
+            "cell": cell,
+            "relaunched": relaunched,
+            "startEpochMS": startEpochMS,
+        ]
+        for (phase, offset) in offsetsMS {
+            payload[phase] = offset
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+              let line = String(data: data, encoding: .utf8) else { return }
+        print("VOCELLO_BENCH_TAKE_PHASES=\(line)")
+        fflush(stdout)
     }
 }

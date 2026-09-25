@@ -446,6 +446,35 @@ def validate_layer(
     return failures
 
 
+# The take identity both layers stamp from the benchmark's current-take file.
+TAKE_IDENTITY_NOTES = ("benchTakeIndex", "benchCell")
+
+
+def validate_take_identity(engine_rows: list[dict], app_rows: list[dict]) -> list[str]:
+    """An app row names the same take as its engine row (audit #74).
+
+    The runner moves the shared current-take file to the next take once a take
+    completes; a layer that read it late would stamp the next take. The app
+    layer snapshots it at submit, and this check refuses a run where either
+    layer's identity still disagrees. A row without a take identity is left to
+    the other checks (engine rows must carry one)."""
+    failures: list[str] = []
+    engine_by_id = {row.get("generationID"): row for row in engine_rows}
+    for app_row in app_rows:
+        engine_row = engine_by_id.get(app_row.get("generationID"))
+        if engine_row is None:
+            continue
+        app_notes = app_row.get("notes") or {}
+        engine_notes = engine_row.get("notes") or {}
+        for key in TAKE_IDENTITY_NOTES:
+            if key in app_notes and str(app_notes[key]) != str(engine_notes.get(key)):
+                failures.append(
+                    f"app generation {app_row.get('generationID', '?')} names {key}="
+                    f"{app_notes[key]!r}, its engine row {engine_notes.get(key)!r}"
+                )
+    return failures
+
+
 def validate_merged(
     rows: list[dict], expected_ids: list[str], expected_count: int
 ) -> list[str]:
@@ -1155,6 +1184,7 @@ def main() -> int:
     if len(set(engine_ids)) != len(engine_ids):
         failures.append("engine generationIDs are not unique")
     failures.extend(validate_layer("app", app_rows, valid_engine_ids, expected))
+    failures.extend(validate_take_identity(engine_rows, app_rows))
     failures.extend(validate_merged(merged_rows, valid_engine_ids, expected))
     failures.extend(
         validate_process_ownership(engine_rows, app_rows, merged_rows, valid_engine_ids)

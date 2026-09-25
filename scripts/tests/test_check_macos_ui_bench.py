@@ -434,6 +434,35 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual(self.last_manifest["historyRecord"]["run"]["classification"], "exploratory")
 
+    def test_each_take_keeps_its_load_and_a_busy_take_makes_the_run_exploratory(self) -> None:
+        """audit #28: the canonical 488a9ed0 ran a cold take at load 14.33 on 8 cores."""
+        result = self.run_checker(self.expected_order, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        record = self.last_manifest["historyRecord"]
+        self.assertTrue(all(take["metrics"]["loadAverage1M"] == 1.0 for take in record["takes"]))
+        self.assertNotIn("classification", record["run"])
+
+        cores = json.loads((ROOT / "benchmarks" / "hardware-profiles.json").read_text(encoding="utf-8"))
+        limit = next(
+            profile["cpuCores"] for profile in cores["profiles"]
+            if profile["platform"] == "macos" and profile.get("canonical") is True
+        )
+
+        def busy_first_take(layers: dict[str, list[dict]]) -> None:
+            layers["engine"][0]["summary"]["runEnvironment"]["loadAverage1Minute"] = limit + 0.5
+
+        def at_the_limit(layers: dict[str, list[dict]]) -> None:
+            layers["engine"][0]["summary"]["runEnvironment"]["loadAverage1Minute"] = float(limit)
+
+        result = self.run_checker(self.expected_order, mutate_layers=busy_first_take, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        record = self.last_manifest["historyRecord"]
+        self.assertEqual(record["takes"][0]["metrics"]["loadAverage1M"], limit + 0.5)
+        self.assertEqual(record["run"]["classification"], "exploratory")
+        result = self.run_checker(self.expected_order, mutate_layers=at_the_limit, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("classification", self.last_manifest["historyRecord"]["run"])
+
     def run_with_stalls(
         self, device_class: str | None, *, forced: bool = False, stalls: int = 2,
         maximum_ms: int = 300, extra_args: list[str] | None = None, evidence: bool = False,

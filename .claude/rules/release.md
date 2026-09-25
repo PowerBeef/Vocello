@@ -99,7 +99,7 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   warm takes against a baseline pooled from at least three seeded runs on one clean commit (thresholds
   floored by the between-run spread and printed), and reports a loaded, throttled or low-power host as
   inconclusive (`GATE: INCONCLUSIVE`, exit 3), never as pass or fail. A timing take whose own one-minute
-  load exceeded the core count marks its engine record exploratory.
+  load exceeded the core count marks its engine or macOS UI benchmark record exploratory.
 - **Memory-qualified publication.** Telemetry schema v8 or newer (records are v8; streaming v9 is a
   digest-bound sidecar), manifest v2, exact sidecar digests, memory contract v2 (one series per
   process; no gap between samples above `unobservedGapBound` in

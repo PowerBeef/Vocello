@@ -85,6 +85,17 @@ def stall_gate_applies(notes: dict) -> bool:
     return str(notes.get("deviceClassForced", "false")).lower() != "true"
 
 
+def takes_above_load_limit(history_takes: list[dict]) -> list[tuple[int, float]]:
+    """(takeIndex, load) of every take whose own one-minute load exceeded the
+    stricter per-take limit (maintainer decision 2026-09-25, audit #28): the
+    publisher's rule for engine records, applied to the macOS UI benchmark on
+    the canonical profile's core count. Such a run's record is exploratory."""
+    import publish_benchmark_history as publisher
+
+    cores = int(publisher.canonical_hardware_profile("macos")["cpuCores"])
+    return publisher.takes_above_exploratory_load(history_takes, cores)
+
+
 def diagnostic_memory_tier(rows: list[dict]) -> bool:
     """Whether any engine row ran a forced memory class or an emulated smaller
     Mac (QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB, audit #11 option b).
@@ -599,6 +610,9 @@ def tracked_metrics(engine: dict, app: dict) -> dict[str, float | int]:
     add("samplerEffectiveMedianIntervalMS", summary.get("effectiveIntervalNS"), 1 / 1_000_000)
     add("samplerMaximumLatenessMS", summary.get("maximumLatenessNS"), 1 / 1_000_000)
     add("samplerMaximumDriftMS", summary.get("maximumDriftNS"), 1 / 1_000_000)
+    # The take's own one-minute load average (audit #28); the run's hardware
+    # block keeps only the busiest take's.
+    add("loadAverage1M", (summary.get("runEnvironment") or {}).get("loadAverage1Minute"))
     resources = summary.get("processResourceUsage") or {}
     add("cpuUserSeconds", resources.get("userCPUTimeMS"), 1 / 1_000)
     add("cpuSystemSeconds", resources.get("systemCPUTimeMS"), 1 / 1_000)
@@ -918,6 +932,11 @@ def build_manifest(
             **capture["fields"],
             **take_quality_identity(row),
         })
+    busy_takes = takes_above_load_limit(history_takes)
+    if busy_takes:
+        listed = ", ".join(f"take {index} at {load:.2f}" for index, load in busy_takes)
+        print(f"note: {listed} exceeded the per-take load limit; the record is exploratory")
+    exploratory = diagnostic_memory_tier(engine_rows) or bool(busy_takes)
     if playback_capture_dir is not None:
         write_json_atomic(Path(playback_capture_dir) / "summary.json", {
             "schemaVersion": 1,
@@ -946,8 +965,9 @@ def build_manifest(
             "finishedAt": finished_at,
             "warnings": run_warnings,
             "rtfDefinition": rtf_semantics.STANDARD_RTF_DEFINITION,
-            # A forced or emulated memory tier is exploratory evidence (audit #11).
-            **({"classification": "exploratory"} if diagnostic_memory_tier(engine_rows) else {}),
+            # A forced or emulated memory tier (audit #11) or a take above the
+            # per-take load limit (audit #28) is exploratory evidence.
+            **({"classification": "exploratory"} if exploratory else {}),
         },
         "hardware": hardware,
         "toolchain": {"optimization": optimization},

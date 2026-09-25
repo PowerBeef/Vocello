@@ -1894,8 +1894,9 @@ struct StreamingExecutionContext: Sendable {
             metrics: scratchBuffer.limiterMetrics,
             context: "streaming chunks"
         )
-        // Token loop + pipelined decoder drain finished; post-stream work (WAV
-        // finalize, telemetry marks) is tracked separately from decodeWallSeconds.
+        // The model finished: its token loop and the tail after it (timed as
+        // `qwen_tail_decode_total`). Post-stream work (WAV finalize, telemetry
+        // marks) is tracked separately from decodeWallSeconds.
         await telemetryRecorder?.mark(stage: .streamGenerationEnded)
         await telemetrySampler?.captureBoundary("final_audio_materialized")
 

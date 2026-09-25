@@ -4016,6 +4016,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
 
         tokenLoopAttributedAtExit = tokenLoopAttributedTotal()
+        // Audit #60: the work after the token loop (the final flush, `.info`,
+        // and the tail chunk's decode, eval and sends, or quality-first's full
+        // decode) is timed as its own span, `qwen_tail_decode_total`, so no
+        // loop key has to stand in for it.
+        let tailStartedAt = ContinuousClock.now
 
         // A chunk stashed in the final token step (EOS or token cap) flushes
         // here, before the info event and the tail chunk — the same relative
@@ -4186,6 +4191,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             ])
             var mergedTimingsMS = qwenHotLoopTimingsMS()
                 .merging(preparationTimingsMS) { _, rhs in rhs }
+            mergedTimingsMS["qwen_tail_decode_total"] = tailStartedAt.elapsed.roundedMilliseconds
             if isPureVoiceDesign {
                 mergedTimingsMS["design_stream_step_eval_total_ms"] = designStreamStepEvalTotal.roundedMilliseconds
                 mergedTimingsMS["design_stream_step_eos_read_total_ms"] = designStreamStepEOSReadTotal.roundedMilliseconds
@@ -4269,6 +4275,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         clearGenerationCache()
         var mergedTimingsMS = qwenHotLoopTimingsMS()
             .merging(preparationTimingsMS) { _, rhs in rhs }
+        mergedTimingsMS["qwen_tail_decode_total"] = tailStartedAt.elapsed.roundedMilliseconds
         if isPureVoiceDesign {
             mergedTimingsMS["design_stream_step_eval_total_ms"] = designStreamStepEvalTotal.roundedMilliseconds
             mergedTimingsMS["design_stream_step_eos_read_total_ms"] = designStreamStepEOSReadTotal.roundedMilliseconds

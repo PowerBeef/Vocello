@@ -309,6 +309,7 @@ authoritative list.** Representative keys (prefix `qwen_…`):
 | `qwen_stream_step_eos_read_total` | EOS‑flag readback (a GPU sync). |
 | `qwen_audio_chunk_eval_total` | Audio‑chunk evals: the assembly `asyncEval`, the pipelined flush (signpost `Audio Chunk Flush`) and the tail chunk. |
 | `qwen_token_loop_total` | Whole per‑token loop wall time. |
+| `qwen_tail_decode_total` | The work after the loop: the final pipelined flush, `.info`, and the tail chunk's decode, eval and sends (or quality-first's full decode). Rows since 2026-09-25 (audit #60); no loop key covers it. |
 | `qwen_token_loop_unattributed` | In‑loop time no named substage covers (slack to chase), read when the loop exits so the tail work after it cannot hide it. It still contains the sink hand-offs below. |
 | `qwen_token_loop_sink_handoff_total` / `_count` | The awaited materialized-sink hand-offs inside the token loop (`.token`, `.codecFrame`, `.chunkTimings`, `.audio`, the pipelined flush's sends and the codec-trace sink); the final flush, `.info` and tail chunk after the loop are not counted (audit #61, 2026-09-25). A part of `qwen_token_loop_unattributed`, never subtracted from it. |
 | `qwen_generated_code_count` | Tokens generated (counter). |

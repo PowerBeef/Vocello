@@ -172,7 +172,7 @@ class PairedOverheadAnnotationTests(unittest.TestCase):
         annotation = overhead.paired_overhead_annotation(
             samples([value * factor for value, factor in zip(off, factors)]), samples(off), "rtf",
         )
-        self.assertTrue(annotation["annotationOnly"])
+        self.assertTrue(annotation["decidesVerdict"])
         self.assertEqual((annotation["n"], annotation["unpairedTakes"]), (6, 0))
         self.assertAlmostEqual(annotation["medianRatio"], 1.035)
         self.assertAlmostEqual(annotation["meanPercentDifference"], 3.5)
@@ -208,7 +208,46 @@ class PairedOverheadAnnotationTests(unittest.TestCase):
         annotation = overhead.paired_overhead_annotation(
             broken, samples([0.30, 0.31, 0.32, 0.30, 0.29, 0.31]), "rtf",
         )
-        self.assertEqual(annotation, {"annotationOnly": True, "metric": "rtf", "unavailable": "KeyError"})
+        self.assertEqual(annotation, {"decidesVerdict": False, "metric": "rtf", "unavailable": "KeyError"})
+
+
+class OverheadVerdictTests(unittest.TestCase):
+    """Audit #63 part 3: a straddling interval or a loaded host is inconclusive (exit 3)."""
+
+    @staticmethod
+    def annotation(lower: float, upper: float) -> dict:
+        return {"decidesVerdict": True, "confidenceInterval95": {"lower": lower, "upper": upper}}
+
+    def test_the_paired_interval_decides_pass_fail_or_inconclusive(self) -> None:
+        self.assertEqual(overhead.arm_verdict(2.0, self.annotation(0.5, 4.7), 5.0), ("pass", ""))
+        status, reason = overhead.arm_verdict(6.0, self.annotation(5.5, 7.0), 5.0)
+        self.assertEqual(status, "fail")
+        self.assertIn("above the 5% limit", reason)
+        # A median over the limit whose interval straddles it is not a failure...
+        status, reason = overhead.arm_verdict(5.4, self.annotation(3.9, 6.8), 5.0)
+        self.assertEqual(status, "inconclusive")
+        self.assertIn("straddles the 5% limit", reason)
+        # ...and a median under it whose interval straddles it is not a pass.
+        self.assertEqual(overhead.arm_verdict(4.6, self.annotation(3.9, 6.8), 5.0)[0], "inconclusive")
+        # Without an interval the median decides, as before.
+        unavailable = {"decidesVerdict": False, "unavailable": "KeyError"}
+        self.assertEqual(overhead.arm_verdict(6.0, unavailable, 5.0)[0], "fail")
+        self.assertEqual(overhead.arm_verdict(4.0, unavailable, 5.0)[0], "pass")
+
+    def test_a_loaded_throttled_or_low_power_take_makes_the_run_inconclusive(self) -> None:
+        def sample(load: float, thermal: str = "nominal", low_power: bool = False) -> dict:
+            return {"environment": {"loadAverage1Minute": load, "thermalState": thermal,
+                                    "lowPowerModeEnabled": low_power}}
+
+        self.assertEqual(overhead.host_inconclusive_reasons([sample(3.0), sample(7.9)], cpu_count=4), [])
+        loaded = overhead.host_inconclusive_reasons([sample(3.0), sample(8.5)], cpu_count=4)
+        self.assertEqual(len(loaded), 1)
+        self.assertIn("8.50, above 2x4 cores", loaded[0])
+        reasons = overhead.host_inconclusive_reasons(
+            [sample(1.0, thermal="serious"), sample(1.0, low_power=True)], cpu_count=4,
+        )
+        self.assertEqual(len(reasons), 2)
+        self.assertEqual(overhead.EXIT_INCONCLUSIVE, 3)
 
 
 if __name__ == "__main__":

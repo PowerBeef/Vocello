@@ -1227,9 +1227,16 @@ cmd_telemetry_overhead() {
   # scripts/ui_test.sh before every UI-driven generation.
   check_mac_test_models --strict
   "$SCRIPT_DIR/build.sh" cli-optimized >/dev/null
-  local verdict_path
+  local verdict_path overhead_st=0
   note "telemetry-overhead: 3 counterbalanced rotations; warm-up×1 + measured×2 per mode/rotation"
-  verdict_path="$(python3 "$SCRIPT_DIR/telemetry_overhead.py" "$@")" \
+  verdict_path="$(python3 "$SCRIPT_DIR/telemetry_overhead.py" "$@")" || overhead_st=$?
+  # Exit 3 (audit #63): a paired interval straddles its limit, or a measured
+  # take ran on a loaded, throttled or low-power host. Never a pass or a fail.
+  if (( overhead_st == 3 )); then
+    warn "telemetry-overhead INCONCLUSIVE (see the reasons above) · $verdict_path"
+    return 3
+  fi
+  (( overhead_st == 0 )) \
     || die "telemetry-overhead FAIL (see the artifact path reported by telemetry_overhead.py)"
   [[ -f "$verdict_path" ]] || die "telemetry-overhead verdict missing: $verdict_path"
   note "telemetry-overhead PASS (local diagnostic; not benchmark-history eligible) · $verdict_path"

@@ -752,7 +752,13 @@ scripts/macos_test.sh telemetry-overhead
 This counterbalances `off`, `lightweight`, and `verbose` through three deterministic order
 rotations. Every rotation performs one warm-up and two measured takes per mode, yielding six
 machine-readable measured takes per mode. It requires identical PCM, records thermal/load context,
-and gates median RTF/TTFC at 5% (lightweight) and 10% (verbose) versus off. It never repairs or
+and gates RTF/TTFC at 5% (lightweight) and 10% (verbose) versus off. Since 2026-09-25 (audit #63
+part 3, decided by the audit's recommendation) each arm's paired 95% interval of the percent
+difference decides when it exists (each take paired with the off take of its rotation): wholly above
+the limit fails, wholly at or below it passes, and straddling it is inconclusive; without an interval
+the median comparison decides. A measured take above twice the core count, at a serious or critical
+thermal state or in low power mode also makes the run inconclusive. An inconclusive verdict is
+recorded (`status: inconclusive`, `inconclusiveReasons`) and exits 3, never a pass or a fail. It never repairs or
 downloads models; missing fixtures stop the run. Its verdict stays under `build/artifacts/macos/`
 and is not
 published to tracked history: adding the in-process memory sampler to the `off` lane would change

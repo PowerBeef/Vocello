@@ -120,10 +120,10 @@ def paired_overhead_annotation(mode_samples: list[dict], off_samples: list[dict]
     index (same seeded text, adjacent in time), so host drift between rotations
     cancels. Reports the median paired ratio, a BCa 95% interval of the mean
     paired percent difference and the exact Wilcoxon signed-rank test from
-    ``delivery_statistics``. Annotation only: the verdict still compares the arm
-    medians against the tracked thresholds, and a failure here is recorded as
-    ``unavailable`` rather than raised, so it can never cost the lane its
-    verdict.
+    ``delivery_statistics``. Since audit #63 part 3 the interval decides the
+    arm's verdict (``arm_verdict``); a failure here is recorded as
+    ``unavailable`` rather than raised, and the median comparison then decides,
+    so it can never cost the lane its verdict.
     """
     try:
         off = {(sample["rotation"], sample["measuredTake"]): float(sample[metric]) for sample in off_samples}
@@ -135,7 +135,7 @@ def paired_overhead_annotation(mode_samples: list[dict], off_samples: list[dict]
         usable = [(candidate, baseline) for candidate, baseline in pairs if baseline > 0]
         percent = [(candidate / baseline - 1.0) * 100.0 for candidate, baseline in usable]
         return {
-            "annotationOnly": True,
+            "decidesVerdict": True,
             "pairing": "rotation-and-measured-take",
             "metric": metric,
             "n": len(percent),
@@ -146,10 +146,63 @@ def paired_overhead_annotation(mode_samples: list[dict], off_samples: list[dict]
             "wilcoxon": wilcoxon_signed_rank(percent),
         }
     except Exception as error:  # noqa: BLE001 - an annotation never blocks the verdict
-        return {"annotationOnly": True, "metric": metric, "unavailable": type(error).__name__}
+        return {"decidesVerdict": False, "metric": metric, "unavailable": type(error).__name__}
 
 
 utc_now = jsonio.utc_now
+
+# Exit 3 (audit #63 part 3; decided 2026-09-25 by the audit's recommendation):
+# the lane cannot judge an arm whose paired 95% interval straddles its limit,
+# or a run whose host was loaded (a measured take above twice the core count,
+# the gate's limit), throttled or in low power. Such a verdict is inconclusive,
+# never a pass or a fail.
+EXIT_INCONCLUSIVE = 3
+LOAD_LIMIT_CORE_MULTIPLE = 2.0
+THROTTLED_THERMAL_STATES = frozenset({"serious", "critical"})
+
+
+def host_inconclusive_reasons(samples: list[dict], *, cpu_count: int | None = None) -> list[str]:
+    """The gate's host limits, judged on every measured take's own environment."""
+    cores = cpu_count or os.cpu_count() or 1
+    reasons = []
+    loads = [
+        float(sample["environment"]["loadAverage1Minute"]) for sample in samples
+        if isinstance((sample.get("environment") or {}).get("loadAverage1Minute"), (int, float))
+    ]
+    if loads and max(loads) > LOAD_LIMIT_CORE_MULTIPLE * cores:
+        reasons.append(
+            f"a measured take ran at load {max(loads):.2f}, above {LOAD_LIMIT_CORE_MULTIPLE:g}x{cores} cores"
+        )
+    thermal = sorted({
+        str((sample.get("environment") or {}).get("thermalState", "")).lower() for sample in samples
+    } & THROTTLED_THERMAL_STATES)
+    if thermal:
+        reasons.append(f"a measured take ran at thermal state {thermal[-1]}")
+    if any((sample.get("environment") or {}).get("lowPowerModeEnabled") is True for sample in samples):
+        reasons.append("a measured take ran in low power mode")
+    return reasons
+
+
+def arm_verdict(median_regression: float, annotation: dict, limit: float) -> tuple[str, str]:
+    """pass, fail or inconclusive for one arm and metric, with its reason.
+
+    The paired 95% interval of the mean percent difference decides when it is
+    available: wholly above the limit fails, wholly at or below it passes, and
+    straddling it is inconclusive. Without an interval (an unavailable
+    annotation) the median comparison decides, as before.
+    """
+    interval = annotation.get("confidenceInterval95") if isinstance(annotation, dict) else None
+    lower = interval.get("lower") if isinstance(interval, dict) else None
+    upper = interval.get("upper") if isinstance(interval, dict) else None
+    if isinstance(lower, (int, float)) and isinstance(upper, (int, float)):
+        if lower > limit:
+            return "fail", f"paired 95% interval [{lower:.2f}, {upper:.2f}]% lies above the {limit:g}% limit"
+        if upper <= limit:
+            return "pass", ""
+        return "inconclusive", f"paired 95% interval [{lower:.2f}, {upper:.2f}]% straddles the {limit:g}% limit"
+    if median_regression > limit:
+        return "fail", f"median regression {median_regression:.2f}% exceeds {limit:g}% (no paired interval)"
+    return "pass", ""
 
 
 def machine_context() -> dict:
@@ -444,9 +497,13 @@ def run_lane(args: argparse.Namespace) -> dict:
     baseline = results["off"]
     thresholds = {"lightweight": 5.0, "verbose": 10.0}
     failures = []
+    inconclusive: list[str] = []
     parity = all(results[mode]["pcmSHA256"] == baseline["pcmSHA256"] for mode in MODES[1:])
     if not parity:
         failures.append("seeded PCM differs across telemetry modes")
+    inconclusive.extend(host_inconclusive_reasons(
+        [sample for mode in MODES for sample in results[mode]["samples"]]
+    ))
     for mode, limit in thresholds.items():
         # RTF is lower-is-better, so it regresses like a latency.
         results[mode]["rtfRegressionPercent"] = latency_regression(
@@ -461,17 +518,24 @@ def run_lane(args: argparse.Namespace) -> dict:
             )
             for metric in ("rtf", "ttfcMS")
         }
-        if results[mode]["rtfRegressionPercent"] > limit:
-            failures.append(f"{mode} median RTF regression exceeds {limit:.0f}%")
-        if results[mode]["ttfcRegressionPercent"] > limit:
-            failures.append(f"{mode} median TTFC regression exceeds {limit:.0f}%")
+        for metric, key, name in (("rtf", "rtfRegressionPercent", "RTF"),
+                                  ("ttfcMS", "ttfcRegressionPercent", "TTFC")):
+            status, reason = arm_verdict(
+                results[mode][key], results[mode]["pairedAgainstOff"][metric], limit,
+            )
+            if status == "fail":
+                failures.append(f"{mode} {name}: {reason}")
+            elif status == "inconclusive":
+                inconclusive.append(f"{mode} {name}: {reason}")
 
+    status = "fail" if failures else "inconclusive" if inconclusive else "pass"
     verdict = {
         "schemaVersion": 2,
         "runID": run_id,
         "startedAt": started_at,
         "completedAt": utc_now(),
-        "status": "pass" if not failures else "fail",
+        "status": status,
+        "inconclusiveReasons": inconclusive,
         "attestationSummary": {
             "seed": args.seed,
             "rotationCount": len(ROTATIONS),
@@ -510,6 +574,8 @@ def run_lane(args: argparse.Namespace) -> dict:
     verdict_path.write_text(json.dumps(verdict, indent=2, sort_keys=True) + "\n")
     if failures:
         raise RuntimeError("; ".join(failures))
+    if inconclusive:
+        print(f"INCONCLUSIVE: {'; '.join(inconclusive)}", file=sys.stderr)
 
     # This diagnostic intentionally compares telemetry-off with enabled modes.
     # Instrumenting the off lane with the in-process v8 memory sampler would
@@ -526,8 +592,8 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1_264_849_675)
     args = parser.parse_args()
     try:
-        run_lane(args)
-        return 0
+        verdict = run_lane(args)
+        return EXIT_INCONCLUSIVE if verdict.get("status") == "inconclusive" else 0
     except RuntimeError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

@@ -591,7 +591,10 @@ Designed so the numbers you optimize against are trustworthy.
 - **Gated to zero when off.** No recorder, no sampler, no writes; per‑chunk capture is
   guarded by `telemetryRecorder != nil`.
 - **Device‑tiered sampler cadence** (`NativeTelemetryMode.sampleIntervalMS(for:)`): high‑memory
-  Mac 100 ms, 16 GB Mac 250 ms, **8 GB Mac / iPhone 500 ms** — the background sampler never
+  Mac 100 ms, 16 GB Mac, 8 GB Mac and iPhone 250 ms (the floor tiers sampled every 500 ms until
+  2026-09-25, when periodic ticks stopped enumerating threads, their heaviest call; audit #3). Each
+  sample records its own `captureDurationNS`, and a take's `samplerBoundaryCaptureTotalMS` sums the
+  boundary captures the generation path awaits inline (audit #65) — the background sampler never
   competes with generation on constrained devices.
 - **Cadence is measured, not assumed.** Periodic samples retain scheduled and captured elapsed
   nanoseconds plus lateness. The summary reports effective/maximum interval, maximum drift,

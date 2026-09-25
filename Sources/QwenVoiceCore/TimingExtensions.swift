@@ -26,6 +26,14 @@ extension Duration {
         let attosecondsMS = Double(components.attoseconds) / 1_000_000_000_000_000
         return Int((secondsMS + attosecondsMS).rounded())
     }
+
+    /// Whole nanoseconds, zero for a negative duration.
+    var wholeNanoseconds: UInt64 {
+        let components = components
+        guard components.seconds >= 0, components.attoseconds >= 0 else { return 0 }
+        return UInt64(components.seconds) &* 1_000_000_000
+            &+ UInt64(components.attoseconds / 1_000_000_000)
+    }
 }
 
 /// High-resolution clock that pairs the portable `ProcessInfo.systemUptime`

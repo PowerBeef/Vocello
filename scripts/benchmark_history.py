@@ -461,6 +461,9 @@ METRIC_KEYS = {
     "blockIOOperations", "samplerTargetIntervalMS", "samplerEffectiveMedianIntervalMS",
     "samplerMaximumLatenessMS", "samplerBoundarySampleCount", "samplerCaptureFailureCount",
     "samplerMaximumDriftMS",
+    # The summed cost of a take's boundary memory captures, which the
+    # generation path awaits inline (records since 2026-09-25, audit #65).
+    "samplerBoundaryCaptureTotalMS",
     "residentStartMB", "residentEndMB", "residentDeltaMB",
     "physicalFootprintStartMB", "physicalFootprintEndMB", "physicalFootprintDeltaMB",
     "gpuRecommendedWorkingSetMB", "gpuWorkingSetUsageRatioPeak", "memoryTimeToPeakMS",

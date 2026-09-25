@@ -17,7 +17,7 @@
     "ios": 9
   },
   "unobservedGapBound": {
-    "description": "Memory contract v2 timer health for every memory-qualified take: no gap between two consecutive samples of the process's one memory series may exceed max(targetIntervalMultiple x the sampler cadence, floorMS). The cadence is 500 ms on the 8 GB Mac and the iPhone, 250 ms on the 16 GB canonical M6 and 100 ms above, so the floor keeps one scheduler stall on a fast-cadence host from failing a take. Each take records the bound it met as samplerUnobservedGapLimitMS. Provisional: the first consented memory lane on the canonical M6 calibrates it, and a maintainer records that run here.",
+    "description": "Memory contract v2 timer health for every memory-qualified take: no gap between two consecutive samples of the process's one memory series may exceed max(targetIntervalMultiple x the sampler cadence, floorMS). The cadence is 250 ms on the 8 GB Mac, the iPhone and the 16 GB canonical M6 (the floor tiers sampled every 500 ms until 2026-09-25, when periodic ticks stopped enumerating threads) and 100 ms above, so the floor keeps one scheduler stall on a fast-cadence host from failing a take. Each take records the bound it met as samplerUnobservedGapLimitMS. Provisional: the first consented memory lane on the canonical M6 calibrates it, and a maintainer records that run here.",
     "targetIntervalMultiple": 2.0,
     "floorMS": 500,
     "status": "provisional",

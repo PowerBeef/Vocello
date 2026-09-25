@@ -1475,6 +1475,7 @@ class PublisherTests(unittest.TestCase):
             "maximumLatenessNS": 12_000_000,
             "maximumDriftNS": 9_000_000,
             "boundarySampleCount": 4,
+            "boundaryCaptureTotalNS": 1_250_000,
             "captureFailureCount": 1,
             "processResourceUsage": {
                 "userCPUTimeMS": 2_500.0,
@@ -1505,6 +1506,8 @@ class PublisherTests(unittest.TestCase):
             "flags": ["dc_offset"],
         })
         metrics = publisher.row_metrics(row)
+        # What the inline boundary captures cost the take (audit #65).
+        self.assertEqual(metrics["samplerBoundaryCaptureTotalMS"], 1.25)
         self.assertEqual(metrics["samplerTargetIntervalMS"], 500.0)
         self.assertEqual(metrics["samplerEffectiveMedianIntervalMS"], 510.0)
         self.assertEqual(metrics["samplerMaximumLatenessMS"], 12.0)

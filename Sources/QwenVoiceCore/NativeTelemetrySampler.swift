@@ -137,6 +137,14 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
     public let kernelPhysFootprintPeakMB: Double?
     /// The graphics-tagged footprint ledger at capture, from the same call.
     public let graphicsFootprintMB: Double?
+    /// How long this capture took on the monotonic clock (audit #65): the
+    /// probe's own cost, which boundary captures pay inline on the generation
+    /// path. nil in rows written before 2026-09-25.
+    public let captureDurationNS: UInt64?
+    /// The task's thread count. Since 2026-09-25 only lifecycle and boundary
+    /// samples enumerate threads (audit #3): `task_threads` was the heaviest
+    /// call of a periodic tick, so periodic samples record 0 and a nil
+    /// `threadCaptureSucceeded` (not attempted), never a failure.
     public let threads: Int
     public let thermalState: String?
     public var stage: String?
@@ -173,6 +181,7 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
         gpuWorkingSetUsageRatio: Double? = nil,
         kernelPhysFootprintPeakMB: Double? = nil,
         graphicsFootprintMB: Double? = nil,
+        captureDurationNS: UInt64? = nil,
         threads: Int,
         thermalState: String? = nil,
         stage: String? = nil,
@@ -203,6 +212,7 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
         self.gpuWorkingSetUsageRatio = gpuWorkingSetUsageRatio
         self.kernelPhysFootprintPeakMB = kernelPhysFootprintPeakMB
         self.graphicsFootprintMB = graphicsFootprintMB
+        self.captureDurationNS = captureDurationNS
         self.threads = threads
         self.thermalState = thermalState
         self.stage = stage
@@ -237,6 +247,7 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
         case gpuWorkingSetUsageRatio
         case kernelPhysFootprintPeakMB
         case graphicsFootprintMB
+        case captureDurationNS
         case threads
         case thermalState
         case stage
@@ -273,6 +284,7 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
         self.gpuWorkingSetUsageRatio = try container.decodeIfPresent(Double.self, forKey: .gpuWorkingSetUsageRatio)
         self.kernelPhysFootprintPeakMB = try container.decodeIfPresent(Double.self, forKey: .kernelPhysFootprintPeakMB)
         self.graphicsFootprintMB = try container.decodeIfPresent(Double.self, forKey: .graphicsFootprintMB)
+        self.captureDurationNS = try container.decodeIfPresent(UInt64.self, forKey: .captureDurationNS)
         self.threads = try container.decode(Int.self, forKey: .threads)
         self.thermalState = try container.decodeIfPresent(String.self, forKey: .thermalState)
         self.stage = try container.decodeIfPresent(String.self, forKey: .stage)
@@ -306,6 +318,7 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
         try container.encodeIfPresent(gpuWorkingSetUsageRatio, forKey: .gpuWorkingSetUsageRatio)
         try container.encodeIfPresent(kernelPhysFootprintPeakMB, forKey: .kernelPhysFootprintPeakMB)
         try container.encodeIfPresent(graphicsFootprintMB, forKey: .graphicsFootprintMB)
+        try container.encodeIfPresent(captureDurationNS, forKey: .captureDurationNS)
         try container.encode(threads, forKey: .threads)
         try container.encodeIfPresent(thermalState, forKey: .thermalState)
         try container.encodeIfPresent(stage, forKey: .stage)
@@ -493,15 +506,20 @@ public struct TelemetryCaptureCoverage: Hashable, Codable, Sendable {
     public let processResourceCaptureSucceeded: Bool
     public let processResourceCaptureFailureCount: Int
 
+    /// `threadAttemptedSampleCount` counts the samples that enumerated threads:
+    /// every sample in rows written before 2026-09-25, the lifecycle and
+    /// boundary samples since (audit #3). nil means every sample attempted.
     public init(
         totalSampleCount: Int,
         memorySuccessfulSampleCount: Int,
         threadSuccessfulSampleCount: Int,
         headroomSuccessfulSampleCount: Int,
         metalSuccessfulSampleCount: Int,
-        processResourceCaptureSucceeded: Bool
+        processResourceCaptureSucceeded: Bool,
+        threadAttemptedSampleCount: Int? = nil
     ) {
         let denominator = max(totalSampleCount, 1)
+        let threadAttempts = threadAttemptedSampleCount ?? totalSampleCount
         self.totalSampleCount = totalSampleCount
         self.memorySuccessfulSampleCount = memorySuccessfulSampleCount
         self.memoryCaptureFailureCount = max(totalSampleCount - memorySuccessfulSampleCount, 0)
@@ -509,9 +527,9 @@ public struct TelemetryCaptureCoverage: Hashable, Codable, Sendable {
             ? Double(memorySuccessfulSampleCount) / Double(denominator)
             : 0
         self.threadSuccessfulSampleCount = threadSuccessfulSampleCount
-        self.threadCaptureFailureCount = max(totalSampleCount - threadSuccessfulSampleCount, 0)
-        self.threadCoverageRatio = totalSampleCount > 0
-            ? Double(threadSuccessfulSampleCount) / Double(denominator)
+        self.threadCaptureFailureCount = max(threadAttempts - threadSuccessfulSampleCount, 0)
+        self.threadCoverageRatio = threadAttempts > 0
+            ? Double(threadSuccessfulSampleCount) / Double(threadAttempts)
             : 0
         self.headroomSuccessfulSampleCount = headroomSuccessfulSampleCount
         self.headroomCoverageRatio = totalSampleCount > 0
@@ -610,6 +628,10 @@ public struct TelemetrySummary: Hashable, Codable, Sendable {
     public let kernelPhysFootprintPeakMB: Double?
     /// The graphics-tagged footprint ledger at the last sample.
     public let graphicsFootprintEndMB: Double?
+    /// The summed `captureDurationNS` of this window's boundary samples, which
+    /// the generation path awaits inline (audit #65). nil when no boundary
+    /// sample recorded its cost.
+    public let boundaryCaptureTotalNS: UInt64?
 
     public init(
         residentStartMB: Double?,
@@ -663,7 +685,8 @@ public struct TelemetrySummary: Hashable, Codable, Sendable {
         boundaryCoverage: TelemetryBoundaryCoverage? = nil,
         kernelPhysFootprintPeakStartMB: Double? = nil,
         kernelPhysFootprintPeakMB: Double? = nil,
-        graphicsFootprintEndMB: Double? = nil
+        graphicsFootprintEndMB: Double? = nil,
+        boundaryCaptureTotalNS: UInt64? = nil
     ) {
         self.processRole = processRole
         self.residentStartMB = residentStartMB
@@ -717,6 +740,7 @@ public struct TelemetrySummary: Hashable, Codable, Sendable {
         self.kernelPhysFootprintPeakStartMB = kernelPhysFootprintPeakStartMB
         self.kernelPhysFootprintPeakMB = kernelPhysFootprintPeakMB
         self.graphicsFootprintEndMB = graphicsFootprintEndMB
+        self.boundaryCaptureTotalNS = boundaryCaptureTotalNS
     }
 
     public static func empty(stageMarks: [NativeTelemetryStageMark]) -> TelemetrySummary {
@@ -987,6 +1011,7 @@ public actor NativeTelemetrySampler {
 
         let memorySuccessfulSampleCount = samples.count(where: Self.memoryCaptureSucceeded)
         let threadSuccessfulSampleCount = samples.count(where: Self.threadCaptureSucceeded)
+        let threadAttemptedSampleCount = samples.count(where: Self.threadCaptureAttempted)
         let headroomSuccessfulSampleCount = samples.count(where: { $0.headroomMB != nil })
         let metalSuccessfulSampleCount = samples.count(where: { $0.gpuAllocatedMB != nil })
         let captureCoverage = TelemetryCaptureCoverage(
@@ -995,8 +1020,12 @@ public actor NativeTelemetrySampler {
             threadSuccessfulSampleCount: threadSuccessfulSampleCount,
             headroomSuccessfulSampleCount: headroomSuccessfulSampleCount,
             metalSuccessfulSampleCount: metalSuccessfulSampleCount,
-            processResourceCaptureSucceeded: processResourceUsage != nil
+            processResourceCaptureSucceeded: processResourceUsage != nil,
+            threadAttemptedSampleCount: threadAttemptedSampleCount
         )
+        let boundaryCaptureDurations = samples
+            .filter { $0.kind == .boundary }
+            .compactMap(\.captureDurationNS)
         let observedBoundaries = Set(samples.compactMap(\.boundary))
         let boundaryCoverage = TelemetryBoundaryCoverage(
             requirements: boundaryRequirements,
@@ -1076,7 +1105,10 @@ public actor NativeTelemetrySampler {
             boundaryCoverage: boundaryCoverage,
             kernelPhysFootprintPeakStartMB: samples.first?.kernelPhysFootprintPeakMB,
             kernelPhysFootprintPeakMB: samples.last?.kernelPhysFootprintPeakMB,
-            graphicsFootprintEndMB: samples.last?.graphicsFootprintMB
+            graphicsFootprintEndMB: samples.last?.graphicsFootprintMB,
+            boundaryCaptureTotalNS: boundaryCaptureDurations.isEmpty
+                ? nil
+                : boundaryCaptureDurations.reduce(0, &+)
         )
     }
 
@@ -1093,6 +1125,13 @@ public actor NativeTelemetrySampler {
 
     private static func threadCaptureSucceeded(_ sample: TelemetrySample) -> Bool {
         sample.threadCaptureSucceeded ?? (sample.threads > 0)
+    }
+
+    /// Whether the sample enumerated threads: a periodic sample written since
+    /// 2026-09-25 does not (a nil `threadCaptureSucceeded`, audit #3); every
+    /// older sample did.
+    private static func threadCaptureAttempted(_ sample: TelemetrySample) -> Bool {
+        sample.threadCaptureSucceeded != nil || sample.kind != .periodic || sample.threads > 0
     }
 
     private static func metalRatio(for sample: TelemetrySample?) -> Double? {
@@ -1165,13 +1204,17 @@ public actor NativeTelemetrySampler {
         scheduledElapsedNS: UInt64? = nil,
         boundary: String? = nil
     ) -> TelemetrySample {
+        let captureStartedAt = ContinuousClock.now
         let capturedUptimeNS = DispatchTime.now().uptimeNanoseconds
         let (ms, ns) = clock.now()
         let snapshot = IOSMemorySnapshot.capture(device: device)
-        let threadCapture = threadCount()
+        // Periodic ticks skip `task_threads`, the heaviest call of a tick
+        // (audit #3); lifecycle and boundary samples still count threads.
+        let threadCapture: (count: Int, succeeded: Bool)? = kind == .periodic ? nil : threadCount()
         let memoryCaptureSucceeded = snapshot.residentBytes != nil
             || snapshot.physFootprintBytes != nil
             || snapshot.compressedBytes != nil
+        let captureDurationNS = captureStartedAt.duration(to: .now).wholeNanoseconds
         return TelemetrySample(
             tMS: ms,
             tNS: ns,
@@ -1184,7 +1227,7 @@ public actor NativeTelemetrySampler {
             processRole: processRole,
             captureSucceeded: memoryCaptureSucceeded,
             memoryCaptureSucceeded: memoryCaptureSucceeded,
-            threadCaptureSucceeded: threadCapture.succeeded,
+            threadCaptureSucceeded: threadCapture?.succeeded,
             headroomCaptureSucceeded: snapshot.availableHeadroomBytes != nil,
             metalCaptureSucceeded: snapshot.gpuAllocatedBytes != nil,
             totalDeviceRAMMB: Double(snapshot.totalDeviceRAMBytes) / 1_048_576,
@@ -1198,7 +1241,8 @@ public actor NativeTelemetrySampler {
             gpuWorkingSetUsageRatio: snapshot.gpuWorkingSetUsageRatio,
             kernelPhysFootprintPeakMB: snapshot.kernelPhysFootprintPeakMB,
             graphicsFootprintMB: snapshot.graphicsFootprintMB,
-            threads: threadCapture.count,
+            captureDurationNS: captureDurationNS,
+            threads: threadCapture?.count ?? 0,
             thermalState: ThermalStateSnapshot.string(for: ProcessInfo.processInfo.thermalState)
         )
     }

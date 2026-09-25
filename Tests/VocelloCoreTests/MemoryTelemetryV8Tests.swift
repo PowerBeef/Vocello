@@ -228,6 +228,66 @@ final class MemoryTelemetryV8Tests: XCTestCase {
         XCTAssertNil(legacy.graphicsFootprintEndMB)
     }
 
+    func testPeriodicTicksSkipThreadsAndBoundaryCapturesReportTheirCost() {
+        // Audit #3: periodic samples no longer enumerate threads, so they are
+        // not thread-capture failures. Audit #65: each sample records its own
+        // capture cost, and the summary totals the boundary captures the
+        // generation path awaits inline.
+        func sample(
+            _ tMS: Int, _ kind: TelemetrySampleKind, threads: Bool?, costNS: UInt64?
+        ) -> TelemetrySample {
+            TelemetrySample(
+                tMS: tMS,
+                tNS: UInt64(tMS) * 1_000_000,
+                kind: kind,
+                boundary: kind == .boundary ? "fixture" : nil,
+                captureSucceeded: true,
+                threadCaptureSucceeded: threads,
+                residentMB: 90,
+                physFootprintMB: 100,
+                compressedMB: 10,
+                headroomMB: nil,
+                gpuAllocatedMB: nil,
+                gpuRecommendedWorkingSetMB: nil,
+                captureDurationNS: costNS,
+                threads: threads == true ? 8 : 0
+            )
+        }
+        let summary = NativeTelemetrySampler.summarize(
+            samples: [
+                sample(0, .start, threads: true, costNS: 40_000),
+                sample(5, .periodic, threads: nil, costNS: 9_000),
+                sample(6, .boundary, threads: true, costNS: 30_000),
+                sample(8, .boundary, threads: false, costNS: 50_000),
+                sample(10, .periodic, threads: nil, costNS: 8_000),
+                sample(15, .stop, threads: true, costNS: 45_000),
+            ],
+            stageMarks: [],
+            targetIntervalNS: 5_000_000
+        )
+        XCTAssertEqual(summary.captureCoverage?.threadSuccessfulSampleCount, 3)
+        XCTAssertEqual(summary.captureCoverage?.threadCaptureFailureCount, 1)
+        XCTAssertEqual(summary.captureCoverage?.threadCoverageRatio, 0.75)
+        XCTAssertEqual(summary.boundaryCaptureTotalNS, 80_000)
+
+        let legacy = NativeTelemetrySampler.summarize(
+            samples: [sample(0, .start, threads: true, costNS: nil)],
+            stageMarks: [],
+            targetIntervalNS: 5_000_000
+        )
+        XCTAssertNil(legacy.boundaryCaptureTotalNS)
+    }
+
+    func testFloorTiersSampleAtTheSixteenGigabyteCadence() {
+        // Audit #3 part 4: the time periodic ticks save buys the floor tiers
+        // the 250 ms cadence.
+        for deviceClass in [NativeDeviceMemoryClass.floor8GBMac, .iPhonePro, .mid16GBMac] {
+            XCTAssertEqual(NativeTelemetryMode.verbose.sampleIntervalMS(for: deviceClass), 250)
+        }
+        XCTAssertEqual(NativeTelemetryMode.verbose.sampleIntervalMS(for: .highMemoryMac), 100)
+        XCTAssertNil(NativeTelemetryMode.off.sampleIntervalMS(for: .iPhonePro))
+    }
+
     func testThreadCountReleasesTheThreadPortsItReceives() {
         let thread = mach_thread_self()
         defer { mach_port_deallocate(mach_task_self_, thread) }

@@ -1018,9 +1018,11 @@ public enum NativeTelemetryMode: String, Hashable, Codable, Sendable {
     case verbose
 
     /// Device-tiered memory-sampling cadence. Finer on roomy Macs where the
-    /// sampler's per-tick cost is negligible; coarser on restricted hardware
-    /// (8 GB Macs, iPhone) so the background sampler never competes with
-    /// generation for CPU/Metal. `off` disables sampling entirely.
+    /// sampler's per-tick cost is negligible. The floor tiers (8 GB Macs,
+    /// iPhone) sampled every 500 ms until 2026-09-25; periodic ticks no longer
+    /// enumerate threads, their heaviest call, and the time saved buys them the
+    /// 16 GB Mac's 250 ms cadence (audit #3), which halves the window a short
+    /// allocation spike can hide in. `off` disables sampling entirely.
     public func sampleIntervalMS(for deviceClass: NativeDeviceMemoryClass) -> Int? {
         switch self {
         case .off:
@@ -1029,10 +1031,8 @@ public enum NativeTelemetryMode: String, Hashable, Codable, Sendable {
             switch deviceClass {
             case .highMemoryMac:
                 return 100
-            case .mid16GBMac:
+            case .mid16GBMac, .floor8GBMac, .iPhonePro:
                 return 250
-            case .floor8GBMac, .iPhonePro:
-                return 500
             }
         }
     }

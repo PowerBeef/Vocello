@@ -1024,7 +1024,7 @@ record keyed by `generationID`
 with `layer { engine, engineService, app, merged }`. New validation consumes typed
 `FrontendGenerationMetrics`, `EngineTransportMetrics`, `BackendGenerationMetrics`, and
 `GenerationOutputMetrics`, plus typed model/runtime identity. The generation sampler starts before
-model preparation, adds lifecycle boundary samples to its 500 ms cadence, and reports capture time,
+model preparation, adds lifecycle boundary samples to its 250 ms cadence (500 ms before 2026-09-25), and reports capture time,
 lateness, effective interval, drift, resource deltas, and safe run context. Frontend timing calls
 playback what it can prove—**scheduled**, not acoustically audible—and reports sampled delayed-heartbeat
 counts with coverage plus typed playback queue, continuity, and underrun health. The legacy timing/counter/note dictionaries remain serialization compatibility

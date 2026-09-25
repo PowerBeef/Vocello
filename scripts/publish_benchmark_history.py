@@ -754,6 +754,12 @@ def row_metrics(row: dict[str, Any], take: dict[str, Any] | None = None) -> dict
             if finite_number(summary.get("maximumDriftNS")) is not None else None
         ),
         "samplerBoundarySampleCount": summary.get("boundarySampleCount"),
+        # What the boundary captures cost the generation path, which awaits
+        # them inline (rows since 2026-09-25, audit #65).
+        "samplerBoundaryCaptureTotalMS": (
+            float(summary["boundaryCaptureTotalNS"]) / 1_000_000.0
+            if finite_number(summary.get("boundaryCaptureTotalNS")) is not None else None
+        ),
         "samplerCaptureFailureCount": summary.get("captureFailureCount"),
         "memoryTrimCount": len(trim_levels),
         "maximumTrimLevel": max(

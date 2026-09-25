@@ -137,7 +137,7 @@ matching registry entry. Prefer `actor`, `Mutex` (Swift 6), immutable adapters, 
 
 - Use `Task { ... }` from `@MainActor` contexts when the work must hop off the main thread and you want structured concurrency.
 - Use `Task.detached(priority: .utility) { ... }` for long-lived background work that must outlive the initiating scope, such as the telemetry merge after a generation completes.
-- Avoid `Task.sleep` busy-waiting on the hot path. The telemetry sampler uses `try? await Task.sleep(nanoseconds:)` with a device-tiered cadence (500 ms on 8 GB Mac / iPhone).
+- Avoid `Task.sleep` busy-waiting on the hot path. The telemetry sampler uses `try? await Task.sleep(nanoseconds:)` with a device-tiered cadence (250 ms on the 8 GB Mac, the iPhone and the 16 GB Mac; periodic ticks skip `task_threads`).
 
 ---
 

@@ -221,32 +221,45 @@ CORPUS_FREE_KINDS = frozenset({"ui-perf"})
 # claim"); a bump starts a new lineage and never rewrites a stored key.
 LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     **{key: 1 for key in LINEAGE_PATHS},
+    # Sampler change (2026-09-25, audit #3 part 4, #65 part 2), every kind that
+    # carries memory evidence: periodic memory ticks no longer enumerate
+    # threads, the floor tiers (8 GB Mac, iPhone) sample every 250 ms instead of
+    # 500 ms, and every sample times its own capture. The versions below that
+    # name it moved for it; the others were already moved in the same batch.
+    ("ui-generation", "macos"): 2,
+    ("ui-generation", "ios"): 2,
+    ("engine-generation", "macos"): 2,
+    ("memory-qualification", "macos"): 2,
     # 2 (2026-09-25, audit #12/#99): the CPU profile records three warm takes
     # instead of one on a quiet host, and publishes per-take decode-loop
     # interval statistics that must keep 36 intervals per decode step.
-    # 3 (2026-09-25, audit #50/#97): the kind gains the os_signpost-only
-    # witness profile, a macOS profile's matrix hash names its profile kind, so
-    # a witness, CPU or memory profile never shares a lineage, and a CPU trace
-    # reports each take's cycles per rusage CPU-second. No record of the kind
-    # carried the lineage stamp yet.
+    # 3 (2026-09-25, audit #50/#97, the sampler change): the kind gains the
+    # os_signpost-only witness profile, a macOS profile's matrix hash names its
+    # profile kind, so a witness, CPU or memory profile never shares a lineage,
+    # and a CPU trace reports each take's cycles per rusage CPU-second. No
+    # record of the kind carried the lineage stamp yet.
     ("instrument-profile", "macos"): 3,
     # 2 (2026-09-25, audit #45/#56): the iPhone gate's generation step and the
     # memory-qualification wait no longer copy the whole diagnostics tree from
     # the phone every 10 s while the take runs; they poll only their markers.
-    ("engine-generation", "ios"): 2,
-    ("memory-qualification", "ios"): 2,
+    # 3 (2026-09-25): the sampler change.
+    ("engine-generation", "ios"): 3,
+    ("memory-qualification", "ios"): 3,
     # 2 (2026-09-25, audit #89): the whisper recognition time excludes model
     # load and warm-up, and the processed duration is the decoded sample count.
-    ("language", "macos"): 2,
-    # 3 (2026-09-25, audit #87): the iPhone lang-bench probes each take's
-    # sentinel first at its predicted end, then every 3 s, instead of every 10 s
-    # from the launch, so fewer device copies overlap the measured generation.
+    # 3 (2026-09-25): the sampler change.
+    ("language", "macos"): 3,
+    # 3 (2026-09-25, audit #87 and the sampler change): the iPhone lang-bench
+    # probes each take's sentinel first at its predicted end, then every 3 s,
+    # instead of every 10 s from the launch, so fewer device copies overlap the
+    # measured generation.
     ("language", "ios"): 3,
-    # 2 (2026-09-25, audit #51/#52): the iPhone memory profile records through
-    # the Allocations template (no automatic VM snapshots, which suspended the
-    # target), and every iPhone profile stops recording once its take's sentinel
-    # appears instead of recording the idle app to the time limit; a CPU trace
-    # reports the take's cycles per rusage CPU-second (audit #97).
+    # 2 (2026-09-25, audit #51/#52/#97 and the sampler change): the iPhone
+    # memory profile records through the Allocations template (no automatic VM
+    # snapshots, which suspended the target), every iPhone profile stops
+    # recording once its take's sentinel appears instead of recording the idle
+    # app to the time limit, and a CPU trace reports the take's cycles per
+    # rusage CPU-second.
     ("instrument-profile", "ios"): 2,
 }
 

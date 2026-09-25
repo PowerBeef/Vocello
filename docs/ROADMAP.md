@@ -13,7 +13,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
-| `audit-remediation-2026-09` | active | backend-and-platform | 1/12 (8%) |
+| `audit-remediation-2026-09` | active | backend-and-platform | 2/12 (17%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 11/17 (65%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 17/26 (65%) |
@@ -98,10 +98,9 @@ Narrative authority: [`docs/reference/project-review-2026-09-18.md`](reference/p
 | `AUD-04` | parked | Clone readiness reflects the context it actually has | — |
 | `AUD-06` | parked | iOS modals hide their background from VoiceOver | — |
 | `AUD-07` | parked | Verify recovery from an unverified StoreKit purchase | — |
-| `AUD-08` | planned | Make the logging half of the privacy invariant a gate | — |
 | `AUD-09` | planned | Smoke test01 owns the fixture it depends on | — |
 | `AUD-10` | planned | The engine is kept hot by intent, not by browsing | — |
-| `AUD-11` | planned | Use constant-time sampler membership without changing token order | — |
+| `AUD-11` | in-flight | Use constant-time sampler membership without changing token order | — |
 | `AUD-12` | parked | Migrate off the deprecated audio-session interruption keys | — |
 
 ### Open items in detail
@@ -129,16 +128,13 @@ Narrative authority: [`docs/reference/project-review-2026-09-18.md`](reference/p
   gate: A consented StoreKit lane establishes verification-failure and retry/Restore behavior; the resulting handling policy preserves fail-closed entitlements and has deterministic repeated/delayed-update tests. Do not unconditionally finish unverified transactions without that evidence.
   unparkWhen: the paired iPhone is available and unlocked for a consented lane (CONV-20)
 
-- **`AUD-08`** (planned) — Make the logging half of the privacy invariant a gate.
-  gate: The documented lexical scan scope remains accurate; runtime diagnostic boundaries use privacy-safe classifications or redaction and synthetic path/prompt-bearing failures prove prohibited content is not retained.
-
 - **`AUD-09`** (planned) — Smoke test01 owns the fixture it depends on.
   gate: Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome.
 
 - **`AUD-10`** (planned) — The engine is kept hot by intent, not by browsing.
   gate: On the high-memory Mac tier a warm prefetch is followed by an idle unload or a pressure response; navigating between tabs alone does not pin the engine in memory.
 
-- **`AUD-11`** (planned) — Use constant-time sampler membership without changing token order.
+- **`AUD-11`** (in-flight) — Use constant-time sampler membership without changing token order.
   gate: The per-step token dedup is a set membership test; runtime parity is proven by the seeded runtime tests and the gate bench shows no regression.
 
 - **`AUD-12`** (parked) — Migrate off the deprecated audio-session interruption keys.
@@ -449,7 +445,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-20` | in-flight | Accessibility and localization reach every surface | — |
 | `PA-25` | planned | Docs and tooling stay proportional | — |
 | `PA-26` | planned | Low-severity backlog from the external audit | — |
-| `PA-30` | planned | Leftovers from PA-21, PA-22 and AUD-05 | — |
+| `PA-30` | in-flight | Leftovers from PA-21, PA-22 and AUD-05 | — |
 | `PA-31` | planned | The engine store reports frontend state changes with the streaming engine | — |
 
 ### Open items in detail
@@ -481,7 +477,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 - **`PA-26`** (planned) — Low-severity backlog from the external audit.
   gate: Every Low and Info finding in the external audit that no other item covers is fixed or declined with a reason, section by section.
 
-- **`PA-30`** (planned) — Leftovers from PA-21, PA-22 and AUD-05.
+- **`PA-30`** (in-flight) — Leftovers from PA-21, PA-22 and AUD-05.
   gate: A failed History clear is never silent and a pending clear has its own banner copy on both platforms; a long-form acceptance interrupted by app suspension is retried after resume and keeps its audio, with copy that matches; a set-aside unreadable audio-removal list is reported once or can be discarded; the iPhone offers a one-time, confirmed removal of audio earlier clears left in its private storage (maintainer decision 2026-09-24: the Mac outputs folder stays untouched); the resident speech tokenizer gets an owner-scoped release (ENG-06) only with a device memory re-qualification.
 
 - **`PA-31`** (planned) — The engine store reports frontend state changes with the streaming engine.

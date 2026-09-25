@@ -4030,6 +4030,19 @@
       "notes": "Closed 2026-09-24. Deletion: a delete whose audio cannot be removed says so and keeps the path on a durable removal list every reconcile retries (regular files only, never a path a row or queued take uses); clear-all hands its audio to that list before its marker retires and counts only what stays listed. Contention: with no long-form journal pending, History reads are read transactions. Paging: both platforms read bounded pages (filter and search reach every row) with Show More. Data-loss fix after two adversarial reviews: the clear marker records the highest row id it saw and a resume deletes only rows up to it (ids are AUTOINCREMENT, tested on real SQLite); a clear with a marker pending finishes it, then clears what is visible; a keep-files request never escalates; the clear read fails rather than withholding long-form rows; a marker from before the bound is abandoned. Leftovers moved to PA-30.",
       "plan": "audit-remediation-2026-09",
       "updated": "2026-09-24"
+    },
+    {
+      "id": "AUD-08",
+      "title": "Make the logging half of the privacy invariant a gate",
+      "status": "done",
+      "gate": "The documented lexical scan scope remains accurate; runtime diagnostic boundaries use privacy-safe classifications or redaction and synthetic path/prompt-bearing failures prove prohibited content is not retained.",
+      "sourceOfTruth": [
+        "scripts/privacy_scan.py",
+        "docs/reference/privacy-storage.md"
+      ],
+      "notes": "Closed 2026-09-24. One privacy helper (QwenVoiceCore DiagnosticPrivacy) keeps a typed summary (error code and classification, type, domain and code chain, stage, HTTP status) and redacts URLs, e-mail addresses, quoted spans, absolute and home paths and content-keyed values. Every persisted or exported diagnostic that could carry a path, prompt or transcript goes through it: model-download diagnostics, the iOS device-diagnostics manifest, action messages and sentinels, engine native-events, the commerce error record (schema 2), crash-observer exception reasons and MetricKit reasons. Generation failures and telemetry already stored only codes or digests. Regression tests feed synthetic path, prompt and transcript failures and prove none is retained; the privacy docs state the scan scope. Left elsewhere: console-only prints (not persisted) on PA-26, error text shown in the UI on PA-20, ENG-08 (user text in an owned-package error message) on PA-26.",
+      "plan": "audit-remediation-2026-09",
+      "updated": "2026-09-24"
     }
   ]
 }

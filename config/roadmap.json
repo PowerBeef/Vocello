@@ -1207,19 +1207,6 @@
       "unparkWhen": "the paired iPhone is available and unlocked for a consented lane (CONV-20)"
     },
     {
-      "id": "AUD-08",
-      "title": "Make the logging half of the privacy invariant a gate",
-      "status": "planned",
-      "gate": "The documented lexical scan scope remains accurate; runtime diagnostic boundaries use privacy-safe classifications or redaction and synthetic path/prompt-bearing failures prove prohibited content is not retained.",
-      "sourceOfTruth": [
-        "scripts/privacy_scan.py",
-        "docs/reference/privacy-storage.md"
-      ],
-      "notes": "Revalidated 2026-09-18 (P2): source-pattern scanning cannot evaluate interpolated runtime errors. This setup corrects CLAUDE.md and privacy-storage.md to state that limitation. The item remains open for runtime-log boundary review and regression coverage, including localizedDescription from filesystem failures; no actual private log was collected. Existing allowlisted support-log schema remains authoritative. See project-review-2026-09-18.md.",
-      "plan": "audit-remediation-2026-09",
-      "updated": "2026-09-18"
-    },
-    {
       "id": "AUD-09",
       "title": "Smoke test01 owns the fixture it depends on",
       "status": "planned",
@@ -1247,14 +1234,14 @@
     {
       "id": "AUD-11",
       "title": "Use constant-time sampler membership without changing token order",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "The per-step token dedup is a set membership test; runtime parity is proven by the seeded runtime tests and the gate bench shows no regression.",
       "sourceOfTruth": [
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
       ],
-      "notes": "Revalidated 2026-09-18 (P3 optimization): Qwen3SamplerScratch appendRepetitionTokenID uses array.contains; its MLX array cache is invalidated only for a newly appended token, not every repeated token. An outer membership set exists but is not used by this check. Timing impact is unmeasured. Preserve insertion order, seeded parity, package isolation and the owned-package semantic-delta/inventory contract. See project-review-2026-09-18.md.",
+      "notes": "Revalidated 2026-09-18 (P3 optimization): Qwen3SamplerScratch appendRepetitionTokenID uses array.contains; its MLX array cache is invalidated only for a newly appended token, not every repeated token. An outer membership set exists but is not used by this check. Timing impact is unmeasured. Preserve insertion order, seeded parity, package isolation and the owned-package semantic-delta/inventory contract. See project-review-2026-09-18.md. 2026-09-24: the repetition dedup is a set membership test with the ordered index array unchanged; a focused sampler test and the seeded generate-loop replay pass. The consent-given M6 gate bench (no-regression check) is still to run.",
       "plan": "audit-remediation-2026-09",
-      "updated": "2026-09-18"
+      "updated": "2026-09-24"
     },
     {
       "id": "AUD-12",
@@ -1311,9 +1298,9 @@
         "Sources/ContentView.swift",
         "Packages/VocelloQwen3Core/OWNERSHIP.json"
       ],
-      "notes": "Maintainability observations, not measured defects: macOS ModelManagerViewModel is @Observable and the iOS one ObservableObject; three download drivers call downloadFiles; MacInlinePlayerCard and MacStudioPlayerCard coexist; ContentView and QVoiceiOSRootView build @Observable models through State(initialValue:) in init, re-running construction on parent re-init; Qwen3TTS.generateVoiceDesign is the core loop for every mode; OWNERSHIP.json omits MLXAudioMark; the Cmd-6 item titled Models opens Settings. Prefer small reversible steps; UI changes need their lanes on explicit request. External audit ENG-14: MLXAudioMark is also missing from COMPATIBILITY.json and RUNTIME_MANIFEST.json target lists; qwen3_core_contract.py checks one direction only. MAC-23 is the root-view construction item.",
+      "notes": "Maintainability observations, not measured defects: macOS ModelManagerViewModel is @Observable and the iOS one ObservableObject; three download drivers call downloadFiles; MacInlinePlayerCard and MacStudioPlayerCard coexist; ContentView and QVoiceiOSRootView build @Observable models through State(initialValue:) in init, re-running construction on parent re-init; Qwen3TTS.generateVoiceDesign is the core loop for every mode; OWNERSHIP.json omits MLXAudioMark; the Cmd-6 item titled Models opens Settings. Prefer small reversible steps; UI changes need their lanes on explicit request. External audit ENG-14: MLXAudioMark is also missing from COMPATIBILITY.json and RUNTIME_MANIFEST.json target lists; qwen3_core_contract.py checks one direction only. MAC-23 is the root-view construction item. 2026-09-24: OWNERSHIP.json, COMPATIBILITY.json and RUNTIME_MANIFEST.json list MLXAudioMark, and the package contract checks every target both ways (ENG-14).",
       "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
+      "updated": "2026-09-24"
     },
     {
       "id": "PA-10",
@@ -1405,15 +1392,15 @@
       "sourceOfTruth": [
         "docs/audits/2026-09-22-project-audit.md"
       ],
-      "notes": "External audit 2026-09-22, sections 5 to 12: the Low and Info rows not grouped into PA-01 to PA-25 or existing items (for example ENG-07 to ENG-17, CORE-10 to CORE-22, MAC-09 to MAC-26, IOS-16 to IOS-25, SEC-08 to SEC-16, CI-09 to CI-21, WEB-02, WEB-06 to WEB-08, UX-01, REPO-01 to REPO-04). Work them in batches by area; the report's verification addendum lists the rows that are wrong or already fixed.",
+      "notes": "External audit 2026-09-22, sections 5 to 12: the Low and Info rows not grouped into PA-01 to PA-25 or existing items (for example ENG-07 to ENG-17, CORE-10 to CORE-22, MAC-09 to MAC-26, IOS-16 to IOS-25, SEC-08 to SEC-16, CI-09 to CI-21, WEB-02, WEB-06 to WEB-08, UX-01, REPO-01 to REPO-04). Work them in batches by area; the report's verification addendum lists the rows that are wrong or already fixed. From AUD-08: console-only error prints (not persisted) in IOSAudioSessionOwner, QVoiceiOSApp, IOSGenerationModeViews, IOSVoicePreviewPlayer, MacVoiceCloningScreen, MacStudioGenerationActions, LivePreviewDiagnostics and the package's stderr paths.",
       "plan": "project-audit-2026-09",
-      "updated": "2026-09-22"
+      "updated": "2026-09-24"
     },
     {
       "id": "PA-30",
       "plan": "project-audit-2026-09",
       "title": "Leftovers from PA-21, PA-22 and AUD-05",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "A failed History clear is never silent and a pending clear has its own banner copy on both platforms; a long-form acceptance interrupted by app suspension is retried after resume and keeps its audio, with copy that matches; a set-aside unreadable audio-removal list is reported once or can be discarded; the iPhone offers a one-time, confirmed removal of audio earlier clears left in its private storage (maintainer decision 2026-09-24: the Mac outputs folder stays untouched); the resident speech tokenizer gets an owner-scoped release (ENG-06) only with a device memory re-qualification.",
       "sourceOfTruth": [
@@ -1422,7 +1409,7 @@
         "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
       ],
-      "notes": "Split out 2026-09-24. Done 2026-09-24: the Clone reference picker shows a failed Saved Voices load with Retry; History suspends its GRDB queue before the app is suspended, and a write that meets the suspension leaves the take in the outbox for the reconcile after resume (IOS-11, adversarially reviewed). Open from the second History review: iOS keeps a failed clear's error where only an empty list shows it, and a pending clear falls through to the \"0 takes queued\" banner copy on both platforms; a suspension inside a long-form acceptance lets the next write roll it back and delete the new joined output while the copy says the audio was kept, and one before prepare orphans the candidate; a set-aside removal list counts as an issue forever. ENG-06 is latent: one model operation runs at a time today; a strict owner token can double the resident tokenizer on iOS (about 218 MB). Orphaned audio from earlier Keep Audio Files clears is user data.",
+      "notes": "Split out 2026-09-24. Done 2026-09-24: the Clone reference picker shows a failed Saved Voices load with Retry; History suspends its GRDB queue before the app is suspended and a take that meets the suspension waits in the outbox (IOS-11). From the second History review, also done: a failed iOS clear shows an alert and a pending clear has its own notice on both platforms (never a zero count); a long-form acceptance interrupted by suspension is marked resumable on the writer and completes after resume with its audio kept; an unreadable removal list is its own notice that Retry discards without touching audio. Open: the confirmed one-time iPhone removal of audio earlier clears left (maintainer decision 2026-09-24; the Mac outputs folder stays untouched), and ENG-06: the speech tokenizer is adopted across engines, safe today because one model operation runs at a time; a strict owner token can double the resident tokenizer on iOS (about 218 MB) and needs a device memory re-qualification.",
       "updated": "2026-09-24"
     },
     {

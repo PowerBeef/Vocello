@@ -707,6 +707,11 @@ def compact_profile_failures(
             if marker.get("retentionPolicy") == "keptExplicitly":
                 print(f"profile-retained: path={trace} policy=keptExplicitly")
                 continue
+            # A memory profile keeps its raw trace by default: the trace is its
+            # only allocation and VM evidence (audit #69).
+            if marker.get("retentionPolicy") == "keptByDefault" and kind == "memory":
+                print(f"profile-retained: path={trace} policy=keptByDefault")
+                continue
             if not (
                 marker.get("retentionPolicy") == "summaryOnly"
                 and marker.get("rawTraceRetained") is True

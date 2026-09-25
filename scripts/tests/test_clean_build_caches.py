@@ -538,6 +538,44 @@ raise SystemExit(0 if payload.get("_fixtureValid") is True else 1)
         old_marker = json.loads((old_run / "profile-retention.json").read_text())
         self.assertEqual(old_marker["retentionPolicy"], "failedCompacted")
 
+    def test_memory_profile_trace_kept_by_default_is_retained_as_valid(self) -> None:
+        memory_run, memory_trace = self.profile_run(
+            "mac-memory-profile-20260713-000000-00000001"
+        )
+        self.profile_marker(
+            memory_run,
+            memory_trace,
+            platform="macos",
+            kind="memory",
+            status="published",
+            policy="keptByDefault",
+            capture_time="2026-07-13T00:00:00Z",
+        )
+        self.published_profile(memory_run, memory_trace, platform="macos")
+        # Only a memory profile keeps its trace by default; a CPU marker that
+        # claims it is kept as invalid state, never removed.
+        cpu_run, cpu_trace = self.profile_run(
+            "mac-cpu-profile-20260713-000001-00000002", kind="cpu"
+        )
+        self.profile_marker(
+            cpu_run,
+            cpu_trace,
+            platform="macos",
+            kind="cpu",
+            status="published",
+            policy="keptByDefault",
+            capture_time="2026-07-13T00:00:01Z",
+        )
+        self.published_profile(cpu_run, cpu_trace, platform="macos")
+
+        result = self.run_clean("--routine")
+
+        self.assertTrue(memory_trace.exists())
+        self.assertIn(f"/{memory_trace.name} policy=keptByDefault", result.stdout)
+        self.assertNotIn(f"/{memory_trace.name} reason=", result.stdout)
+        self.assertTrue(cpu_trace.exists())
+        self.assertIn(f"/{cpu_trace.name} reason=invalid-retention-state", result.stdout)
+
     def test_profile_digest_mismatch_is_preserved(self) -> None:
         run, trace = self.profile_run("mac-cpu-profile-20260713-000000-00000001", kind="cpu")
         self.profile_marker(

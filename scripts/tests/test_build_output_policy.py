@@ -251,6 +251,37 @@ class BuildOutputPolicyTests(unittest.TestCase):
         self.assertIn("filesystem", status)
         self.assertGreater(status["filesystem"]["totalBytes"], 0)
 
+    def test_memory_profile_trace_kept_by_default_is_retained_not_invalid(self) -> None:
+        def profile(run_id: str, kind: str, policy: str) -> None:
+            run = self.root / "build/artifacts/macos/profiles" / run_id
+            trace = run / f"{run_id}.trace"
+            trace.mkdir(parents=True)
+            (trace / "events.bin").write_bytes(b"trace")
+            (run / "profile-retention.json").write_text(json.dumps({
+                "schemaVersion": 1,
+                "runID": run_id,
+                "platform": "macos",
+                "profileKind": kind,
+                "status": "published",
+                "retentionPolicy": policy,
+                "rawTraceRetained": True,
+                "captureTime": "2026-07-13T00:00:0%sZ" % run_id[-1],
+                "originalEphemeralPath": trace.relative_to(self.root).as_posix(),
+            }), encoding="utf-8")
+
+        profile("mac-memory-profile-20260713-000001-00000001", "memory", "keptByDefault")
+        profile("mac-cpu-profile-20260713-000002-00000002", "cpu", "keptByDefault")
+        status = POLICY._profile_retention_status(POLICY.load_policy(self.root, self.manifest))
+        reasons = {run["runID"]: (run["action"], run["reason"]) for run in status["runs"]}
+        self.assertEqual(
+            reasons["mac-memory-profile-20260713-000001-00000001"], ("retain", "kept-by-default")
+        )
+        # Only a memory profile keeps its trace by default.
+        self.assertEqual(
+            reasons["mac-cpu-profile-20260713-000002-00000002"],
+            ("retain", "publication-proof-invalid"),
+        )
+
     def test_a_nested_unowned_root_is_reported(self) -> None:
         # The regression this exists for: the check used to look one level deep
         # while governed paths are two to four levels deep, so a top-level name

@@ -862,6 +862,12 @@ def _profile_retention_status(policy: LoadedPolicy) -> dict[str, Any]:
             if marker.get("retentionPolicy") == "keptExplicitly":
                 candidate.update(action="retain", reason="kept-explicitly")
             elif (
+                marker.get("retentionPolicy") == "keptByDefault"
+                and candidate["kind"] == "memory"
+            ):
+                # A memory profile keeps its raw trace by default (audit #69).
+                candidate.update(action="retain", reason="kept-by-default")
+            elif (
                 marker.get("retentionPolicy") == "summaryOnly"
                 and marker.get("rawTraceRetained") is True
                 and _valid_profile_history_record(

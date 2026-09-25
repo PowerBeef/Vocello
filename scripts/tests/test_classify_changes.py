@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("classify_changes", ROOT / "scripts/ci/classify_changes.py")
@@ -268,15 +269,39 @@ class ClassificationTests(unittest.TestCase):
             self.assertIn("python", self.lanes(path), path)
 
     def test_native_lanes_follow_the_imports_of_their_python_drivers(self) -> None:
-        # Every native build loads the build-output policy through
-        # scripts/lib/build_paths.sh; its library imports route with it.
-        for path in ("scripts/lib/build_artifact_retention.py", "scripts/lib/profile_trace_retention.py",
-                     "scripts/lib/jsonio.py"):
-            self.assertTrue({"swift", "ios"} <= self.lanes(path), path)
-        closure = MODULE.python_import_closure(MODULE.MACOS_LANE_SCRIPTS)
-        self.assertIn("scripts/build_output_policy.py", closure)
-        self.assertIn("scripts/lib/jsonio.py", closure)
-        self.assertNotIn("scripts/benchmark_history.py", closure)
+        # A synthetic scripts/ tree, so the test pins how imports are followed
+        # rather than what any real driver happens to import today.
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "scripts/lib").mkdir(parents=True)
+            sources = {
+                "scripts/driver.py": "import os\nfrom lib import alpha\n\ndef later():\n    import helper\n",
+                "scripts/helper.py": "",
+                "scripts/lib/alpha.py": "import lib.beta\n",
+                "scripts/lib/beta.py": "try:\n    import gamma\nexcept ImportError:\n    pass\n",
+                "scripts/lib/gamma.py": "import driver\n",
+                "scripts/unrelated.py": "",
+                "scripts/lib/unrelated.py": "",
+            }
+            for path, text in sources.items():
+                (root / path).write_text(text, encoding="utf-8")
+            MODULE.python_import_closure.cache_clear()
+            try:
+                with mock.patch.object(MODULE, "REPO_ROOT", root), \
+                        mock.patch.object(MODULE, "MACOS_LANE_SCRIPTS", ("scripts/driver.py", "scripts/run.sh")):
+                    closure = MODULE.python_import_closure(MODULE.MACOS_LANE_SCRIPTS)
+                    routed = {path for path in sources if MODULE._is_swift(path)}
+            finally:
+                MODULE.python_import_closure.cache_clear()
+        loaded = {"scripts/driver.py", "scripts/helper.py", "scripts/lib/alpha.py", "scripts/lib/beta.py",
+                  "scripts/lib/gamma.py"}
+        self.assertEqual(closure, loaded)
+        self.assertEqual(routed, loaded)
+
+    def test_every_module_a_native_driver_loads_routes_to_its_lane(self) -> None:
+        for drivers, lane in ((MODULE.MACOS_LANE_SCRIPTS, "swift"), (MODULE.IOS_BUILD_SCRIPTS, "ios")):
+            for path in MODULE.python_import_closure(drivers):
+                self.assertIn(lane, self.lanes(path), path)
 
     def test_xcuitest_only_sources_skip_the_swift_lane(self) -> None:
         # PA-06: no deterministic bundle or TSan subset compiles the XCUITest

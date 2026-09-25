@@ -160,7 +160,7 @@ final class DatabaseService: @unchecked Sendable {
     }
 
     /// Every row, newest first. Screens page instead (`fetchGenerationPage`);
-    /// clear-all still needs every audio path.
+    /// clear-all reads through `fetchAllGenerationsForClear()`.
     func fetchAllGenerations() throws -> [Generation] {
         let dbQueue = try requireQueue(for: .read)
         do {
@@ -174,6 +174,22 @@ final class DatabaseService: @unchecked Sendable {
             }
             return try dbQueue.write { db in
                 return try longFormAcceptance.readableHistory(in: db)
+            }
+        } catch {
+            throw HistoryPersistenceError.classify(error, operation: .read)
+        }
+    }
+
+    /// Every row for clear-all, read on the writer after long-form
+    /// reconciliation. While a journal needs recovery it throws instead of
+    /// withholding project rows, so a clear's bound never covers a row it did
+    /// not capture (AUD-05).
+    func fetchAllGenerationsForClear() throws -> [Generation] {
+        let dbQueue = try requireQueue(for: .read)
+        do {
+            return try dbQueue.write { db in
+                try longFormAcceptance.reconcile(in: db)
+                return try Generation.order(Generation.Columns.createdAt.desc).fetchAll(db)
             }
         } catch {
             throw HistoryPersistenceError.classify(error, operation: .read)
@@ -242,17 +258,13 @@ final class DatabaseService: @unchecked Sendable {
     }
 
     /// Deletes the rows whose id is at most `maxRowID` and returns their audio
-    /// paths, in one write. Ids auto-increment and are never reused, so a take
-    /// saved after a clear captured its bound survives it (AUD-05).
+    /// paths, in one write (`GenerationHistoryBoundedDelete`, AUD-05).
     func deleteGenerations(throughID maxRowID: Int64) throws -> [String] {
         let dbQueue = try requireQueue(for: .delete)
         do {
             return try dbQueue.write { db in
                 try longFormAcceptance.reconcile(in: db)
-                let bounded = Generation.filter(Generation.Columns.id <= maxRowID)
-                let paths = try bounded.select(Generation.Columns.audioPath, as: String.self).fetchAll(db)
-                _ = try bounded.deleteAll(db)
-                return paths
+                return try GenerationHistoryBoundedDelete.deleteRows(throughID: maxRowID, in: db)
             }
         } catch {
             throw HistoryPersistenceError.classify(error, operation: .delete)

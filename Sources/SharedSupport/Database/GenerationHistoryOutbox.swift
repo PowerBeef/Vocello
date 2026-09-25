@@ -238,7 +238,7 @@ struct GenerationHistoryOutboxStore: Sendable {
         let entry = GenerationHistoryOutboxEntry(operation: operation, generation: generation)
         do {
             try ensureRoot()
-            try atomicWrite(encode(entry), to: entryURL(for: entry.id))
+            try publishNewEntry(encode(entry), id: entry.id)
             return entry
         } catch let error as GenerationHistoryOutboxError {
             throw error
@@ -247,7 +247,15 @@ struct GenerationHistoryOutboxStore: Sendable {
         }
     }
 
-    func scan() -> GenerationHistoryOutboxScan {
+    /// Whether the entry is still queued (a clear may have removed it).
+    func containsEntry(id: UUID) -> Bool {
+        FileManager.default.fileExists(atPath: entryURL(for: id).path)
+    }
+
+    /// Reads every entry. By default a valid interrupted `.writing` file is
+    /// promoted; `promotingWrites: false` only reads, for a check that runs
+    /// off the coordinator and must not race its promotion (AUD-05).
+    func scan(promotingWrites: Bool = true) -> GenerationHistoryOutboxScan {
         do {
             try ensureRoot()
             let urls = try FileManager.default.contentsOfDirectory(
@@ -266,15 +274,29 @@ struct GenerationHistoryOutboxStore: Sendable {
                     do {
                         let entry: GenerationHistoryOutboxEntry = try decode(url)
                         try validate(entry, filenameID: writingFileID(url))
-                        let finalURL = entryURL(for: entry.id)
-                        if FileManager.default.fileExists(atPath: finalURL.path) {
-                            try FileManager.default.removeItem(at: url)
-                        } else {
-                            try FileManager.default.moveItem(at: url, to: finalURL)
+                        // Unpromoted, a final file for the same id may be read
+                        // too; the duplicate only repeats its audio path.
+                        if promotingWrites {
+                            let finalURL = entryURL(for: entry.id)
+                            if FileManager.default.fileExists(atPath: finalURL.path) {
+                                try FileManager.default.removeItem(at: url)
+                            } else {
+                                try FileManager.default.moveItem(at: url, to: finalURL)
+                            }
                         }
                         entries.append(entry)
                     } catch {
-                        issues += 1
+                        // The scan can lose the race with a promotion made
+                        // meanwhile (an off-actor enqueue renames its own
+                        // `.writing`); the promoted file is then the entry.
+                        if !FileManager.default.fileExists(atPath: url.path),
+                           let id = writingFileID(url),
+                           let promoted: GenerationHistoryOutboxEntry = try? decode(entryURL(for: id)),
+                           (try? validate(promoted, filenameID: id)) != nil {
+                            entries.append(promoted)
+                        } else {
+                            issues += 1
+                        }
                     }
                 } else if url.pathExtension == "json", url != clearTransactionURL {
                     do {
@@ -282,7 +304,11 @@ struct GenerationHistoryOutboxStore: Sendable {
                         try validate(entry, filenameID: UUID(uuidString: url.deletingPathExtension().lastPathComponent))
                         entries.append(entry)
                     } catch {
-                        issues += 1
+                        // An entry committed and removed since the listing is
+                        // gone, not damaged.
+                        if FileManager.default.fileExists(atPath: url.path) {
+                            issues += 1
+                        }
                     }
                 }
             }
@@ -509,11 +535,23 @@ struct GenerationHistoryOutboxStore: Sendable {
         return try decoder.decode(T.self, from: Data(contentsOf: url))
     }
 
-    private func atomicWrite(_ data: Data, to finalURL: URL) throws {
-        guard let id = UUID(uuidString: finalURL.deletingPathExtension().lastPathComponent) else {
-            throw GenerationHistoryOutboxError.invalidEntryIdentity
+    /// A fresh entry's id is new, so no final file of its own predates it and
+    /// none is ever replaced. Enqueue runs off the coordinator, whose scan may
+    /// promote this `.writing` first: that is the same publication, so the
+    /// entry is in place either way (AUD-05).
+    private func publishNewEntry(_ data: Data, id: UUID) throws {
+        let fileManager = FileManager.default
+        let writing = writingURL(for: id)
+        let final = entryURL(for: id)
+        do {
+            try data.write(to: writing, options: [.atomic])
+            try fileManager.moveItem(at: writing, to: final)
+        } catch {
+            if !fileManager.fileExists(atPath: writing.path), fileManager.fileExists(atPath: final.path) {
+                return
+            }
+            throw GenerationHistoryOutboxError.unavailable
         }
-        try atomicWrite(data, to: finalURL, writingURL: writingURL(for: id))
     }
 
     private func atomicWrite(_ data: Data, to finalURL: URL, writingURL: URL) throws {
@@ -540,6 +578,9 @@ struct GenerationHistoryOutboxStore: Sendable {
 /// idempotent through the injected audio-identity-aware commit operation.
 actor GenerationHistoryRecoveryCoordinator {
     typealias Commit = @Sendable (GenerationHistoryOutboxOperation, Generation) async throws -> Generation
+    /// Every History row, or a throw. A read that would withhold rows (a
+    /// long-form journal awaiting recovery) must fail instead: the clear's
+    /// bound must never cover a row it did not capture (AUD-05).
     typealias FetchAll = @Sendable () async throws -> [Generation]
     /// Deletes the History rows whose id is at most the bound and returns
     /// their audio paths, in one database write.
@@ -552,6 +593,16 @@ actor GenerationHistoryRecoveryCoordinator {
     private let fetchAllGenerations: FetchAll
     private let deleteGenerationsThrough: DeleteThrough
     private let referencedAudioPaths: ReferencedAudioPaths
+    /// Audio of takes whose commit is awaiting the database. The entry may be
+    /// gone already (a clear removed it) while the row is not yet visible, so
+    /// the guarded removal treats these paths as in use (AUD-05).
+    private var committingAudioPaths: [String: Int] = [:]
+    /// Clear completions run one at a time. Each writes back and retires the
+    /// marker it loaded, so two interleaved at an await could restore an
+    /// intent another request changed or retire a marker the other has not
+    /// finished (AUD-05).
+    private var clearInProgress = false
+    private var clearWaiters: [CheckedContinuation<Void, Never>] = []
 
     init(
         store: GenerationHistoryOutboxStore,
@@ -568,8 +619,17 @@ actor GenerationHistoryRecoveryCoordinator {
     }
 
     func commit(_ entry: GenerationHistoryOutboxEntry) async throws -> Generation {
-        guard FileManager.default.fileExists(atPath: entry.generation.audioPath) else {
+        let audioPath = entry.generation.audioPath
+        guard FileManager.default.fileExists(atPath: audioPath) else {
             throw GenerationHistoryOutboxError.missingAudio
+        }
+        committingAudioPaths[audioPath, default: 0] += 1
+        defer {
+            if let count = committingAudioPaths[audioPath], count > 1 {
+                committingAudioPaths[audioPath] = count - 1
+            } else {
+                committingAudioPaths[audioPath] = nil
+            }
         }
         do {
             let saved = try await commitGeneration(entry.operation, entry.generation)
@@ -583,19 +643,21 @@ actor GenerationHistoryRecoveryCoordinator {
     }
 
     func reconcile() async -> GenerationHistoryReconciliationResult {
-        if (try? store.loadClearTransaction()) != nil {
-            do {
-                _ = try await resumeClearTransactionIfNeeded()
-            } catch {
-                return GenerationHistoryReconciliationResult(
-                    committed: [],
-                    snapshot: snapshot()
-                )
-            }
+        // A marker that cannot be read fails closed: committing now could
+        // bring back takes the interrupted clear removes (AUD-05).
+        do {
+            _ = try await resumeClearTransactionIfNeeded()
+        } catch {
+            return GenerationHistoryReconciliationResult(
+                committed: [],
+                snapshot: snapshot()
+            )
         }
         let scan = store.scan()
         var committed: [Generation] = []
-        for entry in scan.entries {
+        // A clear may remove an entry while an earlier commit awaits: skip it
+        // rather than bring back a take the user cleared.
+        for entry in scan.entries where store.containsEntry(id: entry.id) {
             if let saved = try? await commit(entry) {
                 committed.append(saved)
             }
@@ -649,12 +711,21 @@ actor GenerationHistoryRecoveryCoordinator {
     }
 
     func clearAll(deleteAudio: Bool) async throws -> GenerationHistoryClearOutcome {
+        // A keep-files request downgrades a pending clear at once, before any
+        // await: a crash, a later resume, and a completion already running
+        // (it reads the stored intent after its row deletion) all keep the
+        // audio. Nothing ever escalates to deleting it (AUD-05).
+        if !deleteAudio {
+            try keepAudioOfPendingClear()
+        }
+        await acquireClear()
+        defer { releaseClear() }
+        var failures = 0
         if let pending = try store.loadClearTransaction() {
-            let failures = try await completeClearTransaction(pending.keepingAudio(unless: deleteAudio))
-            return GenerationHistoryClearOutcome(
-                failedFileRemovals: failures,
-                snapshot: snapshot()
-            )
+            // An interrupted clear finishes first under its own bound. Takes
+            // saved since then are this request's: it captures a fresh bound
+            // below instead of reporting the old clear as its own.
+            failures = try await completeClearTransaction(pending)
         }
         let scan = store.scan()
         guard scan.issueCount == 0 else {
@@ -666,9 +737,8 @@ actor GenerationHistoryRecoveryCoordinator {
         } catch {
             throw GenerationHistoryOutboxError.clearUnavailable
         }
-        // The bound comes from the same read as the paths. Rows it cannot see
-        // (a long-form project withheld during journal recovery) keep their
-        // larger ids and survive; the clear never reaches past what it read.
+        // The bound comes from the same read as the paths, which fails rather
+        // than withholding rows, so every row at or below it was captured.
         let transaction = GenerationHistoryClearTransaction(
             deleteAudio: deleteAudio,
             audioPaths: databaseRows.map(\.audioPath) + scan.entries.map(\.generation.audioPath),
@@ -676,25 +746,51 @@ actor GenerationHistoryRecoveryCoordinator {
             maxRowID: databaseRows.compactMap(\.id).max() ?? 0
         )
         try store.writeClearTransaction(transaction)
-        let failures = try await completeClearTransaction(transaction)
+        failures += try await completeClearTransaction(transaction)
         return GenerationHistoryClearOutcome(failedFileRemovals: failures, snapshot: snapshot())
+    }
+
+    /// Records a keep-files request on a pending delete-audio clear, even when
+    /// the request itself is then refused (AUD-05).
+    func keepAudioOfPendingClear() throws {
+        guard let pending = try store.loadClearTransaction(), pending.deleteAudio else { return }
+        do {
+            try store.writeClearTransaction(pending.keepingAudio(unless: false))
+        } catch {
+            throw GenerationHistoryOutboxError.clearUnavailable
+        }
     }
 
     @discardableResult
     private func resumeClearTransactionIfNeeded() async throws -> Int {
+        await acquireClear()
+        defer { releaseClear() }
         guard let transaction = try store.loadClearTransaction() else { return 0 }
         return try await completeClearTransaction(transaction)
+    }
+
+    private func acquireClear() async {
+        guard clearInProgress else {
+            clearInProgress = true
+            return
+        }
+        await withCheckedContinuation { clearWaiters.append($0) }
+    }
+
+    private func releaseClear() {
+        if clearWaiters.isEmpty {
+            clearInProgress = false
+        } else {
+            clearWaiters.removeFirst().resume()
+        }
     }
 
     private func completeClearTransaction(_ transaction: GenerationHistoryClearTransaction) async throws -> Int {
         var transaction = transaction
         if !transaction.rowsDeleted {
             guard let bound = transaction.maxRowID else {
-                // Written before the bound existed: an unbounded resume could
-                // delete takes saved since, so the clear is abandoned instead.
-                // Nothing was deleted; the rows stay and the user can clear again.
-                try? store.removeClearTransaction()
-                throw GenerationHistoryOutboxError.clearUnavailable
+                try abandonUnboundedClear(transaction)
+                return 0
             }
             let deletedAudioPaths: [String]
             do {
@@ -702,10 +798,26 @@ actor GenerationHistoryRecoveryCoordinator {
             } catch {
                 throw GenerationHistoryOutboxError.clearUnavailable
             }
+            // A keep-files request may have downgraded the stored intent while
+            // the delete ran; it wins.
+            // An intent that cannot be read keeps the audio. Under the clear
+            // lock no one else finishes this marker, so a missing or foreign
+            // one is damage: fail closed rather than report a finished clear.
+            let stored: GenerationHistoryClearTransaction?
+            do {
+                stored = try store.loadClearTransaction()
+            } catch {
+                stored = transaction.keepingAudio(unless: false)
+            }
+            guard let stored, stored.id == transaction.id else {
+                throw GenerationHistoryOutboxError.clearUnavailable
+            }
             // Record the phase before any later step can fail. A repeat of the
             // bounded delete would be harmless (those rows are gone and later
             // takes have larger ids), but the phase also keeps the audio list.
-            transaction = transaction.markingRowsDeleted(addingAudioPaths: deletedAudioPaths)
+            transaction = transaction
+                .keepingAudio(unless: stored.deleteAudio)
+                .markingRowsDeleted(addingAudioPaths: deletedAudioPaths)
             try? store.writeClearTransaction(transaction)
         }
         for id in transaction.pendingEntryIDs {
@@ -726,9 +838,34 @@ actor GenerationHistoryRecoveryCoordinator {
             throw GenerationHistoryOutboxError.clearUnavailable
         }
         try store.removeClearTransaction()
-        _ = try? await removePendingAudio()
-        let fileManager = FileManager.default
-        return transaction.audioPaths.count { fileManager.fileExists(atPath: $0) }
+        // Only a failed removal counts. Audio kept because a surviving row or
+        // a queued take uses it, or waiting on a commit in flight, is none.
+        let failed: Set<String>
+        do {
+            failed = try await removePendingAudio()
+        } catch {
+            let fileManager = FileManager.default
+            return transaction.audioPaths.count { fileManager.fileExists(atPath: $0) }
+        }
+        return transaction.audioPaths.count { failed.contains($0) }
+    }
+
+    /// A marker written before the bound existed. An unbounded resume could
+    /// delete takes saved since, so the clear is abandoned: rows still there
+    /// stay, and the user can clear again. The rows of an interrupted old clear
+    /// may already be gone, so a delete-audio clear queues its audio for the
+    /// guarded removal. Much of that audio may still belong to live rows; it
+    /// is safe only because that removal skips any path a row or a queued take
+    /// still uses.
+    private func abandonUnboundedClear(_ transaction: GenerationHistoryClearTransaction) throws {
+        do {
+            if transaction.deleteAudio {
+                try store.appendPendingAudioRemovals(transaction.audioPaths)
+            }
+            try store.removeClearTransaction()
+        } catch {
+            throw GenerationHistoryOutboxError.clearUnavailable
+        }
     }
 
     /// A single delete removed the row but not its audio file: keep the path so
@@ -740,37 +877,50 @@ actor GenerationHistoryRecoveryCoordinator {
 
     /// Retries the pending audio removals. Audio a History row or a queued take
     /// still points at is never removed (it only leaves the list), and neither
-    /// is anything but a regular file. Returns the paths still pending.
+    /// is anything but a regular file. Audio only a commit in flight uses stays
+    /// listed, for a pass after that commit to decide: if the commit fails
+    /// after a clear removed its entry, nothing else would ever remove it.
+    /// Returns the paths whose removal failed.
     @discardableResult
     private func removePendingAudio() async throws -> Set<String> {
         let pending = try store.loadPendingAudioRemovals()
         guard !pending.isEmpty else { return [] }
-        let referenced = try await referencedAudioPaths(pending)
-        // The await lets other work on this actor run, and
-        // `retainAudioRemoval(_:)` may have added a path meanwhile. So only the
-        // paths this pass resolved leave the list, which is read again below;
-        // a list rebuilt from `pending` would drop the new path silently.
+        // The outbox is read before the rows. A commit inserts its row before
+        // it removes its entry, so a take this scan misses is one the row read
+        // below sees. An outbox that cannot be read fully may hide a queued
+        // take that uses one of these paths: remove nothing until it can.
         let scan = store.scan()
-        // An outbox that cannot be read fully may hide a queued take that uses
-        // one of these paths: remove nothing until it can (fail closed).
         guard scan.issueCount == 0 else { return Set(pending) }
         let queued = Set(scan.entries.map(\.generation.audioPath))
+        var committing = Set(committingAudioPaths.keys)
+        let referenced = try await referencedAudioPaths(pending)
+        // The await lets other work on this actor run: a commit may have
+        // started (its entry possibly already removed by a clear), and
+        // `retainAudioRemoval(_:)` may have added a path. So in-flight commits
+        // are read again, and only the paths this pass resolved leave the
+        // list, which is read again below; a list rebuilt from `pending` would
+        // drop the new path silently.
+        committing.formUnion(committingAudioPaths.keys)
         var resolved: Set<String> = []
+        var failed: Set<String> = []
         for path in pending {
             if queued.contains(path) || referenced.contains(path) {
                 resolved.insert(path)
                 continue
             }
+            if committing.contains(path) {
+                continue // Stays listed until that commit has landed or failed.
+            }
             switch GenerationHistoryAudioFile.removeRegularFile(atPath: path) {
             case .removed, .absentOrNotRegular:
                 resolved.insert(path)
             case .failed:
-                break // Stays listed for the next reconcile.
+                failed.insert(path) // Stays listed for the next reconcile.
             }
         }
         let remaining = try store.loadPendingAudioRemovals().filter { !resolved.contains($0) }
         try store.writePendingAudioRemovals(remaining)
-        return Set(remaining)
+        return failed
     }
 }
 
@@ -780,14 +930,45 @@ enum GenerationHistoryAudioFile {
     enum RemovalResult: Equatable {
         case removed
         case absentOrNotRegular
-        case failed
+        case failed(POSIXErrorCode)
+    }
+
+    /// A deleted row's audio is removed only when no other History row and no
+    /// queued take still uses the path, and only a regular file. The outbox is
+    /// read first: a commit inserts its row before it removes its entry, so a
+    /// take the scan misses is one the row check sees. An outbox that cannot be
+    /// read fully keeps the file: the error makes the screen retain it for a
+    /// later, guarded retry. The scan only reads, since this runs off the
+    /// coordinator and must not race its promotion.
+    static func removeUnreferenced(
+        atPath path: String,
+        outbox: GenerationHistoryOutboxStore,
+        referencedAudioPaths: ([String]) throws -> Set<String>
+    ) throws {
+        let scan = outbox.scan(promotingWrites: false)
+        guard scan.issueCount == 0 else { throw GenerationHistoryOutboxError.corruptEntry }
+        guard !scan.entries.contains(where: { $0.generation.audioPath == path }) else { return }
+        guard try referencedAudioPaths([path]).isEmpty else { return }
+        if case .failed(let code) = removeRegularFile(atPath: path) {
+            throw POSIXError(code)
+        }
     }
 
     static func removeRegularFile(atPath path: String) -> RemovalResult {
         var info = stat()
-        guard lstat(path, &info) == 0 else { return .absentOrNotRegular }
+        guard lstat(path, &info) == 0 else {
+            // Only a missing file is absent. Any other failure (EACCES, EIO)
+            // keeps the path listed for a later retry.
+            let code = errno
+            return code == ENOENT || code == ENOTDIR ? .absentOrNotRegular : .failed(posixCode(code))
+        }
         guard (info.st_mode & S_IFMT) == S_IFREG else { return .absentOrNotRegular }
-        if unlink(path) == 0 || errno == ENOENT { return .removed }
-        return .failed
+        if unlink(path) == 0 { return .removed }
+        let code = errno
+        return code == ENOENT ? .removed : .failed(posixCode(code))
+    }
+
+    private static func posixCode(_ code: Int32) -> POSIXErrorCode {
+        POSIXErrorCode(rawValue: code) ?? .EIO
     }
 }

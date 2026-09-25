@@ -106,3 +106,18 @@ enum GenerationMigrations {
         return migrator
     }
 }
+
+/// Clear-all's row deletion (AUD-05). The `generations` id is AUTOINCREMENT
+/// from v1 on (v3 rebuilds the table with it and SQLite keeps the sequence
+/// across the rename), so ids are never reused: a take saved after a clear
+/// captured its bound has a larger id and survives the clear.
+enum GenerationHistoryBoundedDelete {
+    /// Deletes the rows whose id is at most `maxRowID` and returns their
+    /// audio paths. Runs inside the caller's write.
+    static func deleteRows(throughID maxRowID: Int64, in db: Database) throws -> [String] {
+        let bounded = Generation.filter(Generation.Columns.id <= maxRowID)
+        let paths = try bounded.select(Generation.Columns.audioPath, as: String.self).fetchAll(db)
+        _ = try bounded.deleteAll(db)
+        return paths
+    }
+}

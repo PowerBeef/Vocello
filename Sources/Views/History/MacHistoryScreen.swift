@@ -896,8 +896,9 @@ private extension MacHistoryScreen {
 
     /// Clears the whole history. With `deleteAudio` false (GitHub #48), only
     /// the database rows and session cache go; the WAVs stay on disk. The
-    /// durable clear transaction captures database and pending-outbox paths,
-    /// deletes database rows first, then clears recovery entries and files.
+    /// durable clear transaction captures database and pending-outbox paths
+    /// with the highest row id, deletes the rows up to it first, then clears
+    /// recovery entries and files.
     func performClearAll(deleteAudio: Bool) {
         Task { @concurrent in
             let outcome: GenerationHistoryClearOutcome
@@ -905,11 +906,14 @@ private extension MacHistoryScreen {
                 outcome = try await GenerationHistoryRecovery.clearAll(deleteAudio: deleteAudio)
             } catch {
                 await MainActor.run {
-                    databaseUnavailable = true
                     presentActionAlert(
                         title: MacInterfaceText.historyClearError,
                         message: error.localizedDescription
                     )
+                    // A pending clear may have finished before this request
+                    // failed, and the read decides whether the database itself
+                    // is unavailable (AUD-05).
+                    reloadHistory(reconciling: false)
                 }
                 return
             }
@@ -924,6 +928,9 @@ private extension MacHistoryScreen {
                 MacHistorySessionCache.items = []
                 MacHistorySessionCache.hasMoreItems = false
                 MacHistorySessionCache.archiveCount = 0
+                // The clear is bounded: a take saved while it ran survives,
+                // so read what remains rather than assuming nothing (AUD-05).
+                reloadHistory()
 
                 if failures > 0 {
                     presentActionAlert(

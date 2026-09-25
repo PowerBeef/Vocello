@@ -50,6 +50,16 @@ final class GenerationHistoryOutboxTests: XCTestCase {
 
     private struct StubError: Error {}
 
+    /// `true` for the first caller only.
+    private actor FirstCallGate {
+        private var claimed = false
+
+        func claim() -> Bool {
+            defer { claimed = true }
+            return !claimed
+        }
+    }
+
     private var temporaryRoots: [URL] = []
     private var lockedDirectories: [URL] = []
 
@@ -227,11 +237,17 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         try Data("invalid".utf8).write(
             to: fixture.store.rootURL.appendingPathComponent("clear-transaction.writing")
         )
-        let coordinator = makeCoordinator(store: fixture.store, state: CommitState())
+        let state = CommitState()
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+        // The interrupted clear may have captured this queued take: committing
+        // it now could bring back a take the user cleared.
+        let entry = try fixture.store.enqueue(fixture.generation, operation: .append)
 
         let result = await coordinator.reconcile()
 
         XCTAssertTrue(result.committed.isEmpty)
+        XCTAssertEqual(state.counts.commits, 0)
+        XCTAssertEqual(fixture.store.scan().entries.map(\.id), [entry.id], "The entry is kept")
         XCTAssertEqual(result.snapshot.issueCount, 1)
         XCTAssertTrue(result.snapshot.clearRecoveryPending)
     }
@@ -376,7 +392,9 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: later.path))
     }
 
-    /// A transaction written before the phase existed still deletes its rows.
+    /// A bounded marker without the phase field reads as not yet deleted and
+    /// deletes its rows. (A marker from before the phase existed also has no
+    /// bound; `testLegacyUnboundedClearIsAbandonedWithRowsPreserved` covers it.)
     func testClearTransactionWithoutAPhaseStillDeletesItsRows() async throws {
         let fixture = try makeFixture()
         let state = CommitState()
@@ -467,26 +485,37 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         let state = CommitState()
         _ = try state.commit(fixture.generation)
         let coordinator = makeCoordinator(store: fixture.store, state: state)
-        var legacy = try JSONSerialization.jsonObject(with: encode(GenerationHistoryClearTransaction(
-            deleteAudio: true,
-            audioPaths: [fixture.audioURL.path],
-            pendingEntryIDs: [],
-            maxRowID: 1
-        ))) as! [String: Any]
-        legacy.removeValue(forKey: "maxRowID")
-        try JSONSerialization.data(withJSONObject: legacy)
-            .write(to: fixture.store.rootURL.appendingPathComponent("clear-transaction.json"))
+        try writeUnboundedMarker(in: fixture, deleteAudio: true)
 
-        _ = await coordinator.reconcile()
+        let result = await coordinator.reconcile()
 
         XCTAssertEqual(state.counts.deletes, 0)
         XCTAssertEqual(state.counts.rows, 1)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path), "A row still uses it")
         XCTAssertNil(try fixture.store.loadClearTransaction(), "The abandoned marker is gone")
+        XCTAssertEqual(result.snapshot, .empty)
     }
 
-    /// Resuming a pending delete-audio clear from a keep-files request keeps the audio.
-    func testKeepFilesClearNeverEscalatesAPendingDeleteAudioClear() async throws {
+    /// The rows of an interrupted old clear may already be gone: abandoning its
+    /// delete-audio marker hands their audio to the guarded removal instead of
+    /// orphaning it.
+    func testAbandonedLegacyClearRemovesAudioItsRowsNoLongerUse() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+        try writeUnboundedMarker(in: fixture, deleteAudio: true)
+
+        let result = await coordinator.reconcile()
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+        XCTAssertNil(try fixture.store.loadClearTransaction())
+        XCTAssertEqual(result.snapshot, .empty)
+    }
+
+    /// Clear all with an interrupted clear still pending finishes it, then
+    /// clears what the user sees now: a take saved since the interrupted clear
+    /// goes too. Clearing only the old bound would leave it silently (AUD-05).
+    func testClearWithAPendingClearAlsoClearsTakesSavedSince() async throws {
         let fixture = try makeFixture()
         let state = CommitState()
         _ = try state.commit(fixture.generation)
@@ -494,11 +523,432 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         state.setFailure(true)
         _ = try? await coordinator.clearAll(deleteAudio: true)
         state.setFailure(false)
+        let later = try makeAudio(in: fixture, named: "later.wav")
+        _ = try state.commit(generation(fixture, audioPath: later.path))
 
+        let outcome = try await coordinator.clearAll(deleteAudio: true)
+
+        XCTAssertEqual(state.counts.rows, 0)
+        XCTAssertEqual(outcome.failedFileRemovals, 0)
+        XCTAssertEqual(outcome.snapshot, .empty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: later.path))
+    }
+
+    /// The first clear after the update meets a marker from before the bound:
+    /// it is abandoned and the request still clears every visible row.
+    func testClearWithALegacyMarkerAbandonsItAndStillClears() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        _ = try state.commit(fixture.generation)
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+        try writeUnboundedMarker(in: fixture, deleteAudio: false)
+
+        let outcome = try await coordinator.clearAll(deleteAudio: true)
+
+        XCTAssertEqual(state.counts.rows, 0)
+        XCTAssertEqual(state.counts.deletes, 1, "Only the fresh, bounded delete ran")
+        XCTAssertEqual(outcome.snapshot, .empty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+    }
+
+    /// A keep-files request downgrades a pending delete-audio clear, and the
+    /// downgrade is stored before the delete is retried: a crash or a
+    /// concurrent reconcile then never resumes the old delete-audio intent.
+    func testKeepFilesRequestDowngradesAPendingDeleteAudioClear() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        _ = try state.commit(fixture.generation)
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+        state.setFailure(true)
+        _ = try? await coordinator.clearAll(deleteAudio: true)
+
+        _ = try? await coordinator.clearAll(deleteAudio: false)
+        XCTAssertEqual(try fixture.store.loadClearTransaction()?.deleteAudio, false, "Stored before the retry")
+        state.setFailure(false)
         _ = try await coordinator.clearAll(deleteAudio: false)
 
         XCTAssertEqual(state.counts.rows, 0)
         XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+    }
+
+    /// A delete-audio request never escalates a pending keep-files clear: the
+    /// audio that clear kept stays. Takes saved since are the request's own
+    /// and lose their audio.
+    func testDeleteAudioRequestNeverEscalatesAPendingKeepFilesClear() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        _ = try state.commit(fixture.generation)
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+        state.setFailure(true)
+        _ = try? await coordinator.clearAll(deleteAudio: false)
+        state.setFailure(false)
+        let later = try makeAudio(in: fixture, named: "later.wav")
+        _ = try state.commit(generation(fixture, audioPath: later.path))
+
+        _ = try await coordinator.clearAll(deleteAudio: true)
+
+        XCTAssertEqual(state.counts.rows, 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path), "The pending clear kept it")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: later.path))
+    }
+
+    /// Audio a surviving row still uses is kept on purpose and is no failure:
+    /// only audio still waiting for removal counts.
+    func testAudioKeptForASurvivingRowIsNotReportedAsAFailure() async throws {
+        let fixture = try makeFixture()
+        var survivor = fixture.generation
+        survivor.id = 1
+        let row = survivor
+        let coordinator = GenerationHistoryRecoveryCoordinator(
+            store: fixture.store,
+            commitGeneration: { _, generation in generation },
+            fetchAllGenerations: { [row] },
+            deleteGenerationsThrough: { _ in [row.audioPath] },
+            referencedAudioPaths: { Set($0) } // a later row still uses the file
+        )
+
+        let outcome = try await coordinator.clearAll(deleteAudio: true)
+
+        XCTAssertEqual(outcome.failedFileRemovals, 0)
+        XCTAssertEqual(outcome.snapshot.pendingAudioRemovalCount, 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+    }
+
+    /// A read that cannot return every row (a long-form journal awaiting
+    /// recovery) fails the clear before its marker exists, so no later resume
+    /// can delete rows the user never saw.
+    func testClearFailsClosedWithoutAMarkerWhenNotEveryRowCanBeRead() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        let coordinator = GenerationHistoryRecoveryCoordinator(
+            store: fixture.store,
+            commitGeneration: { _, generation in try state.commit(generation) },
+            fetchAllGenerations: { throw StubError() },
+            deleteGenerationsThrough: { try state.delete(throughID: $0) },
+            referencedAudioPaths: { _ in [] }
+        )
+        _ = try state.commit(fixture.generation)
+
+        do {
+            _ = try await coordinator.clearAll(deleteAudio: true)
+            XCTFail("Expected clear to fail closed")
+        } catch {
+            XCTAssertEqual(error as? GenerationHistoryOutboxError, .clearUnavailable)
+        }
+
+        XCTAssertNil(try fixture.store.loadClearTransaction())
+        XCTAssertEqual(state.counts.deletes, 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+    }
+
+    /// Actor reentrancy: while clear-all awaits its row deletion, a take is
+    /// committed and a reconcile starts. The take has a larger id than the
+    /// captured bound and survives the clear and the reconcile, which waits
+    /// for the clear to finish before it resumes any marker.
+    func testATakeCommittedWhileAClearAwaitsItsDeleteSurvivesIt() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        _ = try state.commit(fixture.generation)
+        let (entered, enteredContinuation) = AsyncStream<Void>.makeStream()
+        let (release, releaseContinuation) = AsyncStream<Void>.makeStream()
+        let firstDelete = FirstCallGate()
+        let coordinator = GenerationHistoryRecoveryCoordinator(
+            store: fixture.store,
+            commitGeneration: { _, generation in try state.commit(generation) },
+            fetchAllGenerations: { state.rows() },
+            deleteGenerationsThrough: { bound in
+                if await firstDelete.claim() {
+                    enteredContinuation.yield()
+                    for await _ in release { break }
+                }
+                return try state.delete(throughID: bound)
+            },
+            referencedAudioPaths: { paths in Set(state.rows().map(\.audioPath)).intersection(paths) }
+        )
+
+        let clear = Task { try await coordinator.clearAll(deleteAudio: true) }
+        for await _ in entered { break }
+        let later = try makeAudio(in: fixture, named: "later.wav")
+        let entry = try fixture.store.enqueue(generation(fixture, audioPath: later.path), operation: .append)
+        let saved = try await coordinator.commit(entry)
+        let reconcile = Task { await coordinator.reconcile() }
+        releaseContinuation.yield()
+        _ = try await clear.value
+        _ = await reconcile.value
+
+        XCTAssertEqual(state.rows().map(\.id), [saved.id])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: later.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+        XCTAssertNil(try fixture.store.loadClearTransaction())
+    }
+
+    /// A keep-files request that arrives while a reconcile is already
+    /// resuming a delete-audio clear (suspended in its row deletion) wins: the
+    /// completion reads the stored intent after the deletion and keeps the audio.
+    func testKeepFilesRequestReachesAClearAlreadyBeingResumed() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        _ = try state.commit(fixture.generation)
+        let (entered, enteredContinuation) = AsyncStream<Void>.makeStream()
+        let (release, releaseContinuation) = AsyncStream<Void>.makeStream()
+        let firstDelete = FirstCallGate()
+        let coordinator = GenerationHistoryRecoveryCoordinator(
+            store: fixture.store,
+            commitGeneration: { _, generation in try state.commit(generation) },
+            fetchAllGenerations: { state.rows() },
+            deleteGenerationsThrough: { bound in
+                if await firstDelete.claim() {
+                    enteredContinuation.yield()
+                    for await _ in release { break }
+                }
+                return try state.delete(throughID: bound)
+            },
+            referencedAudioPaths: { paths in Set(state.rows().map(\.audioPath)).intersection(paths) }
+        )
+        try fixture.store.writeClearTransaction(GenerationHistoryClearTransaction(
+            deleteAudio: true,
+            audioPaths: [fixture.audioURL.path],
+            pendingEntryIDs: [],
+            maxRowID: 1
+        ))
+
+        let reconcile = Task { await coordinator.reconcile() }
+        for await _ in entered { break }
+        let keepFiles = Task { try await coordinator.clearAll(deleteAudio: false) }
+        // Read the marker file without the store, whose load promotes files
+        // the actor may be writing.
+        let markerURL = fixture.store.rootURL.appendingPathComponent("clear-transaction.json")
+        var downgraded = false
+        for _ in 0..<100_000 where !downgraded {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .millisecondsSince1970
+            downgraded = (try? Data(contentsOf: markerURL))
+                .flatMap { try? decoder.decode(GenerationHistoryClearTransaction.self, from: $0) }?
+                .deleteAudio == false
+            if !downgraded { await Task.yield() }
+        }
+        XCTAssertTrue(downgraded, "The keep-files request stores its downgrade before waiting")
+        releaseContinuation.yield()
+        _ = await reconcile.value
+        _ = try await keepFiles.value
+
+        XCTAssertEqual(state.counts.rows, 0)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+        XCTAssertEqual(try fixture.store.loadPendingAudioRemovals(), [])
+        XCTAssertNil(try fixture.store.loadClearTransaction())
+    }
+
+    /// A take whose commit is awaiting the database, its entry already
+    /// removed (as a clear does), keeps its audio: neither the outbox nor the
+    /// rows show it yet. The path stays listed, not as a failure, until the
+    /// commit lands (the row then keeps the audio) or fails (the take was
+    /// cleared, so a later pass removes the audio instead of orphaning it).
+    func testAudioOfATakeBeingCommittedWaitsForThatCommit() async throws {
+        for commitFails in [false, true] {
+            let fixture = try makeFixture()
+            let state = CommitState()
+            let (entered, enteredContinuation) = AsyncStream<Void>.makeStream()
+            let (release, releaseContinuation) = AsyncStream<Void>.makeStream()
+            let coordinator = GenerationHistoryRecoveryCoordinator(
+                store: fixture.store,
+                commitGeneration: { _, generation in
+                    enteredContinuation.yield()
+                    for await _ in release { break }
+                    return try state.commit(generation)
+                },
+                fetchAllGenerations: { state.rows() },
+                deleteGenerationsThrough: { try state.delete(throughID: $0) },
+                referencedAudioPaths: { paths in Set(state.rows().map(\.audioPath)).intersection(paths) }
+            )
+            let entry = try fixture.store.enqueue(fixture.generation, operation: .append)
+            let commit = Task { try await coordinator.commit(entry) }
+            for await _ in entered { break }
+            try fixture.store.removeEntry(id: entry.id)
+            try await coordinator.retainAudioRemoval(fixture.audioURL.path)
+
+            let during = await coordinator.reconcile()
+            XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+            XCTAssertEqual(during.snapshot.pendingAudioRemovalCount, 1, "Still listed while the commit is in flight")
+
+            state.setFailure(commitFails)
+            releaseContinuation.yield()
+            _ = try? await commit.value
+            let after = await coordinator.reconcile()
+
+            XCTAssertEqual(after.snapshot.pendingAudioRemovalCount, 0)
+            XCTAssertEqual(
+                FileManager.default.fileExists(atPath: fixture.audioURL.path),
+                !commitFails,
+                commitFails ? "A cleared take's audio is removed" : "The landed row keeps its audio"
+            )
+        }
+    }
+
+    /// A clear waiting for the clear lock runs once the clear holding it
+    /// fails: the lock is released on every exit.
+    func testAClearWaitingBehindAFailedClearStillRuns() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        _ = try state.commit(fixture.generation)
+        let (entered, enteredContinuation) = AsyncStream<Void>.makeStream()
+        let (release, releaseContinuation) = AsyncStream<Void>.makeStream()
+        let firstDelete = FirstCallGate()
+        let coordinator = GenerationHistoryRecoveryCoordinator(
+            store: fixture.store,
+            commitGeneration: { _, generation in try state.commit(generation) },
+            fetchAllGenerations: { state.rows() },
+            deleteGenerationsThrough: { bound in
+                if await firstDelete.claim() {
+                    enteredContinuation.yield()
+                    for await _ in release { break }
+                    throw StubError()
+                }
+                return try state.delete(throughID: bound)
+            },
+            referencedAudioPaths: { paths in Set(state.rows().map(\.audioPath)).intersection(paths) }
+        )
+
+        let first = Task { try await coordinator.clearAll(deleteAudio: true) }
+        for await _ in entered { break }
+        let second = Task { try await coordinator.clearAll(deleteAudio: true) }
+        releaseContinuation.yield()
+
+        do {
+            _ = try await first.value
+            XCTFail("The first clear's delete failed")
+        } catch {
+            XCTAssertEqual(error as? GenerationHistoryOutboxError, .clearUnavailable)
+        }
+        let outcome = try await second.value
+        XCTAssertEqual(state.counts.rows, 0)
+        XCTAssertEqual(outcome.snapshot, .empty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+    }
+
+    /// The bound rests on SQLite AUTOINCREMENT: the migrated table declares it,
+    /// and after the bounded delete (even of the highest row) a new row gets a
+    /// larger id than the bound, never a reused one.
+    func testHistoryIdsAreNeverReusedAfterABoundedDelete() throws {
+        let queue = try DatabaseQueue()
+        try GenerationMigrations.makeMigrator().migrate(queue)
+        let fixture = try makeFixture()
+
+        let schema = try queue.read { db in
+            try String.fetchOne(db, sql: "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'generations'")
+        }
+        XCTAssertTrue(try XCTUnwrap(schema).uppercased().contains("AUTOINCREMENT"))
+
+        let bound: Int64 = try queue.write { db in
+            var ids: [Int64] = []
+            for name in ["a.wav", "b.wav", "c.wav"] {
+                var row = generation(fixture, audioPath: "bounded-\(name)")
+                try row.insert(db)
+                ids.append(try XCTUnwrap(row.id))
+            }
+            return try XCTUnwrap(ids.max())
+        }
+        let deleted = try queue.write { db in
+            try GenerationHistoryBoundedDelete.deleteRows(throughID: bound, in: db)
+        }
+        XCTAssertEqual(deleted.count, 3)
+
+        let next: Int64 = try queue.write { db in
+            var row = generation(fixture, audioPath: "bounded-d.wav")
+            try row.insert(db)
+            return try XCTUnwrap(row.id)
+        }
+        XCTAssertGreaterThan(next, bound)
+        let survivors = try queue.write { db in
+            _ = try GenerationHistoryBoundedDelete.deleteRows(throughID: bound, in: db)
+            return try Generation.fetchCount(db)
+        }
+        XCTAssertEqual(survivors, 1, "A repeated bounded delete leaves the later row")
+    }
+
+    // MARK: - Single-delete audio removal (AUD-05)
+
+    func testSingleDeleteKeepsAudioAnotherRowOrAQueuedTakeUses() throws {
+        let fixture = try makeFixture()
+        let shared = try makeAudio(in: fixture, named: "shared.wav")
+        try GenerationHistoryAudioFile.removeUnreferenced(
+            atPath: shared.path,
+            outbox: fixture.store,
+            referencedAudioPaths: { Set($0) }
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: shared.path), "Another row uses it")
+
+        let queued = try makeAudio(in: fixture, named: "queued.wav")
+        _ = try fixture.store.enqueue(generation(fixture, audioPath: queued.path), operation: .append)
+        try GenerationHistoryAudioFile.removeUnreferenced(
+            atPath: queued.path,
+            outbox: fixture.store,
+            referencedAudioPaths: { _ in [] }
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: queued.path), "A queued take uses it")
+
+        let unused = try makeAudio(in: fixture, named: "unused.wav")
+        try GenerationHistoryAudioFile.removeUnreferenced(
+            atPath: unused.path,
+            outbox: fixture.store,
+            referencedAudioPaths: { _ in [] }
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: unused.path))
+    }
+
+    /// An outbox that cannot be read fully may hide a queued take using the
+    /// file: the removal throws and keeps it, for the screen to retain.
+    func testSingleDeleteKeepsAudioWhileTheOutboxCannotBeReadFully() throws {
+        let fixture = try makeFixture()
+        try Data("invalid".utf8).write(to: fixture.store.rootURL.appendingPathComponent("\(UUID()).json"))
+
+        XCTAssertThrowsError(try GenerationHistoryAudioFile.removeUnreferenced(
+            atPath: fixture.audioURL.path,
+            outbox: fixture.store,
+            referencedAudioPaths: { _ in [] }
+        )) { error in
+            XCTAssertEqual(error as? GenerationHistoryOutboxError, .corruptEntry)
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+    }
+
+    /// The check runs off the coordinator, so it only reads: an interrupted
+    /// entry write still counts as queued and is left for the coordinator.
+    func testSingleDeleteReadsInterruptedEntriesWithoutPromotingThem() throws {
+        let fixture = try makeFixture()
+        let entry = GenerationHistoryOutboxEntry(operation: .append, generation: fixture.generation)
+        let writing = fixture.store.rootURL.appendingPathComponent("\(entry.id.uuidString.lowercased()).writing")
+        try encode(entry).write(to: writing)
+
+        try GenerationHistoryAudioFile.removeUnreferenced(
+            atPath: fixture.audioURL.path,
+            outbox: fixture.store,
+            referencedAudioPaths: { _ in [] }
+        )
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path), "The interrupted take uses it")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: writing.path), "Left for the coordinator")
+    }
+
+    /// Only a missing file is absent. A path that cannot be examined (here a
+    /// parent directory without search permission) is a failure, so it stays
+    /// listed for a later retry instead of being dropped.
+    func testAudioThatCannotBeExaminedIsAFailureNotAbsent() throws {
+        let fixture = try makeFixture()
+        let locked = try makeLockableAudio(in: fixture, named: "hidden.wav")
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: locked.directory.path)
+        lockedDirectories.append(locked.directory)
+        if FileManager.default.isReadableFile(atPath: locked.audio.path) {
+            throw XCTSkip("File permissions are not enforced for this user")
+        }
+
+        XCTAssertEqual(GenerationHistoryAudioFile.removeRegularFile(atPath: locked.audio.path), .failed(.EACCES))
+        XCTAssertEqual(
+            GenerationHistoryAudioFile.removeRegularFile(atPath: fixture.audioURL.path + ".missing"),
+            .absentOrNotRegular
+        )
+        try unlock(locked.directory)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: locked.audio.path))
     }
 
     /// A complete `.writing` marker is the newer state and wins over a stale final file.
@@ -606,6 +1056,23 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         XCTAssertEqual(resumed.snapshot, .empty)
         let rows = try await queue.read { try Generation.fetchCount($0) }
         XCTAssertEqual(rows, 1)
+    }
+
+    /// A clear marker as written before the bound existed.
+    private func writeUnboundedMarker(
+        in fixture: (store: GenerationHistoryOutboxStore, generation: Generation, audioURL: URL),
+        deleteAudio: Bool
+    ) throws {
+        var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: encode(GenerationHistoryClearTransaction(
+            deleteAudio: deleteAudio,
+            audioPaths: [fixture.audioURL.path],
+            pendingEntryIDs: [],
+            maxRowID: 1
+        ))) as? [String: Any])
+        legacy.removeValue(forKey: "maxRowID")
+        legacy.removeValue(forKey: "rowsDeleted")
+        try JSONSerialization.data(withJSONObject: legacy)
+            .write(to: fixture.store.rootURL.appendingPathComponent("clear-transaction.json"))
     }
 
     private func makeAudio(

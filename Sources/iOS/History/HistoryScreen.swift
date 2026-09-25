@@ -407,10 +407,12 @@ private struct IOSHistoryLibrarySection: View {
                     }
                 }
             } catch {
-                let message = error.localizedDescription
                 await MainActor.run {
-                    databaseUnavailable = true
-                    errorMessage = message
+                    // A pending clear may have finished before this request
+                    // failed: read what remains, and let the recovery banner
+                    // show what is still pending (AUD-05).
+                    NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
+                    loadPage(reconciling: false)
                 }
             }
         }

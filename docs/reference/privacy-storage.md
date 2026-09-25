@@ -169,8 +169,11 @@ Maintained iPhone subtrees:
   as empty.
 - `history-outbox/` uses the same schema-v1 atomic publication/commit/reconciliation protocol as
   macOS. The iPhone recovery banner exposes Retry and an explicit system share/export action for
-  available pending audio. Clear-all is resumable and database-first; its local marker remains until
-  every requested pending-entry and audio cleanup has completed.
+  available pending audio. Clear-all is resumable and database-first. Its local marker records the
+  highest History row id it saw, and a resume deletes only rows up to that id, so a take saved after
+  the clear survives it; a marker written before that bound existed is abandoned rather than resumed
+  unbounded. The marker is retired once its rows and pending entries are gone; audio that could not
+  be removed moves to a durable removal list that a later reconcile retries.
   The same app-session-only enqueue-failure warning and bounded `long-form/` acceptance journal
   apply on iOS. Long-form generation continuation remains session-scoped: retained segments are
   individually durable History takes, but not an accepted project until joined QC and the entire

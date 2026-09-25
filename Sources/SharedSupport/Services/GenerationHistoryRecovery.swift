@@ -23,7 +23,7 @@ enum GenerationHistoryRecovery {
             }
         },
         fetchAllGenerations: {
-            try DatabaseService.shared.fetchAllGenerations()
+            try DatabaseService.shared.fetchAllGenerationsForClear()
         },
         deleteGenerationsThrough: { maxRowID in
             try DatabaseService.shared.deleteGenerations(throughID: maxRowID)
@@ -43,18 +43,14 @@ enum GenerationHistoryRecovery {
         fileExists: { FileManager.default.fileExists(atPath: $0) }
     )
 
-    /// A deleted row's audio is removed only when no other History row and no
-    /// queued take still uses the path, and only a regular file (AUD-05). An
-    /// outbox that cannot be read fully keeps the file: the error makes the
-    /// screen retain it for a later, guarded retry.
+    /// A deleted row's audio, removed only when nothing else uses it
+    /// (`GenerationHistoryAudioFile.removeUnreferenced`).
     static func removeUnreferencedAudio(atPath path: String) throws {
-        guard try DatabaseService.shared.referencedAudioPaths(among: [path]).isEmpty else { return }
-        let scan = outboxStore.scan()
-        guard scan.issueCount == 0 else { throw GenerationHistoryOutboxError.unavailable }
-        guard !scan.entries.contains(where: { $0.generation.audioPath == path }) else { return }
-        if GenerationHistoryAudioFile.removeRegularFile(atPath: path) == .failed {
-            throw GenerationHistoryOutboxError.unavailable
-        }
+        try GenerationHistoryAudioFile.removeUnreferenced(
+            atPath: path,
+            outbox: outboxStore,
+            referencedAudioPaths: { try DatabaseService.shared.referencedAudioPaths(among: $0) }
+        )
     }
 
     /// Keeps the audio of a deleted row for a later reconcile to remove (AUD-05).
@@ -114,6 +110,11 @@ enum GenerationHistoryRecovery {
     }
 
     static func clearAll(deleteAudio: Bool) async throws -> GenerationHistoryClearOutcome {
+        // A keep-files request reaches a pending clear even when it is refused
+        // below, so a later resume never deletes the audio (AUD-05).
+        if !deleteAudio {
+            try await coordinator.keepAudioOfPendingClear()
+        }
         // Never discard unqueued identity or silently exclude its audio from
         // the durable clear transaction. First retry saving or export it.
         guard await unqueued.records.isEmpty else { throw GenerationHistoryOutboxError.clearUnavailable }

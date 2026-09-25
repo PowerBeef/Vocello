@@ -639,6 +639,67 @@ class DeliveryResourceSupervisorTests(unittest.TestCase):
         )
         self.assertEqual(result.report["recoveryAttribution"]["status"], "recovered")
         self.assertEqual(result.report["recoveryAttribution"]["childPeakBasis"], "resident")
+        candidate = result.report["candidateRecoveryRule"]
+        self.assertEqual(candidate["algorithm"], "attributed-post-exit-recovery-v2")
+        self.assertFalse(candidate["binding"])
+
+    # -- the recommended rule, report-only until M6 evidence (audit #102) --
+
+    def _candidate(self, before: HostSnapshot, after: HostSnapshot, *, child: int) -> dict:
+        snapshots = iter((before, after))
+        return run_supervised(
+            [sys.executable, "-c", "import time; time.sleep(.1)"],
+            lock_root=self.root, snapshotter=lambda: next(snapshots),
+            process_sampler=lambda _pid: ProcessSample(64 * MIB, 128 * MIB, child),
+            measure_physical_footprint=True, maximum_physical_footprint_bytes=8 * GIB,
+            recovery_timeout_seconds=0,
+        ).report
+
+    def test_the_candidate_rule_frees_a_concurrent_allocator_only_under_normal_pressure(self) -> None:
+        # A 20-point drop the child's 1 GiB (6.25 %) cannot explain, kernel level normal.
+        report = self._candidate(
+            HostSnapshot(60.0, 0, False, 1, 16 * GIB), HostSnapshot(40.0, 0, False, 1, 16 * GIB), child=GIB,
+        )
+        self.assertIn("post-exit-memory-recovery-unqualified", report["qualificationFailures"])
+        self.assertFalse(report["qualified"], "the binding five-point rule is unchanged")
+        candidate = report["candidateRecoveryRule"]
+        self.assertEqual((candidate["qualified"], candidate["attribution"]), (True, "drop-exceeds-child-peak"))
+        # The same drop under a warning kernel pressure level fails the candidate too.
+        warned = self._candidate(
+            HostSnapshot(60.0, 0, False, 1, 16 * GIB), HostSnapshot(40.0, 0, False, 2, 16 * GIB), child=GIB,
+        )["candidateRecoveryRule"]
+        self.assertEqual(warned["failures"], ["kernel-pressure-not-normal"])
+
+    def test_the_candidate_rule_still_fails_a_drop_the_child_explains(self) -> None:
+        report = self._candidate(
+            HostSnapshot(60.0, 0, False, 1, 16 * GIB), HostSnapshot(40.0, 0, False, 1, 16 * GIB), child=4 * GIB,
+        )
+        self.assertEqual(report["candidateRecoveryRule"]["failures"], ["post-exit-recovery-attributed-to-child"])
+        # Without a kernel level, the binding free-percent warning judges pressure.
+        fallback = self._candidate(
+            HostSnapshot(60.0, 0, False, None, 16 * GIB), HostSnapshot(8.0, 0, True, None, 16 * GIB), child=GIB,
+        )["candidateRecoveryRule"]
+        self.assertIn("host-pressure-not-clean", fallback["failures"])
+
+    def test_the_recovery_report_counts_what_the_candidate_would_flip(self) -> None:
+        from delivery_resource_supervisor import envelopes_in, main, recovery_report
+
+        concurrent = self._candidate(
+            HostSnapshot(60.0, 0, False, 1, 16 * GIB), HostSnapshot(40.0, 0, False, 1, 16 * GIB), child=GIB,
+        )
+        child = self._candidate(
+            HostSnapshot(60.0, 0, False, 1, 16 * GIB), HostSnapshot(40.0, 0, False, 1, 16 * GIB), child=4 * GIB,
+        )
+        evidence = {"producer": {"resourceEnvelope": concurrent}, "rows": [{"envelope": child}]}
+        self.assertEqual(len(envelopes_in(evidence)), 2)
+        summary = recovery_report(envelopes_in(evidence))
+        self.assertEqual(summary["bindingRecoveryFailures"], 2)
+        self.assertEqual(summary["candidateFailures"], 1)
+        self.assertEqual(summary["candidateWouldQualifyBindingFailure"], 1)
+        self.assertEqual(summary["attribution"], {"drop-exceeds-child-peak": 1, "drop-within-child-peak": 1})
+        path = self.root / "evidence.json"
+        path.write_text(json.dumps(evidence))
+        self.assertEqual(main(["recovery-report", str(path)]), 0)
 
 
 if __name__ == "__main__":

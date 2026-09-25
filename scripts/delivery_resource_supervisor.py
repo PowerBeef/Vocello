@@ -21,6 +21,15 @@ roadmap AV-17) qualify a final policy.
   The envelope adds the kernel pressure level and attribution fields so an
   unqualified recovery can be told apart from a concurrent allocation before
   anyone proposes a rule change.
+- The recommended rule change rides beside it, report-only (audit #102; the
+  maintainer delegated the decision to the audit's recommendation on
+  2026-09-25, which is to measure on the M6 before relaxing anything):
+  ``candidateRecoveryRule`` (``attributed-post-exit-recovery-v2``) judges
+  pressure by the kernel pressure level the timing lanes use and fails a
+  post-exit drop only when the child's own peak can explain it (or nothing
+  attributes it); a drop larger than the child's peak is a concurrent
+  allocator's. ``recovery-report`` tabulates the binding and candidate
+  verdicts over saved envelopes, the evidence a rule change needs.
 """
 
 from __future__ import annotations
@@ -542,6 +551,102 @@ def recovery_attribution(
     }
 
 
+CANDIDATE_RECOVERY_RULE = "attributed-post-exit-recovery-v2"
+# The kernel pressure level the timing lanes accept (`require_quiet_host`).
+MAXIMUM_NORMAL_KERNEL_PRESSURE_LEVEL = 1
+
+
+def candidate_recovery_verdict(
+    before: HostSnapshot, after: HostSnapshot, attribution: dict[str, Any],
+    *, exit_confirmed: bool,
+) -> dict[str, Any]:
+    """The recovery rule the audit recommends proposing after M6 evidence (#102).
+
+    Report only: it never enters ``qualified``. Pressure is the kernel level
+    the timing lanes judge (normal is 1) when both snapshots read it, else the
+    binding free-percent warning. A post-exit drop beyond the five-point
+    tolerance fails only when attribution leaves it to the child
+    (``drop-within-child-peak``) or cannot attribute it; a drop larger than the
+    child's own peak (``drop-exceeds-child-peak``) is another allocator's.
+    """
+    failures: list[str] = []
+    if not exit_confirmed:
+        failures.append("process-exit-unconfirmed")
+    levels = (before.kernel_pressure_level, after.kernel_pressure_level)
+    if all(isinstance(level, int) for level in levels):
+        if any(level > MAXIMUM_NORMAL_KERNEL_PRESSURE_LEVEL for level in levels):
+            failures.append("kernel-pressure-not-normal")
+    elif before.pressure_warning is not False or after.pressure_warning is not False:
+        failures.append("host-pressure-not-clean")
+    status = attribution.get("status")
+    if status == "drop-within-child-peak":
+        failures.append("post-exit-recovery-attributed-to-child")
+    elif status == "unattributed":
+        failures.append("post-exit-recovery-unattributed")
+    return {
+        "algorithm": CANDIDATE_RECOVERY_RULE,
+        "binding": False,
+        "attribution": status,
+        "qualified": not failures,
+        "failures": failures,
+    }
+
+
+def recovery_report(envelopes: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Binding against candidate recovery verdicts over saved envelopes (audit #102).
+
+    Counts each envelope's binding recovery outcome (the five-point rule and the
+    free-percent pressure warning), the candidate's, and the attribution, so a
+    proposed rule change cites how many results it would flip and why.
+    """
+    rows = []
+    for envelope in envelopes:
+        failures = set(envelope.get("qualificationFailures") or [])
+        binding_recovery = not failures & {
+            "post-exit-memory-recovery-unqualified", "host-pressure-not-clean",
+        }
+        candidate = envelope.get("candidateRecoveryRule") or {}
+        attribution = (envelope.get("recoveryAttribution") or {}).get("status")
+        rows.append({
+            "bindingRecoveryQualified": binding_recovery,
+            "candidateQualified": candidate.get("qualified"),
+            "attribution": attribution,
+        })
+    judged = [row for row in rows if row["candidateQualified"] is not None]
+    by_attribution: dict[str, int] = {}
+    for row in rows:
+        key = str(row["attribution"])
+        by_attribution[key] = by_attribution.get(key, 0) + 1
+    return {
+        "candidateRule": CANDIDATE_RECOVERY_RULE,
+        "envelopes": len(rows),
+        "withCandidateVerdict": len(judged),
+        "bindingRecoveryFailures": sum(not row["bindingRecoveryQualified"] for row in rows),
+        "candidateFailures": sum(row["candidateQualified"] is False for row in judged),
+        "candidateWouldQualifyBindingFailure": sum(
+            1 for row in judged if row["candidateQualified"] and not row["bindingRecoveryQualified"]
+        ),
+        "candidateWouldFailBindingPass": sum(
+            1 for row in judged if not row["candidateQualified"] and row["bindingRecoveryQualified"]
+        ),
+        "attribution": dict(sorted(by_attribution.items())),
+    }
+
+
+def envelopes_in(value: Any) -> list[dict[str, Any]]:
+    """Every resource envelope nested anywhere in a saved JSON document."""
+    found: list[dict[str, Any]] = []
+    if isinstance(value, dict):
+        if value.get("kind") == "delivery-analyzer-resource-envelope":
+            found.append(value)
+        for item in value.values():
+            found.extend(envelopes_in(item))
+    elif isinstance(value, list):
+        for item in value:
+            found.extend(envelopes_in(item))
+    return found
+
+
 def run_supervised(
     command: Sequence[str], *, lock_root: Path,
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
@@ -775,6 +880,9 @@ def run_supervised(
         else:
             child_peak = max(peak_rss, wait_max_rss or 0) or None
             child_basis = "resident"
+        attribution = recovery_attribution(
+            before, after, child_peak_bytes=child_peak, child_peak_basis=child_basis,
+        )
         report = {
             "schemaVersion": SCHEMA_VERSION,
             "probeAlgorithmVersion": PROBE_ALGORITHM_VERSION,
@@ -812,8 +920,9 @@ def run_supervised(
             "hostAfter": after.report(),
             "swapDeltaBytes": swap_delta,
             "postExitMemoryRecovered": memory_recovered,
-            "recoveryAttribution": recovery_attribution(
-                before, after, child_peak_bytes=child_peak, child_peak_basis=child_basis,
+            "recoveryAttribution": attribution,
+            "candidateRecoveryRule": candidate_recovery_verdict(
+                before, after, attribution, exit_confirmed=exit_confirmed,
             ),
             "recoverySnapshotCount": recovery_snapshot_count,
             "recoveryWaitSeconds": recovery_wait_seconds,
@@ -825,3 +934,31 @@ def run_supervised(
             "qualified": not failures,
         }
         return SupervisedResult(report, stdout, stderr)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """``recovery-report FILE...``: binding against candidate recovery verdicts."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Delivery analyzer resource supervisor tools")
+    commands = parser.add_subparsers(dest="command", required=True)
+    report_parser = commands.add_parser(
+        "recovery-report",
+        help="tabulate the binding and candidate post-exit recovery verdicts of saved envelopes",
+    )
+    report_parser.add_argument("paths", nargs="+", type=Path,
+                               help="JSON evidence holding resource envelopes (e.g. independent-asr.json)")
+    arguments = parser.parse_args(argv)
+    envelopes: list[dict[str, Any]] = []
+    for path in arguments.paths:
+        try:
+            envelopes.extend(envelopes_in(json.loads(path.read_text(encoding="utf-8"))))
+        except (OSError, json.JSONDecodeError) as error:
+            print(f"recovery-report: {path.name} is unreadable: {error}", file=sys.stderr)
+            return 1
+    print(json.dumps(recovery_report(envelopes), indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

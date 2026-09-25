@@ -537,6 +537,18 @@ and changes how the envelope is measured:
   memory and the kernel pressure level before and after, and classifies an unrecovered drop as
   `drop-exceeds-child-peak` (another allocator) or `drop-within-child-peak`. It is report only:
   the five-point recovery rule is unchanged until M6 measurements support a proposal.
+- The recommended rule rides beside the binding one as `candidateRecoveryRule`
+  (`attributed-post-exit-recovery-v2`, `binding: false`; audit #102, the maintainer delegated
+  the decision to the audit's recommendation on 2026-09-25, which is to measure on the M6 before
+  relaxing anything). It judges pressure by the kernel pressure level the timing lanes use
+  (normal is 1; the free-percent warning only when a level is unreadable) and fails a post-exit
+  drop beyond five points only when attribution leaves it to the child (`drop-within-child-peak`)
+  or cannot attribute it; a drop larger than the child's own peak is another allocator's and
+  qualifies. `python3 scripts/delivery_resource_supervisor.py recovery-report <evidence.json>...`
+  finds every envelope in saved evidence (for example each `independent-asr.json` and compact
+  qualification output of the M6 lang-bench and AV-17(5) runs) and counts the binding recovery
+  failures, the candidate's, and the results the candidate would flip. The binding rule changes
+  only with that table from M6 runs, as a separate reviewed change.
 
 The supervisor's SHA-256 is bound into every prepared compact-adapter configuration, so after a
 supervisor change re-run `prepare_delivery_compact_model_config.py` for each adapter (including

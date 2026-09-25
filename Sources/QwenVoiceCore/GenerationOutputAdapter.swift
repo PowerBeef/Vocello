@@ -965,6 +965,14 @@ struct PCM16StreamLimiter: Sendable {
         // sees steps the slew limiter had to clamp.
         var stepBurstPeakCount = 0
         var stepBurstPeakStartSample: Int? = nil
+        // Clustered click events (QC v9, audit #85; observational): slew-limited
+        // samples no more than `clickEventGapSamples` apart are one event, so a
+        // seam that clamps a run of samples counts once and the count does not
+        // grow with take length the way the per-sample fraction does. The
+        // low-energy subcount holds the events that start while the recent input
+        // envelope is quiet, where a step is most exposed.
+        var clickEventCount = 0
+        var lowEnergyClickEventCount = 0
 
         private static func partsPerMillion(_ value: Float) -> Int {
             Int((Double(value) * 1_000_000).rounded())
@@ -979,6 +987,15 @@ struct PCM16StreamLimiter: Sendable {
     static let stepBurstStepThreshold: Float = 0.25
     /// Step-burst window: 20 ms at the engine's fixed 24 kHz output rate.
     static let stepBurstWindowSamples = 480
+    /// Slew-limited samples at most this far apart are one click event: 10 ms
+    /// at the engine's fixed 24 kHz output rate.
+    static let clickEventGapSamples = 240
+    /// Per-sample smoothing of the input envelope a click event is judged
+    /// against (about a 10 ms time constant at 24 kHz).
+    static let clickEnvelopeCoefficient: Float = 1.0 / 240.0
+    /// A click event starting while the envelope sits below this mean absolute
+    /// level (about -34 dBFS) counts as low-energy.
+    static let lowEnergyClickEnvelope: Float = 0.02
     /// Below this absolute input magnitude a sample counts as silence for
     /// interior-dropout detection.
     static let silenceFloor: Float = 0.001
@@ -995,6 +1012,9 @@ struct PCM16StreamLimiter: Sendable {
     // Absolute indices of the large output steps inside the trailing
     // step-burst window (bounded by the window length).
     private var recentLargeStepSamples: [Int] = []
+    // Click-event clustering state (QC v9), carried across `append` calls.
+    private var lastSlewLimitedSample: Int?
+    private var clickEnvelope: Float = 0
     // Cross-`append` silence-run state (a dropout can span chunk boundaries).
     private var sawAudio = false
     private var currentSilentRun = 0
@@ -1012,6 +1032,8 @@ struct PCM16StreamLimiter: Sendable {
         var localSilentRun = currentSilentRun
         var localSilentRunStart = currentSilentRunStartSample
         var localRecentSteps = recentLargeStepSamples
+        var localLastSlewLimited = lastSlewLimitedSample
+        var localEnvelope = clickEnvelope
 
         samples.withUnsafeBufferPointer { buffer in
             guard let base = buffer.baseAddress else { return }
@@ -1093,14 +1115,29 @@ struct PCM16StreamLimiter: Sendable {
                             localMetrics.stepBurstPeakStartSample = localRecentSteps.first
                         }
                     }
+                    var slewLimited = false
                     if delta > Self.maxSingleSampleStep {
                         limited = localPreviousOutput + Self.maxSingleSampleStep
-                        localMetrics.slewLimitedSamples += 1
+                        slewLimited = true
                     } else if delta < -Self.maxSingleSampleStep {
                         limited = localPreviousOutput - Self.maxSingleSampleStep
+                        slewLimited = true
+                    }
+                    if slewLimited {
                         localMetrics.slewLimitedSamples += 1
+                        let startsEvent = localLastSlewLimited.map {
+                            absoluteIndex - $0 > Self.clickEventGapSamples
+                        } ?? true
+                        if startsEvent {
+                            localMetrics.clickEventCount += 1
+                            if localEnvelope < Self.lowEnergyClickEnvelope {
+                                localMetrics.lowEnergyClickEventCount += 1
+                            }
+                        }
+                        localLastSlewLimited = absoluteIndex
                     }
                 }
+                localEnvelope += (rawMagnitude - localEnvelope) * Self.clickEnvelopeCoefficient
 
                 limited = max(-Self.ceiling, min(Self.ceiling, limited))
                 localPreviousOutput = limited
@@ -1117,6 +1154,8 @@ struct PCM16StreamLimiter: Sendable {
         currentSilentRun = localSilentRun
         currentSilentRunStartSample = localSilentRunStart
         recentLargeStepSamples = localRecentSteps
+        lastSlewLimitedSample = localLastSlewLimited
+        clickEnvelope = localEnvelope
         localMetrics.trailingSilentRunSamples = localSilentRun
         localMetrics.trailingSilentRunStartSample = localSilentRunStart
         metrics = localMetrics
@@ -2823,6 +2862,13 @@ struct StreamingExecutionContext: Sendable {
         let clippedFrac = Double(clipped) / Double(denom)
         let clickFrac = Double(clicks) / Double(denom)
         let hotFrac = Double(hot) / Double(denom)
+        // v9 (audit #85): clustered click events per second of audio, a rate
+        // that does not grow with take length. Observational: the per-sample
+        // fraction below stays the only click bound until a calibrated
+        // per-second bound is qualified under the threshold-change authority.
+        let clickEventsPerSecond: Double? = durationSeconds > 0
+            ? Double(metrics.clickEventCount) / durationSeconds
+            : nil
 
         // Conservative thresholds (documented; tune as the corpus dictates).
         let silentFailDBFS = -60.0, lowLevelWarnDBFS = -45.0
@@ -3019,7 +3065,10 @@ struct StreamingExecutionContext: Sendable {
             cadence: cadence,
             chunkQC: chunkQC,
             speakingRateTextUnits: speakingRate?.textUnits,
-            secondsPerTextUnit: secondsPerTextUnit
+            secondsPerTextUnit: secondsPerTextUnit,
+            clickEventCount: metrics.clickEventCount,
+            lowEnergyClickEventCount: metrics.lowEnergyClickEventCount,
+            clickEventsPerSecond: clickEventsPerSecond
         )
     }
 

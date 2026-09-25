@@ -556,6 +556,9 @@ METRIC_KEYS = {
     "nonFiniteCount", "dcOffset", "longestSilenceMS", "stepBurstPeakCount", "stepBurstPeakStartMS",
     # Audio QC v8 speaking rate: seconds per letter or digit of the spoken text.
     "secondsPerTextUnit",
+    # Audio QC v9 clustered click events (audit #85): the count, the low-energy
+    # subcount and events per second of audio. Observational.
+    "clickEventCount", "lowEnergyClickEventCount", "clickEventsPerSecond",
     # Played-audio capture (PC-01, 2026-09): the app's rendered output compared with the take.
     "playbackCaptureAlignmentMS", "playbackCaptureResidualDBFS", "playbackCaptureDropoutCount",
     "playbackCaptureMaxGapMS", "playbackCaptureFirstAudibleMS", "playbackCaptureCoverage",

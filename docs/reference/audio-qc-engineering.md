@@ -18,6 +18,7 @@ sourceOfTruth:
   - scripts/independent_asr.py
   - scripts/lib/language_metrics.py
   - scripts/lib/audio_qc.py
+  - scripts/derive_audio_qc_bounds.py
   - config/prosody-holdout-policy.json
   - scripts/prosody_corpus_inventory.py
   - scripts/prosody_holdout_validation.py
@@ -794,11 +795,43 @@ at 0.26 s and Japanese at 0.22 s per character. Replayed against those takes the
 macOS lang-bench German take at 19.36 s and Chinese take at 17.28 s) and four Design takes at 1.8x
 to 2.6x their cell's median. No failing bound exists; one needs the authority below.
 
+**Failing bound: screened, not qualified (2026-09-25).** The maintainer delegated the decision to
+the audit's recommendation (#10: set any fail bound under this authority), so the bound was screened
+offline with `scripts/derive_audio_qc_bounds.py speaking-rate`, which reads the bands and benchmark
+texts from the Swift sources and replays the committed records read-only. It reproduces the seeding
+(3,725 takes before the QC v8 commit, the same 8 warned takes) and splits off the 24 takes
+published since (the M6 gate records), none warned. The evidence does not qualify a failing bound:
+the warned takes are not separated from ordinary ones (the slowest unwarned alphabetic take is 0.140
+s per unit, the fastest warned 0.146); the two canonical run-ons (0.164 and 0.166) sit below even
+1.25x the band (0.181), which a slow Design take (0.206) exceeds, so any bound that fails the
+run-ons also fails Design deliveries; the replay's only run-on label is the duration the bound
+reads, so there is no independent reference evidence; and the untouched split holds no run-on at
+all. `speaking_rate_slow` therefore stays warn-only. A qualifying change needs an untouched
+confirmation cohort of at least 60 run-on and 60 ordinary takes whose labels come from independent
+evidence (for example a two-family transcript that shows the repeated or extra words), then a
+reviewed Swift edit; the tool never reports a bound as qualified.
+
+### Clustered click events (QC v9, audit #85, 2026-09-25)
+
+The click bound counts slew-limited samples as a fraction of the take (warn above 0.05 %, fail
+above 0.5 %), which at 24 kHz is 12 and 120 clamped samples per second, so its tolerance grows with
+take length and a seam that clamps several samples counts several times. QC v9 (`PCM16StreamLimiter`)
+also clusters clamped samples into events (samples at most 10 ms apart are one event), counts the
+events that start while the input envelope (about a 10 ms mean absolute level) sits below 0.02
+(about -34 dBFS) as low-energy, and reports `clickEventCount`, `lowEnergyClickEventCount` and
+`clickEventsPerSecond`, published as take metrics. They are observational: no flag reads them and
+the per-sample fraction stays the only click bound, as the audit recommends until the events are
+calibrated on the retained codec A/B takes (the decision was delegated to that recommendation on
+2026-09-25). `scripts/derive_audio_qc_bounds.py clicks` replays the committed records (273 of 3,778
+takes clamp at all; clamped samples per second median 0.74, p99 20.0, max 25.0) and runs WAV files,
+such as the retained A/B takes with a `--labels` file, through a mirror of the counter to screen
+per-second candidates; the result feeds this authority, never a bound directly.
+
 ### Threshold-change authority
 
-The Fast-QC cadence and dropout boundaries (`makeAudioQCReport`, algorithm v8; v7 added only the
-warn-only `onset_step_burst` flag and v8 only the warn-only `speaking_rate_slow` flag, no cadence
-or dropout boundary moved) change only under
+The Fast-QC cadence and dropout boundaries (`makeAudioQCReport`, algorithm v9; v7 added only the
+warn-only `onset_step_burst` flag, v8 only the warn-only `speaking_rate_slow` flag and v9 only the
+observational clustered click events, no cadence, dropout or click boundary moved) change only under
 this policy, carried over verbatim on 2026-09-12 from the retired cadence contract,
 `audio-cadence-qc-contract.json` (in git history):
 

@@ -116,7 +116,10 @@
         "stepBurstPeakCount": {"type": "integer", "minimum": 0},
         "stepBurstPeakStartMS": {"type": ["integer", "null"], "minimum": 0},
         "speakingRateTextUnits": {"type": ["integer", "null"], "minimum": 0},
-        "secondsPerTextUnit": {"type": ["number", "null"], "exclusiveMinimum": 0}
+        "secondsPerTextUnit": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "clickEventCount": {"type": ["integer", "null"], "minimum": 0},
+        "lowEnergyClickEventCount": {"type": ["integer", "null"], "minimum": 0},
+        "clickEventsPerSecond": {"type": ["number", "null"], "minimum": 0}
       }
     },
     "audioCadenceQC": {

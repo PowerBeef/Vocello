@@ -580,6 +580,27 @@ class IOSStartupReliabilityTests(unittest.TestCase):
                 with self.assertRaises(MODULE.ContractError):
                     MODULE.validate_audio_qc(malformed, "take.audioQC")
 
+    def test_audio_qc_accepts_v9_clustered_click_events(self):
+        # QC v9 (audit #85) encodes the clustered click events and their rate.
+        qc = {
+            "algorithmVersion": 9, "instabilityVerdict": "pass",
+            "writtenOutputVerdict": "pass", "verdict": "pass",
+            "flags": [], "peak": 0.4, "clippedSamples": 0,
+            "hotSamples": 0, "nonFiniteSamples": 0, "clickEvents": 7,
+            "longestSilenceMS": 140, "durationSeconds": 6.5,
+            "stepBurstPeakCount": 2, "stepBurstPeakStartMS": 180,
+            "clickEventCount": 2, "lowEnergyClickEventCount": 1, "clickEventsPerSecond": 2 / 6.5,
+        }
+        MODULE.validate_audio_qc(qc, "take.audioQC")
+        schema = json.loads((ROOT / "config/ios-startup-reliability-result-schema-v2.json").read_text())
+        self.assertLessEqual(set(qc), set(schema["$defs"]["audioQC"]["properties"]))
+        for key, invalid in (
+            ("clickEventCount", -1), ("lowEnergyClickEventCount", 1.5),
+            ("clickEventsPerSecond", -0.1), ("clickEventsPerSecond", True),
+        ):
+            with self.subTest(key=key, invalid=invalid), self.assertRaises(MODULE.ContractError):
+                MODULE.validate_audio_qc({**qc, key: invalid}, "take.audioQC")
+
     def test_audio_qc_accepts_v7_step_burst_and_v8_speaking_rate(self):
         # AudioQCReport always encodes stepBurstPeakCount since QC v7 and adds the
         # speaking-rate pair in v8; the closed contract must accept what it encodes.

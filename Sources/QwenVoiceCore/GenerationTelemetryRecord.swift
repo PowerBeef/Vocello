@@ -1077,8 +1077,12 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
     /// v8 relates the take's length to its text: it reports seconds per text
     /// unit and warns (`speaking_rate_slow`, instability) when a take runs on
     /// far past its script (`AudioSpeakingRateQC`). Warn-only; no v7 verdict
-    /// boundary moves.
-    public static let currentAlgorithmVersion = 8
+    /// boundary moves. v9 (audit #85) counts slew-limited samples as clustered
+    /// click events, with a low-energy subcount and a per-second rate that does
+    /// not grow with take length. Observational only: no flag and no verdict
+    /// boundary moves; the per-sample click fraction stays the bound until a
+    /// per-second bound is qualified under the threshold-change authority.
+    public static let currentAlgorithmVersion = 9
 
     public enum Verdict: String, Hashable, Codable, Sendable {
         case pass
@@ -1140,6 +1144,12 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
     /// without request text (a persisted-file check or a chunk snapshot).
     public let speakingRateTextUnits: Int?
     public let secondsPerTextUnit: Double?
+    /// v9: slew-limited samples clustered into events (samples at most 10 ms
+    /// apart are one event), the events that start in a quiet input envelope,
+    /// and events per second of audio. nil before v9.
+    public let clickEventCount: Int?
+    public let lowEnergyClickEventCount: Int?
+    public let clickEventsPerSecond: Double?
 
     public init(
         algorithmVersion: Int = AudioQCReport.currentAlgorithmVersion,
@@ -1166,7 +1176,10 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         cadence: AudioCadenceQCReport? = nil,
         chunkQC: [AudioQCChunkReport]? = nil,
         speakingRateTextUnits: Int? = nil,
-        secondsPerTextUnit: Double? = nil
+        secondsPerTextUnit: Double? = nil,
+        clickEventCount: Int? = nil,
+        lowEnergyClickEventCount: Int? = nil,
+        clickEventsPerSecond: Double? = nil
     ) {
         self.algorithmVersion = algorithmVersion
         self.instabilityVerdict = instabilityVerdict ?? verdict
@@ -1193,6 +1206,9 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         self.chunkQC = chunkQC
         self.speakingRateTextUnits = speakingRateTextUnits
         self.secondsPerTextUnit = secondsPerTextUnit
+        self.clickEventCount = clickEventCount
+        self.lowEnergyClickEventCount = lowEnergyClickEventCount
+        self.clickEventsPerSecond = clickEventsPerSecond
     }
 
     /// Backward-compatible decoding: older JSONL rows written before Phase 4
@@ -1224,6 +1240,9 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         self.chunkQC = try container.decodeIfPresent([AudioQCChunkReport].self, forKey: .chunkQC)
         self.speakingRateTextUnits = try container.decodeIfPresent(Int.self, forKey: .speakingRateTextUnits)
         self.secondsPerTextUnit = try container.decodeIfPresent(Double.self, forKey: .secondsPerTextUnit)
+        self.clickEventCount = try container.decodeIfPresent(Int.self, forKey: .clickEventCount)
+        self.lowEnergyClickEventCount = try container.decodeIfPresent(Int.self, forKey: .lowEnergyClickEventCount)
+        self.clickEventsPerSecond = try container.decodeIfPresent(Double.self, forKey: .clickEventsPerSecond)
     }
 }
 

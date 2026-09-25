@@ -102,3 +102,17 @@ class StepBurstMetricTests(unittest.TestCase):
         self.assertEqual(metrics["secondsPerTextUnit"], 0.1644)
         self.assertNotIn("speakingRateTextUnits", metrics)
         self.assertNotIn("secondsPerTextUnit", audio_qc.qc_metrics({"clickEvents": 0}))
+
+    def test_qc_v9_click_events_are_published_per_second_beside_the_sample_count(self) -> None:
+        # audit #85: clustered events and their per-second rate reach the take;
+        # the per-sample count keeps its legacy name.
+        row = {"clickEvents": 12, "clippedSamples": 0, "nonFiniteSamples": 0, "longestSilenceMS": 0,
+               "dcOffset": 0.0, "clickEventCount": 3, "lowEnergyClickEventCount": 1,
+               "clickEventsPerSecond": 0.5}
+        metrics = audio_qc.qc_metrics(row)
+        self.assertEqual(metrics["discontinuityCount"], 12.0)
+        self.assertEqual(
+            (metrics["clickEventCount"], metrics["lowEnergyClickEventCount"], metrics["clickEventsPerSecond"]),
+            (3.0, 1.0, 0.5),
+        )
+        self.assertNotIn("clickEventsPerSecond", audio_qc.qc_metrics({"clickEvents": 0}))

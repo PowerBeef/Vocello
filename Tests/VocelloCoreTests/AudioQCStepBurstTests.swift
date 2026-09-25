@@ -77,7 +77,7 @@ final class AudioQCStepBurstTests: XCTestCase {
         XCTAssertEqual(opening.stepBurstPeakStartMS, 2)
         XCTAssertTrue(opening.flags.contains("onset_step_burst"), "\(opening.flags)")
         XCTAssertEqual(opening.instabilityVerdict, .warn)
-        XCTAssertEqual(opening.algorithmVersion, 8)
+        XCTAssertEqual(opening.algorithmVersion, 9)
         // The same cluster at the plosive onset (150 ms) is recorded, not judged.
         let later = report(burstAtSample: 3_600)
         XCTAssertEqual(later.stepBurstPeakCount, 11)
@@ -100,6 +100,89 @@ final class AudioQCStepBurstTests: XCTestCase {
         XCTAssertNil(report.speakingRateTextUnits)
         XCTAssertNil(report.secondsPerTextUnit)
         XCTAssertNil(encoded?["secondsPerTextUnit"])
+        // Pre-v9 rows carry no clustered click events either.
+        XCTAssertNil(report.clickEventCount)
+        XCTAssertNil(report.clickEventsPerSecond)
+        XCTAssertNil(encoded?["clickEventCount"])
+    }
+}
+
+/// v9 (audit #85): the click bound counts slew-limited samples as a fraction of
+/// the take, so its tolerance grew with take length (12 and 120 clamps per
+/// second at 24 kHz). The limiter now clusters clamped samples into events and
+/// the report publishes events per second, with a low-energy subcount.
+final class AudioQCClickEventTests: XCTestCase {
+    /// A 0.3 tone with `seams` full-scale jumps (+0.9 then back), each clamping
+    /// two samples, the seams `spacing` samples apart, padded to `seconds`.
+    private func toneWithSeams(seconds: Double, seams: Int, spacing: Int, quiet: Bool = false) -> [Float] {
+        let count = Int(seconds * 24_000)
+        var signal = (0 ..< count).map {
+            quiet ? Float(0) : Float(0.3 * sin(2 * Double.pi * 220 * Double($0) / 24_000))
+        }
+        for seam in 0 ..< seams {
+            let index = 2_400 + seam * spacing
+            signal[index] = 0.95
+            signal[index + 1] = -0.9
+        }
+        return signal
+    }
+
+    private func report(_ signal: [Float], chunk: Int? = nil) -> AudioQCReport {
+        var limiter = PCM16StreamLimiter()
+        var output: [Int16] = []
+        if let chunk {
+            var start = 0
+            while start < signal.count {
+                let end = min(signal.count, start + chunk)
+                limiter.append(Array(signal[start ..< end]), into: &output)
+                start = end
+            }
+        } else {
+            limiter.append(signal, into: &output)
+        }
+        return StreamingExecutionContext.makeAudioQCReport(
+            metrics: limiter.metrics, sampleRate: 24_000,
+            durationSeconds: Double(signal.count) / 24_000, expectedPauseCount: 0
+        )
+    }
+
+    func testClampedSamplesOfOneSeamAreOneEventAndTheCountIgnoresTakeLength() throws {
+        let short = report(toneWithSeams(seconds: 2, seams: 2, spacing: 4_800))
+        let long = report(toneWithSeams(seconds: 20, seams: 2, spacing: 4_800))
+        XCTAssertGreaterThan(short.clickEvents, 2, "each seam clamps more than one sample")
+        XCTAssertEqual(short.clickEvents, long.clickEvents)
+        XCTAssertEqual(short.clickEventCount, 2)
+        XCTAssertEqual(long.clickEventCount, 2)
+        XCTAssertEqual(try XCTUnwrap(short.clickEventsPerSecond), 1.0, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(long.clickEventsPerSecond), 0.1, accuracy: 1e-9)
+        XCTAssertEqual(short.algorithmVersion, 9)
+        // Observational: no flag reads the events; the per-sample bound is unchanged.
+        XCTAssertFalse(short.flags.contains("clicks"), "\(short.flags)")
+    }
+
+    func testSeamsFartherApartThanTheGapAreSeparateEventsAcrossChunks() {
+        // The chunk boundary at sample 2450 falls between the first seam and the next.
+        let near = report(toneWithSeams(seconds: 2, seams: 3, spacing: 120), chunk: 2_450)
+        XCTAssertEqual(near.clickEventCount, 1, "seams 5 ms apart are one event")
+        let far = report(toneWithSeams(seconds: 2, seams: 3, spacing: 480), chunk: 2_450)
+        XCTAssertEqual(far.clickEventCount, 3, "seams 20 ms apart are three events")
+    }
+
+    func testAnEventOutOfSilenceIsLowEnergy() {
+        let quiet = report(toneWithSeams(seconds: 1, seams: 1, spacing: 0, quiet: true))
+        XCTAssertEqual(quiet.clickEventCount, 1)
+        XCTAssertEqual(quiet.lowEnergyClickEventCount, 1)
+        let loud = report(toneWithSeams(seconds: 1, seams: 1, spacing: 0))
+        XCTAssertEqual(loud.clickEventCount, 1)
+        XCTAssertEqual(loud.lowEnergyClickEventCount, 0)
+    }
+
+    func testASmoothTakeHasNoEvents() {
+        let smooth = report(toneWithSeams(seconds: 1, seams: 0, spacing: 0))
+        XCTAssertEqual(smooth.clickEvents, 0)
+        XCTAssertEqual(smooth.clickEventCount, 0)
+        XCTAssertEqual(smooth.lowEnergyClickEventCount, 0)
+        XCTAssertEqual(try XCTUnwrap(smooth.clickEventsPerSecond), 0, accuracy: 1e-12)
     }
 }
 
@@ -159,7 +242,7 @@ final class AudioQCSpeakingRateTests: XCTestCase {
 
     func testAnOrdinaryTakeReportsItsRateWithoutAFlag() throws {
         let qc = report(seconds: 6.5, text: Self.mediumScript)
-        XCTAssertEqual(qc.algorithmVersion, 8)
+        XCTAssertEqual(qc.algorithmVersion, 9)
         XCTAssertEqual(qc.speakingRateTextUnits, 91)
         XCTAssertEqual(try XCTUnwrap(qc.secondsPerTextUnit), 6.5 / 91, accuracy: 1e-12)
         XCTAssertFalse(qc.flags.contains("speaking_rate_slow"), "\(qc.flags)")

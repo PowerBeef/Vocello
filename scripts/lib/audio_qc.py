@@ -36,6 +36,13 @@ QC_METRIC_MAP = (
     # QC v8 (2026-09-25): the take's duration per letter or digit of its spoken
     # text (the `speaking_rate_slow` warning's measure); absent on older rows.
     ("secondsPerTextUnit", "secondsPerTextUnit"),
+    # QC v9 (2026-09-25, audit #85): slew-limited samples clustered into click
+    # events (10 ms apart at most), those starting in a quiet envelope, and
+    # events per second, a rate that does not grow with take length.
+    # Observational; `discontinuityCount` keeps the per-sample count.
+    ("clickEventCount", "clickEventCount"),
+    ("lowEnergyClickEventCount", "lowEnergyClickEventCount"),
+    ("clickEventsPerSecond", "clickEventsPerSecond"),
 )
 VERDICT_KEYS = ("verdict", "instabilityVerdict", "writtenOutputVerdict")
 VERDICT_RANK = {"pass": 0, "warn": 1, "fail": 2}

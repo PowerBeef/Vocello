@@ -2609,8 +2609,14 @@ class PublisherTests(unittest.TestCase):
                 publisher.memory_retention_evidence(results, reordered, "macos")
 
     def test_retained_memory_v2_reports_mlx_growth_and_gates_only_once_calibrated(self) -> None:
+        # The live policy supplies the contract's shape; both platforms start
+        # explicitly uncalibrated here, whatever a maintainer records later.
         policy = json.loads(publisher.MEMORY_POLICY_PATH.read_text(encoding="utf-8"))
-        self.assertEqual(policy["retainedMemoryV2"]["calibration"]["macos"]["status"], "uncalibrated")
+        for platform_entry in ("macos", "ios"):
+            policy["retainedMemoryV2"]["calibration"][platform_entry] = {
+                "status": "uncalibrated", "calibrationRunID": None,
+                "growthLimitMBByMode": {"custom": None, "design": None, "clone": None},
+            }
         takes = []
         index = 1
         for mode in ("custom", "design", "clone"):

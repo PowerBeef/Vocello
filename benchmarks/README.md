@@ -1,9 +1,10 @@
 # benchmarks/
 
 Validated, privacy-safe benchmark **summaries** live here. Raw telemetry, audio, screenshots, traces,
-and result bundles are never tracked. Successful profile traces are ephemeral by default: their
-digest, capture settings, extracted evidence, original path, and retention status are published
-before the raw trace is discarded. `--keep-trace` is an explicit local diagnostic exception.
+and result bundles are never tracked. A successful profile publishes its trace digest, capture
+settings, extracted evidence, original path, and retention status first. A CPU profile's raw trace is
+then discarded unless `--keep-trace` was given; a memory profile keeps its raw trace locally by
+default (`keptByDefault`), because the trace is its only allocation and VM evidence.
 
 ## What may live here
 

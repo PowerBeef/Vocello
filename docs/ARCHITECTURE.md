@@ -1037,10 +1037,12 @@ persisted-WAV written-output verdicts. Schema v8 adds absolute-uptime sample ali
 memory/thread/headroom/Metal capture success and coverage, total-RAM/implied-process-limit context,
 start/end/delta/peak memory fields, aligned extrema snapshots, and explicit app/engine lifecycle
 boundaries. Publishable benchmark-evidence v2 binds exact verbose sidecars under memory contract v2
-and rejects an unobserved sampler gap above twice the cadence, capture failures, critical pressure,
-memory warnings/exits, `hardTrim`, and `fullUnload`; each take publishes its sampled peaks' shortfall
-against the exact MLX (and, when sampled, kernel-ledger) high-water marks. One process has one memory
-series: the in-process macOS app and engine samplers merge by uptime and are never summed.
+and rejects an unobserved sampler gap above the policy bound (twice the cadence, at least 500 ms,
+provisional until the first consented M6 memory lane calibrates it), capture failures, critical
+pressure, memory warnings/exits, `hardTrim`, and `fullUnload`; each take publishes its sampled
+peaks' shortfall against the exact MLX (and, when sampled, kernel-ledger) high-water marks. One
+process has one memory series: the in-process macOS app and engine samplers merge by uptime and are
+never summed.
 Older telemetry remains decodable but cannot enter memory-qualified trends.
 No telemetry persists raw script, transcript, path, or voice description. The generation-failure
 log stores only an allowlisted error code/classification, lifecycle stage, known model identifier,

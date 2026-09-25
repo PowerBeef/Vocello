@@ -10,10 +10,13 @@ iOS is a single-process engine/app runtime, and so is macOS since 2026-09-15:
 the macOS app-layer and engine-layer samplers both read the one hosting
 process, so their samples are merged into one series (never summed) and the
 app sidecar adds its samples, its coverage and its submit/terminal order.  A
-take qualifies when no gap between consecutive samples exceeds twice the
-sampler cadence, and each take publishes how far its sampled peaks fell short
-of the exact high-water marks (the MLX allocator's per-request peak and, when
-the sampler read it, the kernel's physical-footprint ledger peak).
+take qualifies when no gap between consecutive samples exceeds the policy's
+unobserved-gap bound (`unobservedGapBound` in
+config/memory-qualification-policy.json: a multiple of the sampler cadence with
+an absolute floor, provisional until a consented lane calibrates it), and each
+take publishes the bound it met and how far its sampled peaks fell short of the
+exact high-water marks (the MLX allocator's per-request peak and, when the
+sampler read it, the kernel's physical-footprint ledger peak).
 
 Contract v1 records (before 2026-09-25) summed uptime-paired app and engine
 samples and required 95% periodic coverage; they are never rewritten and the
@@ -34,8 +37,13 @@ MEMORY_CONTRACT_VERSION = 2
 REQUIRED_TELEMETRY_SCHEMA = 8
 # Timer health (contract v2): the longest stretch in which the process's memory
 # went unobserved, between any two consecutive samples of its one series, may
-# not exceed this multiple of the sampler's target interval.
-MAXIMUM_UNOBSERVED_GAP_TARGET_MULTIPLE = 2.0
+# not exceed the policy's bound: max(multiple x the sampler's target interval,
+# an absolute floor). Each take records the bound it met.
+MEMORY_QUALIFICATION_POLICY_PATH = (
+    Path(__file__).resolve().parents[1] / "config" / "memory-qualification-policy.json"
+)
+UNOBSERVED_GAP_POLICY_KEY = "unobservedGapBound"
+UNOBSERVED_GAP_STATUSES = frozenset({"provisional", "calibrated"})
 # The kernel footprint ledger peak and the sampled footprint come from the same
 # task_info call; a ledger peak below a sample (beyond rounding) is a broken read.
 KERNEL_LEDGER_TOLERANCE_MB = 1.0
@@ -159,6 +167,52 @@ MEMORY_EVENT_KINDS = frozenset({
 
 class MemoryEvidenceError(ValueError):
     """Raised when benchmark memory evidence is absent or unsafe to publish."""
+
+
+@dataclass(frozen=True)
+class UnobservedGapBound:
+    """The longest gap a memory-qualified take's one series may leave (contract v2)."""
+
+    target_interval_multiple: float
+    floor_ms: float
+
+    def limit_ms(self, target_interval_ms: float) -> float:
+        return max(self.target_interval_multiple * target_interval_ms, self.floor_ms)
+
+
+def load_unobserved_gap_bound(path: Path | None = None) -> UnobservedGapBound:
+    """The declared unobserved-gap bound; fails closed on a missing or malformed block."""
+    source = path or MEMORY_QUALIFICATION_POLICY_PATH
+    try:
+        document = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise MemoryEvidenceError(f"memory qualification policy is unreadable: {error}") from error
+    block = document.get(UNOBSERVED_GAP_POLICY_KEY) if isinstance(document, dict) else None
+    if not isinstance(block, dict):
+        raise MemoryEvidenceError(
+            f"memory qualification policy has no {UNOBSERVED_GAP_POLICY_KEY} block"
+        )
+    values: dict[str, float] = {}
+    for key, minimum in (("targetIntervalMultiple", 1.0), ("floorMS", 0.0)):
+        value = block.get(key)
+        if (
+            isinstance(value, bool) or not isinstance(value, (int, float))
+            or not math.isfinite(value) or value < minimum
+        ):
+            raise MemoryEvidenceError(
+                f"{UNOBSERVED_GAP_POLICY_KEY}.{key} must be a finite number of at least {minimum:g}"
+            )
+        values[key] = float(value)
+    status = block.get("status")
+    run_id = block.get("calibrationRunID")
+    if status not in UNOBSERVED_GAP_STATUSES or (
+        (status == "calibrated") != (isinstance(run_id, str) and bool(run_id))
+    ) or (status == "provisional" and run_id is not None):
+        raise MemoryEvidenceError(
+            f"{UNOBSERVED_GAP_POLICY_KEY} status must be provisional (no run ID) "
+            "or calibrated (with its run ID)"
+        )
+    return UnobservedGapBound(values["targetIntervalMultiple"], values["floorMS"])
 
 
 def load_ios_memory_budget(path: Path | None = None) -> dict[str, float]:
@@ -546,9 +600,10 @@ class LayerEvidence:
     samples: tuple[dict[str, Any], ...]
     metrics: dict[str, float | int]
     warnings: tuple[str, ...]
-    # Per-sample kernel ledgers, in sample order; empty when not sampled.
+    # Per-sample kernel ledgers, in sample order; empty when not sampled. A
+    # graphics value is None on a sample whose read the sampler dropped.
     kernel_peaks: tuple[float, ...] = ()
-    graphics: tuple[float, ...] = ()
+    graphics: tuple[float | None, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -605,9 +660,11 @@ def _validate_layer(
     implied_limits: list[float] = []
     total_ram: list[float] = []
     uptimes: list[int] = []
-    # Optional exact kernel ledgers (samplers since 2026-09-25): all or none.
+    # Optional kernel ledgers (samplers since 2026-09-25). The footprint peak
+    # is all or none; the graphics ledger is only reported, so a sample whose
+    # read the sampler dropped (a negative ledger) is tolerated as None.
     kernel_peaks: list[float] = []
-    graphics: list[float] = []
+    graphics: list[float | None] = []
     kernel_present = any(KERNEL_PEAK_SAMPLE_KEY in sample for sample in samples)
     graphics_present = any(GRAPHICS_SAMPLE_KEY in sample for sample in samples)
     periodic_count = 0
@@ -623,14 +680,20 @@ def _validate_layer(
         previous_elapsed, previous_uptime = elapsed, uptime
         uptimes.append(uptime)
         if kernel_present:
+            # Not checked for monotonicity in sidecar order: a sample reads its
+            # clocks before task_info, and a periodic capture preempted between
+            # the two can read the ledger after a later-stamped boundary
+            # capture, so a new high can sort first. Only the series-level
+            # bound (the ledger's max covers the sampled footprint's max) holds
+            # under every interleaving; see `_apply_peak_fidelity`.
             kernel_peaks.append(_finite(
                 sample.get(KERNEL_PEAK_SAMPLE_KEY), f"{prefix}.{KERNEL_PEAK_SAMPLE_KEY}"
             ))
-            # A lifetime high-water mark never falls.
-            if len(kernel_peaks) > 1 and kernel_peaks[-1] + 1e-6 < kernel_peaks[-2]:
-                raise MemoryEvidenceError(f"{prefix}: the kernel footprint ledger peak fell")
         if graphics_present:
-            graphics.append(_finite(sample.get(GRAPHICS_SAMPLE_KEY), f"{prefix}.{GRAPHICS_SAMPLE_KEY}"))
+            graphics.append(
+                _finite(sample[GRAPHICS_SAMPLE_KEY], f"{prefix}.{GRAPHICS_SAMPLE_KEY}")
+                if GRAPHICS_SAMPLE_KEY in sample else None
+            )
         kind = sample.get("kind")
         if kind not in {"start", "periodic", "boundary", "stop"}:
             raise MemoryEvidenceError(f"{prefix}: invalid sample kind {kind!r}")
@@ -859,11 +922,11 @@ def _validate_layer(
         ("graphicsFootprintEndMB", graphics, -1),
     ):
         if summary_key in summary:
-            if not values:
+            if not values or values[pick] is None:
                 raise MemoryEvidenceError(
                     f"generation {generation_id} {layer}: {summary_key} has no sampled ledger"
                 )
-            match(summary_key, values[pick])
+            match(summary_key, float(values[pick]))
 
     max_gpu_recommended = max(gpu_recommended)
     gpu_ratio = max(gpu_ratios)
@@ -935,8 +998,6 @@ def _validate_layer(
     )
 
 
-
-
 def _mlx_end_of_take(row: dict[str, Any], generation_id: str) -> tuple[float, float] | None:
     """MLX active and cache memory at the end of a take (retained-memory-v2).
 
@@ -975,7 +1036,7 @@ def _process_identifier(row: dict[str, Any] | None) -> int | None:
 
 def _one_process_series(
     engine: LayerEvidence, app: LayerEvidence
-) -> tuple[dict[str, float | int], list[float], list[float]]:
+) -> tuple[dict[str, float | int], list[float], list[float | None]]:
     """One memory series for the one process both macOS layers sampled (contract v2).
 
     Since 2026-09-15 the engine runs inside the app process, so the app-layer
@@ -1043,7 +1104,7 @@ def _one_process_series(
 def _apply_peak_fidelity(
     metrics: dict[str, float | int],
     kernel: list[float],
-    graphics: list[float],
+    graphics: list[float | None],
     generation_id: str,
 ) -> None:
     """Measure the sampled peaks against the exact high-water marks (contract v2).
@@ -1073,7 +1134,8 @@ def _apply_peak_fidelity(
         metrics["kernelPhysFootprintPeakExact"] = 1 if exact else 0
         if exact:
             metrics["footprintPeakCaptureMissMB"] = max(0.0, kernel_peak - sampled_peak)
-    if graphics:
+    # Reported when the series' last sample read the graphics ledger.
+    if graphics and graphics[-1] is not None:
         metrics["graphicsFootprintEndMB"] = graphics[-1]
 
 
@@ -1154,12 +1216,16 @@ def qualify_take_memory(
 
     target_ms = float(metrics["samplerTargetIntervalMS"])
     gap_ms = float(metrics["samplerMaximumUnobservedGapMS"])
-    if gap_ms > MAXIMUM_UNOBSERVED_GAP_TARGET_MULTIPLE * target_ms + 1e-9:
+    gap_bound = load_unobserved_gap_bound()
+    limit_ms = gap_bound.limit_ms(target_ms)
+    if gap_ms > limit_ms + 1e-9:
         raise MemoryEvidenceError(
             f"generation {generation_id}: the process memory went unobserved for "
-            f"{gap_ms:.1f} ms, more than {MAXIMUM_UNOBSERVED_GAP_TARGET_MULTIPLE:g}x the "
-            f"{target_ms:g} ms sampler cadence"
+            f"{gap_ms:.1f} ms, more than the {limit_ms:g} ms bound "
+            f"(max({gap_bound.target_interval_multiple:g}x the {target_ms:g} ms sampler "
+            f"cadence, {gap_bound.floor_ms:g} ms))"
         )
+    metrics["samplerUnobservedGapLimitMS"] = limit_ms
     _apply_peak_fidelity(metrics, kernel, graphics, generation_id)
 
     events = _memory_warnings_and_failures(row)

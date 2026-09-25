@@ -1241,6 +1241,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
             "samplerPeriodicSampleCount": 1.0,
             "samplerTargetIntervalMS": 500.0,
             "samplerMaximumUnobservedGapMS": 1000.0,
+            "samplerUnobservedGapLimitMS": 1000.0,
             "gpuRecommendedWorkingSetMB": 4096.0,
             "peakGPUAllocatedMB": 90.0,
             "peakPhysicalFootprintMB": 300.0,
@@ -1274,9 +1275,21 @@ class BenchmarkHistoryTests(unittest.TestCase):
                 lambda metrics: metrics.pop("samplerMaximumUnobservedGapMS"),
                 "incomplete: samplerMaximumUnobservedGapMS",
             ),
+            # The gap cases assert only that the record is refused.
             "long-gap": (
                 lambda metrics: metrics.update({"samplerMaximumUnobservedGapMS": 1000.5}),
-                "unobserved for more than 2x",
+                None,
+            ),
+            "no-bound": (lambda metrics: metrics.pop("samplerUnobservedGapLimitMS"), None),
+            "bound-below-cadence": (
+                lambda metrics: metrics.update({
+                    "samplerMaximumUnobservedGapMS": 100.0, "samplerUnobservedGapLimitMS": 400.0,
+                }),
+                None,
+            ),
+            "no-cadence": (lambda metrics: metrics.pop("samplerTargetIntervalMS"), None),
+            "boolean-exact": (
+                lambda metrics: metrics.update({"kernelPhysFootprintPeakExact": True}), None,
             ),
             "wrong-miss": (
                 lambda metrics: metrics.update({"gpuPeakCaptureMissMB": 0.0}),
@@ -1299,7 +1312,11 @@ class BenchmarkHistoryTests(unittest.TestCase):
         }
         for name, (change, message) in cases.items():
             candidate = mutated(name, change)
-            with self.subTest(case=name), self.assertRaisesRegex(history.HistoryError, message):
+            refused = (
+                self.assertRaises(history.HistoryError) if message is None
+                else self.assertRaisesRegex(history.HistoryError, message)
+            )
+            with self.subTest(case=name), refused:
                 self.publish(candidate, candidate["run"]["id"])
 
         unknown = copy.deepcopy(valid)
@@ -1801,6 +1818,18 @@ class BenchmarkHistoryTests(unittest.TestCase):
                 history.record_manifest(self.write_manifest(manifest, run_id))
             self.assertFalse(list(self.runs.rglob("*.json")))
             self.assertTrue((self.root / "build" / f"{run_id}.trace").is_dir())
+
+    def test_only_a_memory_profile_keeps_its_raw_trace_by_default(self) -> None:
+        # A valid CPU profile that kept its trace explicitly publishes; the
+        # same record claiming the memory-only default is refused.
+        run_id = "profile-cpu-kept"
+        manifest = self.profile_producer_manifest(run_id, quality=True, policy="keptExplicitly")
+        history.record_manifest(self.write_manifest(manifest, run_id))
+        run_id = "profile-cpu-kept-by-default"
+        manifest = self.profile_producer_manifest(run_id, quality=True, policy="keptExplicitly")
+        manifest["historyRecord"]["evidence"]["trace"]["retentionPolicy"] = "keptByDefault"
+        with self.assertRaises(history.HistoryError):
+            history.record_manifest(self.write_manifest(manifest, run_id))
 
     def test_memory_instrument_profile_requires_and_accepts_target_rows(self) -> None:
         record = record_fixture(run_id="profile-memory-valid", kind="instrument-profile")

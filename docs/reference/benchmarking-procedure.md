@@ -445,8 +445,8 @@ allocation/VM peaks. The lane uses Apple's Allocations template for its Allocati
 tracks because that template disables automatic VM snapshots; adding standalone VM Tracker to a
 Blank trace enables stop-the-world snapshots that create real holes in the target's 500 ms sampler.
 Publication verifies the captured template setting and applies the same unobserved-gap gate as
-every memory-qualified take (no gap above twice the cadence). The memory
-profile's default 180-second safety cap is only a maximum; exact-target exit ends the recording
+every memory-qualified take (no gap above the policy bound: twice the cadence, at least 500 ms). The
+memory profile's default 180-second safety cap is only a maximum; exact-target exit ends the recording
 early. The separate `scripts/macos_test.sh memory` lane owns repeated retained growth.
 
 Produces `build/artifacts/macos/profiles/<run-id>/<run-id>.trace` containing CPU Profiler samples and
@@ -699,7 +699,11 @@ process in absolute-uptime order (memory contract v2) and are never summed. Head
 CLI/profile runs remain owning-engine-process evidence.
 
 Sidecar and summary counts must agree, capture failures must be zero, and no gap between two
-consecutive samples of the series may exceed twice the sampler cadence. Each take also publishes
+consecutive samples of the series may exceed the unobserved-gap bound declared in
+`config/memory-qualification-policy.json` (`unobservedGapBound`: twice the sampler cadence, at least
+500 ms, so a single stall at the 100 ms cadence of Macs above 16 GB does not fail a take). The bound
+is provisional: the first consented memory lane on the canonical M6 calibrates it, and each take
+records the bound it met as `samplerUnobservedGapLimitMS`. Each take also publishes
 how far its sampled peaks fell below the exact high-water marks (`gpuPeakCaptureMissMB` against
 `mlxPeakMB`, and the kernel footprint ledger when sampled). Guarded pressure or `softTrim` produces
 `passedWithWarnings`; the routine post-generation cache clear is counted as `policyCacheClearCount`

@@ -55,6 +55,7 @@ from benchmark_memory import (  # noqa: E402
     MLX_END_OF_TAKE_STAGES,
     MemoryEvidenceError,
     REQUIRED_TELEMETRY_SCHEMA,
+    UNOBSERVED_GAP_POLICY_KEY,
     qualify_memory_rows,
 )
 from language_bench_evidence import stable_default_seed  # noqa: E402
@@ -1257,9 +1258,14 @@ def memory_retention_evidence(
     policy = load_json(MEMORY_POLICY_PATH)
     if not isinstance(policy, dict):
         raise PublicationError("memory qualification policy must be an object")
-    # retained-memory-v2 is declared beside v1 and reported on the same run.
+    # retained-memory-v2 is declared beside v1 and reported on the same run;
+    # the unobserved-gap bound governs every memory-qualified take and is read
+    # by benchmark_memory.py.
     retained_v2_policy = policy.get(RETAINED_MEMORY_V2_KEY)
-    policy = {key: value for key, value in policy.items() if key != RETAINED_MEMORY_V2_KEY}
+    policy = {
+        key: value for key, value in policy.items()
+        if key not in {RETAINED_MEMORY_V2_KEY, UNOBSERVED_GAP_POLICY_KEY}
+    }
     required_policy = {
         "schemaVersion": 1,
         "policyID": "retained-memory-v1",
@@ -1393,8 +1399,9 @@ def retained_memory_v2_evidence(
     """Within-mode MLX active growth after each retained take (audit #25/#26).
 
     retained-memory-v1 compares the physical footprint at the end of each
-    retained take against 5% of RAM: leaks under about 205 MB per take pass on
-    the Mac, and on a tier without the post-generation clear the value also
+    retained take against 5% of the canonical host's RAM: leaks under about
+    410 MB per take pass on the canonical 16 GB M6 (307 MB on the 12 GB
+    iPhone), and on a tier without the post-generation clear the value also
     holds the MLX cache. v2 reads the MLX active memory at the end of each take
     (after the clear when the tier runs one), which excludes the cache, and
     gates each mode's growth only against a bound calibrated from a consented

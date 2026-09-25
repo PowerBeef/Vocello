@@ -270,13 +270,15 @@ screenshots, and `.xcresult` remain untracked; publication never stages, commits
 New publishable generation runs use telemetry schema v8 and evidence manifest v2. Their exact
 `samples-<generationID>.jsonl` files must begin/end with one start/stop sample, contain the required
 load/stream/finalization boundaries, match summary counts, have zero capture failures, and leave no
-gap between samples above twice the sampler cadence. The app and engine samples of the one hosting
+gap between samples above the policy's unobserved-gap bound (twice the sampler cadence, at least
+500 ms, provisional until the first consented M6 memory lane calibrates it;
+`config/memory-qualification-policy.json`). The app and engine samples of the one hosting
 process form one series in absolute-uptime order; they are never summed.
 Critical pressure, app memory warning/exit, `hardTrim`, or `fullUnload` fails publication, and so
 does a marking peak-equality breach (CP-2: within every take, no post-marking footprint sample may
 exceed the pre-marking peak beyond tolerance, and the exact MLX peak, cumulative since the request
-began, may not rise across the marking pass by more than one page —
-`config/marking-peak-equality.json`). Guarded
+began, may not rise across the marking pass by more than one page; a marked take whose engine row
+lacks those MLX snapshots fails too — `config/marking-peak-equality.json`). Guarded
 pressure or `softTrim` publishes only as an explicit warning.
 
 The routine per-tier cache clear (a `trim-action` with source `post-generation` and reason

@@ -147,7 +147,7 @@ requested.
 - **Hardware and memory.** `IOSDeviceSupport.isSupportedHardware` (iPhone 15 Pro and later) aligns with
   `scripts/ios_device_eligibility.py`; the `increased-memory-limit` entitlement stays; clone load profile
   follows the entitled limit. Publishable device evidence is memory-qualified (telemetry schema v8 or
-  newer, no unobserved sampler gap above twice the cadence, sampled peaks measured against the exact
+  newer, no unobserved sampler gap above the policy bound, sampled peaks measured against the exact
   high-water marks, no critical pressure, warning, `hardTrim` or `fullUnload`).
 - **Localization grows through typed catalog entries.** Dynamic copy belongs in `VocelloPresentationText`
   and `Localizable.xcstrings` with plural rules; formatted copy goes through `VocelloLocalization.format`

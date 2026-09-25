@@ -440,7 +440,8 @@ cmd_profile() {
     # standalone VM Tracker instrument to a Blank trace enables stop-the-world
     # automatic snapshots, which can suspend the exact target for 1-2 seconds
     # and leave its honest 500 ms in-process sampler blind for longer than the
-    # memory contract's unobserved-gap gate (twice the cadence) allows.
+    # memory contract's unobserved-gap gate (twice the cadence, at least 500 ms)
+    # allows.
     instrument_args=(--template "$memory_template" --instrument "$cpu_instrument")
     capture_instruments="$cpu_instrument + $allocations_instrument + $vm_tracker_instrument + os_signpost"
   else

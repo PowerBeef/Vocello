@@ -93,8 +93,10 @@ scratch, and per-tier cleanup keep resident growth controlled. Sliding/quantized
 legacy speed profiles, and alternate eval strategies must be read through their ledger state; a
 knob in source is not proof that it is active or beneficial.
 
-Memory-qualified benchmarks use telemetry schema v8 and evidence manifest v2. Process memory
-stays attributed to the process that measured it; macOS app/XPC totals use uptime-aligned samples.
+Memory-qualified benchmarks use telemetry schema v8 and evidence manifest v2. One process has one
+memory series: the macOS app hosts the engine, so its app and engine samplers are two readers of that
+process and their samples are merged by uptime, never summed (memory contract v2; contract-v1
+records paired and summed the two layers' samples by uptime).
 
 ## Mimi decoder correctness
 

@@ -7,14 +7,22 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+from typing import Any
 import unittest
+from unittest import mock
 
 
 SCRIPTS = Path(__file__).resolve().parents[1]
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-from benchmark_memory import MemoryEvidenceError, load_ios_memory_budget, qualify_memory_rows  # noqa: E402
+import benchmark_memory  # noqa: E402
+from benchmark_memory import (  # noqa: E402
+    MemoryEvidenceError,
+    load_ios_memory_budget,
+    load_unobserved_gap_bound,
+    qualify_memory_rows,
+)
 
 
 ENGINE_BOUNDARIES = [
@@ -290,29 +298,79 @@ class MemoryEvidenceTests(unittest.TestCase):
         self.assertEqual(qualified[0].metrics["samplerMissedDeadlineCount"], 2)
         self.assertEqual(qualified[0].metrics["samplerMaximumUnobservedGapMS"], 40.0)
 
-    def test_an_unobserved_gap_above_twice_the_cadence_fails(self) -> None:
+    def gap_policy(self, **block: object) -> Any:
+        """A policy file declaring only the unobserved-gap bound, patched in."""
+        declared = {
+            "targetIntervalMultiple": 2.0, "floorMS": 500,
+            "status": "provisional", "calibrationRunID": None,
+        }
+        declared.update(block)
+        path = self.root / "memory-qualification-policy.json"
+        path.write_text(json.dumps({"unobservedGapBound": declared}), encoding="utf-8")
+        return mock.patch.object(benchmark_memory, "MEMORY_QUALIFICATION_POLICY_PATH", path)
+
+    def with_stop_after(self, engine: dict, base: list[dict], gap_ms: int,
+                        target_ns: int = 500_000_000) -> dict:
+        sidecar = copy.deepcopy(base)
+        before_stop = sidecar[-2]
+        stop = sidecar[-1]
+        stop["capturedElapsedNS"] = before_stop["capturedElapsedNS"] + gap_ms * 1_000_000
+        stop["capturedUptimeNS"] = before_stop["capturedUptimeNS"] + gap_ms * 1_000_000
+        stop["tMS"] = stop["capturedElapsedNS"] // 1_000_000
+        fixture = row(engine["generationID"], sidecar, layer="engine", ios=True)
+        fixture["summary"]["targetIntervalNS"] = target_ns
+        self.write_sidecar("engine", engine["generationID"], sidecar)
+        return fixture
+
+    def test_an_unobserved_gap_above_the_policy_bound_fails(self) -> None:
         engine, base = self.ios_fixture()
-
-        def with_stop_after(gap_ms: int) -> dict:
-            sidecar = copy.deepcopy(base)
-            before_stop = sidecar[-2]
-            stop = sidecar[-1]
-            stop["capturedElapsedNS"] = before_stop["capturedElapsedNS"] + gap_ms * 1_000_000
-            stop["capturedUptimeNS"] = before_stop["capturedUptimeNS"] + gap_ms * 1_000_000
-            stop["tMS"] = stop["capturedElapsedNS"] // 1_000_000
-            fixture = row(engine["generationID"], sidecar, layer="engine", ios=True)
-            self.write_sidecar("engine", engine["generationID"], sidecar)
-            return fixture
-
-        # The fixture's cadence is 500 ms: a 1,000 ms gap is the bound.
-        qualified, _ = qualify_memory_rows(
-            rows=[with_stop_after(1_000)], diagnostics=self.root, platform="ios"
-        )
-        self.assertEqual(qualified[0].metrics["samplerMaximumUnobservedGapMS"], 1_000.0)
-        with self.assertRaisesRegex(MemoryEvidenceError, "unobserved for 1001.0 ms"):
-            qualify_memory_rows(
-                rows=[with_stop_after(1_001)], diagnostics=self.root, platform="ios"
+        with self.gap_policy():
+            # A 500 ms cadence: twice it, 1,000 ms, is the bound.
+            qualified, _ = qualify_memory_rows(
+                rows=[self.with_stop_after(engine, base, 1_000)],
+                diagnostics=self.root, platform="ios",
             )
+            self.assertEqual(qualified[0].metrics["samplerMaximumUnobservedGapMS"], 1_000.0)
+            self.assertEqual(qualified[0].metrics["samplerUnobservedGapLimitMS"], 1_000.0)
+            with self.assertRaisesRegex(MemoryEvidenceError, "unobserved for 1001.0 ms"):
+                qualify_memory_rows(
+                    rows=[self.with_stop_after(engine, base, 1_001)],
+                    diagnostics=self.root, platform="ios",
+                )
+            # A 100 ms cadence: the 500 ms floor, not twice the cadence, bounds it,
+            # so one scheduler stall on a fast-cadence host does not fail a take.
+            qualified, _ = qualify_memory_rows(
+                rows=[self.with_stop_after(engine, base, 450, target_ns=100_000_000)],
+                diagnostics=self.root, platform="ios",
+            )
+            self.assertEqual(qualified[0].metrics["samplerUnobservedGapLimitMS"], 500.0)
+            with self.assertRaises(MemoryEvidenceError):
+                qualify_memory_rows(
+                    rows=[self.with_stop_after(engine, base, 501, target_ns=100_000_000)],
+                    diagnostics=self.root, platform="ios",
+                )
+
+    def test_a_malformed_unobserved_gap_bound_fails_closed(self) -> None:
+        engine, base = self.ios_fixture()
+        fixture = self.with_stop_after(engine, base, 100)
+        cases = {
+            "multiple below one": {"targetIntervalMultiple": 0.5},
+            "negative floor": {"floorMS": -1},
+            "boolean floor": {"floorMS": True},
+            "unknown status": {"status": "draft"},
+            "calibrated without run": {"status": "calibrated"},
+            "provisional with run": {"calibrationRunID": "mac-memory-qualification-x"},
+        }
+        for label, block in cases.items():
+            with self.subTest(label=label), self.gap_policy(**block):
+                with self.assertRaises(MemoryEvidenceError):
+                    qualify_memory_rows(rows=[fixture], diagnostics=self.root, platform="ios")
+        with self.gap_policy(status="calibrated", calibrationRunID="mac-memory-qualification-x"):
+            self.assertEqual(load_unobserved_gap_bound().limit_ms(250.0), 500.0)
+        missing = self.root / "absent.json"
+        with mock.patch.object(benchmark_memory, "MEMORY_QUALIFICATION_POLICY_PATH", missing):
+            with self.assertRaises(MemoryEvidenceError):
+                load_unobserved_gap_bound()
 
     def test_peak_fidelity_reports_the_miss_against_the_exact_mlx_peak(self) -> None:
         engine, sidecar = self.ios_fixture()
@@ -368,9 +426,8 @@ class MemoryEvidenceTests(unittest.TestCase):
             "below a sampled footprint": lambda rows: [
                 sample.__setitem__("kernelPhysFootprintPeakMB", 2000.0) for sample in rows
             ],
-            "falls": lambda rows: rows[-1].__setitem__("kernelPhysFootprintPeakMB", 1.0),
             "missing on one sample": lambda rows: rows[3].pop("kernelPhysFootprintPeakMB"),
-            "graphics missing on one sample": lambda rows: rows[3].pop("graphicsFootprintMB"),
+            "graphics not finite": lambda rows: rows[3].__setitem__("graphicsFootprintMB", -1.0),
         }
         for label, mutate in mutations.items():
             with self.subTest(label=label):
@@ -386,6 +443,43 @@ class MemoryEvidenceTests(unittest.TestCase):
         self.write_sidecar("engine", engine["generationID"], base)
         with self.assertRaisesRegex(MemoryEvidenceError, "kernelPhysFootprintPeakMB"):
             qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")
+
+    def test_a_dropped_graphics_ledger_read_is_tolerated(self) -> None:
+        # The graphics ledger is only reported: a sample whose read the sampler
+        # dropped does not fail the take, and the end value is published only
+        # when the last sample read it.
+        sidecar = samples(
+            role="engine", boundaries=ENGINE_BOUNDARIES, ios=True, kernel_ledgers=True
+        )
+        sidecar[3].pop("graphicsFootprintMB")
+        engine = row("generation-graphics-gap", sidecar, layer="engine", ios=True)
+        self.write_sidecar("engine", engine["generationID"], sidecar)
+        qualified, _ = qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")
+        self.assertEqual(
+            qualified[0].metrics["graphicsFootprintEndMB"], sidecar[-1]["graphicsFootprintMB"]
+        )
+        sidecar[-1].pop("graphicsFootprintMB")
+        engine = row("generation-graphics-end", sidecar, layer="engine", ios=True)
+        self.write_sidecar("engine", engine["generationID"], sidecar)
+        qualified, _ = qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")
+        self.assertNotIn("graphicsFootprintEndMB", qualified[0].metrics)
+
+    def test_kernel_ledger_read_out_of_sidecar_order_still_qualifies(self) -> None:
+        # A periodic capture stamps its clock, is preempted, and reads the
+        # ledger after a later-stamped boundary capture: the earlier-sorted
+        # sample holds the newer, higher lifetime peak. That proves nothing
+        # about the kernel, so the take qualifies on the series-level bound.
+        sidecar = samples(
+            role="engine", boundaries=ENGINE_BOUNDARIES, ios=True, kernel_ledgers=True
+        )
+        sidecar[5]["kernelPhysFootprintPeakMB"] = sidecar[6]["kernelPhysFootprintPeakMB"] + 50.0
+        engine = row("generation-kernel-interleaved", sidecar, layer="engine", ios=True)
+        self.write_sidecar("engine", engine["generationID"], sidecar)
+        qualified, _ = qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")
+        self.assertEqual(
+            qualified[0].metrics["kernelPhysFootprintPeakMB"],
+            max(sample["kernelPhysFootprintPeakMB"] for sample in sidecar),
+        )
 
     def test_each_required_engine_boundary_is_checked_from_the_raw_sidecar(self) -> None:
         engine, original = self.ios_fixture()

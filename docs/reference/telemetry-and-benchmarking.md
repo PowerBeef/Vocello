@@ -406,7 +406,9 @@ where time goes; use **Instruments signposts** (see [`benchmarking-procedure.md`
   (`before_stream`, `first_chunk`, `after_stream`, `after_final_write`,
   `after_generation_trim`, `before_marking`/`after_marking` when marking runs, plus
   prepare/clone/prewarm stages). `peak` is cumulative since the request began, so a stage raised
-  the request's high-water mark exactly when its peak exceeds the previous stage's. Shows GPU memory growth
+  the request's high-water mark exactly when its peak exceeds the previous stage's. Both marking
+  snapshots follow the cache release that precedes the marking pass, so the take's
+  `mlxCachePeakMB` keeps excluding the end-of-generation cache. Shows GPU memory growth
   across the pipeline — key for restricted‑hardware tuning. Captured at boundaries only
   (a GPU snapshot is too costly per chunk).
 - **`summary`** (`TelemetrySummary`) — owning-process memory **curve** summary from the background
@@ -465,10 +467,13 @@ preparation/model-load/session/final-WAV and first-output/terminal boundaries; a
 `app_submit` and `app_terminal`.
 
 Contract v2 judges each take's one memory series. Timer health: no gap between two consecutive
-samples may exceed twice the sampler's target interval (`samplerMaximumUnobservedGapMS`); a longer
-gap fails publication. Periodic coverage (`samplerCoverage`, `samplerMissedDeadlineCount`) is still
-published but no longer gates, because it counts deadlines honoured rather than whether the peak was
-seen. Peak fidelity: `gpuPeakCaptureMissMB` is how far the sampled Metal peak fell below the exact
+samples (`samplerMaximumUnobservedGapMS`) may exceed the bound in
+`config/memory-qualification-policy.json` `unobservedGapBound`, max(twice the sampler's target
+interval, 500 ms); a longer gap fails publication, and each take records the bound it met as
+`samplerUnobservedGapLimitMS`. The bound is provisional until the first consented memory lane on the
+canonical M6 (250 ms cadence) calibrates it. Periodic coverage (`samplerCoverage`,
+`samplerMissedDeadlineCount`) is still published but no longer gates, because it counts deadlines
+honoured rather than whether the peak was seen. Peak fidelity: `gpuPeakCaptureMissMB` is how far the sampled Metal peak fell below the exact
 `mlxPeakMB` (0 when it caught it). When the sampler read the kernel ledgers (samplers since
 2026-09-25, from the same `task_vm_info` call), `kernelPhysFootprintPeakMB` is the process-lifetime
 footprint high-water mark at the take's end: `kernelPhysFootprintPeakExact` is 1 when it rose inside
@@ -505,14 +510,16 @@ Instruments lane.
 
 Since 2026-09-25 the same run also reports policy `retained-memory-v2`
 (`config/memory-qualification-policy.json` `retainedMemoryV2`; `evidence.retainedMemoryV2` on the
-record). v1 lets a leak of up to about 205 MB per take pass on the Mac (307 MB on the iPhone), and on
-a tier without the post-generation cache clear its end value includes the MLX cache. Each take now
-publishes `mlxEndActiveMB`/`mlxEndCacheMB` from the MLX snapshot after that clear (else after the
-stream) and, when sampled, `graphicsFootprintEndMB`; v2's metric is each mode's growth of
-`mlxEndActiveMB` from the first retained take to the highest later one. It gates per mode only
-against a bound calibrated from a consented memory run on the platform's canonical host. Until a
-maintainer records that bound and its run ID, both platforms are `uncalibrated`: the record reports
-the growth with no bound and no verdict, and v1 alone decides publication.
+record). v1's bound is 5% of the canonical host's RAM, first retained take to the highest later one,
+so a leak of up to about 410 MB per take passes on the canonical 16 GB M6 (819 MB over two takes;
+307 MB per take on the 12 GB iPhone), and on a tier without the post-generation cache clear its end
+value includes the MLX cache. Each take now publishes `mlxEndActiveMB`/`mlxEndCacheMB` from the MLX
+snapshot after that clear (else after the stream) and, when sampled, `graphicsFootprintEndMB`; v2's
+metric is each mode's growth of `mlxEndActiveMB` from the first retained take to the highest later
+one. It gates per mode only against a bound calibrated from a consented memory run on the platform's
+canonical host. Until a maintainer records that bound and its run ID, both platforms are
+`uncalibrated`: the record reports the growth with no bound and no verdict, and v1 alone decides
+publication.
 
 On iOS, MetricKit's delayed daily aggregate is a complementary field signal. The app persists only
 a bounded privacy-reduced memory/exit summary; raw payload JSON, call stacks, identifiers, and paths

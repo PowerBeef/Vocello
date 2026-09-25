@@ -315,7 +315,7 @@
           ]
         },
         "memoryContractVersion": {
-          "description": "1: records before 2026-09-25 (macOS UI totals summed uptime-paired app and engine samples; at least 95% periodic coverage). 2: one memory series per process, a maximum unobserved gap of twice the sampler cadence, and each take's sampled peaks measured against the exact high-water marks.",
+          "description": "1: records before 2026-09-25 (macOS UI totals summed uptime-paired app and engine samples; at least 95% periodic coverage). 2: one memory series per process, a maximum unobserved gap bounded by the memory-qualification policy (each take records the bound it met), and each take's sampled peaks measured against the exact high-water marks.",
           "enum": [
             1,
             2

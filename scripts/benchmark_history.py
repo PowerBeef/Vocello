@@ -39,7 +39,6 @@ if str(SCRIPT_DIRECTORY) not in sys.path:
 from build_output_policy import load_policy
 from benchmark_memory import (  # noqa: E402
     KERNEL_LEDGER_TOLERANCE_MB,
-    MAXIMUM_UNOBSERVED_GAP_TARGET_MULTIPLE,
 )
 from lib import rtf as rtf_semantics
 from lib import jsonio  # noqa: E402
@@ -411,12 +410,13 @@ METRIC_KEYS = {
     # else after the stream).
     "mlxEndActiveMB", "mlxEndCacheMB",
     # Memory contract v2 (records since 2026-09-25): the longest unobserved gap
-    # in the process's one memory series, the sampled Metal peak's shortfall
+    # in the process's one memory series and the policy bound it met
+    # (max(multiple x cadence, floor) at publication), the sampled Metal peak's shortfall
     # against the exact MLX peak, and the kernel ledgers when the sampler read
     # them (a process-lifetime footprint high-water mark, 1 when it rose inside
     # the take so it is the take's exact peak, the sampled footprint's shortfall
     # against it, and the graphics-tagged footprint at the take's end).
-    "samplerMaximumUnobservedGapMS", "gpuPeakCaptureMissMB",
+    "samplerMaximumUnobservedGapMS", "samplerUnobservedGapLimitMS", "gpuPeakCaptureMissMB",
     "kernelPhysFootprintPeakMB", "kernelPhysFootprintPeakExact",
     "footprintPeakCaptureMissMB", "graphicsFootprintEndMB",
     "loadAverage1M", "freeStorageBytes", "uptimeSeconds", "lowPowerMode",
@@ -513,7 +513,10 @@ MACOS_UI_MEMORY_REQUIRED_METRICS = {
 # sampled-peak shortfall against the exact high-water marks, and it never
 # carries the v1 pairing metrics.
 MEMORY_CONTRACT_VERSIONS = frozenset({1, 2})
-MEMORY_V2_REQUIRED_METRICS = {"samplerMaximumUnobservedGapMS", "gpuPeakCaptureMissMB"}
+MEMORY_V2_REQUIRED_METRICS = {
+    "samplerTargetIntervalMS", "samplerMaximumUnobservedGapMS", "samplerUnobservedGapLimitMS",
+    "gpuPeakCaptureMissMB",
+}
 KERNEL_LEDGER_METRICS = {
     "kernelPhysFootprintPeakMB", "kernelPhysFootprintPeakExact", "footprintPeakCaptureMissMB",
 }
@@ -2169,6 +2172,8 @@ def validate_trace_retention(record: dict[str, Any], trace: dict[str, Any]) -> N
         raise HistoryError("trace captureSettings is missing: " + ", ".join(missing))
     if capture_settings["profileKind"] not in {"cpu", "memory"}:
         raise HistoryError("trace captureSettings.profileKind is unsupported")
+    if retention_policy == "keptByDefault" and capture_settings["profileKind"] != "memory":
+        raise HistoryError("only a memory profile keeps its raw trace by default")
     if capture_settings["template"] != trace.get("template"):
         raise HistoryError("trace captureSettings.template does not match trace.template")
     if capture_settings["targetProcess"] != summary.get("targetProcess"):
@@ -3079,11 +3084,14 @@ def validate_memory_contract_v2_take(metrics: dict[str, Any]) -> None:
     if not 0 <= float(metrics["samplerCoverage"]) <= 1:
         raise HistoryError("memory sampler coverage is outside [0, 1]")
     gap = float(metrics["samplerMaximumUnobservedGapMS"])
-    target = float(metrics["samplerTargetIntervalMS"]) if "samplerTargetIntervalMS" in metrics else 0.0
-    if target <= 0 or gap < 0 or gap > MAXIMUM_UNOBSERVED_GAP_TARGET_MULTIPLE * target + 1e-9:
+    target = float(metrics["samplerTargetIntervalMS"])
+    # The bound the publisher applied from the policy at publication; a later
+    # recalibration of the policy never re-judges a published take.
+    limit = float(metrics["samplerUnobservedGapLimitMS"])
+    if target <= 0 or limit < target or gap < 0 or gap > limit + 1e-9:
         raise HistoryError(
-            "memory-qualified take left the process unobserved for more than "
-            f"{MAXIMUM_UNOBSERVED_GAP_TARGET_MULTIPLE:g}x its sampler cadence"
+            "memory-qualified take left the process unobserved for longer than its "
+            "recorded unobserved-gap bound (at least one sampler cadence)"
         )
     expected_miss = max(0.0, float(metrics["mlxPeakMB"]) - float(metrics["peakGPUAllocatedMB"]))
     if not math.isclose(float(metrics["gpuPeakCaptureMissMB"]), expected_miss, rel_tol=0, abs_tol=1e-6):
@@ -3091,7 +3099,11 @@ def validate_memory_contract_v2_take(metrics: dict[str, Any]) -> None:
     present = KERNEL_LEDGER_METRICS & set(metrics)
     if present:
         exact = metrics.get("kernelPhysFootprintPeakExact")
-        if "kernelPhysFootprintPeakMB" not in metrics or exact not in (0, 1):
+        if (
+            "kernelPhysFootprintPeakMB" not in metrics
+            or isinstance(exact, bool)
+            or exact not in (0, 1)
+        ):
             raise HistoryError("the kernel footprint ledger metrics are incomplete")
         kernel_peak = float(metrics["kernelPhysFootprintPeakMB"])
         sampled_peak = float(metrics["peakPhysicalFootprintMB"])

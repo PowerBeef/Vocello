@@ -102,76 +102,44 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
     private let designDebounce: Duration
     private let cloneDebounce: Duration
     private let modeTransitionDebounce: Duration
+    /// The debounce of a plan not yet dispatched. `cancelPendingWarmup()`
+    /// cancels only this: a dispatched warm moves to `dispatchedTask`.
     private var pendingTask: Task<Void, Never>?
     private var pendingPlan: WarmupPlan?
+    /// The warm running now. Its task owns `dispatchedContext` and
+    /// `completedContext` until it ends; only a change of intent cancels it.
+    private var dispatchedTask: Task<Void, Never>?
     private var dispatchedContext: WarmupContext?
+    /// The latest intent asked for while a warm was dispatched; scheduled when
+    /// that warm ends if it differs from the warm's own context.
+    private var intentWhileDispatched: DeferredIntent?
     private var completedContext: WarmupContext?
     private var revision: UInt64 = 0
+
+    private struct DeferredIntent {
+        let context: WarmupContext?
+    }
     /// Warm-admission gate for constrained tiers (defers proactive warms
     /// under kernel memory pressure). Constructed eagerly so its pressure
     /// monitor is already listening before the first pressure transition —
     /// DispatchSource pressure events don't replay the in-progress level to
     /// a late starter. (On highMemoryMac / gate=off it starts no monitor.)
-    private let admissionPolicy = MacWarmupAdmissionPolicy()
+    private let admissionPolicy: MacWarmupAdmissionPolicy
 
     init(
         debounce: Duration = .milliseconds(300),
         customVoiceDebounce: Duration = .milliseconds(100),
         designDebounce: Duration = .milliseconds(800),
         cloneDebounce: Duration = .milliseconds(500),
-        modeTransitionDebounce: Duration = .milliseconds(900)
+        modeTransitionDebounce: Duration = .milliseconds(900),
+        admissionPolicy: MacWarmupAdmissionPolicy = MacWarmupAdmissionPolicy()
     ) {
         self.debounce = debounce
         self.customVoiceDebounce = customVoiceDebounce
         self.designDebounce = designDebounce
         self.cloneDebounce = cloneDebounce
         self.modeTransitionDebounce = modeTransitionDebounce
-    }
-
-    func scheduleWarmupIfNeeded(
-        mode: GenerationMode?,
-        modelID: String?,
-        isModelAvailable: Bool,
-        snapshot: TTSEngineSnapshot,
-        ttsEngineStore: TTSEngineStore
-    ) {
-        if Self.isSuppressed {
-            cancelPendingWarmup()
-            return
-        }
-        guard let mode,
-              let modelID,
-              !modelID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            cancelPendingWarmup()
-            return
-        }
-
-        let identity: WarmupIdentity
-        switch mode {
-        case .custom:
-            identity = .custom(
-                speakerID: GenerationSemantics.canonicalCustomWarmSpeaker,
-                deliveryStyle: GenerationSemantics.canonicalCustomWarmInstruction(),
-                deliveryInstructionCellID: nil,
-                languageHint: Qwen3SupportedLanguage.english.rawValue
-            )
-        case .design, .clone:
-            identity = .modelOnly
-        }
-
-        let context = WarmupContext(
-            mode: mode,
-            modelID: modelID,
-            isModelAvailable: isModelAvailable,
-            identity: identity,
-            purpose: .livePreviewReadiness,
-            deviceClass: NativeMemoryPolicyResolver.deviceClass()
-        )
-        scheduleWarmupIfNeeded(
-            context: context,
-            snapshot: snapshot,
-            ttsEngineStore: ttsEngineStore
-        )
+        self.admissionPolicy = admissionPolicy
     }
 
     func scheduleWarmupIfNeeded(
@@ -179,6 +147,18 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
         snapshot: TTSEngineSnapshot,
         ttsEngineStore: TTSEngineStore
     ) {
+        // While a warm runs, a different warm intent makes it stale; the same
+        // intent (a keystroke that leaves the context unchanged) keeps it, and
+        // so does leaving Studio (no intent: a cancelled cold load would still
+        // finish loading, and idle unload relieves memory later). Either way
+        // the latest intent is scheduled when the warm ends (PA-31).
+        if let dispatchedContext {
+            if let context, context != dispatchedContext {
+                dispatchedTask?.cancel()
+            }
+            intentWhileDispatched = DeferredIntent(context: context)
+            return
+        }
         if Self.isSuppressed {
             cancelPendingWarmup()
             return
@@ -199,10 +179,6 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
             cancelPendingWarmup()
             return
         }
-        guard dispatchedContext == nil else {
-            cancelPendingWarmup()
-            return
-        }
         let plan = WarmupPlan(context: context, action: action)
         guard pendingPlan != plan else { return }
 
@@ -217,9 +193,8 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
             } catch {
                 return
             }
-            guard let self,
-                  let ttsEngineStore,
-                  !Task.isCancelled,
+            guard let self, let ttsEngineStore else { return }
+            guard !Task.isCancelled,
                   self.revision == scheduledRevision,
                   self.pendingPlan == plan,
                   self.dispatchedContext == nil,
@@ -228,6 +203,12 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
                     snapshot: ttsEngineStore.snapshot,
                     context: plan.context
                   ) == plan.action else {
+                // A plan that no newer one replaced leaves, so the same intent
+                // can schedule again once the engine is ready for it.
+                if self.revision == scheduledRevision {
+                    self.pendingPlan = nil
+                    self.pendingTask = nil
+                }
                 return
             }
 
@@ -246,9 +227,34 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
 
             self.pendingPlan = nil
             self.dispatchedContext = plan.context
+            // From here this task is the dispatched warm, which only a change
+            // of intent cancels; the engine's busy states it publishes (a cold
+            // load's .starting, a clone prime's .running) must not (PA-31).
+            self.dispatchedTask = self.pendingTask
+            self.pendingTask = nil
+            // Every exit reconciles: only a warm that ran to the end with its
+            // model loaded is complete (a cancelled one skipped its prewarm or
+            // prime even when the weights loaded), and an intent that changed
+            // meanwhile is scheduled now.
+            var warmCompleted = false
             defer {
                 if self.dispatchedContext == plan.context {
                     self.dispatchedContext = nil
+                    self.dispatchedTask = nil
+                    self.completedContext = warmCompleted ? plan.context : nil
+                    let deferred = self.intentWhileDispatched
+                    self.intentWhileDispatched = nil
+                    // Also after a cancelled warm: an intent that flipped away
+                    // and back (A, B, A) is this warm's own context, which
+                    // the cancellation left cold. Only a change of intent
+                    // cancels, so this retries once per recorded intent.
+                    if let deferred, deferred.context != plan.context || Task.isCancelled {
+                        self.scheduleWarmupIfNeeded(
+                            context: deferred.context,
+                            snapshot: ttsEngineStore.snapshot,
+                            ttsEngineStore: ttsEngineStore
+                        )
+                    }
                 }
             }
 
@@ -264,9 +270,9 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
                 } catch {
                     return
                 }
+                // A change of intent cancels this task; nothing else aborts
+                // the second half of the transition.
                 guard !Task.isCancelled,
-                      self.revision == scheduledRevision,
-                      self.pendingPlan == nil,
                       ttsEngineStore.snapshot.isReady,
                       self.warmupAction(
                         snapshot: ttsEngineStore.snapshot,
@@ -280,9 +286,10 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
                 )
             }
 
-            if case .loaded(let loadedModelID) = ttsEngineStore.snapshot.loadState,
+            if !Task.isCancelled,
+               case .loaded(let loadedModelID) = ttsEngineStore.snapshot.loadState,
                loadedModelID == plan.context.modelID {
-                self.completedContext = plan.context
+                warmCompleted = true
             }
         }
     }
@@ -295,35 +302,33 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
     }
 
     func observe(snapshot: TTSEngineSnapshot) {
+        // While a dispatched warm runs, the busy and idle states are mostly
+        // its own (a cold load, a clone prime, a transition's unload), the
+        // engine serializes a user take behind it, and its task owns both
+        // contexts until it ends (PA-31).
+        guard dispatchedContext == nil else { return }
         if !shouldAllowAnyNavigationWarmup(snapshot: snapshot) {
             cancelPendingWarmup()
         }
 
         switch snapshot.loadState {
-        case .idle:
-            dispatchedContext = nil
-            // On the floor tier, an idle transition is almost always the
-            // engine's own idle-unload relieving memory. Clearing
-            // completedContext here made the coordinator immediately re-warm
-            // the ~2.3 GB model, so an 8 GB Mac churned unload→reload forever
-            // and the unload never actually relieved anything. Keep the
-            // context: the unload sticks, the next generation pays the
-            // documented floor-tier cold start, and fresh user intent
-            // (navigation to a different mode / model change) still creates
-            // a different context that warms normally.
-            if NativeMemoryPolicyResolver.deviceClass() != .floor8GBMac {
-                completedContext = nil
-            }
         case .loaded(let modelID):
-            dispatchedContext = nil
             if completedContext?.modelID != modelID {
                 completedContext = nil
             }
         case .failed:
-            dispatchedContext = nil
             completedContext = nil
-        case .starting, .running:
-            completedContext = nil
+        case .idle, .starting, .running:
+            // Only a different model or a failure invalidates a completed
+            // warm, on every tier. An idle transition is almost always the
+            // engine's own idle unload or pressure relief, and clearing the
+            // context made the coordinator re-warm with no user intent (a
+            // download progress tick is enough), churning unload→reload so the
+            // unload never relieved anything; a take leaves its warm in the
+            // prewarm cache. The unload sticks, the next generation pays the
+            // cold start, and fresh intent (a different draft, mode or model)
+            // is a different context that warms normally.
+            break
         }
     }
 

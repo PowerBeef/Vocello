@@ -513,6 +513,10 @@ targets:
       - path: Sources/iOS/TTSEngineStore.swift
       - path: Sources/iOSSupport/Services/IOSDeviceDiagnosticsRecorder.swift
       - path: Sources/iOSSupport/Services/AppNotifications.swift
+      # PA-31: the macOS warmup coordinator over the store's snapshot bridge.
+      - path: Sources/Services/TTSEngineStore+Mac.swift
+      - path: Sources/Services/MacGenerationWarmupCoordinator.swift
+      - path: Sources/Services/MacWarmupAdmissionPolicy.swift
       - path: Sources/iOSSupport/Services/DatabaseService.swift
       - path: Sources/iOS/Commerce/IOSExportGate.swift
       - path: Sources/iOSSupport/ViewModels/ModelManagerViewModel.swift

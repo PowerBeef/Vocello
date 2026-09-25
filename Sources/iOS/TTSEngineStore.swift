@@ -720,6 +720,12 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
         backend.setAllowsProactiveWarmOperations(
             memoryBudgetPolicy.allowsProactiveWarmOperations(for: latestMemoryContext.pressureBand)
         )
+        // Before the chunk forwarding below, which returns early for a
+        // streaming backend (every MLXTTSEngine) and when no new chunk arrived:
+        // the bridge fires for every applied change (PA-31).
+        if frontendStateChanged {
+            snapshotUpdates.send(retainedSnapshot)
+        }
 
         // When the backend exposes its full event stream, a generation-scoped task forwards chunks
         // (with preview PCM intact); the snapshot's `latestEvent` is coalesced + preview-stripped,
@@ -748,9 +754,6 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
                     "cumulativeDurationSeconds": chunk.cumulativeDurationSeconds as Any,
                 ]
             )
-        }
-        if frontendStateChanged {
-            snapshotUpdates.send(retainedSnapshot)
         }
     }
 

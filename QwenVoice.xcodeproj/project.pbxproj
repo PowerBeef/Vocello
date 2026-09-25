@@ -42,6 +42,7 @@
 		06E706C7F05B460E0699C677 /* MacSettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB384091F8AA65F0DB3AF78 /* MacSettingsScreen.swift */; };
 		071633B3268879BAB9172CCE /* IOSGenerationVariationPreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D187C4B7DA7A21208083FA3 /* IOSGenerationVariationPreference.swift */; };
 		07A334E3DEB1AFE3EA69D091 /* VocelloPlaybackCaptureSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEB61EAD625498B01309B83F /* VocelloPlaybackCaptureSupport.swift */; };
+		08137BD5F37DBCD5332B04CB /* MacWarmupAdmissionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC5190BFE7853E14F8FFC844 /* MacWarmupAdmissionPolicy.swift */; };
 		084BD168AB3E8F8B35A09B78 /* GenerationHistoryRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C3529E0076F8FBE3E3D0E22 /* GenerationHistoryRecovery.swift */; };
 		085B32C1F1FB8CB903440728 /* VocelloExports.storekit in Resources */ = {isa = PBXBuildFile; fileRef = C6B012FB532D3E7FF92C6680 /* VocelloExports.storekit */; };
 		08B80B32880C4F598A8135AD /* ReferenceClipRecordingStash.swift in Sources */ = {isa = PBXBuildFile; fileRef = D26D256158C37672A02CAE3E /* ReferenceClipRecordingStash.swift */; };
@@ -186,6 +187,7 @@
 		38B07AAA652FF501F6AD9A52 /* VocelloSettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0775D911A50AC7B22CF43E82 /* VocelloSettingsViews.swift */; };
 		390B34DC676C741E3D34AC12 /* VocelloUIAutomationSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D38AA69E346AFCA89F8D0331 /* VocelloUIAutomationSupport.swift */; };
 		395754D9F306584D67CEC5CB /* VocelloModeBackdrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = F87F88546CEA3F1D4D7828C5 /* VocelloModeBackdrop.swift */; };
+		39CF5461CC02AEBCDDCF645B /* TTSEngineStore+Mac.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD4CAE1FD0AFC7B324C1424 /* TTSEngineStore+Mac.swift */; };
 		3AC9A1389F6A19E93FD274F6 /* VocelloModeDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39CEC51D20B25EBB0E8227E9 /* VocelloModeDot.swift */; };
 		3ACFD2029190F71999219D87 /* IOSStorageProtectionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FDF43695D1DF90DD0DFE831 /* IOSStorageProtectionPolicy.swift */; };
 		3B14C307F432B1C28D297F2D /* AudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6AFCD5DBEA3DCE816F44221 /* AudioService.swift */; };
@@ -396,6 +398,7 @@
 		85B59B74A8F41DF1C98FBE34 /* VocelloUIInteractionPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1004511291434DD40D335C94 /* VocelloUIInteractionPolicy.swift */; };
 		85B5F6848405FFA700A43C28 /* VocelloSurfaceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CA028AADC687EDF89E916D7 /* VocelloSurfaceCard.swift */; };
 		85D894E9FFDB2976578D84AD /* GenerationDrafts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 101AFE7CFE754BDF26AD5CD4 /* GenerationDrafts.swift */; };
+		860204810DB69C180961C951 /* MacGenerationWarmupCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A55F5C185C7CAC960AAC9C80 /* MacGenerationWarmupCoordinator.swift */; };
 		8612AA28117CF2FDD46D401A /* AppPerformanceSignposts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C8C4331104AAE56B2B7047 /* AppPerformanceSignposts.swift */; };
 		86E11783933FEF1F43647F34 /* IOSExportPurchaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5ABE6DDCB5E50B7789B611D /* IOSExportPurchaseTests.swift */; };
 		8702FEA6F608F1DE83035793 /* MacVoiceCloningScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAE74A91CEE65CD8BF7BA3EC /* MacVoiceCloningScreen.swift */; };
@@ -3060,6 +3063,7 @@
 				C14C50C6AC3650CF1C2D06CA /* MacControlMetrics.swift in Sources */,
 				A3CC0C656C00705B7909D968 /* MacFileSaveCopy.swift in Sources */,
 				192704AC6A08E845A8CE27F1 /* MacFileSaveCopyTests.swift in Sources */,
+				860204810DB69C180961C951 /* MacGenerationWarmupCoordinator.swift in Sources */,
 				5B968F10C786807EB4088C20 /* MacInterfaceLanguage.swift in Sources */,
 				436875D3D08C2764803050FE /* MacInterfaceLanguageTests.swift in Sources */,
 				933923A5D1C8383CB08D38B0 /* MacInterfaceText.swift in Sources */,
@@ -3073,6 +3077,7 @@
 				0B6A4C86670EDDDA579B5F43 /* MacStudioSingleTakeRunnerTests.swift in Sources */,
 				A72C619BAD416870B85110D2 /* MacTypeScale.swift in Sources */,
 				DA93F7E729B445118FDC4DA0 /* MacTypeScaleTests.swift in Sources */,
+				08137BD5F37DBCD5332B04CB /* MacWarmupAdmissionPolicy.swift in Sources */,
 				64531299DDEF9DB9352ED082 /* MainThreadStallWatchdog.swift in Sources */,
 				B2F24D789A1F4DE0B7A5E124 /* MainThreadStallWatchdogTests.swift in Sources */,
 				9D3421699759E1D7B88C354A /* MemoryTelemetryV8Tests.swift in Sources */,
@@ -3108,6 +3113,7 @@
 				D499371098D55BD184F47257 /* StudioGenerationItems.swift in Sources */,
 				D6A462720D38268FA763F7FA /* Support.swift in Sources */,
 				AEE38FBDBE0B8307B0B31086 /* TTSContract.swift in Sources */,
+				39CF5461CC02AEBCDDCF645B /* TTSEngineStore+Mac.swift in Sources */,
 				527663C38A318E62B586AE37 /* TTSEngineStore.swift in Sources */,
 				6F1560A82635C0986DBF7426 /* TTSEngineStoreTests.swift in Sources */,
 				0542C0418276828E822E2A31 /* TTSModel.swift in Sources */,

@@ -48,7 +48,7 @@ private final class MemoryHeadroomDial: Sendable {
 /// It records every call that reaches it and can hold a generation open until the
 /// test releases or cancels it, so the store's ownership is observable mid-take.
 @MainActor
-private final class StoreFixtureEngine: TTSEngineRuntimeControlling, ActiveGenerationCancellable {
+private class StoreFixtureEngine: TTSEngineRuntimeControlling, ActiveGenerationCancellable {
     struct BandTransition: Equatable {
         let from: IOSMemoryPressureBand
         let to: IOSMemoryPressureBand
@@ -76,6 +76,22 @@ private final class StoreFixtureEngine: TTSEngineRuntimeControlling, ActiveGener
     private(set) var clearGenerationActivityCount = 0
     private var pendingGeneration: CheckedContinuation<GenerationResult, any Error>?
     private var pendingRequest: GenerationRequest?
+    /// A prefetch that loads the model as the real engine does: `.starting`
+    /// while it runs, `.loaded` when it ends.
+    var prefetchLoadsModel = false
+    /// Holds a prefetch open until `releasePrefetch()`.
+    var holdsPrefetch = false
+    private var pendingPrefetch: CheckedContinuation<Void, Never>?
+    /// Whether the calling task was cancelled when each prefetch ended.
+    private(set) var prefetchSawCancellation: [Bool] = []
+
+    var isHoldingPrefetch: Bool { pendingPrefetch != nil }
+
+    func releasePrefetch() {
+        let pending = pendingPrefetch
+        pendingPrefetch = nil
+        pending?.resume()
+    }
 
     init(modelRegistry: any ModelRegistry) {
         self.modelRegistry = modelRegistry
@@ -117,7 +133,26 @@ private final class StoreFixtureEngine: TTSEngineRuntimeControlling, ActiveGener
         loadedModelIDs.append(id)
     }
 
-    func unloadModel() async throws {}
+    /// Holds an unload open until `releaseUnload()`.
+    var holdsUnload = false
+    private var pendingUnload: CheckedContinuation<Void, Never>?
+    private(set) var unloadCount = 0
+
+    var isHoldingUnload: Bool { pendingUnload != nil }
+
+    func releaseUnload() {
+        let pending = pendingUnload
+        pendingUnload = nil
+        pending?.resume()
+    }
+
+    func unloadModel() async throws {
+        unloadCount += 1
+        if holdsUnload {
+            await withCheckedContinuation { pendingUnload = $0 }
+        }
+        loadState = .idle
+    }
 
     func prepareAudio(_ request: AudioPreparationRequest) async throws -> AudioNormalizationResult {
         throw StoreFixtureUnexpectedCall()
@@ -187,6 +222,19 @@ private final class StoreFixtureEngine: TTSEngineRuntimeControlling, ActiveGener
         for request: GenerationRequest
     ) async -> InteractivePrefetchDiagnostics? {
         prefetchCount += 1
+        if prefetchLoadsModel {
+            loadState = .starting
+        }
+        if holdsPrefetch {
+            await withCheckedContinuation { pendingPrefetch = $0 }
+        }
+        let cancelled = Task.isCancelled
+        prefetchSawCancellation.append(cancelled)
+        if prefetchLoadsModel {
+            // As MLXTTSEngine does, a cold load cancelled from .starting
+            // reports .idle.
+            loadState = cancelled ? .idle : .loaded(modelID: request.modelID)
+        }
         return nil
     }
 
@@ -208,6 +256,15 @@ private final class StoreFixtureEngine: TTSEngineRuntimeControlling, ActiveGener
 
     func trimMemory(level: NativeMemoryTrimLevel, reason: String) async {
         trimLevels.append(level)
+    }
+}
+
+/// The streaming shape of every production engine (`MLXTTSEngine`): the store
+/// skips its snapshot chunk forwarding for it.
+@MainActor
+private final class StreamingStoreFixtureEngine: StoreFixtureEngine, TTSEngineEventStreaming {
+    nonisolated func events(for generationID: UUID) -> AsyncStream<GenerationEvent> {
+        AsyncStream { $0.finish() }
     }
 }
 
@@ -480,12 +537,17 @@ final class TTSEngineStoreTests: XCTestCase {
         XCTAssertEqual(engine.proactiveWarmAllowances.last, false)
     }
 
-    func testHealthyMemoryLetsProactiveWarmReachTheEngine() async throws {
+    /// The store's thermal gate blocks proactive warm on a throttled host.
+    private func skipIfThermalGateBlocksProactiveWarm() throws {
         let thermal = ProcessInfo.processInfo.thermalState
         try XCTSkipIf(
             thermal == .serious || thermal == .critical,
             "The store's thermal gate blocks proactive warm on a throttled host"
         )
+    }
+
+    func testHealthyMemoryLetsProactiveWarmReachTheEngine() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
         let engine = try makeEngine()
         let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
 
@@ -600,14 +662,9 @@ final class TTSEngineStoreTests: XCTestCase {
 
     /// The documented contract of `snapshotUpdates` ("fires once per applied
     /// frontend-state change"), which the macOS root shell's warmup coordinator
-    /// relies on. Known production defect, owned by its own roadmap item rather
-    /// than the coverage work that found it: `syncFromSnapshot` sends only after
-    /// its chunk-forwarding guards, so the bridge stays silent for an ordinary
-    /// state change (and always for the streaming `MLXTTSEngine`), and the macOS
-    /// warmup coordinator never sees busy, idle, loaded or failed transitions.
-    /// The expectation is strict: moving the `frontendStateChanged` send ahead
-    /// of the streaming and chunk guards makes this test fail until the expected
-    /// failure below is deleted in the same commit.
+    /// relies on to see busy, idle, loaded and failed transitions. The send
+    /// used to sit after the chunk-forwarding guards, so it never fired for an
+    /// ordinary state change or for the streaming `MLXTTSEngine` (PA-31).
     func testSnapshotUpdatesFireForAnAppliedFrontendChange() async throws {
         let engine = try makeEngine()
         let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
@@ -620,10 +677,255 @@ final class TTSEngineStoreTests: XCTestCase {
             store.loadState == .loaded(modelID: "pro_design")
         }
 
-        XCTExpectFailure("PA-31: syncFromSnapshot returns before snapshotUpdates.send on a plain state change")
         await waitUntil("the snapshot bridge to report the change", timeout: .milliseconds(300)) {
             !recorder.snapshots.isEmpty
         }
         XCTAssertEqual(recorder.snapshots.last?.loadState, .loaded(modelID: "pro_design"))
+    }
+
+    /// The same contract with the streaming engine every app runs, whose store
+    /// returns before the snapshot chunk forwarding (PA-31).
+    func testSnapshotUpdatesFireForTheStreamingEngine() async throws {
+        let engine = StreamingStoreFixtureEngine(
+            modelRegistry: try ContractBackedModelRegistry(manifestURL: contractURL)
+        )
+        let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+        let recorder = SnapshotRecorder()
+        let subscription = store.snapshotUpdates.sink { recorder.snapshots.append($0) }
+        defer { subscription.cancel() }
+
+        engine.loadState = .loaded(modelID: "pro_design")
+        await waitUntil("the snapshot bridge to report the change") {
+            recorder.snapshots.last?.loadState == .loaded(modelID: "pro_design")
+        }
+    }
+
+    // MARK: - macOS warmup coordinator over the store's snapshot bridge (PA-31)
+
+    private func warmupCoordinator(_ deviceClass: NativeDeviceMemoryClass) -> MacGenerationWarmupCoordinator {
+        MacGenerationWarmupCoordinator(
+            debounce: .milliseconds(1),
+            customVoiceDebounce: .milliseconds(1),
+            designDebounce: .milliseconds(1),
+            cloneDebounce: .milliseconds(1),
+            modeTransitionDebounce: .milliseconds(1),
+            admissionPolicy: MacWarmupAdmissionPolicy(mode: .off, deviceClass: deviceClass)
+        )
+    }
+
+    private func customWarmContext(
+        _ deviceClass: NativeDeviceMemoryClass,
+        speaker: String = "aiden"
+    ) -> MacGenerationWarmupCoordinator.WarmupContext {
+        MacGenerationWarmupCoordinator.WarmupContext(
+            mode: .custom,
+            modelID: "pro_custom",
+            isModelAvailable: true,
+            identity: .custom(
+                speakerID: speaker,
+                deliveryStyle: nil,
+                deliveryInstructionCellID: nil,
+                languageHint: "en"
+            ),
+            deviceClass: deviceClass
+        )
+    }
+
+    /// A cold warm publishes `.starting`; the coordinator, which now sees every
+    /// snapshot, must not cancel its own dispatched warm for it, and the
+    /// finished warm counts as complete.
+    func testAWarmKeepsRunningThroughTheBusyStateItPublishes() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        let engine = try makeEngine()
+        engine.prefetchLoadsModel = true
+        engine.holdsPrefetch = true
+        let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+        let coordinator = warmupCoordinator(.mid16GBMac)
+        let subscription = store.snapshotChanges.sink { coordinator.observe(snapshot: $0) }
+        defer { subscription.cancel() }
+        let context = customWarmContext(.mid16GBMac)
+
+        coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
+        await waitUntil("the warm to reach the engine") { engine.isHoldingPrefetch }
+        await waitUntil("the store to publish the cold load") { store.loadState == .starting }
+        engine.releasePrefetch()
+        await waitUntil("the warm to end") { engine.prefetchSawCancellation.count == 1 }
+
+        XCTAssertEqual(engine.prefetchSawCancellation, [false])
+        await waitUntil("the model to load") { store.loadState == .loaded(modelID: "pro_custom") }
+        coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(engine.prefetchCount, 1, "A completed warm is not repeated for the same intent")
+    }
+
+    /// A keystroke that leaves the warm context unchanged keeps the running warm.
+    func testTheSameIntentKeepsTheRunningWarm() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        let engine = try makeEngine()
+        engine.prefetchLoadsModel = true
+        engine.holdsPrefetch = true
+        let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+        let coordinator = warmupCoordinator(.mid16GBMac)
+        let subscription = store.snapshotChanges.sink { coordinator.observe(snapshot: $0) }
+        defer { subscription.cancel() }
+        let context = customWarmContext(.mid16GBMac)
+
+        coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
+        await waitUntil("the warm to reach the engine") { engine.isHoldingPrefetch }
+        coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
+        engine.releasePrefetch()
+        await waitUntil("the warm to end") { engine.prefetchSawCancellation.count == 1 }
+        try await Task.sleep(for: .milliseconds(30))
+
+        XCTAssertEqual(engine.prefetchSawCancellation, [false])
+        XCTAssertEqual(engine.prefetchCount, 1)
+    }
+
+    /// An intent that flips away and back while a warm runs (A, B, A, or a
+    /// trip out of Studio and back) still ends warm for A.
+    func testAnIntentThatFlipsBackDuringAWarmStillEndsWarm() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        let engine = try makeEngine()
+        engine.prefetchLoadsModel = true
+        engine.holdsPrefetch = true
+        let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+        let coordinator = warmupCoordinator(.mid16GBMac)
+        let subscription = store.snapshotChanges.sink { coordinator.observe(snapshot: $0) }
+        defer { subscription.cancel() }
+        let context = customWarmContext(.mid16GBMac)
+
+        coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
+        await waitUntil("the warm to reach the engine") { engine.isHoldingPrefetch }
+        coordinator.scheduleWarmupIfNeeded(
+            context: customWarmContext(.mid16GBMac, speaker: "serena"),
+            snapshot: store.snapshot,
+            ttsEngineStore: store
+        )
+        coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
+        engine.holdsPrefetch = false
+        engine.releasePrefetch()
+
+        await waitUntil("the flipped-back intent to warm again") { engine.prefetchSawCancellation.count == 2 }
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(engine.prefetchSawCancellation, [true, false])
+        XCTAssertEqual(engine.prefetchCount, 2)
+    }
+
+    /// Leaving Studio while a cold warm runs keeps it (no intent is not a
+    /// different warm intent), and nothing warms afterwards.
+    func testLeavingStudioDuringAWarmKeepsItAndWarmsNothingElse() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        let engine = try makeEngine()
+        engine.prefetchLoadsModel = true
+        engine.holdsPrefetch = true
+        let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+        let coordinator = warmupCoordinator(.mid16GBMac)
+        let subscription = store.snapshotChanges.sink { coordinator.observe(snapshot: $0) }
+        defer { subscription.cancel() }
+
+        coordinator.scheduleWarmupIfNeeded(
+            context: customWarmContext(.mid16GBMac),
+            snapshot: store.snapshot,
+            ttsEngineStore: store
+        )
+        await waitUntil("the warm to reach the engine") { engine.isHoldingPrefetch }
+        coordinator.scheduleWarmupIfNeeded(context: nil, snapshot: store.snapshot, ttsEngineStore: store)
+        engine.releasePrefetch()
+
+        await waitUntil("the warm to end") { engine.prefetchSawCancellation.count == 1 }
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(engine.prefetchSawCancellation, [false])
+        XCTAssertEqual(engine.prefetchCount, 1)
+    }
+
+    /// A change of intent cancels the stale warm, which does not count as
+    /// complete, and the new intent warms as soon as it ends.
+    func testAChangeOfIntentCancelsTheStaleWarmAndWarmsTheNewIntent() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        let engine = try makeEngine()
+        engine.prefetchLoadsModel = true
+        engine.holdsPrefetch = true
+        let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+        let coordinator = warmupCoordinator(.mid16GBMac)
+        let subscription = store.snapshotChanges.sink { coordinator.observe(snapshot: $0) }
+        defer { subscription.cancel() }
+        let context = customWarmContext(.mid16GBMac)
+
+        coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
+        await waitUntil("the warm to reach the engine") { engine.isHoldingPrefetch }
+        let newIntent = customWarmContext(.mid16GBMac, speaker: "serena")
+        coordinator.scheduleWarmupIfNeeded(context: newIntent, snapshot: store.snapshot, ttsEngineStore: store)
+        engine.holdsPrefetch = false
+        engine.releasePrefetch()
+
+        await waitUntil("the new intent to warm without another request") {
+            engine.prefetchSawCancellation.count == 2
+        }
+        XCTAssertEqual(engine.prefetchSawCancellation, [true, false])
+        await waitUntil("the model to load") { store.loadState == .loaded(modelID: "pro_custom") }
+        coordinator.scheduleWarmupIfNeeded(context: newIntent, snapshot: store.snapshot, ttsEngineStore: store)
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(engine.prefetchCount, 2, "The new intent's warm completed")
+    }
+
+    /// A transition unloads the other model, then warms this one; the same
+    /// intent arriving during the unload (a keystroke, a download progress
+    /// tick) must not abort the second half.
+    func testTheSameIntentDuringATransitionStillWarmsTheNewModel() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        let engine = try makeEngine()
+        engine.prefetchLoadsModel = true
+        engine.holdsUnload = true
+        engine.loadState = .loaded(modelID: "pro_design")
+        let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+        await waitUntil("the other model to reach the store") { store.loadState == .loaded(modelID: "pro_design") }
+        let coordinator = warmupCoordinator(.mid16GBMac)
+        let subscription = store.snapshotChanges.sink { coordinator.observe(snapshot: $0) }
+        defer { subscription.cancel() }
+        let context = customWarmContext(.mid16GBMac)
+
+        coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
+        await waitUntil("the transition to unload the other model") { engine.isHoldingUnload }
+        coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
+        engine.releaseUnload()
+
+        await waitUntil("the new model to warm") { engine.prefetchSawCancellation.count == 1 }
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(engine.prefetchSawCancellation, [false])
+        XCTAssertEqual(engine.unloadCount, 1)
+        XCTAssertEqual(engine.prefetchCount, 1)
+    }
+
+    /// On every tier a take and the idle unload after it keep the completed
+    /// warm, so an unchanged composer (or a download progress tick) does not
+    /// reload the model: the unload sticks.
+    func testACompletedWarmSurvivesATakeAndAnIdleUnload() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        for deviceClass in [NativeDeviceMemoryClass.floor8GBMac, .mid16GBMac, .highMemoryMac] {
+            try await assertCompletedWarmSurvivesATakeAndAnIdleUnload(deviceClass)
+        }
+    }
+
+    private func assertCompletedWarmSurvivesATakeAndAnIdleUnload(_ deviceClass: NativeDeviceMemoryClass) async throws {
+        let engine = try makeEngine()
+        engine.prefetchLoadsModel = true
+        let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+        let coordinator = warmupCoordinator(deviceClass)
+        let subscription = store.snapshotChanges.sink { coordinator.observe(snapshot: $0) }
+        defer { subscription.cancel() }
+        let context = customWarmContext(deviceClass)
+
+        coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
+        await waitUntil("the warm to end") { engine.prefetchSawCancellation.count == 1 }
+        await waitUntil("the model to load") { store.loadState == .loaded(modelID: "pro_custom") }
+
+        engine.loadState = .running(modelID: "pro_custom", label: "Generating", fraction: nil)
+        await waitUntil("the take to reach the store") { store.hasActiveGeneration }
+        engine.loadState = .idle
+        await waitUntil("the idle unload to reach the store") { store.loadState == .idle }
+
+        coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(engine.prefetchCount, 1, "The unload sticks on \(deviceClass)")
     }
 }

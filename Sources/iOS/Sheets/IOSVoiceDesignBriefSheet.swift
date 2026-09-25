@@ -40,10 +40,10 @@ struct IOSVoiceDesignBriefSheet: View {
                     closeSheet()
                 } label: {
                     Text(IOSInterfaceText.confirm)
-                        .font(.system(size: 17, weight: .semibold))
+                        .iosScaledFont(size: 17, weight: .semibold, relativeTo: .headline)
                         .foregroundStyle(Theme.Text.primary)
                         .padding(.horizontal, 18)
-                        .frame(height: 40)
+                        .frame(minHeight: 40)
                         .background {
                             Capsule(style: .continuous)
                                 .fill(tint.opacity(0.18))
@@ -77,7 +77,7 @@ struct IOSVoiceDesignBriefSheet: View {
 
                     if voiceDescription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         Text(VoiceDesignBriefCatalog.placeholder(in: contentLanguage))
-                            .font(.system(size: 16, weight: .medium))
+                            .iosScaledFont(size: 16, weight: .medium, relativeTo: .body)
                             .foregroundStyle(Theme.Text.tertiary)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 18)
@@ -184,7 +184,9 @@ private struct IOSBriefTextEditor: UIViewRepresentable {
         view.delegate = context.coordinator
         view.accessibilityIdentifier = "voiceBrief_editor"
         view.backgroundColor = .clear
-        view.font = .systemFont(ofSize: 16, weight: .medium)
+        // Scales with Dynamic Type (PA-20, IOS-13), like the Studio script editor.
+        view.font = UIFontMetrics(forTextStyle: .body).scaledFont(for: .systemFont(ofSize: 16, weight: .medium))
+        view.adjustsFontForContentSizeCategory = true
         view.textColor = Theme.Text.primaryUIColor
         view.tintColor = tintColor
         view.isScrollEnabled = true

@@ -137,10 +137,10 @@ struct IOSDeliveryPickerSheet: View {
                     closeSheet()
                 } label: {
                     Text(IOSInterfaceText.confirm)
-                        .font(.system(size: 17, weight: .semibold))
+                        .iosScaledFont(size: 17, weight: .semibold, relativeTo: .headline)
                         .foregroundStyle(Theme.Text.primary)
                         .padding(.horizontal, 18)
-                        .frame(height: 40)
+                        .frame(minHeight: 40)
                         .background {
                             Capsule(style: .continuous)
                                 .fill(tint.opacity(0.18))
@@ -207,7 +207,7 @@ struct IOSDeliveryPickerSheet: View {
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "slider.horizontal.3")
-                                .font(.system(size: 13, weight: .semibold))
+                                .iosScaledFont(size: 13, weight: .semibold, relativeTo: .subheadline)
                             Text(IOSInterfaceText.useCustomTone)
                                 .font(.subheadline.weight(.medium))
                         }
@@ -311,7 +311,7 @@ struct IOSDeliveryPickerSheet: View {
 
             if customText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text(placeholderExamples[placeholderExampleIndex])
-                    .font(.system(size: 15, weight: .medium))
+                    .iosScaledFont(size: 15, weight: .medium, relativeTo: .body)
                     .foregroundStyle(Theme.Text.tertiary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
@@ -400,7 +400,9 @@ struct IOSDeliveryPickerSheet: View {
             view.delegate = context.coordinator
             view.accessibilityIdentifier = "deliveryPickerSheet_customTone_editor"
             view.backgroundColor = .clear
-            view.font = .systemFont(ofSize: 16, weight: .medium)
+            // Scales with Dynamic Type (PA-20, IOS-13), like the Studio script editor.
+            view.font = UIFontMetrics(forTextStyle: .body).scaledFont(for: .systemFont(ofSize: 16, weight: .medium))
+            view.adjustsFontForContentSizeCategory = true
             view.textColor = Theme.Text.primaryUIColor
             view.tintColor = tintColor
             view.isScrollEnabled = true
@@ -577,10 +579,10 @@ struct IOSQwenLanguagePickerSheet: View {
                     closeSheet()
                 } label: {
                     Text(IOSInterfaceText.confirm)
-                        .font(.system(size: 17, weight: .semibold))
+                        .iosScaledFont(size: 17, weight: .semibold, relativeTo: .headline)
                         .foregroundStyle(Theme.Text.primary)
                         .padding(.horizontal, 18)
-                        .frame(height: 40)
+                        .frame(minHeight: 40)
                         .background {
                             Capsule(style: .continuous)
                                 .fill(tint.opacity(0.18))
@@ -832,10 +834,10 @@ struct IOSVoicePickerSheet: View {
                     confirmSelection()
                 } label: {
                     Text(IOSInterfaceText.confirm)
-                        .font(.system(size: 17, weight: .semibold))
+                        .iosScaledFont(size: 17, weight: .semibold, relativeTo: .headline)
                         .foregroundStyle(Theme.Text.primary)
                         .padding(.horizontal, 18)
-                        .frame(height: 40)
+                        .frame(minHeight: 40)
                         .background {
                             Capsule(style: .continuous)
                                 .fill(tint.opacity(0.18))
@@ -1038,11 +1040,11 @@ private struct IOSVoicePickerFilterChip: View {
     var body: some View {
         Button(action: action) {
             Text(label)
-                .font(.system(size: 13, weight: .semibold))
+                .iosScaledFont(size: 13, weight: .semibold, relativeTo: .footnote)
                 .foregroundStyle(isActive ? Theme.Text.primary : Theme.Text.secondary)
                 .lineLimit(1)
                 .padding(.horizontal, 12)
-                .frame(height: 32)
+                .frame(minHeight: 32)
                 .frame(maxWidth: .infinity)
                 .background {
                     Capsule(style: .continuous)
@@ -1467,13 +1469,13 @@ struct IOSDeleteModelSheet: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(modelName)
-                    .font(.system(size: 16, weight: .semibold))
+                    .iosScaledFont(size: 16, weight: .semibold, relativeTo: .callout)
                     .tracking(-0.08)
                     .foregroundStyle(Theme.Text.primary)
                     .lineLimit(1)
 
                 Text(IOSInterfaceText.freesStorage(sizeLabel))
-                    .font(.system(size: 13, weight: .regular))
+                    .iosScaledFont(size: 13, relativeTo: .footnote)
                     .foregroundStyle(Theme.Text.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
@@ -1489,13 +1491,13 @@ struct IOSDeleteModelSheet: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "trash")
-                    .font(.system(size: 17, weight: .semibold))
+                    .iosScaledFont(size: 17, weight: .semibold, relativeTo: .headline)
                 Text(IOSInterfaceText.deleteModel)
-                    .font(.system(size: 17, weight: .semibold))
+                    .iosScaledFont(size: 17, weight: .semibold, relativeTo: .headline)
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
-            .frame(height: 56)
+            .frame(minHeight: 56)
             .background {
                 Capsule(style: .continuous)
                     .fill(
@@ -1520,10 +1522,10 @@ struct IOSDeleteModelSheet: View {
             onCancel()
         } label: {
             Text(IOSInterfaceText.cancel)
-                .font(.system(size: 17, weight: .semibold))
+                .iosScaledFont(size: 17, weight: .semibold, relativeTo: .headline)
                 .foregroundStyle(Theme.Text.primary)
                 .frame(maxWidth: .infinity)
-                .frame(height: 56)
+                .frame(minHeight: 56)
                 .background {
                     Capsule(style: .continuous)
                         .fill(Color.white.opacity(0.05))

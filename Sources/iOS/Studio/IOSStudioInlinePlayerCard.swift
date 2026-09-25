@@ -115,6 +115,9 @@ struct IOSStudioPlayerCard: View {
                 liveEstimate: phase.liveEstimate,
                 onExpand: phase.isLive ? nil : onExpand
             )
+            // The time labels scale with the text but stop at AX2 so the
+            // scrubber between them stays wide enough to use.
+            .dynamicTypeSize(...DynamicTypeSize.accessibility2)
             controlsRow
 
             if let cadenceNotice {
@@ -129,8 +132,11 @@ struct IOSStudioPlayerCard: View {
         .padding(.top, 14)
         .padding(.bottom, 16)
         .frame(maxWidth: .infinity)
+        // A floor, not a fixed height (PA-20, IOS-13): at default text sizes the
+        // content fits the reference height exactly as before; larger Dynamic
+        // Type grows the card instead of clipping its scaled text.
         .frame(
-            height: referenceHeight
+            minHeight: referenceHeight
                 + (cadenceNotice == nil ? 0 : cadenceNoticeRowHeight)
                 + (showsSaveAsVoice ? saveAsVoiceRowHeight : 0)
         )
@@ -230,7 +236,7 @@ struct IOSStudioPlayerCard: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(phase.voiceName)
-                    .font(.system(size: 14, weight: .semibold))
+                    .iosScaledFont(size: 14, weight: .semibold, relativeTo: .subheadline)
                     .foregroundStyle(Theme.Text.primary)
                     .lineLimit(1)
                 statusLine
@@ -254,13 +260,13 @@ struct IOSStudioPlayerCard: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "waveform.badge.plus")
-                    .font(.system(size: 14, weight: .semibold))
+                    .iosScaledFont(size: 14, weight: .semibold, relativeTo: .subheadline)
                 Text(IOSInterfaceText.saveAsVoice)
                     .font(.subheadline.weight(.semibold))
             }
             .foregroundStyle(tint)
             .frame(maxWidth: .infinity)
-            .frame(height: 40)
+            .frame(minHeight: 40)
             .background { Capsule(style: .continuous).fill(tint.opacity(0.16)) }
             .overlay { Capsule(style: .continuous).stroke(tint.opacity(0.32), lineWidth: 0.75) }
         }
@@ -364,14 +370,14 @@ struct IOSStudioPlayerCard: View {
                     .frame(width: 6, height: 6)
                     .opacity(reduceMotion ? 1.0 : (pulse ? 1.0 : 0.3))
                 Text(IOSInterfaceText.streamingPreview)
-                    .font(.system(size: 11, weight: .medium))
+                    .iosScaledFont(size: 11, weight: .medium, relativeTo: .caption2)
                     .foregroundStyle(Theme.Text.secondary)
                     .lineLimit(1)
             }
             .transition(.opacity)
         } else {
             Text(IOSInterfaceText.justNowMode(phase.modeLabel))
-                .font(.system(size: 11))
+                .iosScaledFont(size: 11, relativeTo: .caption2)
                 .foregroundStyle(Theme.Text.secondary)
                 .lineLimit(1)
                 .transition(.opacity)
@@ -461,6 +467,8 @@ struct InlineWaveformProgressRow: View {
     var onExpand: (() -> Void)?
 
     @Environment(\.iosReduceMotionEnabled) private var reduceMotion
+    /// Width of the time labels, scaled with their Dynamic Type font (IOS-13).
+    @ScaledMetric(relativeTo: .footnote) private var timeLabelWidth: CGFloat = 36
 
     // Monotonic-handoff guard: the live playhead is `currentTime / estimate`; the completed playhead is
     // `currentTime / actualDuration`. When the real duration is slightly longer than the estimate, the
@@ -498,9 +506,9 @@ struct InlineWaveformProgressRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(controller.formatted(time: controller.currentTime))
-                .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                .iosScaledFont(size: 13, weight: .semibold, monospacedDigit: true, relativeTo: .footnote)
                 .foregroundStyle(Theme.Text.secondary)
-                .frame(width: 36, alignment: .leading)
+                .frame(width: timeLabelWidth, alignment: .leading)
 
             GeometryReader { proxy in
                 IOSWaveformBars(
@@ -567,9 +575,9 @@ struct InlineWaveformProgressRow: View {
             // and doesn't change "by much" across the live→complete morph. The estimate stays
             // internal (it only scales the streaming buffer-fill bands above).
             Text(controller.formatted(time: controller.duration))
-                .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                .iosScaledFont(size: 13, weight: .semibold, monospacedDigit: true, relativeTo: .footnote)
                 .foregroundStyle(Theme.Text.secondary)
-                .frame(width: 36, alignment: .trailing)
+                .frame(width: timeLabelWidth, alignment: .trailing)
         }
     }
 

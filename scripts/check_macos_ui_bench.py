@@ -111,6 +111,21 @@ def diagnostic_memory_tier(rows: list[dict]) -> bool:
     return False
 
 
+def run_runtime_policy(rows: list[dict]) -> dict | None:
+    """The record's memory-tier provenance, `run.runtimePolicy` (audit #19).
+
+    The engine publisher's block, reused so a forced tier or an emulated
+    smaller Mac (audit #11) names itself on the tracked UI record, not only in
+    untracked telemetry. Rows that predate the stamp yield None; a partly
+    stamped, mixed-tier or mixed-emulation selection raises ValueError."""
+    import publish_benchmark_history as publisher
+
+    try:
+        return publisher.runtime_policy_provenance(rows)
+    except publisher.PublicationError as error:
+        raise ValueError(str(error)) from error
+
+
 def take_seed(notes: dict) -> tuple[int | None, str | None]:
     """The take's effective sampling seed and its source from the engine's
     receipt (`samplingSeed`, `samplingSeedSource`: requested or generated)."""
@@ -833,6 +848,7 @@ def build_manifest(
     capture_results: dict[int, dict] | None = None,
     memory_qualification: tuple | None = None,
     stall_gate: dict | None = None,
+    runtime_policy: dict | None = None,
 ) -> dict:
     # The gate already qualified these rows; reuse its result (audit #21).
     memory_evidence, memory_run = memory_qualification or qualify_memory_rows(
@@ -1025,6 +1041,9 @@ def build_manifest(
             # A forced or emulated memory tier (audit #11) or a take above the
             # per-take load limit (audit #28) is exploratory evidence.
             **({"classification": "exploratory"} if exploratory else {}),
+            # The tier the takes ran under, forced or emulated included; never
+            # part of the comparison key.
+            **({"runtimePolicy": runtime_policy} if runtime_policy is not None else {}),
         },
         "hardware": hardware,
         "toolchain": {"optimization": optimization},
@@ -1342,6 +1361,15 @@ def main() -> int:
             )
     stall_gate = stall_gate_summary(stall_contract, stall_observed, censored_heartbeats)
 
+    # The record's tier provenance (audit #19, #11): a selection that does not
+    # share one stamped tier and one emulation cannot publish a record.
+    runtime_policy = None
+    if args.evidence_manifest:
+        try:
+            runtime_policy = run_runtime_policy(engine_rows)
+        except ValueError as error:
+            failures.append(f"runtime policy: {error}")
+
     memory_qualification = None
     if not failures:
         try:
@@ -1413,6 +1441,7 @@ def main() -> int:
             capture_results=capture_results,
             memory_qualification=memory_qualification,
             stall_gate=stall_gate,
+            runtime_policy=runtime_policy,
         )
         write_json_atomic(args.evidence_manifest, manifest)
         print(f"evidence={args.evidence_manifest}")

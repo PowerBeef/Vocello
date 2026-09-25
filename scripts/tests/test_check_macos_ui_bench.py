@@ -416,6 +416,8 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         result = self.run_checker(self.expected_order, evidence=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("classification", self.last_manifest["historyRecord"]["run"])
+        # Rows that predate the tier stamp carry no provenance block.
+        self.assertNotIn("runtimePolicy", self.last_manifest["historyRecord"]["run"])
 
         def emulate_floor(rows: list[dict]) -> None:
             for row in rows:
@@ -428,11 +430,40 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
             for row in rows:
                 row["notes"].update({"deviceClass": "mid_16gb_mac", "deviceClassForced": "true"})
 
-        for name, mutate in (("emulated floor", emulate_floor), ("forced class", force_class)):
+        def native_tier(rows: list[dict]) -> None:
+            for row in rows:
+                row["notes"].update({"deviceClass": "mid_16gb_mac", "deviceClassForced": "false"})
+
+        # The record names the tier it ran under, so an emulated floor never
+        # reads as a loaded-host M6 run (the classification alone cannot tell).
+        for name, mutate, classification, policy in (
+            ("emulated floor", emulate_floor, "exploratory", {
+                "deviceClass": "floor_8gb_mac", "deviceClassForced": True, "simulatedPhysicalMemoryMB": 8192,
+            }),
+            ("forced class", force_class, "exploratory", {"deviceClass": "mid_16gb_mac", "deviceClassForced": True}),
+            ("native tier", native_tier, None, {"deviceClass": "mid_16gb_mac", "deviceClassForced": False}),
+        ):
             with self.subTest(name):
                 result = self.run_checker(self.expected_order, mutate, evidence=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertEqual(self.last_manifest["historyRecord"]["run"]["classification"], "exploratory")
+                run = self.last_manifest["historyRecord"]["run"]
+                self.assertEqual(run.get("classification"), classification)
+                self.assertEqual(run["runtimePolicy"], policy)
+
+        def emulate_some_takes(rows: list[dict]) -> None:
+            emulate_floor(rows)
+            rows[0]["notes"].pop("simulatedPhysicalMemoryMB")
+
+        def unstamp_one_take(rows: list[dict]) -> None:
+            native_tier(rows)
+            rows[0]["notes"].pop("deviceClass")
+
+        # A selection that does not share one tier and one emulation publishes nothing.
+        for name, mutate in (("mixed emulation", emulate_some_takes), ("partly stamped", unstamp_one_take)):
+            with self.subTest(name):
+                result = self.run_checker(self.expected_order, mutate, evidence=True)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIsNone(self.last_manifest)
 
     def test_each_take_keeps_its_load_and_a_busy_take_makes_the_run_exploratory(self) -> None:
         """audit #28: the canonical 488a9ed0 ran a cold take at load 14.33 on 8 cores."""

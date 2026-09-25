@@ -235,6 +235,10 @@ class UICheckerRoundTripTests(unittest.TestCase):
         record, _size = publish_through_registry(checker.last_manifest, screenshots=True)
         self.assertEqual(record["run"]["classification"], "exploratory")
         self.assertFalse(record["comparison"]["comparable"])
+        # The tracked record names the emulation, as an engine record does.
+        self.assertEqual(record["run"]["runtimePolicy"], {
+            "deviceClass": "floor_8gb_mac", "deviceClassForced": True, "simulatedPhysicalMemoryMB": 8192,
+        })
 
     def test_canonical_macos_ui_benchmark_fits_the_record_cap(self) -> None:
         checker = mac_ui.CheckMacOSUIBenchmarkTests("run_checker")

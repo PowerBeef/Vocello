@@ -5,13 +5,16 @@ name the hardware profile and display refresh interval they were derived on. A r
 another profile or refresh rate gets one `uiperf.uncalibrated:<profile>` code instead
 of ceiling verdicts, so a faster host is never scored against a slower host's numbers.
 
-Ceilings come from counted ui-perf records of one profile:
+Ceilings come from counted ui-perf records: canonical records of one profile and one
+comparison lineage (one ``comparison.key``), so dirty or exploratory sessions and
+builds of another lineage never shape a contract.
 
 * ``spread-v1`` (maintainer decision 2026-09-25): at least three runs; per confirmatory
-  scenario, ``median x max(1.3, 1 + 3 x relative range)``, where the relative range is
-  ``(max - min) / median``. Scenarios whose run-to-run spread is under 10% get the
-  1.3x floor (the two terms meet at exactly 10%); noisier scenarios get proportionally
-  more room, which always clears the worst observed run.
+  scenario, ``max(1.3 x median, median + 3 x (max - min))``. With a nonzero median that
+  is ``median x max(1.3, 1 + 3 x relative range)``: scenarios whose run-to-run spread
+  is under 10% get the 1.3x floor (the two terms meet at exactly 10%) and noisier
+  scenarios get proportionally more room. Either way the ceiling clears the worst
+  observed run, including a quiet scenario whose median is zero.
 * ``v3``: the 2026-09-15 rule, kept so the committed M2 ceilings stay reproducible:
   ``max(2 x median, 1.25 x max)`` for hitch time and ``max(1.5 x median, 1.25 x max)``
   for the maximum gap.
@@ -118,19 +121,21 @@ def _round_up(value: float, step: float) -> float:
 def _ceiling(values: list[float], *, rule: str, v3_median_factor: float, floor: float, step: float) -> tuple[float, dict]:
     median = statistics.median(values)
     worst = max(values)
-    relative_range = (worst - min(values)) / median if median > 0 else 0.0
+    spread = worst - min(values)
     if rule == SPREAD_RULE:
-        multiplier = max(SPREAD_FLOOR_MULTIPLIER, 1.0 + SPREAD_SLOPE * relative_range)
-        raw = median * multiplier
+        # Written in absolute terms so a zero median (a quiet scenario with one
+        # noisy run) still clears its worst run instead of collapsing to the floor.
+        raw = max(SPREAD_FLOOR_MULTIPLIER * median, median + SPREAD_SLOPE * spread)
     else:
-        multiplier = v3_median_factor
         raw = max(v3_median_factor * median, 1.25 * worst)
     ceiling = _round_up(max(floor, raw), step)
     return ceiling, {
         "values": [round(value, 3) for value in values],
         "median": round(median, 3),
-        "relativeRange": round(relative_range, 4),
-        "multiplier": round(multiplier, 4),
+        "range": round(spread, 3),
+        # Undefined for a zero median; the ceiling does not depend on it.
+        "relativeRange": round(spread / median, 4) if median > 0 else None,
+        "multiplier": round(raw / median, 4) if median > 0 else None,
         "ceiling": ceiling,
     }
 
@@ -138,8 +143,11 @@ def _ceiling(values: list[float], *, rule: str, v3_median_factor: float, floor: 
 def derive(records: list[dict[str, Any]], base: dict[str, Any], *, rule: str = SPREAD_RULE) -> dict[str, Any]:
     """A ceiling contract derived from counted ui-perf records of one profile.
 
-    `base` supplies what the records cannot: the confirmatory designation, the
-    schema fields and the footprint-growth ceiling. The result names its runs,
+    Counted means classified canonical and of one comparison lineage, so the
+    ceilings describe one build on one host rather than a mix of dirty or
+    exploratory sessions and other builds. `base` supplies what the records
+    cannot: the confirmatory designation, the schema fields and the
+    footprint-growth ceiling. The result names its runs,
     its rule, the profile and refresh interval they ran on, and each scenario's
     inputs, so the derivation can be replayed.
     """
@@ -159,6 +167,19 @@ def derive(records: list[dict[str, Any]], base: dict[str, Any], *, rule: str = S
     run_ids = [record["run"]["id"] for record in records]
     if len(set(run_ids)) != len(run_ids):
         raise DerivationError("derivation inputs repeat a run")
+    uncounted = [
+        record["run"]["id"] for record in records if record["run"].get("classification") != "canonical"
+    ]
+    if uncounted:
+        raise DerivationError(
+            f"ceilings come from counted (canonical) runs only; not canonical: {', '.join(uncounted)}"
+        )
+    lineages = {(record.get("comparison") or {}).get("key") for record in records}
+    if len(lineages) != 1 or not all(isinstance(key, str) and key for key in lineages):
+        raise DerivationError(
+            "derivation inputs must share one comparison.key (one build lineage); "
+            f"got {len(lineages)} distinct key(s)"
+        )
     confirmatory = list(base["confirmatoryScenarios"])
 
     def take(record: dict[str, Any], scenario: str) -> dict[str, Any]:
@@ -191,7 +212,7 @@ def derive(records: list[dict[str, Any]], base: dict[str, Any], *, rule: str = S
             f"Derived with {rule} from {len(records)} counted ui-perf runs on {profile} "
             f"({', '.join(run_ids)}) by check_*_ui_perf.py --derive-thresholds. "
             + (
-                "Per confirmatory scenario: median x max(1.3, 1 + 3 x (max - min) / median)"
+                "Per confirmatory scenario: max(1.3 x median, median + 3 x (max - min))"
                 if rule == SPREAD_RULE else
                 "Per confirmatory scenario: max(2 x median, 1.25 x max) hitch, max(1.5 x median, 1.25 x max) gap"
             )

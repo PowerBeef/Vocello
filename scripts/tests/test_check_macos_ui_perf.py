@@ -352,8 +352,9 @@ V3_BASIS = {
 def perf_record(run_id: str, values: dict[str, tuple[float, float]], *, profile: str = "mac-mini-m2-8gb",
                 refresh: float = 16.667) -> dict:
     return {
-        "run": {"id": run_id, "kind": "ui-perf", "platform": "macos"},
+        "run": {"id": run_id, "kind": "ui-perf", "platform": "macos", "classification": "canonical"},
         "hardware": {"profileID": profile},
+        "comparison": {"key": "0" * 64},
         "takes": [
             {"cell": f"ui-perf/{scenario}", "metrics": {
                 "uiHitchTimeMSPerS": hitch, "uiMaxGapMS": gap, "uiRefreshIntervalMS": refresh,
@@ -403,6 +404,29 @@ class DerivationTests(unittest.TestCase):
         derived = rules.derive(records, self.base, rule=rules.SPREAD_RULE)
         # median 30, relative range 66.7% -> x3.0 -> 90
         self.assertEqual(derived["hitchCeilingMSPerS"]["composer-typing"], 90.0)
+
+    def test_a_zero_median_scenario_still_clears_its_worst_run(self):
+        records = v3_records()
+        for record, value in zip(records, (0.0, 0.0, 20.0)):
+            next(t for t in record["takes"] if t["cell"] == "ui-perf/settings-scroll")["metrics"]["uiHitchTimeMSPerS"] = value
+        derived = rules.derive(records, self.base, rule=rules.SPREAD_RULE)
+        # median 0, range 20 -> 0 + 3 x 20 = 60, above the calibration run's own 20
+        self.assertEqual(derived["hitchCeilingMSPerS"]["settings-scroll"], 60.0)
+
+    def test_derivation_counts_only_canonical_runs_of_one_lineage(self):
+        exploratory = v3_records()
+        exploratory[1]["run"]["classification"] = "exploratory"
+        with self.assertRaises(rules.DerivationError):
+            rules.derive(exploratory, self.base)
+        mixed = v3_records()
+        mixed[2]["comparison"]["key"] = "1" * 64
+        with self.assertRaises(rules.DerivationError):
+            rules.derive(mixed, self.base)
+        keyless = v3_records()
+        for record in keyless:
+            del record["comparison"]
+        with self.assertRaises(rules.DerivationError):
+            rules.derive(keyless, self.base)
 
     def test_derivation_refuses_too_few_runs_or_mixed_profiles(self):
         with self.assertRaises(rules.DerivationError):

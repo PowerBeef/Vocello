@@ -199,9 +199,12 @@ Mac mini M6 because the ceilings come from the retired M2, carries one
 `uiperf.uncalibrated:<profile>` code instead of ceiling verdicts. Roadmap item AV-17 step 3
 re-derives them from at least three counted M6 sessions:
 `python3 scripts/check_macos_ui_perf.py --derive-thresholds <run IDs...> --write
-config/ui-perf-thresholds.json` (rule `spread-v1`: per confirmatory scenario, the median times
-max(1.3, 1 + 3 × the run-to-run relative range), hitch rounded up to 0.5 ms/s with a 5 ms/s floor,
-gap to 10 ms with a 40 ms floor; `--rule v3` reproduces the committed M2 ceilings). A confirmatory
+config/ui-perf-thresholds.json` (rule `spread-v1`: per confirmatory scenario, max(1.3 × the
+median, the median + 3 × the run-to-run range), which is the median times max(1.3, 1 + 3 × the
+relative range) whenever the median is above zero; hitch rounded up to 0.5 ms/s with a 5 ms/s floor,
+gap to 10 ms with a 40 ms floor; `--rule v3` reproduces the committed M2 ceilings). The derivation
+accepts only canonical records of one comparison lineage (one `comparison.key`), so dirty or
+exploratory sessions and other builds never shape the contract. A confirmatory
 window whose footprint grows past `footprintGrowthCeilingMB` (250 MB) gets a warn-only
 `uiperf.footprint:<scenario>` code: since the engine moved in-process, sidebar-navigation's own
 product warms grow it by about 1-2.4 GB. Scenarios that repeat a cycle (sidebar-navigation,

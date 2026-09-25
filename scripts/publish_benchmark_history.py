@@ -1056,24 +1056,42 @@ def fold_delivery_prosody(
     result_takes: list[dict[str, Any]],
     takes: list[dict[str, Any]],
     prosody_rows: list[dict[str, Any]],
+    *,
+    run_id: str,
 ) -> None:
     """Fold the delivery sidecar's per-take metrics and prosody gate verdict
     into the tracked takes. Stage 3: the gate verdict computed by the same
     analysis pass must reach PASS-only history — advisory flags become
-    machine warnings; an absent or incomplete verdict cannot publish."""
+    machine warnings; an absent or incomplete verdict cannot publish.
+
+    Each take joins its sidecar row by generation ID and the row must name this
+    run (audit #104): a (mode, model, delivery) join accepted a stale sidecar
+    from an earlier run with the same cells."""
     for result_take, tracked_take in zip(result_takes, takes):
         delivery = result_take.get("delivery")
         if not delivery:
             continue
+        generation_id = result_take.get("generationID")
         matches = [
             row for row in prosody_rows
-            if row.get("mode") == result_take.get("mode")
-            and row.get("model") == result_take.get("modelID")
-            and row.get("delivery") == delivery
+            if isinstance(generation_id, str) and generation_id
+            and row.get("generationID") == generation_id
         ]
         if len(matches) != 1:
             raise PublicationError(
                 f"delivery take {tracked_take['generationID']} has {len(matches)} prosody rows"
+            )
+        if matches[0].get("runID") != run_id:
+            raise PublicationError(
+                f"delivery take {tracked_take['generationID']} prosody row belongs to another run"
+            )
+        if (
+            matches[0].get("mode") != result_take.get("mode")
+            or matches[0].get("model") != result_take.get("modelID")
+            or matches[0].get("delivery") != delivery
+        ):
+            raise PublicationError(
+                f"delivery take {tracked_take['generationID']} prosody row names another cell"
             )
         metrics = matches[0].get("deliveryMetrics")
         if not isinstance(metrics, dict) or "error" in metrics:
@@ -1825,7 +1843,7 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
             or any(character not in "0123456789abcdef" for character in analysis_profile_digest)
         ):
             raise PublicationError("delivery prosody analysis profile digest is invalid")
-        fold_delivery_prosody(result_takes, takes, prosody_rows)
+        fold_delivery_prosody(result_takes, takes, prosody_rows, run_id=args.run_id)
     telemetry_schema = max(
         int(row.get("schemaVersion", 0)) for row in [*selected, *selected_app]
     )

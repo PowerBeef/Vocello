@@ -153,5 +153,55 @@ class TelemetryOverheadIdentityTests(unittest.TestCase):
             )
 
 
+SLOTS = ((1, 1), (1, 2), (2, 1), (2, 2), (3, 1), (3, 2))
+
+
+def samples(rtfs: list[float]) -> list[dict]:
+    return [
+        {"rotation": rotation, "measuredTake": take, "rtf": rtf, "ttfcMS": 1000.0 * rtf}
+        for (rotation, take), rtf in zip(SLOTS, rtfs)
+    ]
+
+
+class PairedOverheadAnnotationTests(unittest.TestCase):
+    """Audit #63/#106: overhead verdicts carry paired uncertainty as annotations."""
+
+    def test_pairs_each_take_with_the_off_take_of_its_rotation(self) -> None:
+        off = [0.30, 0.31, 0.32, 0.30, 0.29, 0.31]
+        factors = [1.01, 1.02, 1.03, 1.04, 1.05, 1.06]
+        annotation = overhead.paired_overhead_annotation(
+            samples([value * factor for value, factor in zip(off, factors)]), samples(off), "rtf",
+        )
+        self.assertTrue(annotation["annotationOnly"])
+        self.assertEqual((annotation["n"], annotation["unpairedTakes"]), (6, 0))
+        self.assertAlmostEqual(annotation["medianRatio"], 1.035)
+        self.assertAlmostEqual(annotation["meanPercentDifference"], 3.5)
+        # Six distinct positive paired differences: exact two-sided p = 2/64.
+        self.assertEqual(annotation["wilcoxon"]["method"], "exact")
+        self.assertAlmostEqual(annotation["wilcoxon"]["pValue"], 0.03125)
+        interval = annotation["confidenceInterval95"]
+        self.assertEqual(interval["method"], "BCa")
+        self.assertGreater(interval["lower"], 0.0)
+        self.assertLess(interval["lower"], 3.5)
+        self.assertGreater(interval["upper"], 3.5)
+
+    def test_pairing_cancels_drift_between_rotations(self) -> None:
+        # Rotation 3 ran 20% slower for every arm: unpaired medians move, the
+        # paired percent difference stays a steady +2%.
+        off = [0.30, 0.30, 0.30, 0.30, 0.36, 0.36]
+        on = [value * 1.02 for value in off]
+        annotation = overhead.paired_overhead_annotation(samples(on), samples(off), "ttfcMS")
+        self.assertAlmostEqual(annotation["medianRatio"], 1.02)
+        self.assertAlmostEqual(annotation["confidenceInterval95"]["lower"], 2.0)
+        self.assertAlmostEqual(annotation["confidenceInterval95"]["upper"], 2.0)
+
+    def test_a_take_without_its_off_partner_is_counted_not_paired(self) -> None:
+        off = samples([0.30, 0.31, 0.32, 0.30, 0.29, 0.31])[:-1]
+        annotation = overhead.paired_overhead_annotation(
+            samples([0.31, 0.32, 0.33, 0.31, 0.30, 0.32]), off, "rtf",
+        )
+        self.assertEqual((annotation["n"], annotation["unpairedTakes"]), (5, 1))
+
+
 if __name__ == "__main__":
     unittest.main()

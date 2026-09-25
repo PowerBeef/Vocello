@@ -38,7 +38,8 @@ and emotion carry into the take.
 The builder and its scorers run from a local, untracked virtual environment:
 `python3 -m venv .venv && .venv/bin/pip install torch transformers speechbrain` (the headers of
 `scripts/emotion_advisory.py` and `scripts/clone_speaker_similarity.py` name the exact
-wav2vec2 and ECAPA backends; the ECAPA identity scorer imports `speechbrain`). Never install these into the system interpreter and never run
+wav2vec2 and ECAPA backends; the ECAPA identity scorer imports `speechbrain` and loads its pinned
+snapshot from the local Hugging Face cache only, so the maintainer caches it once). Never install these into the system interpreter and never run
 them while the engine is generating.
 
 ```sh

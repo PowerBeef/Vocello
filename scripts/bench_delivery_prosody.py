@@ -259,6 +259,7 @@ def load_engine_provenance(diagnostics_dir: Path, run_id: str) -> dict[str, dict
     if not rows_path.is_file():
         raise ValueError(f"engine telemetry rows not found: {rows_path}")
     provenance: dict[str, dict[str, Any]] = {}
+    unparsable = 0
     with rows_path.open("r", encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
@@ -267,6 +268,12 @@ def load_engine_provenance(diagnostics_dir: Path, run_id: str) -> dict[str, dict
             try:
                 row = json.loads(line)
             except json.JSONDecodeError:
+                # Reported, not swallowed (audit #104): a lost row surfaces as
+                # a missing-provenance failure, and this count explains it.
+                unparsable += 1
+                continue
+            if not isinstance(row, dict):
+                unparsable += 1
                 continue
             notes = row.get("notes") or {}
             if notes.get("benchRunID") != run_id:
@@ -298,6 +305,12 @@ def load_engine_provenance(diagnostics_dir: Path, run_id: str) -> dict[str, dict
             elif isinstance(seed, int) and not isinstance(seed, bool):
                 entry["seed"] = seed
             provenance[generation_id] = entry
+    if unparsable:
+        print(
+            f"warning: {unparsable} engine telemetry row(s) could not be parsed and "
+            "supply no prompt provenance",
+            file=sys.stderr,
+        )
     return provenance
 
 

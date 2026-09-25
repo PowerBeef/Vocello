@@ -926,6 +926,36 @@ def test_delivery_prosody_effect_column_is_the_paired_effect():
     assert sgt.prosody_for_delivery([legacy], "custom", "m", "happy.strong")["effect"] is None
 
 
+def test_prosody_sidecar_keeps_only_the_selected_run_and_reports_parse_errors():
+    """audit #104: a stale sidecar row never supplies this run's prosody, and an
+    unreadable sidecar is reported instead of read as no prosody."""
+    tmp = tempfile.mkdtemp()
+    try:
+        row = {"runID": "run-now", "generationID": "g1", "mode": "custom", "model": "m",
+               "delivery": "happy.strong", "pairedProsodyEffect": 0.4, "dF0Std": 1.0,
+               "dRateCV": 0.01, "dPauseRatio": -0.02, "dRoughness": 0.01}
+        stale = dict(row, runID="run-before", generationID="g0", pairedProsodyEffect=9.0)
+        path = os.path.join(tmp, "bench-prosody.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump([row, stale, "not-a-row"], handle)
+        output = io.StringIO()
+        with redirect_stdout(output):
+            rows = sgt.load_prosody(tmp, run_id="run-now", generation_ids={"g1"})
+        assert rows == [row]
+        assert output.getvalue().strip()  # the dropped rows are reported
+        summary = sgt.prosody_for_delivery(rows, "custom", "m", "happy.strong")
+        assert summary["effect"] == 0.4 and summary["n"] == 1
+
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write("[{\"runID\": ")
+        output = io.StringIO()
+        with redirect_stdout(output):
+            assert sgt.load_prosody(tmp, run_id="run-now") == []
+        assert output.getvalue().strip()  # the parse error is reported
+    finally:
+        shutil.rmtree(tmp)
+
+
 def load_tests(_loader, _tests, _pattern):
     """Expose function-style tests to the repository's unittest-only gate."""
     suite = unittest.TestSuite()

@@ -122,10 +122,18 @@ def ecapa_section(reference, clone_paths, control_paths):
         embed = ecapa_embedder()
     except Exception as error:
         return {"skipped": f"torch/speechbrain not installed: {error}"}
+    from clone_speaker_similarity import separation
+
     profile = load_similarity_profile(None)
     section = {"clones": analyze_takes(reference, clone_paths, embed, profile)}
     if control_paths:
         section["controls"] = analyze_takes(reference, control_paths, embed, profile)
+        # AUC and EER with intervals, so the bands are fitted from a measured
+        # separation instead of read off two controls (audit #103).
+        section["separation"] = separation(
+            [row["cosineSimilarity"] for row in section["clones"]["takes"]],
+            [row["cosineSimilarity"] for row in section["controls"]["takes"]],
+        )
     return section
 
 

@@ -1136,6 +1136,7 @@ class PublisherTests(unittest.TestCase):
             gate: object, delivery_gate: object = clean_delivery_gate
         ) -> tuple[list[dict], list[dict], list[dict]]:
             result_takes = [{
+                "generationID": "delivery-current",
                 "delivery": "happy.strong",
                 "mode": "custom",
                 "modelID": "pro_custom_speed",
@@ -1147,6 +1148,8 @@ class PublisherTests(unittest.TestCase):
                 "status": "passed",
             }]
             row: dict = {
+                "runID": "run-current",
+                "generationID": "delivery-current",
                 "mode": "custom",
                 "model": "pro_custom_speed",
                 "delivery": "happy.strong",
@@ -1162,8 +1165,11 @@ class PublisherTests(unittest.TestCase):
                 row["deliveryGate"] = delivery_gate
             return result_takes, takes, [row]
 
+        def fold(*arguments) -> None:
+            publisher.fold_delivery_prosody(*arguments, run_id="run-current")
+
         clean = fixture({"passed": True, "flags": []})
-        publisher.fold_delivery_prosody(*clean)
+        fold(*clean)
         self.assertEqual(clean[1][0]["warnings"], [])
         self.assertEqual(clean[1][0]["status"], "passed")
         self.assertEqual(clean[1][0]["metrics"]["f0StdHz"], 31.5)
@@ -1177,7 +1183,7 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(clean[1][0]["metrics"]["deliveryArousalScore"], 1.7)
 
         flagged = fixture({"passed": False, "flags": ["monotone", "long_pause"]})
-        publisher.fold_delivery_prosody(*flagged)
+        fold(*flagged)
         self.assertEqual(
             flagged[1][0]["warnings"],
             ["prosody_gate:long_pause", "prosody_gate:monotone"],
@@ -1188,7 +1194,7 @@ class PublisherTests(unittest.TestCase):
             {"passed": True, "flags": []},
             {"passed": False, "flags": ["delivery_effect_weak_rate_delta_hz"], "metrics": {}},
         )
-        publisher.fold_delivery_prosody(*adherence_flagged)
+        fold(*adherence_flagged)
         self.assertEqual(
             adherence_flagged[1][0]["warnings"],
             ["delivery_gate:delivery_effect_weak_rate_delta_hz"],
@@ -1208,7 +1214,35 @@ class PublisherTests(unittest.TestCase):
             ),
         ):
             with self.subTest(name=name), self.assertRaises(publisher.PublicationError):
-                publisher.fold_delivery_prosody(*fixture(gate, delivery_gate))
+                fold(*fixture(gate, delivery_gate))
+
+    def test_delivery_prosody_joins_by_generation_and_refuses_a_stale_sidecar(self) -> None:
+        """Audit #104: the sidecar row is the take's own (generation ID, run ID)."""
+        gate = {"passed": True, "flags": []}
+
+        def fixture(**row_overrides) -> tuple[list[dict], list[dict], list[dict]]:
+            result_takes = [{"generationID": "delivery-current", "delivery": "happy.strong",
+                             "mode": "custom", "modelID": "pro_custom_speed"}]
+            takes = [{"generationID": "delivery-current", "metrics": {}, "warnings": [],
+                      "status": "passed"}]
+            row = {"runID": "run-current", "generationID": "delivery-current", "mode": "custom",
+                   "model": "pro_custom_speed", "delivery": "happy.strong",
+                   "deliveryMetrics": {"f0_std_hz": 31.5}, "qualityGate": gate,
+                   "deliveryGate": {"passed": True, "flags": [], "metrics": {}}}
+            row.update(row_overrides)
+            return result_takes, takes, [row]
+
+        publisher.fold_delivery_prosody(*fixture(), run_id="run-current")
+        cases = {
+            # An earlier run's sidecar with the same cell: the same (mode, model,
+            # delivery) the old join accepted.
+            "stale-run": {"runID": "run-earlier", "generationID": "delivery-earlier"},
+            "same-generation-other-run": {"runID": "run-earlier"},
+            "other-cell": {"delivery": "calm.normal"},
+        }
+        for name, overrides in cases.items():
+            with self.subTest(name=name), self.assertRaises(publisher.PublicationError):
+                publisher.fold_delivery_prosody(*fixture(**overrides), run_id="run-current")
 
     def test_forced_memory_profile_is_exploratory(self) -> None:
         self.assertFalse(publisher.uses_forced_memory_profile([engine_row("native")]))

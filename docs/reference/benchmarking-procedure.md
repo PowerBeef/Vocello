@@ -374,7 +374,13 @@ python3 scripts/delivery_quality_gate.py --cohort take1.wav … takeN.wav
 
 The delivery gate and cohort bounds are calibrated, digest-chained profile values
 (`scripts/prosody_profile.py`); adherence/cohort regressions beyond them are promotion
-findings, not waivable annotations. The clone lane and SER column stay advisory.
+findings, not waivable annotations. The cohort's arousal-outlier check scores each take against
+the median and MAD of the other takes (`leave-one-out-median-mad-v1`): the earlier population
+z-score included the candidate and could not exceed 2.5 for seven or fewer takes. The clone lane
+and SER column stay advisory; the clone lane reports AUC and equal error rate with seeded 95%
+intervals whenever it has controls (`bandCalibrationReady` needs at least eight), embeds 16 kHz
+audio through the pinned polyphase resampler and loads the ECAPA snapshot from the local cache
+only.
 
 ### 4.7 iOS on-device bench
 

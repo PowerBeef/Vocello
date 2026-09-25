@@ -382,7 +382,7 @@ def build(arguments: argparse.Namespace) -> int:
             arguments.vocello,
         )
 
-    from clone_speaker_similarity import ECAPA_REVISION, ECAPA_SOURCE
+    from clone_speaker_similarity import ECAPA_PREPROCESSING, ECAPA_REVISION, ECAPA_SOURCE
     from emotion_advisory import EMOTION_MODEL_REVISION, EMOTION_MODEL_SOURCE
 
     manifest = {
@@ -412,7 +412,8 @@ def build(arguments: argparse.Namespace) -> int:
         "enrolledVoices": enrolled,
         "scorers": {
             "ser": {"source": EMOTION_MODEL_SOURCE, "revision": EMOTION_MODEL_REVISION},
-            "identity": {"source": ECAPA_SOURCE, "revision": ECAPA_REVISION},
+            "identity": {"source": ECAPA_SOURCE, "revision": ECAPA_REVISION,
+                         "preprocessing": dict(ECAPA_PREPROCESSING)},
         },
     }
     manifest_path = work_dir / "bank-manifest.json"

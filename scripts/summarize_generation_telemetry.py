@@ -359,16 +359,39 @@ def len_bucket(prompt_chars):
     return "medium"
 
 
-def load_prosody(diag_dir):
-    """Load bench-prosody.json sidecar, if present. Returns list of rows."""
+def load_prosody(diag_dir, *, run_id=None, generation_ids=None):
+    """The bench-prosody.json rows of the selected run (audit #104).
+
+    An unreadable sidecar is reported rather than read as "no prosody", and a
+    row that names another run or an unselected generation is dropped and
+    counted, so a stale sidecar can never supply this run's prosody columns.
+    """
     path = os.path.join(diag_dir, "bench-prosody.json")
     if not os.path.exists(path):
         return []
     try:
         with open(path, "r", encoding="utf-8") as handle:
-            return json.load(handle)
-    except Exception:
+            loaded = json.load(handle)
+    except (OSError, ValueError) as error:
+        print(f"WARN: bench-prosody.json is unreadable; delivery prosody is not shown ({type(error).__name__})")
         return []
+    if not isinstance(loaded, list):
+        print("WARN: bench-prosody.json is not an array; delivery prosody is not shown")
+        return []
+    selected = []
+    dropped = 0
+    for row in loaded:
+        if (
+            not isinstance(row, dict)
+            or (run_id and row.get("runID") != run_id)
+            or (generation_ids is not None and row.get("generationID") not in generation_ids)
+        ):
+            dropped += 1
+            continue
+        selected.append(row)
+    if dropped:
+        print(f"WARN: ignored {dropped} bench-prosody.json row(s) outside the selected run")
+    return selected
 
 
 def prosody_for_delivery(prosody_rows, mode, model_id, delivery):
@@ -2190,7 +2213,11 @@ def main():
         return 1
     if skipped_failed:
         print(f"(skipped {skipped_failed} non-success engine row(s) with finishReason failed/superseded/cancelled)")
-    prosody_rows = load_prosody(diag_dir)
+    prosody_rows = load_prosody(
+        diag_dir,
+        run_id=selected_run_id,
+        generation_ids={run.get("generationID") for run in runs},
+    )
 
     if args.save_baseline or args.seed_baseline or args.compare_baseline:
         forced = forced_memory_class_rows(runs)

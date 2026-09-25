@@ -110,6 +110,39 @@ def latency_regression(candidate: float, baseline: float) -> float:
     return 0.0 if baseline <= 0 else ((candidate / baseline) - 1.0) * 100.0
 
 
+def paired_overhead_annotation(mode_samples: list[dict], off_samples: list[dict], metric: str) -> dict:
+    """Paired uncertainty for one enabled arm against telemetry-off (audit #63, #106).
+
+    Each measured take pairs with the off take of the same rotation and measured
+    index (same seeded text, adjacent in time), so host drift between rotations
+    cancels. Reports the median paired ratio, a BCa 95% interval of the mean
+    paired percent difference and the exact Wilcoxon signed-rank test from
+    ``delivery_statistics``. Annotation only: the verdict still compares the arm
+    medians against the tracked thresholds.
+    """
+    from delivery_statistics import bootstrap_ci, wilcoxon_signed_rank
+
+    off = {(sample["rotation"], sample["measuredTake"]): float(sample[metric]) for sample in off_samples}
+    pairs = [
+        (float(sample[metric]), off[(sample["rotation"], sample["measuredTake"])])
+        for sample in mode_samples
+        if (sample["rotation"], sample["measuredTake"]) in off
+    ]
+    usable = [(candidate, baseline) for candidate, baseline in pairs if baseline > 0]
+    percent = [(candidate / baseline - 1.0) * 100.0 for candidate, baseline in usable]
+    return {
+        "annotationOnly": True,
+        "pairing": "rotation-and-measured-take",
+        "metric": metric,
+        "n": len(percent),
+        "unpairedTakes": len(mode_samples) - len(usable),
+        "medianRatio": statistics.median(c / b for c, b in usable) if usable else None,
+        "meanPercentDifference": statistics.fmean(percent) if percent else None,
+        "confidenceInterval95": bootstrap_ci(percent),
+        "wilcoxon": wilcoxon_signed_rank(percent),
+    }
+
+
 utc_now = jsonio.utc_now
 
 
@@ -416,6 +449,12 @@ def run_lane(args: argparse.Namespace) -> dict:
         results[mode]["ttfcRegressionPercent"] = latency_regression(
             results[mode]["medianTTFCMS"], baseline["medianTTFCMS"]
         )
+        results[mode]["pairedAgainstOff"] = {
+            metric: paired_overhead_annotation(
+                results[mode]["samples"], baseline["samples"], metric
+            )
+            for metric in ("rtf", "ttfcMS")
+        }
         if results[mode]["rtfRegressionPercent"] > limit:
             failures.append(f"{mode} median RTF regression exceeds {limit:.0f}%")
         if results[mode]["ttfcRegressionPercent"] > limit:
@@ -438,7 +477,7 @@ def run_lane(args: argparse.Namespace) -> dict:
                     key: results[mode][key]
                     for key in (
                         "medianRTF", "medianTTFCMS", "rtfRegressionPercent",
-                        "ttfcRegressionPercent",
+                        "ttfcRegressionPercent", "pairedAgainstOff",
                     )
                     if key in results[mode]
                 }

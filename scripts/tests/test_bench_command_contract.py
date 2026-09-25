@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import io
 import json
 from pathlib import Path
 import sys
@@ -223,6 +224,18 @@ class BenchDeliveryProsodyTests(unittest.TestCase):
         )
         for take in takes:
             (self.bench_dir / str(take["outputFileName"])).touch()
+
+    def test_unparsable_engine_rows_are_reported_not_swallowed(self) -> None:
+        """Audit #104: a truncated telemetry line is counted on stderr."""
+        takes = [self.take(1, "neutral-gen", "custom_pro_custom_speed_medium_warm_0.wav", delivery=None)]
+        self.write_engine_rows(takes)
+        rows_path = self.diagnostics / "engine" / "generations.jsonl"
+        rows_path.write_text(rows_path.read_text(encoding="utf-8") + '{"generationID": "trunc\n[]\n',
+                             encoding="utf-8")
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+            provenance = prosody.load_engine_provenance(self.diagnostics, "run-current")
+        self.assertEqual(set(provenance), {"neutral-gen"})
+        self.assertTrue(stderr.getvalue().strip())
 
     def test_analysis_preserves_custom_speaker_identity(self) -> None:
         takes = [

@@ -15,6 +15,7 @@ from delivery_quality_gate import (
     delivery_features,
     evaluate_delivery,
     evaluate_neutral_cohort,
+    leave_one_out_robust_z,
 )
 from prosody_profile import (
     SCHEMA_VERSION,
@@ -127,6 +128,36 @@ class DeliveryGateTests(unittest.TestCase):
         verdict = evaluate_neutral_cohort(cohort)
         self.assertFalse(verdict["passed"])
         self.assertIn("pitch_spread_exceeded", verdict["flags"])
+
+    def test_neutral_outlier_fires_at_n4_where_the_population_z_could_not(self):
+        # With the candidate inside a population SD, |z| <= sqrt(n - 1) = 1.73
+        # at n = 4, so the 2.5 bound could never fire (audit #105).
+        cohort = [metrics(f0=148.0, clip="a.wav"), metrics(f0=149.0, clip="b.wav"),
+                  metrics(f0=150.0, clip="c.wav"), metrics(f0=175.0, clip="d.wav")]
+        verdict = evaluate_neutral_cohort(cohort)
+        self.assertEqual(verdict["flags"], ["arousal_outlier"])
+        self.assertEqual(verdict["outliers"], ["d.wav"])
+        self.assertGreater(verdict["metrics"]["max_abs_z"], 2.5)
+        self.assertEqual(verdict["outlierAlgorithm"], "leave-one-out-median-mad-v1")
+
+    def test_neutral_outlier_at_n8(self):
+        steady = [metrics(f0=148.0 + 0.5 * i, clip=f"s{i}.wav") for i in range(8)]
+        verdict = evaluate_neutral_cohort(steady)
+        self.assertTrue(verdict["passed"], verdict["flags"])
+        self.assertLess(verdict["metrics"]["max_abs_z"], 2.5)
+        wandering = steady[:7] + [metrics(f0=170.0, clip="w.wav")]
+        verdict = evaluate_neutral_cohort(wandering)
+        self.assertEqual(verdict["outliers"], ["w.wav"])
+        self.assertIn("arousal_outlier", verdict["flags"])
+
+    def test_leave_one_out_score_handles_exact_agreement(self):
+        self.assertEqual(leave_one_out_robust_z([1.0, 1.0, 1.0, 1.0], 3), 0.0)
+        self.assertEqual(leave_one_out_robust_z([1.0, 1.0, 1.0, 2.0], 3), float("inf"))
+        self.assertAlmostEqual(leave_one_out_robust_z([1.0, 2.0, 3.0, 5.0], 3), 3.0 / 1.4826)
+        verdict = evaluate_neutral_cohort([metrics(clip=f"{i}.wav") for i in range(3)]
+                                          + [metrics(f0=160.0, clip="x.wav")])
+        self.assertEqual(verdict["outliers"], ["x.wav"])
+        self.assertIsNone(verdict["metrics"]["max_abs_z"])
 
     def test_neutral_cohort_too_small_is_failure_class(self):
         verdict = evaluate_neutral_cohort([metrics(), metrics()])

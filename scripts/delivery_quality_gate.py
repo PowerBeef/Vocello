@@ -30,6 +30,7 @@ import argparse
 import json
 import math
 import os
+import statistics
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -48,6 +49,13 @@ from prosody_profile import (
 # whose analysis predates those keys skips them into the verdict's
 # `unavailableFeatures` list instead of failing `metrics_incomplete`.
 DELIVERY_GATE_ALGORITHM_VERSION = 2
+
+# Neutral-cohort outlier score (audit #105). Each take is judged against the
+# median and MAD of the OTHER takes: with the candidate inside a population SD,
+# |z| can never exceed sqrt(n - 1) (Samuelson), so the 2.5 bound could not fire
+# for any cohort of seven or fewer takes.
+COHORT_OUTLIER_ALGORITHM = "leave-one-out-median-mad-v1"
+MAD_TO_SIGMA = 1.4826
 
 # Flags that mean the verdict could not be computed (mapped to a distinct
 # "unavailable" outcome downstream, mirroring the prosody sidecar contract).
@@ -281,6 +289,26 @@ def evaluate_delivery(instructed_metrics, neutral_metrics, delivery_id, profile=
     return verdict
 
 
+def leave_one_out_robust_z(values, index):
+    """Robust z-score of ``values[index]`` against the remaining values.
+
+    Centre: the median of the others; scale: 1.4826 x their median absolute
+    deviation. When the others agree exactly (zero MAD) their sample standard
+    deviation stands in; when that is zero too, any departure is unbounded.
+    """
+    others = [float(value) for position, value in enumerate(values) if position != index]
+    if not others:
+        return 0.0
+    centre = statistics.median(others)
+    scale = MAD_TO_SIGMA * statistics.median(abs(value - centre) for value in others)
+    if scale <= 1e-9 and len(others) >= 2:
+        scale = statistics.stdev(others)
+    difference = float(values[index]) - centre
+    if scale <= 1e-9:
+        return 0.0 if abs(difference) <= 1e-9 else math.copysign(math.inf, difference)
+    return difference / scale
+
+
 def evaluate_neutral_cohort(cohort_metrics, profile=None):
     """Cross-take consistency verdict for repeated same-preset takes."""
     prof = profile if profile is not None else builtin_profile()
@@ -316,14 +344,11 @@ def evaluate_neutral_cohort(cohort_metrics, profile=None):
         12.0 * math.log2(max(medians) / min(medians)) if min(medians) > 0 else 0.0
     )
     rate_spread = max(rates) - min(rates)
-    mean_proxy = sum(proxies) / len(proxies)
-    variance = sum((value - mean_proxy) ** 2 for value in proxies) / len(proxies)
-    deviation = math.sqrt(variance)
     z_bound = neutral_consistency(prof, "outlier_z_score")
     outliers = []
     max_abs_z = 0.0
-    for metrics, proxy in zip(valid, proxies):
-        z_score = (proxy - mean_proxy) / deviation if deviation > 1e-9 else 0.0
+    for index, metrics in enumerate(valid):
+        z_score = leave_one_out_robust_z(proxies, index)
         max_abs_z = max(max_abs_z, abs(z_score))
         if abs(z_score) > z_bound:
             outliers.append(metrics.get("clip", ""))
@@ -345,8 +370,10 @@ def evaluate_neutral_cohort(cohort_metrics, profile=None):
         "metrics": {
             "pitch_spread_semitones": round(pitch_spread, 3),
             "rate_spread_hz": round(rate_spread, 3),
-            "max_abs_z": round(max_abs_z, 3),
+            # None when the other takes agree exactly and one departs from them.
+            "max_abs_z": round(max_abs_z, 3) if math.isfinite(max_abs_z) else None,
         },
+        "outlierAlgorithm": COHORT_OUTLIER_ALGORITHM,
         "outliers": outliers,
     }
 

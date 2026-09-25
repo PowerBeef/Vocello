@@ -2028,6 +2028,8 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(take["metrics"]["independentWordErrorRate"], 0.125)
         self.assertEqual(take["metrics"]["independentPrimaryAccuracyScore"], 0.125)
         self.assertEqual(take["metrics"]["independentLanguagePass"], 1.0)
+        self.assertEqual(take["detectedLanguages"], {"whisper": "french"})
+        self.assertEqual(verification["languageCheckKinds"], {"whisper": "audio-language-identification"})
         # Whisper's confidence is published beside its verdict (audit #89).
         self.assertEqual(take["metrics"]["independentMaximumNoSpeechProbability"], 0.02)
         self.assertEqual(take["metrics"]["independentMeanAverageLogProbability"], -0.25)
@@ -2150,6 +2152,14 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(metrics["wordErrorRate"], 0.125)
         self.assertEqual(metrics["independentWordErrorRate"], 0.0)
         self.assertEqual(metrics["recognitionPassCount"], 3.0)
+        # Audit #42: each family's check is declared for what it observes, and
+        # each family's detected language is published per take.
+        self.assertEqual(verification["languageCheckKinds"], {
+            "apple-speech": "transcript-language-consistency",
+            "whisper": "audio-language-identification",
+        })
+        self.assertEqual(set(record["takes"][0]["detectedLanguages"]), {"apple-speech", "whisper"})
+        self.assertEqual(record["takes"][0]["detectedLanguages"]["whisper"], "french")
         profile_takes = captured["manifest"]["historyRecord"]["inputs"]
         self.assertRegex(profile_takes["analysisProfileHash"], r"^[0-9a-f]{64}$")
 

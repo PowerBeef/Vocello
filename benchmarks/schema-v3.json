@@ -297,6 +297,10 @@
             "independentModelIdentitySHA256": {
               "type": "string",
               "pattern": "^[0-9a-f]{64}$"
+            },
+            "languageCheckKinds": {
+              "description": "Records since 2026-09-25: what each cited family's language check observes (apple-speech: transcript-language consistency on its locked transcript; whisper: audio language identification).",
+              "type": "object"
             }
           },
           "required": [],
@@ -817,6 +821,10 @@
         },
         "cell": {
           "type": "string"
+        },
+        "detectedLanguages": {
+          "description": "Language takes since 2026-09-25: the language each cited recognizer family detected (Apple Speech from its locked transcript, whisper from the audio), so a misattributed verdict is visible.",
+          "type": "object"
         },
         "durationSeconds": {
           "minimum": 0,

@@ -148,7 +148,13 @@ variable. The plan also freezes the corpus-owned Custom speaker and one shared D
 instruction; the shared Design fixture keeps language as the controlled variable and preserves one
 typed fixture identity for the model across the matrix.
 The diagnostic cohort is seed-major and evaluates exactly three cells across five fixed
-seeds (15 takes). It performs no retry and never publishes benchmark history.
+seeds (15 takes). It performs no retry and never publishes benchmark history. Whisper runs for the
+cohort too (recognition rows are keyed by the take's child run ID, so a cell repeated across seeds
+is five distinct rows), and `independent_asr.py verdict` combines each take's whisper verdict with
+its in-app Apple Speech verdict through the shared family rule: the cohort passes only when the two
+families agree on every take's expected outcome (`witnesses=apple-speech,whisper consensus=pass`),
+disagreement is `inconclusive` and fails the lane, and a cohort run without the in-app pass is
+labelled `one-witness` rather than reported as consensus (audit #44).
 
 Gates:
 
@@ -169,6 +175,15 @@ record under `benchmarks/runs/language/` and regenerates `benchmarks/HISTORY.md`
 Failed cells, missing typed telemetry/model identity, or a publication error leave the tracked
 registry unchanged; the untracked artifact directory retains the idempotent repair command.
 Passing the diagnostic cohort prints its verdict locally and intentionally creates no record.
+
+Each family's language check observes something different, and records say so (audit #42):
+`evidence.languageVerification.languageCheckKinds` declares `transcript-language-consistency` for
+Apple Speech (text language detection over a transcript produced with the recognizer locked to the
+expected locale, close to unfalsifiable for an anglicized take) and `audio-language-identification`
+for whisper (detection from the first 30 s of audio). Each language take publishes the language each
+family detected in `detectedLanguages`. On the negative control an English-locked whisper hears
+English and passes its language check; the control fails on accuracy alone. Per-channel consensus
+and re-declaring the control remain maintainer decisions.
 
 ### Validation and diagnostic snapshot (through 2026-07-16)
 

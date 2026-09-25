@@ -48,6 +48,16 @@ CHARACTER_ERROR_LANGUAGES = frozenset({"chinese", "japanese"})
 # Recognizer families a language verdict may cite. One family is one witness;
 # `consensus` needs two independent families for a pass or a fail.
 RECOGNITION_FAMILIES = ("apple-speech", "whisper", "sensevoice")
+# What each family's language check observes (audit #42). Apple Speech runs
+# locked to the expected locale and its languagePass is text language
+# detection over that locked transcript: transcript-language consistency, close
+# to unfalsifiable for an anglicized take. Whisper and SenseVoice identify the
+# language from the audio. Records declare this beside their families.
+LANGUAGE_CHECK_KINDS = {
+    "apple-speech": "transcript-language-consistency",
+    "whisper": "audio-language-identification",
+    "sensevoice": "audio-language-identification",
+}
 SENSEVOICE_LANGUAGES = frozenset({"english", "chinese", "japanese", "korean", "cantonese"})
 MAX_TEXT_CHARACTERS = 4096
 

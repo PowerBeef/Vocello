@@ -44,6 +44,7 @@ from lib import rtf as rtf_semantics
 from lib import jsonio  # noqa: E402
 from lib import lineage_identity  # noqa: E402
 from lib import trace_intervals  # noqa: E402
+from lib.language_metrics import LANGUAGE_CHECK_KINDS  # noqa: E402
 from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
 
 
@@ -176,6 +177,7 @@ TAKE_KEYS = {
     "streamingTelemetryV9SidecarDigest", "samplingPromotionPackaged", "samplingWAVDigest",
     "samplingSeedAgreement",
     "qualityRegistryOutcome", "qualityRegistryRequiredGates", "qualityRegistryIssues",
+    "detectedLanguages",
 }
 OUTPUT_KEYS = {
     "readableWAV", "atomicPublish", "durationSeconds", "sampleRate", "channels",
@@ -231,6 +233,9 @@ LANGUAGE_VERIFICATION_KEYS = {
     "negativeControlsConfirmed", "families",
     # Independent (whisper-family) recognizer identity, records since 2026-09-12.
     "independentRecognitionAlgorithm", "independentModelIdentitySHA256",
+    # What each cited family's language check observes (records since
+    # 2026-09-25, audit #42): lib.language_metrics.LANGUAGE_CHECK_KINDS.
+    "languageCheckKinds",
 }
 RECOGNITION_FAMILIES = ("apple-speech", "whisper", "sensevoice")
 # Records before 2026-09-12 carry no `families`; every one of them was verified
@@ -340,6 +345,9 @@ V2_ONLY_TAKE_KEYS = {
     "memoryStatus", "sampleSidecarDigest",
     "streamingTelemetryV9SidecarDigest", "samplingPromotionPackaged", "samplingWAVDigest",
     "samplingSeedAgreement",
+    # The language each recognizer family detected for a language take (records
+    # since 2026-09-25, audit #42), so a misattributed verdict is visible.
+    "detectedLanguages",
 }
 # Phase 13: the typed quality-registry identity is a v3 addition; v1/v2
 # records must reject it as unknown so historical documents stay immutable.
@@ -2995,6 +3003,24 @@ def validate_record(
         and language_verification["negativeControlsConfirmed"] != negative_control_count
     ):
         raise HistoryError("negativeControlsConfirmed does not match the negative-control takes")
+    if language_verification is not None and "languageCheckKinds" in language_verification:
+        if language_verification["languageCheckKinds"] != {
+            family: LANGUAGE_CHECK_KINDS[family] for family in families
+        }:
+            raise HistoryError("languageCheckKinds must declare exactly the cited families' checks")
+    for take in takes:
+        detected = take.get("detectedLanguages")
+        if detected is None:
+            continue
+        if (
+            not isinstance(detected, dict) or not detected
+            or any(family not in families for family in detected)
+            or not all(
+                isinstance(value, str) and re.fullmatch(r"[a-z][a-z0-9-]{1,31}", value)
+                for value in detected.values()
+            )
+        ):
+            raise HistoryError("take.detectedLanguages must map cited families to language names")
 
     cells = record.get("cells")
     if not isinstance(cells, list):

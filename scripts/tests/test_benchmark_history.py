@@ -797,6 +797,57 @@ class BenchmarkHistoryTests(unittest.TestCase):
         })
         self.publish(apple, "apple-control")
 
+    def test_language_evidence_added_by_the_audit_is_bounded(self) -> None:
+        """Audit #42, #84, #89: check kinds, detected languages, deletion runs and
+        whisper confidence are optional, but never malformed or misattributed."""
+        valid = self._schema_v3_language_record("audited-valid")
+        valid["evidence"]["languageVerification"] = {
+            **history.INDEPENDENT_VERIFICATION_IDENTITY,
+            "families": ["whisper"],
+            "independentRecognitionAlgorithm": "mlx-whisper-locked-decode-v1",
+            "independentModelIdentitySHA256": "2" * 64,
+            "hintCellsPassed": 1, "hintCellsExpected": 1,
+            "outputCellsPassed": 1, "outputCellsExpected": 1, "negativeControlsConfirmed": 0,
+            "languageCheckKinds": {"whisper": "audio-language-identification"},
+        }
+        valid["takes"][0].update({
+            "accuracyMetric": "wordErrorRate", "accuracyThreshold": 0.15,
+            "detectedLanguages": {"whisper": "french"},
+        })
+        valid["takes"][0]["metrics"].update({
+            "independentWordErrorRate": 0.125, "independentCharacterErrorRate": 0.1,
+            "independentPrimaryAccuracyScore": 0.125, "independentLanguageMatchScore": 0.97,
+            "independentLanguagePass": 1.0, "independentAccuracyPass": 1.0,
+            "independentRecognitionDurationSeconds": 0.4, "independentLongestDeletionRun": 1.0,
+            "independentMaximumNoSpeechProbability": 0.02, "independentMeanAverageLogProbability": -0.3,
+        })
+        self.publish(valid, "audited-valid")
+
+        verification = lambda record: record["evidence"]["languageVerification"]  # noqa: E731
+        mutations = {
+            "a check kind for an uncited family": lambda record: verification(record).__setitem__(
+                "languageCheckKinds", {"apple-speech": "transcript-language-consistency",
+                                       "whisper": "audio-language-identification"}),
+            "a relabelled check": lambda record: verification(record).__setitem__(
+                "languageCheckKinds", {"whisper": "transcript-language-consistency"}),
+            "a detected language from an uncited family": lambda record: record["takes"][0].__setitem__(
+                "detectedLanguages", {"apple-speech": "french"}),
+            "a free-text detected language": lambda record: record["takes"][0].__setitem__(
+                "detectedLanguages", {"whisper": "French (Canada)"}),
+            "a fractional deletion run": lambda record: record["takes"][0]["metrics"].__setitem__(
+                "independentLongestDeletionRun", 1.5),
+            "a no-speech probability above one": lambda record: record["takes"][0]["metrics"].__setitem__(
+                "independentMaximumNoSpeechProbability", 1.2),
+            "a positive log probability": lambda record: record["takes"][0]["metrics"].__setitem__(
+                "independentMeanAverageLogProbability", 0.1),
+        }
+        for index, (label, mutate) in enumerate(mutations.items()):
+            record = copy.deepcopy(valid)
+            record["run"]["id"] = f"audited-invalid-{index}"
+            mutate(record)
+            with self.subTest(label=label), self.assertRaises(history.HistoryError):
+                self.publish(record, f"audited-invalid-{index}")
+
     def test_language_take_accuracy_gate_is_bounded_and_paired(self) -> None:
         valid = record_fixture(run_id="accuracy-valid", kind="language")
         provenance = {

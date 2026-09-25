@@ -25,6 +25,9 @@ Commands:
   manifest    build the row manifest for a macOS or iOS language run, or for a
               cascade input
   transcribe  run the producer over a manifest and write recognition evidence
+  verdict     score the evidence per row, with the Apple Speech verdict when the
+              manifest carries one, and report the family consensus (or one
+              witness) for a lane that publishes no record, such as a cohort
 """
 
 from __future__ import annotations
@@ -46,8 +49,11 @@ from lib.language_metrics import (  # noqa: E402
     INDEPENDENT_ASR_ALGORITHM,
     INDEPENDENT_RECOGNITION_SCHEMA,
     LANGUAGE_LOCALE_CODES,
+    consensus,
     edges_covered,
     is_sha256,
+    recognition_issues,
+    score_recognition,
     text_sha256,
 )
 
@@ -101,7 +107,8 @@ def _wav_duration_seconds(path: Path) -> float:
 
 def _row(*, row_id: str, generation_id: str, audio: Path, audio_sha256: str,
          expected_language: str, reference_text: str, expected_outcome: str = "pass",
-         role: str | None = None) -> dict[str, Any]:
+         role: str | None = None, cell_id: str | None = None,
+         apple_speech_pass: bool | None = None) -> dict[str, Any]:
     if not isinstance(reference_text, str) or not reference_text.strip():
         raise IndependentASRError(f"{row_id}: reference text is empty")
     if expected_language not in LANGUAGE_LOCALE_CODES:
@@ -119,6 +126,10 @@ def _row(*, row_id: str, generation_id: str, audio: Path, audio_sha256: str,
     }
     if role is not None:
         entry["role"] = role
+    if cell_id is not None:
+        entry["cellID"] = cell_id
+    if apple_speech_pass is not None:
+        entry["appleSpeechPass"] = apple_speech_pass
     return entry
 
 
@@ -216,10 +227,17 @@ def build_ios_manifest(*, diagnostics: Path, run_id: str, plan: Path, corpus: Pa
         script = scripts.get(str(take.get("scriptLang")))
         if not isinstance(script, str):
             raise IndependentASRError(f"{child}: corpus lacks scriptLang {take.get('scriptLang')!r}")
+        verification = record.get("outputVerification")
+        apple_pass = verification.get("pass") if isinstance(verification, dict) else None
+        # Rows are keyed by the take's child run ID (audit #44): a diagnostic
+        # cohort repeats each cell across seeds, which cell keys rejected as
+        # duplicates and so kept whisper out of every cohort.
         rows.append(_row(
-            row_id=str(take["cellID"]), generation_id=str(record.get("generationID")), audio=audio,
+            row_id=child, cell_id=str(take["cellID"]),
+            generation_id=str(record.get("generationID")), audio=audio,
             audio_sha256=declared, expected_language=str(take.get("expectedHint")),
             reference_text=script, expected_outcome=str(take.get("expectedOutcome", "pass")),
+            apple_speech_pass=apple_pass if isinstance(apple_pass, bool) else None,
         ))
     return _manifest(rows, run_id=run_id, platform="ios",
                      generation_process_exited=generation_process_exited)
@@ -511,6 +529,7 @@ def transcribe_manifest(
         "producer": producer,
         "cells": {
             row["id"]: {
+                "cellID": row.get("cellID", row["id"]),
                 "generationID": row["generationID"],
                 "audioSHA256": row["audioSHA256"],
                 "expectedLanguage": row["expectedLanguage"],
@@ -520,6 +539,61 @@ def transcribe_manifest(
             for row in manifest["rows"]
         },
     }
+
+
+def witness_verdict(manifest: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
+    """Per-row family consensus for a lane that publishes no record (audit #44).
+
+    Each row's whisper recognition is re-qualified and re-scored from its
+    transcript; when the manifest carries the in-app Apple Speech verdict, the
+    two families vote through the shared consensus rule. A row passes only when
+    the families agree on its expected outcome; with one family the result is
+    labelled one witness, never consensus.
+    """
+    manifest = validate_manifest(manifest)
+    cells = evidence.get("cells") if isinstance(evidence, dict) else None
+    if not isinstance(cells, dict):
+        raise IndependentASRError("recognition evidence has no cells")
+    rows: list[dict[str, Any]] = []
+    for row in manifest["rows"]:
+        entry = cells.get(row["id"])
+        recognitions = entry.get("recognitions") if isinstance(entry, dict) else None
+        if not isinstance(recognitions, list) or len(recognitions) != 1:
+            raise IndependentASRError(f"{row['id']}: evidence needs exactly one recognition")
+        recognition = recognitions[0]
+        issues = recognition_issues(
+            recognition, audio_sha256=row["audioSHA256"], script=row["referenceText"],
+            script_sha256=row["scriptSHA256"], language=row["expectedLanguage"],
+            duration_seconds=float(row["durationSeconds"]),
+        )
+        whisper = score_recognition(recognition, script=row["referenceText"], language=row["expectedLanguage"])
+        votes: dict[str, list[bool]] = {"whisper": [bool(whisper["passed"]) and not issues]}
+        if isinstance(row.get("appleSpeechPass"), bool):
+            votes["apple-speech"] = [row["appleSpeechPass"]]
+        expected = "fail" if row.get("expectedOutcome") == "fail" else "pass"
+        agreement = consensus(votes)
+        if len(votes) >= 2:
+            status = agreement["status"]
+            met = status == expected
+        else:
+            status = "one-witness"
+            met = votes["whisper"][0] == (expected == "pass")
+        rows.append({
+            "id": row["id"], "cellID": row.get("cellID", row["id"]), "expectedOutcome": expected,
+            "families": sorted(votes), "status": status, "expectationMet": met,
+            "whisperIssues": issues, "whisperErrorRate": whisper["errorRate"],
+            "reasons": agreement["reasons"],
+        })
+    families = sorted({family for row in rows for family in row["families"]})
+    if any(row["status"] == "inconclusive" for row in rows):
+        overall = "inconclusive"
+    elif not all(row["expectationMet"] for row in rows):
+        overall = "fail"
+    elif len(families) >= 2 and all(len(row["families"]) >= 2 for row in rows):
+        overall = "pass"
+    else:
+        overall = "one-witness"
+    return {"status": overall, "families": families, "rowCount": len(rows), "rows": rows}
 
 
 # --------------------------------------------------------------------------- #
@@ -574,9 +648,26 @@ def main() -> int:
     transcribe.add_argument("--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS)
     transcribe.add_argument("--maximum-rss-bytes", type=int, default=MAXIMUM_RSS_BYTES)
 
+    verdict = commands.add_parser("verdict", help="score evidence per row and report the family consensus")
+    verdict.add_argument("--manifest", type=Path, required=True)
+    verdict.add_argument("--evidence", type=Path, required=True)
+    verdict.add_argument("--output", type=Path)
+
     args = parser.parse_args()
     try:
         from delivery_analysis_cache import DeliveryAnalysisCache, atomic_json, configured_resampler
+        if args.command == "verdict":
+            report = witness_verdict(_load_json(args.manifest), _load_json(args.evidence))
+            if args.output is not None:
+                atomic_json(args.output, report)
+            for row in report["rows"]:
+                print(f"  {row['id']:<48} {row['status']:<12} expected={row['expectedOutcome']} "
+                      f"families={','.join(row['families'])}")
+            print(f"witnesses={','.join(report['families'])} consensus={report['status']} "
+                  f"rows={report['rowCount']}")
+            # A labelled single witness is reported, not failed; a caller that
+            # needs two families checks consensus=pass.
+            return 0 if report["status"] in {"pass", "one-witness"} else 1
         if args.command == "manifest":
             if args.platform == "macos":
                 missing = [name for name in ("diagnostics", "run_id", "matrix", "corpus", "subset", "wav_dir")

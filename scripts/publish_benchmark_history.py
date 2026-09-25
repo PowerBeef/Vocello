@@ -62,6 +62,7 @@ from benchmark_memory import (  # noqa: E402
 from language_bench_evidence import stable_default_seed  # noqa: E402
 from lib.language_metrics import (  # noqa: E402
     DELETION_RUN_WARNING_LENGTH,
+    LANGUAGE_CHECK_KINDS,
     INDEPENDENT_ASR_ALGORITHM,
     INDEPENDENT_OUTPUT_ALGORITHM,
     INDEPENDENT_OUTPUT_SCHEMA,
@@ -2654,6 +2655,12 @@ def load_independent_recognitions(path: Path, *, run_id: str, platform: str) -> 
     return payload
 
 
+def record_detected_language(take: dict[str, Any], family: str, detected: Any) -> None:
+    """Publish the language one family detected for the take (audit #42)."""
+    if isinstance(detected, str) and re.fullmatch(r"[a-z][a-z0-9-]{1,31}", detected):
+        take.setdefault("detectedLanguages", {})[family] = detected
+
+
 def flag_deletion_run(take: dict[str, Any], run: int, *, family: str, negative_control: bool) -> None:
     """Warn (never fail) when a recognizer deleted a run of consecutive units (audit #84).
 
@@ -2979,6 +2986,7 @@ def language_command(args: argparse.Namespace) -> Path:
                 "accuracyThreshold": evidence["accuracyThreshold"],
                 "longestDeletionRun": float(evidence["longestDeletionRun"]),
             })
+            record_detected_language(take, "apple-speech", evidence.get("detectedLanguage"))
             flag_deletion_run(take, evidence["longestDeletionRun"], family="apple-speech",
                               negative_control=cell.get("expectedOutcome") == "fail")
     independent_evidence: list[dict[str, Any]] = []
@@ -2988,13 +2996,23 @@ def language_command(args: argparse.Namespace) -> Path:
             recognitions_path, run_id=args.run_id, platform=args.platform,
         )
         apple_by_cell = {evidence["cell"]: evidence for evidence in asr_evidence}
+        # Planned (iOS) rows are keyed by the take's child run ID since audit
+        # #44; macOS rows, and evidence from before it, by the cell ID.
+        child_by_cell = {
+            str(planned.get("cellID")): str(planned.get("childRunID")) for planned in (planned_takes or [])
+        }
         for cell, row, take in zip(cells, selected, takes):
             if cell.get("skipOutputVerification"):
                 continue
             cell_id = str(cell.get("id"))
-            entry = recognitions["cells"].get(cell_id)
+            child = child_by_cell.get(cell_id)
+            entry = recognitions["cells"].get(child) if child else None
+            if entry is None:
+                entry = recognitions["cells"].get(cell_id)
             if entry is None:
                 raise PublicationError(f"language cell {cell_id} lacks independent recognition evidence")
+            if entry.get("cellID", cell_id) != cell_id:
+                raise PublicationError(f"language cell {cell_id} independent recognition names another cell")
             output = take.get("output") or {}
             expected_digest = output.get("fileDigest") or (row.get("notes") or {}).get("samplingWAVDigest")
             duration = output.get("durationSeconds")
@@ -3031,6 +3049,7 @@ def language_command(args: argparse.Namespace) -> Path:
                 "independentRecognitionDurationSeconds": evidence["recognitionDurationSeconds"],
                 "independentLongestDeletionRun": float(evidence["longestDeletionRun"]),
             })
+            record_detected_language(take, "whisper", evidence.get("detectedLanguage"))
             flag_deletion_run(take, evidence["longestDeletionRun"], family="whisper",
                               negative_control=cell.get("expectedOutcome") == "fail")
             for source, target in (
@@ -3202,6 +3221,10 @@ def language_command(args: argparse.Namespace) -> Path:
         })
     if families:
         language_verification["families"] = families
+        # Relabelled (audit #42): what each family's language check observes.
+        language_verification["languageCheckKinds"] = {
+            family: LANGUAGE_CHECK_KINDS[family] for family in families
+        }
     if independent_evidence and independent_provenance is not None:
         language_verification.update({
             "independentRecognitionAlgorithm": INDEPENDENT_ASR_ALGORITHM,

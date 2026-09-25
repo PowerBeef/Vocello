@@ -325,6 +325,79 @@ class IndependentASRTests(unittest.TestCase):
                 subset="quick", wav_dir=wav_dir, generation_process_exited=True,
             )
 
+    def test_fifteen_row_cohort_gets_whisper_and_a_family_consensus(self) -> None:
+        """Audit #44: the 3-cell x 5-seed diagnostic cohort repeats cell IDs, so rows
+        keyed by cell were rejected as duplicates and whisper never ran for it."""
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from test_language_bench_evidence import COHORT, CORPUS, MATRIX, build_source
+        from language_bench_evidence import build_plan
+
+        plan = build_plan(run_id="cohort-fixture", matrix_path=MATRIX, corpus_path=CORPUS,
+                          subset="full", cohort_path=COHORT)
+        plan_path = self.root / "plan.json"
+        plan_path.write_text(json.dumps(plan))
+        diagnostics = self.root / "cohort"
+        build_source(diagnostics, plan)
+        for take in plan["takes"]:
+            sentinel = diagnostics / take["childRunID"] / "device-diagnostics-done.json"
+            record = json.loads(sentinel.read_text())
+            record["outputVerification"] = {"pass": True}
+            sentinel.write_text(json.dumps(record))
+
+        with self.assertRaisesRegex(independent_asr.IndependentASRError, "duplicated"):
+            independent_asr._manifest(
+                [{"id": take["cellID"]} for take in plan["takes"]], run_id="cohort-fixture",
+                platform="ios", generation_process_exited=True,
+            )
+        manifest = independent_asr.build_ios_manifest(
+            diagnostics=diagnostics, run_id="cohort-fixture", plan=plan_path, corpus=CORPUS,
+            generation_process_exited=True,
+        )
+        rows = manifest["rows"]
+        self.assertEqual(len(rows), 15)
+        self.assertEqual(len({row["id"] for row in rows}), 15)
+        self.assertEqual(len({row["cellID"] for row in rows}), 3)
+        self.assertTrue(all(row["appleSpeechPass"] is True for row in rows))
+
+        by_id = {row["id"]: row for row in rows}
+        codes = {"english": "en", "french": "fr"}
+
+        def cohort_worker(command, **kwargs):
+            job = json.loads(Path(command[3]).read_text())
+            answers = []
+            for item in job["rows"]:
+                row = by_id[item["id"]]
+                answers.append({
+                    "id": item["id"], "transcript": row["referenceText"],
+                    "language": item["language"], "detectedLanguage": codes[row["expectedLanguage"]],
+                    "detectedLanguageProbability": 0.97, "expectedLanguageProbability": 0.97,
+                    "segments": [{"start": 0.0, "end": 1.2, "noSpeechProb": 0.01, "avgLogprob": -0.2}],
+                    "decodedSampleCount": Path(item["pcmPath"]).stat().st_size // 2,
+                    "sampleRateHz": 16_000, "wallSeconds": 0.2,
+                })
+            payload = {"schemaVersion": 1, "kind": "independent-asr-worker-output", "rows": answers}
+            return SupervisedResult(envelope(), json.dumps(payload).encode(), b"")
+
+        evidence = independent_asr.transcribe_manifest(
+            manifest=manifest, config=self.config, cache=self.cache,
+            lock_root=self.root, supervisor=cohort_worker,
+        )
+        self.assertEqual(len(evidence["cells"]), 15)
+        verdict = independent_asr.witness_verdict(manifest, evidence)
+        self.assertEqual(verdict["status"], "pass")
+        self.assertEqual(verdict["families"], ["apple-speech", "whisper"])
+        self.assertEqual(verdict["rowCount"], 15)
+
+        # One family disagreeing on one take leaves the cohort inconclusive.
+        split = copy.deepcopy(manifest)
+        split["rows"][4]["appleSpeechPass"] = False
+        self.assertEqual(independent_asr.witness_verdict(split, evidence)["status"], "inconclusive")
+        # Without the in-app verdicts the cohort rests on one witness, labelled so.
+        alone = copy.deepcopy(manifest)
+        for row in alone["rows"]:
+            row.pop("appleSpeechPass")
+        self.assertEqual(independent_asr.witness_verdict(alone, evidence)["status"], "one-witness")
+
     def test_cascade_manifest_carries_roles_and_review_evidence_shape(self) -> None:
         neutral = self.root / "neutral.wav"
         write_wave(neutral, seconds=1.5)

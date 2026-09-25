@@ -1489,9 +1489,13 @@ PY
   # Mac runs no engine, so the pinned whisper-small model may load now: one
   # supervised subprocess over the collected output.wav files, cached by audio
   # and model identity. Apple Speech (in-app) plus whisper gives the publisher
-  # two independent witnesses; their agreement is required for a record.
-  local asr_st=0 asr_config="$ROOT_DIR/build/cache/delivery-analysis/whisper-small-mlx.json"
-  if [[ -z "$cohort" && $collect_st -eq 0 ]]; then
+  # two independent witnesses; their agreement is required for a record. A
+  # diagnostic cohort publishes nothing, so the lane reports that agreement
+  # itself (rows are keyed by child run ID, so repeated cells across seeds are
+  # distinct takes): the families must agree on every take, or the result is
+  # labelled as one witness (audit #44).
+  local asr_st=0 witness_st=0 asr_config="$ROOT_DIR/build/cache/delivery-analysis/whisper-small-mlx.json"
+  if [[ $collect_st -eq 0 ]]; then
     python3 "$ROOT_DIR/scripts/prepare_delivery_compact_model_config.py" whisper-small-mlx \
       --output "$asr_config" >/dev/null \
       || die "lang-bench: the pinned whisper-small MLX recognizer is not prepared on this host (nothing is downloaded automatically)"
@@ -1505,6 +1509,13 @@ PY
         --output "$artifacts/independent-asr.json" \
         | tee "$artifacts/independent-asr.txt" || asr_st=$?
     fi
+    if [[ -n "$cohort" ]] && (( asr_st == 0 )); then
+      python3 "$ROOT_DIR/scripts/independent_asr.py" verdict \
+        --manifest "$artifacts/independent-asr-manifest.json" \
+        --evidence "$artifacts/independent-asr.json" \
+        --output "$artifacts/witness-verdict.json" \
+        | tee "$artifacts/witness-verdict.txt" || witness_st=$?
+    fi
   fi
 
   {
@@ -1517,15 +1528,17 @@ PY
     else
       echo "output_gate=SKIPPED"
     fi
-    if [[ -z "$cohort" ]]; then
-      echo "independent_asr=$([[ $asr_st -eq 0 ]] && echo PASS || echo FAIL)"
+    echo "independent_asr=$([[ $asr_st -eq 0 ]] && echo PASS || echo FAIL)"
+    if [[ -n "$cohort" ]]; then
+      echo "witness_verdict=$(tail -n 1 "$artifacts/witness-verdict.txt" 2>/dev/null || echo unavailable)"
     fi
   } | tee "$artifacts/verdict.txt"
 
-  if (( cell_fail > 0 || collect_st != 0 || hint_st != 0 || output_st != 0 || asr_st != 0 )); then
+  if (( cell_fail > 0 || collect_st != 0 || hint_st != 0 || output_st != 0 || asr_st != 0 || witness_st != 0 )); then
     die "lang-bench FAIL · $artifacts"
   fi
   if [[ -n "$cohort" ]]; then
+    note "lang-bench diagnostic cohort $(tail -n 1 "$artifacts/witness-verdict.txt")"
     note "lang-bench diagnostic cohort PASS · all $cell_count predeclared takes passed · no history record created"
     return 0
   fi

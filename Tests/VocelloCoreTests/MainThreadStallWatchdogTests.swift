@@ -55,6 +55,35 @@ final class MainThreadStallWatchdogTests: XCTestCase {
         XCTAssertEqual(report.asCounters["censoredHeartbeatCount"], report.censoredHeartbeatCount)
     }
 
+    /// Audit #80: an interval-recording watchdog (the UI-perf probe's) hands
+    /// each drained interval its own heartbeats; the shared default keeps none.
+    func testIntervalRecordingDrainsEachIntervalsHeartbeats() throws {
+        // XCTest runs this on the main thread, so no timer heartbeat can
+        // complete meanwhile; only the test's own completion runs.
+        XCTAssertTrue(Thread.isMainThread)
+        let watchdog = MainThreadStallWatchdog(recordsIntervals: true)
+        watchdog.begin()
+        let late = try XCTUnwrap(watchdog.heartbeatCompletionForTesting())
+        Thread.sleep(forTimeInterval: 0.12)
+        late()
+        let first = watchdog.drainInterval()
+        XCTAssertEqual(first.completedHeartbeatCount, 1)
+        XCTAssertEqual(first.delayedHeartbeats.count, 1)
+        XCTAssertGreaterThanOrEqual(first.delayedHeartbeats.first?.delayMS ?? 0, 100)
+        XCTAssertEqual(first.droppedEventCount, 0)
+        let second = watchdog.drainInterval()
+        XCTAssertEqual(second.completedHeartbeatCount, 0)
+        XCTAssertTrue(second.delayedHeartbeats.isEmpty)
+        _ = watchdog.end()
+
+        let shared = MainThreadStallWatchdog()
+        shared.begin()
+        let completion = try XCTUnwrap(shared.heartbeatCompletionForTesting())
+        completion()
+        XCTAssertEqual(shared.drainInterval().completedHeartbeatCount, 0)
+        _ = shared.end()
+    }
+
     func testCensoredHeartbeatsDoNotOutliveTheirSession() throws {
         let watchdog = MainThreadStallWatchdog()
         watchdog.begin()

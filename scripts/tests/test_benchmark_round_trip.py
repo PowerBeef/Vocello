@@ -325,6 +325,28 @@ class UICheckerRoundTripTests(unittest.TestCase):
         generation = next(take for take in record["takes"] if take["cell"] == "ui-perf/generation-active")
         self.assertEqual(generation["metrics"]["samplerTargetIntervalMS"], 250)
 
+    def test_a_macos_ui_perf_manifest_with_probe_samples_publishes(self) -> None:
+        """audit #80, #81: the window-scoped sample metrics pass the registry."""
+        fixture = mac_perf.UIPerfFixture("run_checker")
+        fixture.setUp()
+        try:
+            log = fixture.write_run(samples=True)
+            live_publisher = sys.modules.get("publish_benchmark_history", publisher)
+            with mock.patch.object(
+                live_publisher, "verify_canonical_hardware", return_value={"profileID": "mac-mini-m6-16gb"}
+            ):
+                status, _report = fixture.run_checker(log, emit=True)
+            self.assertEqual(status, 0)
+            manifest = json.loads((fixture.root / "benchmark-evidence.json").read_text(encoding="utf-8"))
+        finally:
+            fixture.tearDown()
+        record, _size = publish_through_registry(manifest, screenshots=True, run_lane="perf")
+        metrics = record["takes"][0]["metrics"]
+        for key in ("uiP95GapMS", "uiGapSampleCount", "uiWindowHeartbeatCount",
+                    "uiWindowDelayedHeartbeatCount50", "uiWindowMaximumDelayedHeartbeatMS"):
+            self.assertIn(key, metrics)
+        self.assertNotIn("uiP95GapMSApprox", metrics)
+
     def test_uncalibrated_macos_ui_perf_manifest_publishes(self) -> None:
         """audit #77: M2 ceilings on the M6 publish one run-level uncalibrated code."""
         fixture = mac_perf.UIPerfFixture("run_checker")

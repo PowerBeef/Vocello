@@ -22,7 +22,30 @@ import Foundation
 /// `TelemetryGate` is on (same convention as `AppGenerationTimeline`), so
 /// shipped non-debug runs never start the timer. The whole thing costs one
 /// no-op main-queue block per 100 ms while a generation is active.
+///
+/// A watchdog created with `recordsIntervals` (the UI-perf frame probes' private
+/// instance, audit #80) also keeps, per interval the probe drains, its completed
+/// heartbeat count and each delayed heartbeat's completion time and delay, so the
+/// checker can scope heartbeat statistics to a measured window instead of the
+/// launch. The shared generation session never records intervals.
 final class MainThreadStallWatchdog: @unchecked Sendable {
+    /// One heartbeat that ran more than 50 ms late: when it completed (wall-clock
+    /// epoch milliseconds, the probe's block clock) and by how much.
+    struct DelayedHeartbeat: Sendable {
+        let completedEpochMS: Int64
+        let delayMS: Int
+    }
+
+    /// What one interval of an interval-recording watchdog saw.
+    struct IntervalHeartbeats: Sendable {
+        let completedHeartbeatCount: Int
+        /// Oldest first, at most `intervalEventLimit`; `droppedEventCount` more.
+        let delayedHeartbeats: [DelayedHeartbeat]
+        let droppedEventCount: Int
+    }
+
+    static let intervalEventLimit = 256
+
     struct Report {
         let delayedHeartbeatCount50: Int
         let delayedHeartbeatCount250: Int
@@ -71,8 +94,14 @@ final class MainThreadStallWatchdog: @unchecked Sendable {
     /// Send instants of this session's heartbeats that have not run yet.
     private var pendingSentAt: [UInt64: ContinuousClock.Instant] = [:]
     private var nextHeartbeatID: UInt64 = 0
+    private let recordsIntervals: Bool
+    private var intervalCompletedCount = 0
+    private var intervalDelayed: [DelayedHeartbeat] = []
+    private var intervalDroppedCount = 0
 
-    init() {}
+    init(recordsIntervals: Bool = false) {
+        self.recordsIntervals = recordsIntervals
+    }
 
     /// Start (or join) a measurement session.
     func begin() {
@@ -89,6 +118,9 @@ final class MainThreadStallWatchdog: @unchecked Sendable {
         scheduledHeartbeatCount = 0
         completedHeartbeatCount = 0
         pendingSentAt.removeAll(keepingCapacity: true)
+        intervalCompletedCount = 0
+        intervalDelayed.removeAll(keepingCapacity: true)
+        intervalDroppedCount = 0
 
         let source = DispatchSource.makeTimerSource(queue: queue)
         source.schedule(deadline: .now() + .milliseconds(100), repeating: .milliseconds(100))
@@ -171,8 +203,41 @@ final class MainThreadStallWatchdog: @unchecked Sendable {
             self.pendingSentAt.removeValue(forKey: heartbeatID)
             self.completedHeartbeatCount += 1
             self.recordDelayLocked(ms)
+            if self.recordsIntervals {
+                self.recordIntervalLocked(ms)
+            }
             self.lock.unlock()
         }
+    }
+
+    /// The heartbeats completed since the previous drain (an interval-recording
+    /// watchdog; empty otherwise), and a fresh interval.
+    func drainInterval() -> IntervalHeartbeats {
+        lock.lock()
+        defer { lock.unlock() }
+        let interval = IntervalHeartbeats(
+            completedHeartbeatCount: intervalCompletedCount,
+            delayedHeartbeats: intervalDelayed,
+            droppedEventCount: intervalDroppedCount
+        )
+        intervalCompletedCount = 0
+        intervalDelayed.removeAll(keepingCapacity: true)
+        intervalDroppedCount = 0
+        return interval
+    }
+
+    /// Callers hold `lock`.
+    private func recordIntervalLocked(_ ms: Int) {
+        intervalCompletedCount += 1
+        guard ms > 50 else { return }
+        guard intervalDelayed.count < Self.intervalEventLimit else {
+            intervalDroppedCount += 1
+            return
+        }
+        intervalDelayed.append(DelayedHeartbeat(
+            completedEpochMS: Int64((Date().timeIntervalSince1970 * 1_000).rounded()),
+            delayMS: ms
+        ))
     }
 
     /// Callers hold `lock`.

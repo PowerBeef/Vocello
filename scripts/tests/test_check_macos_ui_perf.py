@@ -81,7 +81,8 @@ class UIPerfFixture(unittest.TestCase):
 
     def write_run(self, hitch_by_scenario: dict[str, float] | None = None, *,
                   refresh_ms: float = 16.667, footprint_growth: dict[str, float] | None = None,
-                  probe_summary: dict | None = None, sampler_interval_ms: int | None = None):
+                  probe_summary: dict | None = None, sampler_interval_ms: int | None = None,
+                  samples: bool = False):
         hitch_by_scenario = hitch_by_scenario or {}
         footprint_growth = footprint_growth or {}
         log_lines = []
@@ -106,6 +107,13 @@ class UIPerfFixture(unittest.TestCase):
             for index, block in enumerate(blocks):
                 block["refreshIntervalMS"] = refresh_ms
                 block["footprintMB"] = 60.0 + footprint_growth.get(scenario, 0.0) * index / (len(blocks) - 1)
+                if samples:
+                    # Every frame gap and the block's heartbeats (audit #80, #81).
+                    block["gaps"] = [[round((frame + 1) * 16.667, 2), 16.67] for frame in range(30)]
+                    block["heartbeatCount"] = 5
+                    block["delayedHeartbeats"] = (
+                        [[block["startEpochMS"] + 250, 120]] if index == 4 else []
+                    )
             rows += [dict(block, scenario=scenario) for block in blocks]
             if probe_summary is not None:
                 rows.append({"kind": "summary", "scenario": scenario, **probe_summary})
@@ -406,6 +414,40 @@ class WindowArithmeticTests(unittest.TestCase):
             {"step": "xcuitest", "status": "passed", "secondsSincePrevious": 210.0},
         ])
         self.assertEqual(lane.lane_phases({}, None, checker.EXPECTED_SCENARIOS), {"scenarios": [], "windowShare": None})
+
+    def test_samples_clip_the_maximum_gap_and_scope_heartbeats_to_the_window(self):
+        """audit #80, #81: a gap straddling the window edge counts only its
+        in-window part, p95 comes from samples, heartbeats by completion time."""
+        blocks = make_blocks(0, 4)
+        for block in blocks:
+            block["gaps"] = [[16.67 * (frame + 1), 16.67] for frame in range(29)]
+            block["heartbeatCount"] = 5
+            block["delayedHeartbeats"] = []
+        # A 400 ms stall ending 100 ms into the window [1_000, 2_000): 300 ms
+        # of it fell before the window opened.
+        blocks[2]["gaps"].append([100.0, 400.0])
+        blocks[2]["maxGapMS"] = 400.0
+        blocks[3]["delayedHeartbeats"] = [[1_700, 300], [2_600, 900]]
+        summary, _ = checker.summarize_scenario(self.marker(1_000, 2_000), blocks, exploratory=set())
+        self.assertEqual(summary["maxGapMS"], 100.0)
+        self.assertTrue(summary["maxGapClipped"])
+        self.assertEqual(summary["p95GapMS"], 16.67)
+        self.assertEqual(summary["gapSampleCount"], 59)
+        self.assertIsNone(summary["p95GapMSApprox"])
+        self.assertEqual(summary["windowHeartbeats"], {
+            "heartbeatCount": 10, "delayedHeartbeatCount50": 1,
+            "delayedHeartbeatCount250": 1, "maximumDelayedHeartbeatMS": 300,
+        })
+        metrics = checker.take_metrics(summary)
+        self.assertEqual(metrics["uiMaxGapMS"], 100.0)
+        self.assertEqual(metrics["uiP95GapMS"], 16.67)
+        self.assertNotIn("uiP95GapMSApprox", metrics)
+        self.assertEqual(metrics["uiWindowMaximumDelayedHeartbeatMS"], 300)
+        # A probe without samples keeps the block maxima and the approximation.
+        legacy, _ = checker.summarize_scenario(self.marker(1_000, 2_000), make_blocks(0, 4), exploratory=set())
+        self.assertNotIn("maxGapClipped", legacy)
+        self.assertIsNotNone(legacy["p95GapMSApprox"])
+        self.assertFalse({key for key in checker.take_metrics(legacy) if key.startswith("uiWindowHeartbeat") or key.startswith("uiWindowDelayed") or key.startswith("uiWindowMaximum")})
 
     def test_a_missing_refresh_interval_fails_closed(self):
         blocks = make_blocks(0, 4)

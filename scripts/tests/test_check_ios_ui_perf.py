@@ -71,6 +71,7 @@ class IOSUIPerfFixture(unittest.TestCase):
         hitch_by_scenario: dict[str, float] | None = None,
         frames_by_scenario: dict[str, int] | None = None,
         block_count_by_scenario: dict[str, int] | None = None,
+        sampler_interval_ms: int | None = None,
     ):
         hitch_by_scenario = hitch_by_scenario or {}
         frames_by_scenario = frames_by_scenario or {}
@@ -91,6 +92,7 @@ class IOSUIPerfFixture(unittest.TestCase):
                 "loadAverage1Minute": 1.5 + offset * 0.1,
                 "freeStorageBytes": 40_000_000_000 + offset,
                 "thermalState": "nominal",
+                **({"telemetrySamplerIntervalMS": sampler_interval_ms} if sampler_interval_ms else {}),
             }]
             rows += [dict(block, scenario=scenario) for block in make_blocks(
                 window_start - 1_000,
@@ -142,6 +144,18 @@ class IOSUIPerfFixture(unittest.TestCase):
         self.assertEqual(len(report["scenarios"]), len(checker.EXPECTED_SCENARIOS))
         for scenario in report["scenarios"]:
             self.assertEqual(scenario["medianBlockCadenceHz"], 60.0)
+
+    def test_generation_active_names_its_sampler_cadence(self):
+        """audit #33 (iPhone): the probe's environment row names the cadence."""
+        status, report = self.run_checker(self.write_run(sampler_interval_ms=500))
+        self.assertEqual(status, 0)
+        generation = next(item for item in report["scenarios"] if item["scenario"] == "ios-generation-active")
+        self.assertEqual(checker.take_metrics(generation)["samplerTargetIntervalMS"], 500)
+        others = [item for item in report["scenarios"] if item["scenario"] != "ios-generation-active"]
+        self.assertFalse([item for item in others if "samplerTargetIntervalMS" in checker.take_metrics(item)])
+        status, report = self.run_checker(self.write_run())
+        generation = next(item for item in report["scenarios"] if item["scenario"] == "ios-generation-active")
+        self.assertNotIn("samplerTargetIntervalMS", checker.take_metrics(generation))
 
     def test_missing_marker_fails_closed(self):
         log = self.write_run()

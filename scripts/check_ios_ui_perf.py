@@ -61,6 +61,7 @@ if str(REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from lib import ui_perf_thresholds as calibration_rules  # noqa: E402
 from lib import ui_perf_lane  # noqa: E402
+from lib import ui_perf_samples  # noqa: E402
 
 EXPECTED_SCENARIOS = [
     "ios-idle-baseline",
@@ -250,7 +251,7 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
     summary_rows = [r for r in rows if r.get("kind") == "summary"]
     stall = summary_rows[0] if summary_rows else {}
     scenario = marker["scenario"]
-    return {
+    summary = {
         "scenario": scenario,
         "designation": "exploratory" if scenario in exploratory else "confirmatory",
         "durationMS": duration_ms,
@@ -280,7 +281,15 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
         "launchStalls250": stall.get("delayedHeartbeatCount250"),
         "launchMaxStallMS": stall.get("maximumDelayedHeartbeatMS"),
         "actionCount": marker.get("actionCount"),
-    }, coverage
+    }
+    # Probes since 2026-09-25 carry every frame gap and the block's heartbeats:
+    # the maximum gap is then clipped to the window, p95 comes from samples, and
+    # heartbeat statistics are window-scoped (audit #80, #81).
+    try:
+        ui_perf_samples.apply(summary, window, start, end, fractions)
+    except ValueError as error:
+        raise GateError(f"scenario '{scenario}': {error}") from None
+    return summary, coverage
 
 
 def evaluate_cadence(summary: dict) -> list[str]:
@@ -394,6 +403,25 @@ def run_hardware_context(
     return hardware
 
 
+# The scenario that runs a real take, with the memory samplers alongside.
+GENERATION_SCENARIO = "ios-generation-active"
+
+
+def sampler_interval(rows: list[dict]) -> dict:
+    """The telemetry sampler cadence the scenario's launch ran (audit #33, the
+    iPhone twin of the macOS probe's), when its environment row names one;
+    probes before 2026-09-25 do not."""
+    values = {
+        row["telemetrySamplerIntervalMS"] for row in rows
+        if row.get("kind") == "environment"
+        and isinstance(row.get("telemetrySamplerIntervalMS"), (int, float))
+        and not isinstance(row.get("telemetrySamplerIntervalMS"), bool)
+    }
+    if len(values) != 1:
+        return {}
+    return {"samplerIntervalMS": values.pop()}
+
+
 def take_metrics(summary: dict) -> dict:
     metrics = {
         "uiHitchTimeMSPerS": summary["hitchTimeMSPerS"],
@@ -415,8 +443,12 @@ def take_metrics(summary: dict) -> dict:
         "physicalFootprintDeltaMB": summary.get("footprintDeltaMB"),
         # The probe watchdog's launch-scoped summary is not mapped onto the
         # generation-scoped heartbeat metrics (audit #80).
+        # ios-generation-active only: the memory samplers' cadence (audit #33).
+        "samplerTargetIntervalMS": summary.get("samplerIntervalMS"),
     }
     metrics.update({key: value for key, value in optional.items() if value is not None})
+    # Window-scoped samples (audit #80, #81).
+    metrics.update(ui_perf_samples.take_metrics(summary))
     return metrics
 
 
@@ -584,6 +616,8 @@ def main() -> int:
                     f"{sorted(env_scenarios)}"
                 )
             summary, coverage = summarize_scenario(markers[name], rows, exploratory=exploratory)
+            if name == GENERATION_SCENARIO:
+                summary.update(sampler_interval(rows))
             if coverage < COVERAGE_FLOOR:
                 raise GateError(
                     f"scenario '{name}': probe coverage {coverage:.0%} below "

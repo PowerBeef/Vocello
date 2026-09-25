@@ -522,6 +522,14 @@ METRIC_KEYS = {
     # In-window excess frame time per scripted action (records since
     # 2026-09-25, audit #79; never backfilled).
     "uiHitchMSPerAction",
+    # From the probe's per-block samples (records since 2026-09-25, audit #80,
+    # #81): the p95 of the frame gaps that end in the window and how many it
+    # read (its presence also marks uiMaxGapMS as clipped to the window), and
+    # the window's own heartbeats: completed, delayed past 50 and 250 ms, and
+    # the largest delay past 50 ms (0 when none).
+    "uiP95GapMS", "uiGapSampleCount",
+    "uiWindowHeartbeatCount", "uiWindowDelayedHeartbeatCount50",
+    "uiWindowDelayedHeartbeatCount250", "uiWindowMaximumDelayedHeartbeatMS",
 }
 UI_PERF_REQUIRED_METRICS = {
     "uiHitchTimeMSPerS", "uiMaxGapMS", "uiFramesDelivered", "uiExpectedFrames",

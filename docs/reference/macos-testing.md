@@ -223,8 +223,16 @@ sidebar-navigation-warms measures them apart. Scenarios that repeat a cycle (sid
 delivery-menu, composer-typing) mark each cycle, and the report lists a hitch rate per cycle;
 records also carry `uiHitchMSPerAction`, the window's excess frame time per scripted action, and the
 generation-active take names the memory samplers' cadence during its take (`samplerTargetIntervalMS`,
-from the probe's environment row: 100, 250 or 500 ms by tier). The probe watchdog's launch-scoped summary stays in the report and is never published under the
-generation-scoped heartbeat names. On the canonical hardware profile
+from the probe's environment row: 100, 250 or 500 ms by tier; the iPhone lane names it too). Since
+2026-09-25 each probe block also carries every frame gap (`gaps`, end offset and length) and the
+private watchdog's heartbeats of that block (`heartbeatCount`, `delayedHeartbeats`), so the checker
+clips `uiMaxGapMS` to the window (a gap straddling a window edge counts only its in-window part),
+takes `uiP95GapMS` from the gaps that end in the window instead of a histogram bucket edge (with
+`uiGapSampleCount`; `uiP95GapMSApprox` is no longer published for such probes) and publishes the
+window's own heartbeats (`uiWindowHeartbeatCount`, `uiWindowDelayedHeartbeatCount50`/`250`,
+`uiWindowMaximumDelayedHeartbeatMS`) (audit #80, #81). The watchdog's launch-scoped summary stays in
+the report and is never published under the generation-scoped heartbeat names; probes without the
+samples keep the block-level fallbacks. On the canonical hardware profile
 only, the checker emits `benchmark-evidence.json`, which the lane publishes as a
 PASS-only `ui-perf` registry record (one take per scenario, no
 model/telemetry/QC claims). Non-canonical hosts keep local-only reports, and

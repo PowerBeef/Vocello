@@ -57,6 +57,7 @@ if str(REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from lib import ui_perf_thresholds as calibration_rules  # noqa: E402
 from lib import ui_perf_lane  # noqa: E402
+from lib import ui_perf_samples  # noqa: E402
 
 EXPECTED_SCENARIOS = [
     "idle-baseline",
@@ -324,7 +325,7 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
     action_count = marker.get("actionCount")
     cycle_rates = cycle_hitch_rates(marker, blocks)
     phase_rates = phase_hitch_rates(marker, blocks)
-    return {
+    summary = {
         "scenario": scenario,
         "designation": "exploratory" if scenario in exploratory else "confirmatory",
         "durationMS": duration_ms,
@@ -360,7 +361,15 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
         "launchStalls250": stall.get("delayedHeartbeatCount250"),
         "launchMaxStallMS": stall.get("maximumDelayedHeartbeatMS"),
         "actionCount": action_count,
-    }, coverage
+    }
+    # Probes since 2026-09-25 carry every frame gap and the block's heartbeats:
+    # the maximum gap is then clipped to the window, p95 comes from samples, and
+    # heartbeat statistics are window-scoped (audit #80, #81).
+    try:
+        ui_perf_samples.apply(summary, window, start, end, fractions)
+    except ValueError as error:
+        raise GateError(f"scenario '{scenario}': {error}") from None
+    return summary, coverage
 
 
 def load_thresholds(path: Path) -> dict:
@@ -476,6 +485,9 @@ def take_metrics(summary: dict) -> dict:
         "samplerTargetIntervalMS": summary.get("samplerIntervalMS"),
     }
     metrics.update({key: value for key, value in optional.items() if value is not None})
+    # Window-scoped samples (audit #80, #81): the sample p95, how many gaps it
+    # read, and the window's own heartbeats.
+    metrics.update(ui_perf_samples.take_metrics(summary))
     return metrics
 
 

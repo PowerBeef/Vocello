@@ -50,7 +50,9 @@ final class IOSUIPerfFrameProbe: NSObject {
 
     private let scenario: String
     private let launchEpochMS: Int64
-    private let watchdog = MainThreadStallWatchdog()
+    /// Records per-block heartbeats (audit #80): the window, not the launch,
+    /// scopes the published heartbeat statistics.
+    private let watchdog = MainThreadStallWatchdog(recordsIntervals: true)
     private var displayLink: CADisplayLink?
     private var writer: FileHandle?
     private let writerQueue = DispatchQueue(label: "com.qwenvoice.ios-uiperf-writer", qos: .utility)
@@ -65,6 +67,12 @@ final class IOSUIPerfFrameProbe: NSObject {
     /// Gap histogram in multiples of the refresh interval:
     /// ≤1.25×, ≤1.75×, ≤2.75×, ≤4.75×, ≤8×, ≤16×, >16×.
     private var gapHistogram = [0, 0, 0, 0, 0, 0, 0]
+    /// Every frame gap of the block as [end offset from the block start, gap],
+    /// both in ms, at most `gapSampleLimit` (audit #81): the checker clips the
+    /// maximum gap to the measured window and takes p95 from the samples.
+    private var gapSamples: [[Double]] = []
+    private var gapSamplesDropped = 0
+    private static let gapSampleLimit = 256
 
     private init(scenario: String) {
         self.scenario = scenario
@@ -121,6 +129,12 @@ final class IOSUIPerfFrameProbe: NSObject {
         framesDelivered += 1
         sumExcessMS += max(0, deltaMS - expectedMS)
         maxGapMS = max(maxGapMS, deltaMS)
+        let nowEpochMS = Int64(Date().timeIntervalSince1970 * 1000)
+        if gapSamples.count < Self.gapSampleLimit {
+            gapSamples.append([Double(nowEpochMS - blockStartEpochMS), (deltaMS * 100).rounded() / 100])
+        } else {
+            gapSamplesDropped += 1
+        }
         if expectedMS > 0 {
             let multiple = deltaMS / expectedMS
             let bucket: Int
@@ -135,7 +149,6 @@ final class IOSUIPerfFrameProbe: NSObject {
             }
             gapHistogram[bucket] += 1
         }
-        let nowEpochMS = Int64(Date().timeIntervalSince1970 * 1000)
         if Double(nowEpochMS - blockStartEpochMS) >= Self.blockDurationMS {
             flushBlock(endEpochMS: nowEpochMS)
         }
@@ -162,12 +175,26 @@ final class IOSUIPerfFrameProbe: NSObject {
             let windowMS = Double(endEpochMS - blockStartEpochMS)
             row["expectedFrames"] = Int((windowMS / refreshIntervalMS).rounded())
         }
+        row["gaps"] = gapSamples
+        if gapSamplesDropped > 0 {
+            row["gapsDropped"] = gapSamplesDropped
+        }
+        // The block's own heartbeats (audit #80): completed count and each
+        // heartbeat delayed past 50 ms as [completion epoch ms, delay ms].
+        let heartbeats = watchdog.drainInterval()
+        row["heartbeatCount"] = heartbeats.completedHeartbeatCount
+        row["delayedHeartbeats"] = heartbeats.delayedHeartbeats.map { [$0.completedEpochMS, Int64($0.delayMS)] }
+        if heartbeats.droppedEventCount > 0 {
+            row["delayedHeartbeatsDropped"] = heartbeats.droppedEventCount
+        }
         append(row)
         blockStartEpochMS = endEpochMS
         framesDelivered = 0
         sumExcessMS = 0
         maxGapMS = 0
         gapHistogram = [0, 0, 0, 0, 0, 0, 0]
+        gapSamples.removeAll(keepingCapacity: true)
+        gapSamplesDropped = 0
     }
 
     /// One privacy-safe device-environment row per launch (IUI-6): the same
@@ -196,6 +223,14 @@ final class IOSUIPerfFrameProbe: NSObject {
         ]
         if loadCount > 0 { row["loadAverage1Minute"] = loadValues[0] }
         if let freeStorageBytes { row["freeStorageBytes"] = freeStorageBytes }
+        // The memory samplers' cadence while a take runs (audit #33): the
+        // generation-active window shares the process with them, so the record
+        // names it, as the macOS probe does.
+        if let samplerIntervalMS = TelemetryGate.appProcessIntendedMode.sampleIntervalMS(
+            for: NativeMemoryPolicyResolver.deviceClass()
+        ) {
+            row["telemetrySamplerIntervalMS"] = samplerIntervalMS
+        }
         append(row)
     }
 

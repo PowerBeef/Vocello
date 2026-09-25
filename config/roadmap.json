@@ -1455,7 +1455,7 @@
         "Sources/QwenVoiceCore/NativeTelemetrySampler.swift",
         "config/memory-qualification-policy.json"
       ],
-      "notes": "Audit #1 #2 #3 #4 #16 #24 #25 #26 #64 #65 #66 #67 #68 #70 #90 V-4. Headline: since the engine moved in-process, macOS UI memory is summed from two samplers of one process (about 1.8x in 8 exploratory records; no canonical record yet), and the 500 ms sampler misses short peaks (119 of 173 memory-qualification takes miss the Metal peak) while exact high-water marks go unused. Needs maintainer rule decisions (audit 4.4: native.md single memory series per process; release.md coverage rule). Must land before AV-17.",
+      "notes": "Audit #1 #2 #3 #4 #16 #24 #25 #26 #64 #65 #66 #67 #68 #70 #90 V-4. Headline: since the engine moved in-process, macOS UI memory is summed from two samplers of one process (about 1.8x in 8 exploratory records; no canonical record yet), and the 500 ms sampler misses short peaks (119 of 173 memory-qualification takes miss the Metal peak) while exact high-water marks go unused. Needs maintainer rule decisions (audit 4.4: native.md single memory series per process; release.md coverage rule). Must land before AV-17. Maintainer decisions 2026-09-25: approved one memory series per process (native.md, app layer for frontend timings only) and replacing the >=95% coverage rule with a maximum unobserved gap plus a peak-fidelity check (native.md, release.md); keep memory-profile traces by default (#69, release.md).",
       "updated": "2026-09-25"
     },
     {
@@ -1471,7 +1471,7 @@
         "Sources/VocelloCLI/BenchCommand.swift",
         "benchmarks/baselines/mac-gate-bench.json"
       ],
-      "notes": "Audit #5 #11 #13 #14 #15 #19 #20 #27 #36 #53 #54 #55 #57 #58 #59 #63 V-5 V-6 V-7. Headlines: the footprint threshold collapsed to a flat 5% while identical-source runs drift 2-13% (false regressions on re-seed), the gate is unseeded, the printed repair command wastes a run, a missing model is found only after 3-4 minutes, the 48-sidecar prune makes the default 58-take matrix unpublishable, and the bench's telemetry-off arm is not off. Files are in harnessHash or the baseline identity, so this lands before the re-seed. Must land before AV-17.",
+      "notes": "Audit #5 #11 #13 #14 #15 #19 #20 #27 #36 #53 #54 #55 #57 #58 #59 #63 V-5 V-6 V-7. Headlines: the footprint threshold collapsed to a flat 5% while identical-source runs drift 2-13% (false regressions on re-seed), the gate is unseeded, the printed repair command wastes a run, a missing model is found only after 3-4 minutes, the 48-sidecar prune makes the default 58-take matrix unpublishable, and the bench's telemetry-off arm is not off. Files are in harnessHash or the baseline identity, so this lands before the re-seed. Must land before AV-17. Maintainer decisions 2026-09-25: the gate bench measures five warm takes (release.md:89, #5) and a stricter per-take host-load limit marks a timing record exploratory (#28, release.md host rules).",
       "updated": "2026-09-25"
     },
     {
@@ -1487,7 +1487,7 @@
         "config/ui-perf-thresholds.json",
         "scripts/ui_test.sh"
       ],
-      "notes": "Audit #6 #17 #18 #21 #28-#35 #72 #74 #75 #77-#83 V-1 V-3 V-8 V-9. Headline: the macOS stall gate went live on the M6 with zero tolerance for delayed heartbeats, which 90.3% of M2 takes had, so the first canonical M6 benchmark is likely to fail; per-take harness overhead (captured playback, per-character typing) is unmeasured. Several choices need maintainer decisions (audit 4.5). Must land before AV-17.",
+      "notes": "Audit #6 #17 #18 #21 #28-#35 #72 #74 #75 #77-#83 V-1 V-3 V-8 V-9. Headline: the macOS stall gate went live on the M6 with zero tolerance for delayed heartbeats, which 90.3% of M2 takes had, so the first canonical M6 benchmark is likely to fail; per-take harness overhead (captured playback, per-character typing) is unmeasured. Several choices need maintainer decisions (audit 4.5). Must land before AV-17. Maintainer decisions 2026-09-25: publish medians pooled across recent canonical records instead of repinning to the newest one (#72, release.md); the stricter per-take load limit applies to UI timing records too.",
       "updated": "2026-09-25"
     },
     {
@@ -1502,7 +1502,7 @@
         "scripts/publish_benchmark_history.py",
         "scripts/ci/classify_changes.py"
       ],
-      "notes": "Audit #8 #22 #23 #46 #47 #71 #73 #76 #91-#94. Headlines: producer round-trip tests would have caught four publication refusals (each a new 14-17 minute consented run); the comparison key is broader than the measurement (needs a rules decision, audit 4.4); 55 darwin-only publication tests never run in CI; mocking one host probe saves about 35-40 s of macOS CI per push. Must land before AV-17.",
+      "notes": "Audit #8 #22 #23 #46 #47 #71 #73 #76 #91-#94. Headlines: producer round-trip tests would have caught four publication refusals (each a new 14-17 minute consented run); the comparison key is broader than the measurement (needs a rules decision, audit 4.4); 55 darwin-only publication tests never run in CI; mocking one host probe saves about 35-40 s of macOS CI per push. Must land before AV-17. Maintainer decision 2026-09-25: approved narrowing each record kind's comparison key to what it measures, legacy keys byte-identical, with a contract-version bump rule (release.md, #22 #23 #34).",
       "updated": "2026-09-25"
     },
     {

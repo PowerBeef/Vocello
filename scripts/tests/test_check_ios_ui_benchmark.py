@@ -159,6 +159,7 @@ class CheckIOSUIBenchmarkTests(unittest.TestCase):
         cells: list[tuple[str, str, str]],
         mutate_rows=None,
         mutate_app_rows=None,
+        mutate_engine_after_upgrade=None,
         malformed_layer: str | None = None,
         evidence: bool = False,
         modes: str = "custom,clone",
@@ -185,6 +186,8 @@ class CheckIOSUIBenchmarkTests(unittest.TestCase):
                 for row in rows
             ]
             upgrade_rows_to_v8(rows, app_rows, diagnostics)
+            if mutate_engine_after_upgrade is not None:
+                mutate_engine_after_upgrade(rows)
             if mutate_app_rows is not None:
                 mutate_app_rows(app_rows)
             (engine / "generations.jsonl").write_text(
@@ -409,6 +412,44 @@ class CheckIOSUIBenchmarkTests(unittest.TestCase):
         result = self.run_checker(cells, mutate_rows=two_seeds)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("different sampling seeds", result.stdout + result.stderr)
+
+    def test_every_take_gets_the_model_identity_check_with_one_seed_per_mode(self) -> None:
+        # V-1: the per-take identity and schema checks once ran only when a mode
+        # used several seeds, and then only against the last row. A defect on
+        # any earlier take must refuse publication with one seed per mode.
+        def seed_every_take(rows):
+            for row in rows:
+                row["notes"]["samplingSeed"] = "42"
+
+        breakages = {
+            "revision": lambda row: row["modelRuntimeIdentity"].pop("huggingFaceRevision"),
+            "integrity": lambda row: row["modelRuntimeIdentity"].pop("integrityManifestDigest"),
+            "prompt-digest": lambda row: row["notes"].pop("promptDigest"),
+            "fixture-digest": lambda row: row["modelRuntimeIdentity"].pop("fixtureDigest"),
+        }
+        for name, breakage in breakages.items():
+            # Take 4 is the first clone take, so it has a fixture digest to
+            # lose; every other defect lands on take 1, never the last row.
+            target = 3 if name == "fixture-digest" else 0
+
+            def break_one_take(rows, breakage=breakage, target=target):
+                breakage(rows[target])
+
+            with self.subTest(breakage=name):
+                result = self.run_checker(
+                    self.expected_order,
+                    mutate_rows=seed_every_take,
+                    mutate_engine_after_upgrade=break_one_take,
+                    evidence=True,
+                )
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIsNone(self.last_manifest)
+
+        # The same seeded matrix without a defect still passes.
+        result = self.run_checker(
+            self.expected_order, mutate_rows=seed_every_take, evidence=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_schema_v8_complete_accuracy_evidence_passes(self) -> None:
         result = self.run_checker(

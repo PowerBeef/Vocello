@@ -725,9 +725,6 @@ def main() -> int:
         identity = row.get("modelRuntimeIdentity") or {}
         if row.get("schemaVersion", 0) >= 7:
             failures.extend(validate_v7_engine_telemetry(row))
-    for mode, seeds in sorted(seeds_by_mode.items()):
-        if len(seeds) > 1:
-            failures.append(f"mode {mode} used {len(seeds)} different sampling seeds; the matrix freezes one seed per mode")
             if not isinstance(row.get("backendMetrics"), dict):
                 failures.append(f"{row.get('generationID', '?')}: missing typed backend metrics")
             if identity.get("resolvedModelID") != row.get("modelID"):
@@ -756,6 +753,11 @@ def main() -> int:
                 f"{row.get('generationID', '?')}: benchmark publication requires telemetry "
                 f"schema v{REQUIRED_TELEMETRY_SCHEMA} or newer"
             )
+    # Checked once the whole matrix is known; the per-take identity and schema
+    # checks above belong to every row, not to this loop (V-1).
+    for mode, seeds in sorted(seeds_by_mode.items()):
+        if len(seeds) > 1:
+            failures.append(f"mode {mode} used {len(seeds)} different sampling seeds; the matrix freezes one seed per mode")
 
     valid_ids = [value for value in generation_ids if isinstance(value, str) and value]
     failures.extend(validate_layer("app", app_rows, valid_ids, expected_count))

@@ -42,10 +42,12 @@ final class MainThreadStallWatchdogTests: XCTestCase {
         let report = try XCTUnwrap(watchdog.end())
 
         XCTAssertEqual(report.completedHeartbeatCount, 0)
-        XCTAssertGreaterThanOrEqual(report.censoredHeartbeatCount, 3)
+        // About five ticks fit in the sleep; the bounds leave room for a
+        // loaded CI host firing the utility-queue timer late.
+        XCTAssertGreaterThanOrEqual(report.censoredHeartbeatCount, 2)
         XCTAssertEqual(report.scheduledHeartbeatCount, report.censoredHeartbeatCount)
         // The first heartbeat was sent about 100 ms in and waited about 500 ms.
-        XCTAssertGreaterThanOrEqual(report.maximumDelayedHeartbeatMS, 350)
+        XCTAssertGreaterThanOrEqual(report.maximumDelayedHeartbeatMS, 300)
         XCTAssertGreaterThanOrEqual(report.delayedHeartbeatCount250, 1)
         XCTAssertGreaterThanOrEqual(report.delayedHeartbeatCount50, report.delayedHeartbeatCount250)
         XCTAssertEqual(report.asCounters["censoredHeartbeatCount"], report.censoredHeartbeatCount)

@@ -873,7 +873,13 @@ consecutive samples of the series may exceed the unobserved-gap bound declared i
 `config/memory-qualification-policy.json` (`unobservedGapBound`: twice the sampler cadence, at least
 500 ms, so a single stall at the 100 ms cadence of Macs above 16 GB does not fail a take). The bound
 is provisional: the first consented memory lane on the canonical M6 calibrates it, and each take
-records the bound it met as `samplerUnobservedGapLimitMS`. Each take also publishes
+records the bound it met as `samplerUnobservedGapLimitMS`. After that lane,
+`python3 scripts/derive_memory_calibration.py benchmarks/runs/memory-qualification/<run-id>.json`
+prints what the run measured and the bounds it proposes: the gap multiple (never below 2, the
+floor unchanged) that covers every take's longest gap with a 1.25 margin, and each mode's
+retained-memory-v2 bound (the mode's MLX growth plus three times its end-of-take spread, rounded up
+to 8 MB, at least 16 MB). `--write` records them in the policy as calibrated with the run ID (the gap
+bound only from a macOS record); the maintainer commits the policy with the record. Each take also publishes
 how far its sampled peaks fell below the exact high-water marks (`gpuPeakCaptureMissMB` against
 `mlxPeakMB`, and the kernel footprint ledger when sampled). Guarded pressure or `softTrim` produces
 `passedWithWarnings`; the routine post-generation cache clear is counted as `policyCacheClearCount`

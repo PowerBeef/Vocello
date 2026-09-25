@@ -137,6 +137,8 @@ PROFILE_SUMMARY = (
     "scripts/lib/profile_trace_retention.py",
     # The per-take decode-loop interval statistics and their completeness check.
     "scripts/lib/trace_intervals.py",
+    # The per-take CPU cycles per rusage CPU-second (audit #97).
+    "scripts/lib/trace_cpu.py",
 )
 
 LINEAGE_PATHS: dict[tuple[str, str], tuple[str, ...]] = {
@@ -222,10 +224,11 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # 2 (2026-09-25, audit #12/#99): the CPU profile records three warm takes
     # instead of one on a quiet host, and publishes per-take decode-loop
     # interval statistics that must keep 36 intervals per decode step.
-    # 3 (2026-09-25, audit #50): the kind gains the os_signpost-only witness
-    # profile, and a macOS profile's matrix hash names its profile kind, so a
-    # witness, CPU or memory profile never shares a lineage. No record of the
-    # kind carried the lineage stamp yet.
+    # 3 (2026-09-25, audit #50/#97): the kind gains the os_signpost-only
+    # witness profile, a macOS profile's matrix hash names its profile kind, so
+    # a witness, CPU or memory profile never shares a lineage, and a CPU trace
+    # reports each take's cycles per rusage CPU-second. No record of the kind
+    # carried the lineage stamp yet.
     ("instrument-profile", "macos"): 3,
     # 2 (2026-09-25, audit #45/#56): the iPhone gate's generation step and the
     # memory-qualification wait no longer copy the whole diagnostics tree from
@@ -242,7 +245,8 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # 2 (2026-09-25, audit #51/#52): the iPhone memory profile records through
     # the Allocations template (no automatic VM snapshots, which suspended the
     # target), and every iPhone profile stops recording once its take's sentinel
-    # appears instead of recording the idle app to the time limit.
+    # appears instead of recording the idle app to the time limit; a CPU trace
+    # reports the take's cycles per rusage CPU-second (audit #97).
     ("instrument-profile", "ios"): 2,
 }
 

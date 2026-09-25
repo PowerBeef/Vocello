@@ -3490,6 +3490,57 @@ class PublisherTests(unittest.TestCase):
                 require_cpu_samples=require_cpu_samples,
             )
 
+    def test_a_cpu_profile_reports_cycles_per_cpu_second_and_unresolved_rows(self) -> None:
+        # audit #97: the take's CPU Profiler cycles inside its generation window
+        # against its own rusage CPU seconds, and the CPU rows the sums lost.
+        trace = self.root / "profile-cpu.trace"
+        trace.mkdir(exist_ok=True)
+        message = "runID=profile-run generationID=gen-1 takeIndex=1 cell=custom/speed/medium/warm#0"
+
+        def fake_export(command, **_kwargs):
+            output = Path(command[command.index("--output") + 1])
+            xpath = command[command.index("--xpath") + 1]
+            if "cpu-profile" in xpath:
+                xml = """<trace-query-result>
+                <row><process pid='4242'/><sample-time>2000000</sample-time><cycle-weight id='c'>1500000000</cycle-weight></row>
+                <row><process pid='4242'/><sample-time>3000000</sample-time><cycle-weight ref='c'/></row>
+                <row><process pid='4242'/><sample-time>4000000</sample-time></row>
+                <row><process pid='9999'/><sample-time>5000000</sample-time><cycle-weight>7</cycle-weight></row>
+                </trace-query-result>"""
+            elif "os-signpost-interval" in xpath:
+                xml = self.interval_export(generated_tokens=2)
+            else:
+                xml = f"""<trace-query-result><node>
+                <schema name='os-signpost'><col><mnemonic>time</mnemonic></col>
+                <col><mnemonic>event-type</mnemonic></col><col><mnemonic>process</mnemonic></col>
+                <col><mnemonic>message</mnemonic></col></schema>
+                <row><event-time>1000000</event-time><event-type fmt='Event'>Event</event-type>
+                <process pid='4242'/><os-log-metadata fmt='{message}'/></row>
+                </node></trace-query-result>"""
+            output.write_text(xml, encoding="utf-8")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with mock.patch.object(publisher.subprocess, "run", side_effect=fake_export):
+            summary = publisher.extract_trace_data_summary(
+                trace, {"cpu-profile", "os-signpost", "os-signpost-interval"},
+                run_id="profile-run", target_pid=4242,
+                expected_correlations={("gen-1", 1, "custom/speed/medium/warm#0")},
+                take_expectations={
+                    ("gen-1", 1, "custom/speed/medium/warm#0"): {
+                        "generatedTokens": 2, "endReason": "eos",
+                        "timingsMS": {}, "cpuSeconds": 1.5,
+                    },
+                },
+                require_complete_intervals=True,
+            )
+        block = summary["cpuPlausibility"]
+        # The third target row has no cycle weight; the other process's row is not the target's.
+        self.assertEqual(block["unresolvedRowCount"], 1)
+        take = block["takes"][0]
+        self.assertEqual(take["cycleWeight"], 3e9)
+        self.assertEqual(take["gigacyclesPerCPUSecond"], 2.0)
+        self.assertIs(take["plausible"], True)
+
     def test_a_witness_trace_publishes_its_intervals_without_cpu_fields(self) -> None:
         # audit #50: the os_signpost-only witness records no sampler, so its
         # summary has no CPU fields, never zeros, and keeps the full per-take

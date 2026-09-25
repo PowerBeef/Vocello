@@ -1248,6 +1248,9 @@
           "minimum": 0,
           "type": "number"
         },
+        "cpuPlausibility": {
+          "type": "object"
+        },
         "processCount": {
           "minimum": 1,
           "type": "integer"

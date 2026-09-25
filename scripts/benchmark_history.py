@@ -44,6 +44,7 @@ from lib import rtf as rtf_semantics
 from lib import jsonio  # noqa: E402
 from lib import lineage_identity  # noqa: E402
 from lib import bench_seed  # noqa: E402
+from lib import trace_cpu  # noqa: E402
 from lib import trace_intervals  # noqa: E402
 from lib.language_metrics import LANGUAGE_CHECK_KINDS  # noqa: E402
 from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
@@ -226,10 +227,13 @@ MEMORY_TRACE_V2_SUMMARY_KEYS = {
 # begin/end/point/interval counts, orphans, the recorded duration and per-take
 # decode-loop interval statistics (scripts/lib/trace_intervals.py).
 SIGNPOST_TRACE_SUMMARY_KEYS = set(trace_intervals.SUMMARY_KEYS)
+# Per-take cycles per rusage CPU-second and the CPU rows the sums lost (records
+# since 2026-09-25, audit #97; scripts/lib/trace_cpu.py).
+CPU_PLAUSIBILITY_TRACE_SUMMARY_KEYS = {"cpuPlausibility"}
 TRACE_SUMMARY_KEYS = {
     "artifact", "capturedDataRowCount", "capturedRowsBySchema",
     "correlatedSignpostEventCount", "correlationFieldsVerified",
-    "cpuCycleWeight", "cpuSampleCount", "cpuSampleSpanMS", "cpuSampleWeightMS",
+    "cpuCycleWeight", "cpuSampleCount", "cpuSampleSpanMS", "cpuSampleWeightMS", "cpuPlausibility",
     "processCount", "schemaCount", "signpostEventCount", "signpostSchemaCount",
     "tableCount", "targetPIDVerified", "targetProcess", "tocDigest",
 } | LEGACY_MEMORY_TRACE_SUMMARY_KEYS | MEMORY_TRACE_V2_SUMMARY_KEYS | SIGNPOST_TRACE_SUMMARY_KEYS
@@ -374,6 +378,7 @@ V2_ONLY_TRACE_SUMMARY_KEYS = {
     *LEGACY_MEMORY_TRACE_SUMMARY_KEYS,
     *MEMORY_TRACE_V2_SUMMARY_KEYS,
     *SIGNPOST_TRACE_SUMMARY_KEYS,
+    *CPU_PLAUSIBILITY_TRACE_SUMMARY_KEYS,
 }
 V2_ONLY_TRACE_KEYS = set(TRACE_RETENTION_KEYS)
 # Profile kinds a trace's capture settings may name. The witness (audit #50,
@@ -384,7 +389,9 @@ V2_ONLY_TRACE_KEYS = set(TRACE_RETENTION_KEYS)
 TRACE_PROFILE_KINDS = {"cpu", "memory", "witness"}
 WITNESS_TRACE_TEMPLATE = "os_signpost"
 CPU_TRACE_SUMMARY_KEYS = frozenset({"cpuSampleCount", "cpuSampleSpanMS"})
-CPU_SAMPLER_TRACE_SUMMARY_KEYS = CPU_TRACE_SUMMARY_KEYS | {"cpuCycleWeight", "cpuSampleWeightMS"}
+CPU_SAMPLER_TRACE_SUMMARY_KEYS = CPU_TRACE_SUMMARY_KEYS | {
+    "cpuCycleWeight", "cpuSampleWeightMS", "cpuPlausibility",
+}
 
 
 def schema_required_keys(version: int) -> dict[str, set[str]]:
@@ -2699,6 +2706,14 @@ def validate_trace_summary(record: dict[str, Any]) -> None:
         weight = summary.get("cpuCycleWeight", summary.get("cpuSampleWeightMS"))
         if not isinstance(weight, (int, float)) or isinstance(weight, bool) or weight <= 0:
             raise HistoryError("trace summary lacks positive CPU sample weight")
+    if "cpuPlausibility" in summary:
+        try:
+            trace_cpu.validate_cpu_plausibility(
+                summary["cpuPlausibility"],
+                take_indices=[take.get("takeIndex") for take in record["takes"]],
+            )
+        except ValueError as error:
+            raise HistoryError(str(error)) from error
     signpost_keys = SIGNPOST_TRACE_SUMMARY_KEYS.intersection(summary)
     if witness and not signpost_keys:
         raise HistoryError("a witness trace summary lacks its per-take interval statistics")

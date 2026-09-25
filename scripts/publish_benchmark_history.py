@@ -41,6 +41,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from lib import rtf as rtf_semantics  # noqa: E402
+from lib import trace_cpu  # noqa: E402
 from lib import trace_intervals  # noqa: E402
 from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
 from lib.audio_qc import (  # noqa: E402
@@ -1294,8 +1295,18 @@ def label_instrumented_takes(takes: list[dict[str, Any]], trace: dict[str, Any] 
     kind = settings.get("profileKind") if isinstance(settings, dict) else None
     if not isinstance(kind, str) or not kind:
         raise PublicationError("profile trace evidence does not name its profile kind")
+    summary = trace.get("summary") if isinstance(trace.get("summary"), dict) else {}
+    plausibility = summary.get("cpuPlausibility")
+    implausible = set(
+        trace_cpu.implausible_take_indices(plausibility) if isinstance(plausibility, dict) else []
+    )
     for take in takes:
-        take["warnings"] = sorted(set(take.get("warnings", [])) | {f"trace.instrumented:{kind}"})
+        labels = {f"trace.instrumented:{kind}"}
+        # The CPU Profiler's cycles disagree with the take's rusage CPU time
+        # (audit #97): a warning, never a failure.
+        if take.get("takeIndex") in implausible:
+            labels.add("trace.cpu-cycles-implausible")
+        take["warnings"] = sorted(set(take.get("warnings", [])) | labels)
         take["status"] = "passedWithWarnings"
 
 
@@ -3570,6 +3581,10 @@ class _TraceTableScan:
         self.cpu_sample_times_ns: list[float] = []
         self.cpu_weights_ns: list[float] = []
         self.cpu_cycle_weights: list[float] = []
+        # (sample time ns, cycle weight) of each target CPU Profiler row with
+        # both values, and the target CPU rows missing either (audit #97).
+        self.cpu_cycle_samples: list[tuple[float, float]] = []
+        self.cpu_unresolved_rows = 0
         self.correlated_rows = 0
         self.observed_correlations: set[tuple[str, int, str]] = set()
         self.event_counts = {"begin": 0, "end": 0, "point": 0}
@@ -3643,13 +3658,20 @@ class _TraceTableScan:
                 ("cycle-weight", self.cpu_cycle_weights)
                 if self.schema == "cpu-profile" else ("weight", self.cpu_weights_ns)
             )
+            resolved: list[float | None] = []
             for tag, destination in fields:
                 element = next(
                     (child for child in row.iter() if child.tag.rsplit("}", 1)[-1] == tag),
                     None,
                 )
-                if (value := self._number(element)) is not None:
+                value = self._number(element)
+                resolved.append(value)
+                if value is not None:
                     destination.append(value)
+            if any(value is None for value in resolved):
+                self.cpu_unresolved_rows += 1
+            elif self.schema == "cpu-profile":
+                self.cpu_cycle_samples.append((resolved[0], resolved[1]))
         if not self.signposts:
             return
         serialized = self._resolved_text(row)
@@ -3756,6 +3778,8 @@ def extract_trace_data_summary(
     cpu_weights_ns: list[float] = []
     cpu_cycle_weights: list[float] = []
     cpu_sample_times_ns: list[float] = []
+    cpu_cycle_samples: list[tuple[float, float]] = []
+    cpu_unresolved_rows = 0
     signpost_events = 0
     correlated_signposts = 0
     observed_correlations: set[tuple[str, int, str]] = set()
@@ -3792,6 +3816,8 @@ def extract_trace_data_summary(
             cpu_sample_times_ns.extend(scan.cpu_sample_times_ns)
             cpu_weights_ns.extend(scan.cpu_weights_ns)
             cpu_cycle_weights.extend(scan.cpu_cycle_weights)
+            cpu_cycle_samples.extend(scan.cpu_cycle_samples)
+            cpu_unresolved_rows += scan.cpu_unresolved_rows
             if scan.signposts:
                 signpost_events += scan.rows
                 correlated_signposts += scan.correlated_rows
@@ -3878,6 +3904,15 @@ def extract_trace_data_summary(
             "takes": takes,
         },
     })
+    if cpu_cycle_samples:
+        # Cycles per rusage CPU-second per take, and the rows the sums lost
+        # (audit #97). Reports only; an implausible take is warned on.
+        summary["cpuPlausibility"] = trace_cpu.cpu_plausibility(
+            samples=cpu_cycle_samples,
+            unresolved_rows=cpu_unresolved_rows,
+            correlated=correlated_intervals,
+            expectations=take_expectations,
+        )
     return summary
 
 
@@ -4316,8 +4351,18 @@ def _profile_take_expectations(
                 f"generation {correlation[0]} records no eos or token_cap end reason to size "
                 "its signpost completeness check"
             )
+        summary = row.get("summary") if isinstance(row.get("summary"), dict) else {}
+        resources = (
+            summary.get("processResourceUsage")
+            if isinstance(summary.get("processResourceUsage"), dict) else {}
+        )
+        cpu_ms = [finite_number(resources.get(key)) for key in ("userCPUTimeMS", "systemCPUTimeMS")]
         expectations[correlation] = {
             "generatedTokens": tokens, "endReason": end_reason, "timingsMS": timings,
+            # The take's rusage CPU time, for the cycle plausibility (audit #97).
+            "cpuSeconds": (
+                sum(cpu_ms) / 1_000.0 if all(value is not None for value in cpu_ms) else None
+            ),
         }
     return expectations
 

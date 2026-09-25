@@ -518,7 +518,13 @@ ran: `tokens + 1` for an EOS take, whose last step samples EOS, and `tokens` for
 the token cap (a QC warning, still published). A macOS take short of 36 per step fails
 publication; an iPhone take is published with `complete: false`.
 Each take also reports how many interval sums drifted from the engine's own JSONL totals
-(`scripts/lib/trace_intervals.py`); that witness only reports.
+(`scripts/lib/trace_intervals.py`); that witness only reports. A trace with CPU Profiler cycles also
+publishes `cpuPlausibility` (`scripts/lib/trace_cpu.py`, audit #97): per take, the cycles inside its
+generation window against its own rusage CPU seconds, in gigacycles per CPU-second, judged against a
+provisional 0.8-5 GHz band, and the count of target CPU rows whose time or weight could not be
+resolved. An implausible take carries `trace.cpu-cycles-implausible`; it never fails publication and
+never keeps the trace by itself. Every profile take also carries `trace.instrumented:<kind>`, naming
+the capture its metrics were measured under.
 
 The witness profile (`--kind witness`, audit #50) records the CPU profile's takes with
 `os_signpost` alone: no CPU sampler, which cost profiled takes 29-80% of their warm tokens/s. It

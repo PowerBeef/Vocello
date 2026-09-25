@@ -209,8 +209,9 @@ window whose footprint grows past `footprintGrowthCeilingMB` (250 MB) gets a war
 `uiperf.footprint:<scenario>` code: since the engine moved in-process, sidebar-navigation's own
 product warms grow it by about 1-2.4 GB. Scenarios that repeat a cycle (sidebar-navigation,
 delivery-menu, composer-typing) mark each cycle, and the report lists a hitch rate per cycle;
-records also carry `uiHitchMSPerAction`, the window's excess frame time per scripted action. The
-probe watchdog's launch-scoped summary stays in the report and is never published under the
+records also carry `uiHitchMSPerAction`, the window's excess frame time per scripted action, and the
+generation-active take names the memory samplers' cadence during its take (`samplerTargetIntervalMS`,
+from the probe's environment row: 100, 250 or 500 ms by tier). The probe watchdog's launch-scoped summary stays in the report and is never published under the
 generation-scoped heartbeat names. On the canonical hardware profile
 only, the checker emits `benchmark-evidence.json`, which the lane publishes as a
 PASS-only `ui-perf` registry record (one take per scenario, no

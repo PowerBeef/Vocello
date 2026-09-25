@@ -367,6 +367,24 @@ def evaluate_thresholds(summary: dict, thresholds: dict) -> list[str]:
     return warnings
 
 
+# The scenario that runs a real take, with the memory samplers alongside.
+GENERATION_SCENARIO = "generation-active"
+
+
+def sampler_interval(rows: list[dict]) -> dict:
+    """The telemetry sampler cadence the scenario's launch ran (audit #33), when
+    its probe's environment row names one; probes before 2026-09-25 do not."""
+    values = {
+        row["telemetrySamplerIntervalMS"] for row in rows
+        if row.get("kind") == "environment"
+        and isinstance(row.get("telemetrySamplerIntervalMS"), (int, float))
+        and not isinstance(row.get("telemetrySamplerIntervalMS"), bool)
+    }
+    if len(values) != 1:
+        return {}
+    return {"samplerIntervalMS": values.pop()}
+
+
 def take_metrics(summary: dict) -> dict:
     metrics = {
         "uiHitchTimeMSPerS": summary["hitchTimeMSPerS"],
@@ -388,6 +406,8 @@ def take_metrics(summary: dict) -> dict:
         "physicalFootprintStartMB": summary.get("footprintStartMB"),
         "peakPhysicalFootprintMB": summary.get("footprintPeakMB"),
         "physicalFootprintDeltaMB": summary.get("footprintDeltaMB"),
+        # generation-active only: the memory samplers' cadence during its take.
+        "samplerTargetIntervalMS": summary.get("samplerIntervalMS"),
     }
     metrics.update({key: value for key, value in optional.items() if value is not None})
     return metrics
@@ -523,6 +543,8 @@ def main() -> int:
                     f"{sorted(env_scenarios)}"
                 )
             summary, coverage = summarize_scenario(markers[name], rows, exploratory=exploratory)
+            if name == GENERATION_SCENARIO:
+                summary.update(sampler_interval(rows))
             if coverage < COVERAGE_FLOOR:
                 raise GateError(
                     f"scenario '{name}': probe coverage {coverage:.0%} below "

@@ -273,7 +273,7 @@ class UICheckerRoundTripTests(unittest.TestCase):
         fixture = mac_perf.UIPerfFixture("run_checker")
         fixture.setUp()
         try:
-            log = fixture.write_run()
+            log = fixture.write_run(sampler_interval_ms=250)
             # The checker imports the publisher by name at emit time; patch that
             # module object (a test module may have loaded its own copy).
             live_publisher = sys.modules.get("publish_benchmark_history", publisher)
@@ -288,6 +288,9 @@ class UICheckerRoundTripTests(unittest.TestCase):
         record, _size = publish_through_registry(manifest, screenshots=True, run_lane="perf")
         self.assertEqual(record["run"]["kind"], "ui-perf")
         self.assertIn("uiHitchMSPerAction", record["takes"][1]["metrics"])
+        # The generation-active take names its sampler cadence (audit #33).
+        generation = next(take for take in record["takes"] if take["cell"] == "ui-perf/generation-active")
+        self.assertEqual(generation["metrics"]["samplerTargetIntervalMS"], 250)
 
     def test_uncalibrated_macos_ui_perf_manifest_publishes(self) -> None:
         """audit #77: M2 ceilings on the M6 publish one run-level uncalibrated code."""

@@ -80,7 +80,7 @@ class UIPerfFixture(unittest.TestCase):
 
     def write_run(self, hitch_by_scenario: dict[str, float] | None = None, *,
                   refresh_ms: float = 16.667, footprint_growth: dict[str, float] | None = None,
-                  probe_summary: dict | None = None):
+                  probe_summary: dict | None = None, sampler_interval_ms: int | None = None):
         hitch_by_scenario = hitch_by_scenario or {}
         footprint_growth = footprint_growth or {}
         log_lines = []
@@ -99,6 +99,7 @@ class UIPerfFixture(unittest.TestCase):
                 "loadAverage1Minute": 2.0 + offset * 0.1,
                 "freeStorageBytes": 90_000_000_000 + offset,
                 "thermalState": "nominal",
+                **({"telemetrySamplerIntervalMS": sampler_interval_ms} if sampler_interval_ms else {}),
             }]
             blocks = make_blocks(window_start - 1_000, 16, hitch_ms_per_block=per_block)
             for index, block in enumerate(blocks):
@@ -142,6 +143,24 @@ class UIPerfFixture(unittest.TestCase):
         self.assertEqual(report["status"], "passed")
         self.assertEqual(report["thresholds"]["warnings"], [])
         self.assertEqual(len(report["scenarios"]), len(checker.EXPECTED_SCENARIOS))
+
+    def test_generation_active_names_its_sampler_cadence(self):
+        """audit #33: the memory samplers run beside the generation-active window."""
+        status, report = self.run_checker(self.write_run(sampler_interval_ms=250))
+        self.assertEqual(status, 0)
+        by_scenario = {row["scenario"]: row for row in report["scenarios"]}
+        self.assertEqual(by_scenario["generation-active"]["samplerIntervalMS"], 250)
+        self.assertEqual(
+            checker.take_metrics(by_scenario["generation-active"])["samplerTargetIntervalMS"], 250,
+        )
+        self.assertNotIn("samplerIntervalMS", by_scenario["idle-baseline"])
+        # Probes that predate the field publish no cadence.
+        status, report = self.run_checker(self.write_run())
+        self.assertEqual(status, 0)
+        self.assertNotIn(
+            "samplerTargetIntervalMS",
+            checker.take_metrics({row["scenario"]: row for row in report["scenarios"]}["generation-active"]),
+        )
 
     def test_missing_marker_fails_closed(self):
         log = self.write_run()

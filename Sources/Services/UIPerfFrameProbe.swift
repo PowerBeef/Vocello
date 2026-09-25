@@ -119,6 +119,14 @@ final class UIPerfFrameProbe: NSObject {
         ]
         if loadCount > 0 { row["loadAverage1Minute"] = loadValues[0] }
         if let freeStorageBytes { row["freeStorageBytes"] = freeStorageBytes }
+        // The memory samplers' cadence while a take runs (audit #33): the
+        // generation-active window shares the main process with them, and the
+        // cadence follows the tier (100, 250 or 500 ms), so the record names it.
+        if let samplerIntervalMS = TelemetryGate.appProcessIntendedMode.sampleIntervalMS(
+            for: NativeMemoryPolicyResolver.deviceClass()
+        ) {
+            row["telemetrySamplerIntervalMS"] = samplerIntervalMS
+        }
         append(row)
     }
 

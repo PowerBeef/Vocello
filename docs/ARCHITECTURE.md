@@ -419,8 +419,11 @@ so it applies only in an internal diagnostics build with the `QWENVOICE_DEBUG` m
 | `.iPhonePro` | 128 MB* | 1 | 30 s | 50 |
 
 Every tier idle-unloads and answers kernel pressure (AUD-10). Warms follow intent (entering
-Studio or generating), never browsing, and a warm that ends early or a cancelled clone prime
-settles through the runtime, so resident weights always keep an idle unload. The high-memory window is
+Studio or generating), never browsing. A warm prefetch that ends early (cancelled or failed) and a
+cancelled clone prime settle through the runtime, so the weights they leave resident keep an idle
+unload. A clone prime that fails after its model loaded, short of a captured MLX failure (a
+reference that cannot be conditioned, for example), still publishes `.failed` and keeps that model
+resident with no idle unload until a later model operation or `stop()`. The high-memory window is
 the longest because 2 to 3 GB of idle weights is a small share of 32 GB or more, while an unload
 makes the next take pay a cold load and prewarm; only the floor tier shortens its window under
 pressure.

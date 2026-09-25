@@ -80,8 +80,9 @@ requested.
   it in the iOS `TTSEngineStore` (compiled by path from `Sources/iOS`, behavior frozen except the shared consent admission and the PA-31 snapshot bridge). No XPC service,
   no service retirement, no wire protocol; a separate engine process must not be reintroduced. Views inject the store as `@EnvironmentObject`; the root shell subscribes to
   `snapshotChanges` with `onReceive` and never reads the store in `body` (W1-D/W2-A).
-- **Memory relief is in-process.** The engine's own kernel-pressure responder trims and unloads; the
-  store's `MacMemoryBudgetPolicy` gates admission on footprint and Metal working set; idle unload follows
+- **Memory relief is in-process.** The engine's own kernel-pressure responder trims caches and never
+  unloads the weights; the store's `MacMemoryBudgetPolicy` gates admission on footprint and Metal working
+  set and fully unloads at its critical band; idle unload follows
   `NativeMemoryPolicyResolver`; `MacWarmupAdmissionPolicy` defers proactive warms. Every tier, the
   high-memory Mac included, idle-unloads and answers pressure; warms follow Studio intent, never
   browsing, and a cancelled warm or prime re-arms idle unload (AUD-10). No hard

@@ -119,7 +119,7 @@ values without retaining raw launch input. Never add an undocumented environment
 |---|---|
 | `QWENVOICE_SUPPRESS_WARMUP=1` | Skips proactive prewarm/clone‑priming so the first generation records its own **cold** load (`MacGenerationWarmupCoordinator`). App‑process only. |
 | `QWENVOICE_FORCE_MEMORY_CLASS=floor_8gb_mac` | Forces the device-memory tier (`NativeDeviceClassGate`), read in-process by the engine's host. Runs constrained-tier code paths for diagnostic comparison. See §11 "Memory and pressure interpretation". Accepts the `NativeDeviceMemoryClass` raw values + aliases `8gb`/`16gb`. |
-| `QWENVOICE_MAC_WARM_GATE=off\|records\|enforce` | macOS warm‑admission gate (`MacWarmupAdmissionPolicy`): defers **proactive** warms while the app‑process kernel pressure level is soft/hardTrim on floor/mid tiers. Default `enforce` (validated 2026‑06‑09); `records` logs verdicts without blocking; user generations are never gated. Events land in the app layer's `native-events.jsonl`. |
+| `QWENVOICE_MAC_WARM_GATE=off\|records\|enforce` | macOS warm‑admission gate (`MacWarmupAdmissionPolicy`): defers **proactive** warms while the app‑process kernel pressure level is soft/hardTrim on every Mac tier (the high‑memory Mac since AUD‑10). Default `enforce` (validated 2026‑06‑09); `records` logs verdicts without blocking; user generations are never gated. Events land in the app layer's `native-events.jsonl`. |
 | `QVOICE_TALKER_KV_QUANT=8\|4` | **Dev-only** opt‑in talker KV‑cache quantization (QuantizedKVCache, group 64). Measured (P4, §H): clone/long −271 MB physFoot but **−8.6% RTF** — not shipped on any tier; insurance knob only. Never combined with `QVOICE_TALKER_KV_WINDOW`. |
 | `QVOICE_IOS_MLX_CACHE_LIMIT_MB=<n>` | **Dev-only** override of the MLX `Memory.cacheLimit` for the iPhone tier. Useful for sweeps; production uses the tier default. |
 | `QVOICE_IOS_MLX_MEMORY_LIMIT_MB=<n>` | **Dev-only / do not ship** override of MLX `Memory.memoryLimit`. Production avoids a hard `memoryLimit`; see `mlx-guide.md` §5.2. |
@@ -264,7 +264,7 @@ Stages (`NativeRuntimeStage`): `preparedCacheValidation`, `preparedCacheRebuild`
 `streamGenerationEnded` closes the model/decode span before final WAV publication, while
 `streamCompleted` is the successful terminal lifecycle mark. Load/prewarm marks appear only on a **cold**
 run (warm runs skip that work — that's correct, not missing data). Two additional
-string‑keyed marks record memory events on pressure‑bound tiers: `memory_pressure` and
+string‑keyed marks record memory events on every tier: `memory_pressure` and
 `memory_trim` (see §8).
 
 ### 6.2 Decode breakdown (`timingsMS`)
@@ -404,8 +404,8 @@ where time goes; use **Instruments signposts** (see [`benchmarking-procedure.md`
   `headroomCaptureSucceeded`, and `metalCaptureSucceeded` flags) to the exact
   `<layer>/samples-<generationID>.jsonl` sidecar. Raw rows remain untracked.
   Off by default (higher volume).
-- **Kernel memory‑pressure marks** (in `stageMarks`) — on the pressure‑bound tiers
-  (`floor8GBMac` / `mid16GBMac` / `iPhonePro`, where `NativeMemoryPressureMonitor` runs):
+- **Kernel memory‑pressure marks** (in `stageMarks`) — on every tier, where
+  `NativeMemoryPressureMonitor` runs:
   - `memory_pressure` — the **raw kernel signal** (`metadata.level` = `softTrim`/`hardTrim`),
     stamped by `NativeEngineRuntime.recordMemoryPressureObserved` the instant the
     `DispatchSource` event arrives. Always recorded — it takes no prewarm slot.

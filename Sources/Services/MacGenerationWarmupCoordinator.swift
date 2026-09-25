@@ -212,7 +212,7 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
                 return
             }
 
-            // Warm-admission gate (constrained Macs): defer proactive warms
+            // Warm-admission gate (every Mac tier, AUD-10): defer proactive warms
             // while the system is under memory pressure — checked at dispatch
             // time (after the debounce) so the freshest pressure level wins.
             // Clearing pendingPlan lets the next snapshot/draft change

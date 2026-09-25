@@ -698,6 +698,8 @@ def row_metrics(row: dict[str, Any], take: dict[str, Any] | None = None) -> dict
             (TRIM_SEVERITY.get(level, 0) for level in trim_levels), default=0
         ),
     }
+    # The startup windows the standard RTF leaves out of the request wall.
+    candidates.update(rtf_semantics.startup_windows_ms(row) or {})
     if take is not None:
         candidates["ttfcMS"] = take.get("firstChunkMS")
     return {
@@ -1252,8 +1254,11 @@ def record_shell(
     models: list[dict[str, Any]] | None = None,
     crash_delta: dict[str, Any] | None = None,
     memory_evidence: dict[str, Any] | None = None,
+    ttfc_definition: str | None = None,
 ) -> dict[str, Any]:
     effective_label = label or run_id
+    if ttfc_definition is not None and ttfc_definition not in rtf_semantics.TTFC_DEFINITIONS:
+        raise PublicationError(f"unknown first-chunk definition {ttfc_definition!r}")
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,95}", effective_label):
         raise PublicationError(
             "benchmark label must be an opaque 1-96 character identifier"
@@ -1303,6 +1308,7 @@ def record_shell(
             "matrixScope": matrix_scope,
             "warnings": warnings,
             "rtfDefinition": rtf_semantics.STANDARD_RTF_DEFINITION,
+            **({"ttfcDefinition": ttfc_definition} if ttfc_definition else {}),
             **({"classification": classification} if classification else {}),
         },
         "toolchain": {"optimization": optimization},
@@ -1523,11 +1529,28 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
             else None
         ),
         memory_evidence={**compact_memory_evidence(memory_run), **retention_evidence},
+        ttfc_definition=engine_ttfc_definition(args.platform, takes),
     )
     return write_and_record(
         args.artifact_dir, manifest,
         defer_record=bool(getattr(args, "defer_record", False)),
     )
+
+
+def engine_ttfc_definition(platform: str, takes: list[dict[str, Any]]) -> str | None:
+    """What `ttfcMS` means in a bench-results record (audit #59).
+
+    bench-results.json comes from `vocello bench` on macOS, whose firstChunkMS
+    is its stream observer's first chunk measured from its own submission, and
+    from the iOS device runner, whose firstChunkMS is the engine recorder's
+    first-chunk mark measured from prepare entry.
+    """
+    if not any("ttfcMS" in (take.get("metrics") or {}) for take in takes):
+        return None
+    return {
+        "macos": rtf_semantics.TTFC_CLI_SUBMIT_TO_FIRST_CHUNK,
+        "ios": rtf_semantics.TTFC_ENGINE_PREPARE_TO_FIRST_CHUNK,
+    }[platform]
 
 
 def ios_engine_command(

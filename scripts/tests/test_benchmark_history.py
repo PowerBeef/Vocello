@@ -847,6 +847,69 @@ class BenchmarkHistoryTests(unittest.TestCase):
             with self.subTest(count=count), self.assertRaises(history.HistoryError):
                 self.publish(candidate, candidate["run"]["id"])
 
+    def test_ttfc_definition_is_typed_v2_only_and_isolates_lineages(self) -> None:
+        def v2_record(run_id: str, definition: str | None) -> dict:
+            record = record_fixture(run_id=run_id, kind="language")
+            record["schemaVersion"] = 2
+            record["evidence"].update({
+                "telemetrySchemaVersion": 8, "memoryContractVersion": 1,
+                "memoryQualified": True, "sampleSidecarCount": 1,
+                "sampleSidecarsDigest": "a" * 64,
+            })
+            take = record["takes"][0]
+            take.update({"memoryStatus": "qualified", "sampleSidecarDigest": "b" * 64})
+            take["metrics"].update({key: 0.0 for key in history.MEMORY_REQUIRED_METRICS})
+            take["metrics"].update({"samplerCoverage": 1.0, "gpuRecommendedWorkingSetMB": 4096.0})
+            if definition is not None:
+                record["run"]["ttfcDefinition"] = definition
+            return record
+
+        cli = v2_record("ttfc-cli", "cli-submit-to-first-chunk")
+        published = json.loads(self.publish(cli, "ttfc-cli").read_text())
+        self.assertEqual(published["run"]["ttfcDefinition"], "cli-submit-to-first-chunk")
+        # Legacy records (no declaration) keep their comparison key unchanged;
+        # the two definitions, and a declared one versus none, never share one.
+        legacy = v2_record("ttfc-legacy", None)
+        engine = v2_record("ttfc-engine", "engine-prepare-to-first-chunk")
+        self.assertEqual(
+            len({history.comparison_key(item) for item in (cli, legacy, engine)}), 3
+        )
+        undeclared = copy.deepcopy(legacy)
+        undeclared["run"].pop("ttfcDefinition", None)
+        self.assertEqual(history.comparison_key(legacy), history.comparison_key(undeclared))
+
+        invalid_cases = {
+            "unknown": v2_record("ttfc-unknown", "wall-clock"),
+            "no-ttfc-take": v2_record("ttfc-orphan", "cli-submit-to-first-chunk"),
+            "schema-v1": record_fixture(run_id="ttfc-v1"),
+        }
+        invalid_cases["no-ttfc-take"]["takes"][0]["metrics"].pop("ttfcMS")
+        invalid_cases["schema-v1"]["run"]["ttfcDefinition"] = "cli-submit-to-first-chunk"
+        for name, candidate in invalid_cases.items():
+            with self.subTest(case=name), self.assertRaises(history.HistoryError):
+                self.publish(candidate, candidate["run"]["id"])
+
+    def test_startup_windows_must_be_complete_and_sum_to_the_exclusion(self) -> None:
+        valid = record_fixture(run_id="startup-windows")
+        valid["takes"][0]["metrics"].update({
+            "modelLoadWindowMS": 1500.0, "prewarmWindowMS": 500.0, "excludedStartupMS": 2000.0,
+        })
+        self.publish(valid, "startup-windows")
+        for name, change in (
+            ("wrong-sum", {"excludedStartupMS": 1999.0}),
+            ("negative", {"prewarmWindowMS": -1.0, "excludedStartupMS": 1499.0}),
+        ):
+            candidate = copy.deepcopy(valid)
+            candidate["run"]["id"] = f"startup-windows-{name}"
+            candidate["takes"][0]["metrics"].update(change)
+            with self.subTest(case=name), self.assertRaises(history.HistoryError):
+                self.publish(candidate, candidate["run"]["id"])
+        partial = copy.deepcopy(valid)
+        partial["run"]["id"] = "startup-windows-partial"
+        partial["takes"][0]["metrics"].pop("prewarmWindowMS")
+        with self.assertRaises(history.HistoryError):
+            self.publish(partial, partial["run"]["id"])
+
     def test_paired_prosody_effect_publishes_beside_the_legacy_key(self) -> None:
         record = record_fixture(run_id="paired-prosody-fixture", kind="engine-generation")
         record["takes"][0]["metrics"].update({

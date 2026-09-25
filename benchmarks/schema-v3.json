@@ -650,6 +650,13 @@
             "passedWithWarnings"
           ]
         },
+        "ttfcDefinition": {
+          "description": "What the takes' `ttfcMS` measures, on records since 2026-09-25 that carry one: \"cli-submit-to-first-chunk\" (macOS CLI bench: its own submission to the first chunk its stream observer receives) or \"engine-prepare-to-first-chunk\" (iOS device runner: the engine recorder's first-chunk mark from prepare entry). Absent on older records.",
+          "enum": [
+            "cli-submit-to-first-chunk",
+            "engine-prepare-to-first-chunk"
+          ]
+        },
         "warnings": {
           "items": {
             "maxLength": 96,

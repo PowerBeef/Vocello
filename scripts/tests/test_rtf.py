@@ -30,6 +30,42 @@ class RequestWallTests(unittest.TestCase):
         ]
         self.assertAlmostEqual(rtf.request_wall_seconds_from_marks(marks), 6.03)
 
+    def test_startup_windows_publish_exactly_what_the_request_wall_excludes(self) -> None:
+        # audit #58: the excluded startup time is published, not just subtracted.
+        marks = [
+            mark("startup.request_validated", 0),
+            mark("startup.model_load_started", 20),
+            mark("startup.model_loaded", 1_520),
+            mark("startup.prewarm_started", 1_530),
+            mark("startup.prewarm_completed", 2_030),
+            mark("streamCompleted", 8_030),
+        ]
+        row = {"backendMetrics": {"stages": marks}}
+        windows = rtf.startup_windows_ms(row)
+        self.assertEqual(windows, {
+            "modelLoadWindowMS": 1_500.0, "prewarmWindowMS": 500.0, "excludedStartupMS": 2_000.0,
+        })
+        self.assertAlmostEqual(
+            rtf.request_wall_seconds_from_marks(marks),
+            (8_030 - windows["excludedStartupMS"]) / 1_000,
+        )
+
+        # A warm take with no startup marks excludes nothing, and says so.
+        warm = {"stageMarks": [mark("startup.request_validated", 0), mark("streamCompleted", 900)]}
+        self.assertEqual(rtf.startup_windows_ms(warm), {
+            "modelLoadWindowMS": 0.0, "prewarmWindowMS": 0.0, "excludedStartupMS": 0.0,
+        })
+        # An inverted window is not excluded by the request wall either.
+        inverted = {"stageMarks": [
+            mark("startup.prewarm_started", 500), mark("startup.prewarm_completed", 400),
+            mark("streamCompleted", 900),
+        ]}
+        self.assertEqual(rtf.startup_windows_ms(inverted)["excludedStartupMS"], 0.0)
+        self.assertEqual(rtf.request_wall_seconds_from_marks(inverted["stageMarks"]), 0.9)
+        # No terminal mark: no request wall, so no windows.
+        self.assertIsNone(rtf.startup_windows_ms({"stageMarks": [mark("startup.model_loaded", 5)]}))
+        self.assertIsNone(rtf.startup_windows_ms({}))
+
     def test_generation_ended_is_the_fallback_terminal_mark(self) -> None:
         marks = [mark("startup.request_validated", 0), mark("streamGenerationEnded", 4_000)]
         self.assertEqual(rtf.request_wall_seconds_from_marks(marks), 4.0)

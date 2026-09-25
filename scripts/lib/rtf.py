@@ -34,6 +34,19 @@ STARTUP_INTERVALS = (
     ("startup.model_load_started", "startup.model_loaded"),
     ("startup.prewarm_started", "startup.prewarm_completed"),
 )
+# Per-take keys naming the startup windows the request wall excludes (audit
+# #58), in STARTUP_INTERVALS order; `excludedStartupMS` is their sum.
+STARTUP_WINDOW_KEYS = ("modelLoadWindowMS", "prewarmWindowMS")
+
+# What a record's `ttfcMS` measures (audit #59). The key has carried two
+# different spans: the macOS CLI bench stamps it from its own submission to the
+# first chunk its stream observer receives, while the iOS device runner reads
+# the engine recorder's first-chunk mark, measured from prepare entry. Records
+# since 2026-09-25 declare which one as `run.ttfcDefinition`; the two never share
+# a comparison lineage.
+TTFC_CLI_SUBMIT_TO_FIRST_CHUNK = "cli-submit-to-first-chunk"
+TTFC_ENGINE_PREPARE_TO_FIRST_CHUNK = "engine-prepare-to-first-chunk"
+TTFC_DEFINITIONS = frozenset({TTFC_CLI_SUBMIT_TO_FIRST_CHUNK, TTFC_ENGINE_PREPARE_TO_FIRST_CHUNK})
 
 
 def _finite(value: Any) -> float | None:
@@ -52,23 +65,51 @@ def stage_marks(row: dict[str, Any]) -> list[dict[str, Any]]:
     return [mark for mark in marks if isinstance(mark, dict)]
 
 
-def request_wall_seconds_from_marks(marks: Iterable[dict[str, Any]]) -> float | None:
-    """Mirror of `GenerationOutputAdapter.requestWallSeconds(stageMarks:)`."""
+def _first_stage_ms(marks: Iterable[dict[str, Any]]) -> dict[str, int]:
     first: dict[str, int] = {}
     for mark in marks:
         stage = mark.get("stage")
         t_ms = mark.get("tMS")
         if isinstance(stage, str) and stage not in first and isinstance(t_ms, (int, float)) and not isinstance(t_ms, bool):
             first[stage] = int(t_ms)
+    return first
+
+
+def _startup_windows(first: dict[str, int]) -> list[int]:
+    """Each STARTUP_INTERVALS window in ms; 0 when absent or not positive."""
+    return [
+        first[end] - first[start]
+        if start in first and end in first and first[end] > first[start] else 0
+        for start, end in STARTUP_INTERVALS
+    ]
+
+
+def request_wall_seconds_from_marks(marks: Iterable[dict[str, Any]]) -> float | None:
+    """Mirror of `GenerationOutputAdapter.requestWallSeconds(stageMarks:)`."""
+    first = _first_stage_ms(marks)
     terminal = next((first[stage] for stage in TERMINAL_STAGES if stage in first), None)
     if terminal is None:
         return None
-    excluded = 0
-    for start, end in STARTUP_INTERVALS:
-        if start in first and end in first and first[end] > first[start]:
-            excluded += first[end] - first[start]
-    wall_ms = terminal - excluded
+    wall_ms = terminal - sum(_startup_windows(first))
     return wall_ms / 1000.0 if wall_ms > 0 else None
+
+
+def startup_windows_ms(row: dict[str, Any]) -> dict[str, float] | None:
+    """The startup time the standard RTF leaves out of the request wall (audit #58).
+
+    `modelLoadWindowMS` and `prewarmWindowMS` are the model-load and in-request
+    prewarm windows on the take's own stage recorder, and `excludedStartupMS`
+    is exactly what `request_wall_seconds_from_marks` subtracts. They are not
+    `prewarmMS`, which times the explicit prewarm. None when the row has no
+    terminal mark, since there is then no request wall to exclude them from.
+    """
+    first = _first_stage_ms(stage_marks(row))
+    if not any(stage in first for stage in TERMINAL_STAGES):
+        return None
+    windows = _startup_windows(first)
+    result = {key: float(value) for key, value in zip(STARTUP_WINDOW_KEYS, windows, strict=True)}
+    result["excludedStartupMS"] = float(sum(windows))
+    return result
 
 
 def request_wall_seconds(row: dict[str, Any]) -> float | None:

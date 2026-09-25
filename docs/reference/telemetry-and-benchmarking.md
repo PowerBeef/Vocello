@@ -315,11 +315,19 @@ backend throughput:
 |---|---|---|
 | `audioSeconds` | Generated audio duration (frames ÷ sample rate). | Output length. |
 | `requestWallSeconds` | Whole request on the per-generation monotonic recorder: prepare entry → `streamCompleted` (after the final WAV write), minus the one-time `startup.model_load_*` and `startup.prewarm_*` intervals. | Synthesis wall time; the wall side of RTF on cold and warm takes alike. |
+| (published) `excludedStartupMS`, `modelLoadWindowMS`, `prewarmWindowMS` | The `startup.model_load_*` and `startup.prewarm_*` windows on the take's own recorder, and their sum: exactly what `requestWallSeconds` leaves out (`scripts/lib/rtf.py`, records since 2026-09-25). `prewarmMS` still times the explicit prewarm. | How much startup work the RTF excludes; work moved into these windows lowers RTF without being faster. |
 | `realTimeFactor` | `requestWallSeconds ÷ audioSeconds`. | **Standard real-time factor (RTF): lower is faster, <1 = faster than real time.** Primary throughput KPI since 2026-09-12; published as `rtf`. Every record since then declares `run.rtfDefinition: "wall/audio"`; a record without that field predates the cutover, stores the decode speedup under `rtf`, and never shares a comparison key with a new one. |
 | `decodeWallSeconds` | Decode wall time (`qwen_token_loop_total` when present, else model `.info.generateTime`, else `streamStartup→streamGenerationEnded` span). Excludes WAV finalize I/O. | Compute cost — **same time base as the summarizer `decode ms` column.** |
 | `audioSecondsPerWallSecond` | `audioSeconds ÷ decodeWallSeconds`. | **Decode-loop speedup** (higher is faster), published as `decodeSpeedupX`. Records before 2026-09-12 stored it under `rtf`; it is not an RTF. |
 | `tokensPerSecond` | Codec tokens ÷ decode wall seconds (from `.info` when present). | Decode throughput; compare across model variants / patches. |
 | `generatedTokenCount` | Codec tokens produced. | Work done; normalize other metrics by this. |
+
+A record's published `ttfcMS` is not one measurement: the macOS CLI bench stamps it from its own
+submission to the first chunk its stream observer receives, while the iOS device runner reads the
+engine recorder's `firstChunk` mark from prepare entry. Records since 2026-09-25 that carry a
+`ttfcMS` declare which as `run.ttfcDefinition` (`cli-submit-to-first-chunk` or
+`engine-prepare-to-first-chunk`), and the two never share a comparison key; older records carry no
+declaration and keep their keys.
 
 Frontend latency is the app row's `submitToFirstChunkMS` and
 `submitToPlaybackScheduledMS`. The latter means the player was commanded with a bounded queued

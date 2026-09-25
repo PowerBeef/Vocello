@@ -515,6 +515,32 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         self.assertIn("inconsistent frontend lifecycle ordering", result.stdout + result.stderr)
 
 
+class StartupWindowMetricsTests(unittest.TestCase):
+    """audit #58: the startup time the standard RTF excludes is published."""
+
+    def test_tracked_metrics_publish_the_excluded_startup_windows(self) -> None:
+        if str(ROOT / "scripts") not in sys.path:
+            sys.path.insert(0, str(ROOT / "scripts"))
+        import check_macos_ui_bench as checker
+
+        engine = {
+            "stageMarks": [
+                {"stage": "startup.model_load_started", "tMS": 0},
+                {"stage": "startup.model_loaded", "tMS": 900},
+                {"stage": "startup.prewarm_started", "tMS": 910},
+                {"stage": "startup.prewarm_completed", "tMS": 1_110},
+                {"stage": "streamCompleted", "tMS": 3_000},
+            ],
+            "derivedMetrics": {"audioSeconds": 2.0},
+        }
+        metrics = checker.tracked_metrics(engine, {})
+        self.assertEqual(metrics["modelLoadWindowMS"], 900.0)
+        self.assertEqual(metrics["prewarmWindowMS"], 200.0)
+        self.assertEqual(metrics["excludedStartupMS"], 1_100.0)
+        # The request wall (and so RTF) is exactly the terminal mark minus them.
+        self.assertAlmostEqual(metrics["requestWallSeconds"], (3_000 - 1_100) / 1_000)
+
+
 if __name__ == "__main__":
     raise SystemExit(unittest.main())
 

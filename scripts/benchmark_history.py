@@ -105,6 +105,9 @@ SECTION_KEYS = {
         # "wall/audio" on every record published since 2026-09-12; absent on
         # legacy records whose `rtf` is the inverted decode-loop speedup.
         "rtfDefinition",
+        # What `ttfcMS` measures (lib/rtf.py TTFC_DEFINITIONS); schema v2+
+        # records since 2026-09-25 that carry a ttfcMS. Absent on older records.
+        "ttfcDefinition",
     },
     "hardware": {
         "profileID", "modelIdentifier", "marketingName", "chip", "memoryBytes",
@@ -258,7 +261,7 @@ SCHEMA_PROPERTY_KEYS = {
     "traceSummary": TRACE_SUMMARY_KEYS,
 }
 SCHEMA_REQUIRED_KEYS = {
-    "run": SECTION_KEYS["run"] - {"rtfDefinition"},
+    "run": SECTION_KEYS["run"] - {"rtfDefinition", "ttfcDefinition"},
     "hardware": SECTION_KEYS["hardware"],
     "source": SECTION_KEYS["source"],
     "toolchain": SECTION_KEYS["toolchain"],
@@ -304,6 +307,8 @@ V2_ONLY_EVIDENCE_KEYS = {
     "streamingTelemetryV9SidecarCount", "streamingTelemetryV9SidecarsDigest",
     "streamingTelemetryV9PublicationReadyCount",
 }
+# schema-v1 is frozen history; the first-chunk definition arrived after it.
+V2_ONLY_RUN_KEYS = {"ttfcDefinition"}
 V2_ONLY_TAKE_KEYS = {
     "memoryStatus", "sampleSidecarDigest",
     "streamingTelemetryV9SidecarDigest", "samplingPromotionPackaged", "samplingWAVDigest",
@@ -330,6 +335,7 @@ V2_ONLY_TRACE_KEYS = set(TRACE_RETENTION_KEYS)
 def schema_property_keys(version: int) -> dict[str, set[str]]:
     properties = {name: set(keys) for name, keys in SCHEMA_PROPERTY_KEYS.items()}
     if version == 1:
+        properties["run"] -= V2_ONLY_RUN_KEYS
         properties["evidence"] -= V2_ONLY_EVIDENCE_KEYS
         properties["comparison"] -= {"deltaMetrics"}   # legacy records never declare it
         properties["take"] -= V2_ONLY_TAKE_KEYS | V3_ONLY_TAKE_KEYS
@@ -363,6 +369,9 @@ RAW_BENCHMARK_BUNDLE_SUFFIXES = {".xcresult", ".trace", ".xcarchive", ".dsym"}
 # into the tracked schema rather than leaking arbitrary diagnostics into Git.
 METRIC_KEYS = {
     "rtf", "requestWallSeconds", "decodeSpeedupX", "rtfAppEndToEnd",
+    # The startup windows the standard RTF excludes from requestWallSeconds
+    # (records since 2026-09-25); `prewarmMS` keeps timing the explicit prewarm.
+    "excludedStartupMS", "modelLoadWindowMS", "prewarmWindowMS",
     "tokensPerSecond", "ttfcMS", "submitToFirstChunkMS", "submitToCompletedMS",
     "playbackScheduledMS", "firstChunkToPlaybackScheduledMS", "requestToFirstChunkMS",
     "decodeWallSeconds", "audioSeconds", "generatedTokens", "backendWallMS",
@@ -1475,6 +1484,10 @@ def comparison_key(record: dict[str, Any]) -> str:
     definition = record["run"].get("rtfDefinition")
     if definition:
         comparable_identity["rtfDefinition"] = definition
+    # Likewise the two first-chunk definitions never share a lineage (audit #59).
+    ttfc_definition = record["run"].get("ttfcDefinition")
+    if ttfc_definition:
+        comparable_identity["ttfcDefinition"] = ttfc_definition
     return sha256_bytes(canonical_bytes(comparable_identity))
 
 
@@ -2264,6 +2277,8 @@ def validate_record(
         allowed = SECTION_KEYS[section]
         if version == 1 and section == "evidence":
             allowed = allowed - V2_ONLY_EVIDENCE_KEYS
+        if version == 1 and section == "run":
+            allowed = allowed - V2_ONLY_RUN_KEYS
         reject_unknown_keys(payload, allowed, section)
 
     run = record["run"]
@@ -2297,6 +2312,15 @@ def validate_record(
         raise HistoryError(
             "records published since the RTF cutover must declare run.rtfDefinition"
         )
+    ttfc_definition = run.get("ttfcDefinition")
+    if ttfc_definition is not None:
+        if ttfc_definition not in rtf_semantics.TTFC_DEFINITIONS:
+            raise HistoryError("run.ttfcDefinition is not a known first-chunk definition")
+        if not any(
+            "ttfcMS" in (take.get("metrics") or {})
+            for take in record.get("takes", []) if isinstance(take, dict)
+        ):
+            raise HistoryError("run.ttfcDefinition declares a ttfcMS that no take carries")
 
     profiles = load_profiles()
     hardware = record["hardware"]
@@ -2451,6 +2475,18 @@ def validate_record(
         for metric, value in take["metrics"].items():
             if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(float(value)):
                 raise HistoryError(f"take metric {metric} must be finite numeric data")
+        startup_keys = (*rtf_semantics.STARTUP_WINDOW_KEYS, "excludedStartupMS")
+        present_startup = [key for key in startup_keys if key in take["metrics"]]
+        if present_startup:
+            windows = [float(take["metrics"].get(key, -1)) for key in startup_keys]
+            if (
+                len(present_startup) != len(startup_keys)
+                or any(value < 0 for value in windows)
+                or not math.isclose(windows[-1], sum(windows[:-1]), rel_tol=0, abs_tol=1e-6)
+            ):
+                raise HistoryError(
+                    "startup windows must be complete, non-negative and sum to excludedStartupMS"
+                )
         if version >= 2 and run["kind"] in MEMORY_QUALIFIED_KINDS:
             required_memory = set(MEMORY_REQUIRED_METRICS)
             if run["platform"] == "ios":

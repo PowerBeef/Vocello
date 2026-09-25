@@ -439,6 +439,9 @@ def tracked_metrics(engine: dict, app: dict) -> dict[str, float | int]:
     add("requestWallSeconds", rtf_semantics.request_wall_seconds(engine))
     add("decodeSpeedupX", rtf_semantics.decode_speedup(engine))
     add("rtfAppEndToEnd", rtf_semantics.app_end_to_end_rtf(app, rtf_semantics.audio_seconds(engine)))
+    # The startup windows the standard RTF leaves out of the request wall.
+    for name, value in (rtf_semantics.startup_windows_ms(engine) or {}).items():
+        add(name, value)
     for source, destination in (
         ("tokensPerSecond", "tokensPerSecond"),
         ("audioSeconds", "audioSeconds"),

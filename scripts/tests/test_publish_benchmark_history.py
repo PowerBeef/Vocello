@@ -539,12 +539,41 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(metrics["requestWallSeconds"], 1.5)
         self.assertEqual(metrics["decodeSpeedupX"], 1.5)
         self.assertEqual(record["run"]["rtfDefinition"], "wall/audio")
+        # The macOS CLI bench stamps ttfcMS from its own submission (audit #59).
+        self.assertEqual(record["run"]["ttfcDefinition"], "cli-submit-to-first-chunk")
         self.assertEqual(
             record["takes"][0]["runtimeProfileSignature"],
             "pro_custom_speed:fixture-v1",
         )
         self.assertEqual(record["toolchain"]["optimization"], "-O")
         self.assertEqual(record["evidence"]["actualTakeCount"], 1)
+
+    def test_ttfc_definition_follows_the_bench_results_producer(self) -> None:
+        with_ttfc = [{"metrics": {"ttfcMS": 400.0}}, {"metrics": {}}]
+        self.assertEqual(
+            publisher.engine_ttfc_definition("macos", with_ttfc), "cli-submit-to-first-chunk"
+        )
+        self.assertEqual(
+            publisher.engine_ttfc_definition("ios", with_ttfc), "engine-prepare-to-first-chunk"
+        )
+        self.assertIsNone(publisher.engine_ttfc_definition("macos", [{"metrics": {}}]))
+
+    def test_row_metrics_publish_the_startup_windows_rtf_excludes(self) -> None:
+        row = engine_row("windows")
+        row["backendMetrics"]["stages"] = [
+            {"stage": "startup.model_load_started", "tMS": 10},
+            {"stage": "startup.model_loaded", "tMS": 1_210},
+            {"stage": "startup.prewarm_started", "tMS": 1_220},
+            {"stage": "startup.prewarm_completed", "tMS": 1_520},
+            {"stage": "streamCompleted", "tMS": 4_000},
+        ]
+        metrics = publisher.row_metrics(row)
+        self.assertEqual(metrics["modelLoadWindowMS"], 1_200.0)
+        self.assertEqual(metrics["prewarmWindowMS"], 300.0)
+        self.assertEqual(metrics["excludedStartupMS"], 1_500.0)
+        # prewarmMS keeps timing the explicit prewarm; it is not the window.
+        self.assertNotIn("prewarmMS", metrics)
+        self.assertNotIn("excludedStartupMS", publisher.row_metrics(engine_row("no-marks")))
 
     def test_engine_matrix_scope_is_canonical_only_for_the_full_speed_matrix(self) -> None:
         def take(cell: str, delivery: str | None = None) -> dict:

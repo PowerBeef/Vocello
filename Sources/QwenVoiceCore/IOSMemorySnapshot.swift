@@ -42,6 +42,16 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
     public let gpuAllocatedBytes: UInt64?
     public let gpuRecommendedWorkingSetBytes: UInt64?
     public let hasUnifiedMemory: Bool?
+    /// The kernel's physical-footprint ledger high-water mark for this process's
+    /// lifetime, read in the same `task_vm_info` call as `physFootprintBytes`,
+    /// so it is never below any footprint the process has had. Exact, unlike a
+    /// periodic sample, but a lifetime maximum: it is a take's own peak only when
+    /// it rose during that take. Never a system peak. nil when the kernel did
+    /// not fill that revision of the structure.
+    public let kernelPhysFootprintPeakBytes: UInt64?
+    /// The graphics-tagged footprint ledger (IOAccelerator/Metal memory counted
+    /// in the footprint), from the same call. nil when unavailable.
+    public let graphicsFootprintBytes: UInt64?
 
     public init(
         processRole: IOSMemoryProcessRole = .currentProcess,
@@ -54,7 +64,9 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
         compressedBytes: UInt64?,
         gpuAllocatedBytes: UInt64?,
         gpuRecommendedWorkingSetBytes: UInt64?,
-        hasUnifiedMemory: Bool?
+        hasUnifiedMemory: Bool?,
+        kernelPhysFootprintPeakBytes: UInt64? = nil,
+        graphicsFootprintBytes: UInt64? = nil
     ) {
         self.processRole = processRole
         self.pid = pid
@@ -67,6 +79,16 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
         self.gpuAllocatedBytes = gpuAllocatedBytes
         self.gpuRecommendedWorkingSetBytes = gpuRecommendedWorkingSetBytes
         self.hasUnifiedMemory = hasUnifiedMemory
+        self.kernelPhysFootprintPeakBytes = kernelPhysFootprintPeakBytes
+        self.graphicsFootprintBytes = graphicsFootprintBytes
+    }
+
+    public var kernelPhysFootprintPeakMB: Double? {
+        Self.bytesToMB(kernelPhysFootprintPeakBytes)
+    }
+
+    public var graphicsFootprintMB: Double? {
+        Self.bytesToMB(graphicsFootprintBytes)
     }
 
     public var residentMB: Double? {
@@ -178,15 +200,21 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
             compressedBytes: metrics.compressedBytes,
             gpuAllocatedBytes: device.map { UInt64($0.currentAllocatedSize) },
             gpuRecommendedWorkingSetBytes: device.map { $0.recommendedMaxWorkingSetSize },
-            hasUnifiedMemory: device?.hasUnifiedMemory
+            hasUnifiedMemory: device?.hasUnifiedMemory,
+            kernelPhysFootprintPeakBytes: metrics.kernelPhysFootprintPeakBytes,
+            graphicsFootprintBytes: metrics.graphicsFootprintBytes
         )
     }
 
-    private static func taskMemoryMetrics() -> (
-        residentBytes: UInt64?,
-        physFootprintBytes: UInt64?,
-        compressedBytes: UInt64?
-    ) {
+    private struct TaskMemoryMetrics {
+        var residentBytes: UInt64?
+        var physFootprintBytes: UInt64?
+        var compressedBytes: UInt64?
+        var kernelPhysFootprintPeakBytes: UInt64?
+        var graphicsFootprintBytes: UInt64?
+    }
+
+    private static func taskMemoryMetrics() -> TaskMemoryMetrics {
         var info = task_vm_info_data_t()
         var count = mach_msg_type_number_t(
             MemoryLayout<task_vm_info_data_t>.stride / MemoryLayout<integer_t>.stride
@@ -203,14 +231,41 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
         }
 
         guard result == KERN_SUCCESS else {
-            return (nil, nil, nil)
+            return TaskMemoryMetrics()
         }
 
-        return (
+        // The kernel fills only the structure revision it supports and reports
+        // how much it filled in `count`; a later ledger is read only when the
+        // filled words cover it.
+        let filledBytes = Int(count) * MemoryLayout<integer_t>.stride
+        return TaskMemoryMetrics(
             residentBytes: info.resident_size,
             physFootprintBytes: info.phys_footprint,
-            compressedBytes: info.compressed
+            compressedBytes: info.compressed,
+            kernelPhysFootprintPeakBytes: ledgerBytes(
+                info.ledger_phys_footprint_peak,
+                fieldOffset: MemoryLayout<task_vm_info_data_t>.offset(
+                    of: \task_vm_info_data_t.ledger_phys_footprint_peak
+                ),
+                filledBytes: filledBytes
+            ),
+            graphicsFootprintBytes: ledgerBytes(
+                info.ledger_tag_graphics_footprint,
+                fieldOffset: MemoryLayout<task_vm_info_data_t>.offset(
+                    of: \task_vm_info_data_t.ledger_tag_graphics_footprint
+                ),
+                filledBytes: filledBytes
+            )
         )
+    }
+
+    /// A signed ledger value, only when the kernel filled its field and it is
+    /// not negative.
+    static func ledgerBytes(_ value: Int64, fieldOffset: Int?, filledBytes: Int) -> UInt64? {
+        guard let fieldOffset,
+              fieldOffset + MemoryLayout<Int64>.size <= filledBytes,
+              value >= 0 else { return nil }
+        return UInt64(value)
     }
 
     private static func availableProcessMemory() -> UInt64? {

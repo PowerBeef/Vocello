@@ -414,7 +414,12 @@ where time goes; use **Instruments signposts** (see [`benchmarking-procedure.md`
   `memoryAtPeakPhysFootprint`, and `memoryAtMinimumHeadroom` snapshots. Memory, thread, headroom,
   Metal, and process-resource capture success/coverage are independent, so one failed API cannot
   masquerade as a zero value. Generation-scoped CPU, page-fault, context-switch, and block-I/O
-  deltas remain process-owned.
+  deltas remain process-owned. Since 2026-09-25 the summary also carries the kernel's
+  physical-footprint ledger high-water mark at the first and last sample
+  (`kernelPhysFootprintPeakStartMB`, `kernelPhysFootprintPeakMB`) and the graphics-tagged footprint
+  at the last (`graphicsFootprintEndMB`). The ledger peak is exact but a process-lifetime maximum:
+  it is the window's own peak only when the end value is above the start value, and never a system
+  peak.
 - **Boundary samples** — capture immediately around model load, first chunk, final WAV, and trim.
   They sit at stage edges, not at the allocation spike, so sampled peaks still miss allocations
   shorter than the 500 ms constrained-device tick: in committed records 2,035 of 3,634 takes sampled
@@ -426,7 +431,9 @@ where time goes; use **Instruments signposts** (see [`benchmarking-procedure.md`
 - **Verbose raw series** — `verbose` mode writes every sample (`tMS`, `scheduledElapsedNS`,
   `capturedElapsedNS`, absolute `capturedUptimeNS`, `latenessNS`, `kind`, `boundary`,
   `processRole`, resident/physical-footprint/compressed/headroom/Metal values, total RAM, implied
-  process limit, and separate `memoryCaptureSucceeded`, `threadCaptureSucceeded`,
+  process limit, the kernel ledgers read in the same `task_vm_info` call
+  (`kernelPhysFootprintPeakMB`, `graphicsFootprintMB`; absent when the kernel did not fill them),
+  and separate `memoryCaptureSucceeded`, `threadCaptureSucceeded`,
   `headroomCaptureSucceeded`, and `metalCaptureSucceeded` flags) to the exact
   `<layer>/samples-<generationID>.jsonl` sidecar. Raw rows remain untracked.
   Off by default (higher volume).

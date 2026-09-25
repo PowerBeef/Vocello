@@ -132,6 +132,11 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
     public let gpuRecommendedWorkingSetMB: Double?
     public let impliedProcessLimitMB: Double?
     public let gpuWorkingSetUsageRatio: Double?
+    /// The kernel's lifetime physical-footprint high-water mark at capture, from
+    /// the same `task_vm_info` call as `physFootprintMB` (never below it).
+    public let kernelPhysFootprintPeakMB: Double?
+    /// The graphics-tagged footprint ledger at capture, from the same call.
+    public let graphicsFootprintMB: Double?
     public let threads: Int
     public let thermalState: String?
     public var stage: String?
@@ -166,6 +171,8 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
         gpuRecommendedWorkingSetMB: Double?,
         impliedProcessLimitMB: Double? = nil,
         gpuWorkingSetUsageRatio: Double? = nil,
+        kernelPhysFootprintPeakMB: Double? = nil,
+        graphicsFootprintMB: Double? = nil,
         threads: Int,
         thermalState: String? = nil,
         stage: String? = nil,
@@ -194,6 +201,8 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
         self.gpuRecommendedWorkingSetMB = gpuRecommendedWorkingSetMB
         self.impliedProcessLimitMB = impliedProcessLimitMB
         self.gpuWorkingSetUsageRatio = gpuWorkingSetUsageRatio
+        self.kernelPhysFootprintPeakMB = kernelPhysFootprintPeakMB
+        self.graphicsFootprintMB = graphicsFootprintMB
         self.threads = threads
         self.thermalState = thermalState
         self.stage = stage
@@ -226,6 +235,8 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
         case gpuRecommendedWorkingSetMB
         case impliedProcessLimitMB
         case gpuWorkingSetUsageRatio
+        case kernelPhysFootprintPeakMB
+        case graphicsFootprintMB
         case threads
         case thermalState
         case stage
@@ -260,6 +271,8 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
         self.gpuRecommendedWorkingSetMB = try container.decodeIfPresent(Double.self, forKey: .gpuRecommendedWorkingSetMB)
         self.impliedProcessLimitMB = try container.decodeIfPresent(Double.self, forKey: .impliedProcessLimitMB)
         self.gpuWorkingSetUsageRatio = try container.decodeIfPresent(Double.self, forKey: .gpuWorkingSetUsageRatio)
+        self.kernelPhysFootprintPeakMB = try container.decodeIfPresent(Double.self, forKey: .kernelPhysFootprintPeakMB)
+        self.graphicsFootprintMB = try container.decodeIfPresent(Double.self, forKey: .graphicsFootprintMB)
         self.threads = try container.decode(Int.self, forKey: .threads)
         self.thermalState = try container.decodeIfPresent(String.self, forKey: .thermalState)
         self.stage = try container.decodeIfPresent(String.self, forKey: .stage)
@@ -291,6 +304,8 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
         try container.encodeIfPresent(gpuRecommendedWorkingSetMB, forKey: .gpuRecommendedWorkingSetMB)
         try container.encodeIfPresent(impliedProcessLimitMB, forKey: .impliedProcessLimitMB)
         try container.encodeIfPresent(gpuWorkingSetUsageRatio, forKey: .gpuWorkingSetUsageRatio)
+        try container.encodeIfPresent(kernelPhysFootprintPeakMB, forKey: .kernelPhysFootprintPeakMB)
+        try container.encodeIfPresent(graphicsFootprintMB, forKey: .graphicsFootprintMB)
         try container.encode(threads, forKey: .threads)
         try container.encodeIfPresent(thermalState, forKey: .thermalState)
         try container.encodeIfPresent(stage, forKey: .stage)
@@ -586,6 +601,15 @@ public struct TelemetrySummary: Hashable, Codable, Sendable {
     public let runEnvironment: RunEnvironmentSnapshot?
     public let captureCoverage: TelemetryCaptureCoverage?
     public let boundaryCoverage: TelemetryBoundaryCoverage?
+    /// The kernel's lifetime physical-footprint high-water mark at the first and
+    /// last sample. When the end value is above the start value the process set
+    /// a new peak inside this window, so the end value is the window's exact
+    /// peak; otherwise it only bounds it. A per-process lifetime maximum, never
+    /// a system peak. nil when the sampler could not read the ledger.
+    public let kernelPhysFootprintPeakStartMB: Double?
+    public let kernelPhysFootprintPeakMB: Double?
+    /// The graphics-tagged footprint ledger at the last sample.
+    public let graphicsFootprintEndMB: Double?
 
     public init(
         residentStartMB: Double?,
@@ -636,7 +660,10 @@ public struct TelemetrySummary: Hashable, Codable, Sendable {
         memoryAtPeakPhysFootprint: AlignedMemoryBudgetSnapshot? = nil,
         memoryAtMinimumHeadroom: AlignedMemoryBudgetSnapshot? = nil,
         captureCoverage: TelemetryCaptureCoverage? = nil,
-        boundaryCoverage: TelemetryBoundaryCoverage? = nil
+        boundaryCoverage: TelemetryBoundaryCoverage? = nil,
+        kernelPhysFootprintPeakStartMB: Double? = nil,
+        kernelPhysFootprintPeakMB: Double? = nil,
+        graphicsFootprintEndMB: Double? = nil
     ) {
         self.processRole = processRole
         self.residentStartMB = residentStartMB
@@ -687,6 +714,9 @@ public struct TelemetrySummary: Hashable, Codable, Sendable {
         self.runEnvironment = runEnvironment
         self.captureCoverage = captureCoverage
         self.boundaryCoverage = boundaryCoverage
+        self.kernelPhysFootprintPeakStartMB = kernelPhysFootprintPeakStartMB
+        self.kernelPhysFootprintPeakMB = kernelPhysFootprintPeakMB
+        self.graphicsFootprintEndMB = graphicsFootprintEndMB
     }
 
     public static func empty(stageMarks: [NativeTelemetryStageMark]) -> TelemetrySummary {
@@ -1043,7 +1073,10 @@ public actor NativeTelemetrySampler {
             memoryAtPeakPhysFootprint: physFootprintPeakSample.map(Self.alignedMemorySnapshot),
             memoryAtMinimumHeadroom: minimumHeadroomSample.map(Self.alignedMemorySnapshot),
             captureCoverage: captureCoverage,
-            boundaryCoverage: boundaryCoverage
+            boundaryCoverage: boundaryCoverage,
+            kernelPhysFootprintPeakStartMB: samples.first?.kernelPhysFootprintPeakMB,
+            kernelPhysFootprintPeakMB: samples.last?.kernelPhysFootprintPeakMB,
+            graphicsFootprintEndMB: samples.last?.graphicsFootprintMB
         )
     }
 
@@ -1163,6 +1196,8 @@ public actor NativeTelemetrySampler {
             gpuRecommendedWorkingSetMB: snapshot.gpuRecommendedWorkingSetMB,
             impliedProcessLimitMB: snapshot.impliedProcessLimitMB,
             gpuWorkingSetUsageRatio: snapshot.gpuWorkingSetUsageRatio,
+            kernelPhysFootprintPeakMB: snapshot.kernelPhysFootprintPeakMB,
+            graphicsFootprintMB: snapshot.graphicsFootprintMB,
             threads: threadCapture.count,
             thermalState: ThermalStateSnapshot.string(for: ProcessInfo.processInfo.thermalState)
         )
@@ -1242,12 +1277,18 @@ public actor NativeTelemetrySampler {
         )
     }
 
-    private static func threadCount() -> (count: Int, succeeded: Bool) {
+    /// Counts the task's threads. `task_threads` hands back one send right per
+    /// thread; each is released here, or every sample would leak a reference
+    /// to every live thread (audit #64/#65).
+    static func threadCount() -> (count: Int, succeeded: Bool) {
         var threadList: thread_act_array_t?
         var threadCount: mach_msg_type_number_t = 0
         let result = task_threads(mach_task_self_, &threadList, &threadCount)
         defer {
             if let threadList {
+                for index in 0..<Int(threadCount) {
+                    mach_port_deallocate(mach_task_self_, threadList[index])
+                }
                 vm_deallocate(
                     mach_task_self_,
                     vm_address_t(UInt(bitPattern: threadList)),

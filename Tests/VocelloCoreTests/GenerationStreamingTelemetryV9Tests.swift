@@ -443,6 +443,106 @@ final class GenerationStreamingTelemetryV9Tests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: published.url.path))
     }
 
+    func testDerivedMLXInstantsCarryTheirProvenanceIntoTheCompleteSidecar() throws {
+        let digest = String(repeating: "ab", count: 32)
+        var notes = GenerationStreamingTelemetryV9Publication.shippingIdentityNotes
+        for key in [
+            "streamingV9PlanDigest",
+            "streamingV9SamplingDigest",
+            "streamingV9ChunkDigest",
+            "streamingV9MemoryDigest",
+            "streamingV9OutputPolicyDigest",
+            "streamingV9QualityPolicyDigest",
+        ] {
+            notes[key] = digest
+        }
+        for key in [
+            "streamingV9PlanVersion",
+            "streamingV9SamplingVersion",
+            "streamingV9ChunkVersion",
+            "streamingV9MemoryVersion",
+            "streamingV9OutputPolicyVersion",
+            "streamingV9QualityPolicyVersion",
+        ] {
+            notes[key] = "1"
+        }
+        let observation = ShippingChunkObservationV9(
+            index: 0,
+            transportSequence: 0,
+            codecStartFrame: 0,
+            codecEndFrameExclusive: 7,
+            audioStartFrame: 0,
+            audioEndFrameExclusive: 13_440,
+            generatedAtNS: 10,
+            mlxEvaluationEnqueuedAtNS: 11,
+            mlxEnqueueDurationNS: 1,
+            mlxMaterializationDurationNS: 19,
+            materializedAtNS: 30,
+            writtenAtNS: 40,
+            previewDisposition: .notRequested,
+            mlxInstantProvenance: .derivedFromStepDurations
+        )
+        let transition = try XCTUnwrap(GenerationStreamingTelemetryV9Bridge.make(
+            generationID: "A57D9599-E428-4D74-A7DE-69A6BD801F54",
+            layer: .engine,
+            notes: notes,
+            frontend: nil,
+            transport: nil,
+            terminals: GenerationTerminalTimelineV9(
+                modelTerminalAtNS: 50,
+                productTerminalAtNS: 60,
+                modelOutcome: .eos,
+                productOutcome: .completed
+            ),
+            chunkObservations: [observation],
+            audioChannel: AudioChannelSummaryV9(
+                capacityFrames: 13_440,
+                highWaterFrames: 13_440,
+                producerSuspensionNS: 0,
+                producerSuspensionCount: 0,
+                cancellationWakeups: 0
+            )
+        ))
+        let document = try GenerationStreamingTelemetryV9Publication.makeCompleteDocument(from: transition)
+        XCTAssertEqual(document.chunks.map(\.mlxInstantProvenance), [.derivedFromStepDurations])
+        let json = String(decoding: try JSONEncoder().encode(document), as: UTF8.self)
+        XCTAssertTrue(json.contains("derived-from-step-durations"))
+
+        // A document written before the label decodes with no provenance and
+        // re-encodes without the key.
+        let legacy = try makeRecord()
+        let legacyJSON = String(decoding: try JSONEncoder().encode(legacy), as: UTF8.self)
+        XCTAssertFalse(legacyJSON.contains("mlxInstantProvenance"))
+        let decodedLegacy = try JSONDecoder().decode(
+            GenerationStreamingTelemetryV9.self,
+            from: Data(legacyJSON.utf8)
+        )
+        XCTAssertEqual(decodedLegacy.chunks.map(\.mlxInstantProvenance), [nil, nil])
+
+        // A provenance label without the instants it describes is refused.
+        let unlabelledInstants = ShippingChunkObservationV9(
+            index: 0,
+            transportSequence: 0,
+            audioStartFrame: 0,
+            audioEndFrameExclusive: 13_440,
+            materializedAtNS: 30,
+            writtenAtNS: 40,
+            previewDisposition: .notRequested,
+            mlxInstantProvenance: .derivedFromStepDurations
+        )
+        XCTAssertThrowsError(try GenerationStreamingTelemetryTransitionV9(
+            generationID: UUID(),
+            identities: transition.identities,
+            chunks: [unlabelledInstants],
+            unavailable: []
+        )) { error in
+            XCTAssertEqual(
+                error as? TelemetryV9ValidationError,
+                .invalidOrdering("shipping-chunk-instant-provenance")
+            )
+        }
+    }
+
     func testCompleteV9SidecarPublicationRoundTrip() throws {
         let document = try makeRecord()
         let directory = FileManager.default.temporaryDirectory

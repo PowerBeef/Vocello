@@ -87,10 +87,16 @@ public struct ShippingChunkObservationV9: Codable, Hashable, Sendable {
     public let mlxEvaluationEnqueuedAtNS: UInt64?
     public let mlxEnqueueDurationNS: UInt64?
     public let mlxMaterializationDurationNS: UInt64?
+    /// The consumer's receipt of the chunk (the output adapter's clock read on
+    /// arrival), not an MLX completion event.
     public let materializedAtNS: UInt64
     public let writtenAtNS: UInt64
     public let previewPublishedAtNS: UInt64?
     public let previewDisposition: PreviewPublicationDispositionV9
+    /// How the MLX instants were obtained; nil when they are absent or were
+    /// written before the label existed (output-adapter identity version 2 or
+    /// older).
+    public let mlxInstantProvenance: MLXChunkInstantProvenanceV9?
 
     public init(
         index: Int,
@@ -106,7 +112,8 @@ public struct ShippingChunkObservationV9: Codable, Hashable, Sendable {
         materializedAtNS: UInt64,
         writtenAtNS: UInt64,
         previewPublishedAtNS: UInt64? = nil,
-        previewDisposition: PreviewPublicationDispositionV9
+        previewDisposition: PreviewPublicationDispositionV9,
+        mlxInstantProvenance: MLXChunkInstantProvenanceV9? = nil
     ) {
         self.index = index
         self.transportSequence = transportSequence
@@ -122,13 +129,15 @@ public struct ShippingChunkObservationV9: Codable, Hashable, Sendable {
         self.writtenAtNS = writtenAtNS
         self.previewPublishedAtNS = previewPublishedAtNS
         self.previewDisposition = previewDisposition
+        self.mlxInstantProvenance = mlxInstantProvenance
     }
 
-    /// Whether MLX enqueue/materialization instants are present for a
-    /// complete schema-v9 chunk range (no invented zeros). They are derived
-    /// from step durations, not observed MLX events; `materializedAtNS` is the
-    /// consumer's receipt of the chunk (audit #49/#62).
-    public var hasExactMLXChunkInstants: Bool {
+    /// Whether the four MLX instant fields a complete schema-v9 chunk range
+    /// needs are present (no invented zeros). Present is not observed: they
+    /// are derived from step durations (`mlxInstantProvenance`), and
+    /// `materializedAtNS` is the consumer's receipt of the chunk (audit
+    /// #49/#62).
+    public var hasMLXChunkInstants: Bool {
         generatedAtNS != nil
             && mlxEvaluationEnqueuedAtNS != nil
             && mlxEnqueueDurationNS != nil
@@ -152,6 +161,9 @@ public struct ShippingChunkObservationV9: Codable, Hashable, Sendable {
             }
         } else if previewDisposition == .publishedToProductSink {
             throw TelemetryV9ValidationError.invalidOrdering("shipping-chunk-preview-presence")
+        }
+        if mlxInstantProvenance != nil, !hasMLXChunkInstants {
+            throw TelemetryV9ValidationError.invalidOrdering("shipping-chunk-instant-provenance")
         }
         if codecStartFrame == nil || codecEndFrameExclusive == nil {
             guard codecStartFrame == nil, codecEndFrameExclusive == nil else {

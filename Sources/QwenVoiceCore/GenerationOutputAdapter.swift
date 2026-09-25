@@ -1741,7 +1741,8 @@ struct StreamingExecutionContext: Sendable {
                                 materializedAtNS: materializedAtNS,
                                 writtenAtNS: writtenAtNS,
                                 previewPublishedAtNS: previewPublishedAtNS,
-                                previewDisposition: previewDisposition
+                                previewDisposition: previewDisposition,
+                                mlxInstantProvenance: mlxInstants == nil ? nil : .derivedFromStepDurations
                             )
                         )
                     }

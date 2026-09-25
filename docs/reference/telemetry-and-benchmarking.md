@@ -204,9 +204,14 @@ older rows stay readable but are marked memory-contract-incomplete and excluded 
 
 > **Convergence status:** The shipping JSONL envelope remains schema v8 and still embeds a nested
 > `GenerationStreamingTelemetryTransitionV9` projection. When the transition is publication-ready
-> and every chunk carries exact MLX instants, the engine also publishes a complete
+> and every chunk carries its MLX instants, the engine also publishes a complete
 > `*.streaming-telemetry-v9.json` sidecar and stamps `streamingTelemetryV9SidecarDigest` /
-> `streamingTelemetryV9PublicationReady` notes. History may bind those sidecar digests; the
+> `streamingTelemetryV9PublicationReady` notes. No producer observes MLX events: a chunk's
+> `generatedAtNS`, `mlxEvaluationEnqueuedAtNS` and the two MLX durations are counted back from the
+> engine's per-chunk step durations, and `materializedAtNS` is the output adapter's receipt of the
+> chunk. Since output-adapter identity version 3 each such chunk says so with
+> `mlxInstantProvenance: derived-from-step-durations`; older sidecars carry the same derived values
+> without the label (audit #49/#62). History may bind those sidecar digests; the
 > top-level JSONL schema is not flipped to 9. Sampling promotion packaging stamps
 > `samplingPromotionPackaged=true` after `SamplingTakeEvidence.validatedForPromotion()`.
 
@@ -294,7 +299,7 @@ authoritative list.** Representative keys (prefix `qwen_…`):
 | `qwen_stream_decoder_total` | Streaming audio decoder (codec → waveform). |
 | `qwen_stream_step_eval_total` | `eval(...)` flush after each forward step (GPU dispatch; under the default `.pipelined` policy only the `asyncEval` enqueue). |
 | `qwen_stream_step_token_read_total` | The step's first blocking read, the sampled token: under `.pipelined` the host's wait for the step's GPU work (signpost `Token Read`). |
-| `qwen_stream_step_eval_wait_total` | The observed step wait: equals the token read under `.pipelined`; 0 under synchronous policies, whose wait stays inside the eval call, and under `.deferred`, whose token read itself dispatches and waits for the work the token depends on. The v9 sidecar's derived `mlxMaterializationDurationNS` counts back this wait; rows and sidecars with that meaning carry output-adapter identity version 2. |
+| `qwen_stream_step_eval_wait_total` | The observed step wait: equals the token read under `.pipelined`; 0 under synchronous policies, whose wait stays inside the eval call, and under `.deferred`, whose token read itself dispatches and waits for the work the token depends on. The v9 sidecar's derived `mlxMaterializationDurationNS` counts back this wait; rows and sidecars with that meaning carry output-adapter identity version 2 or later (3 labels the derived instants). |
 | `qwen_stream_step_eos_read_total` | EOS‑flag readback (a GPU sync). |
 | `qwen_audio_chunk_eval_total` | Audio‑chunk evals: the assembly `asyncEval`, the pipelined flush (signpost `Audio Chunk Flush`) and the tail chunk. |
 | `qwen_token_loop_total` | Whole per‑token loop wall time. |

@@ -15,7 +15,10 @@ public enum GenerationStreamingTelemetryV9Publication: Sendable {
     /// `generatedAtNS` count back the observed step wait (the sampled-token
     /// read) instead of a zero eval-minus-enqueue remainder. The bump marks rows
     /// and sidecars written with that meaning; version 1 predates it.
-    public static let outputAdapterIdentityVersion = 2
+    /// 3 (BT-06, audit #49/#62): every chunk that carries those instants also
+    /// labels them `mlxInstantProvenance: derived-from-step-durations`, in the
+    /// nested transition and in the complete sidecar. The values are unchanged.
+    public static let outputAdapterIdentityVersion = 3
 
     public enum PublicationError: Error, Equatable, Sendable {
         case validationFailed
@@ -150,7 +153,7 @@ public enum GenerationStreamingTelemetryV9Publication: Sendable {
         from transition: GenerationStreamingTelemetryTransitionV9
     ) throws -> GenerationStreamingTelemetryV9 {
         try requirePublicationReady(transition)
-        guard transition.chunks.allSatisfy(\.hasExactMLXChunkInstants) else {
+        guard transition.chunks.allSatisfy(\.hasMLXChunkInstants) else {
             throw PublicationError.incompleteChunkInstants
         }
         guard let plan = transition.identities.plan,
@@ -199,7 +202,8 @@ public enum GenerationStreamingTelemetryV9Publication: Sendable {
                 writtenAtNS: observation.writtenAtNS,
                 previewPublishedAtNS: observation.previewPublishedAtNS,
                 mlxEnqueueDurationNS: enqueueDurationNS,
-                mlxMaterializationDurationNS: materializationDurationNS
+                mlxMaterializationDurationNS: materializationDurationNS,
+                mlxInstantProvenance: observation.mlxInstantProvenance
             )
         }
 

@@ -365,19 +365,39 @@ public struct AudioChannelSummaryV9: Hashable, Codable, Sendable {
     }
 }
 
+/// How a chunk's MLX instants (`generatedAtNS`, `mlxEvaluationEnqueuedAtNS`,
+/// `mlxEnqueueDurationNS`, `mlxMaterializationDurationNS`) were obtained
+/// (audit #49/#62). No producer observes MLX events: the output adapter derives
+/// them from the engine's per-chunk step durations, counted back from the
+/// consumer's receipt of the chunk (`materializedAtNS`). A document without a
+/// provenance predates the label (output-adapter identity version 2 or older)
+/// and carries the same derived values.
+public enum MLXChunkInstantProvenanceV9: String, Hashable, Codable, Sendable {
+    /// Counted back from summed step durations; only `materializedAtNS` was
+    /// observed, and it is the consumer's clock, not an MLX event.
+    case derivedFromStepDurations = "derived-from-step-durations"
+}
+
 public struct StreamingChunkRangeV9: Hashable, Codable, Sendable {
     public let index: Int
     public let codecStartFrame: UInt64
     public let codecEndFrameExclusive: UInt64
     public let audioStartFrame: UInt64
     public let audioEndFrameExclusive: UInt64
+    /// Derived, not observed: see `mlxInstantProvenance`.
     public let generatedAtNS: UInt64
+    /// Derived, not observed: see `mlxInstantProvenance`.
     public let mlxEvaluationEnqueuedAtNS: UInt64
+    /// When the consumer (the output adapter) received the chunk: its own
+    /// clock read on arrival, not an MLX completion event.
     public let materializedAtNS: UInt64
     public let writtenAtNS: UInt64?
     public let previewPublishedAtNS: UInt64?
     public let mlxEnqueueDurationNS: UInt64
     public let mlxMaterializationDurationNS: UInt64
+    /// How the four MLX fields above were obtained; nil in documents written
+    /// before the label existed.
+    public let mlxInstantProvenance: MLXChunkInstantProvenanceV9?
 
     public var codecFrameCount: UInt64 { codecEndFrameExclusive - codecStartFrame }
     public var audioFrameCount: UInt64 { audioEndFrameExclusive - audioStartFrame }
@@ -394,7 +414,8 @@ public struct StreamingChunkRangeV9: Hashable, Codable, Sendable {
         writtenAtNS: UInt64? = nil,
         previewPublishedAtNS: UInt64? = nil,
         mlxEnqueueDurationNS: UInt64,
-        mlxMaterializationDurationNS: UInt64
+        mlxMaterializationDurationNS: UInt64,
+        mlxInstantProvenance: MLXChunkInstantProvenanceV9? = nil
     ) {
         self.index = index
         self.codecStartFrame = codecStartFrame
@@ -408,6 +429,7 @@ public struct StreamingChunkRangeV9: Hashable, Codable, Sendable {
         self.previewPublishedAtNS = previewPublishedAtNS
         self.mlxEnqueueDurationNS = mlxEnqueueDurationNS
         self.mlxMaterializationDurationNS = mlxMaterializationDurationNS
+        self.mlxInstantProvenance = mlxInstantProvenance
     }
 
     fileprivate func validate(

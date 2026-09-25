@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="720" height="440" viewBox="0 0 720 440" role="img">
 <g font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
 <text x="16.0" y="28.0" fill="#1f2328" font-size="16" font-weight="600" text-anchor="start">Faster than playback in every mode</text>
-<text x="16.0" y="47.0" fill="#656d76" font-size="12" font-weight="normal" text-anchor="start">Warm real-time factor: seconds of generation per second of audio (lower is faster) · Mac mini M2, 8 GB</text>
+<text x="16.0" y="47.0" fill="#656d76" font-size="12" font-weight="normal" text-anchor="start">Warm real-time factor: seconds of generation per second of audio (lower is faster) · Mac mini M2, 8 GB · Speed models</text>
 <line x1="219.6" y1="64.0" x2="219.6" y2="388" stroke="#d1d9e0" stroke-width="1" stroke-dasharray="3 3"/>
 <text x="219.6" y="406.0" fill="#656d76" font-size="11" font-weight="normal" text-anchor="middle">0.25</text>
 <line x1="329.2" y1="64.0" x2="329.2" y2="388" stroke="#d1d9e0" stroke-width="1" stroke-dasharray="3 3"/>

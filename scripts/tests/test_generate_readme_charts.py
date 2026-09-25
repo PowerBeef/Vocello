@@ -44,9 +44,11 @@ class GenerateReadmeChartsTests(unittest.TestCase):
         self.assertIn(MODULE.LONGFORM_RUN_ID[-8:], rendered["longform-memory-dark.svg"])
 
     def test_the_readme_block_is_fresh_for_the_pooled_medians(self) -> None:
-        medians, _ = MODULE.load_rtf_medians(MODULE.chart_pool())
+        pool = MODULE.chart_pool()
+        medians, _ = MODULE.load_rtf_medians(pool)
         self.assertEqual(
-            MODULE.README_PATH.read_text(encoding="utf-8"), MODULE.render_readme(medians),
+            MODULE.README_PATH.read_text(encoding="utf-8"),
+            MODULE.render_readme(medians, MODULE.pool_variant_label(pool)),
             "README rtf-chart block is stale — run scripts/generate_readme_charts.py",
         )
         alt = MODULE.readme_alt_text(medians)
@@ -77,7 +79,8 @@ class GenerateReadmeChartsTests(unittest.TestCase):
 
 def write_record(directory: Path, run_id: str, profile: str, finished_at: str,
                  classification: str = "canonical", key: str = "lineage-a",
-                 rtf: float = 0.5, app_build: str = "24", lock: str = "lock-a") -> None:
+                 rtf: float = 0.5, app_build: str = "24", lock: str = "lock-a",
+                 variant: str = "speed") -> None:
     marketing = {
         "mac-mini-m2-8gb": "Mac mini (M2, 8 GB)",
         "mac-mini-m6-16gb": "Mac mini (M6, 16 GB)",
@@ -92,7 +95,7 @@ def write_record(directory: Path, run_id: str, profile: str, finished_at: str,
         "inputs": {"dependencyLockHash": lock},
         "comparison": {"key": key},
         "takes": [
-            {"cell": f"{mode}/{length}/warm#{index}", "metrics": {"rtf": rtf + index / 100}}
+            {"cell": f"{mode}/{length}/warm#{index}", "variant": variant, "metrics": {"rtf": rtf + index / 100}}
             for mode in MODULE.MODES for length in MODULE.LENGTHS for index in range(3)
         ],
     }), encoding="utf-8")
@@ -184,6 +187,21 @@ class ChartPoolTests(unittest.TestCase):
         pooled = ["macos-xcui-benchmark-20260915-000000-pooledm2", *one]
         self.assertEqual(MODULE.provenance_text(pooled), "median of 2 records through pooledm2")
         self.assertIn("Median of 2 records through pooledm2", MODULE.website_medians_text(pooled, medians))
+
+    def test_the_label_names_the_one_variant_the_pool_ran(self) -> None:
+        """audit #17: the chart never publishes numbers under a hardware-only label."""
+        self.assertEqual(MODULE.pool_variant_label(self.pool(), self.records), "Speed")
+        anchor = MODULE.chart_pool()
+        self.assertIn(f"{MODULE.pool_variant_label(anchor)} models", MODULE.render_all()["rtf-by-mode-dark.svg"])
+        self.assertIn("of the Speed models", MODULE.readme_alt_text(
+            {f"{mode}/{length}/warm": 0.5 for mode in MODULE.MODES for length in MODULE.LENGTHS}, "Speed",
+        ))
+        write_record(self.records, "macos-xcui-benchmark-20260915-000000-quality", "mac-mini-m2-8gb",
+                     "2026-09-15T00:00:00Z", variant="quality")
+        pool = self.pool()
+        self.assertEqual(MODULE.pool_variant_label(pool[:1], self.records), "Quality")
+        with self.assertRaises(SystemExit):
+            MODULE.pool_variant_label(pool, self.records)
 
     def test_pooled_medians_take_every_take_of_the_pool(self) -> None:
         write_record(self.records, "macos-xcui-benchmark-20260915-000000-second", "mac-mini-m2-8gb",

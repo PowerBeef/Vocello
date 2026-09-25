@@ -23,6 +23,8 @@ Data provenance:
     until they are regenerated (and the website medians and provenance line
     updated from the printed values). Records from different hardware
     profiles are never pooled; the subtitle names the anchor's hardware and
+    the one model variant every pooled take ran (audit #17: the benchmark
+    measures Speed whatever the tier recommends, and the label says so), and
     the footer the anchor and the pool size. RTF is the standard
     real-time factor (generation seconds per audio second, lower is faster).
     A record published before the 2026-09-12 cutover stores the inverted
@@ -85,6 +87,11 @@ LONGFORM_SEGMENTS = (
 
 MODES = ("custom", "design", "clone")
 MODE_LABELS = {"custom": "Built-in Voice", "design": "Voice Design", "clone": "Voice Cloning"}
+# The take-level model variant (`takes[].variant`) the chart label names.
+VARIANT_LABELS = {
+    "speed": "Speed", "quality": "Quality",
+    "compact_speed": "Compact Speed", "compact_quality": "Compact Quality",
+}
 LENGTHS = ("short", "medium", "long")
 
 # Palette validated with the dataviz six-checks validator against each
@@ -139,6 +146,23 @@ def hardware_label(record: dict) -> str:
     if not match:
         raise SystemExit(f"error: record hardware has no chartable marketingName: {name!r}")
     return f"{match.group(1)} {match.group(2)}"
+
+
+def pool_variant_label(record_ids: list[str], records_dir: Path | None = None) -> str:
+    """The one model variant every take of the pool ran, as the chart names it (audit #17).
+
+    Pooled records share a comparison key, which names their models, so a pool
+    runs one variant; a pool that does not is never charted under one label."""
+    variants = {
+        take.get("variant")
+        for record_id in record_ids
+        for take in load_record(record_id, records_dir)["takes"]
+    }
+    if len(variants) != 1 or (variant := variants.pop()) not in VARIANT_LABELS:
+        raise SystemExit(
+            f"error: the pooled records do not share one chartable model variant: {sorted(map(str, variants))}"
+        )
+    return VARIANT_LABELS[variant]
 
 
 def load_rtf_medians(record_ids: list[str], records_dir: Path | None = None) -> tuple[dict[str, float], bool]:
@@ -225,20 +249,21 @@ def website_medians_text(pool: list[str], medians: dict[str, float]) -> str:
     ])
 
 
-def readme_alt_text(medians: dict[str, float]) -> str:
+def readme_alt_text(medians: dict[str, float], variant: str | None = None) -> str:
     parts = []
     for mode in MODES:
         values = [medians[f"{mode}/{length}/warm"] for length in LENGTHS]
         parts.append(f"{MODE_LABELS[mode]} {min(values):.2f} to {max(values):.2f}")
+    measured = f" of the {variant} models" if variant else ""
     return (
-        "Grouped bar chart: warm real-time factor by script length, lower is faster: "
+        f"Grouped bar chart: warm real-time factor{measured} by script length, lower is faster: "
         + ", ".join(parts)
         + ". Every bar sits below the real-time line at 1.0."
     )
 
 
-def readme_block(medians: dict[str, float]) -> str:
-    alt = readme_alt_text(medians)
+def readme_block(medians: dict[str, float], variant: str | None = None) -> str:
+    alt = readme_alt_text(medians, variant)
     return "\n".join([
         README_MARKERS[0],
         "<picture>",
@@ -249,14 +274,14 @@ def readme_block(medians: dict[str, float]) -> str:
     ])
 
 
-def render_readme(medians: dict[str, float]) -> str:
+def render_readme(medians: dict[str, float], variant: str | None = None) -> str:
     text = README_PATH.read_text(encoding="utf-8")
     start, end = README_MARKERS
     if text.count(start) != 1 or text.count(end) != 1:
         raise SystemExit("error: README.md must contain exactly one rtf-chart marker pair")
     head, rest = text.split(start, 1)
     _, tail = rest.split(end, 1)
-    return head + readme_block(medians) + tail
+    return head + readme_block(medians, variant) + tail
 
 
 def svg_open(width: int, height: int) -> list[str]:
@@ -291,7 +316,9 @@ def rtf_chart(theme_name: str) -> str:
     parts = svg_open(width, height)
     parts.append(text(16, 28, "Faster than playback in every mode", fill=theme["ink"], size=16, weight="600"))
     hardware = hardware_label(load_record(anchor))
-    parts.append(text(16, 47, f"Warm real-time factor: seconds of generation per second of audio (lower is faster) · {hardware}",
+    variant = pool_variant_label(pool)
+    parts.append(text(16, 47, "Warm real-time factor: seconds of generation per second of audio "
+                              f"(lower is faster) · {hardware} · {variant} models",
                       fill=theme["muted"], size=12))
 
     bar_h, in_gap, group_gap = 16.0, 6.0, 26.0
@@ -489,7 +516,7 @@ def main() -> int:
     pool = chart_pool()
     rendered = render_all()
     medians, _ = load_rtf_medians(pool)
-    readme = render_readme(medians)
+    readme = render_readme(medians, pool_variant_label(pool))
     if args.check:
         stale = [
             name for name, content in rendered.items()

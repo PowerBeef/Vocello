@@ -275,11 +275,17 @@ which landed earlier; a no-cold mode; a design note before any batching).
   needs, but no delivery analysis pairs it: about 11.5 % of sweep time, 9-10 % wasted.
   `vocello bench … --delivery … --no-cold` (a bare flag; it requires `--delivery`) skips it and
   loads the model explicitly instead, so the neutral and instructed takes all run on a resident
-  model and stay `warm`. The run has no `cold#0` cell, so its matrix hash never matches a timing
-  matrix, and `bench-results.json` records `coldTakes: false` (absent otherwise). Its first warm
-  take may carry first-generation warm-up the cold take used to absorb: a no-cold run is a delivery
-  sweep, not a timing benchmark. `custom_delivery_matrix.py run --no-cold` passes it to every unit
-  and records `coldTakes: false` in the plan; a resume that changes it is refused.
+  model and stay `warm`. Custom and Design prewarm inside a generation's prepare step, not in the
+  model load, so the sweep then runs the cold take's prewarm itself (the cold length's neutral
+  request, through the engine's interactive-readiness path, which generates nothing) and fails if
+  it did not run; without it the first warm take paid the prewarm the cold take used to absorb,
+  as Clone's did before its priming (audit #55). The 8 GB tier defers the dedicated Custom prewarm
+  into the first generation, so there `--no-cold` refuses a Custom sweep. The run has no `cold#0`
+  cell, so its matrix hash never matches a timing matrix, and `bench-results.json` records
+  `coldTakes: false` (absent otherwise). Other one-time costs of a first generation that the
+  prewarm does not cover can still reach the first warm take: a no-cold run is a delivery sweep,
+  not a timing benchmark. `custom_delivery_matrix.py run --no-cold` passes it to every unit and
+  records `coldTakes: false` in the plan; a resume that changes it is refused.
 - **Batching (design, not implemented).** A sweep still pays, per seed, one process start, the
   runtime bootstrap, and an unload and reload per mode and variant. A batched sweep would take
   `--seeds a,b,c` in one process and, per mode and variant, load once and then run seed-major: for

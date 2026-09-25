@@ -234,7 +234,9 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # expectation-bound paired features and their per-take adherence flags as a
     # diagnostic count; the cell verdict, not each take's flags, warns. And for
     # audit #48: ttfcObserverLagMS joins the observer on the hand-off stamp
-    # every streamed chunk carries, so the preview-less bench publishes it.
+    # every streamed chunk carries, so the preview-less bench publishes it. A
+    # --no-cold delivery sweep's explicit prewarm before its first warm take
+    # (BT-05 review) rides 2 too: the stamped records carry 1.
     ("engine-generation", "macos"): 2,
     ("memory-qualification", "macos"): 2,
     # 2 (2026-09-25, audit #12/#99): the CPU profile records three warm takes

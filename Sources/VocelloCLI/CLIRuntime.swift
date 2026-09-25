@@ -34,15 +34,11 @@ struct CLIRuntime {
         let deviceClass = NativeMemoryPolicyResolver.deviceClass()
         let registry = try ContractBackedModelRegistry(manifestURL: manifestURL)
             .expandedForPlatform(.macOS, deviceClass: deviceClass, includeBaseAliases: true)
-        // Same tiered prewarm policy as the macOS app: defer the dedicated custom
-        // prewarm on the 8 GB floor tier (the work folds into the first generation).
-        let customPrewarmPolicy: NativeCustomPrewarmPolicy =
-            deviceClass == .floor8GBMac ? .skipDedicatedCustomPrewarm : .eager
         let runtime = try NativeRuntimeFactory.make(
             registry: registry,
             paths: .rooted(at: dataDirectory),
             storeVersionSeed: storeVersionSeed(),
-            customPrewarmPolicy: customPrewarmPolicy
+            customPrewarmPolicy: customPrewarmPolicy(for: deviceClass)
         )
         try await runtime.engine.initialize(appSupportDirectory: dataDirectory)
         return CLIRuntime(
@@ -51,6 +47,12 @@ struct CLIRuntime {
             dataDirectory: dataDirectory,
             voiceCloningConsent: voiceCloningConsent
         )
+    }
+
+    /// Same tiered prewarm policy as the macOS app: defer the dedicated custom
+    /// prewarm on the 8 GB floor tier (the work folds into the first generation).
+    static func customPrewarmPolicy(for deviceClass: NativeDeviceMemoryClass) -> NativeCustomPrewarmPolicy {
+        deviceClass == .floor8GBMac ? .skipDedicatedCustomPrewarm : .eager
     }
 
     /// Every CLI generation: clone requests are refused without recorded consent.

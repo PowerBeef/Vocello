@@ -320,12 +320,24 @@ enum BenchCommand {
             throw CLIError("--continue-delivery-failures requires --delivery")
         }
         // Audit #104: a delivery sweep never pairs the cold take, which cost about
-        // 11.5 % of sweep time. `--no-cold` skips it and loads the model instead,
-        // so the neutral and instructed takes stay warm. A timing matrix keeps its
-        // cold cell, so the mode needs --delivery.
+        // 11.5 % of sweep time. `--no-cold` skips it, loads the model and runs
+        // the cold take's prewarm instead, so the neutral and instructed takes
+        // stay warm. A timing matrix keeps its cold cell, so the mode needs
+        // --delivery.
         let noCold = args.flag("no-cold")
         if noCold, deliveryItems.isEmpty {
             throw CLIError("--no-cold is a delivery-sweep mode and requires --delivery")
+        }
+        // The 8 GB tier defers the dedicated Custom prewarm into the first
+        // generation, so nothing but a generation can warm Custom there, and a
+        // --no-cold sweep's first Custom take would pay it.
+        if noCold, modes.contains("custom"),
+           CLIRuntime.customPrewarmPolicy(for: NativeMemoryPolicyResolver.deviceClass())
+               == .skipDedicatedCustomPrewarm {
+            throw CLIError(
+                "--no-cold cannot warm Custom on this Mac's memory tier, where the Custom prewarm "
+                    + "folds into the first generation; run Custom without --no-cold"
+            )
         }
         if continueDeliveryFailures, !noSummary {
             throw CLIError("--continue-delivery-failures requires --no-summary")
@@ -471,10 +483,31 @@ enum BenchCommand {
                 // generate loads inside the call (records warmState=cold).
                 try await runtime.engine.unloadModel()
 
-                // A --no-cold delivery sweep loads the model without a cold take,
-                // so its first take is warm like the others (audit #104).
+                // A --no-cold delivery sweep loads the model without a cold take
+                // (audit #104). Custom and Design prewarm in a generation's prepare
+                // step, not in loadModel, so the sweep then runs the cold take's
+                // prewarm (the cold length's neutral request) through the engine's
+                // readiness path, which generates nothing; otherwise warm#0 would pay
+                // it, as Clone's did before its priming (audit #55). A prewarm that
+                // did not run fails the sweep.
                 if mode != .clone, noCold {
                     try await runtime.engine.loadModel(id: modelID)
+                    if let coldLen {
+                        let prewarmText = try requiredText(for: coldLen)
+                        let prewarmRequest = GenerationRequest(
+                            mode: mode, modelID: modelID, text: prewarmText,
+                            outputPath: outDir.appendingPathComponent("no-cold-prewarm.wav").path,
+                            shouldStream: !noStream, payload: payload, seed: seed
+                        )
+                        let prewarm = await runtime.engine.prefetchInteractiveReadinessIfNeeded(
+                            for: prewarmRequest
+                        )
+                        guard prewarm != nil else {
+                            throw CLIError(
+                                "--no-cold could not prewarm \(mode.rawValue)/\(variantStr.lowercased()) before its first take"
+                            )
+                        }
+                    }
                 }
                 // Cold sample (Custom/Design only — Clone is warm-by-design).
                 if mode != .clone, !noCold, let coldLen {
@@ -1664,8 +1697,9 @@ enum BenchCommand {
                          allowed for a Custom/Design cold-only diagnostic;
                          Clone and --delivery require at least one warm take.
           --no-cold      (with --delivery) skip the Custom/Design cold take a
-                         delivery sweep never pairs; the model is loaded first
-                         so every take stays warm
+                         delivery sweep never pairs; the model is loaded and
+                         prewarmed first so every take stays warm (Custom is
+                         refused on the 8 GB tier, which defers its prewarm)
           --voice        (clone) saved voice name; default \(defaultCloneVoice)
           --confirm-consent  required when clone is in --modes: confirms you own or
                          have permission to clone the saved voice

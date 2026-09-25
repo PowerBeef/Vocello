@@ -18,11 +18,27 @@ from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from delivery_resource_supervisor import (  # noqa: E402
+    FootprintSample,
     HostSnapshot,
+    ProcessSample,
     ResourceSupervisorError,
+    host_snapshot,
+    owned_process_sample,
+    parse_free_percent,
+    parse_macos_footprint_peak,
     parse_macos_footprint_report,
+    parse_swap_used_bytes,
     macos_footprint_sampler,
     run_supervised,
+)
+
+GIB = 1024**3
+MIB = 1024**2
+# `sysctl -n vm.swapusage` and `memory_pressure -Q` as the fr_CA host prints them.
+FR_CA_SWAP = "total = 2048,00M  used = 12,50M  free = 2035,50M  (encrypted)"
+FR_CA_PRESSURE = (
+    "The system has 17179869184 (1048576 pages with a page size of 16384).\n"
+    "System-wide memory free percentage: 71%"
 )
 
 
@@ -340,13 +356,16 @@ class DeliveryResourceSupervisorTests(unittest.TestCase):
             macos_footprint_sampler(raw)
         def run(command, **kwargs):
             self.assertEqual(command[:3], ["/usr/bin/footprint", "-p", "42"])
+            self.assertEqual(kwargs["env"]["LC_ALL"], "C")
             Path(command[-1]).write_text(json.dumps({
                 "unit": "byte", "bytes per unit": 1, "errors": [], "warnings": [],
-                "processes": [{"pid": 42, "footprint": 1024}],
+                "processes": [{"pid": 42, "footprint": 1024,
+                               "auxiliary": {"phys_footprint_peak": 4096, "phys_footprint": 1024}}],
             }))
             return subprocess.CompletedProcess(command, 0, b"", b"")
         with patch("delivery_resource_supervisor.subprocess.run", side_effect=run):
-            self.assertEqual(sample(42), 1024)
+            # The tool's lifetime peak is kept beside the current footprint (audit #38).
+            self.assertEqual(sample(42), FootprintSample(1024, 4096))
         self.assertTrue((raw / "footprint-0000.json").is_file())
         with patch("delivery_resource_supervisor.subprocess.run", return_value=
                    subprocess.CompletedProcess([], 1, b"", b"permission denied: private path")), \
@@ -385,6 +404,241 @@ class DeliveryResourceSupervisorTests(unittest.TestCase):
         self.assertTrue(result.report["postExitMemoryRecovered"])
         self.assertEqual(result.report["recoverySnapshotCount"], 2)
         self.assertTrue(result.report["qualified"])
+
+    # -- owned-process-probe-v3: locale-free host probes (audit #7) ----------
+
+    def test_fr_ca_formatted_host_text_parses(self) -> None:
+        self.assertEqual(parse_swap_used_bytes(FR_CA_SWAP), int(12.5 * MIB))
+        self.assertEqual(parse_swap_used_bytes("total = 0,00M  used = 0,00M  free = 0,00M  (encrypted)"), 0)
+        self.assertEqual(parse_swap_used_bytes("total = 4.00G  used = 1.25G  free = 2.75G"), int(1.25 * GIB))
+        self.assertIsNone(parse_swap_used_bytes("swap usage unavailable"))
+        self.assertEqual(parse_free_percent(FR_CA_PRESSURE), 71.0)
+        self.assertEqual(parse_free_percent("System-wide memory free percentage: 71,5%"), 71.5)
+        self.assertIsNone(parse_free_percent("memory_pressure: unknown option"))
+
+    def test_host_snapshot_reads_sysctl_without_spawning_a_probe(self) -> None:
+        values = {"kern.memorystatus_level": 71, "vm.swapusage": 12 * MIB,
+                  "kern.memorystatus_vm_pressure_level": 1, "hw.memsize": 16 * GIB}
+
+        def no_probe(command):
+            raise AssertionError(f"text probe spawned: {command}")
+
+        snapshot = host_snapshot(read_sysctl=values.get, run_probe=no_probe)
+        self.assertEqual(snapshot, HostSnapshot(71.0, 12 * MIB, False, 1, 16 * GIB, ()))
+        self.assertEqual(snapshot.report()["kernelPressureLevel"], 1)
+
+    def test_text_fallback_probes_run_in_the_c_locale(self) -> None:
+        calls = []
+
+        def run(command, **kwargs):
+            calls.append((command, kwargs["env"]))
+            output = FR_CA_PRESSURE if command[0].endswith("memory_pressure") else FR_CA_SWAP
+            return subprocess.CompletedProcess(command, 0, output, "")
+
+        with patch("delivery_resource_supervisor.subprocess.run", side_effect=run):
+            snapshot = host_snapshot(read_sysctl=lambda _name: None)
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(all(env["LC_ALL"] == "C" and env["LANG"] == "C" for _, env in calls))
+        self.assertEqual((snapshot.free_percent, snapshot.swap_used_bytes), (71.0, int(12.5 * MIB)))
+        self.assertEqual(snapshot.probe_failures,
+                         ("kernel-pressure-level-unavailable", "physical-memory-unavailable"))
+
+    def test_supervised_run_under_fr_ca_host_output_is_qualified(self) -> None:
+        """Roadmap BT-05: a trivial supervised child under fr_CA comes back qualified."""
+        def fr_ca_probe(command):
+            return FR_CA_PRESSURE if command[0].endswith("memory_pressure") else FR_CA_SWAP
+
+        def snapshot():
+            kernel = {"kern.memorystatus_vm_pressure_level": 1, "hw.memsize": 16 * GIB}
+            return host_snapshot(read_sysctl=kernel.get, run_probe=fr_ca_probe)
+
+        result = run_supervised(
+            [sys.executable, "-c", "import time; time.sleep(.15)"],
+            lock_root=self.root, snapshotter=snapshot, rss_sampler=lambda _pid: 12 * MIB,
+        )
+        self.assertTrue(result.report["qualified"], result.report["qualificationFailures"])
+        self.assertEqual(result.report["hostBefore"]["swapUsedBytes"], int(12.5 * MIB))
+        self.assertEqual(result.report["hostAfter"]["probeFailures"], [])
+        self.assertEqual(result.report["swapDeltaBytes"], 0)
+
+    def test_unparsed_host_probe_is_typed_apart_from_swap_growth(self) -> None:
+        def snapshot():
+            kernel = {"kern.memorystatus_level": 70, "kern.memorystatus_vm_pressure_level": 1,
+                      "hw.memsize": 16 * GIB}
+            return host_snapshot(read_sysctl=kernel.get, run_probe=lambda _command: "unexpected text")
+
+        result = run_supervised(
+            [sys.executable, "-c", "import time; time.sleep(.1)"],
+            lock_root=self.root, snapshotter=snapshot, rss_sampler=lambda _pid: 12 * MIB,
+        )
+        failures = result.report["qualificationFailures"]
+        self.assertFalse(result.report["qualified"])
+        self.assertIn("host-swap-probe-failed", failures)
+        self.assertNotIn("swap-recovery-unqualified", failures)
+        self.assertNotIn("post-exit-memory-recovery-unqualified", failures)
+        self.assertEqual(result.report["hostBefore"]["probeFailures"], ["swap-usage-unparsed"])
+
+    # -- owned-process-probe-v3: in-process sampling (audit #38, #101) -------
+
+    def test_default_probe_samples_the_child_in_process(self) -> None:
+        def no_probe_process(*args, **kwargs):
+            raise AssertionError("a probe subprocess was spawned during supervision")
+
+        with patch("delivery_resource_supervisor.subprocess.run", side_effect=no_probe_process):
+            result = run_supervised(
+                [sys.executable, "-c", "import time; time.sleep(.3)"],
+                lock_root=self.root, snapshotter=self._snapshot,
+            )
+        report = result.report
+        self.assertTrue(report["qualified"], report["qualificationFailures"])
+        self.assertEqual(report["probeAlgorithmVersion"], "owned-process-probe-v3")
+        self.assertIn(report["processProbe"], ("libproc-rusage-v4", "procfs-status"))
+        self.assertGreater(report["peakRSSBytes"], 0)
+        self.assertGreaterEqual(report["resourceSampleCount"], 2)
+        self.assertEqual(report["sampleIntervalSeconds"], 0.05)
+        self.assertLess(report["maximumSampleGapSeconds"], 1.0)
+        self.assertEqual(report["probeFailureCount"], 0)
+        # The kernel's lifetime maximum RSS from the reap, kept apart from the samples.
+        self.assertGreater(report["waitMaxRSSBytes"], 0)
+
+    def test_failed_process_sample_is_counted_never_read_as_zero(self) -> None:
+        def broken(_pid):
+            raise ResourceSupervisorError("private probe detail")
+
+        result = run_supervised(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            lock_root=self.root, snapshotter=self._snapshot, process_sampler=broken,
+        )
+        self.assertFalse(result.report["qualified"])
+        self.assertIn("resource-probe-failed", result.report["qualificationFailures"])
+        self.assertEqual(result.report["probeFailures"], [{"stage": "process", "reason": "probe-exception"}])
+        self.assertEqual(result.report["probeFailureCount"], 1)
+        self.assertNotIn("private probe detail", str(result.report))
+
+    def test_scripted_spike_between_samples_is_caught_by_the_lifetime_peak(self) -> None:
+        readings = iter([
+            ProcessSample(64 * MIB, 128 * MIB, 128 * MIB),
+            ProcessSample(64 * MIB, 128 * MIB, 128 * MIB),
+            # The spike rose and fell between two samples: only the kernel's
+            # lifetime high-water mark saw it.
+            ProcessSample(64 * MIB, 128 * MIB, 6 * GIB),
+        ])
+
+        def sampler(_pid):
+            return next(readings, ProcessSample(64 * MIB, 128 * MIB, 6 * GIB))
+
+        result = run_supervised(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            lock_root=self.root, snapshotter=self._snapshot,
+            process_sampler=sampler, measure_physical_footprint=True,
+        )
+        report = result.report
+        self.assertTrue(report["resourceLimitTerminated"])
+        self.assertEqual(report["sampledPeakPhysicalFootprintBytes"], 128 * MIB)
+        self.assertEqual(report["lifetimeMaxPhysicalFootprintBytes"], 6 * GIB)
+        self.assertEqual(report["peakPhysicalFootprintBytes"], 6 * GIB)
+        self.assertIn("provisional-physical-footprint-ceiling-exceeded", report["qualificationFailures"])
+
+    @unittest.skipUnless(sys.platform == "darwin", "proc_pid_rusage is a macOS probe")
+    def test_real_child_spike_is_kept_through_exit(self) -> None:
+        code = (
+            "import time; time.sleep(.15); b = bytearray(96 * 1024 * 1024); "
+            "b[::16384] = b'x' * len(b[::16384]); del b; time.sleep(.15)"
+        )
+        result = run_supervised(
+            [sys.executable, "-c", code], lock_root=self.root, snapshotter=self._snapshot,
+            measure_physical_footprint=True,
+        )
+        report = result.report
+        self.assertTrue(report["qualified"], report["qualificationFailures"])
+        self.assertTrue(report["terminalLifetimePeakRead"])
+        self.assertGreaterEqual(report["lifetimeMaxPhysicalFootprintBytes"], 96 * MIB)
+        self.assertEqual(report["peakPhysicalFootprintBytes"], report["lifetimeMaxPhysicalFootprintBytes"])
+        self.assertTrue(report["physicalFootprintCeilingEvaluated"])
+
+    @unittest.skipUnless(sys.platform == "darwin", "proc_pid_rusage is a macOS probe")
+    def test_owned_process_sample_reads_the_live_child(self) -> None:
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(.3)"])
+        try:
+            sample = owned_process_sample(child.pid)
+        finally:
+            child.wait(timeout=5)
+        self.assertGreater(sample.resident_bytes, 0)
+        self.assertGreater(sample.lifetime_max_physical_footprint_bytes, 0)
+        with self.assertRaises(ProcessLookupError):
+            owned_process_sample(child.pid)
+
+    def test_unmeasured_footprint_ceiling_is_marked_not_evaluated(self) -> None:
+        result = run_supervised(
+            [sys.executable, "-c", "import time; time.sleep(.1)"],
+            lock_root=self.root, snapshotter=self._snapshot, rss_sampler=lambda _pid: 12 * MIB,
+        )
+        self.assertTrue(result.report["qualified"])
+        self.assertFalse(result.report["physicalFootprintCeilingEvaluated"])
+        self.assertIsNone(result.report["peakPhysicalFootprintBytes"])
+
+    def test_requested_in_process_footprint_is_evaluated(self) -> None:
+        result = run_supervised(
+            [sys.executable, "-c", "import time; time.sleep(.15)"],
+            lock_root=self.root, snapshotter=self._snapshot,
+            process_sampler=lambda _pid: ProcessSample(64 * MIB, 128 * MIB, 256 * MIB),
+            measure_physical_footprint=True,
+        )
+        report = result.report
+        self.assertTrue(report["qualified"], report["qualificationFailures"])
+        self.assertTrue(report["physicalFootprintMeasurementRequested"])
+        self.assertTrue(report["physicalFootprintCeilingEvaluated"])
+        self.assertEqual(report["peakPhysicalFootprintBytes"], 256 * MIB)
+        self.assertEqual(report["processProbe"], "injected")
+
+    def test_footprint_peak_parser_reads_the_tool_lifetime_peak(self) -> None:
+        payload = {"unit": "byte", "bytes per unit": 1, "errors": [], "warnings": [],
+                   "processes": [{"pid": 42, "footprint": 1024,
+                                  "auxiliary": {"phys_footprint_peak": 8192}}]}
+        self.assertEqual(parse_macos_footprint_peak(payload, 42), 8192)
+        payload["processes"][0].pop("auxiliary")
+        self.assertIsNone(parse_macos_footprint_peak(payload, 42))
+
+    # -- post-exit recovery attribution (audit #102; the rule is unchanged) --
+
+    def _attributed(self, *, child_lifetime: int, ceiling: int = 5 * GIB) -> dict:
+        snapshots = iter((
+            HostSnapshot(60.0, 0, False, 1, 16 * GIB),
+            HostSnapshot(40.0, 0, False, 2, 16 * GIB),
+        ))
+        return run_supervised(
+            [sys.executable, "-c", "import time; time.sleep(.1)"],
+            lock_root=self.root, snapshotter=lambda: next(snapshots),
+            process_sampler=lambda _pid: ProcessSample(64 * MIB, 128 * MIB, child_lifetime),
+            measure_physical_footprint=True, maximum_physical_footprint_bytes=ceiling,
+            recovery_timeout_seconds=0,
+        ).report
+
+    def test_drop_larger_than_the_child_peak_is_attributed_to_another_allocator(self) -> None:
+        report = self._attributed(child_lifetime=GIB)
+        attribution = report["recoveryAttribution"]
+        self.assertEqual(attribution["status"], "drop-exceeds-child-peak")
+        self.assertEqual(attribution["freePercentDropPoints"], 20.0)
+        self.assertEqual(attribution["childPeakPercentOfPhysicalMemory"], 6.25)
+        self.assertEqual(attribution["childPeakBasis"], "physical-footprint")
+        self.assertEqual(attribution["kernelPressureLevelAfter"], 2)
+        self.assertFalse(attribution["ruleChanged"])
+        # Report only: the five-point recovery rule still fails the run.
+        self.assertIn("post-exit-memory-recovery-unqualified", report["qualificationFailures"])
+
+    def test_drop_within_the_child_peak_is_attributed_to_the_child(self) -> None:
+        report = self._attributed(child_lifetime=4 * GIB, ceiling=8 * GIB)
+        self.assertEqual(report["recoveryAttribution"]["status"], "drop-within-child-peak")
+        self.assertEqual(report["recoveryAttribution"]["childPeakPercentOfPhysicalMemory"], 25.0)
+        self.assertIn("post-exit-memory-recovery-unqualified", report["qualificationFailures"])
+
+    def test_recovered_run_is_attributed_as_recovered(self) -> None:
+        result = run_supervised(
+            [sys.executable, "-c", "import time; time.sleep(.1)"],
+            lock_root=self.root, snapshotter=self._snapshot, rss_sampler=lambda _pid: 12 * MIB,
+        )
+        self.assertEqual(result.report["recoveryAttribution"]["status"], "recovered")
+        self.assertEqual(result.report["recoveryAttribution"]["childPeakBasis"], "resident")
 
 
 if __name__ == "__main__":

@@ -123,6 +123,31 @@ class DeliveryCompactModelAdapterTests(unittest.TestCase):
         self.assertTrue(hit)
         self.assertEqual(retained, payload)
 
+    def test_mlx_adapter_measures_physical_footprint_by_default(self) -> None:
+        calls = []
+
+        def supervisor(command, **kwargs):
+            calls.append(kwargs)
+            output = {"transcript": "hello", "language": "en", "detectedLanguage": "en", "segments": [],
+                      "languageTag": "en", "emotionTag": "neutral", "eventTag": "speech"}
+            report = {"qualified": True, "qualificationFailures": []}
+            return SupervisedResult(report, json.dumps(output).encode(), b"")
+
+        whisper = copy.deepcopy(self.config)
+        whisper["adapterID"] = "whisper-small-mlx"
+        whisper["modelID"] = "whisper-small-mlx-fixture"
+        run_compact_adapter(
+            wav_path=self.audio, config=whisper, cache=self.cache,
+            lock_root=self.root / "lock", supervisor=supervisor,
+        )
+        self.assertIs(calls[0]["measure_physical_footprint"], True)
+        # CPU adapters keep their RSS-only envelope unless a caller asks.
+        run_compact_adapter(
+            wav_path=self.audio, config=self.config, cache=DeliveryAnalysisCache(self.root / "cpu"),
+            lock_root=self.root / "lock", supervisor=supervisor,
+        )
+        self.assertNotIn("measure_physical_footprint", calls[1])
+
     def test_license_digest_and_requested_label_fail_closed(self) -> None:
         incompatible = copy.deepcopy(self.config)
         incompatible["commercialUseCompatible"] = False

@@ -32,6 +32,9 @@ import delivery_resource_supervisor
 
 SCHEMA_VERSION = 1
 PERMITTED_ADAPTERS = ("sensevoice-small-q8", "distilhubert", "whisper-small-mlx", "nisqa-v2")
+# Adapters whose runtime allocates on the GPU through MLX; their supervised
+# envelope measures physical footprint by default.
+MLX_ADAPTERS = frozenset({"whisper-small-mlx"})
 NISQA_OUTPUT_FIELDS = ("mos", "noisiness", "discontinuity", "coloration", "loudness")
 EXECUTION_IDENTITY_VERSION = 2
 SENSEVOICE_OUTPUT = re.compile(
@@ -240,6 +243,9 @@ def run_compact_adapter(
         environment = dict(os.environ)
         environment.update({"VOCELLO_DELIVERY_ADAPTER_DEVICE": "cpu"})
         options = dict(supervisor_options or {})
+        if config["adapterID"] in MLX_ADAPTERS:
+            # MLX allocates Metal memory that RSS cannot see (audit #101).
+            options.setdefault("measure_physical_footprint", True)
         result = supervisor(
             command, lock_root=lock_root, environment=environment, **options
         )

@@ -485,10 +485,13 @@ sample proved too noisy; the five-point recovery threshold itself remains fail c
 does not accept a caller-authored host label: it checks `hw.model` and `hw.memsize` against the
 tracked canonical macOS hardware profile and binds the qualifier source in its report.
 
-RSS does not measure total MLX/Metal residency. Callers diagnosing those allocations must supply
-an exact-PID `physical_footprint_sampler` to `run_supervised`; it is not silently enabled for
-existing CPU-analyzer callers. The additive envelope fields identify whether it was requested,
-the measured peak and sample count, and the separate provisional ceiling. Never add RSS to
+RSS does not measure total MLX/Metal residency. MLX callers (`independent_asr.py` and the
+`whisper-small-mlx` compact adapter) pass `measure_physical_footprint=True`; other callers may
+supply an exact-PID `physical_footprint_sampler`. It is not silently enabled for existing
+CPU-analyzer callers, and `physicalFootprintCeilingEvaluated` is false when nothing was measured,
+so a printed footprint ceiling is never mistaken for an evaluated one. The additive envelope fields
+identify whether it was requested, the measured peak and sample count, and the separate
+provisional ceiling. Never add RSS to
 physical footprint or relabel older RSS-only reports as footprint-qualified. Missing/invalid
 requested measurements and probe exceptions fail closed. A sampled RSS or footprint breach now
 terminates and awaits the owned child instead of merely rejecting its report after completion;
@@ -503,14 +506,42 @@ results exist. Never infer OS termination cause, model qualification or a memory
 No production generation
 memory threshold, historical evidence, or model qualification is changed by this diagnostic fix.
 
-Use `macos_footprint_sampler(new_untracked_directory)` for new physical-footprint probes. It
-retains raw reports, validates the exact PID and byte units, and rejects unexplained diagnostics.
+`macos_footprint_sampler(new_untracked_directory)` remains available for raw-report
+diagnostics. It retains raw reports, validates the exact PID and byte units, rejects unexplained
+diagnostics and keeps the tool's lifetime peak (`auxiliary.phys_footprint_peak`).
 `owned-process-probe-v2` records sanitized `probeFailures` and `terminalProbeCount` alongside
 historical schema-1 fields. Only a typed target-disappeared observation permits a bounded 250 ms
 wait for the owned child before signalling. Confirmed exit requires earlier valid measurements;
 it does not excuse nonzero exit, permission denial, malformed data, or unavailable live samples.
 An unconfirmed exit still triggers bounded shutdown and fails qualification. Never retrofit this
 classification into an old failed envelope or infer that all old signal denials were harmless.
+
+`owned-process-probe-v3` (2026-09-25, benchmark audit #7, #38, #101 and #102) keeps those rules
+and changes how the envelope is measured:
+
+- The child is sampled in-process (`proc_pid_rusage` on macOS, `/proc` elsewhere) every 50 ms;
+  no probe process is spawned per tick. A failed sample is counted (`probeFailureCount`) and
+  fails closed; it never reads as zero memory. `resourceSampleCount`, `sampleIntervalSeconds`,
+  `maximumSampleGapSeconds` and `processProbe` describe the coverage.
+- A measured footprint peaks at the larger of the samples and the kernel's lifetime high-water
+  mark, read once more from the exited child before it is reaped (`terminalLifetimePeakRead`),
+  so a spike between samples is not lost. `ru_maxrss` from the reap is published separately as
+  `waitMaxRSSBytes`; the RSS ceiling still judges the sampled `peakRSSBytes`.
+- Host memory is read with `sysctlbyname` (`kern.memorystatus_level`, `vm.swapusage`,
+  `kern.memorystatus_vm_pressure_level`, `hw.memsize`), which no locale can reformat. The text
+  fallbacks run under `LC_ALL=C` and accept a decimal comma: under the host's `fr_CA` locale the
+  v2 swap parse rejected `0,00M`, so every supervised run came back unqualified. A host probe
+  failure is typed (`host-swap-probe-failed`, `host-memory-probe-failed`, with the reason in
+  `hostBefore/hostAfter.probeFailures`) instead of reading as swap growth or lost recovery.
+- `recoveryAttribution` reports the free-memory drop, the child's peak as a share of physical
+  memory and the kernel pressure level before and after, and classifies an unrecovered drop as
+  `drop-exceeds-child-peak` (another allocator) or `drop-within-child-peak`. It is report only:
+  the five-point recovery rule is unchanged until M6 measurements support a proposal.
+
+The supervisor's SHA-256 is bound into every prepared compact-adapter configuration, so after a
+supervisor change re-run `prepare_delivery_compact_model_config.py` for each adapter (including
+`whisper-small-mlx` for `independent_asr.py`) before the next qualification or ASR run; cached
+results under the old configuration are not reused.
 
 ### 2.4 Cadence validity is separate from delivery adherence
 

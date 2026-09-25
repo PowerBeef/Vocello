@@ -104,6 +104,8 @@ class IndependentASRTests(unittest.TestCase):
         job = json.loads(Path(command[4]).read_text())
         self.assertEqual(job["weights"], str(self.weights))
         self.assertEqual(kwargs["maximum_rss_bytes"], independent_asr.MAXIMUM_RSS_BYTES)
+        # MLX: the footprint ceiling is measured and evaluated, never printed unevaluated.
+        self.assertIs(kwargs["measure_physical_footprint"], True)
         self.assertEqual(kwargs["environment"]["HF_HUB_OFFLINE"], "1")
         rows = []
         for row in job["rows"]:

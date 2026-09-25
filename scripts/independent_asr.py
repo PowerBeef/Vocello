@@ -417,10 +417,14 @@ def transcribe_manifest(
             command = [str(config["binaryPath"]), str(Path(__file__).resolve()), "worker", "--job", str(job_path)]
             environment = dict(os.environ)
             environment.update({"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1"})
+            # Whisper runs on MLX: its Metal memory is invisible to RSS, so the
+            # footprint (with the kernel's lifetime peak) is measured and its
+            # ceiling evaluated (audit #101).
             result = supervise(
                 command, lock_root=lock_root, timeout_seconds=timeout_seconds,
                 maximum_rss_bytes=maximum_rss_bytes,
                 maximum_physical_footprint_bytes=maximum_rss_bytes,
+                measure_physical_footprint=True,
                 environment=environment,
             )
         envelope = result.report

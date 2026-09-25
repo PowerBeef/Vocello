@@ -389,7 +389,12 @@ p < 0.05, where a leave-one-out median/MAD score crossed 2.5 in 58-82% of health
 to eight takes. Choosing its cohort-wise alpha, and so making it binding, is a maintainer decision
 under the audio-QC threshold-change authority. The clone lane
 and SER column stay advisory; the clone lane reports AUC and equal error rate with seeded 95%
-intervals whenever it has controls (`bandCalibrationReady` needs at least eight), embeds 16 kHz
+intervals whenever it has controls (`bandCalibrationReady` needs at least eight). Since
+2026-09-25 (audit #103 part 1, decided by the audit's recommendation) its default plan generates
+eight built-in-speaker controls matched to the reference voice's gender (read from the voice name,
+else `--reference-gender`) plus four cross-clone negatives, clone takes of the other saved voices,
+and reports the separation per kind (`controlSeparation`, `crossCloneSeparation`) and over every
+negative (`separation`); lane version 2. The lane embeds 16 kHz
 audio through the pinned polyphase resampler and loads the ECAPA snapshot from the local cache
 only.
 

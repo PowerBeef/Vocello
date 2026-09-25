@@ -10,10 +10,16 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from clone_fidelity_lane import (
+    DEFAULT_CROSS_CLONES,
+    DEFAULT_MATCHED_CONTROLS,
     FIXED_TEXT,
     build_take_plan,
+    builtin_speaker_genders,
+    discover_cross_clone_voices,
     generate_all,
     generation_command,
+    infer_reference_gender,
+    matched_control_speakers,
 )
 
 
@@ -23,10 +29,54 @@ class CloneFidelityLaneTests(unittest.TestCase):
         self.assertEqual([item["kind"] for item in plan],
                          ["clone", "clone", "clone", "control", "control"])
         self.assertEqual([item["seed"] for item in plan], [100, 101, 102, 100, 101])
-        self.assertEqual(plan[3]["speaker"], "aiden")
+        # Controls match the reference's gender (audit #103): no cross-gender control.
+        self.assertEqual(plan[3]["speaker"], "vivian")
         self.assertEqual(plan[4]["speaker"], "serena")
+        self.assertTrue(all(item["matchedGender"] for item in plan[3:]))
         names = [item["name"] for item in plan]
         self.assertEqual(len(names), len(set(names)))
+
+    def test_the_default_plan_has_eight_matched_controls_and_cross_clone_negatives(self):
+        """Audit #103 part 1: at least eight matched controls plus cross-clone negatives."""
+        self.assertEqual((DEFAULT_MATCHED_CONTROLS, DEFAULT_CROSS_CLONES), (8, 4))
+        genders = builtin_speaker_genders()
+        self.assertEqual(genders["serena"], "female")
+        self.assertEqual(genders["aiden"], "male")
+        plan = build_take_plan(
+            "A_warm_elderly_woman", 6, DEFAULT_MATCHED_CONTROLS, 100,
+            cross_clone_voices=["A_warm_elderly_woman", "Bright_young_man", "Calm_narrator"],
+            cross_clone_count=DEFAULT_CROSS_CLONES,
+        )
+        controls = [item for item in plan if item["kind"] == "control"]
+        self.assertEqual(len(controls), 8)
+        self.assertTrue(all(genders[item["speaker"]] == "female" for item in controls))
+        self.assertEqual(len({item["name"] for item in controls}), 8)
+        crosses = [item for item in plan if item["kind"] == "cross-clone"]
+        self.assertEqual([item["voice"] for item in crosses],
+                         ["Bright_young_man", "Calm_narrator", "Bright_young_man", "Calm_narrator"])
+        command = generation_command("/repo/build/vocello", crosses[0], "/tmp/run")
+        self.assertIn("--confirm-consent", command)
+        self.assertIn("Bright_young_man", command)
+        # Without another saved voice there are no cross-clone takes.
+        self.assertFalse([item for item in build_take_plan(
+            "A_warm_elderly_woman", 1, 8, 1, cross_clone_voices=["A_warm_elderly_woman"],
+            cross_clone_count=4) if item["kind"] == "cross-clone"])
+
+    def test_reference_gender_is_inferred_or_required(self):
+        self.assertEqual(infer_reference_gender("A_warm_elderly_woman"), "female")
+        self.assertEqual(infer_reference_gender("Deep-voiced_man"), "male")
+        self.assertIsNone(infer_reference_gender("VoiceX"))
+        self.assertEqual(matched_control_speakers("male")[0], "aiden")
+        self.assertIn("serena", matched_control_speakers(None))
+
+    def test_cross_clone_voices_are_the_other_saved_voices(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            os.makedirs(os.path.join(directory, "voices"))
+            for name in ("Target.wav", "Other_b.wav", "Other_a.wav", "notes.txt"):
+                open(os.path.join(directory, "voices", name), "w").close()
+            self.assertEqual(discover_cross_clone_voices(directory, "Target"), ["Other_a", "Other_b"])
+            self.assertEqual(discover_cross_clone_voices(os.path.join(directory, "none"), "Target"), [])
 
     def test_clone_command_uses_saved_voice_and_consistent_variation(self):
         item = build_take_plan("VoiceX", 1, 0, 7)[0]

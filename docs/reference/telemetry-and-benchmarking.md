@@ -437,7 +437,8 @@ where time goes; use **Instruments signposts** (see [`benchmarking-procedure.md`
   `after_generation_trim`, `before_marking`/`after_marking` when marking runs, plus
   prepare/clone/prewarm stages). `peak` is cumulative since the request began, so a stage raised
   the request's high-water mark exactly when its peak exceeds the previous stage's. With
-  `QWENVOICE_MLX_STAGE_PEAKS=1` (a bounded-observability knob, audit #3 part 2) each stage snapshot
+  `QWENVOICE_MLX_STAGE_PEAKS=1` (a production-affecting diagnostic behind `QWENVOICE_DEBUG`, named in the
+  row's runtime-debug provenance; audit #3 part 2) each stage snapshot
   also carries `stagePeakMB`, that stage's own exact peak: the snapshot reads MLX's peak counter and
   resets it, bounded below by the memory active at the reset, while `peak` stays the running
   request maximum. It is off by default because a mid-request reset races the generation's

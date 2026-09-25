@@ -223,7 +223,11 @@ public enum NativeMemoryPolicyResolver {
     }
 
     /// Exact per-stage MLX peaks (audit #3 part 2), opt-in with
-    /// `QWENVOICE_MLX_STAGE_PEAKS=1`. MLX keeps one process-wide peak counter,
+    /// `QWENVOICE_MLX_STAGE_PEAKS=1`, a production-affecting diagnostic: it
+    /// needs the internal-diagnostics build and `QWENVOICE_DEBUG`, and the
+    /// row's runtime-debug provenance names it, because it changes what MLX's
+    /// raw peak counter reads mid-request (`AudioGenerationInfo.peakMemoryUsage`
+    /// becomes the peak since the last stage). MLX keeps one process-wide peak counter,
     /// reset at each request's start, so a stage snapshot's `peakMB` is the
     /// request's peak so far and a stage that set no new high has no peak of
     /// its own. With the knob, each stage snapshot (`stageSnapshot()`) reads
@@ -236,7 +240,7 @@ public enum NativeMemoryPolicyResolver {
     /// runs repeat it to the megabyte), so default evidence keeps MLX's own
     /// uninterrupted counter.
     public static let stagePeaksEnabled: Bool =
-        ProcessInfo.processInfo.environment["QWENVOICE_MLX_STAGE_PEAKS"] == "1"
+        RuntimeDebugGate.value(for: "QWENVOICE_MLX_STAGE_PEAKS") == "1"
 
     private struct StagePeakState: Sendable {
         var cumulativePeakBytes = 0

@@ -291,7 +291,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         XCTAssertGreaterThan(plainJournal, 0)
         let acceptance = startCommit(f)
         try await waitUntil { self.journalSize(f.store) > plainJournal }
-        XCTAssertThrowsError(try f.queue.write { db in try f.store.reconcile(in: db) })
+        XCTAssertThrowsError(try syncWrite(f.queue) { db in try f.store.reconcile(in: db) })
         XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath))
 
         NotificationCenter.default.post(name: Database.resumeNotification, object: nil)
@@ -375,10 +375,10 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         NotificationCenter.default.post(name: Database.resumeNotification, object: nil)
         let relaunched = LongFormHistoryAcceptanceStore(rootURL: f.store.rootURL)
         XCTAssertTrue(relaunched.hasPendingRecovery)
-        try f.queue.write { db in try relaunched.reconcile(in: db) }
+        try syncWrite(f.queue) { db in try relaunched.reconcile(in: db) }
         XCTAssertEqual(try rowCount(f.queue), 4, "The rows are saved")
         XCTAssertEqual(try journalURLs(f.store).count, 1, "Retired once a later reconcile sees them committed")
-        try f.queue.write { db in try relaunched.reconcile(in: db) }
+        try syncWrite(f.queue) { db in try relaunched.reconcile(in: db) }
         XCTAssertTrue(try journalURLs(f.store).isEmpty)
         XCTAssertEqual(try rowCount(f.queue), 4)
         XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), try f.input.manifest.canonicalJSONData())
@@ -506,6 +506,12 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         let input: LongFormHistoryAcceptance
         let oldJoined: URL
         let oldManifest: Data
+    }
+
+    /// A synchronous write: inside an async test, `queue.write` resolves to
+    /// GRDB's async overload.
+    private func syncWrite<T>(_ queue: DatabaseQueue, _ updates: (Database) throws -> T) throws -> T {
+        try queue.write(updates)
     }
 
     private func rowCount(_ queue: DatabaseQueue) throws -> Int {

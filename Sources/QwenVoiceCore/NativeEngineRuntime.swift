@@ -872,28 +872,33 @@ actor NativeEngineRuntime {
         stringFlags["sampling_effective_seed"] = String(samplingConfiguration.effectiveSeed)
         stringFlags["sampling_talker_top_k"] = String(samplingConfiguration.talker.topK)
         stringFlags["sampling_subtalker_top_k"] = String(samplingConfiguration.subtalker.topK)
+
+        if loadResult.didLoad {
+            timingOverridesMS["load_model"] = loadStartedAt.elapsedMilliseconds
+        }
         // The request-resolved prompt digest the iPhone diagnostics sentinel also
         // stamps, for Custom and Design: an Auto language take draws its own seed
         // (seed identity v2), so matching its pinned twin's prompt digest is what
         // proves Auto resolved to the pinned language on the Mac, where no
-        // sentinel exists. Clone prompts depend on a resolved transcript and stay
-        // out.
-        switch request.payload {
-        case .custom, .design:
-            if let promptDigest = GenerationSemantics.promptAssemblyDigest(
-                GenerationSemantics.qwen3PromptAssembly(
-                    for: request,
-                    capabilities: descriptorCapabilities
-                )
-            ) {
-                stringFlags["resolved_prompt_assembly_digest"] = promptDigest
+        // sentinel exists. Request-level by definition, like the sentinel's: no
+        // spoken-text normalization and no speaker-native delivery variant.
+        // Clone prompts depend on a resolved transcript and stay out. Only an
+        // engine row reads it, and a row needs the telemetry recorder; computed
+        // after the load timing so it never counts as model load.
+        if telemetryRecorder != nil {
+            switch request.payload {
+            case .custom, .design:
+                if let promptDigest = GenerationSemantics.promptAssemblyDigest(
+                    GenerationSemantics.qwen3PromptAssembly(
+                        for: request,
+                        capabilities: descriptorCapabilities
+                    )
+                ) {
+                    stringFlags["resolved_prompt_assembly_digest"] = promptDigest
+                }
+            case .clone:
+                break
             }
-        case .clone:
-            break
-        }
-
-        if loadResult.didLoad {
-            timingOverridesMS["load_model"] = loadStartedAt.elapsedMilliseconds
         }
 
         let cloneConditioning: ResolvedCloneConditioning?

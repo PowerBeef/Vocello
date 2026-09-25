@@ -499,10 +499,14 @@ enum BenchCommand {
                             outputPath: outDir.appendingPathComponent("no-cold-prewarm.wav").path,
                             shouldStream: !noStream, payload: payload, seed: seed
                         )
+                        // Full prewarm depth: never lighter than the cold take's.
                         let prewarm = await runtime.engine.prefetchInteractiveReadinessIfNeeded(
                             for: prewarmRequest
                         )
-                        guard prewarm != nil else {
+                        let prewarmRan = prewarm.map {
+                            $0.booleanFlags["custom_dedicated_prewarm_skipped"] != true
+                        } ?? false
+                        guard prewarmRan else {
                             throw CLIError(
                                 "--no-cold could not prewarm \(mode.rawValue)/\(variantStr.lowercased()) before its first take"
                             )

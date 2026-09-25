@@ -1301,9 +1301,13 @@ public struct GenerationChunkTelemetry: Hashable, Codable, Sendable {
     public let codePredictorMS: Double
     public let audioDecoderMS: Double
     public let streamStepEvalMS: Double
-    /// Phase 2a split of `streamStepEvalMS`: enqueued eval work wall time.
+    /// The step-eval call itself (the enqueue); it equals `streamStepEvalMS`
+    /// under every policy. Under a synchronous eval (`.full`, `.eosOnly`) it
+    /// also contains the GPU wait, which cannot be split out there.
     public let streamStepEvalEnqueueMS: Double
-    /// Phase 2a split of `streamStepEvalMS`: GPU drain wait time.
+    /// The observed wait for the step's submitted GPU work: under `.pipelined`
+    /// the sampled-token read after `asyncEval` (audit #49/#62), outside
+    /// `streamStepEvalMS`; 0 under the other policies.
     public let streamStepEvalWaitMS: Double
     public let streamStepEOSReadMS: Double
     public let audioChunkEvalMS: Double

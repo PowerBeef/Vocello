@@ -888,18 +888,52 @@ probe_device_run_file() {
     >/dev/null 2>&1
 }
 
-# wait_device_diagnostics_sentinel RUN_ID TIMEOUT DEST [DEVICE PID]
+# device_poll_step WAITED [PREDICTED]
+# Seconds until the next marker probe (audit #87). Without a prediction every
+# probe follows the legacy 10 s timer. With one, the first probe lands at the
+# predicted end of the take, so no probe competes with most of the generation,
+# and later probes follow every QVOICE_IOS_POLL_INTERVAL_SECONDS (default 3), so
+# a finished take is seen within seconds instead of up to 10. PREDICTED 0 probes
+# at once (the take already ended). Both values are provisional: a measured lane
+# tunes them.
+device_poll_step() {
+  local waited="$1" predicted="${2:-}"
+  local interval="${QVOICE_IOS_POLL_INTERVAL_SECONDS:-3}"
+  [[ "$interval" =~ ^[1-9][0-9]*$ ]] || interval=3
+  if [[ ! "$predicted" =~ ^[0-9]+$ ]]; then
+    printf '10\n'
+  elif (( waited == 0 )); then
+    printf '%s\n' "$predicted"
+  else
+    printf '%s\n' "$interval"
+  fi
+}
+
+# predicted_take_seconds SHORTEST_WAIT
+# A back-to-back lane's prediction for its next take: four fifths of the
+# shortest wait it has seen, so a take is never first probed later than the
+# fastest take so far would end. Empty (no prediction) before any take ended.
+predicted_take_seconds() {
+  local shortest="${1:-}"
+  [[ "$shortest" =~ ^[1-9][0-9]*$ ]] || return 0
+  printf '%s\n' $(( shortest * 4 / 5 ))
+}
+
+# wait_device_diagnostics_sentinel RUN_ID TIMEOUT DEST [DEVICE PID [PREDICTED]]
 # Polls the sentinel only until device-diagnostics-done.json exists for RUN_ID,
 # then pulls the complete run once. Given the launched process's exact PID, a
 # process that exits without writing the sentinel stops the wait with 27.
+# PREDICTED (seconds) sets the poll cadence (device_poll_step).
 # Returns 0 and prints the sentinel path on success; dies on timeout/interference.
 wait_device_diagnostics_sentinel() {
   local run_id="$1" timeout="${2:-300}" dest="$3" dev="${4:-}" target_pid="${5:-}"
-  local waited=0 sentinel="" exited=0 wait_started=$SECONDS
+  local predicted="${6:-}"
+  local waited=0 sentinel="" exited=0 wait_started=$SECONDS step
   while (( waited < timeout )); do
     if (( exited == 0 )); then
-      sleep 10
-      waited=$((waited + 10))
+      step="$(device_poll_step "$waited" "$predicted")"
+      sleep "$step"
+      waited=$((waited + step))
     fi
     probe_device_sentinel "$run_id" "$dest" "$dev" || true
     # Require RUN_ID to be the sentinel's immediate parent. Profile artifacts
@@ -907,7 +941,7 @@ wait_device_diagnostics_sentinel() {
     # otherwise select an unrelated historical sentinel from the pulled tree.
     sentinel="$(find "$dest" -type f -path "*/${run_id}/device-diagnostics-done.json" 2>/dev/null | head -1)"
     if [[ -n "$sentinel" && -f "$sentinel" ]]; then
-      # Where the wall time goes (audit #87): the 10 s poll quantizes the
+      # Where the wall time goes (audit #87): the poll cadence quantizes the
       # sentinel, and the one full pull follows it.
       local pull_started=$SECONDS
       note "sentinel found after ${waited}s of polling, $((pull_started - wait_started))s of wall time since the wait began (runID=$run_id)"
@@ -1317,6 +1351,64 @@ collect_startup_reliability_system_crash_delta() {
     --output "$destination/system-crash-summary.json"
 }
 
+# snapshot_device_process_exit_baseline DIR
+# The systemCrashLogs hashes before a lane launches its exact process, so an
+# exit without a terminal marker can be classified (audit #45). Keeps only the
+# hash list; the pulled reports are removed at once. Best effort: a failed
+# snapshot only means the exit stays unclassified.
+snapshot_device_process_exit_baseline() {
+  local destination="$1"
+  if snapshot_startup_reliability_system_crashes "$destination" >/dev/null 2>&1; then
+    rm -rf "$destination/pull"
+  else
+    rm -rf "$destination"
+    warn "could not snapshot systemCrashLogs before launch; an early process exit will stay unclassified"
+  fi
+}
+
+# classify_device_process_exit ARTIFACTS BASELINE_DIR
+# After a lane's exact process exited without its terminal marker (27), take
+# the systemCrashLogs delta since BASELINE_DIR and say what ended the process
+# (audit #45): the sanitized, privacy-safe summary classifies each report of
+# this app as jetsam, watchdog or crash. Raw reports stay local and untracked.
+# Prints jetsam, watchdog, crash, unknown or no-report; returns 1 when no delta
+# could be taken.
+classify_device_process_exit() {
+  local artifacts="$1" baseline="$2"
+  [[ -f "$baseline/hashes.txt" ]] || return 1
+  snapshot_startup_reliability_system_crashes "$artifacts/system-crashes-after" >/dev/null 2>&1 \
+    || return 1
+  collect_startup_reliability_system_crash_delta \
+      "$baseline" "$artifacts/system-crashes-after" "$artifacts/system-crash-delta" \
+      >/dev/null 2>&1 \
+    || { rm -rf "$artifacts/system-crashes-after/pull"; return 1; }
+  rm -rf "$artifacts/system-crashes-after/pull"
+  python3 - "$artifacts/system-crash-delta/system-crash-summary.json" <<'PY'
+import json, sys
+reports = json.load(open(sys.argv[1], encoding="utf-8")).get("reports") or []
+kinds = {report.get("classification") for report in reports}
+print(next(
+    (kind for kind in ("jetsam", "watchdog", "crash", "unknown") if kind in kinds),
+    "no-report",
+))
+PY
+}
+
+# describe_device_process_exit ARTIFACTS BASELINE_DIR
+# One phrase for the die message of a lane whose process exited early.
+describe_device_process_exit() {
+  local classification
+  if classification="$(classify_device_process_exit "$1" "$2")"; then
+    case "$classification" in
+      no-report) printf 'no crash or jetsam report for this app in the systemCrashLogs delta\n' ;;
+      *) printf 'systemCrashLogs delta classifies the exit as %s (sanitized summary: %s)\n' \
+           "$classification" "$1/system-crash-delta/system-crash-summary.json" ;;
+    esac
+  else
+    printf "unclassified: no systemCrashLogs delta could be taken; check '%s crashes'\n" "$0"
+  fi
+}
+
 read_devicectl_launch_pid() {
   local launch_json="$1"
   python3 - "$launch_json" <<'PY'
@@ -1421,6 +1513,7 @@ cmd_lang_bench() {
   fi
 
   local cell_json cell_count=0 cell_fail=0
+  local shortest_take_wait="" take_wait_started=0 take_wait=0
   while IFS= read -r cell_json; do
     [[ -n "$cell_json" ]] || continue
     cell_count=$((cell_count + 1))
@@ -1468,13 +1561,19 @@ PY
     # the unset state) as soon as cmd_launch returns.
     QWENVOICE_NATIVE_TELEMETRY_MODE=verbose cmd_launch "$spec" >/dev/null
     set +e
-    sentinel="$({ wait_device_diagnostics_sentinel "$child_run_id" "$cell_timeout" "$dest"; })"
+    take_wait_started=$SECONDS
+    sentinel="$({ wait_device_diagnostics_sentinel "$child_run_id" "$cell_timeout" "$dest" "" "" \
+      "$(predicted_take_seconds "$shortest_take_wait")"; })"
     wait_st=$?
     set -e
     if (( wait_st != 0 )) || [[ -z "$sentinel" || ! -f "$sentinel" ]]; then
       warn "lang-bench cell $cell_id: timed out or failed (runID=$child_run_id)"
       cell_fail=$((cell_fail + 1))
       continue
+    fi
+    take_wait=$((SECONDS - take_wait_started))
+    if [[ -z "$shortest_take_wait" ]] || (( take_wait < shortest_take_wait )); then
+      shortest_take_wait="$take_wait"
     fi
     if ! python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("status")=="ok" else 1)' "$sentinel"; then
       warn "lang-bench cell $cell_id: diagnostics status != ok (see $sentinel)"
@@ -1871,6 +1970,7 @@ print(json.dumps({"QWENVOICE_DEBUG":"1", **{key:os.environ[key] for key in keys}
   export QVOICE_IOS_DEVICE_DIAGNOSTICS_VERIFY_OUTPUT=1
   export QVOICE_IOS_DEVICE_VOICE_RELIABILITY_CAPTURE_CODEC_TRACE=1
   local row_json row_count=0 row_fail=0
+  local shortest_take_wait="" take_wait_started=0 take_wait=0
   while IFS= read -r row_json; do
     [[ -n "$row_json" ]] || continue
     row_count=$((row_count + 1))
@@ -1969,12 +2069,19 @@ with path.open("a", encoding="utf-8") as handle:
 PY
     QWENVOICE_NATIVE_TELEMETRY_MODE=verbose cmd_launch "$spec" >/dev/null
     set +e
-    sentinel="$({ wait_device_diagnostics_sentinel "$child_run_id" "$timeout" "$dest"; })"
+    take_wait_started=$SECONDS
+    sentinel="$({ wait_device_diagnostics_sentinel "$child_run_id" "$timeout" "$dest" "" "" \
+      "$(predicted_take_seconds "$shortest_take_wait")"; })"
     wait_st=$?
     set -e
     if (( wait_st != 0 )) || [[ -z "$sentinel" || ! -f "$sentinel" ]]; then
       row_fail=$((row_fail + 1))
       warn "voice-reliability take failed before a terminal sentinel: $take_id"
+    else
+      take_wait=$((SECONDS - take_wait_started))
+      if [[ -z "$shortest_take_wait" ]] || (( take_wait < shortest_take_wait )); then
+        shortest_take_wait="$take_wait"
+      fi
     fi
   done < <(python3 - "$plan" <<'PY'
 import importlib.util, json, pathlib, sys
@@ -2260,7 +2367,10 @@ cmd_logs() {
 # profile [--kind cpu|memory] [spec]: record an Instruments/xctrace trace while device diagnostics runs one
 # generation on-device (burns-in safe — headless, screen dark). The lane always records
 # CPU Profiler and os_signpost in one trace; memory profiles also record Allocations and
-# VM Tracker. QVOICE_IOS_PROFILE_DURATION controls the capture window (seconds, default 90),
+# VM Tracker through Apple's Allocations template, whose VM Tracker takes no automatic
+# snapshots (audit #51; publication checks the captured setting). The recording stops
+# once the take's sentinel appears, not at the time limit (audit #52).
+# QVOICE_IOS_PROFILE_DURATION caps the capture window (seconds, default 90),
 # and QVOICE_IOS_MEMORY_PROFILE_DURATION may override it for memory captures. The engine
 # emits OSSignpost intervals under
 # com.qwenvoice.engine / com.patricedery.vocello. Produces
@@ -2289,10 +2399,15 @@ cmd_profile() {
   local cpu_instrument="CPU Profiler"
   local allocations_instrument="Allocations"
   local vm_tracker_instrument="VM Tracker"
+  local memory_template="Allocations"
   local -a instrument_args=(--instrument "$cpu_instrument")
   local capture_instruments="$cpu_instrument + os_signpost"
   if [[ "$kind" == "memory" ]]; then
-    instrument_args+=(--instrument "$allocations_instrument" --instrument "$vm_tracker_instrument")
+    # As on macOS (d52340a0): standalone VM Tracker instruments take
+    # stop-the-world automatic snapshots that blind the in-process sampler (414 ms
+    # lateness profiled against 5.7-48 ms unprofiled); Apple's Allocations
+    # template carries both memory tracks with automatic snapshots disabled.
+    instrument_args=(--template "$memory_template" --instrument "$cpu_instrument")
     capture_instruments="$cpu_instrument + $allocations_instrument + $vm_tracker_instrument + os_signpost"
   fi
   instrument_args+=(--instrument os_signpost)
@@ -2423,7 +2538,30 @@ PY
   xcrun devicectl device process resume --device "$dev" --pid "$target_pid" \
     >"$artifacts/resume.log" 2>&1 \
     || { kill "$xctrace_pid" >/dev/null 2>&1 || true; die "could not resume the profiled target"; }
-  wait "$xctrace_pid" || die "xctrace failed (see $artifacts/xctrace.log)"
+  # The app never exits after its take, so the recording used to run to the
+  # time limit: tens of idle seconds per profile (audit #52). Poll the take's
+  # small sentinel while xctrace records and, once it exists, stop the
+  # recording with SIGINT, which saves the trace as a Stop does (xctrace then
+  # exits 54, accepted only after this stop and with a saved trace).
+  local recorded=0 stopped_early=0 tracer_status=0 step
+  step="$(device_poll_step 1 0)"
+  while kill -0 "$xctrace_pid" >/dev/null 2>&1; do
+    sleep "$step"
+    recorded=$((recorded + step))
+    kill -0 "$xctrace_pid" >/dev/null 2>&1 || break
+    probe_device_sentinel "$run_id" "$dest" "$dev" || true
+    if [[ -n "$(find "$dest" -type f -path "*/${run_id}/device-diagnostics-done.json" 2>/dev/null | head -1)" ]]; then
+      note "take finished after ~${recorded}s of recording; stopping the trace"
+      stopped_early=1
+      kill -INT "$xctrace_pid" >/dev/null 2>&1 || true
+      break
+    fi
+  done
+  wait "$xctrace_pid" || tracer_status=$?
+  if (( stopped_early == 1 && tracer_status == 54 )) && [[ -d "$trace" ]]; then
+    tracer_status=0
+  fi
+  (( tracer_status == 0 )) || die "xctrace failed (status $tracer_status; see $artifacts/xctrace.log)"
   xctrace_pid=""
   PROFILE_TRACE_XCTRACE_PID=""
   [[ -d "$trace" ]] || die "no trace produced at $trace"
@@ -2435,7 +2573,9 @@ PY
 
   local sentinel
   PROFILE_TRACE_PHASE="generation-validation"
-  sentinel="$({ wait_device_diagnostics_sentinel "$run_id" "$duration" "$dest"; })" \
+  # The take has ended (or the capture window has): probe at once, no 10 s
+  # sleep first (audit #52).
+  sentinel="$({ wait_device_diagnostics_sentinel "$run_id" "$duration" "$dest" "$dev" "" 0; })" \
     || die "profiled generation did not produce a success sentinel"
   require_uninterrupted_success_sentinel "$sentinel" \
     || die "profiled generation failed or was interrupted"
@@ -2542,6 +2682,7 @@ keys = (
 env = {"QWENVOICE_DEBUG": "1", **{key: os.environ[key] for key in keys}}
 print(json.dumps(env, sort_keys=True))')"
   note "memory qualification: one process, Custom→Design→Clone, 3 retained takes per mode"
+  snapshot_device_process_exit_baseline "$artifacts/system-crashes-before"
   xcrun devicectl device process launch --device "$dev" --terminate-existing \
     -e "$env_json" --json-output "$launch_json" "$BUNDLE_ID" >"$artifacts/launch.log" 2>&1 \
     || die "could not launch the memory qualification plan (see $artifacts/launch.log)"
@@ -2563,7 +2704,7 @@ print(json.dumps(env, sort_keys=True))')"
   sentinel="$({ wait_memory_qualification_sentinel "$run_id" "$timeout" "$dest" "$dev" "$target_pid"; })" \
     || wait_status=$?
   if (( wait_status == 27 )); then
-    die "memory qualification process exited before its terminal marker (jetsam or crash; check '$0 crashes'); no history was published (see $artifacts)"
+    die "memory qualification process exited before its terminal marker ($(describe_device_process_exit "$artifacts" "$artifacts/system-crashes-before")); no history was published (see $artifacts)"
   fi
   (( wait_status == 0 )) \
     || die "memory qualification failed or did not produce its PASS sentinel; no history was published (see $artifacts)"
@@ -2662,6 +2803,7 @@ keys = (
 print(json.dumps({"QWENVOICE_DEBUG": "1", **{key: os.environ[key] for key in keys}}, sort_keys=True))
 ')"
   note "clone-conditioning: transcript-backed then x-vector-only in one exact process"
+  snapshot_device_process_exit_baseline "$artifacts/system-crashes-before"
   xcrun devicectl device process launch --device "$dev" --terminate-existing \
     -e "$env_json" --json-output "$launch_json" "$BUNDLE_ID" >"$artifacts/launch.log" 2>&1 \
     || die "could not launch clone-conditioning acceptance (see $artifacts/launch.log)"
@@ -2683,7 +2825,7 @@ print(json.dumps({"QWENVOICE_DEBUG": "1", **{key: os.environ[key] for key in key
   sentinel="$({ wait_clone_conditioning_sentinel "$run_id" "$timeout" "$dest" "$dev" "$target_pid"; })" \
     || wait_status=$?
   if (( wait_status == 27 )); then
-    die "clone-conditioning process exited before its terminal marker (jetsam or crash; check '$0 crashes'); no PASS evidence was accepted (see $artifacts)"
+    die "clone-conditioning process exited before its terminal marker ($(describe_device_process_exit "$artifacts" "$artifacts/system-crashes-before")); no PASS evidence was accepted (see $artifacts)"
   fi
   (( wait_status == 0 )) \
     || die "clone-conditioning acceptance failed; no PASS evidence was accepted (see $artifacts)"

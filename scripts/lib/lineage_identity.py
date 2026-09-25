@@ -235,7 +235,15 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # 2 (2026-09-25, audit #89): the whisper recognition time excludes model
     # load and warm-up, and the processed duration is the decoded sample count.
     ("language", "macos"): 2,
-    ("language", "ios"): 2,
+    # 3 (2026-09-25, audit #87): the iPhone lang-bench probes each take's
+    # sentinel first at its predicted end, then every 3 s, instead of every 10 s
+    # from the launch, so fewer device copies overlap the measured generation.
+    ("language", "ios"): 3,
+    # 2 (2026-09-25, audit #51/#52): the iPhone memory profile records through
+    # the Allocations template (no automatic VM snapshots, which suspended the
+    # target), and every iPhone profile stops recording once its take's sentinel
+    # appears instead of recording the idle app to the time limit.
+    ("instrument-profile", "ios"): 2,
 }
 
 # (scheme, extra root targets) whose project.yml subset each lane builds;

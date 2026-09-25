@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -149,11 +150,16 @@ class ProfileCaptureContractTests(unittest.TestCase):
             publisher,
         )
 
+        # The iPhone memory profile uses the Allocations template too (audit #51).
         ios_profile = shell_function(
             (REPO / "scripts" / "ios_device.sh").read_text(encoding="utf-8"),
             "cmd_profile",
         )
         self.assertIn(
+            'instrument_args=(--template "$memory_template" --instrument "$cpu_instrument")',
+            ios_profile,
+        )
+        self.assertNotIn(
             'instrument_args+=(--instrument "$allocations_instrument" --instrument "$vm_tracker_instrument")',
             ios_profile,
         )
@@ -276,9 +282,14 @@ class ProfileCaptureContractTests(unittest.TestCase):
         appears on the second probe of it; `exits` makes the exact PID vanish."""
         ios = (REPO / "scripts" / "ios_device.sh").read_text(encoding="utf-8")
         # Up to the closing brace followed by a blank line: a waiter's embedded
-        # Python may itself close a dict at column 0.
-        start = ios.index(f"{function}() {{\n")
-        wait = ios[start:ios.index("\n}\n\n", start) + 3]
+        # Python may itself close a dict at column 0. The real poll-cadence
+        # helper comes along; only devicectl and the clock are stubbed.
+        wait = "".join(
+            ios[start:ios.index("\n}\n\n", start) + 3]
+            for start in (
+                ios.index("device_poll_step() {\n"), ios.index(f"{function}() {{\n"),
+            )
+        )
         with tempfile.TemporaryDirectory() as directory:
             calls = Path(directory) / "calls.log"
             dest = Path(directory) / "dest"
@@ -310,6 +321,49 @@ class ProfileCaptureContractTests(unittest.TestCase):
             )
             log = calls.read_text(encoding="utf-8").splitlines() if calls.exists() else []
         return completed, log
+
+    @staticmethod
+    def poll_steps(*arguments: tuple[str, ...], environment: dict[str, str] | None = None) -> list[str]:
+        ios = (REPO / "scripts" / "ios_device.sh").read_text(encoding="utf-8")
+        helpers = "".join(
+            ios[start:ios.index("\n}\n\n", start) + 3]
+            for start in (
+                ios.index("device_poll_step() {\n"), ios.index("predicted_take_seconds() {\n"),
+            )
+        )
+        script = "set -euo pipefail; " + helpers + "".join(
+            f"\n{' '.join(call)}" for call in arguments
+        )
+        completed = subprocess.run(
+            ["bash", "-c", script], text=True, capture_output=True, check=True,
+            env={"PATH": os.environ.get("PATH", ""), **(environment or {})},
+        )
+        return completed.stdout.split()
+
+    def test_ios_poll_cadence_probes_at_the_predicted_end_then_every_few_seconds(self) -> None:
+        # audit #87: no prediction keeps the 10 s timer; a prediction moves the
+        # first probe to the take's predicted end and tightens the rest.
+        self.assertEqual(
+            self.poll_steps(
+                ("device_poll_step", "0"), ("device_poll_step", "20"),
+                ("device_poll_step", "0", "24"), ("device_poll_step", "24", "24"),
+                ("device_poll_step", "0", "0"), ("device_poll_step", "3", "0"),
+            ),
+            ["10", "10", "24", "3", "0", "3"],
+        )
+        self.assertEqual(
+            self.poll_steps(
+                ("device_poll_step", "5", "24"),
+                environment={"QVOICE_IOS_POLL_INTERVAL_SECONDS": "2"},
+            ),
+            ["2"],
+        )
+        # A lane's prediction is four fifths of its shortest take so far; none
+        # before the first take ends.
+        self.assertEqual(
+            self.poll_steps(("predicted_take_seconds", "30"), ("predicted_take_seconds", "''")),
+            ["24"],
+        )
 
     def test_ios_waits_poll_only_their_markers_and_pull_the_tree_once(self) -> None:
         for function, marker in (

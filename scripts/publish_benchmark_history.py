@@ -4319,6 +4319,9 @@ def ios_profile_command(args: argparse.Namespace) -> Path:
     trace = trace_evidence(
         args,
         expected_correlations=correlations,
+        # The iPhone memory profile passes the same VM auto-snapshot guard as
+        # the Mac (audit #51).
+        require_disabled_vm_auto_snapshot=args.profile_kind == "memory",
         take_expectations=_profile_take_expectations(args, correlations),
         # iPhone traces have dropped intervals under load (34.5-34.75 per step);
         # the take is published with `complete: false` rather than refused.

@@ -527,10 +527,16 @@ naming the app executable and its digest, and publication binds `toolchain.optim
 receipt instead of a literal. While a headless take runs, the host copies only the run's completion
 sentinel from the device every ten seconds and pulls the full diagnostics tree once it appears; the
 `memory` and `clone-conditioning` waits poll their result and failure markers the same way, and the
-`gate` generation step does too (audit #45, #56). Given the exact PID from the launch response, each
-wait also checks that the process is alive, so a jetsam or crash, which writes no marker, ends the
-wait at once (status 27) with a one-time pull of the partial tree, and the lane fails naming the
-process exit instead of timing out after 900 s.
+`gate` generation step does too (audit #45, #56). A lane that runs takes back to back (`lang-bench`,
+voice reliability) first probes each take at its predicted end, four fifths of its shortest take so
+far, then every 3 s (`QVOICE_IOS_POLL_INTERVAL_SECONDS`), so fewer copies overlap the generation and a
+finished take is seen within seconds (audit #87; both values are provisional until a measured lane
+tunes them). Given the exact PID from the launch response, each wait also checks that the process
+is alive, so a jetsam or crash, which writes no marker, ends the wait at once (status 27) with a
+one-time pull of the partial tree, and the lane fails naming the process exit instead of timing out
+after 900 s. The `memory` and `clone-conditioning` lanes also snapshot CoreDevice's systemCrashLogs
+before launch and, on such an exit, name what ended the process from the sanitized delta (jetsam,
+watchdog, crash, or no report; audit #45); raw reports stay local.
 Generation lanes write `device-diagnostics-done.json`; `speech-assets` writes its distinct
 `speech-assets-done.json` completion barrier. The runner never drives or inspects the app UI. Clone
 diagnostics require the exact prepared voice ID, and `--memory-profile` can apply a
@@ -696,7 +702,10 @@ scripts/ios_device.sh profile --kind memory custom:speed:
 ```
 
 This keeps CPU Profiler and correlated `os_signpost` data while adding Allocations and VM Tracker in
-the same exact-PID trace, and forces verbose run-scoped samples. New publishable device runs require
+the same exact-PID trace through Apple's Allocations template, whose VM Tracker takes no automatic
+snapshots; publication checks that setting in the captured trace, as on the Mac (audit #51). Every
+iPhone profile stops recording once its take's sentinel appears rather than at the time limit
+(audit #52). The lane forces verbose run-scoped samples. New publishable device runs require
 telemetry schema v8 and evidence manifest v2: exact start/periodic/boundary/stop sidecars, summary
 agreement, zero capture failures, and no gap between samples above the policy's unobserved-gap bound
 (twice the sampler cadence, at least 500 ms; `config/memory-qualification-policy.json`). Critical

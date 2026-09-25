@@ -816,6 +816,14 @@ struct IOSVoiceDesignView: View {
             // The banner carries an action, so it stays until the person uses or
             // dismisses it, or starts a new take (PA-20, IOS-12; WCAG 2.2.1): no timer.
             .iosAppAnimation(Theme.Motion.miniPlayerSlide, value: savedDesignedResult)
+            // It also leaves with its voice: deleting the voice from Voices must
+            // not leave a Use in Clone action for a reference that is gone.
+            .onChange(of: savedVoicesViewModel.voices) { _, voices in
+                if let result = savedDesignedResult,
+                   !voices.contains(where: { $0.id == result.voice.id }) {
+                    savedDesignedResult = nil
+                }
+            }
     }
 
     // MARK: - Save designed voice → reuse in Clone
@@ -895,9 +903,13 @@ struct IOSVoiceDesignView: View {
     /// record→enroll flow uses).
     private func useDesignedVoiceInClone(_ result: IOSDesignedVoiceSaveResult) {
         savedDesignedResult = nil
+        // Hand off only a voice that is still saved; a deleted one just dismisses the banner.
+        guard let voice = savedVoicesViewModel.voices.first(where: { $0.id == result.voice.id }) else {
+            return
+        }
         appModel.pendingVoiceCloningHandoff = PendingVoiceCloningHandoff(
-            savedVoiceID: result.voice.id,
-            wavPath: result.voice.wavPath,
+            savedVoiceID: voice.id,
+            wavPath: voice.wavPath,
             transcript: result.transcript,
             transcriptLoadError: nil,
             referenceLanguage: PromptLanguageDetector.detect(result.transcript)

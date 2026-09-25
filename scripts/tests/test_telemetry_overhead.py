@@ -202,6 +202,14 @@ class PairedOverheadAnnotationTests(unittest.TestCase):
         )
         self.assertEqual((annotation["n"], annotation["unpairedTakes"]), (5, 1))
 
+    def test_a_failed_annotation_is_recorded_never_raised(self) -> None:
+        broken = samples([0.31, 0.32, 0.33, 0.31, 0.30, 0.32])
+        del broken[2]["rtf"]
+        annotation = overhead.paired_overhead_annotation(
+            broken, samples([0.30, 0.31, 0.32, 0.30, 0.29, 0.31]), "rtf",
+        )
+        self.assertEqual(annotation, {"annotationOnly": True, "metric": "rtf", "unavailable": "KeyError"})
+
 
 if __name__ == "__main__":
     unittest.main()

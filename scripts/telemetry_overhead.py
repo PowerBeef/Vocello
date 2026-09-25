@@ -16,6 +16,9 @@ import subprocess
 import sys
 import time
 import wave
+# Imported here, not lazily: a host python3 without NumPy fails before any take
+# runs instead of after a consented rotation (review of #106).
+from delivery_statistics import bootstrap_ci, wilcoxon_signed_rank  # noqa: E402
 from lib import jsonio  # noqa: E402
 
 
@@ -118,29 +121,32 @@ def paired_overhead_annotation(mode_samples: list[dict], off_samples: list[dict]
     cancels. Reports the median paired ratio, a BCa 95% interval of the mean
     paired percent difference and the exact Wilcoxon signed-rank test from
     ``delivery_statistics``. Annotation only: the verdict still compares the arm
-    medians against the tracked thresholds.
+    medians against the tracked thresholds, and a failure here is recorded as
+    ``unavailable`` rather than raised, so it can never cost the lane its
+    verdict.
     """
-    from delivery_statistics import bootstrap_ci, wilcoxon_signed_rank
-
-    off = {(sample["rotation"], sample["measuredTake"]): float(sample[metric]) for sample in off_samples}
-    pairs = [
-        (float(sample[metric]), off[(sample["rotation"], sample["measuredTake"])])
-        for sample in mode_samples
-        if (sample["rotation"], sample["measuredTake"]) in off
-    ]
-    usable = [(candidate, baseline) for candidate, baseline in pairs if baseline > 0]
-    percent = [(candidate / baseline - 1.0) * 100.0 for candidate, baseline in usable]
-    return {
-        "annotationOnly": True,
-        "pairing": "rotation-and-measured-take",
-        "metric": metric,
-        "n": len(percent),
-        "unpairedTakes": len(mode_samples) - len(usable),
-        "medianRatio": statistics.median(c / b for c, b in usable) if usable else None,
-        "meanPercentDifference": statistics.fmean(percent) if percent else None,
-        "confidenceInterval95": bootstrap_ci(percent),
-        "wilcoxon": wilcoxon_signed_rank(percent),
-    }
+    try:
+        off = {(sample["rotation"], sample["measuredTake"]): float(sample[metric]) for sample in off_samples}
+        pairs = [
+            (float(sample[metric]), off[(sample["rotation"], sample["measuredTake"])])
+            for sample in mode_samples
+            if (sample["rotation"], sample["measuredTake"]) in off
+        ]
+        usable = [(candidate, baseline) for candidate, baseline in pairs if baseline > 0]
+        percent = [(candidate / baseline - 1.0) * 100.0 for candidate, baseline in usable]
+        return {
+            "annotationOnly": True,
+            "pairing": "rotation-and-measured-take",
+            "metric": metric,
+            "n": len(percent),
+            "unpairedTakes": len(mode_samples) - len(usable),
+            "medianRatio": statistics.median(c / b for c, b in usable) if usable else None,
+            "meanPercentDifference": statistics.fmean(percent) if percent else None,
+            "confidenceInterval95": bootstrap_ci(percent),
+            "wilcoxon": wilcoxon_signed_rank(percent),
+        }
+    except Exception as error:  # noqa: BLE001 - an annotation never blocks the verdict
+        return {"annotationOnly": True, "metric": metric, "unavailable": type(error).__name__}
 
 
 utc_now = jsonio.utc_now

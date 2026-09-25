@@ -499,6 +499,21 @@ targets:
       - path: Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift
       # PA-21: Studio drafts kept across launches (IOS-09).
       - path: Sources/iOSSupport/Services/IOSStudioDraftPersistence.swift
+      # PA-19: the orchestrators run under unit tests over a fake engine: the
+      # shared engine store (with its diagnostics recorder and notification
+      # names), the History database service, the iOS export gate and the
+      # iPhone model inventory manager (with the model typealias and contract
+      # lookup it names). The Studio coordinator and its dock payloads are
+      # listed with AUD-03 above.
+      - path: Sources/iOS/TTSEngineStore.swift
+      - path: Sources/iOSSupport/Services/IOSDeviceDiagnosticsRecorder.swift
+      - path: Sources/iOSSupport/Services/AppNotifications.swift
+      - path: Sources/iOSSupport/Services/DatabaseService.swift
+      - path: Sources/iOS/Commerce/IOSExportGate.swift
+      - path: Sources/iOSSupport/ViewModels/ModelManagerViewModel.swift
+      - path: Sources/iOSSupport/Models/TTSModel.swift
+      - path: Sources/iOSSupport/Models/TTSContract.swift
+      - path: Sources/iOSSupport/Services/AppPerformanceSignposts.swift
     dependencies:
       - target: QwenVoiceCore
       - package: GRDB

@@ -134,15 +134,20 @@ final class ModelManagerViewModel: ObservableObject {
 
     private let modelRegistry: ContractBackedModelRegistry
     private let statusProvider: any ModelStatusProviding
+    private let models: [TTSModel]
     private var refreshTask: Task<Void, Never>?
 
+    /// `models` is a test seam (PA-19); the app inventories the bundled
+    /// contract's models.
     init(
         modelRegistry: ContractBackedModelRegistry,
-        statusProvider: any ModelStatusProviding
+        statusProvider: any ModelStatusProviding,
+        models: [TTSModel] = TTSModel.all
     ) {
         self.modelRegistry = modelRegistry
         self.statusProvider = statusProvider
-        self.statuses = statusProvider.initialStatuses(for: TTSModel.all)
+        self.models = models
+        self.statuses = statusProvider.initialStatuses(for: models)
     }
 
     convenience init(
@@ -165,7 +170,7 @@ final class ModelManagerViewModel: ObservableObject {
             let interval = AppPerformanceSignposts.begin("Model Status Refresh")
             let wallStart = DispatchTime.now().uptimeNanoseconds
 
-            statuses = await statusProvider.refreshStatuses(for: TTSModel.all)
+            statuses = await statusProvider.refreshStatuses(for: models)
 
             AppPerformanceSignposts.end(interval)
             if TelemetryGate.resolvedEnabled {

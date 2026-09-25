@@ -22,12 +22,20 @@ final class DatabaseService: @unchecked Sendable {
     static let shared = DatabaseService()
 
     private let store: RecoverableStoreCoordinator<DatabaseQueue, HistoryPersistenceError>
-    private let longFormAcceptance = LongFormHistoryAcceptanceStore(
-        rootURL: AppPaths.appSupportDir.appendingPathComponent("history-outbox/long-form", isDirectory: true)
-    )
+    private let longFormAcceptance: LongFormHistoryAcceptanceStore
 
-    private init() {
-        let dbPath = AppPaths.appSupportDir.appendingPathComponent("history.sqlite").path
+    private convenience init() {
+        self.init(rootDirectory: AppPaths.appSupportDir)
+    }
+
+    /// Test seam (PA-19): a service whose `history.sqlite` and long-form journal
+    /// live under `rootDirectory`. The app uses `shared`, rooted at
+    /// `AppPaths.appSupportDir`.
+    init(rootDirectory: URL) {
+        let dbPath = rootDirectory.appendingPathComponent("history.sqlite").path
+        self.longFormAcceptance = LongFormHistoryAcceptanceStore(
+            rootURL: rootDirectory.appendingPathComponent("history-outbox/long-form", isDirectory: true)
+        )
         self.store = RecoverableStoreCoordinator(
             openStore: { try Self.openQueue(at: dbPath) },
             classify: { HistoryPersistenceError.classify($0, operation: .initialize) }

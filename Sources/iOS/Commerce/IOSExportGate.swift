@@ -1,6 +1,11 @@
+import Foundation
 import Observation
+// The gate's decision logic is Foundation-only so the macOS logic-test bundle
+// compiles and runs it (PA-19); the presentation below is iPhone UI.
+#if canImport(UIKit)
 import SwiftUI
 import UIKit
+#endif
 
 /// Owns a single, immutable export selection. Purchase completion does not
 /// silently export anything: the user closes the sheet and requests export again.
@@ -12,6 +17,13 @@ final class IOSExportGate {
     }
     var presentation: Presentation?
     private var requestID = UUID()
+    private let commerce: @MainActor () -> IOSExportPurchaseState
+
+    /// `commerce` is a test seam (PA-19); the app always consults the one
+    /// StoreKit owner, `IOSExportCommerce.shared`.
+    init(commerce: @escaping @MainActor () -> IOSExportPurchaseState = { IOSExportCommerce.shared }) {
+        self.commerce = commerce
+    }
 
     func share(urls: [URL], provenance: [IOSExportProvenance]) {
         guard !urls.isEmpty, urls.count == provenance.count else { return }
@@ -28,8 +40,9 @@ final class IOSExportGate {
             action()
             return
         }
+        let commerce = self.commerce
         Task { [weak self] in
-            let store = IOSExportCommerce.shared
+            let store = commerce()
             await store.refresh()
             guard let self, self.requestID == id else { return }
             if store.permits(provenance) { action() }
@@ -38,6 +51,7 @@ final class IOSExportGate {
     }
 }
 
+#if canImport(UIKit)
 extension View {
     func iosExportPresentation(_ gate: IOSExportGate) -> some View {
         modifier(IOSExportPresentationModifier(gate: gate))
@@ -158,3 +172,4 @@ struct IOSExportPurchaseSheet: View {
         }
     }
 }
+#endif

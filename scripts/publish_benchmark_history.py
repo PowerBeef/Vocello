@@ -1584,14 +1584,26 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
     ]
     if seed is not None:
         # `--seed` applies to every take; publish it on each take (the schema's
-        # take-level field) once the engine's own receipt agrees (audit #13).
+        # take-level field) only once the engine's own receipt agrees (audit
+        # #13). The engine writes `samplingSeed` for every seeded request, so a
+        # missing receipt is broken telemetry, never an unconfirmed seed.
         for take, row in zip(takes, selected):
             notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
             observed = notes.get("samplingSeed")
-            if observed is not None and str(observed) != str(seed):
+            if observed is None:
+                raise PublicationError(
+                    f"generation {take['generationID']} has no samplingSeed receipt "
+                    f"for the requested seed {seed}"
+                )
+            if uint64_value(observed) != seed:
                 raise PublicationError(
                     f"generation {take['generationID']} sampled with seed {observed}, "
                     f"not the requested {seed}"
+                )
+            source = notes.get("samplingSeedSource")
+            if source is not None and source != "requested":
+                raise PublicationError(
+                    f"generation {take['generationID']} used a {source} seed, not the requested {seed}"
                 )
             take["seed"] = seed
     if selected_app:

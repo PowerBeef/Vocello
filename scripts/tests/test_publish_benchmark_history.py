@@ -650,8 +650,19 @@ class PublisherTests(unittest.TestCase):
 
         # A take whose engine receipt names another seed cannot be published as seeded.
         row["notes"]["samplingSeed"] = "42"
-        with self.assertRaisesRegex(publisher.PublicationError, "seed"):
+        with self.assertRaisesRegex(publisher.PublicationError, "sampled with seed 42"):
             self.publish_gate_fixture(row, seed=19790615, snapshot=snapshot)
+        # Nor can a take without the engine's receipt: the engine writes one for
+        # every seeded request, so its absence is broken telemetry.
+        del row["notes"]["samplingSeed"]
+        with self.assertRaisesRegex(publisher.PublicationError, "no samplingSeed receipt"):
+            self.publish_gate_fixture(row, seed=19790615, snapshot=snapshot)
+        # Or one whose receipt says the engine drew its own seed.
+        row["notes"].update({"samplingSeed": "19790615", "samplingSeedSource": "generated"})
+        with self.assertRaisesRegex(publisher.PublicationError, "generated seed"):
+            self.publish_gate_fixture(row, seed=19790615, snapshot=snapshot)
+        row["notes"]["samplingSeedSource"] = "requested"
+        self.assertEqual(self.publish_gate_fixture(row, seed=19790615, snapshot=snapshot)["takes"][0]["seed"], 19790615)
 
     def test_engine_without_a_seed_or_host_snapshot_publishes_as_before(self) -> None:
         record = self.publish_gate_fixture(

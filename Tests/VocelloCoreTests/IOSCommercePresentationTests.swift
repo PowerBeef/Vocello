@@ -21,7 +21,7 @@ final class IOSCommercePresentationTests: XCTestCase {
         let fixture = PrivateDiagnosticFixture.self
         let failure = NSError(domain: "ASDErrorDomain", code: 500, userInfo: [
             NSLocalizedDescriptionKey: "Could not buy “\(fixture.prompt)”",
-            NSURLErrorFailingURLStringErrorKey: "https://example.invalid/\(fixture.outputName)",
+            NSURLErrorFailingURLErrorKey: URL(string: "https://example.invalid/\(fixture.outputName)")!,
             NSFilePathErrorKey: fixture.path,
             NSUnderlyingErrorKey: fixture.cocoaWriteError,
         ])

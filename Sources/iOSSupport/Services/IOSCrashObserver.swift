@@ -89,7 +89,13 @@ extension IOSCrashObserver: MXMetricManagerSubscriber {
             let crashes = payload.crashDiagnostics ?? []
             let hangs = payload.hangDiagnostics ?? []
             guard !(crashes.isEmpty && hangs.isEmpty) else { continue }
-            writeJSON(payload.jsonRepresentation(), named: "metrickit-\(stamp()).json")
+            // An uncaught Objective-C exception's message and arguments ride in this JSON
+            // (iOS 17+); they get the exception record's redaction (AUD-08).
+            guard let json = DiagnosticPrivacy.redactedMetricKitPayload(payload.jsonRepresentation()) else {
+                os_log("skipped an unreadable MetricKit payload", log: log, type: .error)
+                continue
+            }
+            writeJSON(json, named: "metrickit-\(stamp()).json")
         }
     }
 }

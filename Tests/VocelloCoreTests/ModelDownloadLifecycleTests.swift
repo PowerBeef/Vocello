@@ -751,7 +751,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
             error: HuggingFaceDownloader.DownloadError.fileDownloadFailed(
                 path: PrivateDiagnosticFixture.path,
                 underlying: URLError(.networkConnectionLost, userInfo: [
-                    NSURLErrorFailingURLStringErrorKey: "https://example.invalid/private",
+                    NSURLErrorFailingURLErrorKey: URL(string: "https://example.invalid/private")!,
                 ])
             )
         )

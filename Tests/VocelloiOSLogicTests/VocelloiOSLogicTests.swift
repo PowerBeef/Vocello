@@ -706,7 +706,7 @@ final class VocelloiOSLogicTests: XCTestCase {
             classification: "network/failure",
             error: NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut, userInfo: [
                 NSLocalizedDescriptionKey: "request https://example.invalid/private failed in \(stagedPath)",
-                NSURLErrorFailingURLStringErrorKey: "https://example.invalid/private",
+                NSURLErrorFailingURLErrorKey: URL(string: "https://example.invalid/private")!,
                 NSFilePathErrorKey: stagedPath,
             ])
         )

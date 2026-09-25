@@ -431,6 +431,9 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
             "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
             "thermal nominal → serious",
             "and/or 1/2 a / b",
+            // Device-lane preconditions reach the pullable sentinel through this path.
+            "QVOICE_IOS_DEVICE_DIAGNOSTICS_SEED must be an unsigned 64-bit integer",
+            "the saved clone voice named by QVOICE_IOS_DEVICE_DIAGNOSTICS_CLONE_VOICE_ID was not found; 2 saved voice(s) are installed",
             DiagnosticPrivacy.summary(of: fixture.cocoaWriteError).description,
         ] {
             XCTAssertEqual(DiagnosticPrivacy.redactedText(kept, limit: 1_000), kept)
@@ -457,6 +460,73 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
         XCTAssertEqual(details["textLength"], String(fixture.prompt.count))
         XCTAssertEqual(details["didLoad"], "true")
         fixture.assertNoPrivateContent(details.map { "\($0.key)=\($0.value)" }.joined(separator: "\n"))
+    }
+
+    /// The crash observer persists MetricKit payloads whose Objective-C exception reason
+    /// carries the same message as its own exception record (AUD-08).
+    func testMetricKitPayloadRedactsExceptionReasonAndKeepsSymbolication() throws {
+        let fixture = PrivateDiagnosticFixture.self
+        let frame: [String: Any] = [
+            "binaryName": "QVoiceiOS",
+            "binaryUUID": "00000000-0000-4000-8000-000000000000",
+            "address": 4_312_345_678,
+            "offsetIntoBinaryTextSegment": 12_345,
+        ]
+        let crash: [String: Any] = [
+            "version": "1.0.0",
+            "callStackTree": [
+                "callStackPerThread": true,
+                "callStacks": [["threadAttributed": true, "callStackRootFrames": [frame]]],
+            ],
+            "diagnosticMetaData": [
+                "signal": 6,
+                "terminationReason": "Namespace SIGNAL, Code 0x6",
+                "objectiveCexceptionReason": [
+                    "composedMessage": "could not open “\(fixture.outputName)” from \(fixture.path)",
+                    "formatString": "could not open “%@” from %@",
+                    "arguments": [
+                        "https://example.invalid/\(fixture.outputName)",
+                        fixture.path,
+                    ],
+                    "exceptionName": "NSInvalidArgumentException",
+                    "className": "NSException",
+                ],
+            ],
+        ]
+        let payload = try JSONSerialization.data(withJSONObject: ["crashDiagnostics": [crash]])
+        XCTAssertTrue(String(decoding: payload, as: UTF8.self).contains(fixture.homeFragment))
+
+        let redacted = try XCTUnwrap(DiagnosticPrivacy.redactedMetricKitPayload(payload))
+        let text = String(decoding: redacted, as: UTF8.self)
+        fixture.assertNoPrivateContent(text)
+        XCTAssertFalse(text.contains("example.invalid"))
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: redacted) as? [String: Any])
+        let crashes = try XCTUnwrap(object["crashDiagnostics"] as? [[String: Any]])
+        let metadata = try XCTUnwrap(crashes.first?["diagnosticMetaData"] as? [String: Any])
+        let reason = try XCTUnwrap(metadata["objectiveCexceptionReason"] as? [String: Any])
+        XCTAssertEqual(
+            reason["composedMessage"] as? String,
+            "could not open “\(DiagnosticPrivacy.redactedTextMarker)” from \(DiagnosticPrivacy.redactedPathMarker)"
+        )
+        XCTAssertEqual(
+            reason["arguments"] as? [String],
+            [DiagnosticPrivacy.redactedURLMarker, DiagnosticPrivacy.redactedPathMarker]
+        )
+        XCTAssertEqual(reason["exceptionName"] as? String, "NSInvalidArgumentException")
+        XCTAssertEqual(metadata["terminationReason"] as? String, "Namespace SIGNAL, Code 0x6")
+        let tree = try XCTUnwrap(crashes.first?["callStackTree"] as? [String: Any])
+        let stacks = try XCTUnwrap(tree["callStacks"] as? [[String: Any]])
+        let frames = try XCTUnwrap(stacks.first?["callStackRootFrames"] as? [[String: Any]])
+        XCTAssertEqual(frames.first?["binaryName"] as? String, "QVoiceiOS")
+        XCTAssertEqual(frames.first?["address"] as? Int, 4_312_345_678)
+
+        // A payload without an exception reason keeps MetricKit's bytes; one that is not
+        // JSON is never handed back for persistence.
+        let hangOnly = try JSONSerialization.data(withJSONObject: [
+            "hangDiagnostics": [["callStackTree": ["callStacks": [["callStackRootFrames": [frame]]]]]],
+        ])
+        XCTAssertEqual(DiagnosticPrivacy.redactedMetricKitPayload(hangOnly), hangOnly)
+        XCTAssertNil(DiagnosticPrivacy.redactedMetricKitPayload(Data("not json \(fixture.path)".utf8)))
     }
 
     @MainActor
@@ -550,7 +620,7 @@ enum PrivateDiagnosticFixture {
             HuggingFaceDownloader.DownloadError.fileDownloadFailed(
                 path: path,
                 underlying: URLError(.timedOut, userInfo: [
-                    NSURLErrorFailingURLStringErrorKey: "https://example.invalid/\(outputName)",
+                    NSURLErrorFailingURLErrorKey: URL(string: "https://example.invalid/\(outputName)")!,
                 ])
             ),
             HuggingFaceDownloader.DownloadError.integrityCheckFailed(path: path, reason: prompt),

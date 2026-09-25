@@ -634,7 +634,7 @@ enum IOSDeviceDiagnosticsRunner {
 
         do {
             guard let model = ModelDescriptor.model(for: spec.mode) else {
-                throw DiagnosticsError("no model in the contract for mode '\(spec.mode.rawValue)'")
+                throw DiagnosticsError("no model in the contract for mode \(spec.mode.rawValue)")
             }
             record.modelID = model.id
             record.modelName = model.name
@@ -676,7 +676,7 @@ enum IOSDeviceDiagnosticsRunner {
             )
             diagnosticRequest = request
             guard let capabilities = model.qwen3Capabilities else {
-                throw DiagnosticsError("model '\(model.id)' has no declared Qwen3 prompt capabilities")
+                throw DiagnosticsError("model \(model.id) has no declared Qwen3 prompt capabilities")
             }
             let prompt = GenerationSemantics.qwen3PromptAssembly(
                 for: request,
@@ -774,7 +774,11 @@ enum IOSDeviceDiagnosticsRunner {
             }
             record.status = "error"
             // The pullable sentinel keeps the typed summary, not error text (AUD-08).
-            record.error = DiagnosticPrivacy.summary(of: error).description
+            // A code-owned precondition keeps its redacted message: the lane scripts
+            // print only this field, and every such message would share one summary.
+            record.error = (error as? DiagnosticsError).map {
+                DiagnosticPrivacy.redactedText($0.message)
+            } ?? DiagnosticPrivacy.summary(of: error).description
             let metadata = GenerationFailureDiagnosticLogger.errorMetadata(for: error)
             let evidence = await terminalFailureEvidence(
                 request: diagnosticRequest,
@@ -1549,10 +1553,11 @@ enum IOSDeviceDiagnosticsRunner {
             }
             let voices = try await engine.listPreparedVoices()
             guard let voice = voices.first(where: { $0.id == requestedVoiceID }) else {
-                let availableIDs = voices.map(\.id).sorted().joined(separator: ", ")
+                // Saved voice IDs are the user's voice names, which the pullable
+                // sentinel must not carry (AUD-08); the count stays actionable.
                 throw DiagnosticsError(
-                    "saved clone voice '\(requestedVoiceID)' was not found"
-                    + (availableIDs.isEmpty ? "; no saved voices are installed" : "; available IDs: \(availableIDs)")
+                    "the saved clone voice named by \(cloneVoiceIDEnvKey) was not found"
+                    + (voices.isEmpty ? "; no saved voices are installed" : "; \(voices.count) saved voice(s) are installed")
                 )
             }
             return .clone(

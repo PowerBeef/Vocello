@@ -19,8 +19,11 @@ public enum DiagnosticPrivacy {
     /// Typed classification of `error`: the allowlisted failure code from
     /// `GenerationFailureDiagnosticLogger.errorMetadata(for:)`, the error's type
     /// and enum case, its `NSError` domain and code, the domains and codes of
-    /// the errors it wraps, the runtime stage and an HTTP status. It never
-    /// reads the error's description, failure reason or user info values.
+    /// the errors it wraps, the runtime stage and an HTTP status. It keeps no
+    /// description, failure reason or user info value: the only text it reads is
+    /// a payload-less enum case's name, kept when it is a plain identifier, and
+    /// the only user info entry it follows is `NSUnderlyingErrorKey`, whose
+    /// errors contribute their domain and code alone.
     public static func summary(of error: any Error) -> DiagnosticErrorSummary {
         let metadata = GenerationFailureDiagnosticLogger.errorMetadata(for: error)
         let nsError = error as NSError
@@ -74,6 +77,58 @@ public enum DiagnosticPrivacy {
                 result[entry.key] = redactedText(entry.value, limit: valueLimit)
             }
         }
+    }
+
+    /// A MetricKit diagnostic payload (`MXDiagnosticPayload.jsonRepresentation()`)
+    /// with each uncaught Objective-C exception reason's message, format string
+    /// and arguments passed through `redactedText`, the same treatment as the
+    /// crash observer's own exception record. Call stacks and metadata stay for
+    /// symbolication. A payload without an exception reason is returned as is;
+    /// one that is not JSON returns nil, so a caller never persists it unread.
+    public static func redactedMetricKitPayload(_ json: Data) -> Data? {
+        guard let object = try? JSONSerialization.jsonObject(with: json) else { return nil }
+        var changed = false
+        let redacted = redactingExceptionReasons(in: object, changed: &changed)
+        guard changed else { return json }
+        return try? JSONSerialization.data(withJSONObject: redacted, options: [.prettyPrinted, .sortedKeys])
+    }
+
+    /// `MXCrashDiagnosticObjectiveCExceptionReason` text fields; its
+    /// `exceptionName`, `className` and `exceptionType` are runtime-owned.
+    private static let exceptionReasonTextKeys: Set<String> = ["composedMessage", "formatString"]
+
+    private static func redactingExceptionReasons(in value: Any, changed: inout Bool) -> Any {
+        if var dictionary = value as? [String: Any] {
+            let isExceptionReason = dictionary["composedMessage"] != nil
+            for (key, element) in dictionary {
+                if isExceptionReason, exceptionReasonTextKeys.contains(key), let text = element as? String {
+                    dictionary[key] = redactedText(text, limit: 512)
+                    changed = true
+                } else if isExceptionReason, key == "arguments", let arguments = element as? [Any] {
+                    var redactedArguments: [Any] = []
+                    for argument in arguments {
+                        if let text = argument as? String {
+                            redactedArguments.append(redactedText(text, limit: 512))
+                        } else {
+                            redactedArguments.append(argument)
+                        }
+                    }
+                    dictionary[key] = redactedArguments
+                    changed = true
+                } else {
+                    dictionary[key] = redactingExceptionReasons(in: element, changed: &changed)
+                }
+            }
+            return dictionary
+        }
+        if let array = value as? [Any] {
+            var redactedArray: [Any] = []
+            for element in array {
+                redactedArray.append(redactingExceptionReasons(in: element, changed: &changed))
+            }
+            return redactedArray
+        }
+        return value
     }
 
     private static let contentKeys: Set<String> = [

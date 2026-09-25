@@ -297,9 +297,12 @@ cannot recognize an unquoted prompt. The persisted boundaries that use it:
 - the engine's internal `native-events.jsonl`: detail values are redacted, so the prepared and
   source model directories appear as `<redacted-path>`;
 - the internal device-diagnostics run sentinels (`error`, `failureDescription`) and the internal
-  StoreKit record `commerce/last-purchase-error.json` (schema v2): typed summaries;
-- the iPhone crash observer's uncaught-exception record: a redacted reason, with the exception name
-  and call stack kept for symbolication.
+  StoreKit record `commerce/last-purchase-error.json` (schema v2): typed summaries, except that a
+  sentinel `error` from the runner's own precondition keeps that code-owned message, redacted;
+- the iPhone crash observer (`diagnostics/crashes/` in the pullable Caches): its uncaught-exception
+  record keeps a redacted reason, and a MetricKit payload's Objective-C exception message, format
+  string and arguments are redacted the same way before the payload is written. Exception names,
+  call stacks and MetricKit metadata stay for symbolication.
 
 `generation-failures.jsonl` below and the generation telemetry records were already typed;
 telemetry keeps only a failure message's length and digest. Unified-log calls (`os_log`, `Logger`)

@@ -915,7 +915,7 @@ final class TTSEngineStore: ObservableObject, TTSEngine {
                 do {
                     try await self.backend.cancelActiveGeneration(reason: reason)
                 } catch {
-                    cancellationFailureMessage = error.localizedDescription
+                    cancellationFailureMessage = DiagnosticPrivacy.summary(of: error).description
                     throw error
                 }
                 self.diagnosticsRecorder?.recordAction(

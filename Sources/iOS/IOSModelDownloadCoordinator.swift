@@ -369,7 +369,7 @@ final class IOSModelDownloadCoordinator {
                 await startPendingDownloads()
             }
         } catch {
-            diagnosticsStore.recordFailure(classification: "ledger-restore", message: error.localizedDescription)
+            diagnosticsStore.recordFailure(classification: "ledger-restore", error: error)
             await downloader.cancelAllSessionTasks()
             IOSModelDeliveryBackgroundEventRelay.complete(
                 forOwnedSessionIdentifier: configuration.backgroundSessionIdentifier
@@ -386,7 +386,7 @@ final class IOSModelDownloadCoordinator {
         } catch {
             diagnosticsStore.recordFailure(
                 classification: "background-event-reconciliation",
-                message: error.localizedDescription
+                error: error
             )
             return
         }
@@ -529,7 +529,7 @@ final class IOSModelDownloadCoordinator {
                   !cancellationBarriers.contains(model.id) else { return }
             inflight.removeValue(forKey: model.id)
             markLedgerTerminal(modelID: model.id, status: .failed)
-            diagnosticsStore.recordFailure(classification: "transfer", message: error.localizedDescription)
+            diagnosticsStore.recordFailure(classification: "transfer", error: error)
             diagnosticsStore.recordEvent(
                 layer: "downloader",
                 event: "request-failed",
@@ -538,7 +538,7 @@ final class IOSModelDownloadCoordinator {
                 operationGeneration: generation,
                 artifactVersion: request.artifactVersion,
                 errorClassification: "transfer",
-                errorMessage: error.localizedDescription
+                error: error
             )
             publishFailed(modelID: model.id, message: error.localizedDescription)
             stopDiagnosticsHeartbeat()
@@ -547,7 +547,7 @@ final class IOSModelDownloadCoordinator {
                   !cancellationBarriers.contains(model.id) else { return }
             inflight.removeValue(forKey: model.id)
             markLedgerTerminal(modelID: model.id, status: .failed)
-            diagnosticsStore.recordFailure(classification: "filesystem", message: error.localizedDescription)
+            diagnosticsStore.recordFailure(classification: "filesystem", error: error)
             diagnosticsStore.recordEvent(
                 layer: "filesystem",
                 event: "request-failed",
@@ -556,7 +556,7 @@ final class IOSModelDownloadCoordinator {
                 operationGeneration: generation,
                 artifactVersion: request.artifactVersion,
                 errorClassification: "filesystem",
-                errorMessage: error.localizedDescription
+                error: error
             )
             publishFailed(modelID: model.id, message: error.localizedDescription)
             stopDiagnosticsHeartbeat()
@@ -935,7 +935,7 @@ final class IOSModelDownloadCoordinator {
             lastLedgerProgressWrite[modelID] = now
             return true
         } catch {
-            diagnosticsStore.recordFailure(classification: "ledger-write", message: error.localizedDescription)
+            diagnosticsStore.recordFailure(classification: "ledger-write", error: error)
             return false
         }
     }
@@ -961,7 +961,7 @@ final class IOSModelDownloadCoordinator {
         do {
             try persistLedgerUpdate(modelID: modelID, mutate: mutate)
         } catch {
-            diagnosticsStore.recordFailure(classification: "ledger-write", message: error.localizedDescription)
+            diagnosticsStore.recordFailure(classification: "ledger-write", error: error)
         }
     }
 
@@ -990,7 +990,7 @@ final class IOSModelDownloadCoordinator {
         } catch {
             diagnosticsStore.recordFailure(
                 classification: "cancellation-ledger-write",
-                message: error.localizedDescription
+                error: error
             )
             return false
         }
@@ -1029,7 +1029,7 @@ final class IOSModelDownloadCoordinator {
         } catch {
             diagnosticsStore.recordFailure(
                 classification: "cancellation-install-rollback",
-                message: error.localizedDescription
+                error: error
             )
             return false
         }
@@ -1057,7 +1057,7 @@ final class IOSModelDownloadCoordinator {
         } catch {
             diagnosticsStore.recordFailure(
                 classification: "cancellation-install-reconcile",
-                message: error.localizedDescription
+                error: error
             )
             publishSnapshot(
                 modelID: active.modelID,

@@ -1,6 +1,7 @@
 import Foundation
 import MetricKit
 import os
+import QwenVoiceCore
 
 /// On-device crash/diagnostic backstop.
 ///
@@ -48,7 +49,7 @@ final class IOSCrashObserver: NSObject, @unchecked Sendable {
             try data.write(to: url, options: .atomic)
             os_log("wrote %{public}@", log: log, type: .info, url.lastPathComponent)
         } catch {
-            os_log("write failed: %{public}@", log: log, type: .error, error.localizedDescription)
+            os_log("write failed: %{public}@", log: log, type: .error, DiagnosticPrivacy.summary(of: error).description)
         }
     }
 
@@ -57,7 +58,8 @@ final class IOSCrashObserver: NSObject, @unchecked Sendable {
         let record: [String: Any] = [
             "kind": "uncaughtException",
             "name": exception.name.rawValue,
-            "reason": exception.reason ?? "",
+            // A reason can quote a path, URL or the string an API rejected (AUD-08).
+            "reason": DiagnosticPrivacy.redactedText(exception.reason ?? "", limit: 512),
             "callStack": exception.callStackSymbols,
             "appVersion": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
             "buildVersion": Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String ?? "",

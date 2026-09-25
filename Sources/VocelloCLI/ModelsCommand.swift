@@ -222,7 +222,7 @@ enum ModelsCommand {
                 reusedBytes: transferAccounting.reusedVerifiedBytes
             )
         } catch {
-            diagnostics.recordFailure(classification: "download", message: error.localizedDescription)
+            diagnostics.recordFailure(classification: "download", error: error)
             throw error
         }
 

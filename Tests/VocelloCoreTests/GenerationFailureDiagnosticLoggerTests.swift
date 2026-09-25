@@ -340,4 +340,241 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
         XCTAssertNil(Reason(TTSEngineError.generationFailed("fixture")))
         XCTAssertNil(Reason(CancellationError()))
     }
+
+    // MARK: - Persisted diagnostics privacy (AUD-08)
+
+    func testDiagnosticSummaryKeepsTypedIdentityAndNoErrorText() throws {
+        let fixture = PrivateDiagnosticFixture.self
+        // The fixtures really carry the content: reflected error text names the path.
+        XCTAssertTrue(String(describing: fixture.cocoaWriteError).contains(fixture.homeFragment))
+        XCTAssertTrue(fixture.scriptBearingError.localizedDescription.contains(fixture.prompt))
+
+        for failure in fixture.failures {
+            let summary = DiagnosticPrivacy.summary(of: failure)
+            let encoded = try XCTUnwrap(String(data: JSONEncoder().encode(summary), encoding: .utf8))
+            fixture.assertNoPrivateContent(summary.description)
+            fixture.assertNoPrivateContent(encoded)
+        }
+
+        let cocoa = DiagnosticPrivacy.summary(of: fixture.cocoaWriteError)
+        XCTAssertEqual(cocoa.code, "storage.permission_denied")
+        XCTAssertEqual(cocoa.domain, NSCocoaErrorDomain)
+        XCTAssertEqual(cocoa.domainCode, NSFileWriteNoPermissionError)
+        XCTAssertEqual(cocoa.underlying?.map(\.domain), [NSPOSIXErrorDomain])
+        XCTAssertEqual(cocoa.underlying?.map(\.code), [Int(EACCES)])
+
+        let conversion = DiagnosticPrivacy.summary(
+            of: AudioPreparationError.conversionFailed("Audio write failed: \(fixture.path)")
+        )
+        XCTAssertEqual(conversion.code, "audio.processing_failed")
+        XCTAssertEqual(conversion.caseName, "conversionFailed")
+        XCTAssertTrue(conversion.type.hasSuffix("AudioPreparationError"))
+
+        let wrapped = DiagnosticPrivacy.summary(of: NativeRuntimeError.wrapping(
+            fixture.cocoaWriteError,
+            stage: .clonePreparation,
+            message: "Could not prepare the reference transcript \(fixture.transcript)"
+        ))
+        XCTAssertEqual(wrapped.code, "runtime.failed")
+        XCTAssertEqual(wrapped.stage, "clonePreparation")
+        XCTAssertNil(wrapped.caseName)
+
+        let transfer = DiagnosticPrivacy.summary(of: HuggingFaceDownloader.DownloadError.fileDownloadFailed(
+            path: fixture.path,
+            underlying: URLError(.timedOut)
+        ))
+        XCTAssertEqual(transfer.code, "download.transfer_failed")
+        XCTAssertEqual(transfer.caseName, "fileDownloadFailed")
+        XCTAssertEqual(transfer.underlying?.first?.domain, NSURLErrorDomain)
+        XCTAssertEqual(transfer.underlying?.first?.code, URLError.Code.timedOut.rawValue)
+
+        let http = DiagnosticPrivacy.summary(
+            of: HuggingFaceDownloader.DownloadError.httpError(statusCode: 503, path: fixture.path)
+        )
+        XCTAssertEqual(http.httpStatus, 503)
+        XCTAssertTrue(http.description.hasPrefix("download.transfer_failed "))
+        XCTAssertTrue(http.description.contains("http=503"))
+
+        let integrity = DiagnosticPrivacy.summary(
+            of: HuggingFaceDownloader.DownloadError.integrityCheckFailed(path: fixture.path, reason: fixture.prompt)
+        )
+        // scripts/check_ios_model_management.py keys the integrity finding on this prefix.
+        XCTAssertTrue(integrity.description.hasPrefix("download.integrity_failed "))
+    }
+
+    func testRedactedTextRemovesPathsURLsAddressesAndQuotedNames() {
+        let fixture = PrivateDiagnosticFixture.self
+        let inputs = [
+            String(describing: fixture.cocoaWriteError),
+            "failed at https://example.invalid/\(fixture.outputName) from \(fixture.path)",
+            "open file://\(fixture.path) failed, retrying",
+            "Die Datei „\(fixture.outputName)“ konnte nicht gesichert werden.",
+            "Le fichier « \(fixture.outputName) » est introuvable.",
+            "Could not load '\(fixture.prompt)' because it's too short",
+            "The reference \(fixture.directory)/Quinlan's take (old).wav is missing, retrying",
+            "sent to quinlan.reader@example.com from ~/Library/Caches/Vocello; done",
+            "The file “\(fixture.transcript)” couldn’t be opened.",
+        ]
+        for input in inputs {
+            let redacted = DiagnosticPrivacy.redactedText(input)
+            fixture.assertNoPrivateContent(redacted)
+            XCTAssertFalse(redacted.contains("example.invalid"), redacted)
+            XCTAssertFalse(redacted.contains("quinlan.reader"), redacted)
+            XCTAssertFalse(redacted.contains("Library/Caches"), redacted)
+        }
+        XCTAssertEqual(
+            DiagnosticPrivacy.redactedText("sent to quinlan.reader@example.com from ~/Library/Caches/Vocello; done"),
+            "sent to <redacted-email> from <redacted-path>; done"
+        )
+        // Code-owned copy and identifiers pass through unchanged.
+        for kept in [
+            "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
+            "thermal nominal → serious",
+            "and/or 1/2 a / b",
+            DiagnosticPrivacy.summary(of: fixture.cocoaWriteError).description,
+        ] {
+            XCTAssertEqual(DiagnosticPrivacy.redactedText(kept, limit: 1_000), kept)
+        }
+        XCTAssertEqual(DiagnosticPrivacy.redactedText(String(repeating: "a", count: 500), limit: 12).count, 12)
+    }
+
+    func testRedactedDetailsDropContentKeysAndAbsolutePaths() {
+        let fixture = PrivateDiagnosticFixture.self
+        let details = DiagnosticPrivacy.redactedDetails([
+            "preparedDirectory": fixture.directory,
+            "sourceDirectory": "~/Library/Application Support/QwenVoice/models/pro_custom_speed",
+            "modelRepo": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
+            "text": fixture.prompt,
+            "transcript": fixture.transcript,
+            "textLength": String(fixture.prompt.count),
+            "didLoad": "true",
+        ])
+        XCTAssertEqual(details["preparedDirectory"], DiagnosticPrivacy.redactedPathMarker)
+        XCTAssertEqual(details["sourceDirectory"], DiagnosticPrivacy.redactedPathMarker)
+        XCTAssertEqual(details["modelRepo"], "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice")
+        XCTAssertEqual(details["text"], DiagnosticPrivacy.redactedTextMarker)
+        XCTAssertEqual(details["transcript"], DiagnosticPrivacy.redactedTextMarker)
+        XCTAssertEqual(details["textLength"], String(fixture.prompt.count))
+        XCTAssertEqual(details["didLoad"], "true")
+        fixture.assertNoPrivateContent(details.map { "\($0.key)=\($0.value)" }.joined(separator: "\n"))
+    }
+
+    @MainActor
+    func testDeviceDiagnosticsRecorderPersistsNoStoreRootOrFailureText() async throws {
+        let fixture = PrivateDiagnosticFixture.self
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-device-diagnostics-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let recorder = try XCTUnwrap(IOSDeviceDiagnosticsRecorder.makeIfEnabled(
+            environment: [
+                "QWENVOICE_NATIVE_TELEMETRY_MODE": "light",
+                "QVOICE_IOS_DEVICE_RUN_ID": "aud08-run",
+            ],
+            appSupportDirectory: root.appendingPathComponent("app-support", isDirectory: true),
+            cachesDirectory: root.appendingPathComponent("caches", isDirectory: true)
+        ))
+
+        recorder.recordAction(
+            event: "critical_generation_cancel_failed",
+            reason: "aud08",
+            context: nil,
+            message: DiagnosticPrivacy.summary(of: fixture.cocoaWriteError).description
+        )
+        // A caller that still passes error text is redacted at the boundary.
+        recorder.recordAction(
+            event: "legacy_error_text",
+            reason: "aud08",
+            context: nil,
+            message: String(describing: fixture.cocoaWriteError)
+        )
+
+        let files = PrivateDiagnosticFixture.diagnosticFiles(under: root)
+        XCTAssertEqual(Set(files.map(\.lastPathComponent)), ["manifest.json", "memory-contexts.jsonl"])
+        XCTAssertEqual(files.count, 4, "the App Group and the pullable mirror each hold both files")
+        for file in files {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            fixture.assertNoPrivateContent(text)
+            XCTAssertFalse(text.contains(root.path), file.lastPathComponent)
+            XCTAssertFalse(text.contains("appSupportDirectory"), file.lastPathComponent)
+            if file.lastPathComponent == "memory-contexts.jsonl" {
+                XCTAssertTrue(text.contains("storage.permission_denied"))
+            }
+        }
+    }
+}
+
+/// Synthetic content a failure can carry: an absolute path under a home folder (built
+/// from fragments so the privacy scanner and hooks stay quiet), a generated output name
+/// that begins with the script, a prompt and a reference transcript (AUD-08).
+enum PrivateDiagnosticFixture {
+    static let homeFragment = "aud08-fixture-home"
+    static let prompt = "Tell Mara the vault opens at dusk."
+    static let transcript = "Quinlan reads the harbour ledger aloud."
+    static let outputName = "20260924_10-00-00-000_Tell_Mara_the_vault.wav"
+    static let directory = "/" + "Users/" + homeFragment + "/Library/Application Support/QwenVoice/outputs"
+    static var path: String { directory + "/" + outputName }
+
+    /// Fragments no persisted diagnostic may contain. Words only: numbers could
+    /// match a timestamp or an uptime by chance.
+    static let forbiddenFragments = [
+        homeFragment, "Application Support", "Mara", "vault", "dusk", "Quinlan", "harbour ledger",
+    ]
+
+    static var cocoaWriteError: NSError {
+        NSError(domain: NSCocoaErrorDomain, code: NSFileWriteNoPermissionError, userInfo: [
+            NSFilePathErrorKey: path,
+            NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(EACCES)),
+        ])
+    }
+
+    struct ScriptBearingError: LocalizedError {
+        let errorDescription: String?
+    }
+
+    static var scriptBearingError: ScriptBearingError {
+        ScriptBearingError(errorDescription: "Could not speak “\(prompt)” (\(transcript)) from \(path)")
+    }
+
+    static var failures: [any Error] {
+        [
+            cocoaWriteError,
+            CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: path]),
+            AudioPreparationError.conversionFailed("Audio write failed: \(path)"),
+            AudioPreparationError.missingInputFile(path),
+            TTSEngineError.generationFailed("The current text produced only 3 chat tokens for '\(prompt)'."),
+            NativeRuntimeError.wrapping(
+                cocoaWriteError,
+                stage: .clonePreparation,
+                message: "Could not prepare the reference transcript \(transcript)"
+            ),
+            HuggingFaceDownloader.DownloadError.fileDownloadFailed(
+                path: path,
+                underlying: URLError(.timedOut, userInfo: [
+                    NSURLErrorFailingURLStringErrorKey: "https://example.invalid/\(outputName)",
+                ])
+            ),
+            HuggingFaceDownloader.DownloadError.integrityCheckFailed(path: path, reason: prompt),
+            HuggingFaceDownloader.DownloadError.invalidLocalDestination(path),
+            scriptBearingError,
+        ]
+    }
+
+    static func assertNoPrivateContent(
+        _ text: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        for fragment in forbiddenFragments {
+            XCTAssertFalse(text.contains(fragment), "retained \(fragment): \(text)", file: file, line: line)
+        }
+    }
+
+    /// Every JSON or JSONL file a diagnostic wrote under `root`.
+    static func diagnosticFiles(under root: URL) -> [URL] {
+        let enumerated = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?
+            .allObjects ?? []
+        return enumerated
+            .compactMap { $0 as? URL }
+            .filter { ["json", "jsonl"].contains($0.pathExtension) }
+    }
 }

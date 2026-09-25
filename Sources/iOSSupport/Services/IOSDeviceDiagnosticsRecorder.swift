@@ -49,7 +49,11 @@ final class IOSDeviceDiagnosticsRecorder {
 
     static func makeIfEnabled(
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        appSupportDirectory: URL = AppPaths.appSupportDir
+        appSupportDirectory: URL = AppPaths.appSupportDir,
+        cachesDirectory: URL? = FileManager.default.urls(
+            for: .cachesDirectory,
+            in: .userDomainMask
+        ).first
     ) -> IOSDeviceDiagnosticsRecorder? {
         guard NativeTelemetryMode.current(environment: environment) != .off else {
             return nil
@@ -72,10 +76,7 @@ final class IOSDeviceDiagnosticsRecorder {
             .appendingPathComponent("diagnostics", isDirectory: true)
             .appendingPathComponent(safeRunID, isDirectory: true)
         var directories = [(name: "app-group", url: directory)]
-        if let cachesDirectory = FileManager.default.urls(
-            for: .cachesDirectory,
-            in: .userDomainMask
-        ).first {
+        if let cachesDirectory {
             let mirrorDirectory = cachesDirectory
                 .appendingPathComponent("Vocello", isDirectory: true)
                 .appendingPathComponent("diagnostics", isDirectory: true)
@@ -109,6 +110,8 @@ final class IOSDeviceDiagnosticsRecorder {
         )
     }
 
+    /// `message` is code-owned copy or a failure's `DiagnosticPrivacy` summary, never
+    /// error text; it is redacted again before it is written (AUD-08).
     func recordAction(
         event: String,
         reason: String,
@@ -116,6 +119,7 @@ final class IOSDeviceDiagnosticsRecorder {
         trimLevel: NativeMemoryTrimLevel? = nil,
         message: String? = nil
     ) {
+        let recordedMessage = message.map { DiagnosticPrivacy.redactedText($0) }
         append(
             MemoryContextDiagnosticRecord(
                 event: event,
@@ -129,7 +133,7 @@ final class IOSDeviceDiagnosticsRecorder {
                 previousPressureBand: nil,
                 worstProcessRole: context?.worstProcessRole,
                 trimLevel: trimLevel,
-                message: message,
+                message: recordedMessage,
                 context: context
             )
         )
@@ -154,7 +158,7 @@ final class IOSDeviceDiagnosticsRecorder {
             mirrorNativeEventsToAppContainerCacheIfNeeded()
         } catch {
             if TelemetryGate.resolvedEnabled {
-                print("[IOSDeviceDiagnosticsRecorder] Could not write diagnostics: \(error.localizedDescription)")
+                print("[IOSDeviceDiagnosticsRecorder] Could not write diagnostics: \(DiagnosticPrivacy.summary(of: error))")
             }
         }
     }
@@ -185,7 +189,6 @@ final class IOSDeviceDiagnosticsRecorder {
             deviceModel: Self.hostDescriptor.model,
             systemName: Self.hostDescriptor.systemName,
             systemVersion: Self.hostDescriptor.systemVersion,
-            appSupportDirectory: AppPaths.appSupportDir.path,
             memoryContextsPath: target.memoryContextsURL.lastPathComponent,
             nativeEventsPath: target.nativeEventsURL.lastPathComponent
         )
@@ -214,13 +217,15 @@ final class IOSDeviceDiagnosticsRecorder {
                 )
             } catch {
                 if TelemetryGate.resolvedEnabled {
-                    print("[IOSDeviceDiagnosticsRecorder] Could not mirror native events: \(error.localizedDescription)")
+                    print("[IOSDeviceDiagnosticsRecorder] Could not mirror native events: \(DiagnosticPrivacy.summary(of: error))")
                 }
             }
         }
     }
 }
 
+/// No absolute path: the store root names the user's home on macOS and the App Group
+/// container on iPhone (AUD-08).
 private struct DeviceDiagnosticsManifest: Codable {
     let runID: String
     let createdAt: String
@@ -230,7 +235,6 @@ private struct DeviceDiagnosticsManifest: Codable {
     let deviceModel: String
     let systemName: String
     let systemVersion: String
-    let appSupportDirectory: String
     let memoryContextsPath: String
     let nativeEventsPath: String
 }

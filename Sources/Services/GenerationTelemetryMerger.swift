@@ -96,7 +96,7 @@ enum GenerationTelemetryMerger {
                 print(
                     "[GenerationTelemetryMerger] Row matching '\(generationID)' in "
                     + "\(url.lastPathComponent) failed to decode and was skipped "
-                    + "(schema drift? \(error.localizedDescription))"
+                    + "(schema drift? \(DiagnosticPrivacy.summary(of: error)))"
                 )
             }
         }
@@ -126,7 +126,7 @@ enum GenerationTelemetryMerger {
                 maxBytes: GenerationTelemetryJSONLSink.maxLogBytes
             )
         } catch {
-            print("[GenerationTelemetryMerger] Could not write merged telemetry for '\(merged.generationID)': \(error.localizedDescription)")
+            print("[GenerationTelemetryMerger] Could not write merged telemetry for '\(merged.generationID)': \(DiagnosticPrivacy.summary(of: error))")
         }
     }
 }

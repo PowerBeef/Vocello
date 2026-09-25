@@ -155,7 +155,7 @@ enum IOSPullableDiagnosticsMirror {
                     try Data(payload.utf8).write(to: destination, options: .atomic)
                 }
             } catch {
-                print("[IOSPullableDiagnosticsMirror] could not export \(layer) row: \(error.localizedDescription)")
+                print("[IOSPullableDiagnosticsMirror] could not export \(layer) row: \(DiagnosticPrivacy.summary(of: error))")
             }
         }
 
@@ -173,7 +173,7 @@ enum IOSPullableDiagnosticsMirror {
             try? fileManager.removeItem(at: sampleDestination)
             try fileManager.copyItem(at: sampleSource, to: sampleDestination)
         } catch {
-            print("[IOSPullableDiagnosticsMirror] could not export verbose samples: \(error.localizedDescription)")
+            print("[IOSPullableDiagnosticsMirror] could not export verbose samples: \(DiagnosticPrivacy.summary(of: error))")
         }
     }
 
@@ -195,7 +195,7 @@ enum IOSPullableDiagnosticsMirror {
                 }
                 try fileManager.copyItem(at: from, to: to)
             } catch {
-                print("[IOSPullableDiagnosticsMirror] could not mirror \(layer) telemetry: \(error.localizedDescription)")
+                print("[IOSPullableDiagnosticsMirror] could not mirror \(layer) telemetry: \(DiagnosticPrivacy.summary(of: error))")
             }
         }
     }
@@ -223,7 +223,7 @@ enum IOSPullableDiagnosticsMirror {
             try? fileManager.removeItem(at: destination)
             try fileManager.copyItem(at: source, to: destination)
         } catch {
-            print("[IOSPullableDiagnosticsMirror] could not export startup evidence: \(error.localizedDescription)")
+            print("[IOSPullableDiagnosticsMirror] could not export startup evidence: \(DiagnosticPrivacy.summary(of: error))")
         }
     }
 

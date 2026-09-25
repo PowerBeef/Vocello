@@ -121,7 +121,8 @@ npm --prefix website run check       # independent website acceptance
 - **iOS commerce/localization:** one StoreKit owner and export boundary; interface language is
   `IOSAppLanguage`, separate from generated speech. No macOS or CLI paywall.
 - **Privacy:** no PII, private paths, prompts, transcripts, credentials or raw diagnostics in Git.
-  The literal privacy scanner supplements source review; it cannot prove runtime privacy.
+  The literal privacy scanner supplements source review; it cannot prove runtime privacy. Persisted
+  and exported diagnostics record a failure as its `DiagnosticPrivacy` summary, never as error text.
 - **Owned output:** `config/build-output-policy.json` owns caches/artifacts under `build/`.
   Never clear whole caches to resolve contention. Keep failed raw evidence untracked; publish only
   qualified privacy-safe records. Source-bound evidence and signing rules stay in the runbooks.

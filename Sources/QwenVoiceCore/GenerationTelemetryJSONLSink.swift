@@ -67,7 +67,7 @@ public actor GenerationTelemetryJSONLSink {
             try Self.append(data, to: url)
             Self.pruneJSONLFromFront(at: url, maxBytes: Self.maxLogBytes)
         } catch {
-            Self.logError("Could not write telemetry for '\(record.generationID)': \(error.localizedDescription)")
+            Self.logError("Could not write telemetry for '\(record.generationID)': \(DiagnosticPrivacy.summary(of: error))")
         }
     }
 
@@ -105,7 +105,7 @@ public actor GenerationTelemetryJSONLSink {
                 maxTotalBytes: Self.maxSidecarTotalBytes
             )
         } catch {
-            Self.logError("Could not write raw samples for '\(generationID)': \(error.localizedDescription)")
+            Self.logError("Could not write raw samples for '\(generationID)': \(DiagnosticPrivacy.summary(of: error))")
         }
     }
 
@@ -189,10 +189,10 @@ public actor GenerationTelemetryJSONLSink {
             }
         }
         if let pruneError {
-            logError("Could not prune '\(url.lastPathComponent)': \(pruneError.localizedDescription)")
+            logError("Could not prune '\(url.lastPathComponent)': \(DiagnosticPrivacy.summary(of: pruneError))")
         }
         if let coordinatorError {
-            logError("Could not coordinate prune of '\(url.lastPathComponent)': \(coordinatorError.localizedDescription)")
+            logError("Could not coordinate prune of '\(url.lastPathComponent)': \(DiagnosticPrivacy.summary(of: coordinatorError))")
         }
     }
 

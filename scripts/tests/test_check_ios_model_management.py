@@ -285,6 +285,29 @@ class ModelManagementDiagnosisTests(unittest.TestCase):
             codes.index("xcuitest-failed"),
         )
 
+    def test_classifies_typed_error_summaries(self):
+        def diagnose(summary):
+            failure = event(
+                2,
+                event="request-failed",
+                layer="downloader",
+                errorClassification="transfer",
+                errorMessage=summary,
+            )
+            return {finding.code for finding in MODULE.diagnose([failure], [observation()])}
+
+        integrity = diagnose(
+            "download.integrity_failed type=QwenVoiceCore.HuggingFaceDownloader.DownloadError"
+            ".integrityCheckFailed domain=QwenVoiceCore.HuggingFaceDownloader.DownloadError#3"
+        )
+        self.assertIn("downloaded-file-integrity-rejected", integrity)
+        transfer = diagnose(
+            "download.transfer_failed type=QwenVoiceCore.HuggingFaceDownloader.DownloadError"
+            ".httpError domain=QwenVoiceCore.HuggingFaceDownloader.DownloadError#1 http=503"
+        )
+        self.assertIn("download-request-failed", transfer)
+        self.assertNotIn("downloaded-file-integrity-rejected", transfer)
+
     def test_classifies_claimed_completion_without_downstream_resume(self):
         findings = MODULE.diagnose(
             [

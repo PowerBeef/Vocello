@@ -310,7 +310,8 @@ enum IOSDeviceDiagnosticsRunner {
             result.failureReason = error is VoiceCloningConsentRequiredError
                 ? Self.cloneConsentNotRecordedReason
                 : "enrollment-error"
-            result.failureDescription = String(describing: error).prefix(300).description
+            // Enrollment errors name the staged reference path (AUD-08).
+            result.failureDescription = DiagnosticPrivacy.summary(of: error).description
         }
     }
 
@@ -772,7 +773,8 @@ enum IOSDeviceDiagnosticsRunner {
                 await AppGenerationTimeline.shared.recordFailed(id: generationID)
             }
             record.status = "error"
-            record.error = error.localizedDescription
+            // The pullable sentinel keeps the typed summary, not error text (AUD-08).
+            record.error = DiagnosticPrivacy.summary(of: error).description
             let metadata = GenerationFailureDiagnosticLogger.errorMetadata(for: error)
             let evidence = await terminalFailureEvidence(
                 request: diagnosticRequest,
@@ -787,7 +789,7 @@ enum IOSDeviceDiagnosticsRunner {
                 engine: engine
             )
             record.apply(evidence)
-            print("[device-diagnostics] ✗ \(error.localizedDescription)")
+            print("[device-diagnostics] ✗ \(record.error ?? "error")")
         }
 
         record.finishedAt = ISO8601DateFormatter().string(from: Date())
@@ -2546,7 +2548,7 @@ enum IOSDeviceDiagnosticsRunner {
             try data.write(to: url, options: .atomic)
             print("[device-diagnostics] \(label) → \(url.path)")
         } catch {
-            print("[device-diagnostics] could not write \(label): \(error.localizedDescription)")
+            print("[device-diagnostics] could not write \(label): \(DiagnosticPrivacy.summary(of: error))")
         }
     }
 

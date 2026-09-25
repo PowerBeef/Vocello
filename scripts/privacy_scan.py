@@ -11,6 +11,11 @@ The rules are exact and few: a developer home directory (`/Users/<name>/`,
 placeholder, and the fixed shapes of real credentials (complete private-key PEM blocks,
 AWS access keys, GitHub tokens, Slack tokens, App Store Connect key files). Prose
 about these things is fine; the tokens themselves are not.
+
+The scan reads repository text only. It cannot tell whether arbitrary text holds a
+prompt or transcript, and it cannot see what a running app writes: runtime
+diagnostics record failures through `DiagnosticPrivacy` instead
+(docs/reference/privacy-storage.md, Diagnostics).
 """
 from __future__ import annotations
 

@@ -576,7 +576,9 @@ def diagnose(
             candidate for candidate in reversed(events[:index])
             if candidate.get("modelID") == failure.get("modelID")
         ), None)
-        if "failed integrity checks" in message.lower():
+        # The app records a typed error summary whose first token is the failure
+        # code; traces from builds before AUD-08 carried the downloader's text.
+        if message.startswith("download.integrity_failed") or "failed integrity checks" in message.lower():
             findings.append(Finding(
                 "downloaded-file-integrity-rejected",
                 "file-verification",

@@ -709,23 +709,26 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         ]).validated())
     }
 
-    func testDiagnosticsAreBoundedAndRedactURLsAndAbsolutePaths() throws {
+    func testDiagnosticsAreBoundedAndRecordTypedFailuresWithoutErrorText() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let store = ModelDownloadDiagnosticsStore(directory: root)
         let cap = ModelDownloadDiagnosticsStore.maxRetainedRecords
+        let failures = PrivateDiagnosticFixture.failures
         for index in 0..<(cap + 10) {
             store.recordFailure(
                 classification: "network-\(index)",
-                message: "failed at https://example.invalid/private from /Users/example/private/file"
+                error: failures[index % failures.count]
             )
         }
         let files = try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
         XCTAssertLessThanOrEqual(files.count, cap)
         let payload = try files.map { try String(contentsOf: $0, encoding: .utf8) }.joined()
+        PrivateDiagnosticFixture.assertNoPrivateContent(payload)
         XCTAssertFalse(payload.contains("example.invalid"))
-        XCTAssertFalse(payload.contains("/Users/example"))
+        XCTAssertTrue(payload.contains("download.integrity_failed"))
+        XCTAssertTrue(payload.contains("storage.permission_denied"))
     }
 
     func testModelManagementTraceIsCorrelatedOrderedAndRedacted() throws {
@@ -745,7 +748,12 @@ final class ModelDownloadLifecycleTests: XCTestCase {
             artifactVersion: "speed-v1",
             durableBytes: 42,
             totalBytes: 100,
-            errorMessage: "failed at https://example.invalid/private in /private/var/mobile/fixture"
+            error: HuggingFaceDownloader.DownloadError.fileDownloadFailed(
+                path: PrivateDiagnosticFixture.path,
+                underlying: URLError(.networkConnectionLost, userInfo: [
+                    NSURLErrorFailingURLStringErrorKey: "https://example.invalid/private",
+                ])
+            )
         )
         store.recordEvent(
             layer: "ledger",
@@ -777,16 +785,21 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         XCTAssertEqual(rows.map(\.sequence), [1, 2])
         XCTAssertEqual(Set(rows.map(\.processInstanceID)).count, 1)
         XCTAssertEqual(rows.last?.ledgerStatus, "verifying")
-        XCTAssertFalse(rows.first?.errorMessage?.contains("example.invalid") ?? true)
-        XCTAssertFalse(rows.first?.errorMessage?.contains("/private/var") ?? true)
+        let failureSummary = try XCTUnwrap(rows.first?.errorMessage)
+        XCTAssertTrue(failureSummary.hasPrefix("download.transfer_failed "))
+        XCTAssertTrue(failureSummary.contains("underlying=\(NSURLErrorDomain)#\(URLError.Code.networkConnectionLost.rawValue)"))
+        XCTAssertFalse(failureSummary.contains("example.invalid"))
+        PrivateDiagnosticFixture.assertNoPrivateContent(failureSummary)
+        XCTAssertNil(rows.last?.errorMessage)
 
         let attemptRoot = root.appendingPathComponent("attempts", isDirectory: true)
             .appendingPathComponent("ios-run-1", isDirectory: true)
-        store.recordFailure(classification: "network", message: "bounded")
-        XCTAssertTrue(try FileManager.default.contentsOfDirectory(
+        store.recordFailure(classification: "network", error: URLError(.timedOut))
+        let attemptJournal = try XCTUnwrap(FileManager.default.contentsOfDirectory(
             at: attemptRoot,
             includingPropertiesForKeys: nil
-        ).contains { $0.pathExtension == "jsonl" })
+        ).first { $0.pathExtension == "jsonl" })
+        XCTAssertTrue(try String(contentsOf: attemptJournal, encoding: .utf8).contains("network.request_failed"))
     }
 
     func testModelManagementTraceRetentionCoversOneWorstCaseTransferAndStaysBounded() {

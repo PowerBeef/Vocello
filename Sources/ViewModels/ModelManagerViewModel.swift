@@ -802,7 +802,7 @@ final class ModelManagerViewModel {
                     directory: modelsDirectory
                         .deletingLastPathComponent()
                         .appendingPathComponent("diagnostics/model-downloads", isDirectory: true)
-                ).recordFailure(classification: "download", message: dlError.localizedDescription)
+                ).recordFailure(classification: "download", error: dlError)
                 lastFailureMessages[model.id] = dlError.localizedDescription
             }
         } catch {
@@ -811,7 +811,7 @@ final class ModelManagerViewModel {
                 directory: modelsDirectory
                     .deletingLastPathComponent()
                     .appendingPathComponent("diagnostics/model-downloads", isDirectory: true)
-            ).recordFailure(classification: "download", message: error.localizedDescription)
+            ).recordFailure(classification: "download", error: error)
             lastFailureMessages[model.id] = error.localizedDescription
         }
         await handleMutationCompletion(for: model.id)

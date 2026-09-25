@@ -2193,7 +2193,9 @@ private actor NativeDiagnosticEventJSONLWriter {
             bundleIdentifier: Bundle.main.bundleIdentifier ?? "unknown",
             processIdentifier: ProcessInfo.processInfo.processIdentifier,
             processName: ProcessInfo.processInfo.processName,
-            details: details
+            // Loader and runtime events name prepared and source model
+            // directories by absolute path (AUD-08).
+            details: DiagnosticPrivacy.redactedDetails(details)
         )
 
         do {
@@ -2205,7 +2207,7 @@ private actor NativeDiagnosticEventJSONLWriter {
             data.append(0x0A)
             try append(data, to: url)
         } catch {
-            print("[NativeDiagnosticEventJSONLWriter] Could not write native event '\(name)': \(error.localizedDescription)")
+            print("[NativeDiagnosticEventJSONLWriter] Could not write native event '\(name)': \(DiagnosticPrivacy.summary(of: error))")
         }
     }
 

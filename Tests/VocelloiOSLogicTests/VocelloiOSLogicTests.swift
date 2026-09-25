@@ -696,14 +696,19 @@ final class VocelloiOSLogicTests: XCTestCase {
         XCTAssertEqual(foreignCompletions, 0)
     }
 
-    func testFailureDiagnosticsRedactPrivateRoutes() throws {
+    func testFailureDiagnosticsRecordTypedSummaryWithoutPrivateRoutes() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let store = ModelDownloadDiagnosticsStore(directory: root)
+        let stagedPath = "/private/var/mobile/fixture/Tell Mara the vault.part"
         store.recordFailure(
             classification: "network/failure",
-            message: "request https://example.invalid/private failed in /private/var/mobile/fixture"
+            error: NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut, userInfo: [
+                NSLocalizedDescriptionKey: "request https://example.invalid/private failed in \(stagedPath)",
+                NSURLErrorFailingURLStringErrorKey: "https://example.invalid/private",
+                NSFilePathErrorKey: stagedPath,
+            ])
         )
 
         let file = try XCTUnwrap(
@@ -711,9 +716,10 @@ final class VocelloiOSLogicTests: XCTestCase {
         )
         let text = try String(contentsOf: file, encoding: .utf8)
         XCTAssertFalse(text.contains("example.invalid"))
-        XCTAssertFalse(text.contains("/private/var"))
-        XCTAssertTrue(text.contains("redacted-url"))
-        XCTAssertTrue(text.contains("redacted-path"))
+        XCTAssertFalse(text.contains("private/var"))
+        XCTAssertFalse(text.contains("Mara"))
+        XCTAssertTrue(text.contains("network.request_failed"))
+        XCTAssertTrue(text.contains("NSURLErrorDomain#\(NSURLErrorTimedOut)"))
     }
 
     func testModelProgressPresentationUsesExactDurableByteFraction() {

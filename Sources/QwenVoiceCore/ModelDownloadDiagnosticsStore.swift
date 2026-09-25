@@ -1,7 +1,8 @@
 import Foundation
 
 /// Compact local-only diagnostics for model delivery. The allowlisted schema cannot contain
-/// request URLs, filesystem paths, device identity, model prompts, or user content.
+/// request URLs, filesystem paths, device identity, model prompts, or user content: a failure
+/// is recorded as its `DiagnosticPrivacy` summary, never as error text (AUD-08).
 public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
     /// Schema-versioned, privacy-safe event used by the model-management diagnostic lane. The
     /// schema deliberately has no URL or filesystem-path field.
@@ -230,7 +231,7 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         ledgerStatus: String? = nil,
         outcome: String? = nil,
         errorClassification: String? = nil,
-        errorMessage: String? = nil
+        error: (any Error)? = nil
     ) {
         lock.lock()
         guard let runID = traceRunID else {
@@ -267,7 +268,7 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
             ledgerStatus: Self.safeIdentifier(ledgerStatus),
             outcome: Self.safeIdentifier(outcome),
             errorClassification: Self.safeIdentifier(errorClassification),
-            errorMessage: errorMessage.map(sanitizeMessage)
+            errorMessage: error.map { DiagnosticPrivacy.summary(of: $0).description }
         )
         persistTrace(record)
     }
@@ -405,12 +406,14 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         ))
     }
 
-    public func recordFailure(classification: String, message: String) {
+    /// Records a failure as its typed `DiagnosticPrivacy` summary. The error's text is never
+    /// stored: a file error names the file and a transfer error its request.
+    public func recordFailure(classification: String, error: any Error) {
         persist(Record(
             capturedAtUTC: ISO8601DateFormatter().string(from: Date()),
             kind: "failure",
             classification: sanitizeToken(classification),
-            message: sanitizeMessage(message)
+            message: DiagnosticPrivacy.summary(of: error).description
         ))
     }
 
@@ -559,20 +562,6 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-"))
         guard trimmed.unicodeScalars.allSatisfy({ allowed.contains($0) }) else { return nil }
         return trimmed
-    }
-
-    private func sanitizeMessage(_ value: String) -> String {
-        let withoutURLs = value.replacingOccurrences(
-            of: #"[A-Za-z][A-Za-z0-9+.-]*://\S+"#,
-            with: "<redacted-url>",
-            options: .regularExpression
-        )
-        let withoutPaths = withoutURLs.replacingOccurrences(
-            of: #"/(?:Users|private|var|tmp)/\S+"#,
-            with: "<redacted-path>",
-            options: .regularExpression
-        )
-        return String(withoutPaths.prefix(500))
     }
 
     private func resetRunStateLocked() {

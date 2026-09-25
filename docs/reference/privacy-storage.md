@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-12
+reviewed: 2026-09-24
 summary: Local-first privacy and on-disk storage layout on both platforms — app transfers, operating-system backups, and deletion semantics.
 sourceOfTruth:
   - Sources/SharedSupport
@@ -53,7 +53,7 @@ Maintained macOS subtrees and preferences:
   rebuildable prepared-model overlay (symlinks to the model's files plus its sanitized config) lives
   in `cache/native_mlx/prepared_models/`, never in the model folder, and is removed with its model.
 - `.qwenvoice-downloads/` stores staged model downloads, partial files, resume data, and completed-range sidecars while a download is in progress. A download that reuses shared components holds a hard link to each reused blob here (no extra disk space).
-- `diagnostics/model-downloads/` stores allowlisted transfer/failure summaries, capped at 200 records and 5 MB; raw URLs and absolute paths are excluded.
+- `diagnostics/model-downloads/` stores allowlisted transfer/failure summaries, capped at 200 records and 5 MB. A failure is its typed error summary, so error text, raw URLs and absolute paths are excluded (see [Diagnostics](#diagnostics)).
 - `outputs/CustomVoice/`, `outputs/VoiceDesign/`, and `outputs/Clones/` store generated audio unless the user chooses a different output directory. If a user-chosen directory becomes missing or unwritable, new audio falls back to these default folders and Settings shows a warning — a generation is never lost to a vanished folder.
 - `outputs/bench-archive/` (one folder per run ID; debug-store only; created by `vocello bench --delivery`) retains each delivery benchmark run's take WAVs and result/prosody/quality manifests as the durable measurement evidence. Local-only, never tracked or uploaded; unbounded, prune manually ([`delivery-harness.md`](delivery-harness.md) §3).
 - `voices/` stores committed saved-voice reference assets (the source audio format plus an optional `.txt` transcript sidecar). Each voice is individually deletable; deleting a voice-bank member does not delete its siblings.
@@ -273,11 +273,43 @@ Diagnostics should be user-initiated. The app may write local logs or exportable
 
 `scripts/privacy_scan.py` is a deterministic lexical check supporting these rules. It runs inside
 `./scripts/check_project_inputs.sh` (the `contracts` lane of `scripts/dev.sh check`) and the CI
-`contracts` job and rejects known private-path and credential patterns and credential file types.
-It cannot prove that arbitrary text is free of prompts or transcripts, or determine the values of
-runtime log interpolation. Review error descriptions and logging boundaries separately; typed,
-allowlisted diagnostic records provide stronger guarantees than this source scan. AUD-08 tracks the
-remaining runtime-log review and regression coverage.
+`contracts` job and rejects known private-path and credential patterns and credential file types
+in repository text. It cannot prove that arbitrary text is free of prompts or transcripts, and it
+cannot see what a running app writes.
+
+Runtime diagnostics go through one projection instead (AUD-08): `DiagnosticPrivacy` in
+`Sources/QwenVoiceCore/DiagnosticPrivacy.swift`. Error text is not safe to keep. A file error's
+`localizedDescription` quotes the file name and its reflected description adds the absolute path;
+generated output names begin with the script; a wrapped error can quote a prompt or transcript. A
+persisted or exported diagnostic therefore records a failure as its typed summary, never as error
+text. The summary holds the `GenerationFailureDiagnosticLogger.errorMetadata` code, the error type
+and enum case, the `NSError` domain and code, the domains and codes of the errors it wraps, the
+runtime stage and an HTTP status. Text a diagnostic must keep, such as an exception reason or a
+runtime detail value, passes through `redactedText` or `redactedDetails`. They remove URLs, email
+addresses, quoted names and absolute or home-relative paths. That redaction is best effort: it
+cannot recognize an unquoted prompt. The persisted boundaries that use it:
+
+- the model-download store (`diagnostics/model-downloads/`, with its internal-diagnostics attempt
+  and trace journals): failure records and trace `errorMessage` values are typed summaries;
+- the internal device-diagnostics recorder (`diagnostics/<run>/manifest.json` and
+  `memory-contexts.jsonl`, in the App Group and its pullable Caches mirror): the manifest names no
+  store root, and action messages are code-owned or typed summaries, redacted again on write;
+- the engine's internal `native-events.jsonl`: detail values are redacted, so the prepared and
+  source model directories appear as `<redacted-path>`;
+- the internal device-diagnostics run sentinels (`error`, `failureDescription`) and the internal
+  StoreKit record `commerce/last-purchase-error.json` (schema v2): typed summaries;
+- the iPhone crash observer's uncaught-exception record: a redacted reason, with the exception name
+  and call stack kept for symbolication.
+
+`generation-failures.jsonl` below and the generation telemetry records were already typed;
+telemetry keeps only a failure message's length and digest. Unified-log calls (`os_log`, `Logger`)
+mark only code-owned identifiers and numbers public, and the crash observer's write failure logs a
+typed summary. The app does not persist console output (`print`, standard error). The diagnostics
+writers print typed summaries; other console sites still print error text. Messages shown in the
+interface are not diagnostics and are unchanged. Regression tests pass synthetic failures carrying a
+home-directory path, a script-derived output name, a prompt and a transcript through each tested
+boundary and assert that none of them is retained (`GenerationFailureDiagnosticLoggerTests`,
+`ModelDownloadLifecycleTests`, `IOSCommercePresentationTests`).
 
 When runtime telemetry is explicitly enabled, `generation-failures.jsonl` is a privacy-reduced
 schema-v3 support log capped at 200 entries and 256 KiB; schema-v2 rows remain decodable. It stores

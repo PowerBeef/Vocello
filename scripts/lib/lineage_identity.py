@@ -110,7 +110,11 @@ LANGUAGE_VERIFICATION = (
     "scripts/independent_asr.py",
     "scripts/lib/language_metrics.py",
 )
-PROFILE_SUMMARY = ("scripts/lib/profile_trace_retention.py",)
+PROFILE_SUMMARY = (
+    "scripts/lib/profile_trace_retention.py",
+    # The per-take decode-loop interval statistics and their completeness check.
+    "scripts/lib/trace_intervals.py",
+)
 
 LINEAGE_PATHS: dict[tuple[str, str], tuple[str, ...]] = {
     ("ui-generation", "macos"): (
@@ -188,7 +192,13 @@ CORPUS_FREE_KINDS = frozenset({"ui-perf"})
 # The reviewed measurement version of each kind and platform. Bump one when a
 # change alters what that kind measures (release.md "Records measure what they
 # claim"); a bump starts a new lineage and never rewrites a stored key.
-LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {key: 1 for key in LINEAGE_PATHS}
+LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
+    **{key: 1 for key in LINEAGE_PATHS},
+    # 2 (2026-09-26, audit #12/#99): the CPU profile records three warm takes
+    # instead of one on a quiet host, and publishes per-take decode-loop
+    # interval statistics that must pass the 36 x (tokens + 1) completeness check.
+    ("instrument-profile", "macos"): 2,
+}
 
 # (scheme, extra root targets) whose project.yml subset each lane builds;
 # None when the lane builds nothing.

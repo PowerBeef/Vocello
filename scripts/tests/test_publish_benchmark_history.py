@@ -3254,6 +3254,143 @@ class PublisherTests(unittest.TestCase):
                 },
             )
 
+    @staticmethod
+    def interval_export(*, generated_tokens: int, dropped: int = 0) -> str:
+        """An os-signpost-interval export shaped like xctrace's: a column schema,
+        values defined once with `id` and reused with `ref`, one correlated
+        generation-stream interval and the engine loop inside it."""
+        message = "runID=profile-run generationID=gen-1 takeIndex=1 cell=custom/speed/medium/warm#0"
+        columns = ("start", "duration", "process", "subsystem", "category", "name", "start-message")
+        schema = "".join(f"<col><mnemonic>{name}</mnemonic></col>" for name in columns)
+        rows = [
+            # The take window, correlated by its start message.
+            "<row><start-time>1000000</start-time><duration>900000000</duration>"
+            "<process id='p' fmt='vocello (4242)'><pid id='pp' fmt='4242'>4242</pid></process>"
+            "<subsystem id='se' fmt='com.qwenvoice.engine'>com.qwenvoice.engine</subsystem>"
+            "<category id='cg' fmt='generation'>generation</category>"
+            "<signpost-name fmt='Native Generation Stream'>Native Generation Stream</signpost-name>"
+            f"<os-log-metadata fmt='{message}'/></row>",
+            # A prewarm loop interval before the window: an orphan.
+            "<row><start-time>0</start-time><duration>100000</duration><process ref='p'/>"
+            "<subsystem id='sq' fmt='com.qwenvoice.engine.qwen3'>com.qwenvoice.engine.qwen3</subsystem>"
+            "<category ref='cg'/><signpost-name fmt='Talker Forward'>Talker Forward</signpost-name>"
+            "<sentinel/></row>",
+            # Another process's interval inside the window is not the target's.
+            "<row><start-time>2000000</start-time><duration>100000</duration>"
+            "<process fmt='other (9999)'><pid fmt='9999'>9999</pid></process>"
+            "<subsystem ref='sq'/><category ref='cg'/>"
+            "<signpost-name fmt='Talker Forward'>Talker Forward</signpost-name><sentinel/></row>",
+        ]
+        names: list[str] = []
+        for _ in range(generated_tokens + 1):
+            for name, multiplicity in publisher.trace_intervals.LOOP_STEP_INTERVALS.items():
+                names.extend([name] * multiplicity)
+            names.append("Token Read")
+        loop_names = [name for name in names if name != "Token Read"]
+        drop_from = len(loop_names) - dropped
+        kept = []
+        loop_seen = 0
+        for name in names:
+            if name != "Token Read":
+                loop_seen += 1
+                if loop_seen > drop_from:
+                    continue
+            kept.append(name)
+        defined: set[str] = set()
+        start = 10_000_000
+        for index, name in enumerate(kept):
+            key = name.replace(" ", "-").lower()
+            name_element = (
+                f"<signpost-name ref='{key}'/>" if key in defined
+                else f"<signpost-name id='{key}' fmt='{name}'>{name}</signpost-name>"
+            )
+            defined.add(key)
+            duration = "<duration ref='d'/>" if index else "<duration id='d'>400000</duration>"
+            rows.append(
+                f"<row><start-time>{start}</start-time>{duration}<process ref='p'/>"
+                f"<subsystem ref='sq'/><category ref='cg'/>{name_element}<sentinel/></row>"
+            )
+            start += 1_000_000
+        return (
+            "<trace-query-result><node>"
+            f"<schema name='os-signpost-interval'>{schema}</schema>"
+            + "".join(rows)
+            + "</node></trace-query-result>"
+        )
+
+    def extract_intervals(self, *, dropped: int = 0, require_complete: bool = True) -> dict:
+        trace = self.root / "profile-intervals.trace"
+        trace.mkdir(exist_ok=True)
+        message = "runID=profile-run generationID=gen-1 takeIndex=1 cell=custom/speed/medium/warm#0"
+
+        def fake_export(command, **_kwargs):
+            output = Path(command[command.index("--output") + 1])
+            xpath = command[command.index("--xpath") + 1]
+            if "time-profile" in xpath:
+                xml = """<trace-query-result>
+                <row><process pid='4242'/><sample-time>1000000</sample-time><weight>1000000</weight></row>
+                <row><process pid='4242'/><sample-time>4000000</sample-time><weight>1000000</weight></row>
+                </trace-query-result>"""
+            elif "os-signpost-interval" in xpath:
+                xml = self.interval_export(generated_tokens=2, dropped=dropped)
+            else:
+                xml = f"""<trace-query-result><node>
+                <schema name='os-signpost'><col><mnemonic>time</mnemonic></col>
+                <col><mnemonic>event-type</mnemonic></col><col><mnemonic>process</mnemonic></col>
+                <col><mnemonic>message</mnemonic></col></schema>
+                <row><event-time>1000000</event-time><event-type id='b' fmt='Begin'>Begin</event-type>
+                <process pid='4242'/><os-log-metadata fmt='{message}'/></row>
+                <row><event-time>901000000</event-time><event-type fmt='End'>End</event-type>
+                <process pid='4242'/><os-log-metadata fmt='{message}'/></row>
+                <row><event-time>5000000</event-time><event-type fmt='Event'>Event</event-type>
+                <process pid='4242'/><os-log-metadata fmt='{message}'/></row>
+                </node></trace-query-result>"""
+            output.write_text(xml, encoding="utf-8")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with mock.patch.object(publisher.subprocess, "run", side_effect=fake_export):
+            return publisher.extract_trace_data_summary(
+                trace, {"time-profile", "os-signpost", "os-signpost-interval"},
+                run_id="profile-run", target_pid=4242,
+                expected_correlations={("gen-1", 1, "custom/speed/medium/warm#0")},
+                take_expectations={
+                    ("gen-1", 1, "custom/speed/medium/warm#0"): {
+                        "generatedTokens": 2,
+                        "timingsMS": {"qwen_talker_forward_total": 1},
+                    },
+                },
+                require_complete_intervals=require_complete,
+            )
+
+    def test_trace_summary_publishes_per_take_loop_interval_statistics(self) -> None:
+        summary = self.extract_intervals()
+        # The window row, the prewarm orphan and 3 steps of 36 + Token Read.
+        self.assertEqual(summary["capturedRowsBySchema"]["os-signpost-interval"], 2 + 3 * 37)
+        self.assertEqual(summary["signpostIntervalCount"], 2 + 3 * 37)
+        self.assertEqual(
+            (summary["signpostBeginCount"], summary["signpostEndCount"], summary["signpostPointCount"]),
+            (1, 1, 1),
+        )
+        self.assertEqual(summary["orphanIntervalCount"], 1)
+        self.assertEqual(summary["signpostSummaryVersion"], 1)
+        take = summary["intervalStatistics"]["takes"][0]
+        self.assertEqual(take["takeIndex"], 1)
+        self.assertEqual(take["loopSteps"], 3)
+        self.assertEqual(take["expectedLoopIntervalCount"], 108)
+        self.assertEqual(take["loopIntervalCount"], 108)
+        self.assertTrue(take["complete"])
+        self.assertEqual(take["intervals"]["tokenRead"]["count"], 3)
+        self.assertEqual(take["intervals"]["talkerForward"]["totalMS"], 1.2)
+        self.assertEqual(take["witness"]["comparedCount"], 1)
+        self.assertEqual(take["witness"]["outsideToleranceCount"], 0)
+        self.assertEqual(take["windowMS"], 900.0)
+
+    def test_a_macos_trace_short_of_the_loop_intervals_is_refused(self) -> None:
+        with self.assertRaisesRegex(publisher.PublicationError, r"take 1 has 107 of 108"):
+            self.extract_intervals(dropped=1)
+        summary = self.extract_intervals(dropped=1, require_complete=False)
+        self.assertFalse(summary["intervalStatistics"]["takes"][0]["complete"])
+
 
 if __name__ == "__main__":
     unittest.main()

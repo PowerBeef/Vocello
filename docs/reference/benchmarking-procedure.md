@@ -488,6 +488,19 @@ scripts/macos_test.sh profile --kind memory custom:speed:
 scripts/macos_test.sh profile --keep-trace custom:speed:
 ```
 
+The CPU profile records one cold and three warm medium takes; both kinds refuse a busy host
+(`require_quiet_host`) and a dirty tree (`--allow-dirty` records an exploratory profile of
+uncommitted source). Publication streams each exported table once and publishes, beside the row
+counts, a versioned signpost block: interval, begin, end and point counts, the orphan intervals
+outside every take, the trace's recorded duration and, per take, statistics of the engine's
+decode-loop intervals (count, total, median, p95, max per interval name, `Token Read` included)
+assigned by containment in the take's window, from the end of its correlated prepare interval to
+the end of its correlated `Native Generation Stream` interval. Each decode
+step emits 36 loop intervals, so a take that ran `tokens + 1` steps must keep 36 x (tokens + 1); a
+macOS take short of that fails publication, an iPhone take is published with `complete: false`.
+Each take also reports how many interval sums drifted from the engine's own JSONL totals
+(`scripts/lib/trace_intervals.py`); that witness only reports.
+
 The macOS memory profile records one cold long take. This captures model-load plus sustained
 allocation/VM peaks. The lane uses Apple's Allocations template for its Allocations and VM Tracker
 tracks because that template disables automatic VM snapshots; adding standalone VM Tracker to a

@@ -1760,6 +1760,71 @@ class BenchmarkHistoryTests(unittest.TestCase):
             with self.assertRaises(history.HistoryError):
                 self.publish(record, f"profile-invalid-{index}")
 
+    def test_versioned_signpost_block_validates_and_macos_takes_must_be_complete(self) -> None:
+        correlation = ("gen-1", 1, "custom/speed/medium/warm#0")
+        steps = 3
+        engine = []
+        cursor = 1_000_000.0
+        for _ in range(steps):
+            for name, multiplicity in history.trace_intervals.LOOP_STEP_INTERVALS.items():
+                for _ in range(multiplicity):
+                    engine.append(history.trace_intervals.Interval(name, cursor, 400_000.0))
+                    cursor += 1_000_000.0
+        takes, orphans = history.trace_intervals.interval_statistics(
+            correlated={correlation: [(
+                "Native Generation Stream",
+                history.trace_intervals.Interval("Native Generation Stream", 0.0, 1e10),
+            )]},
+            engine_intervals=engine,
+            expectations={correlation: {"generatedTokens": steps - 1, "timingsMS": {}}},
+        )
+        interval_rows = len(engine) + 1
+        summary = {
+            **trace_summary(),
+            "capturedRowsBySchema": {
+                "cpu-profile": 12, "os-signpost": 4, "os-signpost-interval": interval_rows,
+            },
+            "capturedDataRowCount": 16 + interval_rows,
+            "signpostEventCount": 4 + interval_rows,
+            "signpostSummaryVersion": 1,
+            "signpostIntervalCount": interval_rows,
+            "signpostBeginCount": 1,
+            "signpostEndCount": 1,
+            "signpostPointCount": 2,
+            "orphanIntervalCount": orphans,
+            "recordedDurationSeconds": 12.5,
+            "intervalStatistics": {"version": 1, "takes": takes},
+        }
+
+        def record(platform: str, candidate: dict) -> dict:
+            return {
+                "schemaVersion": 2,
+                "run": {"platform": platform},
+                "takes": [{"takeIndex": 1}],
+                "evidence": {"trace": {
+                    "digest": "f" * 64, "template": "CPU Profiler + os_signpost",
+                    "durationSeconds": 90, "validated": True, "summary": candidate,
+                }},
+            }
+
+        history.validate_trace_summary(record("macos", summary))
+        incomplete = copy.deepcopy(summary)
+        entry = incomplete["intervalStatistics"]["takes"][0]
+        entry.update(loopIntervalCount=entry["expectedLoopIntervalCount"] - 1, complete=False)
+        with self.assertRaisesRegex(history.HistoryError, "lost loop intervals"):
+            history.validate_trace_summary(record("macos", incomplete))
+        # An iPhone profile keeps the shortfall on the record instead.
+        history.validate_trace_summary(record("ios", incomplete))
+        for index, change in enumerate((
+            lambda value: value.pop("orphanIntervalCount"),
+            lambda value: value.__setitem__("signpostIntervalCount", interval_rows - 1),
+            lambda value: value["intervalStatistics"]["takes"][0].__setitem__("takeIndex", 2),
+        )):
+            broken = copy.deepcopy(summary)
+            change(broken)
+            with self.subTest(index=index), self.assertRaises(history.HistoryError):
+                history.validate_trace_summary(record("macos", broken))
+
     def profile_producer_manifest(self, run_id: str, *, quality: bool, policy: str) -> dict:
         """Exercise the production schema selector and retention writer together."""
         fixture = record_fixture(run_id=run_id, kind="instrument-profile")

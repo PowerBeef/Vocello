@@ -18,7 +18,7 @@
 #   scripts/macos_test.sh crashes [--test]          # collect + xcsym-symbolicate .ips (app)
 #   scripts/macos_test.sh debug                     # LLDB attach guidance (app PID)
 #   scripts/macos_test.sh logs                      # retained os_log → build/artifacts/macos/logs/<run>.log
-#   scripts/macos_test.sh profile [--kind cpu|memory] [--keep-trace] [spec]
+#   scripts/macos_test.sh profile [--kind cpu|memory] [--keep-trace] [--allow-dirty] [spec]
 #                                                    # exact-PID xctrace vocello bench
 #   scripts/macos_test.sh memory [--label ID]        # retained-memory qualification sequence
 #   scripts/macos_test.sh gate                      # inputs → build_foundation → test → crashes
@@ -399,11 +399,17 @@ cmd_logs() {
   note "saved $out"
 }
 
-# profile [--kind cpu|memory] [spec]: Instruments/xctrace trace of a headless generation via the `vocello` CLI
-# (engine in-process, the same engine code the app runs). The engine emits OSSignpost
-# intervals under subsystem com.qwenvoice.app,
-# category 'performance'. The CPU lane records CPU Profiler + os_signpost. The memory
-# lane also records Allocations + VM Tracker in that same trace. QVOICE_MAC_PROFILE_DURATION
+# profile [--kind cpu|memory] [--keep-trace] [--allow-dirty] [spec]: Instruments/xctrace trace
+# of a headless generation via the `vocello` CLI (engine in-process, the same engine code the
+# app runs). The engine emits os_signpost intervals under subsystem com.qwenvoice.engine
+# (categories 'runtime' and 'generation': the take-correlated prepare and generation-stream
+# intervals) and com.qwenvoice.engine.qwen3 (category 'generation': the decode loop, 36
+# intervals per step plus Token Read). The record publishes per-take statistics of those
+# loop intervals, which must pass the 36 x (tokens + 1) completeness check (audit #12).
+# The CPU lane records CPU Profiler + os_signpost over one cold and three warm medium takes
+# (audit #99). The memory lane also records Allocations + VM Tracker in that same trace.
+# Both need a quiet host and a clean tree (--allow-dirty records an exploratory profile of
+# uncommitted source). QVOICE_MAC_PROFILE_DURATION
 # controls the capture window (seconds, default 90); QVOICE_MAC_MEMORY_PROFILE_DURATION
 # overrides the memory safety cap (default 180). QVOICE_MAC_PROFILE_GRACE_TIMEOUT bounds target/tracer
 # shutdown after the requested capture window (default 30 seconds for CPU, 60 for memory).
@@ -412,17 +418,24 @@ cmd_logs() {
 cmd_profile() {
   local kind="cpu"
   local spec=""
-  local keep_trace=0
+  local keep_trace=0 allow_dirty=0
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --kind) kind="${2:-}"; shift 2 ;;
       --kind=*) kind="${1#*=}"; shift ;;
       --keep-trace) keep_trace=1; shift ;;
-      -*) die "unknown profile flag: $1 (try --kind cpu|memory [--keep-trace])" ;;
+      --allow-dirty) allow_dirty=1; shift ;;
+      -*) die "unknown profile flag: $1 (try --kind cpu|memory [--keep-trace] [--allow-dirty])" ;;
       *) [[ -z "$spec" ]] || die "profile accepts one generation spec"; spec="$1"; shift ;;
     esac
   done
   case "$kind" in cpu|memory) ;; *) die "profile kind must be cpu or memory" ;; esac
+  # A profile is a timing witness only on committed source (audit #99): five of
+  # the first six profile records came from dirty trees.
+  if (( allow_dirty == 0 )) \
+    && [[ -n "$(git -C "$ROOT_DIR" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ]]; then
+    die "profile needs a clean tree; commit first, or pass --allow-dirty for an exploratory profile"
+  fi
   spec="${spec:-custom:speed:Profile headless generation.}"
   [[ "$spec" == *:* ]] || spec="custom:speed:$spec"
   local mode="${spec%%:*}"
@@ -449,7 +462,9 @@ cmd_profile() {
   fi
   instrument_args+=(--instrument os_signpost)
   local duration="${QVOICE_MAC_PROFILE_DURATION:-90}"
-  local profile_length="medium" profile_warm="1"
+  # Three warm takes, so a profile's per-take interval statistics are not one
+  # sample (audit #99).
+  local profile_length="medium" profile_warm="3"
   [[ "$kind" != "memory" ]] || duration="${QVOICE_MAC_MEMORY_PROFILE_DURATION:-180}"
   if [[ "$kind" == "memory" ]]; then
     # Retention has its own multi-take lane. The Instruments memory lane focuses
@@ -516,7 +531,7 @@ cmd_profile() {
   capture_benchmark_source "$artifacts"
   local profile_label="instrument-${kind}-profile"
   note "profile: kind=$kind, instruments='$capture_instruments', ${duration}s, vocello bench (mode=$mode variant=$variant length=$profile_length warm=$profile_warm) — engine in-process"
-  note "(engine OSSignpost intervals: subsystem com.qwenvoice.engine, category 'runtime')"
+  note "(engine os_signpost intervals: subsystems com.qwenvoice.engine and com.qwenvoice.engine.qwen3)"
   # Start one owned shell process suspended, attach Instruments to that exact PID, then
   # exec the exact CLI binary in place. The PID survives exec, so trace TOC validation
   # proves the capture belongs to this run rather than another process with the same name.
@@ -1592,7 +1607,12 @@ main() {
     crashes) cmd_crashes "$@" ;;
     debug)   cmd_debug "$@" ;;
     logs)    cmd_logs "$@" ;;
-    profile) cmd_profile "$@" ;;
+    profile)
+      # Profiles publish per-take interval statistics, a timing witness, so
+      # they refuse a busy host like the other timing lanes (audit #99).
+      require_quiet_host macos-profile || die "profiling needs a quiet host"
+      cmd_profile "$@"
+      ;;
     memory)
       require_build_free_space memory-qualification \
         || die "macOS memory qualification storage preflight failed"

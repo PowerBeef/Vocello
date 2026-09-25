@@ -41,6 +41,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from lib import rtf as rtf_semantics  # noqa: E402
+from lib import trace_intervals  # noqa: E402
 from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
 from lib.audio_qc import (  # noqa: E402
     SUCCESS_FINISH,
@@ -3364,22 +3365,6 @@ def _element_pid(element: ET.Element) -> int | None:
     return None
 
 
-def _process_reference_pids(root: ET.Element) -> dict[str, int]:
-    references: dict[str, int] = {}
-    for element in root.iter():
-        if _xml_tag(element) != "process":
-            continue
-        pid = _element_pid(element)
-        if pid is None:
-            for child in element:
-                if (pid := _element_pid(child)) is not None:
-                    break
-        identifier = element.get("id")
-        if identifier and pid is not None:
-            references[identifier] = pid
-    return references
-
-
 def _row_process_pid(row: ET.Element, references: dict[str, int]) -> int | None:
     if (direct := _element_pid(row)) is not None:
         return direct
@@ -3396,6 +3381,200 @@ def _row_process_pid(row: ET.Element, references: dict[str, int]) -> int | None:
     return next(iter(observed)) if len(observed) == 1 else None
 
 
+_TRACE_NUMERIC_TAGS = frozenset({
+    "sample-time", "weight", "cycle-weight", "start-time", "duration", "event-time",
+})
+_SIGNPOST_EVENT_TYPES = {"begin": "begin", "end": "end", "event": "point", "point": "point"}
+
+
+class _TraceTableScan:
+    """One streaming pass over one exported xctrace table (audit #100).
+
+    xctrace writes each repeated value once, with an ``id``, and later rows
+    point back to it with ``ref``. References always point backwards, so one
+    pass that remembers what each ``id`` resolved to can drop every row once it
+    is read instead of holding the whole document. Resolved text is kept only
+    for signpost tables, where the correlation and interval names live.
+    """
+
+    def __init__(
+        self,
+        *,
+        schema: str,
+        run_id: str,
+        target_pid: int,
+        expected_correlations: set[tuple[str, int, str]],
+    ) -> None:
+        self.schema = schema
+        self.run_id = run_id
+        self.target_pid = target_pid
+        self.expected_correlations = expected_correlations
+        self.signposts = "signpost" in schema.lower()
+        self.intervals = schema.lower() == "os-signpost-interval"
+        self.events = schema.lower() == "os-signpost"
+        self.cpu = schema in {"cpu-profile", "time-profile"}
+        self.rows = 0
+        self.cpu_sample_times_ns: list[float] = []
+        self.cpu_weights_ns: list[float] = []
+        self.cpu_cycle_weights: list[float] = []
+        self.correlated_rows = 0
+        self.observed_correlations: set[tuple[str, int, str]] = set()
+        self.event_counts = {"begin": 0, "end": 0, "point": 0}
+        # (name, subsystem, start ns, duration ns, correlation or None)
+        self.interval_rows: list[tuple[str, str, float, float, tuple[str, int, str] | None]] = []
+        self._columns: list[str] = []
+        self._text_by_id: dict[str, str] = {}
+        self._number_by_id: dict[tuple[str, str], float] = {}
+        self._pid_by_id: dict[str, int] = {}
+
+    def _resolved_text(self, element: ET.Element) -> str:
+        reference = element.get("ref")
+        if reference is not None:
+            return self._text_by_id.get(reference, "")
+        rendered = element.get("fmt")
+        if rendered:
+            return rendered
+        pieces = [element.text.strip()] if element.text and element.text.strip() else []
+        pieces.extend(
+            value for child in element if (value := self._resolved_text(child))
+        )
+        return " ".join(pieces)
+
+    def _number(self, element: ET.Element | None) -> float | None:
+        if element is None:
+            return None
+        reference = element.get("ref")
+        if reference is not None:
+            return self._number_by_id.get((element.tag.rsplit("}", 1)[-1], reference))
+        try:
+            return float((element.text or "").strip())
+        except ValueError:
+            return None
+
+    def _remember(self, element: ET.Element) -> None:
+        identifier = element.get("id")
+        if not identifier:
+            return
+        tag = element.tag.rsplit("}", 1)[-1]
+        if tag in _TRACE_NUMERIC_TAGS:
+            try:
+                self._number_by_id[(tag, identifier)] = float((element.text or "").strip())
+            except ValueError:
+                pass
+        if _xml_tag(element) == "process":
+            pid = _element_pid(element)
+            if pid is None:
+                for child in element:
+                    if (pid := _element_pid(child)) is not None:
+                        break
+            if pid is not None:
+                self._pid_by_id[identifier] = pid
+        if self.signposts:
+            self._text_by_id[identifier] = self._resolved_text(element)
+
+    def _column(self, row: ET.Element, mnemonic: str, *tags: str) -> ET.Element | None:
+        children = list(row)
+        if self._columns and len(children) == len(self._columns) and mnemonic in self._columns:
+            return children[self._columns.index(mnemonic)]
+        return next(
+            (child for child in children if child.tag.rsplit("}", 1)[-1] in tags), None
+        )
+
+    def _row(self, row: ET.Element) -> None:
+        if _row_process_pid(row, self._pid_by_id) != self.target_pid:
+            return
+        self.rows += 1
+        if self.cpu:
+            fields = [("sample-time", self.cpu_sample_times_ns)]
+            fields.append(
+                ("cycle-weight", self.cpu_cycle_weights)
+                if self.schema == "cpu-profile" else ("weight", self.cpu_weights_ns)
+            )
+            for tag, destination in fields:
+                element = next(
+                    (child for child in row.iter() if child.tag.rsplit("}", 1)[-1] == tag),
+                    None,
+                )
+                if (value := self._number(element)) is not None:
+                    destination.append(value)
+        if not self.signposts:
+            return
+        serialized = self._resolved_text(row)
+        correlation: tuple[str, int, str] | None = None
+        generation = re.search(r"\bgenerationID=\s*([A-Za-z0-9._-]+)", serialized)
+        take_index = re.search(r"\btakeIndex=\s*([1-9][0-9]*)", serialized)
+        cell = re.search(r"\bcell=\s*([^\s<]+)", serialized)
+        run = re.search(r"\brunID=\s*([A-Za-z0-9._-]+)", serialized)
+        if run is not None and run.group(1) == self.run_id and all((generation, take_index, cell)):
+            candidate = (generation.group(1), int(take_index.group(1)), cell.group(1))
+            if candidate in self.expected_correlations:
+                correlation = candidate
+                self.correlated_rows += 1
+                self.observed_correlations.add(candidate)
+        if self.events:
+            event = self._column(row, "event-type", "event-type")
+            kind = _SIGNPOST_EVENT_TYPES.get(
+                self._resolved_text(event).strip().lower() if event is not None else ""
+            )
+            if kind:
+                self.event_counts[kind] += 1
+        if self.intervals:
+            # Columns by the export's own schema mnemonics; by value type only
+            # when a row does not line up with its schema.
+            start = self._number(self._column(row, "start", "start-time"))
+            duration = self._number(self._column(row, "duration", "duration"))
+            name_element = self._column(row, "name", "signpost-name", "name", "string")
+            subsystem_element = self._column(row, "subsystem", "subsystem")
+            if start is not None and duration is not None and name_element is not None:
+                self.interval_rows.append((
+                    self._resolved_text(name_element).strip(),
+                    self._resolved_text(subsystem_element).strip()
+                    if subsystem_element is not None else "",
+                    start,
+                    duration,
+                    correlation,
+                ))
+
+    def scan(self, path: Path) -> None:
+        parents: list[ET.Element] = []
+        for event, element in ET.iterparse(path, events=("start", "end")):
+            if event == "start":
+                parents.append(element)
+                continue
+            parents.pop()
+            tag = element.tag.rsplit("}", 1)[-1]
+            if tag == "schema":
+                self._columns = [
+                    (column.findtext("mnemonic") or "").strip()
+                    for column in element if column.tag.rsplit("}", 1)[-1] == "col"
+                ]
+            if tag == "row":
+                self._row(element)
+                # Drop the finished row; every id it defined is remembered.
+                element.clear()
+                if parents:
+                    parents[-1].remove(element)
+            else:
+                self._remember(element)
+
+
+def _toc_recorded_duration_seconds(toc: ET.ElementTree) -> float | None:
+    """The trace's own recorded duration from its table of contents, not the
+    requested time limit (audit #96)."""
+    for summary in toc.getroot().iter():
+        if summary.tag.rsplit("}", 1)[-1].lower() != "summary":
+            continue
+        for child in summary:
+            if child.tag.rsplit("}", 1)[-1].lower() != "duration":
+                continue
+            try:
+                value = float((child.text or "").strip())
+            except ValueError:
+                return None
+            return round(value, 3) if math.isfinite(value) and value > 0 else None
+    return None
+
+
 def extract_trace_data_summary(
     trace: Path,
     schemas: Iterable[str],
@@ -3403,6 +3582,8 @@ def extract_trace_data_summary(
     run_id: str,
     target_pid: int,
     expected_correlations: set[tuple[str, int, str]],
+    take_expectations: dict[tuple[str, int, str], dict[str, Any]] | None = None,
+    require_complete_intervals: bool = False,
 ) -> dict[str, Any]:
     relevant = sorted({
         schema for schema in schemas
@@ -3421,6 +3602,10 @@ def extract_trace_data_summary(
     signpost_events = 0
     correlated_signposts = 0
     observed_correlations: set[tuple[str, int, str]] = set()
+    event_counts = {"begin": 0, "end": 0, "point": 0}
+    interval_count = 0
+    engine_intervals: list[trace_intervals.Interval] = []
+    correlated_intervals: dict[tuple[str, int, str], list[tuple[str, trace_intervals.Interval]]] = {}
     for schema in relevant:
         descriptor, temporary = tempfile.mkstemp(prefix="vocello-xctrace-", suffix=".xml")
         os.close(descriptor)
@@ -3438,88 +3623,32 @@ def extract_trace_data_summary(
             if completed.returncode:
                 detail = completed.stderr.strip() or completed.stdout.strip() or "unknown export failure"
                 raise PublicationError(f"could not export xctrace schema {schema}: {detail}")
+            scan = _TraceTableScan(
+                schema=schema, run_id=run_id, target_pid=target_pid,
+                expected_correlations=expected_correlations,
+            )
             try:
-                root = ET.parse(temporary).getroot()
+                scan.scan(Path(temporary))
             except (OSError, ET.ParseError) as error:
                 raise PublicationError(f"xctrace schema {schema} exported invalid XML") from error
-            all_rows = [element for element in root.iter() if _xml_tag(element) == "row"]
-            process_references = _process_reference_pids(root)
-            rows = [
-                row for row in all_rows
-                if _row_process_pid(row, process_references) == target_pid
-            ]
-            rows_by_schema[schema] = len(rows)
-            if schema in {"cpu-profile", "time-profile"}:
-                resolved: dict[tuple[str, str], float] = {}
-                for element in root.iter():
-                    tag = element.tag.rsplit("}", 1)[-1]
-                    if tag not in {"cycle-weight", "weight", "sample-time"} or not element.get("id"):
-                        continue
-                    try:
-                        resolved[(tag, element.get("id", ""))] = float((element.text or "").strip())
-                    except ValueError:
-                        continue
-                for row in rows:
-                    fields = [("sample-time", cpu_sample_times_ns)]
-                    fields.append(
-                        ("cycle-weight", cpu_cycle_weights)
-                        if schema == "cpu-profile" else ("weight", cpu_weights_ns)
-                    )
-                    for tag, destination in fields:
-                        element = next(
-                            (child for child in row.iter() if child.tag.rsplit("}", 1)[-1] == tag),
-                            None,
-                        )
-                        if element is None:
-                            continue
-                        value = resolved.get((tag, element.get("ref", "")))
-                        if value is None:
-                            try:
-                                value = float((element.text or "").strip())
-                            except ValueError:
-                                continue
-                        destination.append(value)
-            if "signpost" in schema.lower():
-                signpost_events += len(rows)
-                elements_by_id = {
-                    element.get("id"): element
-                    for element in root.iter()
-                    if element.get("id")
-                }
-
-                def resolved_text(element: ET.Element, seen: frozenset[str] = frozenset()) -> str:
-                    reference = element.get("ref")
-                    if reference and reference not in seen and reference in elements_by_id:
-                        return resolved_text(elements_by_id[reference], seen | {reference})
-                    rendered = element.get("fmt")
-                    if rendered:
-                        return rendered
-                    pieces = [element.text.strip()] if element.text and element.text.strip() else []
-                    pieces.extend(
-                        value for child in element
-                        if (value := resolved_text(child, seen))
-                    )
-                    return " ".join(pieces)
-
-                for row in rows:
-                    serialized = " ".join(
-                        value for element in row.iter()
-                        if (value := resolved_text(element))
-                    )
-                    generation = re.search(r"\bgenerationID=\s*([A-Za-z0-9._-]+)", serialized)
-                    take_index = re.search(r"\btakeIndex=\s*([1-9][0-9]*)", serialized)
-                    cell = re.search(r"\bcell=\s*([^\s<]+)", serialized)
-                    run = re.search(r"\brunID=\s*([A-Za-z0-9._-]+)", serialized)
-                    if run is None or run.group(1) != run_id or not all(
-                        (generation, take_index, cell)
-                    ):
-                        continue
-                    correlation = (
-                        generation.group(1), int(take_index.group(1)), cell.group(1)
-                    )
-                    if correlation in expected_correlations:
-                        correlated_signposts += 1
-                        observed_correlations.add(correlation)
+            rows_by_schema[schema] = scan.rows
+            cpu_sample_times_ns.extend(scan.cpu_sample_times_ns)
+            cpu_weights_ns.extend(scan.cpu_weights_ns)
+            cpu_cycle_weights.extend(scan.cpu_cycle_weights)
+            if scan.signposts:
+                signpost_events += scan.rows
+                correlated_signposts += scan.correlated_rows
+                observed_correlations |= scan.observed_correlations
+            for kind, count in scan.event_counts.items():
+                event_counts[kind] += count
+            if scan.intervals:
+                interval_count += scan.rows
+            for name, subsystem, start, duration, correlation in scan.interval_rows:
+                interval = trace_intervals.Interval(name, start, duration)
+                if correlation is not None:
+                    correlated_intervals.setdefault(correlation, []).append((name, interval))
+                if trace_intervals.is_engine_interval(name, subsystem):
+                    engine_intervals.append(interval)
         finally:
             Path(temporary).unlink(missing_ok=True)
 
@@ -3538,13 +3667,16 @@ def extract_trace_data_summary(
         raise PublicationError(
             f"trace lacks exact signpost correlation for {len(missing_correlations)} profiled take(s)"
         )
-    summary = {
+    summary: dict[str, Any] = {
         "capturedRowsBySchema": rows_by_schema,
         "capturedDataRowCount": captured_rows,
         "cpuSampleCount": len(cpu_sample_times_ns),
         "cpuSampleSpanMS": round(
             (max(cpu_sample_times_ns) - min(cpu_sample_times_ns)) / 1_000_000.0, 6
         ) if len(cpu_sample_times_ns) >= 2 else 0.0,
+        # Every target-PID row of every signpost table (points, interval rows
+        # and arguments), kept under its historical name; the versioned counts
+        # below say what the rows were (audit #96).
         "signpostEventCount": signpost_events,
         "correlatedSignpostEventCount": correlated_signposts,
         "correlationFieldsVerified": correlation_fields_verified,
@@ -3553,6 +3685,38 @@ def extract_trace_data_summary(
         summary["cpuSampleWeightMS"] = round(sum(cpu_weights_ns) / 1_000_000.0, 6)
     if cpu_cycle_weights:
         summary["cpuCycleWeight"] = int(sum(cpu_cycle_weights))
+    if take_expectations is None:
+        return summary
+    if set(take_expectations) != expected_correlations:
+        raise PublicationError("profile take expectations do not match the profiled takes")
+    takes, orphans = trace_intervals.interval_statistics(
+        correlated=correlated_intervals,
+        engine_intervals=engine_intervals,
+        expectations=take_expectations,
+    )
+    incomplete = [take for take in takes if not take["complete"]]
+    if require_complete_intervals and incomplete:
+        detail = ", ".join(
+            f"take {take['takeIndex']} has {take['loopIntervalCount']} of "
+            f"{take['expectedLoopIntervalCount']}"
+            for take in incomplete
+        )
+        raise PublicationError(
+            "trace lost decode-loop signpost intervals "
+            f"({trace_intervals.LOOP_INTERVALS_PER_STEP} x (tokens + 1) required): {detail}"
+        )
+    summary.update({
+        "signpostSummaryVersion": trace_intervals.SIGNPOST_SUMMARY_VERSION,
+        "signpostIntervalCount": interval_count,
+        "signpostBeginCount": event_counts["begin"],
+        "signpostEndCount": event_counts["end"],
+        "signpostPointCount": event_counts["point"],
+        "orphanIntervalCount": orphans,
+        "intervalStatistics": {
+            "version": trace_intervals.INTERVAL_STATISTICS_VERSION,
+            "takes": takes,
+        },
+    })
     return summary
 
 
@@ -3744,6 +3908,8 @@ def trace_evidence(
     *,
     expected_correlations: set[tuple[str, int, str]],
     require_disabled_vm_auto_snapshot: bool = False,
+    take_expectations: dict[tuple[str, int, str], dict[str, Any]] | None = None,
+    require_complete_intervals: bool = False,
 ) -> dict[str, Any]:
     if not expected_correlations:
         raise PublicationError("profile publication has no expected take correlation")
@@ -3864,7 +4030,13 @@ def trace_evidence(
         run_id=str(args.run_id),
         target_pid=target_pid,
         expected_correlations=expected_correlations,
+        take_expectations=take_expectations,
+        require_complete_intervals=require_complete_intervals,
     )
+    if "signpostSummaryVersion" in extracted:
+        recorded = _toc_recorded_duration_seconds(toc)
+        if recorded is not None:
+            extracted["recordedDurationSeconds"] = recorded
     if profile_kind == "memory":
         allocation_files = list(args.trace.glob(f"Trace*.run/event_data_{target_pid}.oa"))
         allocation_target_bytes = sum(
@@ -3949,18 +4121,53 @@ def _profile_correlations(args: argparse.Namespace, *, ios: bool) -> set[tuple[s
     return expected
 
 
+def _profile_take_expectations(
+    args: argparse.Namespace, correlations: set[tuple[str, int, str]],
+) -> dict[tuple[str, int, str], dict[str, Any]]:
+    """Each profiled take's generated tokens and JSONL timings, from its own
+    engine row: the tokens size the interval completeness check and the
+    timings are the witness the trace sums are compared with."""
+    ordered = sorted(correlations, key=lambda correlation: correlation[1])
+    rows = rows_by_generation(
+        load_engine_rows(args.diagnostics), [correlation[0] for correlation in ordered]
+    )
+    expectations: dict[tuple[str, int, str], dict[str, Any]] = {}
+    for correlation, row in zip(ordered, rows):
+        timings = row.get("timingsMS") if isinstance(row.get("timingsMS"), dict) else {}
+        derived = row.get("derivedMetrics") if isinstance(row.get("derivedMetrics"), dict) else {}
+        tokens = timings.get("qwen_generated_code_count", derived.get("generatedTokenCount"))
+        if isinstance(tokens, bool) or not isinstance(tokens, int) or tokens < 1:
+            raise PublicationError(
+                f"generation {correlation[0]} has no generated-token count to size its "
+                "signpost completeness check"
+            )
+        expectations[correlation] = {"generatedTokens": tokens, "timingsMS": timings}
+    return expectations
+
+
 def profile_command(args: argparse.Namespace) -> Path:
+    correlations = _profile_correlations(args, ios=False)
     trace = trace_evidence(
         args,
-        expected_correlations=_profile_correlations(args, ios=False),
+        expected_correlations=correlations,
         require_disabled_vm_auto_snapshot=args.profile_kind == "memory",
+        take_expectations=_profile_take_expectations(args, correlations),
+        # A macOS profile publishes its per-take interval statistics only when
+        # every take kept 36 x (tokens + 1) decode-loop intervals (audit #12).
+        require_complete_intervals=True,
     )
     return engine_command(args, kind="instrument-profile", trace=trace)
 
 
 def ios_profile_command(args: argparse.Namespace) -> Path:
+    correlations = _profile_correlations(args, ios=True)
     trace = trace_evidence(
-        args, expected_correlations=_profile_correlations(args, ios=True)
+        args,
+        expected_correlations=correlations,
+        take_expectations=_profile_take_expectations(args, correlations),
+        # iPhone traces have dropped intervals under load (34.5-34.75 per step);
+        # the take is published with `complete: false` rather than refused.
+        require_complete_intervals=False,
     )
     return ios_engine_command(args, kind="instrument-profile", trace=trace)
 

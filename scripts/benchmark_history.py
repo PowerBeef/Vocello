@@ -43,6 +43,7 @@ from benchmark_memory import (  # noqa: E402
 from lib import rtf as rtf_semantics
 from lib import jsonio  # noqa: E402
 from lib import lineage_identity  # noqa: E402
+from lib import trace_intervals  # noqa: E402
 from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
 
 
@@ -210,13 +211,17 @@ MEMORY_TRACE_V2_SUMMARY_KEYS = {
     "vmTrackerTrackPresent", "vmTrackerRegionMapPresent",
     "vmTrackerDataExportStatus", "vmTrackerTargetRowCount",
 }
+# The versioned signpost block (records since 2026-09-26, audit #12/#96):
+# begin/end/point/interval counts, orphans, the recorded duration and per-take
+# decode-loop interval statistics (scripts/lib/trace_intervals.py).
+SIGNPOST_TRACE_SUMMARY_KEYS = set(trace_intervals.SUMMARY_KEYS)
 TRACE_SUMMARY_KEYS = {
     "artifact", "capturedDataRowCount", "capturedRowsBySchema",
     "correlatedSignpostEventCount", "correlationFieldsVerified",
     "cpuCycleWeight", "cpuSampleCount", "cpuSampleSpanMS", "cpuSampleWeightMS",
     "processCount", "schemaCount", "signpostEventCount", "signpostSchemaCount",
     "tableCount", "targetPIDVerified", "targetProcess", "tocDigest",
-} | LEGACY_MEMORY_TRACE_SUMMARY_KEYS | MEMORY_TRACE_V2_SUMMARY_KEYS
+} | LEGACY_MEMORY_TRACE_SUMMARY_KEYS | MEMORY_TRACE_V2_SUMMARY_KEYS | SIGNPOST_TRACE_SUMMARY_KEYS
 LANGUAGE_VERIFICATION_KEYS = {
     "outputSchemaVersion", "outputAlgorithm", "recognitionSchemaVersion",
     "recognitionAlgorithm", "accuracyMetricVersion", "requiredPassCount",
@@ -346,6 +351,7 @@ PLAYBACK_CAPTURE_STATUSES = {"captured", "silent", "unavailable", "referenceUnre
 V2_ONLY_TRACE_SUMMARY_KEYS = {
     *LEGACY_MEMORY_TRACE_SUMMARY_KEYS,
     *MEMORY_TRACE_V2_SUMMARY_KEYS,
+    *SIGNPOST_TRACE_SUMMARY_KEYS,
 }
 V2_ONLY_TRACE_KEYS = set(TRACE_RETENTION_KEYS)
 
@@ -2512,6 +2518,24 @@ def validate_trace_summary(record: dict[str, Any]) -> None:
     weight = summary.get("cpuCycleWeight", summary.get("cpuSampleWeightMS"))
     if not isinstance(weight, (int, float)) or isinstance(weight, bool) or weight <= 0:
         raise HistoryError("trace summary lacks positive CPU sample weight")
+    signpost_keys = SIGNPOST_TRACE_SUMMARY_KEYS.intersection(summary)
+    if signpost_keys:
+        if missing := sorted(
+            SIGNPOST_TRACE_SUMMARY_KEYS - {"recordedDurationSeconds"} - signpost_keys
+        ):
+            raise HistoryError("trace signpost summary is missing: " + ", ".join(missing))
+        try:
+            trace_intervals.validate_signpost_summary(
+                summary,
+                take_indices=[take.get("takeIndex") for take in record["takes"]],
+                # A macOS profile publishes its statistics only when every take
+                # kept 36 x (tokens + 1) decode-loop intervals.
+                require_complete=record["run"].get("platform") == "macos",
+            )
+        except ValueError as error:
+            raise HistoryError(str(error)) from error
+        if summary["signpostIntervalCount"] != rows.get("os-signpost-interval", 0):
+            raise HistoryError("trace summary interval count does not match its exported rows")
 
 
 def validate_record(

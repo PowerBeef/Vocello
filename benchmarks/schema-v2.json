@@ -1273,6 +1273,36 @@
         },
         "vmTrackerTrackVerified": {
           "const": true
+        },
+        "signpostSummaryVersion": {
+          "const": 1
+        },
+        "signpostIntervalCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "signpostBeginCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "signpostEndCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "signpostPointCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "orphanIntervalCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "intervalStatistics": {
+          "type": "object"
+        },
+        "recordedDurationSeconds": {
+          "minimum": 0,
+          "type": "number"
         }
       },
       "required": [

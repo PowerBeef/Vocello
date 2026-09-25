@@ -33,6 +33,9 @@ QC_METRIC_MAP = (
     # starts; absent on older rows.
     ("stepBurstPeakCount", "stepBurstPeakCount"),
     ("stepBurstPeakStartMS", "stepBurstPeakStartMS"),
+    # QC v8 (2026-09-25): the take's duration per letter or digit of its spoken
+    # text (the `speaking_rate_slow` warning's measure); absent on older rows.
+    ("secondsPerTextUnit", "secondsPerTextUnit"),
 )
 VERDICT_KEYS = ("verdict", "instabilityVerdict", "writtenOutputVerdict")
 VERDICT_RANK = {"pass": 0, "warn": 1, "fail": 2}

@@ -112,7 +112,11 @@
         "trailingSilenceMS": {"type": "integer", "minimum": 0}, "trailingSilenceStartMS": {"type": ["integer", "null"], "minimum": 0},
         "durationSeconds": {"type": "number", "minimum": 0},
         "cadence": {"oneOf": [{"$ref": "#/$defs/audioCadenceQC"}, {"type": "null"}]},
-        "chunkQC": {"type": ["array", "null"], "items": {"$ref": "#/$defs/audioQCChunk"}}
+        "chunkQC": {"type": ["array", "null"], "items": {"$ref": "#/$defs/audioQCChunk"}},
+        "stepBurstPeakCount": {"type": "integer", "minimum": 0},
+        "stepBurstPeakStartMS": {"type": ["integer", "null"], "minimum": 0},
+        "speakingRateTextUnits": {"type": ["integer", "null"], "minimum": 0},
+        "secondsPerTextUnit": {"type": ["number", "null"], "exclusiveMinimum": 0}
       }
     },
     "audioCadenceQC": {

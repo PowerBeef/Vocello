@@ -1048,7 +1048,11 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
     /// least three quarter-scale steps inside the first 50 ms): the September
     /// 13 codec A/B showed the fp16 speech tokenizer's first streamed chunk
     /// can start a clone take with a full-scale burst that fp32 never produces.
-    public static let currentAlgorithmVersion = 7
+    /// v8 relates the take's length to its text: it reports seconds per text
+    /// unit and warns (`speaking_rate_slow`, instability) when a take runs on
+    /// far past its script (`AudioSpeakingRateQC`). Warn-only; no v7 verdict
+    /// boundary moves.
+    public static let currentAlgorithmVersion = 8
 
     public enum Verdict: String, Hashable, Codable, Sendable {
         case pass
@@ -1105,6 +1109,11 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
     public let cadence: AudioCadenceQCReport?
     /// Optional per-chunk QC snapshots (verbose mode only). nil when not computed.
     public let chunkQC: [AudioQCChunkReport]?
+    /// v8: letters and digits of the spoken request text (`AudioSpeakingRateQC`)
+    /// and the take's duration per unit. nil before v8 and whenever the QC ran
+    /// without request text (a persisted-file check or a chunk snapshot).
+    public let speakingRateTextUnits: Int?
+    public let secondsPerTextUnit: Double?
 
     public init(
         algorithmVersion: Int = AudioQCReport.currentAlgorithmVersion,
@@ -1129,7 +1138,9 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         trailingSilenceMS: Int = 0,
         trailingSilenceStartMS: Int? = nil,
         cadence: AudioCadenceQCReport? = nil,
-        chunkQC: [AudioQCChunkReport]? = nil
+        chunkQC: [AudioQCChunkReport]? = nil,
+        speakingRateTextUnits: Int? = nil,
+        secondsPerTextUnit: Double? = nil
     ) {
         self.algorithmVersion = algorithmVersion
         self.instabilityVerdict = instabilityVerdict ?? verdict
@@ -1154,6 +1165,8 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         self.trailingSilenceStartMS = trailingSilenceStartMS
         self.cadence = cadence
         self.chunkQC = chunkQC
+        self.speakingRateTextUnits = speakingRateTextUnits
+        self.secondsPerTextUnit = secondsPerTextUnit
     }
 
     /// Backward-compatible decoding: older JSONL rows written before Phase 4
@@ -1183,6 +1196,8 @@ public struct AudioQCReport: Hashable, Codable, Sendable {
         self.trailingSilenceStartMS = try container.decodeIfPresent(Int.self, forKey: .trailingSilenceStartMS)
         self.cadence = try container.decodeIfPresent(AudioCadenceQCReport.self, forKey: .cadence)
         self.chunkQC = try container.decodeIfPresent([AudioQCChunkReport].self, forKey: .chunkQC)
+        self.speakingRateTextUnits = try container.decodeIfPresent(Int.self, forKey: .speakingRateTextUnits)
+        self.secondsPerTextUnit = try container.decodeIfPresent(Double.self, forKey: .secondsPerTextUnit)
     }
 }
 

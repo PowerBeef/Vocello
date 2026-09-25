@@ -417,6 +417,8 @@ METRIC_KEYS = {
     "f0TurningPointsPerSecond", "syllableRateHz", "localRateCV", "maximumPauseSeconds",
     "pauseSpeechRatio", "energyEnvelopeRoughness", "discontinuityCount", "clipCount",
     "nonFiniteCount", "dcOffset", "longestSilenceMS", "stepBurstPeakCount", "stepBurstPeakStartMS",
+    # Audio QC v8 speaking rate: seconds per letter or digit of the spoken text.
+    "secondsPerTextUnit",
     # Played-audio capture (PC-01, 2026-09): the app's rendered output compared with the take.
     "playbackCaptureAlignmentMS", "playbackCaptureResidualDBFS", "playbackCaptureDropoutCount",
     "playbackCaptureMaxGapMS", "playbackCaptureFirstAudibleMS", "playbackCaptureCoverage",

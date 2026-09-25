@@ -397,9 +397,23 @@ def validate_audio_qc(value: Any, field: str) -> None:
         "rmsDBFS", "dcOffset", "firstNonFiniteSample", "firstClipSample",
         "longestSilenceStartMS", "trailingSilenceMS", "trailingSilenceStartMS",
         "cadence", "chunkQC",
+        # QC v7 always encodes the step-burst count (and its start when found);
+        # QC v8 adds the speaking-rate measure when the request text was known.
+        "stepBurstPeakCount", "stepBurstPeakStartMS",
+        "speakingRateTextUnits", "secondsPerTextUnit",
     }
     if not isinstance(value, dict) or not required.issubset(value) or set(value) - allowed:
         raise ContractError(f"{field} does not match complete AudioQCReport")
+    for key in ("stepBurstPeakCount", "stepBurstPeakStartMS", "speakingRateTextUnits"):
+        observed = value.get(key)
+        if observed is not None and (type(observed) is not int or observed < 0):
+            raise ContractError(f"{field}.{key} is invalid")
+    rate = value.get("secondsPerTextUnit")
+    if rate is not None and (
+        isinstance(rate, bool) or not isinstance(rate, (int, float))
+        or not math.isfinite(float(rate)) or rate <= 0
+    ):
+        raise ContractError(f"{field}.secondsPerTextUnit is invalid")
     if value["verdict"] not in {"pass", "warn", "fail"} or value["instabilityVerdict"] not in {"pass", "warn", "fail"} or value["writtenOutputVerdict"] not in {"pass", "warn", "fail"}:
         raise ContractError(f"{field} has invalid verdict vocabulary")
     if not isinstance(value["longestSilenceMS"], int) or value["longestSilenceMS"] < 0:

@@ -92,3 +92,13 @@ class StepBurstMetricTests(unittest.TestCase):
         self.assertEqual((metrics["stepBurstPeakCount"], metrics["stepBurstPeakStartMS"]), (31, 166))
         legacy = {k: v for k, v in new.items() if not k.startswith("stepBurst")}
         self.assertNotIn("stepBurstPeakCount", audio_qc.qc_metrics(legacy))
+
+    def test_qc_v8_speaking_rate_is_published_only_when_the_engine_measured_it(self) -> None:
+        # audit #10: the run-on measure reaches the tracked take; the unit count
+        # stays in raw telemetry (duration ÷ rate recovers it).
+        row = {"clickEvents": 0, "clippedSamples": 0, "nonFiniteSamples": 0, "longestSilenceMS": 0,
+               "dcOffset": 0.0, "speakingRateTextUnits": 91, "secondsPerTextUnit": 0.1644}
+        metrics = audio_qc.qc_metrics(row)
+        self.assertEqual(metrics["secondsPerTextUnit"], 0.1644)
+        self.assertNotIn("speakingRateTextUnits", metrics)
+        self.assertNotIn("secondsPerTextUnit", audio_qc.qc_metrics({"clickEvents": 0}))

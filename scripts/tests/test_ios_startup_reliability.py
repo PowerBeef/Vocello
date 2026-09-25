@@ -580,6 +580,34 @@ class IOSStartupReliabilityTests(unittest.TestCase):
                 with self.assertRaises(MODULE.ContractError):
                     MODULE.validate_audio_qc(malformed, "take.audioQC")
 
+    def test_audio_qc_accepts_v7_step_burst_and_v8_speaking_rate(self):
+        # AudioQCReport always encodes stepBurstPeakCount since QC v7 and adds the
+        # speaking-rate pair in v8; the closed contract must accept what it encodes.
+        qc = {
+            "algorithmVersion": 8, "instabilityVerdict": "warn",
+            "writtenOutputVerdict": "pass", "verdict": "warn",
+            "flags": ["speaking_rate_slow"], "peak": 0.4, "clippedSamples": 0,
+            "hotSamples": 0, "nonFiniteSamples": 0, "clickEvents": 0,
+            "longestSilenceMS": 140, "durationSeconds": 14.96,
+            "stepBurstPeakCount": 2, "stepBurstPeakStartMS": 180,
+            "speakingRateTextUnits": 91, "secondsPerTextUnit": 14.96 / 91,
+        }
+        MODULE.validate_audio_qc(qc, "take.audioQC")
+        schema = json.loads((ROOT / "config/ios-startup-reliability-result-schema-v2.json").read_text())
+        self.assertLessEqual(set(qc), set(schema["$defs"]["audioQC"]["properties"]))
+        v7 = {key: value for key, value in qc.items() if key not in {"speakingRateTextUnits", "secondsPerTextUnit"}}
+        MODULE.validate_audio_qc(v7, "take.audioQC")
+        for key, invalid in (
+            ("stepBurstPeakCount", -1), ("stepBurstPeakCount", True),
+            ("speakingRateTextUnits", 9.5), ("secondsPerTextUnit", 0),
+            ("secondsPerTextUnit", float("inf")), ("secondsPerTextUnit", True),
+        ):
+            with self.subTest(key=key, invalid=invalid):
+                malformed = dict(qc)
+                malformed[key] = invalid
+                with self.assertRaises(MODULE.ContractError):
+                    MODULE.validate_audio_qc(malformed, "take.audioQC")
+
     def test_audio_qc_allows_omitted_optional_cadence_quantiles(self):
         # Swift's synthesized Codable omits nil quantiles when no pause reaches
         # the cadence threshold. Shorter interior pauses can still be recorded.

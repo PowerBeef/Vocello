@@ -772,10 +772,33 @@ must pass is the clip-quality warn floor. No onset-window warning was added beca
 does not separate the classes. The Python detector in `lib/playback_capture.py` matches the
 Swift count within ±1 on 60 of 60 takes (54 exact), a windowing boundary difference.
 
+### Speaking-rate plausibility (QC v8, audit #10, 2026-09-25)
+
+Every other Fast-QC measure reads amplitude or waveform shape, so a take that runs on or repeats
+itself well past its script passed: two canonical macOS UI takes of the medium script ran 14.96 s
+and 15.12 s against a usual 6.5 s. QC v8 (`AudioSpeakingRateQC` in `GenerationOutputAdapter.swift`)
+relates the take's duration to its spoken request text as `secondsPerTextUnit`, a unit being one
+letter or digit (one character in Chinese or Japanese, one syllable block in Korean). The text's
+own script picks the band, so Auto requests are covered; texts under 20 alphabetic or 8 CJK units
+are reported but not judged. Above 0.145 s per unit (alphabetic), 0.45 (Chinese) or 0.40
+(Japanese, and Korean until it has evidence) the take gains the warn-only `speaking_rate_slow`
+flag on its instability verdict. The value is published as the take metric `secondsPerTextUnit`
+(`scripts/lib/audio_qc.py`).
+
+The bands were seeded offline from 3,724 committed benchmark takes, mapped to their benchmark
+texts by cell (records carry no prompt text; language takes use their own
+`referenceCharacterCount`, and 14 macOS language takes recorded before the July 14 corpus
+calibration were skipped). Alphabetic text runs at a median 0.076 s per unit (p99.5 0.126), Chinese
+at 0.26 s and Japanese at 0.22 s per character. Replayed against those takes the rule flags 8
+(0.21%): the four run-ons the audit named (the two canonical medium takes above, and the September 2
+macOS lang-bench German take at 19.36 s and Chinese take at 17.28 s) and four Design takes at 1.8x
+to 2.6x their cell's median. No failing bound exists; one needs the authority below.
+
 ### Threshold-change authority
 
-The Fast-QC cadence and dropout boundaries (`makeAudioQCReport`, algorithm v7; v7 added only the
-warn-only `onset_step_burst` flag, no cadence or dropout boundary moved) change only under
+The Fast-QC cadence and dropout boundaries (`makeAudioQCReport`, algorithm v8; v7 added only the
+warn-only `onset_step_burst` flag and v8 only the warn-only `speaking_rate_slow` flag, no cadence
+or dropout boundary moved) change only under
 this policy, carried over verbatim on 2026-09-12 from the retired cadence contract,
 `audio-cadence-qc-contract.json` (in git history):
 

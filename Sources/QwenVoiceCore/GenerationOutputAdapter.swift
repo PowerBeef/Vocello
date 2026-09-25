@@ -1921,17 +1921,17 @@ struct StreamingExecutionContext: Sendable {
                 await telemetrySampler?.captureBoundary("after_marking")
             }
             await telemetrySampler?.captureBoundary("before_audio_qc")
+            let spokenText = (try? SpokenTextPlanner.plan(originalText: request.text).spokenText)
+                ?? request.text
             finalAudioQC = try Self.makePersistedWAVAudioQCReport(
                 at: stagingURL,
                 preWriteMetrics: scratchBuffer.limiterMetrics,
-                expectedPauseCount: Self.expectedPauseCount(
-                    in: (try? SpokenTextPlanner.plan(originalText: request.text).spokenText)
-                        ?? request.text
-                ),
+                expectedPauseCount: Self.expectedPauseCount(in: spokenText),
                 chunkQC: chunkQCActive && !chunkQCReports.isEmpty ? chunkQCReports : nil,
                 expectedSampleRate: sampleRate,
                 expectedChannelCount: 1,
-                expectedFrameCount: Int(totalFramesWritten)
+                expectedFrameCount: Int(totalFramesWritten),
+                speakingRateText: spokenText
             )
             await telemetrySampler?.captureBoundary("after_audio_qc")
             guard finalAudioQC.verdict != .fail else {
@@ -2636,6 +2636,8 @@ struct StreamingExecutionContext: Sendable {
     ///     would otherwise be judged on its first channel only.
     ///   - expectedFrameCount: frames the writer actually produced; a header
     ///     rewritten to a shorter, consistent length is caught here.
+    ///   - speakingRateText: the spoken request text, for the v8 speaking-rate
+    ///     check; nil skips it (no text is known for a bare persisted file).
     static func makePersistedWAVAudioQCReport(
         at url: URL,
         preWriteMetrics: PCM16StreamLimiter.Metrics? = nil,
@@ -2643,7 +2645,8 @@ struct StreamingExecutionContext: Sendable {
         chunkQC: [AudioQCChunkReport]? = nil,
         expectedSampleRate: Int? = nil,
         expectedChannelCount: Int? = nil,
-        expectedFrameCount: Int? = nil
+        expectedFrameCount: Int? = nil,
+        speakingRateText: String? = nil
     ) throws -> AudioQCReport {
         let file = try AVAudioFile(forReading: url)
         let frameCount = Int(file.length)
@@ -2724,7 +2727,8 @@ struct StreamingExecutionContext: Sendable {
             durationSeconds: Double(observedFrameCount) / file.processingFormat.sampleRate,
             expectedPauseCount: expectedPauseCount,
             chunkQC: chunkQC,
-            formatIssues: formatIssues
+            formatIssues: formatIssues,
+            speakingRateText: speakingRateText
         )
     }
 
@@ -2739,7 +2743,8 @@ struct StreamingExecutionContext: Sendable {
         durationSeconds: Double,
         expectedPauseCount: Int,
         chunkQC: [AudioQCChunkReport]? = nil,
-        formatIssues: [String] = []
+        formatIssues: [String] = [],
+        speakingRateText: String? = nil
     ) -> AudioQCReport {
         let n = metrics.processedSamples
         let rms = n > 0 ? (metrics.outputSumOfSquares / Double(n)).squareRoot() : 0
@@ -2888,6 +2893,17 @@ struct StreamingExecutionContext: Sendable {
                 flags.append("dc_offset"); raise(.warn, &writtenOutputVerdict)
             }
         }
+        // v8: a take far longer than its text can hold (a model run-on or a
+        // repeated phrase) passes every amplitude check above. Warn-only.
+        let speakingRate = speakingRateText.flatMap(AudioSpeakingRateQC.measure)
+        let secondsPerTextUnit: Double? = speakingRate.flatMap { measurement -> Double? in
+            guard durationSeconds > 0 else { return nil }
+            return durationSeconds / Double(measurement.textUnits)
+        }
+        if let speakingRate, let secondsPerTextUnit,
+           AudioSpeakingRateQC.isSlow(secondsPerUnit: secondsPerTextUnit, measurement: speakingRate) {
+            flags.append("speaking_rate_slow"); raise(.warn, &instabilityVerdict)
+        }
         let verdict = worst(instabilityVerdict, writtenOutputVerdict)
         var cadenceReasons: [AudioCadenceQCReport.Reason] = []
         if excessCadencePauses > 0 {
@@ -2954,7 +2970,9 @@ struct StreamingExecutionContext: Sendable {
             trailingSilenceMS: trailingSilenceMS,
             trailingSilenceStartMS: trailingSilenceStartMS,
             cadence: cadence,
-            chunkQC: chunkQC
+            chunkQC: chunkQC,
+            speakingRateTextUnits: speakingRate?.textUnits,
+            secondsPerTextUnit: secondsPerTextUnit
         )
     }
 
@@ -3182,6 +3200,94 @@ public enum PersistedWAVAudioQCAnalyzer {
     /// excess dropout.
     public static func expectedPauseCount(in text: String) -> Int {
         StreamingExecutionContext.expectedPauseCount(in: text)
+    }
+}
+
+/// Speaking-rate plausibility for the Fast QC (v8, audit #10). Every other QC
+/// measure looks at amplitude or waveform shape, so a take that runs on or
+/// repeats itself well past the end of its script passed. This relates the
+/// take's duration to its spoken text as seconds per text unit, where a unit is
+/// one letter or digit: one character in Chinese or Japanese, one syllable
+/// block in Korean. The text's own script picks the band, so it also holds
+/// when the request language is Auto.
+///
+/// Warn-only. A failing bound belongs to the threshold-change authority in
+/// docs/reference/audio-qc-engineering.md.
+enum AudioSpeakingRateQC {
+    enum ScriptClass: String, Sendable {
+        case alphabetic
+        case chinese
+        case japanese
+        case korean
+    }
+
+    struct Measurement: Equatable, Sendable {
+        let textUnits: Int
+        let scriptClass: ScriptClass
+    }
+
+    /// Seconds per unit above which a take warns `speaking_rate_slow`. Seeded
+    /// offline on 2026-09-25 from 3,724 committed benchmark takes: alphabetic
+    /// text runs at a median 0.076 s per unit (p99.5 0.126, the slowest
+    /// delivery presets up to 0.12), Chinese at 0.26 s and Japanese at 0.22 s
+    /// per character. Each bound sits near twice its median. Replayed on those
+    /// takes it flags 8 (0.21%): the four known run-ons (0.164 and 0.166 s per
+    /// unit on the medium English cell, 0.150 in German, 0.64 s per character
+    /// in Chinese) and four more takes at 1.8x to 2.6x their cell's median.
+    /// Korean has no committed take yet and borrows the Japanese bound.
+    static func slowSecondsPerUnit(for scriptClass: ScriptClass) -> Double {
+        switch scriptClass {
+        case .alphabetic: return 0.145
+        case .chinese: return 0.45
+        case .japanese, .korean: return 0.40
+        }
+    }
+
+    /// Below this many units the fixed leading and trailing silence dominates
+    /// the duration, so the rate is reported but not judged.
+    static func minimumJudgedUnits(for scriptClass: ScriptClass) -> Int {
+        scriptClass == .alphabetic ? 20 : 8
+    }
+
+    /// Units and script class of a spoken text, or nil when it has no letters
+    /// or digits. CJK characters decide the class only when they are at least
+    /// half of the units.
+    static func measure(_ text: String) -> Measurement? {
+        var units = 0
+        var han = 0
+        var kana = 0
+        var hangul = 0
+        for character in text where character.isLetter || character.isNumber {
+            units += 1
+            guard let scalar = character.unicodeScalars.first else { continue }
+            switch scalar.value {
+            case 0x3040...0x30FF, 0x31F0...0x31FF, 0xFF66...0xFF9F:
+                kana += 1
+            case 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF:
+                han += 1
+            case 0x1100...0x11FF, 0x3130...0x318F, 0xAC00...0xD7AF:
+                hangul += 1
+            default:
+                break
+            }
+        }
+        guard units > 0 else { return nil }
+        let scriptClass: ScriptClass
+        if (han + kana + hangul) * 2 < units {
+            scriptClass = .alphabetic
+        } else if kana > 0 {
+            scriptClass = .japanese
+        } else if hangul > han {
+            scriptClass = .korean
+        } else {
+            scriptClass = .chinese
+        }
+        return Measurement(textUnits: units, scriptClass: scriptClass)
+    }
+
+    static func isSlow(secondsPerUnit: Double, measurement: Measurement) -> Bool {
+        measurement.textUnits >= minimumJudgedUnits(for: measurement.scriptClass)
+            && secondsPerUnit > slowSecondsPerUnit(for: measurement.scriptClass)
     }
 }
 

@@ -1099,6 +1099,126 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: target.path))
     }
 
+    // MARK: - Audio earlier clears left (PA-30)
+
+    /// The iPhone's one-time removal decides against every audio path History
+    /// still uses: rows, queued takes, a commit in flight whose entry a clear
+    /// already removed, and pending removals. Only audio none of them names is
+    /// offered, and never a link or a folder.
+    func testLeftoverAudioIsOnlyAudioNoHistoryStateUses() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        let (entered, enteredContinuation) = AsyncStream<Void>.makeStream()
+        let (release, releaseContinuation) = AsyncStream<Void>.makeStream()
+        let coordinator = GenerationHistoryRecoveryCoordinator(
+            store: fixture.store,
+            commitGeneration: { _, generation in
+                enteredContinuation.yield()
+                for await _ in release { break }
+                return try state.commit(generation)
+            },
+            fetchAllGenerations: { state.rows() },
+            deleteGenerationsThrough: { try state.delete(throughID: $0) },
+            referencedAudioPaths: { paths in Set(state.rows().map(\.audioPath)).intersection(paths) }
+        )
+        let folder = fixture.audioURL.deletingLastPathComponent()
+        let row = try makeAudio(in: fixture, named: "row.wav")
+        _ = try state.commit(generation(fixture, audioPath: row.path))
+        let queued = try makeAudio(in: fixture, named: "queued.wav")
+        _ = try fixture.store.enqueue(generation(fixture, audioPath: queued.path), operation: .append)
+        let pending = try makeAudio(in: fixture, named: "pending.wav")
+        try await coordinator.retainAudioRemoval(pending.path)
+        let orphan = try makeAudio(in: fixture, named: "orphan.wav")
+        try FileManager.default.createSymbolicLink(
+            at: folder.appendingPathComponent("link.wav"),
+            withDestinationURL: orphan
+        )
+        try FileManager.default.createDirectory(
+            at: folder.appendingPathComponent("folder.wav", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        let entry = try fixture.store.enqueue(fixture.generation, operation: .append)
+        let commit = Task { () -> (any Error)? in
+            do {
+                _ = try await coordinator.commit(entry)
+                return nil
+            } catch {
+                return error
+            }
+        }
+        for await _ in entered { break }
+        try fixture.store.removeEntry(id: entry.id)
+
+        let referenced = await coordinator.withReferencedAudioPaths { $0 }
+        XCTAssertEqual(referenced, Set([row.path, queued.path, pending.path, fixture.audioURL.path]))
+        let offered = await coordinator.withReferencedAudioPaths { referenced in
+            IOSLeftoverAudioAnalysis.leftovers(
+                in: IOSLeftoverAudioAnalysis.listing(ofDirectories: [folder]),
+                referencedAudioPaths: referenced,
+                writtenBefore: .distantFuture
+            )
+        }
+        XCTAssertEqual(offered??.files.map(\.path), [orphan.path])
+
+        releaseContinuation.yield()
+        let commitError = await commit.value
+        XCTAssertNil(commitError)
+    }
+
+    /// PA-30: the removal fails closed. A pending clear, an outbox entry or a
+    /// removal list that cannot be read, a list set aside as unreadable, or
+    /// History rows that cannot all be read decide nothing.
+    func testLeftoverAudioIsNeverDecidedOnUnreadableHistoryState() async throws {
+        let clean = try makeFixture()
+        let decidesWhenReadable = await decides(makeCoordinator(store: clean.store, state: CommitState()))
+        XCTAssertTrue(decidesWhenReadable, "Control: readable state decides")
+
+        let corruptOutbox = try makeFixture()
+        try Data("not-json".utf8).write(
+            to: corruptOutbox.store.rootURL.appendingPathComponent("\(UUID().uuidString.lowercased()).json")
+        )
+        let decidesWithCorruptOutbox = await decides(makeCoordinator(store: corruptOutbox.store, state: CommitState()))
+        XCTAssertFalse(decidesWithCorruptOutbox, "An outbox entry that cannot be read")
+
+        let pendingClear = try makeFixture()
+        try pendingClear.store.writeClearTransaction(GenerationHistoryClearTransaction(
+            deleteAudio: false,
+            audioPaths: [],
+            pendingEntryIDs: [],
+            maxRowID: 0
+        ))
+        let decidesWithPendingClear = await decides(makeCoordinator(store: pendingClear.store, state: CommitState()))
+        XCTAssertFalse(decidesWithPendingClear, "A clear that has not finished")
+
+        let unreadableList = try makeFixture()
+        try Data("not-json".utf8).write(to: unreadableList.store.rootURL.appendingPathComponent("audio-removals.json"))
+        let decidesWithUnreadableList = await decides(makeCoordinator(store: unreadableList.store, state: CommitState()))
+        XCTAssertFalse(decidesWithUnreadableList, "A removal list that cannot be read")
+
+        let setAsideList = try makeFixture()
+        try Data("not-json".utf8).write(to: setAsideList.store.rootURL.appendingPathComponent("audio-removals.json"))
+        try setAsideList.store.appendPendingAudioRemovals([])
+        XCTAssertEqual(setAsideList.store.unreadableAudioRemovalCount(), 1)
+        let decidesWithSetAsideList = await decides(makeCoordinator(store: setAsideList.store, state: CommitState()))
+        XCTAssertFalse(decidesWithSetAsideList, "A list set aside as unreadable")
+
+        let unreadableRows = try makeFixture()
+        let rowsFail = GenerationHistoryRecoveryCoordinator(
+            store: unreadableRows.store,
+            commitGeneration: { _, generation in generation },
+            fetchAllGenerations: { throw StubError() },
+            deleteGenerationsThrough: { _ in [] },
+            referencedAudioPaths: { _ in [] }
+        )
+        let decidesWithUnreadableRows = await decides(rowsFail)
+        XCTAssertFalse(decidesWithUnreadableRows, "History rows that cannot all be read")
+    }
+
+    /// Whether `withReferencedAudioPaths` ran its decision at all.
+    private func decides(_ coordinator: GenerationHistoryRecoveryCoordinator) async -> Bool {
+        await coordinator.withReferencedAudioPaths { _ in true } ?? false
+    }
+
     // MARK: - Suspension (IOS-11)
 
     /// A take whose database write meets a suspended History database is

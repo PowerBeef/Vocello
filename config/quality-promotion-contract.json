@@ -437,6 +437,7 @@
           "Sources/iOSSupport/Services/*UIPerf*.swift",
           "Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift",
           "Sources/iOSSupport/Services/IOSStudioDraftPersistence.swift",
+          "Sources/iOSSupport/Services/IOSLeftoverAudioAnalysis.swift",
           "Tests/VocelloMacUITests/**",
           "Tests/VocelloiOSUITests/**",
           "config/ui-perf-thresholds.json",

@@ -29,6 +29,9 @@ struct QVoiceiOSApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        // PA-30: audio written from here on is never offered as a leftover of
+        // an earlier History clear, so a take in flight is never removed.
+        _ = IOSLeftoverAudioCleanup.sessionStart
         _deps = StateObject(wrappedValue: IOSAppDependenciesContainer())
         // PA-21: the playback category is set without activating the session;
         // players activate it through the owner when playback actually starts.

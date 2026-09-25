@@ -154,6 +154,9 @@ Maintained iPhone subtrees:
   server, receipt logging or preference unlock. Apple's billing/privacy disclosures remain RF-02
   account-review work. Storage-failure and original-reference recovery remain free. New generated
   Saved Voices retain source mode in enrollment metadata; legacy references are not reclassified.
+  Audio that earlier History clears kept here, which nothing can reach once its rows are gone, is
+  offered once for a confirmed removal in Settings → Models & Files (PA-30); audio any History row,
+  queued take or pending removal uses is never offered.
 - `voices/` stores committed saved-voice reference assets. Each row can delete only its own audio, transcript, and prepared prompt artifacts after an explicit confirmation; other voice-bank members remain intact.
   Prompts derived from one-off references follow the same bounded retention as on macOS.
 - `voice-candidates/` privately stages review candidates for at most 24 hours. They are invisible to the saved-voice catalog until Keep/Save commits them; Cancel, Discard, and outside dismissal remove them. `voice-transactions/` is the bounded recovery journal for commit/replacement/delete operations. `voice-transactions-quarantine/` keeps journals reconciliation could not interpret, with the assets they hold; nothing is deleted from it automatically. Journals written by a newer Vocello build (a newer schema version) stay in `voice-transactions/` untouched.

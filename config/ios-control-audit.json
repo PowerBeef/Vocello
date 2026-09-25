@@ -164,8 +164,8 @@
       "path": "Sources/iOS/Settings/SettingsScreen.swift",
       "screen": "Settings",
       "scenario": "stateful",
-      "reason": "Preferences, privacy, support, source, licenses, permissions, and model navigation are identified. Both value-based Models & Files and Voice Models links retain their existing control identifiers.",
-      "interactiveOccurrenceCount": 6
+      "reason": "Preferences, privacy, support, source, licenses, permissions, and model navigation are identified. Both value-based Models & Files and Voice Models links retain their existing control identifiers. The PA-30 one-time removal of audio earlier History clears left adds its confirmation and failure alerts.",
+      "interactiveOccurrenceCount": 12
     },
     {
       "path": "Sources/iOS/Settings/VoiceModelsScreen.swift",
@@ -560,6 +560,21 @@
       "mutationClass": "reversible",
       "scenario": "stateful",
       "availability": "required"
+    },
+    {
+      "id": "settings-leftover-audio",
+      "identifierPattern": "iosSettings_leftoverAudio(Row|Remove|Keep|Cancel|FailureDismiss)",
+      "sourceToken": "iosSettings_leftoverAudioRow",
+      "screen": "Settings Models & Files",
+      "prerequisite": "Audio earlier History clears left in private storage that no History state uses, not yet removed or kept (PA-30)",
+      "role": "row and buttons",
+      "action": "Inspect the one-time offer; never remove or keep user audio on a user device",
+      "expectedResult": "Count and size shown; audio removed only after Remove Audio; Keep Files ends the offer; Cancel changes nothing; a failure is reported",
+      "expectedSemantics": "Label, size value, count subtitle, hint, and destructive confirmation",
+      "minimumTargetPoints": 44,
+      "mutationClass": "confirm-only",
+      "scenario": "stateful",
+      "availability": "conditional"
     },
     {
       "id": "settings-links",

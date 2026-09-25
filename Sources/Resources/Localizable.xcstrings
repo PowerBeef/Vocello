@@ -21427,6 +21427,1146 @@
         }
       }
     },
+    "vocello.ui.leftoverAudioTitle": {
+      "comment": "iOS Settings Models & Files row title: audio that earlier History clears left in the app's private storage, offered for removal once. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio from Earlier Clears"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio d’anciens effacements"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio de borrados anteriores"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio aus früheren Leerungen"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio di svuotamenti precedenti"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Áudio de limpezas anteriores"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先前清空后遗留的音频"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以前の消去で残った音声"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전에 지운 기록의 오디오"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Аудио после прежних очисток"
+          }
+        }
+      }
+    },
+    "vocello.ui.leftoverAudioFiles": {
+      "comment": "iOS Settings row subtitle; %1$lld is how many audio files earlier History clears left that no History item uses. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld audio file no History item uses"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld audio files no History item uses"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld fichier audio inutilisé par l’historique"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld fichiers audio inutilisés par l’historique"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld fichiers audio inutilisés par l’historique"
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld archivo de audio que el historial no usa"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld archivos de audio que el historial no usa"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld archivos de audio que el historial no usa"
+                }
+              }
+            }
+          }
+        },
+        "de": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld Audiodatei, die kein Verlaufseintrag nutzt"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld Audiodateien, die kein Verlaufseintrag nutzt"
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld file audio non usato dalla cronologia"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld file audio non usati dalla cronologia"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld file audio non usati dalla cronologia"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld arquivo de áudio que o histórico não usa"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld arquivos de áudio que o histórico não usa"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld arquivos de áudio que o histórico não usa"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld 个历史记录未使用的音频文件"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "履歴で使われていない音声ファイル %1$lld 件"
+                }
+              }
+            }
+          }
+        },
+        "ko": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "기록에서 사용하지 않는 오디오 파일 %1$lld개"
+                }
+              }
+            }
+          }
+        },
+        "ru": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld аудиофайл, который не использует история"
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld аудиофайла, которые не использует история"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld аудиофайлов, которые не использует история"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld аудиофайла, которые не использует история"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "vocello.ui.leftoverAudioHint": {
+      "comment": "iOS accessibility hint of the Settings row that offers to remove audio earlier History clears left. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Asks before removing this audio from this iPhone"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demande confirmation avant de supprimer cet audio de cet iPhone"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pide confirmación antes de eliminar este audio de este iPhone"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fragt nach, bevor dieses Audio von diesem iPhone entfernt wird"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chiede conferma prima di rimuovere questo audio da questo iPhone"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pede confirmação antes de remover este áudio deste iPhone"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从此 iPhone 移除这些音频前会先确认"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このiPhoneから音声を削除する前に確認します"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 iPhone에서 오디오를 제거하기 전에 확인합니다"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Запрашивает подтверждение перед удалением этого аудио с iPhone"
+          }
+        }
+      }
+    },
+    "vocello.ui.leftoverAudioConfirmTitle": {
+      "comment": "iOS alert title confirming the one-time removal of audio earlier History clears left. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Audio from Earlier Clears?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer l’audio d’anciens effacements ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Eliminar el audio de borrados anteriores?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio aus früheren Leerungen entfernen?"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovere l’audio di svuotamenti precedenti?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover o áudio de limpezas anteriores?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除先前清空后遗留的音频？"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以前の消去で残った音声を削除しますか？"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이전에 지운 기록의 오디오를 제거할까요?"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить аудио после прежних очисток?"
+          }
+        }
+      }
+    },
+    "vocello.ui.leftoverAudioConfirmCount": {
+      "comment": "iOS alert message, first sentence; %1$lld is how many audio files earlier History clears left that no History item or queued take uses. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld audio file that an earlier History clear left is still stored on this iPhone. No History item or queued take uses it."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld audio files that earlier History clears left are still stored on this iPhone. No History item or queued take uses them."
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld fichier audio laissé par un ancien effacement de l’historique est encore stocké sur cet iPhone. Aucune entrée de l’historique ni prise en attente ne l’utilise."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld fichiers audio laissés par d’anciens effacements de l’historique sont encore stockés sur cet iPhone. Aucune entrée de l’historique ni prise en attente ne les utilise."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld fichiers audio laissés par d’anciens effacements de l’historique sont encore stockés sur cet iPhone. Aucune entrée de l’historique ni prise en attente ne les utilise."
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld archivo de audio que dejó un borrado anterior del historial sigue guardado en este iPhone. Ninguna entrada del historial ni toma en cola lo usa."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld archivos de audio que dejaron borrados anteriores del historial siguen guardados en este iPhone. Ninguna entrada del historial ni toma en cola los usa."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld archivos de audio que dejaron borrados anteriores del historial siguen guardados en este iPhone. Ninguna entrada del historial ni toma en cola los usa."
+                }
+              }
+            }
+          }
+        },
+        "de": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld Audiodatei aus einer früheren Verlaufsleerung ist noch auf diesem iPhone gespeichert. Weder ein Verlaufseintrag noch eine Aufnahme in der Warteschlange nutzt sie."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld Audiodateien aus früheren Verlaufsleerungen sind noch auf diesem iPhone gespeichert. Weder ein Verlaufseintrag noch eine Aufnahme in der Warteschlange nutzt sie."
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld file audio lasciato da uno svuotamento precedente della cronologia è ancora salvato su questo iPhone. Nessuna voce della cronologia né take in coda lo usa."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld file audio lasciati da svuotamenti precedenti della cronologia sono ancora salvati su questo iPhone. Nessuna voce della cronologia né take in coda li usa."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld file audio lasciati da svuotamenti precedenti della cronologia sono ancora salvati su questo iPhone. Nessuna voce della cronologia né take in coda li usa."
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld arquivo de áudio deixado por uma limpeza anterior do histórico ainda está armazenado neste iPhone. Nenhum item do histórico nem tomada na fila o usa."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld arquivos de áudio deixados por limpezas anteriores do histórico ainda estão armazenados neste iPhone. Nenhum item do histórico nem tomada na fila os usa."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld arquivos de áudio deixados por limpezas anteriores do histórico ainda estão armazenados neste iPhone. Nenhum item do histórico nem tomada na fila os usa."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "先前清空历史记录后遗留的 %1$lld 个音频文件仍存储在此 iPhone 上。历史记录和队列中的音频都未使用它们。"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "以前の履歴の消去で残った音声ファイル %1$lld 件がこのiPhoneに保存されています。履歴の項目やキュー内のテイクでは使われていません。"
+                }
+              }
+            }
+          }
+        },
+        "ko": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "이전에 기록을 지울 때 남은 오디오 파일 %1$lld개가 이 iPhone에 아직 저장되어 있습니다. 기록 항목이나 대기 중인 테이크에서 사용하지 않습니다."
+                }
+              }
+            }
+          }
+        },
+        "ru": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld аудиофайл, оставшийся после прежней очистки истории, всё ещё хранится на этом iPhone. Его не использует ни запись истории, ни дубль в очереди."
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld аудиофайла, оставшиеся после прежних очисток истории, всё ещё хранятся на этом iPhone. Их не использует ни запись истории, ни дубль в очереди."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld аудиофайлов, оставшихся после прежних очисток истории, всё ещё хранятся на этом iPhone. Их не использует ни запись истории, ни дубль в очереди."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld аудиофайла, оставшиеся после прежних очисток истории, всё ещё хранятся на этом iPhone. Их не использует ни запись истории, ни дубль в очереди."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "vocello.ui.leftoverAudioConfirmSize": {
+      "comment": "iOS alert message, second sentence; %1$@ is the formatted total size of the audio, such as 84 MB. Keeping the files ends the offer for good. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removing this audio frees %1$@ and can’t be undone. If you keep it, Vocello won’t offer this again."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer cet audio libère %1$@ et est irréversible. Si vous le conservez, Vocello ne le proposera plus."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar este audio libera %1$@ y no se puede deshacer. Si lo conservas, Vocello no volverá a ofrecerlo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Entfernen dieses Audios gibt %1$@ frei und lässt sich nicht widerrufen. Wenn du es behältst, bietet Vocello das nicht erneut an."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovere questo audio libera %1$@ e non si può annullare. Se lo conservi, Vocello non lo proporrà più."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover este áudio libera %1$@ e não pode ser desfeito. Se você o mantiver, o Vocello não oferecerá isso novamente."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除这些音频将释放 %1$@，且无法撤销。如果保留，Vocello 将不再提示。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この音声を削除すると %1$@ が解放されます。この操作は取り消せません。残した場合、Vocelloは今後この提案をしません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 오디오를 제거하면 %1$@의 공간이 확보되며 되돌릴 수 없습니다. 유지하면 Vocello가 다시 제안하지 않습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удаление этого аудио освободит %1$@, и его нельзя отменить. Если вы его сохраните, Vocello больше не предложит это."
+          }
+        }
+      }
+    },
+    "vocello.ui.leftoverAudioRemove": {
+      "comment": "iOS destructive alert button that removes the audio earlier History clears left. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Audio"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer l’audio"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar audio"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio entfernen"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rimuovi audio"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover áudio"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除音频"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声を削除"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "오디오 제거"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить аудио"
+          }
+        }
+      }
+    },
+    "vocello.ui.leftoverAudioKeep": {
+      "comment": "iOS alert button that keeps the audio earlier History clears left and ends the offer for good. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep Files"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conserver les fichiers"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conservar archivos"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dateien behalten"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mantieni i file"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manter arquivos"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留文件"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ファイルを残す"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "파일 유지"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Оставить файлы"
+          }
+        }
+      }
+    },
+    "vocello.ui.leftoverAudioNotRemoved": {
+      "comment": "iOS alert title when some or all of the audio earlier History clears left could not be removed. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio Was Not Removed"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’audio n’a pas été supprimé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se eliminó el audio"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio wurde nicht entfernt"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’audio non è stato rimosso"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O áudio não foi removido"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频未移除"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声を削除できませんでした"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "오디오를 제거하지 못했습니다"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Аудио не удалено"
+          }
+        }
+      }
+    },
+    "vocello.ui.leftoverAudioFailed": {
+      "comment": "iOS alert message; %1$lld is how many audio files earlier History clears left could not be removed. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld audio file could not be removed and is still stored on this iPhone. You can try again."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld audio files could not be removed and are still stored on this iPhone. You can try again."
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld fichier audio n’a pas pu être supprimé et reste stocké sur cet iPhone. Vous pouvez réessayer."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld fichiers audio n’ont pas pu être supprimés et restent stockés sur cet iPhone. Vous pouvez réessayer."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld fichiers audio n’ont pas pu être supprimés et restent stockés sur cet iPhone. Vous pouvez réessayer."
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "No se pudo eliminar %1$lld archivo de audio, que sigue guardado en este iPhone. Puedes volver a intentarlo."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "No se pudieron eliminar %1$lld archivos de audio, que siguen guardados en este iPhone. Puedes volver a intentarlo."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "No se pudieron eliminar %1$lld archivos de audio, que siguen guardados en este iPhone. Puedes volver a intentarlo."
+                }
+              }
+            }
+          }
+        },
+        "de": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld Audiodatei konnte nicht entfernt werden und ist noch auf diesem iPhone gespeichert. Du kannst es erneut versuchen."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$lld Audiodateien konnten nicht entfernt werden und sind noch auf diesem iPhone gespeichert. Du kannst es erneut versuchen."
+                }
+              }
+            }
+          }
+        },
+        "it": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Non è stato possibile rimuovere %1$lld file audio, che è ancora salvato su questo iPhone. Puoi riprovare."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Non è stato possibile rimuovere %1$lld file audio, che sono ancora salvati su questo iPhone. Puoi riprovare."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Non è stato possibile rimuovere %1$lld file audio, che sono ancora salvati su questo iPhone. Puoi riprovare."
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Não foi possível remover %1$lld arquivo de áudio, que ainda está armazenado neste iPhone. Você pode tentar novamente."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Não foi possível remover %1$lld arquivos de áudio, que ainda estão armazenados neste iPhone. Você pode tentar novamente."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Não foi possível remover %1$lld arquivos de áudio, que ainda estão armazenados neste iPhone. Você pode tentar novamente."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "有 %1$lld 个音频文件无法移除，仍存储在此 iPhone 上。你可以重试。"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "音声ファイル %1$lld 件を削除できず、このiPhoneに残っています。もう一度お試しください。"
+                }
+              }
+            }
+          }
+        },
+        "ko": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "오디오 파일 %1$lld개를 제거하지 못해 이 iPhone에 아직 저장되어 있습니다. 다시 시도할 수 있습니다."
+                }
+              }
+            }
+          }
+        },
+        "ru": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Не удалось удалить %1$lld аудиофайл, он всё ещё хранится на этом iPhone. Можно повторить попытку."
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Не удалось удалить %1$lld аудиофайла, они всё ещё хранятся на этом iPhone. Можно повторить попытку."
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Не удалось удалить %1$lld аудиофайлов, они всё ещё хранятся на этом iPhone. Можно повторить попытку."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "Не удалось удалить %1$lld аудиофайла, они всё ещё хранятся на этом iPhone. Можно повторить попытку."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "vocello.ui.leftoverAudioUnavailable": {
+      "comment": "iOS alert message when History or its pending records could not be read, so nothing was removed. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History could not be checked completely, so no audio was removed. Try again later."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’historique n’a pas pu être entièrement vérifié : aucun audio n’a été supprimé. Réessayez plus tard."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo comprobar todo el historial, así que no se eliminó ningún audio. Inténtalo más tarde."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Verlauf konnte nicht vollständig geprüft werden, daher wurde kein Audio entfernt. Versuche es später erneut."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non è stato possibile controllare tutta la cronologia, quindi nessun audio è stato rimosso. Riprova più tardi."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível verificar todo o histórico, então nenhum áudio foi removido. Tente novamente mais tarde."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法完整检查历史记录，因此未移除任何音频。请稍后重试。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "履歴をすべて確認できなかったため、音声は削除されませんでした。しばらくしてからもう一度お試しください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기록을 모두 확인할 수 없어 오디오를 제거하지 않았습니다. 나중에 다시 시도하세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Не удалось полностью проверить историю, поэтому аудио не удалено. Повторите попытку позже."
+          }
+        }
+      }
+    },
     "vocello.ui.historyShowMore": {
       "comment": "iOS History button below the list that loads the next page of older takes. Presentation only.",
       "extractionState": "manual",

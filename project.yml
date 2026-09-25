@@ -504,6 +504,8 @@ targets:
       - path: Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift
       # PA-21: Studio drafts kept across launches (IOS-09).
       - path: Sources/iOSSupport/Services/IOSStudioDraftPersistence.swift
+      # PA-30: which audio earlier iPhone History clears left may be offered and removed.
+      - path: Sources/iOSSupport/Services/IOSLeftoverAudioAnalysis.swift
       # PA-19: the orchestrators run under unit tests over a fake engine: the
       # shared engine store (with its diagnostics recorder and notification
       # names), the History database service, the iOS export gate and the
@@ -581,6 +583,8 @@ targets:
       - path: Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift
       # PA-21: Studio drafts kept across launches (IOS-09).
       - path: Sources/iOSSupport/Services/IOSStudioDraftPersistence.swift
+      # PA-30: which audio earlier iPhone History clears left may be offered and removed.
+      - path: Sources/iOSSupport/Services/IOSLeftoverAudioAnalysis.swift
     dependencies:
       - target: QwenVoiceCore
     settings:

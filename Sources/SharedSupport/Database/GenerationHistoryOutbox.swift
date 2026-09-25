@@ -779,6 +779,49 @@ actor GenerationHistoryRecoveryCoordinator {
         try store.discardUnreadableAudioRemovals()
     }
 
+    /// Runs `decide` with every audio path History still uses: every row,
+    /// every queued take, every commit in flight and every pending removal.
+    /// It serves the iPhone's one-time removal of audio earlier clears left
+    /// (PA-30); the Mac never calls it. `decide` runs on this actor, under the
+    /// clear lock and after the last await, so no commit or clear starts while
+    /// it removes files. It never runs, and the result is nil, when a clear
+    /// has not finished or any of that state cannot be read fully.
+    func withReferencedAudioPaths<T: Sendable>(
+        _ decide: @Sendable (Set<String>) -> T
+    ) async -> T? {
+        await acquireClear()
+        defer { releaseClear() }
+        do {
+            guard try store.loadClearTransaction() == nil else { return nil }
+        } catch {
+            return nil
+        }
+        // A list set aside as unreadable names audio no one can tell apart.
+        guard store.unreadableAudioRemovalCount() == 0 else { return nil }
+        // The outbox is read before the rows, as in `removePendingAudio()`: a
+        // commit inserts its row before it removes its entry.
+        let scan = store.scan()
+        guard scan.issueCount == 0 else { return nil }
+        var referenced = Set(scan.entries.map(\.generation.audioPath))
+        referenced.formUnion(committingAudioPaths.keys)
+        let rows: [Generation]
+        do {
+            rows = try await fetchAllGenerations()
+        } catch {
+            return nil
+        }
+        referenced.formUnion(rows.map(\.audioPath))
+        // The await let other work on this actor run: a commit may have
+        // started, and a single delete may have listed a path.
+        referenced.formUnion(committingAudioPaths.keys)
+        do {
+            referenced.formUnion(try store.loadPendingAudioRemovals())
+        } catch {
+            return nil
+        }
+        return decide(referenced)
+    }
+
     func pendingAudioURLs() -> [URL] {
         store.scan().entries.compactMap { entry in
             guard FileManager.default.fileExists(atPath: entry.generation.audioPath) else { return nil }

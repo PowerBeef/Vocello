@@ -451,6 +451,12 @@ struct SettingsScreen: View {
     @State private var isSavedOutputsDialogPresented = false
     @State private var isFolderPickerPresented = false
     @State private var isExportPurchasePresented = false
+    /// PA-30: audio earlier History clears left, offered once in Models & Files.
+    @State private var leftoverAudio: IOSLeftoverAudioAnalysis.Leftovers?
+    @State private var isLeftoverAudioConfirmationPresented = false
+    @State private var isRemovingLeftoverAudio = false
+    @State private var isLeftoverAudioFailurePresented = false
+    @State private var leftoverAudioFailureMessage = ""
 
     private var readyModelCount: Int {
         TTSModel.all.reduce(into: 0) { total, model in
@@ -619,6 +625,63 @@ struct SettingsScreen: View {
             guard case let .success(urls) = result, let url = urls.first else { return }
             try? IOSSavedOutputsDestination.setFolder(url)
         }
+        .task { await refreshLeftoverAudio() }
+        .alert(
+            IOSInterfaceText.leftoverAudioConfirmTitle,
+            isPresented: $isLeftoverAudioConfirmationPresented,
+            presenting: leftoverAudio
+        ) { leftovers in
+            Button(IOSInterfaceText.leftoverAudioRemove, role: .destructive) { removeLeftoverAudio(leftovers) }
+                .accessibilityIdentifier("iosSettings_leftoverAudioRemove")
+            Button(IOSInterfaceText.leftoverAudioKeep) { keepLeftoverAudio() }
+                .accessibilityIdentifier("iosSettings_leftoverAudioKeep")
+            Button(IOSInterfaceText.cancel, role: .cancel) {}
+                .accessibilityIdentifier("iosSettings_leftoverAudioCancel")
+        } message: { leftovers in
+            Text(IOSInterfaceText.leftoverAudioConfirmMessage(
+                count: leftovers.count,
+                size: IOSSettingsFormatters.fileSize(leftovers.byteCount)
+            ))
+        }
+        .alert(IOSInterfaceText.leftoverAudioNotRemoved, isPresented: $isLeftoverAudioFailurePresented) {
+            Button(IOSInterfaceText.ok, role: .cancel) {}
+                .accessibilityIdentifier("iosSettings_leftoverAudioFailureDismiss")
+        } message: {
+            Text(leftoverAudioFailureMessage)
+        }
+    }
+
+    /// Finds the audio earlier History clears left, unless the one-time review
+    /// is done or History cannot be read fully (then nothing is offered).
+    private func refreshLeftoverAudio() async {
+        leftoverAudio = await IOSLeftoverAudioCleanup.pendingOffer()
+    }
+
+    /// Removes only what the user confirmed and History still does not use.
+    /// A failure is never silent; what could not be removed stays offered.
+    private func removeLeftoverAudio(_ confirmed: IOSLeftoverAudioAnalysis.Leftovers) {
+        guard !isRemovingLeftoverAudio else { return }
+        isRemovingLeftoverAudio = true
+        Task {
+            let outcome = await IOSLeftoverAudioCleanup.remove(confirmed)
+            if let outcome {
+                if outcome.failedCount > 0 {
+                    leftoverAudioFailureMessage = IOSInterfaceText.leftoverAudioFailed(outcome.failedCount)
+                    isLeftoverAudioFailurePresented = true
+                }
+            } else {
+                leftoverAudioFailureMessage = IOSInterfaceText.leftoverAudioUnavailable
+                isLeftoverAudioFailurePresented = true
+            }
+            await refreshLeftoverAudio()
+            isRemovingLeftoverAudio = false
+        }
+    }
+
+    /// Keep Files ends the offer for good; the audio stays where it is.
+    private func keepLeftoverAudio() {
+        IOSLeftoverAudioCleanup.markReviewed()
+        leftoverAudio = nil
     }
 
     private var audioSection: some View {
@@ -691,6 +754,20 @@ struct SettingsScreen: View {
                     accessibilityHint: IOSSettingsText.savedOutputsHint,
                     action: { isSavedOutputsDialogPresented = true }
                 )
+
+                if let leftoverAudio {
+                    IOSSettingsDivider()
+                    IOSSettingsValueRow(
+                        symbol: "trash",
+                        title: IOSInterfaceText.leftoverAudioTitle,
+                        subtitle: IOSInterfaceText.leftoverAudioFiles(leftoverAudio.count),
+                        accessibilityIdentifier: "iosSettings_leftoverAudioRow",
+                        value: IOSSettingsFormatters.fileSize(leftoverAudio.byteCount),
+                        accessibilityHint: IOSInterfaceText.leftoverAudioHint,
+                        action: { isLeftoverAudioConfirmationPresented = true }
+                    )
+                    .disabled(isRemovingLeftoverAudio)
+                }
             }
         }
     }

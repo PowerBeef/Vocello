@@ -100,7 +100,7 @@ private final class IOSControlAuditRecorder {
         "delivery-options", "delivery-editor", "language-options", "variation-options",
         "studio-chips", "reference-actions", "voice-enrollment", "voices-surface",
         "saved-voice-rows", "history-surface", "history-unqueued", "startup-recovery", "history-rows",
-        "settings-preferences",
+        "settings-preferences", "settings-leftover-audio",
         "settings-links", "model-rows", "player-controls", "recording-controls",
         "attribution-controls", "onboarding-controls", "sheet-navigation",
     ]
@@ -400,6 +400,14 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
             VocelloUIScreenshot.attach(element("iosModelRow_\(modelID)"), named: "ios-control-audit-model-\(modelID)")
         }
         leaveVoiceModels()
+        // PA-30: removing or keeping is final for the user's own audio, so the
+        // campaign never answers the one-time offer.
+        recorder.record(
+            scenario: "stateful", controlID: "settings-leftover-audio",
+            classification: "BLOCKED_PRESERVATION_POLICY",
+            expected: "Audio earlier History clears left is offered once with its count and size, removed only after confirmation",
+            actual: "Remove Audio and Keep Files are final for user audio; this campaign never answers the offer"
+        )
 
         select(tab: .history)
         recorder.record(

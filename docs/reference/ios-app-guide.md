@@ -302,7 +302,8 @@ retry (AUD-05); retry `historyRetryButton`. There is no "Keep Audio Files"
 option on iPhone (PA-21, IOS-10): outputs live in the private App Group `outputs/`, which neither
 the app nor Files can reach once their rows are gone, while backup would keep carrying them. Copies
 already exported or saved to a Saved outputs folder are outside the app and are not touched. macOS
-keeps the option because Finder reaches its output folder. Mode-filter chips
+keeps the option because Finder reaches its output folder. Audio that earlier iPhone clears kept is
+offered once for a confirmed removal in Settings → Models & Files (PA-30). Mode-filter chips
 `historyModeFilter` container + `historyModeFilter_all|custom|design|clone`. Rows:
 `historyRow_<id>`, tap area `historyRowTap_<id>` (opens player), menu `historyRowMenu_<id>`
 (Play / Save audio / Pin seed / Delete — the pin item `historyRowPinSeed_<id>` appears only for
@@ -369,6 +370,15 @@ batches are still pending under ASR-12/ISU-4.
 Audio retains `iosSettings_autoPlayToggle` (default on) and the unchanged
 `iosSettings_variationRow` menu. Models & Files owns `iosSettings_voiceModelsRow` and
 `iosSettings_savedOutputsRow`, including the existing History/folder picker and bookmark behavior.
+It also offers, once, the audio earlier History clears left in the private `outputs/` (PA-30;
+`IOSLeftoverAudioCleanup`): `iosSettings_leftoverAudioRow` shows the file count and total size of
+WAV files in the take folders, written before the current app session, whose name no History row,
+queued or committing take, or pending removal names. Its confirmation offers
+`iosSettings_leftoverAudioRemove` (only regular files, through the History guarded removal, decided
+again against History at that moment), `iosSettings_leftoverAudioKeep` (ends the offer for good) and
+`iosSettings_leftoverAudioCancel`; a failure is reported (`iosSettings_leftoverAudioFailureDismiss`).
+Nothing is offered while a clear or long-form acceptance is pending, or while History, its outbox
+or its removal list cannot be read fully. The Mac outputs folder is never touched.
 Accessibility owns `iosSettings_reduceMotionToggle` and `iosSettings_reduceTransparencyToggle`.
 Privacy & Permissions retains `voiceCloning_consentAcknowledgment`, its full legal disclosure,
 `iosSettings_privacyPolicyRow`, and `iosSettings_openIOSSettingsRow`. About owns

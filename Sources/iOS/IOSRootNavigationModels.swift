@@ -706,6 +706,56 @@ import QwenVoiceCore
         IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.historyAudioRemovalPending", defaultValue: "%1$lld audio files from deleted takes are still stored on this iPhone. Retry to delete them.",
                    comment: "iOS History recovery banner detail; %1$lld is how many audio files of deleted takes could not be deleted yet. Presentation only."), count)
     }
+    // PA-30: the one-time, confirmed removal of audio earlier History clears left.
+    static var leftoverAudioTitle: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.leftoverAudioTitle", defaultValue: "Audio from Earlier Clears",
+               comment: "iOS Settings Models & Files row title: audio that earlier History clears left in the app's private storage, offered for removal once. Presentation only.")
+    }
+    static func leftoverAudioFiles(_ count: Int) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.leftoverAudioFiles", defaultValue: "%1$lld audio files no History item uses",
+                   comment: "iOS Settings row subtitle; %1$lld is how many audio files earlier History clears left that no History item uses. Presentation only."), count)
+    }
+    static var leftoverAudioHint: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.leftoverAudioHint", defaultValue: "Asks before removing this audio from this iPhone",
+               comment: "iOS accessibility hint of the Settings row that offers to remove audio earlier History clears left. Presentation only.")
+    }
+    static var leftoverAudioConfirmTitle: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.leftoverAudioConfirmTitle", defaultValue: "Remove Audio from Earlier Clears?",
+               comment: "iOS alert title confirming the one-time removal of audio earlier History clears left. Presentation only.")
+    }
+    /// The confirmation message: how many files, then how much space, in two
+    /// complete sentences so each keeps its own grammar.
+    static func leftoverAudioConfirmMessage(count: Int, size: String) -> String {
+        leftoverAudioConfirmCount(count) + "\n\n" + leftoverAudioConfirmSize(size)
+    }
+    static func leftoverAudioConfirmCount(_ count: Int) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.leftoverAudioConfirmCount", defaultValue: "%1$lld audio files that earlier History clears left are still stored on this iPhone. No History item or queued take uses them.",
+                   comment: "iOS alert message, first sentence; %1$lld is how many audio files earlier History clears left that no History item or queued take uses. Presentation only."), count)
+    }
+    static func leftoverAudioConfirmSize(_ size: String) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.leftoverAudioConfirmSize", defaultValue: "Removing this audio frees %1$@ and can’t be undone. If you keep it, Vocello won’t offer this again.",
+                   comment: "iOS alert message, second sentence; %1$@ is the formatted total size of the audio, such as 84 MB. Keeping the files ends the offer for good. Presentation only."), size)
+    }
+    static var leftoverAudioRemove: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.leftoverAudioRemove", defaultValue: "Remove Audio",
+               comment: "iOS destructive alert button that removes the audio earlier History clears left. Presentation only.")
+    }
+    static var leftoverAudioKeep: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.leftoverAudioKeep", defaultValue: "Keep Files",
+               comment: "iOS alert button that keeps the audio earlier History clears left and ends the offer for good. Presentation only.")
+    }
+    static var leftoverAudioNotRemoved: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.leftoverAudioNotRemoved", defaultValue: "Audio Was Not Removed",
+               comment: "iOS alert title when some or all of the audio earlier History clears left could not be removed. Presentation only.")
+    }
+    static func leftoverAudioFailed(_ count: Int) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.leftoverAudioFailed", defaultValue: "%1$lld audio files could not be removed and are still stored on this iPhone. You can try again.",
+                   comment: "iOS alert message; %1$lld is how many audio files earlier History clears left could not be removed. Presentation only."), count)
+    }
+    static var leftoverAudioUnavailable: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.leftoverAudioUnavailable", defaultValue: "History could not be checked completely, so no audio was removed. Try again later.",
+               comment: "iOS alert message when History or its pending records could not be read, so nothing was removed. Presentation only.")
+    }
     static var historyShowMore: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.historyShowMore", defaultValue: "Show More",
                comment: "iOS History button below the list that loads the next page of older takes. Presentation only.")

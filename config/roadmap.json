@@ -1446,7 +1446,7 @@
       "id": "BT-01",
       "plan": "benchmark-telemetry-audit-2026-09",
       "title": "Trustworthy memory evidence",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "Offline replay puts the 8 in-process macOS UI records near 1.0 (peak over mlxPeakMB), routine cache clears raise no warnings, every committed record reports a peak-missed count, and all legacy records still validate; the next consented memory lane shows the kernel peak at or above mlxPeakMB on every take.",
       "sourceOfTruth": [
@@ -1455,14 +1455,14 @@
         "Sources/QwenVoiceCore/NativeTelemetrySampler.swift",
         "config/memory-qualification-policy.json"
       ],
-      "notes": "Audit #1 #2 #3 #4 #16 #24 #25 #26 #64 #65 #66 #67 #68 #70 #90 V-4. Headline: since the engine moved in-process, macOS UI memory is summed from two samplers of one process (about 1.8x in 8 exploratory records; no canonical record yet), and the 500 ms sampler misses short peaks (119 of 173 memory-qualification takes miss the Metal peak) while exact high-water marks go unused. Needs maintainer rule decisions (audit 4.4: native.md single memory series per process; release.md coverage rule). Must land before AV-17. Maintainer decisions 2026-09-25: approved one memory series per process (native.md, app layer for frontend timings only) and replacing the >=95% coverage rule with a maximum unobserved gap plus a peak-fidelity check (native.md, release.md); keep memory-profile traces by default (#69, release.md).",
+      "notes": "Audit #1 #2 #3 #4 #16 #24 #25 #26 #64 #65 #66 #67 #68 #70 #90 V-4. Headline: since the engine moved in-process, macOS UI memory is summed from two samplers of one process (about 1.8x in 8 exploratory records; no canonical record yet), and the 500 ms sampler misses short peaks (119 of 173 memory-qualification takes miss the Metal peak) while exact high-water marks go unused. Needs maintainer rule decisions (audit 4.4: native.md single memory series per process; release.md coverage rule). Must land before AV-17. Maintainer decisions 2026-09-25: approved one memory series per process (native.md, app layer for frontend timings only) and replacing the >=95% coverage rule with a maximum unobserved gap plus a peak-fidelity check (native.md, release.md); keep memory-profile traces by default (#69, release.md). 2026-09-25 landed: the routine post-generation cache clear is counted apart from pressure (#24/#90), a missed-peak warning and peak-miss-report (#3 part 3), one declared source for the iPhone memory bands (V-4). Open: #1/#2 and the coverage rule (approved), #3 parts 1-2, #4, #16, #25/#26, #64-#68, #70.",
       "updated": "2026-09-25"
     },
     {
       "id": "BT-02",
       "plan": "benchmark-telemetry-audit-2026-09",
       "title": "Engine gate and CLI bench ready for the M6 re-seed",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "Offline comparator replay shows no false regression and flags a synthetic +6% RTF, a gate with a missing model stops within seconds with a finalized ledger, and the AV-17 session seeds the M6 baseline from at least 3 seeded runs on identical source with the thresholds printed.",
       "sourceOfTruth": [
@@ -1471,7 +1471,7 @@
         "Sources/VocelloCLI/BenchCommand.swift",
         "benchmarks/baselines/mac-gate-bench.json"
       ],
-      "notes": "Audit #5 #11 #13 #14 #15 #19 #20 #27 #36 #53 #54 #55 #57 #58 #59 #63 V-5 V-6 V-7. Headlines: the footprint threshold collapsed to a flat 5% while identical-source runs drift 2-13% (false regressions on re-seed), the gate is unseeded, the printed repair command wastes a run, a missing model is found only after 3-4 minutes, the 48-sidecar prune makes the default 58-take matrix unpublishable, and the bench's telemetry-off arm is not off. Files are in harnessHash or the baseline identity, so this lands before the re-seed. Must land before AV-17. Maintainer decisions 2026-09-25: the gate bench measures five warm takes (release.md:89, #5) and a stricter per-take host-load limit marks a timing record exploratory (#28, release.md host rules).",
+      "notes": "Audit #5 #11 #13 #14 #15 #19 #20 #27 #36 #53 #54 #55 #57 #58 #59 #63 V-5 V-6 V-7. Maintainer decisions 2026-09-25: five warm takes and a stricter per-take load limit. Landed 2026-09-25: a seeded gate with governed pooled seeding (at least three seeded runs on one clean commit) and identity read from the evidence, memory tier bound; five warm takes; spread-floored thresholds printed; a preflight that stops a missing model within seconds with a finalized ledger; INCONCLUSIVE from the busiest judged take and from low power; a take above the core count marks its engine record exploratory; Clone prewarm before the warm takes; no duplicate core tests or full pytest in the gate; the bench's telemetry-off arm truly off; the sidecar budget sized to the run; forced memory-class rows refused and a refused identity never truncates a baseline. Open: the consent-bound AV-17 re-seed on the M6.",
       "updated": "2026-09-25"
     },
     {
@@ -1494,7 +1494,7 @@
       "id": "BT-04",
       "plan": "benchmark-telemetry-audit-2026-09",
       "title": "Lineage identity, history and CI evidence tests",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "Offline key replay links at least 9 of 16 canonical macOS UI records with legacy keys unchanged, test_benchmark_history runs 55 passed and 0 skipped on Linux, and every manifest producer round-trips through validate_record.",
       "sourceOfTruth": [
@@ -1502,14 +1502,14 @@
         "scripts/publish_benchmark_history.py",
         "scripts/ci/classify_changes.py"
       ],
-      "notes": "Audit #8 #22 #23 #46 #47 #71 #73 #76 #91-#94. Headlines: producer round-trip tests would have caught four publication refusals (each a new 14-17 minute consented run); the comparison key is broader than the measurement (needs a rules decision, audit 4.4); 55 darwin-only publication tests never run in CI; mocking one host probe saves about 35-40 s of macOS CI per push. Must land before AV-17. Maintainer decision 2026-09-25: approved narrowing each record kind's comparison key to what it measures, legacy keys byte-identical, with a contract-version bump rule (release.md, #22 #23 #34).",
+      "notes": "Audit #8 #22 #23 #46 #47 #71 #73 #76 #91-#94. Headlines: producer round-trip tests would have caught four publication refusals (each a new 14-17 minute consented run); the comparison key is broader than the measurement (needs a rules decision, audit 4.4); 55 darwin-only publication tests never run in CI; mocking one host probe saves about 35-40 s of macOS CI per push. Must land before AV-17. Maintainer decision 2026-09-25: approved narrowing each record kind's comparison key to what it measures, legacy keys byte-identical, with a contract-version bump rule (release.md, #22 #23 #34). 2026-09-25 landed: the host probe mocked (#47), the registry tests run on Linux (#46), producer round-trip tests (#8), narrower CI routing for research tests (#91) and #92-#94/#73. Open: the approved comparison-key narrowing (#22, #23, #34), #71, #76.",
       "updated": "2026-09-25"
     },
     {
       "id": "BT-05",
       "plan": "benchmark-telemetry-audit-2026-09",
       "title": "Audio, language and delivery QC accuracy",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "Offline replay flags the known run-on takes and reproduces the paired prosody effects from the deliveryD* deltas exactly, a supervised run under fr_CA returns qualified, and the next lang-bench publishes a per-channel verdict from two families.",
       "sourceOfTruth": [
@@ -1518,14 +1518,14 @@
         "scripts/independent_asr.py",
         "scripts/delivery_resource_supervisor.py"
       ],
-      "notes": "Audit #7 #9 #10 #37-#44 #84-#86 #88 #89 #101-#106 V-10 V-11 V-12. Headlines: the published deliveryProsodyEffect on all 902 takes is the instructed take's absolute expressiveness, not the paired effect; the delivery supervisor's swap probe fails under the host's fr_CA locale (lands as one batch before AV-17(5)); threshold changes go through the audio-qc threshold authority (audit 4.5).",
+      "notes": "Audit #7 #9 #10 #37-#44 #84-#86 #88 #89 #101-#106 V-10 V-11 V-12. Headlines: the published deliveryProsodyEffect on all 902 takes is the instructed take's absolute expressiveness, not the paired effect; the delivery supervisor's swap probe fails under the host's fr_CA locale (lands as one batch before AV-17(5)); threshold changes go through the audio-qc threshold authority (audit 4.5). 2026-09-25 landed: the paired prosody effect published beside the legacy key (#9) and the warn-only speaking-rate flag (QC v8, #10). Open: the supervisor batch (#7, #38, #101, #102) and the rest.",
       "updated": "2026-09-25"
     },
     {
       "id": "BT-06",
       "plan": "benchmark-telemetry-audit-2026-09",
       "title": "Timing attribution, profiles and device-lane observers",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "The token read has its own timer and signpost, a kept-trace macOS profile publishes per-take interval statistics that pass the 36x(tokens+1) completeness check, the iOS memory profile passes the VM auto-snapshot guard, and the iOS memory, clone-conditioning and gate waits poll only the sentinel and check that the process is alive.",
       "sourceOfTruth": [
@@ -1533,7 +1533,7 @@
         "Sources/QwenVoiceCore/NativeTelemetry.swift",
         "scripts/ios_device.sh"
       ],
-      "notes": "Audit #12 #45 #48-#52 #56 #60-#62 #69 #87 #95-#100 V-2. Headlines: the Instruments profile lanes publish only row counts and discard the one independent timing witness; signposts are not paired with JSONL timings; device-lane waits poll more than the sentinel. Device parts wait for the iPhone.",
+      "notes": "Audit #12 #45 #48-#52 #56 #60-#62 #69 #87 #95-#100 V-2. Headlines: the Instruments profile lanes publish only row counts and discard the one independent timing witness; signposts are not paired with JSONL timings; device-lane waits poll more than the sentinel. Device parts wait for the iPhone. 2026-09-25 landed: tokensPerSecond on ContinuousClock (#60), the startup windows RTF excludes and run.ttfcDefinition (#58, #59).",
       "updated": "2026-09-25"
     }
   ]

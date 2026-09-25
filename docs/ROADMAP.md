@@ -189,31 +189,31 @@ Narrative authority: [`docs/audits/2026-09-25-benchmark-telemetry-audit.md`](aud
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `BT-01` | planned | Trustworthy memory evidence | — |
-| `BT-02` | planned | Engine gate and CLI bench ready for the M6 re-seed | — |
+| `BT-01` | in-flight | Trustworthy memory evidence | — |
+| `BT-02` | in-flight | Engine gate and CLI bench ready for the M6 re-seed | — |
 | `BT-03` | planned | UI benchmark and ui-perf lanes ready for the M6 | — |
-| `BT-04` | planned | Lineage identity, history and CI evidence tests | — |
-| `BT-05` | planned | Audio, language and delivery QC accuracy | — |
-| `BT-06` | planned | Timing attribution, profiles and device-lane observers | — |
+| `BT-04` | in-flight | Lineage identity, history and CI evidence tests | — |
+| `BT-05` | in-flight | Audio, language and delivery QC accuracy | — |
+| `BT-06` | in-flight | Timing attribution, profiles and device-lane observers | — |
 
 ### Open items in detail
 
-- **`BT-01`** (planned) — Trustworthy memory evidence.
+- **`BT-01`** (in-flight) — Trustworthy memory evidence.
   gate: Offline replay puts the 8 in-process macOS UI records near 1.0 (peak over mlxPeakMB), routine cache clears raise no warnings, every committed record reports a peak-missed count, and all legacy records still validate; the next consented memory lane shows the kernel peak at or above mlxPeakMB on every take.
 
-- **`BT-02`** (planned) — Engine gate and CLI bench ready for the M6 re-seed.
+- **`BT-02`** (in-flight) — Engine gate and CLI bench ready for the M6 re-seed.
   gate: Offline comparator replay shows no false regression and flags a synthetic +6% RTF, a gate with a missing model stops within seconds with a finalized ledger, and the AV-17 session seeds the M6 baseline from at least 3 seeded runs on identical source with the thresholds printed.
 
 - **`BT-03`** (planned) — UI benchmark and ui-perf lanes ready for the M6.
   gate: The first canonical M6 UI benchmark validates in one pass under a declared stall contract with every take on the Speed variant, and M6 perf records carry an M6 calibration profile rather than M2 verdicts.
 
-- **`BT-04`** (planned) — Lineage identity, history and CI evidence tests.
+- **`BT-04`** (in-flight) — Lineage identity, history and CI evidence tests.
   gate: Offline key replay links at least 9 of 16 canonical macOS UI records with legacy keys unchanged, test_benchmark_history runs 55 passed and 0 skipped on Linux, and every manifest producer round-trips through validate_record.
 
-- **`BT-05`** (planned) — Audio, language and delivery QC accuracy.
+- **`BT-05`** (in-flight) — Audio, language and delivery QC accuracy.
   gate: Offline replay flags the known run-on takes and reproduces the paired prosody effects from the deliveryD* deltas exactly, a supervised run under fr_CA returns qualified, and the next lang-bench publishes a per-channel verdict from two families.
 
-- **`BT-06`** (planned) — Timing attribution, profiles and device-lane observers.
+- **`BT-06`** (in-flight) — Timing attribution, profiles and device-lane observers.
   gate: The token read has its own timer and signpost, a kept-trace macOS profile publishes per-take interval statistics that pass the 36x(tokens+1) completeness check, the iOS memory profile passes the VM auto-snapshot guard, and the iOS memory, clone-conditioning and gate waits poll only the sentinel and check that the process is alive.
 
 ## Delivery instruction quality and Qwen3-TTS prompting

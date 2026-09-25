@@ -775,3 +775,54 @@ def test_preflight_predicts_whether_the_gate_can_compare_or_seed():
         dirty = _expected_identity(tmp, dirty=True)
         assert _summarize("--preflight-baseline", staged, "--expected-identity", dirty, "--seeding")[0] == 1
         assert _summarize("--preflight-baseline", staged, "--expected-identity", expected, "--seeding")[0] == 0
+
+
+def _drop_host_identity(manifest):
+    """Evidence captured before the run-time host identity was recorded."""
+    with open(manifest, encoding="utf-8") as stream:
+        evidence = json.load(stream)
+    history = evidence["historyRecord"]
+    for key in ("osVersion", "osBuild"):
+        history["hardware"].pop(key)
+    for key in ("xcodeVersion", "xcodeBuild", "swiftVersion"):
+        history["toolchain"].pop(key)
+    with open(manifest, "w", encoding="utf-8") as stream:
+        json.dump(evidence, stream)
+
+
+def test_evidence_without_host_identity_still_compares_with_a_baseline_that_has_none():
+    """The identity is derived only when the baseline has one to compare."""
+    with tempfile.TemporaryDirectory() as tmp:
+        diag, manifest = _write_gate_run(tmp, "old")
+        _drop_host_identity(manifest)
+        arguments = _gate_args(diag, manifest, "old")
+        # An ad-hoc baseline saved without evidence carries no identity.
+        adhoc = os.path.join(tmp, "adhoc.json")
+        assert _summarize(diag, "--run-id", "old", "--engine-only", "--save-baseline", adhoc)[0] == 0
+        with open(adhoc, encoding="utf-8") as stream:
+            assert "identity" not in json.load(stream)
+        assert _summarize(*arguments, "--compare-baseline", adhoc)[0] == 0
+        # A legacy cell array has no identity either.
+        legacy = os.path.join(tmp, "legacy.json")
+        with open(adhoc, encoding="utf-8") as stream:
+            cells = json.load(stream)["cells"]
+        with open(legacy, "w", encoding="utf-8") as stream:
+            json.dump(cells, stream)
+        assert _summarize(*arguments, "--compare-baseline", legacy)[0] == 0
+        # A baseline saved before host identity existed compares on the rest.
+        pre_host = os.path.join(tmp, "pre-host.json")
+        identity = sgt.baseline_identity_from_evidence(_evidence())
+        for key in sgt.HOST_IDENTITY_KEYS:
+            identity.pop(key)
+        with open(pre_host, "w", encoding="utf-8") as stream:
+            json.dump({"schemaVersion": 2, "rtfDefinition": "wall/audio", "identity": identity,
+                       "cells": cells}, stream)
+        assert _summarize(*arguments, "--compare-baseline", pre_host, "--require-baseline-identity")[0] == 0
+        # A governed baseline bound to a host identity cannot compare that evidence ...
+        governed = os.path.join(tmp, "governed.json")
+        with open(governed, "w", encoding="utf-8") as stream:
+            json.dump(sgt.baseline_document(cells, _evidence()), stream)
+        status, text = _summarize(*arguments, "--compare-baseline", governed)
+        assert status == 1 and "osBuild" in text
+        # ... and --require-baseline-identity still rejects a baseline without one.
+        assert _summarize(*arguments, "--compare-baseline", adhoc, "--require-baseline-identity")[0] == 1

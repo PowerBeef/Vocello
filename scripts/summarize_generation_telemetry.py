@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import functools
 import json
 import hashlib
 import os
@@ -1216,7 +1217,7 @@ def _identity_fields(history):
     return fields
 
 
-def baseline_identity_from_evidence(payload):
+def baseline_identity_from_evidence(payload, *, require_host_identity=True):
     """Return the performance-comparison identity from validated evidence.
 
     Source and executable digests are deliberately excluded: a regression
@@ -1225,6 +1226,8 @@ def baseline_identity_from_evidence(payload):
     artifact, matrix/corpus (the matrix hash binds the sampling seed), and
     evidence semantics remain exact so unlike lanes can never compare. Every
     field is read from the evidence; nothing is probed on the comparing host.
+    `require_host_identity=False` is only for comparing with a baseline saved
+    before host identity was recorded, which ignores those keys.
     """
     if not isinstance(payload, dict):
         raise ValueError("baseline identity requires an evidence manifest")
@@ -1250,7 +1253,10 @@ def baseline_identity_from_evidence(payload):
             "telemetrySchemaVersion", "qcAlgorithmVersion",
         )
     }
-    missing = [key for key, value in identity.items() if value in (None, "", [])]
+    missing = [
+        key for key, value in identity.items()
+        if value in (None, "", []) and (require_host_identity or key not in HOST_IDENTITY_KEYS)
+    ]
     if missing:
         raise ValueError(
             "baseline identity is missing: " + ", ".join(sorted(missing))
@@ -1422,6 +1428,13 @@ def baseline_rtf_definition(payload):
 
 
 def baseline_cells(payload, *, current_identity=None, require_identity=False):
+    """The baseline's cells once its identity (if any) matches the current run.
+
+    `current_identity` is the run's identity, or a callable that derives it
+    (`require_host_identity=` keyword) and is called only when the baseline
+    carries an identity to compare, so an ad-hoc or legacy baseline never needs
+    evidence the run lacks.
+    """
     if isinstance(payload, list):
         if require_identity:
             raise ValueError("legacy baseline has no optimization/topology identity")
@@ -1437,12 +1450,15 @@ def baseline_cells(payload, *, current_identity=None, require_identity=False):
         return cells
     if not isinstance(identity, dict):
         raise ValueError("schema-v2 baseline has no identity")
+    # A baseline saved before host identity was recorded compares the rest, and
+    # the caller says so.
+    legacy_host = not any(key in identity for key in HOST_IDENTITY_KEYS)
+    if callable(current_identity):
+        current_identity = current_identity(require_host_identity=not legacy_host)
     if current_identity is None:
         raise ValueError("schema-v2 baseline comparison requires current evidence identity")
     comparable_current = dict(current_identity)
-    if not any(key in identity for key in HOST_IDENTITY_KEYS):
-        # Baseline saved before host identity was recorded: compare the rest and
-        # let the caller say so.
+    if legacy_host:
         for key in HOST_IDENTITY_KEYS:
             comparable_current.pop(key, None)
     differences = identity_differences(identity, comparable_current)
@@ -2492,8 +2508,10 @@ def compare_baseline_command(args, cells, evidence_payload, compare_states, sele
     identity_error = None
     baseline = None
     try:
+        # Derived only when the baseline has an identity to compare: an ad-hoc
+        # or legacy baseline compares evidence that predates the host identity.
         current_identity = (
-            baseline_identity_from_evidence(evidence_payload)
+            functools.partial(baseline_identity_from_evidence, evidence_payload)
             if evidence_payload is not None
             else None
         )

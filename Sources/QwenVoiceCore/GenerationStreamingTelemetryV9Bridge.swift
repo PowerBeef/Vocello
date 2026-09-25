@@ -124,8 +124,10 @@ public struct ShippingChunkObservationV9: Codable, Hashable, Sendable {
         self.previewDisposition = previewDisposition
     }
 
-    /// Whether exact MLX enqueue/materialization instants are present for a
-    /// complete schema-v9 chunk range (no invented zeros).
+    /// Whether MLX enqueue/materialization instants are present for a
+    /// complete schema-v9 chunk range (no invented zeros). They are derived
+    /// from step durations, not observed MLX events; `materializedAtNS` is the
+    /// consumer's receipt of the chunk (audit #49/#62).
     public var hasExactMLXChunkInstants: Bool {
         generatedAtNS != nil
             && mlxEvaluationEnqueuedAtNS != nil

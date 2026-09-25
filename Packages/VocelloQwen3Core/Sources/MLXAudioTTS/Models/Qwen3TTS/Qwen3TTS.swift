@@ -17,10 +17,17 @@ typealias TokenizerError = Tokenizers.TokenizerError
 
 /// TEL-001: stage signposts correlate the Qwen hot path with typed chunk timings.
 private enum Qwen3Signposts {
-    static let signposter = OSSignposter(
-        subsystem: "com.qwenvoice.engine.qwen3",
-        category: "generation"
-    )
+    static let subsystem = "com.qwenvoice.engine.qwen3"
+    static let category = "generation"
+    static let signposter = OSSignposter(subsystem: subsystem, category: category)
+
+    /// The same subsystem and category for per-step intervals emitted through
+    /// the allocation-free `os_signpost` entry point: `OSSignposter.beginInterval`
+    /// allocates an interval-state object on every call (V-2). Made once per
+    /// generation, outside the token loop.
+    static func makeStepLog() -> OSLog {
+        OSLog(subsystem: subsystem, category: category)
+    }
 }
 
 private func qwen3TTSLog(_ message: String) {
@@ -3370,84 +3377,103 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         if isStreaming {
             pendingStreamCodes.reserveCapacity(max(streamingChunkSize, postFirstStreamingChunkSize))
         }
-        var tokenLoopTotalMS = 0
-        var talkerForwardTotalMS = 0
-        var sampleFirstCodebookTotalMS = 0
-        var codePredictorTotalMS = 0
-        var codePredictorStepTotalMS = 0
-        var samplePredictedCodebookTotalMS = 0
-        var codecEmbeddingAssemblyTotalMS = 0
-        var streamingDecoderTotalMS = 0
+        // Hot-loop span totals accumulate at the clock's resolution and are
+        // rounded to whole milliseconds once, at export (audit #61/#95):
+        // rounding every step first sent each sub-millisecond span to zero
+        // before it was summed. Each span's signpost interval opens and
+        // closes around the same code as its clock reads, so a trace's
+        // per-name interval sums line up with these totals.
+        var tokenLoopTotal = Duration.zero
+        var talkerForwardTotal = Duration.zero
+        var sampleFirstCodebookTotal = Duration.zero
+        var codePredictorTotal = Duration.zero
+        var codePredictorStepTotal = Duration.zero
+        var samplePredictedCodebookTotal = Duration.zero
+        var codecEmbeddingAssemblyTotal = Duration.zero
+        var streamingDecoderTotal = Duration.zero
         var streamingDecoderCallCount = 0
         var mimiDecoderBreakdownTotal = MimiDecoderStepTimings()
-        // Snapshot of the cumulative `*TotalMS` accumulators at the
+        // Snapshot of the cumulative span totals at the
         // moment of the previous chunk's emit, so the per-chunk
         // sub-stage delta passed to `onAudioChunkTimings` reflects ONLY
         // the work done since the previous chunk (or since generation
         // start for the first chunk).
-        var lastChunkTalkerForwardMS = 0
-        var lastChunkCodePredictorMS = 0
-        var lastChunkStreamingDecoderMS = 0
+        var lastChunkTalkerForward = Duration.zero
+        var lastChunkCodePredictor = Duration.zero
+        var lastChunkStreamingDecoder = Duration.zero
         var lastChunkMimiDecoderBreakdown = MimiDecoderStepTimings()
         // TEL-001: mode-agnostic counters feed one per-chunk delta path.
-        var streamStepEvalTotalMS = 0
-        var streamStepEvalEnqueueTotalMS = 0
-        var streamStepEvalWaitTotalMS = 0
-        var streamStepEOSReadTotalMS = 0
-        var audioChunkEvalTotalMS = 0
-        var lastChunkStreamStepEvalMS = 0
-        var lastChunkStreamStepEvalEnqueueMS = 0
-        var lastChunkStreamStepEvalWaitMS = 0
-        var lastChunkStreamStepEOSReadMS = 0
-        var lastChunkAudioChunkEvalMS = 0
+        var streamStepEvalTotal = Duration.zero
+        var streamStepEvalEnqueueTotal = Duration.zero
+        var streamStepEvalWaitTotal = Duration.zero
+        // V-2: the first blocking read of each step (the sampled token). Under
+        // `.pipelined` this is where the host waits for the step's GPU work.
+        var streamStepTokenReadTotal = Duration.zero
+        var streamStepEOSReadTotal = Duration.zero
+        var audioChunkEvalTotal = Duration.zero
+        var lastChunkStreamStepEval = Duration.zero
+        var lastChunkStreamStepEvalEnqueue = Duration.zero
+        var lastChunkStreamStepEvalWait = Duration.zero
+        var lastChunkStreamStepEOSRead = Duration.zero
+        var lastChunkAudioChunkEval = Duration.zero
         // TEL-001: track peak KV-cache footprint across the generation.
         var peakKVCacheSeqLength = 0
         var peakKVCacheFootprintMB = 0.0
         var kvCacheTypeAtPeak = talker.model.latestCreatedCacheType
-        var designStreamStepEvalTotalMS = 0
-        var designStreamStepEOSReadTotalMS = 0
-        var designAudioChunkEvalTotalMS = 0
+        var designStreamStepEvalTotal = Duration.zero
+        var designStreamStepEOSReadTotal = Duration.zero
+        var designAudioChunkEvalTotal = Duration.zero
         var designGenerationStepsBeforeFirstChunk: Int?
         var designFirstChunkDecoderTokens: Int?
-        var customStreamStepEvalTotalMS = 0
-        var customStreamStepEOSReadTotalMS = 0
-        var customAudioChunkEvalTotalMS = 0
+        var customStreamStepEvalTotal = Duration.zero
+        var customStreamStepEOSReadTotal = Duration.zero
+        var customAudioChunkEvalTotal = Duration.zero
         var customGenerationStepsBeforeFirstChunk: Int?
         var customFirstChunkDecoderTokens: Int?
-        var cloneStreamStepEvalTotalMS = 0
-        var cloneStreamStepEOSReadTotalMS = 0
-        var cloneAudioChunkEvalTotalMS = 0
+        var cloneStreamStepEvalTotal = Duration.zero
+        var cloneStreamStepEOSReadTotal = Duration.zero
+        var cloneAudioChunkEvalTotal = Duration.zero
         var cloneGenerationStepsBeforeFirstChunk: Int?
         var cloneFirstChunkDecoderTokens: Int?
         var generationEndReason = "token_cap"
         var cacheClearCount = 0
+        func tokenLoopAttributedTotal() -> Duration {
+            talkerForwardTotal
+                + sampleFirstCodebookTotal
+                + codePredictorTotal
+                + codecEmbeddingAssemblyTotal
+                + streamStepEvalTotal
+                + streamStepTokenReadTotal
+                + streamStepEOSReadTotal
+                + streamingDecoderTotal
+                + audioChunkEvalTotal
+        }
+        // The named spans inside the token loop, read when the loop exits: the
+        // final flush, tail decode and tail eval run after the loop and must
+        // not hide in-loop time that no span covers.
+        var tokenLoopAttributedAtExit: Duration?
         func qwenTokenLoopUnattributedMS() -> Int {
-            let attributedMS = talkerForwardTotalMS
-                + sampleFirstCodebookTotalMS
-                + codePredictorTotalMS
-                + codecEmbeddingAssemblyTotalMS
-                + streamStepEvalTotalMS
-                + streamStepEOSReadTotalMS
-                + streamingDecoderTotalMS
-                + audioChunkEvalTotalMS
-            return max(0, tokenLoopTotalMS - attributedMS)
+            let attributed = tokenLoopAttributedAtExit ?? tokenLoopAttributedTotal()
+            return max(Duration.zero, tokenLoopTotal - attributed).roundedMilliseconds
         }
 
         func qwenHotLoopTimingsMS() -> [String: Int] {
             var timings: [String: Int] = [
-                "qwen_token_loop_total": tokenLoopTotalMS,
-                "qwen_talker_forward_total": talkerForwardTotalMS,
-                "qwen_sample_first_codebook_total": sampleFirstCodebookTotalMS,
-                "qwen_code_predictor_total": codePredictorTotalMS,
-                "qwen_code_predictor_step_total": codePredictorStepTotalMS,
-                "qwen_sample_predicted_codebook_total": samplePredictedCodebookTotalMS,
-                "qwen_codec_embedding_assembly_total": codecEmbeddingAssemblyTotalMS,
-                "qwen_stream_step_eval_total": streamStepEvalTotalMS,
-                "qwen_stream_step_eval_enqueue_total": streamStepEvalEnqueueTotalMS,
-                "qwen_stream_step_eval_wait_total": streamStepEvalWaitTotalMS,
-                "qwen_stream_step_eos_read_total": streamStepEOSReadTotalMS,
+                "qwen_token_loop_total": tokenLoopTotal.roundedMilliseconds,
+                "qwen_talker_forward_total": talkerForwardTotal.roundedMilliseconds,
+                "qwen_sample_first_codebook_total": sampleFirstCodebookTotal.roundedMilliseconds,
+                "qwen_code_predictor_total": codePredictorTotal.roundedMilliseconds,
+                "qwen_code_predictor_step_total": codePredictorStepTotal.roundedMilliseconds,
+                "qwen_sample_predicted_codebook_total": samplePredictedCodebookTotal.roundedMilliseconds,
+                "qwen_codec_embedding_assembly_total": codecEmbeddingAssemblyTotal.roundedMilliseconds,
+                "qwen_stream_step_eval_total": streamStepEvalTotal.roundedMilliseconds,
+                "qwen_stream_step_eval_enqueue_total": streamStepEvalEnqueueTotal.roundedMilliseconds,
+                "qwen_stream_step_eval_wait_total": streamStepEvalWaitTotal.roundedMilliseconds,
+                "qwen_stream_step_token_read_total": streamStepTokenReadTotal.roundedMilliseconds,
+                "qwen_stream_step_eos_read_total": streamStepEOSReadTotal.roundedMilliseconds,
                 "qwen_token_loop_unattributed": qwenTokenLoopUnattributedMS(),
-                "qwen_stream_decoder_total": streamingDecoderTotalMS,
+                "qwen_stream_decoder_total": streamingDecoderTotal.roundedMilliseconds,
+                "qwen_audio_chunk_eval_total": audioChunkEvalTotal.roundedMilliseconds,
                 "qwen_stream_decoder_calls": streamingDecoderCallCount,
                 "qwen_generated_code_count": generatedCodeCount,
                 "qwen_talker_kv_cache_offset": cache.first?.offset ?? 0,
@@ -3527,6 +3553,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         // (Stage 1 P3); the plan owns its K/V buffers, so no KVCacheSimple is
         // allocated for the streaming CP.
         let codePredictorStepConstants = CodePredictorStepConstants()
+        let tokenReadLog = Qwen3Signposts.makeStepLog()
 
         if isStreaming {
             speechTokenizer.decoder.resetStreamingState()
@@ -3568,18 +3595,21 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             pendingMaterializedChunk = nil
             guard let materializedEventSink else { return }
             let flushEvalStartedAt = ContinuousClock.now
+            let flushSignpost = Qwen3Signposts.signposter.beginInterval("Audio Chunk Flush")
             eval(pending.audioChunk)
+            Qwen3Signposts.signposter.endInterval("Audio Chunk Flush", flushSignpost)
             // Flush wait lands in the running audio-chunk-eval totals (its
             // chunk's own delta closed at assembly; this shifts attribution by
-            // at most one chunk in the diagnostic breakdown).
-            let flushElapsed = flushEvalStartedAt.elapsedMilliseconds
-            audioChunkEvalTotalMS += flushElapsed
+            // at most one chunk in the diagnostic breakdown). Its own interval
+            // name keeps it apart from the assembly-time `Audio Chunk Eval`.
+            let flushElapsed = flushEvalStartedAt.elapsed
+            audioChunkEvalTotal += flushElapsed
             if isPureVoiceDesign {
-                designAudioChunkEvalTotalMS += flushElapsed
+                designAudioChunkEvalTotal += flushElapsed
             } else if isDedicatedCustomVoice {
-                customAudioChunkEvalTotalMS += flushElapsed
+                customAudioChunkEvalTotal += flushElapsed
             } else if isVoiceCloneGeneration {
-                cloneAudioChunkEvalTotalMS += flushElapsed
+                cloneAudioChunkEvalTotal += flushElapsed
             }
             try Task.checkCancellation()
             let materializedSamples = pending.audioChunk.asArray(Float.self)
@@ -3595,7 +3625,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             try Task.checkCancellation()
             let tokenLoopStartedAt = ContinuousClock.now
             defer {
-                tokenLoopTotalMS += tokenLoopStartedAt.elapsedMilliseconds
+                tokenLoopTotal += tokenLoopStartedAt.elapsed
             }
 
             // Forward pass through talker
@@ -3603,7 +3633,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             let talkerSignpost = Qwen3Signposts.signposter.beginInterval("Talker Forward")
             let (logits, hidden) = talker(inputEmbeds, cache: cache)
             Qwen3Signposts.signposter.endInterval("Talker Forward", talkerSignpost)
-            talkerForwardTotalMS += talkerForwardStartedAt.elapsedMilliseconds
+            talkerForwardTotal += talkerForwardStartedAt.elapsed
 
             let allowsEOS = generatedCodeCount >= Self.productionMinimumGeneratedCodeTokensBeforeEOS
 
@@ -3627,7 +3657,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 "Sample First Codebook",
                 sampleFirstCodebookSignpost
             )
-            sampleFirstCodebookTotalMS += sampleFirstCodebookStartedAt.elapsedMilliseconds
+            sampleFirstCodebookTotal += sampleFirstCodebookStartedAt.elapsed
 
             // Defer sync to the eval boundary with inputEmbeds.
             let isEOS = nextToken .== eosTokenArray
@@ -3671,7 +3701,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     "Code Predictor Step",
                     codePredictorStepSignpost
                 )
-                codePredictorStepTotalMS += codePredictorStepStartedAt.elapsedMilliseconds
+                codePredictorStepTotal += codePredictorStepStartedAt.elapsed
 
                 let samplePredictedCodebookStartedAt = ContinuousClock.now
                 let samplePredictedCodebookSignpost =
@@ -3695,11 +3725,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     "Sample Predicted Codebook",
                     samplePredictedCodebookSignpost
                 )
-                samplePredictedCodebookTotalMS += samplePredictedCodebookStartedAt.elapsedMilliseconds
+                samplePredictedCodebookTotal += samplePredictedCodebookStartedAt.elapsed
                 codeTokens.append(nextCode)
             }
             Qwen3Signposts.signposter.endInterval("Code Predictor Loop", codePredictorSignpost)
-            codePredictorTotalMS += codePredictorStartedAt.elapsedMilliseconds
+            codePredictorTotal += codePredictorStartedAt.elapsed
 
             let allCodes = concatenated(codeTokens, axis: 1) // [1, num_code_groups]
             // Prepare next input
@@ -3725,7 +3755,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 "Codec Embedding Assembly",
                 codecEmbeddingSignpost
             )
-            codecEmbeddingAssemblyTotalMS += codecEmbeddingStartedAt.elapsedMilliseconds
+            codecEmbeddingAssemblyTotal += codecEmbeddingStartedAt.elapsed
             let streamStepEvalStartedAt = ContinuousClock.now
             let stepEvalSignpost = Qwen3Signposts.signposter.beginInterval("Step Eval Flush")
             switch streamStepEvalPolicy {
@@ -3739,17 +3769,20 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 break
             }
             Qwen3Signposts.signposter.endInterval("Step Eval Flush", stepEvalSignpost)
-            let streamStepEvalElapsed = streamStepEvalStartedAt.elapsedMilliseconds
-            streamStepEvalTotalMS += streamStepEvalElapsed
-            // TEL-001: synchronous eval attributes total wall time to enqueue; wait is zero.
-            streamStepEvalEnqueueTotalMS += streamStepEvalElapsed
-            streamStepEvalWaitTotalMS += 0
+            let streamStepEvalElapsed = streamStepEvalStartedAt.elapsed
+            streamStepEvalTotal += streamStepEvalElapsed
+            // The eval call is the enqueue. Only `.pipelined` has a separate,
+            // observable wait: the step's first blocking read below (audit
+            // #49/#62). A synchronous eval (`.full`, `.eosOnly`) fuses enqueue
+            // and wait inside this call, so its split stays all-enqueue and
+            // its wait is not observed.
+            streamStepEvalEnqueueTotal += streamStepEvalElapsed
             if isPureVoiceDesign {
-                designStreamStepEvalTotalMS += streamStepEvalElapsed
+                designStreamStepEvalTotal += streamStepEvalElapsed
             } else if isDedicatedCustomVoice {
-                customStreamStepEvalTotalMS += streamStepEvalElapsed
+                customStreamStepEvalTotal += streamStepEvalElapsed
             } else if isVoiceCloneGeneration {
-                cloneStreamStepEvalTotalMS += streamStepEvalElapsed
+                cloneStreamStepEvalTotal += streamStepEvalElapsed
             }
 
             // The previous chunk's materialization and sends run while this
@@ -3757,7 +3790,21 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             // `.token` send, so channel event order is unchanged.
             try await flushPendingMaterializedChunk()
 
+            // V-2: the sampled-token read is the step's first blocking read.
+            // Under `.pipelined` it waits for the GPU work `asyncEval`
+            // submitted above; untimed, that wait fell into
+            // `qwen_token_loop_unattributed`. Two clock reads and one
+            // exclusive `os_signpost` interval per step: no allocation and no
+            // lock on the hot path.
+            let tokenReadStartedAt = ContinuousClock.now
+            os_signpost(.begin, log: tokenReadLog, name: "Token Read")
             let tokenId = Int(nextToken[0, 0].item(Int32.self))
+            os_signpost(.end, log: tokenReadLog, name: "Token Read")
+            let tokenReadElapsed = tokenReadStartedAt.elapsed
+            streamStepTokenReadTotal += tokenReadElapsed
+            if streamStepEvalPolicy == .pipelined {
+                streamStepEvalWaitTotal += tokenReadElapsed
+            }
             if let materializedEventSink {
                 try Task.checkCancellation()
                 try await materializedEventSink(.token(tokenId))
@@ -3769,14 +3816,14 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             let eosReadSignpost = Qwen3Signposts.signposter.beginInterval("EOS Read")
             let reachedEOS = isEOS.item(Bool.self)
             Qwen3Signposts.signposter.endInterval("EOS Read", eosReadSignpost)
-            let eosReadElapsed = eosReadStartedAt.elapsedMilliseconds
-            streamStepEOSReadTotalMS += eosReadElapsed
+            let eosReadElapsed = eosReadStartedAt.elapsed
+            streamStepEOSReadTotal += eosReadElapsed
             if isPureVoiceDesign {
-                designStreamStepEOSReadTotalMS += eosReadElapsed
+                designStreamStepEOSReadTotal += eosReadElapsed
             } else if isDedicatedCustomVoice {
-                customStreamStepEOSReadTotalMS += eosReadElapsed
+                customStreamStepEOSReadTotal += eosReadElapsed
             } else if isVoiceCloneGeneration {
-                cloneStreamStepEOSReadTotalMS += eosReadElapsed
+                cloneStreamStepEOSReadTotal += eosReadElapsed
             }
             if reachedEOS {
                 generationEndReason = "eos"
@@ -3843,7 +3890,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                         decoded = speechTokenizer.decoder.streamingStep(codesForDecoder)
                     }
                     Qwen3Signposts.signposter.endInterval("Audio Decoder", decoderSignpost)
-                    streamingDecoderTotalMS += streamDecoderStartedAt.elapsedMilliseconds
+                    streamingDecoderTotal += streamDecoderStartedAt.elapsed
                     streamingDecoderCallCount += 1
                     let audioChunk = decoded[0]
                     let audioChunkEvalStartedAt = ContinuousClock.now
@@ -3854,14 +3901,14 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     // MLX value never crosses a task or actor boundary.
                     asyncEval(audioChunk)
                     Qwen3Signposts.signposter.endInterval("Audio Chunk Eval", audioChunkEvalSignpost)
-                    let audioChunkEvalElapsed = audioChunkEvalStartedAt.elapsedMilliseconds
-                    audioChunkEvalTotalMS += audioChunkEvalElapsed
+                    let audioChunkEvalElapsed = audioChunkEvalStartedAt.elapsed
+                    audioChunkEvalTotal += audioChunkEvalElapsed
                     if isPureVoiceDesign {
-                        designAudioChunkEvalTotalMS += audioChunkEvalElapsed
+                        designAudioChunkEvalTotal += audioChunkEvalElapsed
                     } else if isDedicatedCustomVoice {
-                        customAudioChunkEvalTotalMS += audioChunkEvalElapsed
+                        customAudioChunkEvalTotal += audioChunkEvalElapsed
                     } else if isVoiceCloneGeneration {
-                        cloneAudioChunkEvalTotalMS += audioChunkEvalElapsed
+                        cloneAudioChunkEvalTotal += audioChunkEvalElapsed
                     }
 
                     let chunkCodecStart = emittedCodecFrameCount
@@ -3889,27 +3936,27 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                         let kvDiagnostics = makeChunkKVCacheDiagnostics()
                         let chunkMimiBreakdown = mimiDecoderBreakdownTotal.subtracting(lastChunkMimiDecoderBreakdown)
                         let timings = ChunkSubstageTimings(
-                            talkerForwardMS: Double(talkerForwardTotalMS - lastChunkTalkerForwardMS),
-                            codePredictorMS: Double(codePredictorTotalMS - lastChunkCodePredictorMS),
-                            audioDecoderMS: Double(streamingDecoderTotalMS - lastChunkStreamingDecoderMS),
-                            streamStepEvalMS: Double(streamStepEvalTotalMS - lastChunkStreamStepEvalMS),
-                            streamStepEvalEnqueueMS: Double(streamStepEvalEnqueueTotalMS - lastChunkStreamStepEvalEnqueueMS),
-                            streamStepEvalWaitMS: Double(streamStepEvalWaitTotalMS - lastChunkStreamStepEvalWaitMS),
-                            streamStepEOSReadMS: Double(streamStepEOSReadTotalMS - lastChunkStreamStepEOSReadMS),
-                            audioChunkEvalMS: Double(audioChunkEvalTotalMS - lastChunkAudioChunkEvalMS),
+                            talkerForwardMS: (talkerForwardTotal - lastChunkTalkerForward).fractionalMilliseconds,
+                            codePredictorMS: (codePredictorTotal - lastChunkCodePredictor).fractionalMilliseconds,
+                            audioDecoderMS: (streamingDecoderTotal - lastChunkStreamingDecoder).fractionalMilliseconds,
+                            streamStepEvalMS: (streamStepEvalTotal - lastChunkStreamStepEval).fractionalMilliseconds,
+                            streamStepEvalEnqueueMS: (streamStepEvalEnqueueTotal - lastChunkStreamStepEvalEnqueue).fractionalMilliseconds,
+                            streamStepEvalWaitMS: (streamStepEvalWaitTotal - lastChunkStreamStepEvalWait).fractionalMilliseconds,
+                            streamStepEOSReadMS: (streamStepEOSReadTotal - lastChunkStreamStepEOSRead).fractionalMilliseconds,
+                            audioChunkEvalMS: (audioChunkEvalTotal - lastChunkAudioChunkEval).fractionalMilliseconds,
                             kvCacheDiagnostics: kvDiagnostics,
                             mimiDecoderBreakdownMS: chunkMimiBreakdown,
                             codecStartFrame: chunkCodecStart,
                             codecEndFrameExclusive: chunkCodecEnd
                         )
-                        lastChunkTalkerForwardMS = talkerForwardTotalMS
-                        lastChunkCodePredictorMS = codePredictorTotalMS
-                        lastChunkStreamingDecoderMS = streamingDecoderTotalMS
-                        lastChunkStreamStepEvalMS = streamStepEvalTotalMS
-                        lastChunkStreamStepEvalEnqueueMS = streamStepEvalEnqueueTotalMS
-                        lastChunkStreamStepEvalWaitMS = streamStepEvalWaitTotalMS
-                        lastChunkStreamStepEOSReadMS = streamStepEOSReadTotalMS
-                        lastChunkAudioChunkEvalMS = audioChunkEvalTotalMS
+                        lastChunkTalkerForward = talkerForwardTotal
+                        lastChunkCodePredictor = codePredictorTotal
+                        lastChunkStreamingDecoder = streamingDecoderTotal
+                        lastChunkStreamStepEval = streamStepEvalTotal
+                        lastChunkStreamStepEvalEnqueue = streamStepEvalEnqueueTotal
+                        lastChunkStreamStepEvalWait = streamStepEvalWaitTotal
+                        lastChunkStreamStepEOSRead = streamStepEOSReadTotal
+                        lastChunkAudioChunkEval = audioChunkEvalTotal
                         lastChunkMimiDecoderBreakdown = mimiDecoderBreakdownTotal
                         if deferChunkMaterialization {
                             deferredChunkTimings = timings
@@ -3946,6 +3993,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             }
 
         }
+
+        tokenLoopAttributedAtExit = tokenLoopAttributedTotal()
 
         // A chunk stashed in the final token step (EOS or token cap) flushes
         // here, before the info event and the tail chunk — the same relative
@@ -4010,6 +4059,10 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 let codesChunk = stacked(pendingStreamCodes, axis: 1)
                 let codesForDecoder = codesChunk.transposed(0, 2, 1)
                 let streamDecoderStartedAt = ContinuousClock.now
+                // The tail decode and eval carry the same interval names as
+                // the in-loop chunks, so a trace's `Audio Decoder` count
+                // equals `qwen_stream_decoder_calls`.
+                let decoderSignpost = Qwen3Signposts.signposter.beginInterval("Audio Decoder")
                 let decoded: MLXArray
                 if onAudioChunkTimings != nil || emitMaterializedChunkTimings {
                     let decodedWithTimings = speechTokenizer.decoder.streamingStepWithTimings(codesForDecoder)
@@ -4018,7 +4071,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 } else {
                     decoded = speechTokenizer.decoder.streamingStep(codesForDecoder)
                 }
-                streamingDecoderTotalMS += streamDecoderStartedAt.elapsedMilliseconds
+                Qwen3Signposts.signposter.endInterval("Audio Decoder", decoderSignpost)
+                streamingDecoderTotal += streamDecoderStartedAt.elapsed
                 streamingDecoderCallCount += 1
                 let audioChunk = decoded[0]
                 if isPureVoiceDesign, designGenerationStepsBeforeFirstChunk == nil {
@@ -4032,17 +4086,19 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     cloneFirstChunkDecoderTokens = codesForDecoder.dim(2)
                 }
                 let audioChunkEvalStartedAt = ContinuousClock.now
+                let audioChunkEvalSignpost = Qwen3Signposts.signposter.beginInterval("Audio Chunk Eval")
                 // STREAM-001: the final chunk is a synchronous completion barrier. Returning
                 // before materialization can race playback handoff and truncate the preview.
                 eval(audioChunk)
-                let audioChunkEvalElapsed = audioChunkEvalStartedAt.elapsedMilliseconds
-                audioChunkEvalTotalMS += audioChunkEvalElapsed
+                Qwen3Signposts.signposter.endInterval("Audio Chunk Eval", audioChunkEvalSignpost)
+                let audioChunkEvalElapsed = audioChunkEvalStartedAt.elapsed
+                audioChunkEvalTotal += audioChunkEvalElapsed
                 if isPureVoiceDesign {
-                    designAudioChunkEvalTotalMS += audioChunkEvalElapsed
+                    designAudioChunkEvalTotal += audioChunkEvalElapsed
                 } else if isDedicatedCustomVoice {
-                    customAudioChunkEvalTotalMS += audioChunkEvalElapsed
+                    customAudioChunkEvalTotal += audioChunkEvalElapsed
                 } else if isVoiceCloneGeneration {
-                    cloneAudioChunkEvalTotalMS += audioChunkEvalElapsed
+                    cloneAudioChunkEvalTotal += audioChunkEvalElapsed
                 }
                 let materializedSamples: [Float]?
                 if materializedEventSink != nil {
@@ -4058,27 +4114,27 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     let kvDiagnostics = makeChunkKVCacheDiagnostics()
                     let chunkMimiBreakdown = mimiDecoderBreakdownTotal.subtracting(lastChunkMimiDecoderBreakdown)
                     let timings = ChunkSubstageTimings(
-                        talkerForwardMS: Double(talkerForwardTotalMS - lastChunkTalkerForwardMS),
-                        codePredictorMS: Double(codePredictorTotalMS - lastChunkCodePredictorMS),
-                        audioDecoderMS: Double(streamingDecoderTotalMS - lastChunkStreamingDecoderMS),
-                        streamStepEvalMS: Double(streamStepEvalTotalMS - lastChunkStreamStepEvalMS),
-                        streamStepEvalEnqueueMS: Double(streamStepEvalEnqueueTotalMS - lastChunkStreamStepEvalEnqueueMS),
-                        streamStepEvalWaitMS: Double(streamStepEvalWaitTotalMS - lastChunkStreamStepEvalWaitMS),
-                        streamStepEOSReadMS: Double(streamStepEOSReadTotalMS - lastChunkStreamStepEOSReadMS),
-                        audioChunkEvalMS: Double(audioChunkEvalTotalMS - lastChunkAudioChunkEvalMS),
+                        talkerForwardMS: (talkerForwardTotal - lastChunkTalkerForward).fractionalMilliseconds,
+                        codePredictorMS: (codePredictorTotal - lastChunkCodePredictor).fractionalMilliseconds,
+                        audioDecoderMS: (streamingDecoderTotal - lastChunkStreamingDecoder).fractionalMilliseconds,
+                        streamStepEvalMS: (streamStepEvalTotal - lastChunkStreamStepEval).fractionalMilliseconds,
+                        streamStepEvalEnqueueMS: (streamStepEvalEnqueueTotal - lastChunkStreamStepEvalEnqueue).fractionalMilliseconds,
+                        streamStepEvalWaitMS: (streamStepEvalWaitTotal - lastChunkStreamStepEvalWait).fractionalMilliseconds,
+                        streamStepEOSReadMS: (streamStepEOSReadTotal - lastChunkStreamStepEOSRead).fractionalMilliseconds,
+                        audioChunkEvalMS: (audioChunkEvalTotal - lastChunkAudioChunkEval).fractionalMilliseconds,
                         kvCacheDiagnostics: kvDiagnostics,
                         mimiDecoderBreakdownMS: chunkMimiBreakdown,
                         codecStartFrame: chunkCodecStart,
                         codecEndFrameExclusive: chunkCodecEnd
                     )
-                    lastChunkTalkerForwardMS = talkerForwardTotalMS
-                    lastChunkCodePredictorMS = codePredictorTotalMS
-                    lastChunkStreamingDecoderMS = streamingDecoderTotalMS
-                    lastChunkStreamStepEvalMS = streamStepEvalTotalMS
-                    lastChunkStreamStepEvalEnqueueMS = streamStepEvalEnqueueTotalMS
-                    lastChunkStreamStepEvalWaitMS = streamStepEvalWaitTotalMS
-                    lastChunkStreamStepEOSReadMS = streamStepEOSReadTotalMS
-                    lastChunkAudioChunkEvalMS = audioChunkEvalTotalMS
+                    lastChunkTalkerForward = talkerForwardTotal
+                    lastChunkCodePredictor = codePredictorTotal
+                    lastChunkStreamingDecoder = streamingDecoderTotal
+                    lastChunkStreamStepEval = streamStepEvalTotal
+                    lastChunkStreamStepEvalEnqueue = streamStepEvalEnqueueTotal
+                    lastChunkStreamStepEvalWait = streamStepEvalWaitTotal
+                    lastChunkStreamStepEOSRead = streamStepEOSReadTotal
+                    lastChunkAudioChunkEval = audioChunkEvalTotal
                     lastChunkMimiDecoderBreakdown = mimiDecoderBreakdownTotal
                     if let materializedEventSink {
                         try Task.checkCancellation()
@@ -4110,9 +4166,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             var mergedTimingsMS = qwenHotLoopTimingsMS()
                 .merging(preparationTimingsMS) { _, rhs in rhs }
             if isPureVoiceDesign {
-                mergedTimingsMS["design_stream_step_eval_total_ms"] = designStreamStepEvalTotalMS
-                mergedTimingsMS["design_stream_step_eos_read_total_ms"] = designStreamStepEOSReadTotalMS
-                mergedTimingsMS["design_audio_chunk_eval_total_ms"] = designAudioChunkEvalTotalMS
+                mergedTimingsMS["design_stream_step_eval_total_ms"] = designStreamStepEvalTotal.roundedMilliseconds
+                mergedTimingsMS["design_stream_step_eos_read_total_ms"] = designStreamStepEOSReadTotal.roundedMilliseconds
+                mergedTimingsMS["design_audio_chunk_eval_total_ms"] = designAudioChunkEvalTotal.roundedMilliseconds
                 if let designGenerationStepsBeforeFirstChunk {
                     mergedTimingsMS["design_generation_steps_before_first_chunk"] = designGenerationStepsBeforeFirstChunk
                 }
@@ -4120,9 +4176,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     mergedTimingsMS["design_first_chunk_decoder_tokens"] = designFirstChunkDecoderTokens
                 }
             } else if isDedicatedCustomVoice {
-                mergedTimingsMS["custom_stream_step_eval_total_ms"] = customStreamStepEvalTotalMS
-                mergedTimingsMS["custom_stream_step_eos_read_total_ms"] = customStreamStepEOSReadTotalMS
-                mergedTimingsMS["custom_audio_chunk_eval_total_ms"] = customAudioChunkEvalTotalMS
+                mergedTimingsMS["custom_stream_step_eval_total_ms"] = customStreamStepEvalTotal.roundedMilliseconds
+                mergedTimingsMS["custom_stream_step_eos_read_total_ms"] = customStreamStepEOSReadTotal.roundedMilliseconds
+                mergedTimingsMS["custom_audio_chunk_eval_total_ms"] = customAudioChunkEvalTotal.roundedMilliseconds
                 if let customGenerationStepsBeforeFirstChunk {
                     mergedTimingsMS["custom_generation_steps_before_first_chunk"] = customGenerationStepsBeforeFirstChunk
                 }
@@ -4139,9 +4195,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     "custom_generation_end_reason": generationEndReason,
                 ])
             } else if isVoiceCloneGeneration {
-                mergedTimingsMS["clone_stream_step_eval_total_ms"] = cloneStreamStepEvalTotalMS
-                mergedTimingsMS["clone_stream_step_eos_read_total_ms"] = cloneStreamStepEOSReadTotalMS
-                mergedTimingsMS["clone_audio_chunk_eval_total_ms"] = cloneAudioChunkEvalTotalMS
+                mergedTimingsMS["clone_stream_step_eval_total_ms"] = cloneStreamStepEvalTotal.roundedMilliseconds
+                mergedTimingsMS["clone_stream_step_eos_read_total_ms"] = cloneStreamStepEOSReadTotal.roundedMilliseconds
+                mergedTimingsMS["clone_audio_chunk_eval_total_ms"] = cloneAudioChunkEvalTotal.roundedMilliseconds
                 if let cloneGenerationStepsBeforeFirstChunk {
                     mergedTimingsMS["clone_generation_steps_before_first_chunk"] = cloneGenerationStepsBeforeFirstChunk
                 }
@@ -4193,13 +4249,13 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         var mergedTimingsMS = qwenHotLoopTimingsMS()
             .merging(preparationTimingsMS) { _, rhs in rhs }
         if isPureVoiceDesign {
-            mergedTimingsMS["design_stream_step_eval_total_ms"] = designStreamStepEvalTotalMS
-            mergedTimingsMS["design_stream_step_eos_read_total_ms"] = designStreamStepEOSReadTotalMS
+            mergedTimingsMS["design_stream_step_eval_total_ms"] = designStreamStepEvalTotal.roundedMilliseconds
+            mergedTimingsMS["design_stream_step_eos_read_total_ms"] = designStreamStepEOSReadTotal.roundedMilliseconds
             mergedTimingsMS["design_final_decode_eval_ms"] = finalDecodeEvalStartedAt.elapsedMilliseconds
         } else if isDedicatedCustomVoice {
-            mergedTimingsMS["custom_stream_step_eval_total_ms"] = customStreamStepEvalTotalMS
-            mergedTimingsMS["custom_stream_step_eos_read_total_ms"] = customStreamStepEOSReadTotalMS
-            mergedTimingsMS["custom_audio_chunk_eval_total_ms"] = customAudioChunkEvalTotalMS
+            mergedTimingsMS["custom_stream_step_eval_total_ms"] = customStreamStepEvalTotal.roundedMilliseconds
+            mergedTimingsMS["custom_stream_step_eos_read_total_ms"] = customStreamStepEOSReadTotal.roundedMilliseconds
+            mergedTimingsMS["custom_audio_chunk_eval_total_ms"] = customAudioChunkEvalTotal.roundedMilliseconds
             mergedTimingsMS["custom_generation_ended_by_eos"] = generationEndReason == "eos" ? 1 : 0
             mergedTimingsMS["custom_generation_hit_token_cap"] = generationEndReason == "token_cap" ? 1 : 0
             mergePreparationBooleanFlags([
@@ -4210,9 +4266,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 "custom_generation_end_reason": generationEndReason,
             ])
         } else if isVoiceCloneGeneration {
-            mergedTimingsMS["clone_stream_step_eval_total_ms"] = cloneStreamStepEvalTotalMS
-            mergedTimingsMS["clone_stream_step_eos_read_total_ms"] = cloneStreamStepEOSReadTotalMS
-            mergedTimingsMS["clone_audio_chunk_eval_total_ms"] = cloneAudioChunkEvalTotalMS
+            mergedTimingsMS["clone_stream_step_eval_total_ms"] = cloneStreamStepEvalTotal.roundedMilliseconds
+            mergedTimingsMS["clone_stream_step_eos_read_total_ms"] = cloneStreamStepEOSReadTotal.roundedMilliseconds
+            mergedTimingsMS["clone_audio_chunk_eval_total_ms"] = cloneAudioChunkEvalTotal.roundedMilliseconds
         }
         mergePreparationTimingsMS(mergedTimingsMS)
         return audio
@@ -6191,14 +6247,26 @@ private extension ContinuousClock.Instant {
     var elapsedMilliseconds: Int {
         duration(to: .now).roundedMilliseconds
     }
+
+    /// The unrounded span to now, for hot-loop totals that round once at export.
+    var elapsed: Duration {
+        duration(to: .now)
+    }
 }
 
-private extension Duration {
+extension Duration {
+    /// Whole milliseconds, rounded once. Hot-loop totals sum unrounded spans
+    /// and round here at export (audit #61/#95).
     var roundedMilliseconds: Int {
+        Int(fractionalMilliseconds.rounded())
+    }
+
+    /// Unrounded milliseconds, for per-chunk deltas.
+    var fractionalMilliseconds: Double {
         let components = components
         let secondsMS = Double(components.seconds) * 1_000
         let attosecondsMS = Double(components.attoseconds) / 1_000_000_000_000_000
-        return Int((secondsMS + attosecondsMS).rounded())
+        return secondsMS + attosecondsMS
     }
 
     /// Unrounded seconds, for throughput spans measured on ContinuousClock.

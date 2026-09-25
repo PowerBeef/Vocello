@@ -50,6 +50,8 @@ public enum BackendTimingKey: String, Hashable, Codable, Sendable {
     case codePredictor
     case audioDecoder
     case streamStepEval
+    /// The step's first blocking read (V-2): the GPU wait under `.pipelined`.
+    case streamStepTokenRead
     case streamStepEOSRead
     case audioChunkEval
     case finalWAVFinish
@@ -548,6 +550,7 @@ public enum GenerationTelemetryCompatibilityAdapter {
             (.codePredictor, ["qwen_code_predictor_total"]),
             (.audioDecoder, ["qwen_stream_decoder_total"]),
             (.streamStepEval, ["qwen_stream_step_eval_total"]),
+            (.streamStepTokenRead, ["qwen_stream_step_token_read_total"]),
             (.streamStepEOSRead, ["qwen_stream_step_eos_read_total"]),
             (.audioChunkEval, ["qwen_audio_chunk_eval_total"]),
             (.finalWAVFinish, ["native_final_wav_finish_ms"]),

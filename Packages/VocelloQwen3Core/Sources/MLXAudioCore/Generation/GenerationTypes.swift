@@ -179,7 +179,8 @@ public struct MimiDecoderStepTimings: Sendable, Hashable, Codable {
 /// audio packet with the engine work that produced it.
 ///
 /// All values are millisecond deltas from the previous chunk's emit
-/// boundary (or from generation start for the first chunk).
+/// boundary (or from generation start for the first chunk), taken from
+/// unrounded span totals, so sub-millisecond work is kept (audit #61).
 ///
 /// Lives in MLXAudioCore so it can be referenced by the public
 /// `AudioGeneration` enum without forcing a Qwen3-specific dependency
@@ -196,15 +197,15 @@ public struct ChunkSubstageTimings: Sendable, Hashable {
     /// summed to only 18-26 % of `inferMS`; this and the next two
     /// fields chase the missing 74-82 %.
     public let streamStepEvalMS: Double
-    /// Phase 2a split of `streamStepEvalMS`: wall time from when the
-    /// eval work was enqueued until it was issued to the GPU. In the
-    /// current synchronous eval path this equals `streamStepEvalMS`;
-    /// future async instrumentation will populate `streamStepEvalWaitMS`
-    /// separately.
+    /// The step-eval call itself: the enqueue. It equals `streamStepEvalMS`
+    /// under every policy. Under a synchronous eval (`.full`, `.eosOnly`) the
+    /// call also contains the GPU wait, which cannot be split out there.
     public let streamStepEvalEnqueueMS: Double
-    /// Phase 2a split of `streamStepEvalMS`: wall time spent waiting for
-    /// the GPU command buffer to drain. Currently 0 because the eval
-    /// path is synchronous; reserved for future async instrumentation.
+    /// The observed wait for the step's submitted GPU work: under `.pipelined`
+    /// (the production default) the step's first blocking read, the sampled
+    /// token read, after `asyncEval` enqueued the step (audit #49/#62). It is
+    /// not part of `streamStepEvalMS`. 0 under the other policies, whose wait
+    /// is not observed separately (see `streamStepEvalEnqueueMS`).
     public let streamStepEvalWaitMS: Double
     /// Time spent reading the EOS (end-of-speech) flag each forward
     /// step. Lives inside the per-token loop alongside the talker

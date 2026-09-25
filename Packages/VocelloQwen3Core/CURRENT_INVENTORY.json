@@ -43,7 +43,7 @@
     },
     {
       "path": "Sources/MLXAudioCore/Generation/GenerationTypes.swift",
-      "sha256": "993d05f8f68b7b8460b33f415bb395361fc708a0426c82083b640fa3c2eaddb0",
+      "sha256": "6293d2898ef47015212a830fc706151f36188f6f21ce03e10a3c030ae4f34695",
       "upstreamStatus": "modified"
     },
     {
@@ -73,7 +73,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-      "sha256": "ae2f7e53ce7b5413e9e034e25a4f2fed551b4c8931bba3c491dd9d5bcec1c63a",
+      "sha256": "01ef261fe33dc802db59c56234f3bb1effc370caa0fa0c506bc43e42ed5d46d6",
       "upstreamStatus": "modified"
     },
     {
@@ -238,7 +238,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift",
-      "sha256": "a115c9eacb70bbea35e868a9008e5700ba0ab435a4c8b390150f1de47c1a349d",
+      "sha256": "ed5cc3e5c08624c149edb3d92070e934e5fa75b80e4a18e0a5be6709bf0d579c",
       "upstreamStatus": "added"
     },
     {

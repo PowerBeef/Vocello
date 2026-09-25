@@ -136,8 +136,11 @@ public enum GenerationStreamingTelemetryV9Publication: Sendable {
     }
 
     /// Build a complete schema-v9 document from a publication-ready transition.
-    /// Requires exact MLX chunk instants on every shipping observation — never
-    /// invents timestamps or frame counts.
+    /// Requires MLX chunk instants on every shipping observation and never
+    /// invents frame counts. Those instants are derived from the engine's
+    /// per-chunk step durations counted back from the consumer's receipt
+    /// (`GenerationOutputAdapter.mlxChunkInstants`), not observed MLX events
+    /// (audit #49/#62).
     public static func makeCompleteDocument(
         from transition: GenerationStreamingTelemetryTransitionV9
     ) throws -> GenerationStreamingTelemetryV9 {
@@ -220,7 +223,7 @@ public enum GenerationStreamingTelemetryV9Publication: Sendable {
     }
 
     /// Publish a complete v9 sidecar when the transition is publication-ready and
-    /// every chunk carries exact MLX instants. Returns the sidecar URL and SHA-256.
+    /// every chunk carries its derived MLX instants. Returns the sidecar URL and SHA-256.
     public static func publishCompleteSidecarIfReady(
         transition: GenerationStreamingTelemetryTransitionV9,
         directory: URL

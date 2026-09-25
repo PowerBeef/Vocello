@@ -291,16 +291,22 @@ authoritative list.** Representative keys (prefix `qwen_…`):
 | `qwen_talker_forward_total` | LLM talker forward pass, summed over tokens. |
 | `qwen_code_predictor_total` | Multi‑codebook code‑predictor loop. |
 | `qwen_stream_decoder_total` | Streaming audio decoder (codec → waveform). |
-| `qwen_stream_step_eval_total` | `eval(...)` flush after each forward step (GPU dispatch). |
+| `qwen_stream_step_eval_total` | `eval(...)` flush after each forward step (GPU dispatch; under the default `.pipelined` policy only the `asyncEval` enqueue). |
+| `qwen_stream_step_token_read_total` | The step's first blocking read, the sampled token: under `.pipelined` the host's wait for the step's GPU work (signpost `Token Read`). |
+| `qwen_stream_step_eval_wait_total` | The observed step wait: equals the token read under `.pipelined`, 0 under synchronous policies, whose wait stays inside the eval call. |
 | `qwen_stream_step_eos_read_total` | EOS‑flag readback (a GPU sync). |
+| `qwen_audio_chunk_eval_total` | Audio‑chunk evals: the assembly `asyncEval`, the pipelined flush (signpost `Audio Chunk Flush`) and the tail chunk. |
 | `qwen_token_loop_total` | Whole per‑token loop wall time. |
-| `qwen_token_loop_unattributed` | Loop time not attributed to a named substage (slack to chase). |
+| `qwen_token_loop_unattributed` | In‑loop time no named substage covers (slack to chase), read when the loop exits so the tail work after it cannot hide it. |
 | `qwen_generated_code_count` | Tokens generated (counter). |
 | `qwen_stream_decoder_calls` | Streaming chunk decode count. |
 | prep / prewarm keys | `*_prefix_tokenize_ms`, `*_prefix_embed_build_ms`, `decoder_bucket_warm`, `*_prewarm_eval_ms`, … |
 
 Use the breakdown to see which substage dominates (talker vs code‑predictor vs decoder)
-and how much loop time is `unattributed` (candidate for new sub‑probes).
+and how much loop time is `unattributed` (candidate for new sub‑probes). The engine sums
+each span unrounded and rounds a total once at export (audit #61), and every span has a
+same‑named `os_signpost` interval (subsystem `com.qwenvoice.engine.qwen3`) opened and
+closed around the same code, so a profile's per‑take interval sums line up with these keys.
 
 ### 6.3 Per‑chunk timeline (`chunkTimeline`, streaming only)
 
@@ -797,8 +803,11 @@ committed bounded quality summaries and baselines remain permitted.
   numeric metadata.
 - **New derived KPI:** extend `computeDerivedMetrics` in `GenerationOutputAdapter`
   (`Sources/QwenVoiceCore/GenerationOutputAdapter.swift`).
-- **New signpost interval:** wrap the span with `NativeTelemetrySignpostInterval.begin/end`
-  and merge the resulting key into `timingsMS`.
+- **New signpost interval:** open the interval and read the clock around the same code, and
+  close it where the timing is captured (`withMirroredSignpost` does both for a scoped span;
+  `native_prepare_generation_ms` and the Qwen3 loop spans do it by hand), so the trace and the
+  `timingsMS` key time the same span (audit #48). Inside the token loop use the allocation-free
+  `os_signpost` entry point: `OSSignposter.beginInterval` allocates per call.
 - **New field on the record:** add an optional field to `GenerationTelemetryRecord` (so old
   rows still decode) and bump `currentSchemaVersion`.
 - **Naming:** use the `NativeTelemetry…` / `GenerationTelemetry…` families for new telemetry

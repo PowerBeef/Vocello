@@ -342,6 +342,41 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         )
     }
 
+    /// V-2 and audit #61/#95: the token read has its own span, the pipelined
+    /// step wait is that read, and totals are rounded once, at export.
+    func testHotLoopTimesTheTokenReadAndRoundsTotalsOnce() async throws {
+        let model = try Self.makeModel()
+        _ = try await generate(model, seed: 0x5EED_0005)
+        let timings = model.latestPreparationTimingsMS
+        let stringFlags = model.latestPreparationStringFlags
+
+        let loop = try XCTUnwrap(timings["qwen_token_loop_total"])
+        let tokenRead = try XCTUnwrap(
+            timings["qwen_stream_step_token_read_total"],
+            "The sampled-token read is timed as its own span"
+        )
+        let unattributed = try XCTUnwrap(timings["qwen_token_loop_unattributed"])
+        XCTAssertNotNil(timings["qwen_audio_chunk_eval_total"])
+        XCTAssertGreaterThanOrEqual(tokenRead, 0)
+        XCTAssertGreaterThanOrEqual(unattributed, 0)
+        XCTAssertLessThanOrEqual(tokenRead, loop)
+        XCTAssertLessThanOrEqual(unattributed, loop)
+        if stringFlags["stream_step_eval_policy"] == "pipelined" {
+            // Both totals sum the same unrounded spans, so they round alike.
+            XCTAssertEqual(timings["qwen_stream_step_eval_wait_total"], tokenRead)
+        } else {
+            XCTAssertEqual(timings["qwen_stream_step_eval_wait_total"], 0)
+        }
+
+        // Fifteen 0.4 ms spans sum to 6 ms; rounding each first made them 0.
+        let fifteenSpans = (0 ..< 15).reduce(Duration.zero) { total, _ in
+            total + .microseconds(400)
+        }
+        XCTAssertEqual(fifteenSpans.roundedMilliseconds, 6)
+        XCTAssertEqual(Duration.microseconds(400).roundedMilliseconds, 0)
+        XCTAssertEqual(Duration.microseconds(2_500).fractionalMilliseconds, 2.5, accuracy: 1e-9)
+    }
+
     func testGenerationThroughputConvertsTheContinuousClockSpanExactly() {
         let info = Qwen3GenerationThroughput.info(
             generationTokenCount: 150,

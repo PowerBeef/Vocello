@@ -3114,9 +3114,15 @@ struct StreamingExecutionContext: Sendable {
         )
     }
 
-    /// Derive exact MLX enqueue/materialization instants from measured substage
-    /// milliseconds anchored at the observed materialization uptime. Durations
-    /// of zero are allowed when the producer measured zero — never invented.
+    /// Derive MLX enqueue/materialization instants for one chunk from the
+    /// engine's per-chunk step durations, counted back from `materializedAtNS`.
+    /// Only `materializedAtNS` is an observed instant, and it is this
+    /// consumer's receipt of the chunk, not an MLX event. The other three are
+    /// derived: the enqueue duration is the chunk's summed step-eval calls;
+    /// the materialization duration is the chunk's summed observed step wait,
+    /// the sampled-token read under `.pipelined` (audit #49/#62), and falls
+    /// back to the eval-minus-enqueue remainder, which is zero, under a
+    /// synchronous eval policy whose wait is not observed separately.
     private static func mlxChunkInstants(
         timings: VocelloQwen3ChunkTimings?,
         materializedAtNS: UInt64

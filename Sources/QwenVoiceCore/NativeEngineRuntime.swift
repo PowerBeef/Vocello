@@ -803,13 +803,20 @@ actor NativeEngineRuntime {
             "runID=\(benchRunID, privacy: .public) generationID=\(generationID.uuidString, privacy: .public) takeIndex=\(benchTakeIndex, privacy: .public) cell=\(benchCell, privacy: .public)"
         )
         let prepareStartedAt = ContinuousClock.now
-        defer {
+        // The interval closes where `native_prepare_generation_ms` is read, so
+        // Instruments and the JSONL row time the same span (audit #48); the
+        // defer only closes it on a throwing path.
+        var prepareIntervalClosed = false
+        func closePrepareInterval() {
+            guard !prepareIntervalClosed else { return }
+            prepareIntervalClosed = true
             Self.signposter.endInterval(
                 "Native Prepare Generation",
                 prepareSignpost,
                 "runID=\(benchRunID, privacy: .public) generationID=\(generationID.uuidString, privacy: .public) takeIndex=\(benchTakeIndex, privacy: .public) cell=\(benchCell, privacy: .public)"
             )
         }
+        defer { closePrepareInterval() }
         let descriptorCapabilities = try await loadCoordinator.qwen3Capabilities(for: request.modelID)
         receiptCapabilities = descriptorCapabilities
         try Self.validateCloneConditioningCapability(
@@ -1029,6 +1036,7 @@ actor NativeEngineRuntime {
         )
 
         timingOverridesMS["native_prepare_generation_ms"] = prepareStartedAt.elapsedMilliseconds
+        closePrepareInterval()
         Self.recordGenerationPlanShadow(
             request: request,
             generationID: generationID,

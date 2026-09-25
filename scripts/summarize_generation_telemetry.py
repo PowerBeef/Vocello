@@ -951,6 +951,9 @@ _DECODE_STAGE_KEYS = [
     ("codePred", "qwen_code_predictor_total"),      # 15× Code Predictor loop
     ("code2wav", "qwen_stream_decoder_total"),      # Code2Wav audio decoder
     ("stepEval", "qwen_stream_step_eval_total"),    # per-frame eval flush
+    # The step's sampled-token read (V-2): under `.pipelined` the host's wait
+    # for the GPU work stepEval only enqueued. Rows before 2026-09-26 lack it.
+    ("tokRead", "qwen_stream_step_token_read_total"),
 ]
 
 
@@ -2337,7 +2340,8 @@ def main():
     # "other" sum to the decode ms column (qwen_token_loop_total).
     dec_header = (
         f"{'mode':<8} {'model':<26} {'state':<5} {'len':<6} "
-        f"{'talker':>7} {'sampCB0':>7} {'codePred':>8} {'code2wav':>8} {'stepEval':>8} {'other':>7}"
+        f"{'talker':>7} {'sampCB0':>7} {'codePred':>8} {'code2wav':>8} {'stepEval':>8} "
+        f"{'tokRead':>7} {'other':>7}"
     )
     print("\nDecode breakdown (ms; median over cell) — timingsMS (named + other ≈ decode ms)\n")
     print(dec_header)
@@ -2353,6 +2357,7 @@ def main():
             f"{fmt(dec.get('codePred'), 0):>8} "
             f"{fmt(dec.get('code2wav'), 0):>8} "
             f"{fmt(dec.get('stepEval'), 0):>8} "
+            f"{fmt(dec.get('tokRead'), 0):>7} "
             f"{fmt(dec.get('other'), 0):>7}"
         )
 
@@ -2427,16 +2432,19 @@ def main():
         "Decode breakdown (ms, median): talker = qwen_talker_forward_total · "
         "sampCB0 = qwen_sample_first_codebook_total · codePred = qwen_code_predictor_total "
         "(15× loop) · code2wav = qwen_stream_decoder_total (audio decoder) · "
-        "stepEval = qwen_stream_step_eval_total · other = remainder (codec-embedding "
+        "stepEval = qwen_stream_step_eval_total · tokRead = qwen_stream_step_token_read_total "
+        "(the step's GPU wait under the pipelined policy) · other = remainder (codec-embedding "
         "assembly + EOS read + audio-chunk eval + unattributed). Named + other ≈ decode ms."
     )
     print(
         "⚠ These are Swift-side wall-clock timers around LAZY MLX ops, not per-stage GPU "
-        "compute. talker/codePred measure graph-BUILD time; the single per-frame eval() makes "
-        "stepEval the fused compute of Talker+CodePredictor+sampling. code2wav≈0 because the "
+        "compute. talker/codePred measure graph-BUILD time; the fused compute of "
+        "Talker+CodePredictor+sampling lands in stepEval under a synchronous eval and in "
+        "tokRead under the default pipelined policy. code2wav≈0 because the "
         "decoder is asyncEval'd (Phase 2c) and overlaps the token loop — pipelined, not free. "
         "To attribute compute per stage, capture the os_signpost intervals (Talker Forward / "
-        "Code Predictor Loop / Step Eval Flush / Audio Decoder) under Instruments xctrace."
+        "Code Predictor Loop / Step Eval Flush / Token Read / Audio Decoder) under Instruments "
+        "xctrace."
     )
     print(
         "physFoot = phys_footprint peak (the figure Jetsam judges — the OOM-relevant "

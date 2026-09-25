@@ -713,6 +713,13 @@ def test_governed_seed_refuses_a_loaded_host_a_dirty_tree_and_short_cells():
         staged = os.path.join(tmp, "mac-gate-bench.json")
         loaded = _write_gate_run(tmp, "loaded", loads=(2.0, 1000.0, 2.0))
         assert _summarize(*_gate_args(*loaded, "loaded"), "--seed-baseline", staged)[0] == 3
+        # A loaded run is inconclusive even when its evidence also lacks the host identity.
+        loaded_old = _write_gate_run(tmp, "loaded-old", loads=(2.0, 1000.0, 2.0))
+        _drop_host_identity(loaded_old[1])
+        assert _summarize(*_gate_args(*loaded_old, "loaded-old"), "--seed-baseline", staged)[0] == 3
+        quiet_old = _write_gate_run(tmp, "quiet-old")
+        _drop_host_identity(quiet_old[1])
+        assert _summarize(*_gate_args(*quiet_old, "quiet-old"), "--seed-baseline", staged)[0] == 1
         dirty = _write_gate_run(tmp, "dirty", dirty=True)
         assert _summarize(*_gate_args(*dirty, "dirty"), "--seed-baseline", staged)[0] == 1
         clean = _write_gate_run(tmp, "clean")

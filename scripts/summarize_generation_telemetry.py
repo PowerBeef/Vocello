@@ -1710,10 +1710,12 @@ def seed_baseline(path, cells, evidence_payload, *, states=None, minimum_takes=3
     """
     if evidence_payload is None:
         raise SeedRefused("seeding requires --evidence-manifest (the baseline identity comes from the run's evidence)")
-    identity = baseline_identity_from_evidence(evidence_payload)
+    # The host verdict comes first, as in a comparison (audit V-7): a loaded run
+    # is inconclusive whatever else is wrong with its evidence.
     load_reasons = host_load_verdict(evidence_payload, cpu_count=cpu_count, states=states)
     if load_reasons:
         raise SeedRefused("the host was not quiet: " + "; ".join(load_reasons), inconclusive=True)
+    identity = baseline_identity_from_evidence(evidence_payload)
     commit, dirty = _evidence_source(evidence_payload)
     if not isinstance(commit, str) or not commit or dirty is not False:
         raise SeedRefused("seeding requires evidence from a clean source commit")

@@ -4043,6 +4043,20 @@
       "notes": "Closed 2026-09-24. One privacy helper (QwenVoiceCore DiagnosticPrivacy) keeps a typed summary (error code and classification, type, domain and code chain, stage, HTTP status) and redacts URLs, e-mail addresses, quoted spans, absolute and home paths and content-keyed values. Every persisted or exported diagnostic that could carry a path, prompt or transcript goes through it: model-download diagnostics, the iOS device-diagnostics manifest, action messages and sentinels, engine native-events, the commerce error record (schema 2), crash-observer exception reasons and MetricKit reasons. Generation failures and telemetry already stored only codes or digests. Regression tests feed synthetic path, prompt and transcript failures and prove none is retained; the privacy docs state the scan scope. Left elsewhere: console-only prints (not persisted) on PA-26, error text shown in the UI on PA-20, ENG-08 (user text in an owned-package error message) on PA-26.",
       "plan": "audit-remediation-2026-09",
       "updated": "2026-09-24"
+    },
+    {
+      "id": "AUD-10",
+      "title": "The engine is kept hot by intent, not by browsing",
+      "status": "done",
+      "gate": "On the high-memory Mac tier a warm prefetch is followed by an idle unload or a pressure response; navigating between tabs alone does not pin the engine in memory.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/Services/MacWarmupAdmissionPolicy.swift"
+      ],
+      "notes": "Closed 2026-09-25 (maintainer decision 2026-09-24: unload after idle, warm by intent). The high-memory Mac now unloads after 30 minutes idle (floor 2, mid 10 unchanged) and answers kernel memory pressure (soft and hard trims, warm admission deferred under pressure) like the other tiers; navigation alone never warms (only entering Studio or generating does), and PA-31's coordinator keeps an idle unload from being undone. The engine now settles a cancelled cold prefetch and a cancelled clone prime through the runtime and re-arms idle unload, instead of reporting .idle over resident weights. Lifecycle tests cover the per-tier windows, both cancelled paths and navigation without intent. 1800 s is a policy value, not yet measured on real hardware. Leftover: a failed, non-cancelled model operation leaves weights resident with no idle unload (PA-32).",
+      "plan": "audit-remediation-2026-09",
+      "updated": "2026-09-25"
     }
   ]
 }

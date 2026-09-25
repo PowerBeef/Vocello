@@ -40,10 +40,26 @@ fail-closed after two adversarial reviews; leftovers on PA-30). AUD-03 (Mac Stud
 `MacStudioSingleTakeRunner`), PA-19 (orchestrator suites over fakes, a seeded talker generate loop,
 synthetic AudioSeal weights) and PA-20 (interface-language failures and formatters, macOS permission
 prompts, VoiceOver announcements, Dynamic Type, banner timing, website contrast) landed and stay in
-flight for their remaining surfaces and consent-bound lanes. PA-31 (engine-store snapshot updates
-never fire with the streaming engine) waits for a maintainer decision. Waiting on the maintainer:
-the phone (RF-13 exports, AUD-02, PA-18 screenshots), macOS smoke and cancellation lanes for AUD-03,
-the PA-16 M6 gate-bench baseline, PA-31, and the PA-30 Keep Audio Files decision.
+flight for their remaining surfaces and consent-bound lanes.
+
+### September 25 — maintainer decisions applied; lanes wait on host setup
+
+The maintainer approved PA-31, unload-after-idle for AUD-10, a confirmed iPhone-only leftover-audio
+removal for PA-30, and the macOS smoke and gate-bench lanes (the phone stays unavailable). Landed:
+PA-31 (the engine store reports every state change; the Mac warmup coordinator no longer cancels its
+own warms, replays the latest intent, and lets an idle unload stick; three adversarial reviews),
+AUD-08 closed (one privacy helper for every persisted diagnostic), AUD-10 closed (the high-memory Mac
+unloads after 30 minutes idle and answers pressure; cancelled warms re-arm idle unload), AUD-11
+(set-membership sampler dedup; bench pending), PA-08's MLXAudioMark ownership, PA-30's History
+leftovers and the iPhone cleanup, PA-19's long-form runner tests, and PA-05's rehearsal upload check.
+New: PA-32 (a failed, non-cancelled model operation leaves weights loaded; needs a product decision).
+Lanes: the first M6 smoke run never reached a test (Automation Mode needs authentication; the lane
+now refuses that before building; maintainer: `sudo automationmodetool
+enable-automationmode-without-authentication`), and the first M6 gate run passed every code gate
+but lacked the benchmark model (now installed; the clone-voice fixture still failed to enroll).
+Next: rerun the gate bench and re-save the M6 baseline (AV-17 step 1), then the smoke run once
+Automation Mode is set; PA-10's environment, secrets and tag ruleset stay with the maintainer; an
+audit of the benchmark harnesses and telemetry probes is in progress.
 
 ### Current state (September 23)
 

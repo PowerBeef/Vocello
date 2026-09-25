@@ -13,7 +13,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
-| `audit-remediation-2026-09` | active | backend-and-platform | 2/12 (17%) |
+| `audit-remediation-2026-09` | active | backend-and-platform | 3/12 (25%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 11/17 (65%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 17/26 (65%) |
@@ -22,7 +22,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `ios-generation-startup-reliability-2026-08` | active | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | active | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | active | backend-and-platform | 7/8 (88%) |
-| `project-audit-2026-09` | active | backend-and-platform | 21/32 (66%) |
+| `project-audit-2026-09` | active | backend-and-platform | 21/33 (64%) |
 | `voice-identity-language-reliability-2026-08` | active | backend-and-platform | 9/10 (90%) |
 
 ## Vocello 3.0 — release-first execution plan
@@ -99,7 +99,6 @@ Narrative authority: [`docs/reference/project-review-2026-09-18.md`](reference/p
 | `AUD-06` | parked | iOS modals hide their background from VoiceOver | — |
 | `AUD-07` | parked | Verify recovery from an unverified StoreKit purchase | — |
 | `AUD-09` | planned | Smoke test01 owns the fixture it depends on | — |
-| `AUD-10` | planned | The engine is kept hot by intent, not by browsing | — |
 | `AUD-11` | in-flight | Use constant-time sampler membership without changing token order | — |
 | `AUD-12` | parked | Migrate off the deprecated audio-session interruption keys | — |
 
@@ -130,9 +129,6 @@ Narrative authority: [`docs/reference/project-review-2026-09-18.md`](reference/p
 
 - **`AUD-09`** (planned) — Smoke test01 owns the fixture it depends on.
   gate: Smoke explicitly preflights its saved-clone prerequisite with an actionable absent-fixture result, or creates and restores it through genuine UI; a consented smoke run preserves unrelated data and has a defined clean-store outcome.
-
-- **`AUD-10`** (planned) — The engine is kept hot by intent, not by browsing.
-  gate: On the high-memory Mac tier a warm prefetch is followed by an idle unload or a pressure response; navigating between tabs alone does not pin the engine in memory.
 
 - **`AUD-11`** (in-flight) — Use constant-time sampler membership without changing token order.
   gate: The per-step token dedup is a set membership test; runtime parity is proven by the seeded runtime tests and the gate bench shows no regression.
@@ -447,6 +443,7 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 | `PA-26` | planned | Low-severity backlog from the external audit | — |
 | `PA-30` | in-flight | Leftovers from PA-21, PA-22 and AUD-05 | — |
 | `PA-31` | in-flight | The engine store reports frontend state changes with the streaming engine | — |
+| `PA-32` | planned | A failed model operation that leaves weights loaded still unloads after idle | — |
 
 ### Open items in detail
 
@@ -482,6 +479,9 @@ Narrative authority: [`docs/reference/project-audit-2026-09-22.md`](reference/pr
 
 - **`PA-31`** (in-flight) — The engine store reports frontend state changes with the streaming engine.
   gate: TTSEngineStore.snapshotUpdates fires once per applied frontend-state change with the streaming MLXTTSEngine, so the macOS warmup coordinator sees the engine's state: it cancels pending (undispatched) warmups while the engine is busy, never cancels its own dispatched warm for the states that warm publishes, invalidates a completed warm on a different loaded model or a failure (an idle unload sticks), and warms the latest intent after a stale warm; the maintainer approves the change to frozen TTSEngineStore behavior; the expected failure in TTSEngineStoreTests is removed in the same commit; macOS smoke passes.
+
+- **`PA-32`** (planned) — A failed model operation that leaves weights loaded still unloads after idle.
+  gate: After a non-cancelled failure that leaves a model resident (a clone prime whose reference cannot be conditioned, a failed prewarm, a generation failure that is not a captured MLX failure), idle unload still releases the weights on every tier, and the user still sees the failure; the maintainer chooses how the failure stays visible once the engine settles.
 
 ## Clone identity, enrollment transcription, and French Voice Design reliability
 

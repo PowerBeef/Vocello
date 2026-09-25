@@ -1219,19 +1219,6 @@
       "updated": "2026-09-18"
     },
     {
-      "id": "AUD-10",
-      "title": "The engine is kept hot by intent, not by browsing",
-      "status": "planned",
-      "gate": "On the high-memory Mac tier a warm prefetch is followed by an idle unload or a pressure response; navigating between tabs alone does not pin the engine in memory.",
-      "sourceOfTruth": [
-        "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift",
-        "Sources/QwenVoiceCore/MLXTTSEngine.swift"
-      ],
-      "notes": "Revalidated 2026-09-18 (P2 policy decision): highMemoryMac disables idle unload and pressure response while navigation can request prewarm. Resident weights may outlive browsing; this is not demonstrated unbounded memory growth, and explicit unload/model replacement still exist. Choose the latency/memory tradeoff with deterministic lifecycle tests and separately consented real-model qualification. See project-review-2026-09-18.md. Maintainer decision 2026-09-24: unload after idle. Warm prefetch stays tied to intent (entering Studio or generating); idle unload and memory-pressure relief apply on the high-memory Mac tier too, so browsing alone never pins the weights. From the PA-31 review: a cancelled warm's catch in MLXTTSEngine resets .starting to .idle without asking the runtime, and a cancelled clone prime does not re-arm idle unload, so resident weights can sit with no idle unload; settle both through the runtime as settleCancelledModelOperation does.",
-      "plan": "audit-remediation-2026-09",
-      "updated": "2026-09-24"
-    },
-    {
       "id": "AUD-11",
       "title": "Use constant-time sampler membership without changing token order",
       "status": "in-flight",
@@ -1352,9 +1339,9 @@
         "Tests/VocelloCoreTests",
         "Packages/VocelloQwen3Core/Tests/Qwen3RuntimeTests"
       ],
-      "notes": "External audit TEST-01, TEST-02 and TEST-03, verified 2026-09-22 with corrections: the 15% app-code figure omits the linked and tested QwenVoiceCore; the decoder and code predictor already run on tiny random weights. The real gaps are the named orchestrators (0 test references), the talker and generate loop, and the AudioSeal transform call site (2 of 3 parity tests skip in CI). May need a shared framework target for code compiled by path. 2026-09-24: TTSEngineStore, StudioGenerationCoordinator, DatabaseService (real SQLite), IOSExportGate and the iPhone model inventory run over fakes in VocelloCoreTests; a tiny seeded talker drives the production generate loop and synthetic AudioSeal weights cover the marking transform in Qwen3RuntimeTests. Open: the long-form runner (needs an audio-player protocol, LivePreviewEstimate extracted, injected timeline and persistence), the macOS model manager with a downloader seam (its own test target: name collisions), IOSModelDownloadCoordinator. Defect found: PA-31.",
+      "notes": "External audit TEST-01, TEST-02 and TEST-03, verified 2026-09-22: the real gaps were the named orchestrators (0 test references), the talker and generate loop, and the AudioSeal transform call site. 2026-09-24: TTSEngineStore, StudioGenerationCoordinator, DatabaseService (real SQLite), IOSExportGate and the iPhone model inventory run over fakes in VocelloCoreTests; a tiny seeded talker drives the production generate loop and synthetic AudioSeal weights cover the marking transform in Qwen3RuntimeTests; the defect found became PA-31. 2026-09-25: the long-form coordinator and runner run over a fake engine (LivePreviewEstimate moved to SharedSupport; production services injected with defaults). Open: the macOS model manager with a downloader seam (its own test target, because of name collisions) and IOSModelDownloadCoordinator.",
       "plan": "project-audit-2026-09",
-      "updated": "2026-09-24"
+      "updated": "2026-09-25"
     },
     {
       "id": "PA-20",
@@ -1409,8 +1396,8 @@
         "Sources/SharedSupport/Database/GenerationHistoryOutbox.swift",
         "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift"
       ],
-      "notes": "Split out 2026-09-24. Done 2026-09-24: the Clone reference picker shows a failed Saved Voices load with Retry; History suspends its GRDB queue before the app is suspended and a take that meets the suspension waits in the outbox (IOS-11). From the second History review, also done: a failed iOS clear shows an alert and a pending clear has its own notice on both platforms (never a zero count); a long-form acceptance interrupted by suspension is marked resumable on the writer and completes after resume with its audio kept; an unreadable removal list is its own notice that Retry discards without touching audio. Open: the confirmed one-time iPhone removal of audio earlier clears left (maintainer decision 2026-09-24; the Mac outputs folder stays untouched), and ENG-06: the speech tokenizer is adopted across engines, safe today because one model operation runs at a time; a strict owner token can double the resident tokenizer on iOS (about 218 MB) and needs a device memory re-qualification.",
-      "updated": "2026-09-24"
+      "notes": "Split out 2026-09-24. Done: the Clone picker shows a failed Saved Voices load with Retry; History suspends its GRDB queue before app suspension and a take meeting it waits in the outbox (IOS-11); a failed iOS clear shows an alert and a pending clear has its own notice on both platforms; a long-form acceptance interrupted by suspension completes after resume with its audio kept; an unreadable removal list is a notice Retry discards. 2026-09-25: iPhone Settings (Models & Files) offers a one-time, confirmed removal of audio that no row, queued or in-flight take, long-form project, saved voice or removal list references (regular files only, fail-closed, remembered per App Support root; the Mac is untouched). Open: the cleanup's device check, and ENG-06: the speech tokenizer is adopted across engines, safe while one model operation runs at a time; a strict owner token can double the resident tokenizer on iOS (about 218 MB) and needs a device memory re-qualification.",
+      "updated": "2026-09-25"
     },
     {
       "id": "PA-31",
@@ -1426,6 +1413,20 @@
       ],
       "notes": "Found by PA-19 on 2026-09-24. syncFromSnapshot returns for any event-streaming backend (and when no new chunk arrived) before it reaches snapshotUpdates.send, and MLXTTSEngine streams events, so on macOS ContentView's onReceive(snapshotChanges) never fires and MacGenerationWarmupCoordinator.observe never runs. The fix is to send the update above the streaming guard. TTSEngineStore behavior is frozen (native.md) apart from consent admission, and the fix changes macOS warmup timing, so it waits for a maintainer decision and a macOS smoke run. testSnapshotUpdatesFireForAnAppliedFrontendChange records the defect with a strict XCTExpectFailure naming this item. Maintainer approved the fix on 2026-09-24 (the TTSEngineStore freeze is lifted for this change only). 2026-09-24: landed (f46aa2ee); its macOS smoke check waits on the same Automation Mode setup as AUD-03.",
       "updated": "2026-09-24"
+    },
+    {
+      "id": "PA-32",
+      "plan": "project-audit-2026-09",
+      "title": "A failed model operation that leaves weights loaded still unloads after idle",
+      "status": "planned",
+      "blockedBy": [],
+      "gate": "After a non-cancelled failure that leaves a model resident (a clone prime whose reference cannot be conditioned, a failed prewarm, a generation failure that is not a captured MLX failure), idle unload still releases the weights on every tier, and the user still sees the failure; the maintainer chooses how the failure stays visible once the engine settles.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/Services/MacGenerationWarmupCoordinator.swift"
+      ],
+      "notes": "Found by the AUD-10 review on 2026-09-25. These paths publish .failed and never schedule idle unload; performIdleUnloadIfStillIdle clears loadState, clonePreparationState and visibleErrorMessage, so letting it run from .failed would make a surfaced failure disappear after the idle window (30 s on iPhone), while publishing .loaded would need the failure kept elsewhere. Only the store's critical-band full unload, a later model operation or stop() release the weights today, and the Mac warmup coordinator will not warm from .failed. Needs a product decision on how the failure stays visible.",
+      "updated": "2026-09-25"
     }
   ]
 }

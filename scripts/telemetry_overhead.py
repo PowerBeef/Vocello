@@ -121,7 +121,7 @@ def paired_overhead_annotation(mode_samples: list[dict], off_samples: list[dict]
     cancels. Reports the median paired ratio, a BCa 95% interval of the mean
     paired percent difference and the exact Wilcoxon signed-rank test from
     ``delivery_statistics``. Since audit #63 part 3 the interval decides the
-    arm's verdict (``arm_verdict``); a failure here is recorded as
+    arm's verdict with the median as a check (``arm_verdict``); a failure here is recorded as
     ``unavailable`` rather than raised, and the median comparison then decides,
     so it can never cost the lane its verdict.
     """
@@ -153,6 +153,7 @@ utc_now = jsonio.utc_now
 
 # Exit 3 (audit #63 part 3; decided 2026-09-25 by the audit's recommendation):
 # the lane cannot judge an arm whose paired 95% interval straddles its limit,
+# or whose median regression exceeds the limit while its interval lies under it,
 # or a run whose host was loaded (a measured take above twice the core count,
 # the gate's limit), throttled or in low power. Such a verdict is inconclusive,
 # never a pass or a fail.
@@ -187,9 +188,13 @@ def arm_verdict(median_regression: float, annotation: dict, limit: float) -> tup
     """pass, fail or inconclusive for one arm and metric, with its reason.
 
     The paired 95% interval of the mean percent difference decides when it is
-    available: wholly above the limit fails, wholly at or below it passes, and
-    straddling it is inconclusive. Without an interval (an unavailable
-    annotation) the median comparison decides, as before.
+    available: wholly above the limit fails, and straddling it is inconclusive.
+    Wholly at or below it passes only when the median regression, which this
+    lane gated before the interval existed, is also within the limit: the mean
+    of skewed paired differences can sit under the limit while the median sits
+    over it, and that disagreement is inconclusive, never a pass. Without an
+    interval (an unavailable annotation) the median comparison decides, as
+    before.
     """
     interval = annotation.get("confidenceInterval95") if isinstance(annotation, dict) else None
     lower = interval.get("lower") if isinstance(interval, dict) else None
@@ -197,9 +202,14 @@ def arm_verdict(median_regression: float, annotation: dict, limit: float) -> tup
     if isinstance(lower, (int, float)) and isinstance(upper, (int, float)):
         if lower > limit:
             return "fail", f"paired 95% interval [{lower:.2f}, {upper:.2f}]% lies above the {limit:g}% limit"
-        if upper <= limit:
-            return "pass", ""
-        return "inconclusive", f"paired 95% interval [{lower:.2f}, {upper:.2f}]% straddles the {limit:g}% limit"
+        if upper > limit:
+            return "inconclusive", f"paired 95% interval [{lower:.2f}, {upper:.2f}]% straddles the {limit:g}% limit"
+        if median_regression > limit:
+            return "inconclusive", (
+                f"median regression {median_regression:.2f}% exceeds the {limit:g}% limit while the "
+                f"paired 95% interval [{lower:.2f}, {upper:.2f}]% lies at or below it"
+            )
+        return "pass", ""
     if median_regression > limit:
         return "fail", f"median regression {median_regression:.2f}% exceeds {limit:g}% (no paired interval)"
     return "pass", ""

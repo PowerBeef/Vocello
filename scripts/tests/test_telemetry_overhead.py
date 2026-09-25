@@ -229,6 +229,11 @@ class OverheadVerdictTests(unittest.TestCase):
         self.assertIn("straddles the 5% limit", reason)
         # ...and a median under it whose interval straddles it is not a pass.
         self.assertEqual(overhead.arm_verdict(4.6, self.annotation(3.9, 6.8), 5.0)[0], "inconclusive")
+        # An interval under the limit never passes a median over it (BT-05 review).
+        status, reason = overhead.arm_verdict(5.4, self.annotation(0.5, 4.7), 5.0)
+        self.assertEqual(status, "inconclusive")
+        self.assertIn("median regression 5.40% exceeds the 5% limit", reason)
+        self.assertEqual(overhead.arm_verdict(5.0, self.annotation(0.5, 5.0), 5.0), ("pass", ""))
         # Without an interval the median decides, as before.
         unavailable = {"decidesVerdict": False, "unavailable": "KeyError"}
         self.assertEqual(overhead.arm_verdict(6.0, unavailable, 5.0)[0], "fail")

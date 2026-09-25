@@ -1243,8 +1243,9 @@ cmd_telemetry_overhead() {
   local verdict_path overhead_st=0
   note "telemetry-overhead: 3 counterbalanced rotations; warm-up×1 + measured×2 per mode/rotation"
   verdict_path="$(python3 "$SCRIPT_DIR/telemetry_overhead.py" "$@")" || overhead_st=$?
-  # Exit 3 (audit #63): a paired interval straddles its limit, or a measured
-  # take ran on a loaded, throttled or low-power host. Never a pass or a fail.
+  # Exit 3 (audit #63): a paired interval straddles its limit, a median exceeds
+  # it under an interval that does not, or a measured take ran on a loaded,
+  # throttled or low-power host. Never a pass or a fail.
   if (( overhead_st == 3 )); then
     warn "telemetry-overhead INCONCLUSIVE (see the reasons above) · $verdict_path"
     return 3

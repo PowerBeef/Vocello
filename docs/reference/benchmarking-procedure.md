@@ -764,8 +764,9 @@ machine-readable measured takes per mode. It requires identical PCM, records the
 and gates RTF/TTFC at 5% (lightweight) and 10% (verbose) versus off. Since 2026-09-25 (audit #63
 part 3, decided by the audit's recommendation) each arm's paired 95% interval of the percent
 difference decides when it exists (each take paired with the off take of its rotation): wholly above
-the limit fails, wholly at or below it passes, and straddling it is inconclusive; without an interval
-the median comparison decides. A measured take above twice the core count, at a serious or critical
+the limit fails, straddling it is inconclusive, and wholly at or below it passes only when the median
+regression is within the limit too (an interval under the limit beside a median over it is
+inconclusive, never a pass); without an interval the median comparison decides. A measured take above twice the core count, at a serious or critical
 thermal state or in low power mode also makes the run inconclusive. An inconclusive verdict is
 recorded (`status: inconclusive`, `inconclusiveReasons`) and exits 3, never a pass or a fail. It never repairs or
 downloads models; missing fixtures stop the run. Its verdict stays under `build/artifacts/macos/`

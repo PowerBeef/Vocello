@@ -76,9 +76,10 @@ lands in a required-step ledger with the verdict under `build/artifacts/macos/ga
 `QWENVOICE_GATE_BENCH=1` adds two steps. A `benchmark-preflight` before step 0 takes seconds: a
 quiet host, the canonical hardware profile, the installed benchmark model and a prediction of the
 baseline identity from the live host and the gate matrix; any failure stops the gate before a
-build, with a finalized ledger and a verdict. After the crash delta, unless an earlier step failed
+build, with a finalized ledger and a verdict that quotes the preflight's reason (a busy host, the
+hardware, a missing model, or a predicted BASELINE INVALID with its seed command). After the crash delta, unless an earlier step failed
 (the bench step is then left unrecorded and the ledger marks it missing), a bounded `vocello bench`
-of three seeded warm takes re-checks the host right before the model loads, compares the warm
+of five seeded warm takes re-checks the host right before the model loads, compares the warm
 medians with the committed baseline and, on a PASS, publishes one benchmark record. A loaded,
 low-power or throttled host makes the bench INCONCLUSIVE: the ledger records the step as failed with
 exit code 3, nothing is published, and the gate prints `GATE: INCONCLUSIVE` and exits 3, never PASS

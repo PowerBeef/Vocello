@@ -1219,7 +1219,10 @@ GATE_BENCH_MODEL="pro_custom_speed"
 GATE_BENCH_MODES="custom"
 GATE_BENCH_VARIANTS="speed"
 GATE_BENCH_LENGTHS="medium"
-GATE_BENCH_WARM=3
+# Five warm takes (maintainer decision 2026-09-25, audit #5). Every warm#N cell
+# is in the matrix hash and so in the baseline identity, and a seed run must
+# carry this many takes in every warm cell (--seed-minimum-takes below).
+GATE_BENCH_WARM=5
 # Every gate take uses the memory-qualification seed: seeded takes are
 # token-exact, so the gate's audio QC is reproducible from its record (audit
 # #13). The seed is part of the matrix hash and so of the baseline identity.
@@ -1228,8 +1231,8 @@ GATE_BENCH_SEED=19790615
 # The exact commands that seed a baseline, with this run's own paths (audit #14).
 gate_bench_seed_hint() {
   local run_diag="$1" run_id="$2" artifacts="$3"
-  printf '  seed from this run, no rerun: python3 scripts/summarize_generation_telemetry.py %q --run-id %q --evidence-manifest %q --engine-only --compare-states warm --seed-baseline %q\n' \
-    "$run_diag" "$run_id" "$artifacts/benchmark-evidence.json" "$GATE_BENCH_STAGED_BASELINE"
+  printf '  seed from this run, no rerun: python3 scripts/summarize_generation_telemetry.py %q --run-id %q --evidence-manifest %q --engine-only --compare-states warm --seed-baseline %q --seed-minimum-takes %q\n' \
+    "$run_diag" "$run_id" "$artifacts/benchmark-evidence.json" "$GATE_BENCH_STAGED_BASELINE" "$GATE_BENCH_WARM"
   printf '  or seed with new runs: QWENVOICE_GATE_BENCH_SEED=1 scripts/macos_test.sh gate\n'
   printf '  once at least three runs from one clean commit are staged, promote: cp %q %q\n' \
     "$GATE_BENCH_STAGED_BASELINE" "$GATE_BENCH_BASELINE"
@@ -1342,12 +1345,13 @@ PY
     --label "mac-gate-bench" >>"$log" 2>&1 || return 1
 
   if (( seeding )); then
-    # Governed seed: only a quiet host, a clean commit and three takes in every
-    # warm cell add the run to the staged baseline, which prints the thresholds
-    # it now implies.
+    # Governed seed: only a quiet host, a clean commit and the gate's full
+    # $GATE_BENCH_WARM takes in every warm cell add the run to the staged
+    # baseline, which prints the thresholds it now implies.
     local seed_status=0
     python3 "$ROOT_DIR/scripts/summarize_generation_telemetry.py" "${evidence_args[@]}" \
       --compare-states warm --seed-baseline "$GATE_BENCH_STAGED_BASELINE" \
+      --seed-minimum-takes "$GATE_BENCH_WARM" \
       --verdict-json "$verdict_json" >>"$log" 2>&1 || seed_status=$?
     case "$seed_status" in
       0)
@@ -1455,6 +1459,10 @@ cmd_gate() {
       echo "bench preflight: PASS" | tee -a "$verdict"
     else
       echo "bench preflight: FAIL (see preflight.log); no gate step ran" | tee -a "$verdict"
+      # The reason up front (a busy host, non-canonical hardware, a missing
+      # model, a predicted BASELINE INVALID and its seed command), not only in
+      # the log (audit #53).
+      { tail -n 15 "$gate_dir/preflight.log" 2>/dev/null || true; } | sed 's/^/  /' | tee -a "$verdict"
       gate_finish "$verdict" "$step_ledger" "$gate_dir" 1 0
     fi
   fi
@@ -1464,9 +1472,11 @@ cmd_gate() {
   local crash_marker="$gate_dir/.crash-marker"
   touch "$crash_marker"
 
-  # CI on the pushed commit already ran the complete Python suite. Locally the
-  # gate skips it while scripts/ and config/ are clean (QVOICE_GATES=quick,
-  # which check_project_inputs.sh ignores in CI); set QVOICE_GATES to override.
+  # CI runs the complete Python suite on every pushed commit. Locally the gate
+  # skips it while scripts/ and config/ have no uncommitted changes
+  # (QVOICE_GATES=quick, which check_project_inputs.sh ignores in CI), so a
+  # committed but unpushed scripts change is left to CI; set QVOICE_GATES to
+  # override.
   note "gate step 0/$total_steps: check_project_inputs"
   if required_step_run "$step_ledger" project-inputs \
       env QVOICE_GATES="${QVOICE_GATES:-quick}" "$SCRIPT_DIR/check_project_inputs.sh" \

@@ -166,7 +166,7 @@ prints read-only status); bare `xcodebuild` performs no such check.
 
 | Check | Action |
 |-------|--------|
-| Quiet machine | Timing lanes refuse to start on a busy host (`require_quiet_host` in `scripts/lib/host_preflight.sh`: a 1-minute load average above 2× the core count, kernel memory pressure above normal, another holder of the host-wide native lock or a locked agent worktree exits 1 before any model loads; it guards `macos_test.sh gate|memory|lang-bench|telemetry-overhead`, `ios_device.sh bench|lang-bench|memory|gate` and the `ui_test.sh` benchmark and perf lanes). `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues, and the run's own load sample then classifies it. Quit heavy apps and watch thermals (see §6.4). |
+| Quiet machine | Timing lanes refuse to start on a busy host (`require_quiet_host` in `scripts/lib/host_preflight.sh`: a 1-minute load average above 2× the core count, kernel memory pressure above normal, another holder of the host-wide native lock or a locked agent worktree exits 1 before any model loads; it guards the `macos_test.sh gate` bench (`QWENVOICE_GATE_BENCH=1`; the deterministic gate alone does not check) and `macos_test.sh memory|lang-bench|telemetry-overhead`, `ios_device.sh bench|lang-bench|memory|gate` and the `ui_test.sh` benchmark and perf lanes). `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues, and the run's own load sample then classifies it. Quit heavy apps and watch thermals (see §6.4). |
 | Free disk | Heavy lanes check the floors in `config/build-output-policy.json` before building or launching (`require_build_free_space`, `scripts/lib/storage_preflight.py`): 15 GiB for `ui_test.sh … benchmark`, macOS/iOS `memory`, `lang-bench` and iOS `bench`/`gate`; 12 GiB for `telemetry-overhead` and `ui_test.sh … perf`; 8 GiB for `macos_test.sh gate`. A shortfall stops the lane before any work starts. |
 | Single Vocello session | Quit any separately installed Vocello first. The XCUITest runner verifies exact executable paths and signals only its own Release products. |
 | Debug data dir | `QWENVOICE_DEBUG=1` → `~/Library/Application Support/QwenVoice-Debug/` |
@@ -822,8 +822,9 @@ RTF definition and the OS and toolchain that measured it: `osVersion`, `osBuild`
 pre-run snapshot records them and the publisher folds them into the manifest), never from the tools
 installed when the baseline is saved or compared, so a new OS or Xcode build number forces a
 re-seed. It is what `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` compares against — the
-gate runs three warm takes with `--seed 19790615` and compares their medians (`--compare-states
-warm`; the cold take is informational), uses an isolated runtime directory, rejects rows outside
+gate runs five warm takes with `--seed 19790615` and compares their medians (`--compare-states
+warm`; the cold take is informational; the take count is part of the matrix hash, so changing it
+forces a re-seed), uses an isolated runtime directory, rejects rows outside
 its collision-resistant run ID, freezes the exact ordered generation selection in
 `benchmark-evidence.json` before comparing, prints every threshold it used (and keeps them with
 the baseline digest in `bench-verdict.json`), and reports a loaded, low-power or throttled host as
@@ -833,7 +834,8 @@ the baseline's ("engine output changed").
 
 Governed seeding (`QWENVOICE_GATE_BENCH_SEED=1`, or `--seed-baseline` on a finished run) writes
 only the untracked staged file, never the committed baseline, and refuses a busy host, a dirty
-tree or a warm cell with fewer than three takes. A staged baseline pools the runs that share its
+tree or a warm cell with fewer takes than the gate runs (`--seed-minimum-takes 5`; the
+summarizer's own default is three). A staged baseline pools the runs that share its
 identity and source commit: each cell keeps the median of the per-run medians and the between-run
 range, and once it pools three runs that range becomes a threshold basis, so no seed run
 regresses against the baseline it built. Seed at least three runs from one clean commit, then

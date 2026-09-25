@@ -1482,7 +1482,7 @@ def compare_summaries(
     """Return regression entries where current is worse than baseline by > threshold.
 
     `states` restricts the verdict to cells in those warm states (the gate bench
-    compares its three-take warm medians only; the single cold take stays
+    compares its warm medians only; the single cold take stays
     informational). None compares every cell. `details`, when a list, receives
     one row per judged (cell, metric) with the threshold and its basis, so the
     caller can print and keep the thresholds it used.

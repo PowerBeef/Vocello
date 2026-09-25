@@ -347,7 +347,7 @@ the only local block) and CI on `main` as the gate; nothing waits for a model, a
 evidence. Before promoting or releasing a Swift performance change, complete the deeper checklist:
 
 - [ ] Build the change optimized (`scripts/build.sh cli-optimized` for the CLI, `scripts/release.sh` for the apps), not just `-Onone`.
-- [ ] Run the relevant benchmark (`vocello bench`, `scripts/ios_device.sh bench`, or a targeted Instruments profile) on a quiet host: timing lanes refuse a loaded host (`require_quiet_host`), and the gate bench compares medians of three warm takes and reports a loaded or throttled host as inconclusive (exit 3), never as pass or fail.
+- [ ] Run the relevant benchmark (`vocello bench`, `scripts/ios_device.sh bench`, or a targeted Instruments profile) on a quiet host: timing lanes refuse a loaded host (`require_quiet_host`), and the gate bench compares medians of five warm takes and reports a loaded or throttled host as inconclusive (exit 3), never as pass or fail.
 - [ ] Publish only validated records (schema v3 for generation lanes): `rtf` is wall ÷ audio (lower is faster) and is declared through `run.rtfDefinition`; `decodeSpeedupX` is the old inverted figure and never shares a comparison key with `rtf`; `toolchain.optimization` comes from the hash-bound build receipt via `scripts/lib/build_provenance.py`.
 - [ ] Compare telemetry KPIs: `realTimeFactor` (lower is faster), `tokensPerSecond`, process-owned
       physical-footprint peak, `maximumDelayedHeartbeatMS`, and heartbeat coverage.

@@ -481,7 +481,7 @@ Only upgrade when:
 5. Run `scripts/dev.sh check` (advisory) and let CI on `main` gate the push; `scripts/dev.sh ci`
    reproduces push CI serially.
 6. Build the CLI optimized (`scripts/build.sh cli-optimized`) and run a fixed-seed `vocello bench` on
-   a quiet host (`require_quiet_host` refuses a loaded one; the gate bench compares medians of three
+   a quiet host (`require_quiet_host` refuses a loaded one; the gate bench compares medians of five
    warm takes and reports a loaded or throttled host as inconclusive, exit 3). Compare the generated
    registry entry (schema v3 for generation records) with the nearest compatible clean run in `benchmarks/HISTORY.md`: `rtf`
    is wall ÷ audio (lower is faster) and is declared through `run.rtfDefinition`; `decodeSpeedupX`

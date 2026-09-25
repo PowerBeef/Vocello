@@ -700,7 +700,7 @@ class PublisherTests(unittest.TestCase):
         }
         output = self.root / "expected-identity.json"
         args = SimpleNamespace(
-            platform="macos", modes="custom", variants="speed", lengths="medium", warm=3,
+            platform="macos", modes="custom", variants="speed", lengths="medium", warm=5,
             seed=19790615, telemetry_mode="verbose", no_stream=False, output=output,
         )
         with (
@@ -714,7 +714,9 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(history["toolchain"]["optimization"], "-O")
         self.assertEqual(history["run"]["matrixScope"], "focused")
         self.assertEqual(history["source"], {"commit": "a" * 40, "dirty": False})
-        cells = publisher.bench_matrix_cells(["custom"], ["speed"], ["medium"], 3)
+        # The gate bench runs five warm takes: every warm#N cell is in the hash.
+        cells = publisher.bench_matrix_cells(["custom"], ["speed"], ["medium"], 5)
+        self.assertEqual(cells[-1], "custom/speed/medium/warm#4")
         self.assertEqual(
             history["inputs"]["matrixHash"],
             publisher.engine_matrix_hash(cells, "verbose", True, 19790615),

@@ -58,7 +58,8 @@ summarizer's `xRT` column.
 1. **Primary backend driver is headless** — `vocello bench` drives the matrix in-process with exact
    cold/warm control. **`scripts/ui_test.sh macos benchmark`** is the supplementary UI integration net (§4.10).
 2. **Telemetry is runtime-gated** — identical code in Release; off unless `QWENVOICE_DEBUG=1`,
-   `QWENVOICE_NATIVE_TELEMETRY_MODE`, or the app-to-engine handshake enables it.
+   `QWENVOICE_NATIVE_TELEMETRY_MODE`, or the in-process latch enables it, and always off under an
+   explicit `QWENVOICE_NATIVE_TELEMETRY_MODE=off` (`vocello bench --telemetry off`).
 3. **No CI execution gate** — model-dependent benchmarks are local and explicitly requested. CI validates the compact registry and reproducible index but does not run models, devices, XCUITest, or Instruments.
    The consent-bound lanes, never run unasked, are `scripts/macos_test.sh memory|lang-bench`, every
    `scripts/ui_test.sh` lane and every `scripts/ios_device.sh` verb; `scripts/macos_test.sh gate` and

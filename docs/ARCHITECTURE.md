@@ -979,8 +979,10 @@ Telemetry is **off in production** and on only when `TelemetryGate.isEnabled` �
 resolved from `QWENVOICE_DEBUG` (1/true/on/yes) or
 `QWENVOICE_NATIVE_TELEMETRY_MODE` in the engine's own process (the engine is in-process on every
 host; `vocello bench` sets its mode through `TelemetryGate.applyHandshakeMode`), never persisted.
-All diagnostic writers respect `TelemetryGate.resolvedEnabled` — when the gate is off, no JSONL is
-appended.
+An explicit `QWENVOICE_NATIVE_TELEMETRY_MODE=off` or a latched off mode wins over `QWENVOICE_DEBUG`,
+which also unlocks the registered runtime overrides. All diagnostic writers respect
+`TelemetryGate.resolvedEnabled`, and the engine builds its recorder and writes rows only through
+`NativeTelemetryWorkPlan` — when the gate is off, no JSONL is appended.
 
 Environment-variable ownership is explicit. `config/runtime-debug-knobs.json` registers every
 supported key and classifies production-affecting overrides, bounded observability, and

@@ -1240,9 +1240,9 @@
         "Sources/QwenVoiceCore/NativeMemoryPolicyResolver.swift",
         "Sources/QwenVoiceCore/MLXTTSEngine.swift"
       ],
-      "notes": "Revalidated 2026-09-18 (P2 policy decision): highMemoryMac disables idle unload and pressure response while navigation can request prewarm. Resident weights may outlive browsing; this is not demonstrated unbounded memory growth, and explicit unload/model replacement still exist. Choose the latency/memory tradeoff with deterministic lifecycle tests and separately consented real-model qualification. See project-review-2026-09-18.md.",
+      "notes": "Revalidated 2026-09-18 (P2 policy decision): highMemoryMac disables idle unload and pressure response while navigation can request prewarm. Resident weights may outlive browsing; this is not demonstrated unbounded memory growth, and explicit unload/model replacement still exist. Choose the latency/memory tradeoff with deterministic lifecycle tests and separately consented real-model qualification. See project-review-2026-09-18.md. Maintainer decision 2026-09-24: unload after idle. Warm prefetch stays tied to intent (entering Studio or generating); idle unload and memory-pressure relief apply on the high-memory Mac tier too, so browsing alone never pins the weights. From the PA-31 review: a cancelled warm's catch in MLXTTSEngine resets .starting to .idle without asking the runtime, and a cancelled clone prime does not re-arm idle unload, so resident weights can sit with no idle unload; settle both through the runtime as settleCancelledModelOperation does.",
       "plan": "audit-remediation-2026-09",
-      "updated": "2026-09-18"
+      "updated": "2026-09-24"
     },
     {
       "id": "AUD-11",
@@ -1415,7 +1415,7 @@
       "title": "Leftovers from PA-21, PA-22 and AUD-05",
       "status": "planned",
       "blockedBy": [],
-      "gate": "A failed History clear is never silent and a pending clear has its own banner copy on both platforms; a long-form acceptance interrupted by app suspension is retried after resume and keeps its audio, with copy that matches; a set-aside unreadable audio-removal list is reported once or can be discarded; the maintainer decides whether audio kept by earlier Keep Audio Files clears is removed; the resident speech tokenizer gets an owner-scoped release (ENG-06) only with a device memory re-qualification.",
+      "gate": "A failed History clear is never silent and a pending clear has its own banner copy on both platforms; a long-form acceptance interrupted by app suspension is retried after resume and keeps its audio, with copy that matches; a set-aside unreadable audio-removal list is reported once or can be discarded; the iPhone offers a one-time, confirmed removal of audio earlier clears left in its private storage (maintainer decision 2026-09-24: the Mac outputs folder stays untouched); the resident speech tokenizer gets an owner-scoped release (ENG-06) only with a device memory re-qualification.",
       "sourceOfTruth": [
         "Sources/iOS/History/HistoryScreen.swift",
         "Sources/SharedSupport/Database/LongFormHistoryAcceptance.swift",
@@ -1431,13 +1431,13 @@
       "title": "The engine store reports frontend state changes with the streaming engine",
       "status": "planned",
       "blockedBy": [],
-      "gate": "TTSEngineStore.snapshotUpdates fires once per applied frontend-state change with the streaming MLXTTSEngine, so the macOS warmup coordinator cancels pending warmups while the engine is busy and resets on idle, loaded or failed; the maintainer approves the change to frozen TTSEngineStore behavior; the expected failure in TTSEngineStoreTests is removed in the same commit; macOS smoke passes.",
+      "gate": "TTSEngineStore.snapshotUpdates fires once per applied frontend-state change with the streaming MLXTTSEngine, so the macOS warmup coordinator sees the engine's state: it cancels pending (undispatched) warmups while the engine is busy, never cancels its own dispatched warm for the states that warm publishes, invalidates a completed warm on a different loaded model or a failure (an idle unload sticks), and warms the latest intent after a stale warm; the maintainer approves the change to frozen TTSEngineStore behavior; the expected failure in TTSEngineStoreTests is removed in the same commit; macOS smoke passes.",
       "sourceOfTruth": [
         "Sources/iOS/TTSEngineStore.swift",
         "Sources/Services/MacGenerationWarmupCoordinator.swift",
         "Tests/VocelloCoreTests/TTSEngineStoreTests.swift"
       ],
-      "notes": "Found by PA-19 on 2026-09-24. syncFromSnapshot returns for any event-streaming backend (and when no new chunk arrived) before it reaches snapshotUpdates.send, and MLXTTSEngine streams events, so on macOS ContentView's onReceive(snapshotChanges) never fires and MacGenerationWarmupCoordinator.observe never runs. The fix is to send the update above the streaming guard. TTSEngineStore behavior is frozen (native.md) apart from consent admission, and the fix changes macOS warmup timing, so it waits for a maintainer decision and a macOS smoke run. testSnapshotUpdatesFireForAnAppliedFrontendChange records the defect with a strict XCTExpectFailure naming this item.",
+      "notes": "Found by PA-19 on 2026-09-24. syncFromSnapshot returns for any event-streaming backend (and when no new chunk arrived) before it reaches snapshotUpdates.send, and MLXTTSEngine streams events, so on macOS ContentView's onReceive(snapshotChanges) never fires and MacGenerationWarmupCoordinator.observe never runs. The fix is to send the update above the streaming guard. TTSEngineStore behavior is frozen (native.md) apart from consent admission, and the fix changes macOS warmup timing, so it waits for a maintainer decision and a macOS smoke run. testSnapshotUpdatesFireForAnAppliedFrontendChange records the defect with a strict XCTExpectFailure naming this item. Maintainer approved the fix on 2026-09-24 (the TTSEngineStore freeze is lifted for this change only).",
       "updated": "2026-09-24"
     }
   ]

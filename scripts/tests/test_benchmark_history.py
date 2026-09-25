@@ -1117,12 +1117,29 @@ class BenchmarkHistoryTests(unittest.TestCase):
         forced["takes"][0]["generationID"] = "generation-forced"
         self.publish(forced, "policy-forced")
 
+        # The M6 emulating the 8 GB floor (audit #11 option b): a forced floor
+        # tier that names the emulated RAM, exploratory only.
+        emulated = copy.deepcopy(forced)
+        emulated["run"].update({
+            "id": "policy-emulated-20260712",
+            "runtimePolicy": {
+                "deviceClass": "floor_8gb_mac", "deviceClassForced": True, "simulatedPhysicalMemoryMB": 8192,
+            },
+        })
+        emulated["takes"][0]["generationID"] = "generation-emulated"
+        self.publish(emulated, "policy-emulated")
+
         for name, policy in (
             ("wrong-platform", {"deviceClass": "iphone_pro", "deviceClassForced": False}),
             ("forced-comparable", {"deviceClass": "mid_16gb_mac", "deviceClassForced": True}),
             ("unknown-class", {"deviceClass": "m6_mac", "deviceClassForced": False}),
             ("extra-key", {**native, "mlxCacheLimitMB": 1024}),
             ("string-flag", {"deviceClass": "floor_8gb_mac", "deviceClassForced": "false"}),
+            ("emulated-native", {**native, "simulatedPhysicalMemoryMB": 8192}),
+            ("emulated-zero", {"deviceClass": "floor_8gb_mac", "deviceClassForced": True,
+                               "simulatedPhysicalMemoryMB": 0}),
+            ("emulated-string", {"deviceClass": "floor_8gb_mac", "deviceClassForced": True,
+                                 "simulatedPhysicalMemoryMB": "8192"}),
         ):
             candidate = copy.deepcopy(valid)
             candidate["run"]["id"] = f"policy-{name}-20260712"

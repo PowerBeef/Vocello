@@ -170,7 +170,7 @@ prints read-only status); bare `xcodebuild` performs no such check.
 | Free disk | Heavy lanes check the floors in `config/build-output-policy.json` before building or launching (`require_build_free_space`, `scripts/lib/storage_preflight.py`): 15 GiB for `ui_test.sh … benchmark`, macOS/iOS `memory`, `lang-bench` and iOS `bench`/`gate`; 12 GiB for `telemetry-overhead` and `ui_test.sh … perf`; 8 GiB for `macos_test.sh gate`. A shortfall stops the lane before any work starts. |
 | Single Vocello session | Quit any separately installed Vocello first. The XCUITest runner verifies exact executable paths and signals only its own Release products. |
 | Debug data dir | `QWENVOICE_DEBUG=1` → `~/Library/Application Support/QwenVoice-Debug/` |
-| Floor-tier simulation | `QWENVOICE_FORCE_MEMORY_CLASS=floor_8gb_mac` (propagates to engine via handshake) |
+| Floor-tier simulation | `QWENVOICE_FORCE_MEMORY_CLASS=floor_8gb_mac` forces the tier's policy (read in-process by whichever host runs the engine); `QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB=8` emulates the whole 8 GB machine on the M6 (tier, footprint bands, Metal working set). Both are exploratory only; see §4.4 |
 | Suppress proactive warm | `QWENVOICE_SUPPRESS_WARMUP=1` for accurate Custom/Design **cold** rows in UI runs |
 | Disable publication marking | `QWENVOICE_MARKING=off` disables both publication marks only in a repository-built internal diagnostics binary with the master gate enabled. It exists for A/B isolation of the marking pass, is unavailable in distributed builds, and must never be set for canonical records. |
 
@@ -267,11 +267,50 @@ QWENVOICE_DEBUG=1 \
   --label "floor-tier"
 ```
 
-Summarizer header shows `tier: floor_8gb_mac ⚠ forced`. `--save-baseline` and
+Summarizer header shows `tier: floor_8gb_mac ⚠ forced or emulated`. `--save-baseline` and
 `--compare-baseline` refuse forced rows (exit 1): a forced tier changes policy values, not the
 hardware, so it never seeds or meets a regression baseline. The governed baseline identity also
 binds the native `deviceClass` from the evidence's `run.runtimePolicy`; a baseline saved before
 that key compares without it and the summarizer says so.
+
+**The 8 GB floor evidence path (after the M6 became canonical).** The Mac mini M6 16 GB is the
+benchmark host and the 8 GB Mac stays the support floor (maintainer decision 2026-09-25, audit #11
+option b). There is no second canonical host: the floor is emulated on the M6 with
+`QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB=8` (registered in `config/runtime-debug-knobs.json`; it needs
+the internal-diagnostics build and `QWENVOICE_DEBUG=1`, which every repository lane sets). The host
+then reads as an 8 GB Mac wherever policy reads the machine: the tier resolves to `floor_8gb_mac` with
+its policy, the store's footprint bands are the floor's (guarded at 55%, critical at 72% of 8 GiB) and
+the snapshot reports 8,192 MB of RAM and a 5,461 MB Metal working set, so every row's
+`gpuRecommendedWorkingSetMB` reads about 5,461 and `totalDeviceRAMMB` 8,192. A forced class alone
+keeps the M6's bands and working set; use the emulation for floor evidence.
+
+```sh
+# Engine footprint and policy on the emulated floor (vocello bench rows)
+QWENVOICE_DEBUG=1 QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB=8 ./build/vocello bench \
+  --modes custom,design,clone --variants speed --lengths medium --warm 3 --label "floor-emulated"
+
+# The retained-memory protocol on the emulated floor
+QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB=8 scripts/macos_test.sh memory --label floor-emulated
+
+# The app's bands on the emulated floor (the runner hands the knob to the app)
+QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB=8 scripts/ui_test.sh macos benchmark --label floor-emulated
+```
+
+Each is a consent-bound lane like its unemulated form. The rows stamp `deviceClassForced=true`,
+`simulatedPhysicalMemoryMB` and `simulatedMetalWorkingSetMB`; the publisher classifies every such
+record `exploratory` (never canonical, never comparable, never a baseline or a chart point) and an
+engine record's `run.runtimePolicy` names `simulatedPhysicalMemoryMB` beside the forced floor tier. The
+band paths reuse the store's existing knobs: `QVOICE_IOS_MEMORY_GUARD_FORCE_BAND=guarded` or
+`QVOICE_IOS_MEMORY_GUARD_FORCE_CRITICAL_ONCE=1`, which the UI benchmark lane also hands to the app. A
+forced band trims or unloads, which fails memory qualification by design, so such a run is a
+band-path diagnostic that keeps its artifacts and publishes nothing.
+
+What the evidence can claim is **policy and footprint**: the floor tier's policy values, the footprint
+each take reaches against the floor's bands, and Metal allocations against the floor's working set.
+It cannot claim kernel memory pressure, compression, swap or the real Metal budget of an 8 GB Mac, and
+M6 timings say nothing about the floor's speed; the M2 history stays the only 8 GB timing and pressure
+evidence. A pressure balloon that would reproduce pressure needs its own quiet-host exemption and is not
+part of this path.
 
 ### 4.5 Memory-pressure exercise
 

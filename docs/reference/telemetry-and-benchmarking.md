@@ -125,6 +125,7 @@ values without retaining raw launch input. Never add an undocumented environment
 |---|---|
 | `QWENVOICE_SUPPRESS_WARMUP=1` | Skips proactive prewarm/clone‑priming so the first generation records its own **cold** load (`MacGenerationWarmupCoordinator`). App‑process only. |
 | `QWENVOICE_FORCE_MEMORY_CLASS=floor_8gb_mac` | Forces the device-memory tier (`NativeDeviceClassGate`), read in-process by the engine's host. Runs constrained-tier code paths for diagnostic comparison. See §11 "Memory and pressure interpretation". Accepts the `NativeDeviceMemoryClass` raw values + aliases `8gb`/`16gb`. |
+| `QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB=8` | **Floor emulation on a larger Mac** (`NativeHostMemoryEmulation`, audit #11): the host reads as a Mac with that much RAM wherever policy reads the machine: `NativeMemoryPolicyResolver.deviceClass()` (so 8 resolves the floor tier and its policy), the store's footprint bands (`MacMemoryBudgetPolicy`: guarded at 55%, critical at 72% of the emulated RAM) and the snapshot's `totalDeviceRAMMB` and Metal working set (two thirds of the emulated RAM: 5,461 MB for 8 GB), so the GPU working-set ratio is judged against the floor's budget. Only a smaller Mac can be emulated. Rows stamp `notes.deviceClassForced=true`, `notes.simulatedPhysicalMemoryMB` and `notes.simulatedMetalWorkingSetMB`; records are exploratory. Policy and footprint only: see §11. |
 | `QWENVOICE_MAC_WARM_GATE=off\|records\|enforce` | macOS warm‑admission gate (`MacWarmupAdmissionPolicy`): defers **proactive** warms while the app‑process kernel pressure level is soft/hardTrim on every Mac tier (the high‑memory Mac since AUD‑10). Default `enforce` (validated 2026‑06‑09); `records` logs verdicts without blocking; user generations are never gated. Events land in the app layer's `native-events.jsonl`. |
 | `QVOICE_TALKER_KV_QUANT=8\|4` | **Dev-only** opt‑in talker KV‑cache quantization (QuantizedKVCache, group 64). Measured (P4, §H): clone/long −271 MB physFoot but **−8.6% RTF** — not shipped on any tier; insurance knob only. Never combined with `QVOICE_TALKER_KV_WINDOW`. |
 | `QVOICE_IOS_MLX_CACHE_LIMIT_MB=<n>` | **Dev-only** override of the MLX `Memory.cacheLimit` for the iPhone tier. Useful for sweeps; production uses the tier default. |
@@ -657,6 +658,28 @@ forced run for native‑tier data.
 Pressure-triggered trims appear as `memory_pressure` and `memory_trim` stage marks. Interpret them
 together with `physFoot`, the GPU-by-stage block, and the recorded device class; a forced class is
 diagnostic evidence, not proof for that physical device.
+
+**The 8 GB floor after the M6 became canonical (audit #11, option b).** The canonical host is the
+Mac mini M6 16 GB; the 8 GB Mac stays the support floor, and the M2 history stays its only timing and
+pressure evidence. On the M6 the floor is emulated: `QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB=8` makes the
+host read as an 8 GB Mac wherever policy reads the machine, so the tier resolves to `floor_8gb_mac` (a
+forced class alone would keep the M6's bands and working set), the store's footprint bands are the
+floor's (guarded at 55%, critical at 72% of 8 GiB) and the snapshot reports 8,192 MB of RAM and a
+5,461 MB Metal working set, so `gpuWorkingSetUsageRatioPeak` judges the floor's budget. The band paths
+reuse `QVOICE_IOS_MEMORY_GUARD_FORCE_BAND=guarded` and `QVOICE_IOS_MEMORY_GUARD_FORCE_CRITICAL_ONCE=1`
+(the Mac hosts the same store). Emulated rows stamp `deviceClassForced=true` and
+`simulatedPhysicalMemoryMB`, and their records are exploratory, never canonical, never a baseline and
+never comparable with real-hardware records: the engine record's `run.runtimePolicy` carries
+`simulatedPhysicalMemoryMB` beside the forced floor tier. The procedure is in the benchmarking
+procedure, §4.4.
+
+The claims are limited to **policy and footprint**: the floor tier's policy values (256 MB MLX cache,
+the per-generation clear, the 0.6 s streaming interval, the skipped dedicated custom prewarm, the
+2-minute idle unload, one clone cache slot), the footprint each take reaches against the floor's bands,
+and the Metal allocations against its working set. The kernel still has 16 GB: no kernel memory
+pressure, compression, swap or real Metal budget of an 8 GB Mac is reproduced, and timings on the M6
+say nothing about the floor's speed. A pressure balloon that would reproduce pressure needs its own
+quiet-host exemption and is not part of this path.
 
 > **Caveat:** on the forced floor tier, a Quality load that cannot fit will surface as an error rather
 > than silently falling back to Speed. The row's `modelID` reveals the actual variant served — check it

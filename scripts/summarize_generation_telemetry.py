@@ -551,8 +551,9 @@ def _engine_run(e, app_lookup, *, cell_override=None):
         # Resolved device tier this row ran under (notes.deviceClass) —
         # reveals a forced-tier benchmark and the floor Quality→Speed fallback.
         "deviceClass": notes.get("deviceClass") or "?",
-        # Whether the tier was forced via QWENVOICE_FORCE_MEMORY_CLASS (vs the
-        # native tier) — so a real 8 GB Mac isn't mislabeled "forced".
+        # Whether the tier was forced via QWENVOICE_FORCE_MEMORY_CLASS or
+        # emulated via QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB (vs the native
+        # tier) — so a real 8 GB Mac isn't mislabeled "forced".
         "deviceClassForced": notes.get("deviceClassForced") == "true",
         # Input script length (notes.promptChars) → bucket for the
         # short/medium/long sweep. RTF/decode/KV-cache all scale with it.
@@ -1512,7 +1513,8 @@ def baseline_lacks_device_class(payload):
 
 
 def forced_memory_class_rows(runs):
-    """Rows that ran under QWENVOICE_FORCE_MEMORY_CLASS (audit #19).
+    """Rows that ran under QWENVOICE_FORCE_MEMORY_CLASS or an emulated smaller
+    Mac, QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB (audit #19, #11).
 
     A forced tier changes policy values, not the hardware, so such rows are
     exploratory evidence: a regression baseline is never saved or seeded from
@@ -2190,8 +2192,9 @@ def main():
         forced = forced_memory_class_rows(runs)
         if forced:
             print(
-                f"FAIL: {len(forced)} selected row(s) ran under a forced memory class "
-                "(QWENVOICE_FORCE_MEMORY_CLASS); a regression baseline is never saved, "
+                f"FAIL: {len(forced)} selected row(s) ran under a forced or emulated memory class "
+                "(QWENVOICE_FORCE_MEMORY_CLASS, QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB); "
+                "a regression baseline is never saved, "
                 "seeded from or compared with forced rows."
             )
             return 1
@@ -2234,7 +2237,8 @@ def main():
     print(f"({len(runs)} runs across {len(cells) + len(delivery_cells)} cells; warm shows median)")
     print("RTF = request wall ÷ audio (lower is faster); xRT = decode-loop speedup (audio ÷ decode s, higher is faster)")
     print(f"tier: {', '.join(tiers)}"
-          + ("   ⚠ forced (QWENVOICE_FORCE_MEMORY_CLASS)" if forced else "")
+          + ("   ⚠ forced or emulated (QWENVOICE_FORCE_MEMORY_CLASS, "
+             "QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB)" if forced else "")
           + "\n")
     print(header)
     print("-" * len(header))

@@ -646,20 +646,36 @@ def require_schema_object(value: Any, location: str) -> dict[str, Any]:
 # `NativeDeviceMemoryClass` raw values (Sources/QwenVoiceCore/SemanticTypes.swift).
 RUNTIME_DEVICE_CLASSES = {"floor_8gb_mac", "mid_16gb_mac", "high_memory_mac", "iphone_pro"}
 RUNTIME_POLICY_KEYS = {"deviceClass", "deviceClassForced"}
+# A Mac emulating a smaller one (audit #11 option b) names the emulated RAM.
+RUNTIME_POLICY_OPTIONAL_KEYS = {"simulatedPhysicalMemoryMB"}
 
 
 def validate_runtime_policy(run: dict[str, Any]) -> None:
     """Check run.runtimePolicy, the memory-tier provenance (audit #19).
 
     A native tier must match the platform; a forced tier is exploratory
-    evidence and can never join a comparison lineage."""
+    evidence and can never join a comparison lineage. An emulated smaller Mac
+    (`simulatedPhysicalMemoryMB`, audit #11) is a forced tier on macOS."""
     policy = run["runtimePolicy"]
-    if not isinstance(policy, dict) or set(policy) != RUNTIME_POLICY_KEYS:
-        raise HistoryError("run.runtimePolicy must name exactly deviceClass and deviceClassForced")
+    if (
+        not isinstance(policy, dict)
+        or not RUNTIME_POLICY_KEYS <= set(policy)
+        or set(policy) - RUNTIME_POLICY_KEYS - RUNTIME_POLICY_OPTIONAL_KEYS
+    ):
+        raise HistoryError(
+            "run.runtimePolicy must name deviceClass and deviceClassForced "
+            "and at most simulatedPhysicalMemoryMB"
+        )
     device_class = policy["deviceClass"]
     forced = policy["deviceClassForced"]
     if device_class not in RUNTIME_DEVICE_CLASSES or not isinstance(forced, bool):
         raise HistoryError("run.runtimePolicy has an unsupported device class")
+    if "simulatedPhysicalMemoryMB" in policy:
+        simulated = policy["simulatedPhysicalMemoryMB"]
+        if isinstance(simulated, bool) or not isinstance(simulated, int) or simulated <= 0:
+            raise HistoryError("run.runtimePolicy.simulatedPhysicalMemoryMB must be a positive integer")
+        if not forced or run.get("platform") != "macos":
+            raise HistoryError("an emulated physical memory is a forced tier on macOS")
     if forced:
         if run.get("classification") not in {"exploratory", "instrumented", "partial"}:
             raise HistoryError("a forced memory class can only publish non-comparable evidence")

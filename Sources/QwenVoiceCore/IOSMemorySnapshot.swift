@@ -189,17 +189,22 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
             let effectiveLimit = min(realLimit, simLimit)
             headroom = effectiveLimit > footprint ? effectiveLimit - footprint : 0
         }
+        // A Mac emulating the 8 GB floor (`QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB`,
+        // audit #11) reports the emulated RAM and Metal working set, so the
+        // store's bands and the GPU working-set ratio judge the floor's budget.
         return IOSMemorySnapshot(
             processRole: role,
             pid: getpid(),
             capturedAtUptimeSeconds: ProcessInfo.processInfo.systemUptime,
-            totalDeviceRAMBytes: ProcessInfo.processInfo.physicalMemory,
+            totalDeviceRAMBytes: NativeHostMemoryEmulation.effectivePhysicalMemoryBytes(),
             availableHeadroomBytes: headroom,
             residentBytes: metrics.residentBytes,
             physFootprintBytes: metrics.physFootprintBytes,
             compressedBytes: metrics.compressedBytes,
             gpuAllocatedBytes: device.map { UInt64($0.currentAllocatedSize) },
-            gpuRecommendedWorkingSetBytes: device.map { $0.recommendedMaxWorkingSetSize },
+            gpuRecommendedWorkingSetBytes: device.map {
+                NativeHostMemoryEmulation.effectiveMetalWorkingSetBytes(real: $0.recommendedMaxWorkingSetSize)
+            },
             hasUnifiedMemory: device?.hasUnifiedMemory,
             kernelPhysFootprintPeakBytes: metrics.kernelPhysFootprintPeakBytes,
             graphicsFootprintBytes: metrics.graphicsFootprintBytes

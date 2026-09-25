@@ -519,6 +519,8 @@ targets:
       - path: Sources/Services/TTSEngineStore+Mac.swift
       - path: Sources/Services/MacGenerationWarmupCoordinator.swift
       - path: Sources/Services/MacWarmupAdmissionPolicy.swift
+      # Audit #11: the Mac footprint bands, unit-tested under the emulated 8 GB floor.
+      - path: Sources/Services/MacMemoryBudgetPolicy.swift
       - path: Sources/iOSSupport/Services/DatabaseService.swift
       - path: Sources/iOS/Commerce/IOSExportGate.swift
       - path: Sources/iOSSupport/ViewModels/ModelManagerViewModel.swift

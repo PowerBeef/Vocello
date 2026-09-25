@@ -1219,6 +1219,10 @@ class PublisherTests(unittest.TestCase):
         simulated["notes"]["memoryProfile"] = "iphone15pro"
         simulated["notes"]["simulatedProcessLimitMB"] = "5000"
         self.assertTrue(publisher.uses_forced_memory_profile([simulated]))
+        # A Mac emulating the 8 GB floor (audit #11 option b).
+        emulated = engine_row("emulated")
+        emulated["notes"]["simulatedPhysicalMemoryMB"] = "8192"
+        self.assertTrue(publisher.uses_forced_memory_profile([emulated]))
 
     def test_runtime_policy_provenance_comes_from_the_rows_own_stamps(self) -> None:
         def stamped(generation_id: str, device_class: str | None, forced: str = "false") -> dict:
@@ -1243,6 +1247,28 @@ class PublisherTests(unittest.TestCase):
             with self.subTest(rows=[row["notes"].get("deviceClass") for row in rows]):
                 with self.assertRaises(publisher.PublicationError):
                     publisher.runtime_policy_provenance(rows)
+
+    def test_an_emulated_floor_names_its_emulated_memory(self) -> None:
+        """audit #11 option b: the M6 emulating an 8 GB Mac is a forced floor tier."""
+        def emulated(generation_id: str, megabytes: str | None, forced: str = "true") -> dict:
+            row = engine_row(generation_id)
+            row["notes"].update({"deviceClass": "floor_8gb_mac", "deviceClassForced": forced})
+            if megabytes is not None:
+                row["notes"]["simulatedPhysicalMemoryMB"] = megabytes
+            return row
+
+        self.assertEqual(
+            publisher.runtime_policy_provenance([emulated("a", "8192"), emulated("b", "8192")]),
+            {"deviceClass": "floor_8gb_mac", "deviceClassForced": True, "simulatedPhysicalMemoryMB": 8192},
+        )
+        for name, rows in (
+            ("mixed emulation", [emulated("a", "8192"), emulated("b", None)]),
+            ("two machines", [emulated("a", "8192"), emulated("b", "4096")]),
+            ("not forced", [emulated("a", "8192", forced="false")]),
+            ("not a number", [emulated("a", "eight")]),
+        ):
+            with self.subTest(name=name), self.assertRaises(publisher.PublicationError):
+                publisher.runtime_policy_provenance(rows)
 
     @staticmethod
     def sysctl_run(values: dict[tuple[str, ...], str]):

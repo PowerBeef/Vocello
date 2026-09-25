@@ -1461,6 +1461,18 @@ elif [[ "$platform" == "macos" ]]; then
     # and writes take-NN-<cell>.wav/.json here; absent captures never fail the lane.
     mkdir -p "$out/playback-capture"
     export TEST_RUNNER_QVOICE_MAC_BENCH_CAPTURE_DIR="$out/playback-capture"
+    # The 8 GB floor emulated on this Mac (audit #11 option b): the runner hands
+    # the registered knobs to the app. Emulated rows stamp a forced tier and the
+    # emulated RAM, so the record publishes only as exploratory evidence; a
+    # forced band trims or unloads, which fails memory qualification by design
+    # (a band-path diagnostic). Claims stay limited to policy and footprint.
+    for floor_knob in QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB QVOICE_IOS_MEMORY_GUARD_FORCE_BAND \
+        QVOICE_IOS_MEMORY_GUARD_FORCE_CRITICAL_ONCE; do
+      if [[ -n "${!floor_knob:-}" ]]; then
+        export "TEST_RUNNER_$floor_knob=${!floor_knob}"
+        note "floor diagnostic: $floor_knob=${!floor_knob} (never a canonical record)"
+      fi
+    done
   fi
 
   note "macOS XCUITest $lane → $out"

@@ -73,36 +73,3 @@ enum MacEngineBootstrap {
         return "\(bundleIdentifier)|\(marketingVersion)|\(buildVersion)"
     }
 }
-
-/// Memory budget bands for the shared store on a Mac. The headroom thresholds
-/// are inert here (`os_proc_available_memory` is iOS-only, so the snapshot's
-/// headroom falls back to total RAM minus footprint and stays far above them);
-/// the live criteria are the process footprint against physical RAM and the
-/// Metal working-set ratio. `highMemoryMac` keeps only the GPU criterion; its
-/// resident weights are released by the resolver's idle unload, and the
-/// engine's kernel-pressure responder trims caches (AUD-10).
-enum MacMemoryBudgetPolicy {
-    static func policy(
-        for deviceClass: NativeDeviceMemoryClass,
-        physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory
-    ) -> IOSMemoryBudgetPolicy {
-        let healthyHeadroom: UInt64 = 768 * 1_048_576
-        let guardedHeadroom: UInt64 = 384 * 1_048_576
-        switch deviceClass {
-        case .highMemoryMac:
-            return IOSMemoryBudgetPolicy(
-                healthyHeadroomBytes: healthyHeadroom,
-                guardedHeadroomBytes: guardedHeadroom,
-                criticalGPUWorkingSetUsageRatio: 0.90
-            )
-        default:
-            return IOSMemoryBudgetPolicy(
-                healthyHeadroomBytes: healthyHeadroom,
-                guardedHeadroomBytes: guardedHeadroom,
-                criticalGPUWorkingSetUsageRatio: 0.85,
-                aggregateGuardedFootprintBytes: physicalMemory / 100 * 55,
-                aggregateCriticalFootprintBytes: physicalMemory / 100 * 72
-            )
-        }
-    }
-}

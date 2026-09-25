@@ -704,7 +704,7 @@
         },
         "runtimePolicy": {
           "additionalProperties": false,
-          "description": "Run-level memory-tier provenance from the engine rows' own stamps: the device class the rows ran under and whether QWENVOICE_FORCE_MEMORY_CLASS forced it. Optional; absent on records published before 2026-09-25 and never part of the comparison key.",
+          "description": "Run-level memory-tier provenance from the engine rows' own stamps: the device class the rows ran under, whether QWENVOICE_FORCE_MEMORY_CLASS forced it or QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB emulated a smaller Mac (both forced), and the emulated RAM in MB. Optional; absent on records published before 2026-09-25 and never part of the comparison key.",
           "properties": {
             "deviceClass": {
               "enum": [
@@ -716,6 +716,10 @@
             },
             "deviceClassForced": {
               "type": "boolean"
+            },
+            "simulatedPhysicalMemoryMB": {
+              "minimum": 1,
+              "type": "integer"
             }
           },
           "required": [

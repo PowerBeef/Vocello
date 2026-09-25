@@ -819,6 +819,9 @@ def uses_forced_memory_profile(rows: Iterable[dict[str, Any]]) -> bool:
             return True
         if notes.get("memoryProfile") or notes.get("simulatedProcessLimitMB"):
             return True
+        # A Mac emulating the 8 GB floor (audit #11): policy and footprint only.
+        if notes.get("simulatedPhysicalMemoryMB"):
+            return True
     return False
 
 
@@ -827,11 +830,15 @@ def runtime_policy_provenance(rows: Iterable[dict[str, Any]]) -> dict[str, Any] 
 
     Every engine row stamps the device class it ran under and whether
     QWENVOICE_FORCE_MEMORY_CLASS forced it, so a record can prove its tier
-    instead of implying it from the hardware profile. Rows that predate the
-    stamp yield no block; a partly stamped or mixed-tier selection is refused.
+    instead of implying it from the hardware profile. A row on a Mac emulating
+    a smaller one (QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB, audit #11) stamps its
+    tier as forced and names the emulated RAM, which the block carries as
+    `simulatedPhysicalMemoryMB`. Rows that predate the stamp yield no block; a
+    partly stamped, mixed-tier or mixed-emulation selection is refused.
     History is never keyed on this block.
     """
     classes: set[str] = set()
+    emulated: set[str | None] = set()
     stamped = unstamped = 0
     forced = False
     for row in rows:
@@ -844,11 +851,25 @@ def runtime_policy_provenance(rows: Iterable[dict[str, Any]]) -> dict[str, Any] 
             unstamped += 1
         if str(notes.get("deviceClassForced", "false")).lower() == "true":
             forced = True
+        simulated = notes.get("simulatedPhysicalMemoryMB")
+        emulated.add(str(simulated) if simulated not in (None, "") else None)
     if not stamped:
         return None
     if unstamped or len(classes) != 1:
         raise PublicationError("selected engine rows do not share one stamped device class")
-    return {"deviceClass": classes.pop(), "deviceClassForced": forced}
+    if len(emulated) != 1:
+        raise PublicationError("selected engine rows do not share one emulated physical memory")
+    policy: dict[str, Any] = {"deviceClass": classes.pop(), "deviceClassForced": forced}
+    simulated_mb = emulated.pop()
+    if simulated_mb is not None:
+        try:
+            megabytes = int(simulated_mb)
+        except ValueError:
+            raise PublicationError("an emulated physical memory must be a whole number of MB") from None
+        if megabytes <= 0 or not forced:
+            raise PublicationError("an emulated physical memory must stamp its tier as forced")
+        policy["simulatedPhysicalMemoryMB"] = megabytes
+    return policy
 
 
 # The stricter per-take host-load limit (maintainer decision 2026-09-25, BT-02,

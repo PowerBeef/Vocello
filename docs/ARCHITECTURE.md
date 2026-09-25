@@ -410,6 +410,10 @@ tier + mode + batch. Classification: iPhone → `.iPhonePro`; Mac ≤10 GB →
 `.floor8GBMac`; ≤24 GB → `.mid16GBMac`; else `.highMemoryMac`. Diagnostic override
 `QWENVOICE_FORCE_MEMORY_CLASS` is read in-process through `RuntimeDebugGate` (`NativeDeviceClassGate`),
 so it applies only in an internal diagnostics build with the `QWENVOICE_DEBUG` master gate enabled.
+`QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB` (`NativeHostMemoryEmulation`, same gate) emulates a smaller
+Mac for the classification, the store's footprint bands (`MacMemoryBudgetPolicy`) and the snapshot's
+Metal working set; it is how the canonical M6 produces exploratory 8 GB floor evidence (policy and
+footprint only).
 
 | Tier (`NativeDeviceMemoryClass`) | MLX cache | Clone slots | Idle-unload | Token clear cadence |
 | --- | --- | --- | --- | --- |

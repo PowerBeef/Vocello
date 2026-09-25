@@ -576,6 +576,7 @@ generation telemetry retains override key names and a digest, never raw values.
 | `QWENVOICE_DEBUG=1` | Use `QwenVoice-Debug` data folder and enable telemetry. |
 | `QWENVOICE_NATIVE_TELEMETRY_MODE=verbose` | Write raw per-sample memory sidecars. |
 | `QWENVOICE_FORCE_MEMORY_CLASS=8gb\|16gb\|high\|iphone` | Force a constrained memory tier. |
+| `QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB=8` | Emulate a smaller Mac (tier, footprint bands, Metal working set); policy and footprint only. |
 | `QWENVOICE_SUPPRESS_WARMUP=1` | Skip proactive warmup to measure true cold load. |
 | `QVOICE_TALKER_KV_WINDOW=<n>` | Enable sliding-window talker KV cache (dev). |
 | `QVOICE_TALKER_KV_QUANT=4\|8` | Enable quantized talker KV cache (dev). |

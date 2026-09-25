@@ -411,6 +411,29 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.last_manifest["historyRecord"]["hardware"]["profileID"], canonical[0])
 
+    def test_a_forced_or_emulated_tier_publishes_only_exploratory_evidence(self) -> None:
+        """audit #11 option b: the 8 GB floor emulated on the M6 never reads as canonical."""
+        result = self.run_checker(self.expected_order, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("classification", self.last_manifest["historyRecord"]["run"])
+
+        def emulate_floor(rows: list[dict]) -> None:
+            for row in rows:
+                row["notes"].update({
+                    "deviceClass": "floor_8gb_mac", "deviceClassForced": "true",
+                    "simulatedPhysicalMemoryMB": "8192", "simulatedMetalWorkingSetMB": "5461",
+                })
+
+        def force_class(rows: list[dict]) -> None:
+            for row in rows:
+                row["notes"].update({"deviceClass": "mid_16gb_mac", "deviceClassForced": "true"})
+
+        for name, mutate in (("emulated floor", emulate_floor), ("forced class", force_class)):
+            with self.subTest(name):
+                result = self.run_checker(self.expected_order, mutate, evidence=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(self.last_manifest["historyRecord"]["run"]["classification"], "exploratory")
+
     def run_with_stalls(
         self, device_class: str | None, *, forced: bool = False, stalls: int = 2,
         maximum_ms: int = 300, extra_args: list[str] | None = None, evidence: bool = False,

@@ -5,8 +5,11 @@ import MLX
 public enum NativeMemoryPolicyResolver {
     private static let oneGB = 1_024 * 1_024 * 1_024
 
+    /// The tier for a machine with `physicalMemoryBytes` of RAM. The default is
+    /// the machine policy reads: the real RAM, or the smaller Mac that
+    /// `QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB` emulates (audit #11).
     public static func deviceClass(
-        physicalMemoryBytes: UInt64 = ProcessInfo.processInfo.physicalMemory,
+        physicalMemoryBytes: UInt64 = NativeHostMemoryEmulation.effectivePhysicalMemoryBytes(),
         isIPhone: Bool = {
             #if os(iOS)
             return true

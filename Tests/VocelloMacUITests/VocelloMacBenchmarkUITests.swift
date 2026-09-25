@@ -5,6 +5,26 @@ import Darwin
 @MainActor
 final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
     private static let takeFile = URL(fileURLWithPath: "/tmp/vocello-bench-current-take.json")
+    /// Registered diagnostics scripts/ui_test.sh hands through for the emulated
+    /// 8 GB floor (audit #11 option b); absent, the app runs on the real machine.
+    private static let floorEmulationKeys = [
+        "QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB",
+        "QVOICE_IOS_MEMORY_GUARD_FORCE_BAND",
+        "QVOICE_IOS_MEMORY_GUARD_FORCE_CRITICAL_ONCE",
+    ]
+
+    override var additionalLaunchEnvironment: [String: String] { Self.floorEmulationEnvironment() }
+
+    private static func floorEmulationEnvironment() -> [String: String] {
+        let processEnvironment = ProcessInfo.processInfo.environment
+        var environment: [String: String] = [:]
+        for key in floorEmulationKeys {
+            if let value = processEnvironment[key], !value.isEmpty {
+                environment[key] = value
+            }
+        }
+        return environment
+    }
 
     func testOrderedConfigurableMatrix() throws {
         beginSession()
@@ -125,12 +145,13 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
         takeIndex: Int,
         take: VocelloUIBenchMatrix.Take
     ) -> [String: String] {
-        var environment = [
+        var environment = Self.floorEmulationEnvironment()
+        environment.merge([
             "QVOICE_MAC_BENCH_RUN_ID": runID,
             "QVOICE_MAC_BENCH_TAKE_INDEX": String(takeIndex),
             "QVOICE_MAC_BENCH_CELL": take.cellID,
             "QVOICE_MAC_BENCH_WARM_STATE": take.warmState.rawValue,
-        ]
+        ]) { _, take in take }
         environment["QVOICE_MAC_BENCH_LABEL"] = label
         environment["QWENVOICE_BENCH_FORCE_COLD"] = take.warmState == .cold ? "1" : "0"
         if take.mode != .clone {

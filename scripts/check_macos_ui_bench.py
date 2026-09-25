@@ -82,6 +82,21 @@ def stall_gate_applies(notes: dict) -> bool:
     return str(notes.get("deviceClassForced", "false")).lower() != "true"
 
 
+def diagnostic_memory_tier(rows: list[dict]) -> bool:
+    """Whether any engine row ran a forced memory class or an emulated smaller
+    Mac (QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB, audit #11 option b).
+
+    Such a run changes policy values, not the hardware: its record publishes
+    only as exploratory evidence, never canonical and never comparable."""
+    for row in rows:
+        notes = row.get("notes") or {}
+        if str(notes.get("deviceClassForced", "false")).lower() == "true":
+            return True
+        if notes.get("simulatedPhysicalMemoryMB"):
+            return True
+    return False
+
+
 class StallContractError(ValueError):
     pass
 
@@ -906,6 +921,8 @@ def build_manifest(
             "finishedAt": finished_at,
             "warnings": memory_run["warnings"],
             "rtfDefinition": rtf_semantics.STANDARD_RTF_DEFINITION,
+            # A forced or emulated memory tier is exploratory evidence (audit #11).
+            **({"classification": "exploratory"} if diagnostic_memory_tier(engine_rows) else {}),
         },
         "hardware": hardware,
         "toolchain": {"optimization": optimization},

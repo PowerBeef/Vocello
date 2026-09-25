@@ -2405,10 +2405,12 @@ struct StreamingExecutionContext: Sendable {
         let spokenTextPlan = try? SpokenTextPlanner.plan(originalText: request.text)
         var tierNotes = [
             "deviceClass": NativeMemoryPolicyResolver.deviceClass().rawValue,
-            // Whether the tier was forced (QWENVOICE_FORCE_MEMORY_CLASS) vs the
-            // native, physical-memory-derived tier — so the summarizer doesn't
-            // mislabel a real floor_8gb_mac (8 GB Mac) as "forced".
-            "deviceClassForced": NativeDeviceClassGate.resolvedForcedClass != nil ? "true" : "false",
+            // Whether the tier was forced (QWENVOICE_FORCE_MEMORY_CLASS) or
+            // emulated (QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB) vs the native,
+            // physical-memory-derived tier — so the summarizer doesn't mislabel
+            // a real floor_8gb_mac (8 GB Mac) as "forced", and an emulated
+            // floor never reads as native evidence.
+            "deviceClassForced": NativeDeviceClassGate.resolvedTierIsDiagnostic ? "true" : "false",
             // Input script length (characters) so the benchmark summarizer can
             // break results out by prompt length (short / medium / long) — RTF,
             // decode time, and KV-cache memory all scale with it.
@@ -2471,6 +2473,13 @@ struct StreamingExecutionContext: Sendable {
             if let profile = RuntimeDebugGate.value(for: "QVOICE_IOS_MEMORY_PROFILE") {
                 tierNotes["memoryProfile"] = profile
             }
+        }
+        if let emulation = NativeHostMemoryEmulation.current {
+            // Emulated-floor rows (audit #11) say which machine policy judged
+            // them against, so the publisher keeps them exploratory and a
+            // record names the emulated RAM beside its forced tier.
+            tierNotes["simulatedPhysicalMemoryMB"] = String(emulation.physicalMemoryMB)
+            tierNotes["simulatedMetalWorkingSetMB"] = String(emulation.metalWorkingSetMB)
         }
         // Bench delivery cells (vocello bench --delivery) stamp the preset id so
         // the summarizer can segregate instruct-bearing takes from the plain matrix.

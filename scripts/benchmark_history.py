@@ -432,6 +432,9 @@ METRIC_KEYS = {
     "rushedSyllableRateThresholdHz", "rushedMaximumPauseRatio",
     "flatEnvelopeRoughnessThreshold", "flatRateCVThreshold",
     "maximumPauseThresholdSeconds", "maximumPauseRatioThreshold",
+    # The prosody analyzer version a calibration ran (publisher since 2026-07-17);
+    # optional so the one earlier calibration record stays valid.
+    "analyzerAlgorithmVersion",
     "deliveryDF0StdHz", "deliveryDRateCV", "deliveryDPauseRatio",
     # deliveryProsodyEffect is the instructed take's ABSOLUTE expressiveness on
     # every record that carries it (its name notwithstanding); the paired
@@ -1986,8 +1989,11 @@ def validate_prosody_semantics(record: dict[str, Any]) -> None:
         "flatEnvelopeRoughnessThreshold", "flatRateCVThreshold",
         "maximumPauseThresholdSeconds", "maximumPauseRatioThreshold",
     }
-    if set(take["metrics"]) != required_metrics:
+    if not required_metrics <= set(take["metrics"]) <= required_metrics | {"analyzerAlgorithmVersion"}:
         raise HistoryError("prosody calibration aggregate metrics are incomplete")
+    analyzer_version = take["metrics"].get("analyzerAlgorithmVersion")
+    if analyzer_version is not None and (analyzer_version < 1 or not float(analyzer_version).is_integer()):
+        raise HistoryError("prosody calibration analyzerAlgorithmVersion must be a positive integer")
     for name in ("goodClipCount", "badClipCount"):
         value = take["metrics"][name]
         if value < 2 or float(value).is_integer() is False:

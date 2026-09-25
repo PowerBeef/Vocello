@@ -19,12 +19,14 @@ typealias TokenizerError = Tokenizers.TokenizerError
 private enum Qwen3Signposts {
     static let subsystem = "com.qwenvoice.engine.qwen3"
     static let category = "generation"
-    static let signposter = OSSignposter(subsystem: subsystem, category: category)
 
-    /// The same subsystem and category for per-step and per-chunk intervals
-    /// emitted through the allocation-free `os_signpost` entry point:
-    /// `OSSignposter.beginInterval` allocates an interval-state object on every
-    /// call (V-2). Made once per generation, outside the token loop.
+    /// The log every decode-loop, chunk and tail interval is emitted on,
+    /// through the allocation-free `os_signpost(.begin/.end, log:name:)` entry
+    /// point with the exclusive signpost ID: `OSSignposter.beginInterval`
+    /// allocates an interval-state object on every call, about 37 times per
+    /// token (V-2, BT-06). Made once per generation, outside the token loop;
+    /// the interval names are the ones `scripts/lib/trace_intervals.py`
+    /// matches.
     static func makeStepLog() -> OSLog {
         OSLog(subsystem: subsystem, category: category)
     }
@@ -3553,8 +3555,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         // (Stage 1 P3); the plan owns its K/V buffers, so no KVCacheSimple is
         // allocated for the streaming CP.
         let codePredictorStepConstants = CodePredictorStepConstants()
-        // The per-step and per-chunk intervals (`Token Read`, `Audio Chunk
-        // Flush`) go through this log's allocation-free entry point.
+        // Every per-step, per-chunk and tail interval goes through this log's
+        // allocation-free entry point: no per-token allocation, lock or string
+        // formatting.
         let stepSignpostLog = Qwen3Signposts.makeStepLog()
 
         if isStreaming {
@@ -3597,8 +3600,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             pendingMaterializedChunk = nil
             guard let materializedEventSink else { return }
             let flushEvalStartedAt = ContinuousClock.now
-            // Once per chunk under `.pipelined`: the allocation-free entry
-            // point, like `Token Read`, not `OSSignposter.beginInterval`.
+            // Once per chunk under `.pipelined`, on the same allocation-free
+            // entry point as every loop interval.
             os_signpost(.begin, log: stepSignpostLog, name: "Audio Chunk Flush")
             eval(pending.audioChunk)
             os_signpost(.end, log: stepSignpostLog, name: "Audio Chunk Flush")
@@ -3634,17 +3637,16 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
             // Forward pass through talker
             let talkerForwardStartedAt = ContinuousClock.now
-            let talkerSignpost = Qwen3Signposts.signposter.beginInterval("Talker Forward")
+            os_signpost(.begin, log: stepSignpostLog, name: "Talker Forward")
             let (logits, hidden) = talker(inputEmbeds, cache: cache)
-            Qwen3Signposts.signposter.endInterval("Talker Forward", talkerSignpost)
+            os_signpost(.end, log: stepSignpostLog, name: "Talker Forward")
             talkerForwardTotal += talkerForwardStartedAt.elapsed
 
             let allowsEOS = generatedCodeCount >= Self.productionMinimumGeneratedCodeTokensBeforeEOS
 
             // Sample first codebook token
             let sampleFirstCodebookStartedAt = ContinuousClock.now
-            let sampleFirstCodebookSignpost =
-                Qwen3Signposts.signposter.beginInterval("Sample First Codebook")
+            os_signpost(.begin, log: stepSignpostLog, name: "Sample First Codebook")
             let nextToken = Self.sampleToken(
                 logits,
                 temperature: temperature,
@@ -3657,10 +3659,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 allowsEOS: allowsEOS,
                 observe: samplerObserver
             )
-            Qwen3Signposts.signposter.endInterval(
-                "Sample First Codebook",
-                sampleFirstCodebookSignpost
-            )
+            os_signpost(.end, log: stepSignpostLog, name: "Sample First Codebook")
             sampleFirstCodebookTotal += sampleFirstCodebookStartedAt.elapsed
 
             // Defer sync to the eval boundary with inputEmbeds.
@@ -3685,11 +3684,10 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             )
 
             let codePredictorStartedAt = ContinuousClock.now
-            let codePredictorSignpost = Qwen3Signposts.signposter.beginInterval("Code Predictor Loop")
+            os_signpost(.begin, log: stepSignpostLog, name: "Code Predictor Loop")
             for codeIdx in 0 ..< talkerConfig.numCodeGroups - 1 {
                 let codePredictorStepStartedAt = ContinuousClock.now
-                let codePredictorStepSignpost =
-                    Qwen3Signposts.signposter.beginInterval("Code Predictor Step")
+                os_signpost(.begin, log: stepSignpostLog, name: "Code Predictor Step")
                 let codeLogits: MLXArray
                 if codeIdx == 0 {
                     let code0Embed = talker.getInputEmbeddings()(nextToken)
@@ -3701,15 +3699,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                         pass: codeIdx, codeHidden: nil, code0Embed: nil, token: codeTokens.last!
                     )
                 }
-                Qwen3Signposts.signposter.endInterval(
-                    "Code Predictor Step",
-                    codePredictorStepSignpost
-                )
+                os_signpost(.end, log: stepSignpostLog, name: "Code Predictor Step")
                 codePredictorStepTotal += codePredictorStepStartedAt.elapsed
 
                 let samplePredictedCodebookStartedAt = ContinuousClock.now
-                let samplePredictedCodebookSignpost =
-                    Qwen3Signposts.signposter.beginInterval("Sample Predicted Codebook")
+                os_signpost(.begin, log: stepSignpostLog, name: "Sample Predicted Codebook")
                 if codePredictorScratch == nil {
                     codePredictorScratch = Qwen3SamplerScratch(vocabSize: codeLogits.dim(-1))
                 }
@@ -3725,14 +3719,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     scratch: codePredictorScratch,
                     observe: samplerObserver
                 )
-                Qwen3Signposts.signposter.endInterval(
-                    "Sample Predicted Codebook",
-                    samplePredictedCodebookSignpost
-                )
+                os_signpost(.end, log: stepSignpostLog, name: "Sample Predicted Codebook")
                 samplePredictedCodebookTotal += samplePredictedCodebookStartedAt.elapsed
                 codeTokens.append(nextCode)
             }
-            Qwen3Signposts.signposter.endInterval("Code Predictor Loop", codePredictorSignpost)
+            os_signpost(.end, log: stepSignpostLog, name: "Code Predictor Loop")
             codePredictorTotal += codePredictorStartedAt.elapsed
 
             let allCodes = concatenated(codeTokens, axis: 1) // [1, num_code_groups]
@@ -3747,21 +3738,17 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
             // Sum all code embeddings for next step
             let codecEmbeddingStartedAt = ContinuousClock.now
-            let codecEmbeddingSignpost =
-                Qwen3Signposts.signposter.beginInterval("Codec Embedding Assembly")
+            os_signpost(.begin, log: stepSignpostLog, name: "Codec Embedding Assembly")
             var codecEmbed = talker.getInputEmbeddings()(nextToken)
             for (i, code) in codeTokens.dropFirst().enumerated() {
                 codecEmbed = codecEmbed + talker.codePredictor.codecEmbedding[i](code)
             }
 
             inputEmbeds = textEmbed + codecEmbed
-            Qwen3Signposts.signposter.endInterval(
-                "Codec Embedding Assembly",
-                codecEmbeddingSignpost
-            )
+            os_signpost(.end, log: stepSignpostLog, name: "Codec Embedding Assembly")
             codecEmbeddingAssemblyTotal += codecEmbeddingStartedAt.elapsed
             let streamStepEvalStartedAt = ContinuousClock.now
-            let stepEvalSignpost = Qwen3Signposts.signposter.beginInterval("Step Eval Flush")
+            os_signpost(.begin, log: stepSignpostLog, name: "Step Eval Flush")
             switch streamStepEvalPolicy {
             case .full:
                 eval(inputEmbeds, isEOS)
@@ -3772,7 +3759,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             case .deferred:
                 break
             }
-            Qwen3Signposts.signposter.endInterval("Step Eval Flush", stepEvalSignpost)
+            os_signpost(.end, log: stepSignpostLog, name: "Step Eval Flush")
             let streamStepEvalElapsed = streamStepEvalStartedAt.elapsed
             streamStepEvalTotal += streamStepEvalElapsed
             // The eval call is the enqueue. Only `.pipelined` has a separate,
@@ -3817,9 +3804,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 onToken?(tokenId)
             }
             let eosReadStartedAt = ContinuousClock.now
-            let eosReadSignpost = Qwen3Signposts.signposter.beginInterval("EOS Read")
+            os_signpost(.begin, log: stepSignpostLog, name: "EOS Read")
             let reachedEOS = isEOS.item(Bool.self)
-            Qwen3Signposts.signposter.endInterval("EOS Read", eosReadSignpost)
+            os_signpost(.end, log: stepSignpostLog, name: "EOS Read")
             let eosReadElapsed = eosReadStartedAt.elapsed
             streamStepEOSReadTotal += eosReadElapsed
             if isPureVoiceDesign {
@@ -3877,7 +3864,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                         cloneFirstChunkDecoderTokens = codesForDecoder.dim(2)
                     }
                     let streamDecoderStartedAt = ContinuousClock.now
-                    let decoderSignpost = Qwen3Signposts.signposter.beginInterval("Audio Decoder")
+                    os_signpost(.begin, log: stepSignpostLog, name: "Audio Decoder")
                     // Measured do-NOT (2026-07-26): building this decode graph
                     // on a dedicated stream (Stream.withNewDefaultStream)
                     // regressed warm RTF on every cell (−0.4% to −4.3%) — the
@@ -3893,18 +3880,18 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     } else {
                         decoded = speechTokenizer.decoder.streamingStep(codesForDecoder)
                     }
-                    Qwen3Signposts.signposter.endInterval("Audio Decoder", decoderSignpost)
+                    os_signpost(.end, log: stepSignpostLog, name: "Audio Decoder")
                     streamingDecoderTotal += streamDecoderStartedAt.elapsed
                     streamingDecoderCallCount += 1
                     let audioChunk = decoded[0]
                     let audioChunkEvalStartedAt = ContinuousClock.now
-                    let audioChunkEvalSignpost = Qwen3Signposts.signposter.beginInterval("Audio Chunk Eval")
+                    os_signpost(.begin, log: stepSignpostLog, name: "Audio Chunk Eval")
                     // STREAM-001: non-final chunks evaluate asynchronously so decoding can
                     // overlap the next token loop on the compatibility path. The suspending
                     // actor path materializes in this task before it awaits its sink, so an
                     // MLX value never crosses a task or actor boundary.
                     asyncEval(audioChunk)
-                    Qwen3Signposts.signposter.endInterval("Audio Chunk Eval", audioChunkEvalSignpost)
+                    os_signpost(.end, log: stepSignpostLog, name: "Audio Chunk Eval")
                     let audioChunkEvalElapsed = audioChunkEvalStartedAt.elapsed
                     audioChunkEvalTotal += audioChunkEvalElapsed
                     if isPureVoiceDesign {
@@ -4066,7 +4053,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 // The tail decode and eval carry the same interval names as
                 // the in-loop chunks, so a trace's `Audio Decoder` count
                 // equals `qwen_stream_decoder_calls`.
-                let decoderSignpost = Qwen3Signposts.signposter.beginInterval("Audio Decoder")
+                os_signpost(.begin, log: stepSignpostLog, name: "Audio Decoder")
                 let decoded: MLXArray
                 if onAudioChunkTimings != nil || emitMaterializedChunkTimings {
                     let decodedWithTimings = speechTokenizer.decoder.streamingStepWithTimings(codesForDecoder)
@@ -4075,7 +4062,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 } else {
                     decoded = speechTokenizer.decoder.streamingStep(codesForDecoder)
                 }
-                Qwen3Signposts.signposter.endInterval("Audio Decoder", decoderSignpost)
+                os_signpost(.end, log: stepSignpostLog, name: "Audio Decoder")
                 streamingDecoderTotal += streamDecoderStartedAt.elapsed
                 streamingDecoderCallCount += 1
                 let audioChunk = decoded[0]
@@ -4090,11 +4077,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     cloneFirstChunkDecoderTokens = codesForDecoder.dim(2)
                 }
                 let audioChunkEvalStartedAt = ContinuousClock.now
-                let audioChunkEvalSignpost = Qwen3Signposts.signposter.beginInterval("Audio Chunk Eval")
+                os_signpost(.begin, log: stepSignpostLog, name: "Audio Chunk Eval")
                 // STREAM-001: the final chunk is a synchronous completion barrier. Returning
                 // before materialization can race playback handoff and truncate the preview.
                 eval(audioChunk)
-                Qwen3Signposts.signposter.endInterval("Audio Chunk Eval", audioChunkEvalSignpost)
+                os_signpost(.end, log: stepSignpostLog, name: "Audio Chunk Eval")
                 let audioChunkEvalElapsed = audioChunkEvalStartedAt.elapsed
                 audioChunkEvalTotal += audioChunkEvalElapsed
                 if isPureVoiceDesign {

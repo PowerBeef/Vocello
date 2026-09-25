@@ -122,8 +122,8 @@ SECTION_KEYS = {
         # What `ttfcMS` measures (lib/rtf.py TTFC_DEFINITIONS); schema v2+
         # records since 2026-09-25 that carry a ttfcMS. Absent on older records.
         "ttfcDefinition",
-        # Memory-tier provenance (audit #19): optional, schema v2 and later,
-        # never part of the comparison key.
+        # Memory-tier provenance (audit #19): optional, schema v2 and later.
+        # Lineage contract 2 keys a forced or emulated tier apart (audit #11).
         "runtimePolicy",
     },
     "hardware": {
@@ -1642,17 +1642,45 @@ def comparison_key(record: dict[str, Any]) -> str:
     record's lineage contract version (lib/lineage_identity.py, audit #22).
 
     A published version's composition never changes: a new identity field or a
-    changed meaning bumps LINEAGE_CONTRACT_VERSION and adds a branch here."""
+    changed meaning bumps LINEAGE_CONTRACT_VERSION and adds a branch to
+    lineage_comparison_identity."""
     version = record["inputs"].get("lineageContractVersion")
     if version is None:
         return legacy_comparison_key(record)
+    return sha256_bytes(canonical_bytes(lineage_comparison_identity(record)))
+
+
+def lineage_comparison_identity(record: dict[str, Any]) -> dict[str, Any]:
+    """The frozen identity of a lineage-stamped record's contract version."""
+    version = record["inputs"].get("lineageContractVersion")
     if version == 1:
-        return lineage_v1_comparison_key(record)
+        return lineage_v1_identity(record)
+    if version == 2:
+        return lineage_v2_identity(record)
     raise HistoryError(f"inputs.lineageContractVersion is unsupported: {version!r}")
 
 
 def lineage_v1_comparison_key(record: dict[str, Any]) -> str:
     return sha256_bytes(canonical_bytes(lineage_v1_identity(record)))
+
+
+def lineage_v2_comparison_key(record: dict[str, Any]) -> str:
+    return sha256_bytes(canonical_bytes(lineage_v2_identity(record)))
+
+
+def lineage_v2_identity(record: dict[str, Any]) -> dict[str, Any]:
+    """Lineage contract v2: contract v1 plus the forced or emulated memory tier
+    and the run's seed policy (audit #11 option b, #29).
+
+    A forced class or an emulated smaller Mac keys apart from the host it ran
+    on (a native tier adds None, so native records key alike with or without
+    run.runtimePolicy), and a seeded matrix (run.seedPolicy) never shares a
+    lineage with random per-take seeds. Contract-1 records keep their keys."""
+    identity = lineage_v1_identity(record)
+    identity["lineageContractVersion"] = 2
+    identity["runtimePolicy"] = lineage_identity.runtime_policy_identity(record["run"])
+    identity["seedPolicy"] = record["run"].get("seedPolicy")
+    return identity
 
 
 def lineage_v1_identity(record: dict[str, Any]) -> dict[str, Any]:
@@ -3577,7 +3605,9 @@ def lineage_replay(
             )
             assert lineage is not None
             candidate = {**record, "inputs": {**record["inputs"], **lineage}}
-            replayed.append((record, lineage_v1_identity(candidate), str(lineage["lineageHarnessHash"])))
+            replayed.append((
+                record, lineage_comparison_identity(candidate), str(lineage["lineageHarnessHash"]),
+            ))
     finally:
         reader.close()
     rows: list[dict[str, Any]] = []
@@ -3716,9 +3746,9 @@ def trend_summary(record: dict[str, Any], baseline_record: dict[str, Any] | None
 
 
 def history_classification(run: dict[str, Any]) -> str:
-    """The HISTORY classification cell. A forced or emulated memory tier keeps
-    the hardware profile's comparison key (lineage v1 never reads
-    run.runtimePolicy) and is never comparable, so its row names the tier it
+    """The HISTORY classification cell. A forced or emulated memory tier is
+    never comparable; under lineage contract 1 it kept the hardware profile's
+    comparison key (contract 2 gives it its own), so its row names the tier it
     ran under beside the classification instead of reading as that host's."""
     policy = run.get("runtimePolicy")
     if not isinstance(policy, dict) or policy.get("deviceClassForced") is not True:

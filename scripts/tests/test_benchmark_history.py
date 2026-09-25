@@ -1155,7 +1155,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
         valid["run"]["runtimePolicy"] = native
         published = json.loads(self.publish(valid, "policy-native").read_text())
         self.assertEqual(published["run"]["runtimePolicy"], native)
-        # History is never keyed on the policy block.
+        # A native tier adds nothing to the key: the hardware profile names it.
         unstamped = copy.deepcopy(published)
         unstamped["run"].pop("runtimePolicy")
         self.assertEqual(history.comparison_key(published), history.comparison_key(unstamped))
@@ -1166,7 +1166,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
             "runtimePolicy": {"deviceClass": "mid_16gb_mac", "deviceClassForced": True},
         })
         forced["takes"][0]["generationID"] = "generation-forced"
-        self.publish(forced, "policy-forced")
+        forced_record = json.loads(self.publish(forced, "policy-forced").read_text())
 
         # The M6 emulating the 8 GB floor (audit #11 option b): a forced floor
         # tier that names the emulated RAM, exploratory only.
@@ -1179,9 +1179,15 @@ class BenchmarkHistoryTests(unittest.TestCase):
         })
         emulated["takes"][0]["generationID"] = "generation-emulated"
         emulated_record = json.loads(self.publish(emulated, "policy-emulated").read_text())
-        # Lineage v1 never reads the policy: an emulated record keeps the host's
-        # key string but is never comparable, and its HISTORY row names the tier.
-        self.assertEqual(emulated_record["comparison"]["key"], published["comparison"]["key"])
+        # Lineage contract 2 keys a forced or an emulated tier apart from the
+        # host's native records (audit #11 option b); such a record stays never
+        # comparable, and its HISTORY row names the tier.
+        keys = {
+            "native": published["comparison"]["key"],
+            "forced": forced_record["comparison"]["key"],
+            "emulated": emulated_record["comparison"]["key"],
+        }
+        self.assertEqual(len(set(keys.values())), 3, keys)
         self.assertFalse(emulated_record["comparison"]["comparable"])
         self.assertIsNone(emulated_record["comparison"].get("baselineRunID"))
         rows = {
@@ -2466,8 +2472,44 @@ class BenchmarkHistoryTests(unittest.TestCase):
             inputs["lineageMeasurementVersion"],
             history.lineage_identity.LINEAGE_MEASUREMENT_VERSIONS[("language", "macos")],
         )
-        self.assertEqual(published["comparison"]["key"], history.lineage_v1_comparison_key(published))
+        self.assertEqual(published["comparison"]["key"], history.lineage_v2_comparison_key(published))
         self.assertNotEqual(published["comparison"]["key"], history.legacy_comparison_key(published))
+
+        # Contract-1 records keep their stored keys byte for byte (the first M6
+        # gate records were published under it).
+        stamped_v1 = json.loads((FROZEN_RECORDS / "macos-engine-lineage-v1.json").read_text())
+        self.assertEqual(stamped_v1["inputs"]["lineageContractVersion"], 1)
+        self.assertEqual(history.comparison_key(stamped_v1), stamped_v1["comparison"]["key"])
+        self.assertEqual(history.lineage_v1_comparison_key(stamped_v1), stamped_v1["comparison"]["key"])
+        history.validate_lineage_inputs(stamped_v1)
+
+    def test_contract_2_keys_the_forced_tier_and_the_seed_policy(self) -> None:
+        stamped = json.loads((FROZEN_RECORDS / "macos-engine-lineage-v1.json").read_text())
+        record = copy.deepcopy(stamped)
+        record["inputs"]["lineageContractVersion"] = 2
+        record["run"]["runtimePolicy"] = {"deviceClass": "mid_16gb_mac", "deviceClassForced": False}
+        key = history.comparison_key(record)
+        # Contract 2 never collides with the contract-1 key of the same record.
+        self.assertNotEqual(key, stamped["comparison"]["key"])
+
+        def keyed(mutate) -> str:
+            candidate = copy.deepcopy(record)
+            mutate(candidate)
+            return history.comparison_key(candidate)
+
+        self.assertEqual(keyed(lambda r: r["run"].pop("runtimePolicy")), key)
+        forced = keyed(lambda r: r["run"].update(
+            runtimePolicy={"deviceClass": "floor_8gb_mac", "deviceClassForced": True}))
+        emulated = keyed(lambda r: r["run"].update(runtimePolicy={
+            "deviceClass": "floor_8gb_mac", "deviceClassForced": True, "simulatedPhysicalMemoryMB": 8192,
+        }))
+        seeded = keyed(lambda r: r["run"].update(seedPolicy="cell-hash-v1"))
+        self.assertEqual(len({key, forced, emulated, seeded}), 4)
+        # The same composition under contract 1 ignores both.
+        v1 = copy.deepcopy(record)
+        v1["inputs"]["lineageContractVersion"] = 1
+        v1["run"]["runtimePolicy"]["deviceClassForced"] = True
+        self.assertEqual(history.comparison_key(v1), stamped["comparison"]["key"])
 
         # Schema v1 is frozen history: a v1 record is never stamped.
         legacy = json.loads(self.publish(record_fixture(run_id="lineage-v1-20260712"), "lineage-v1").read_text())
@@ -2528,7 +2570,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
 
         invalid = {
             "a missing field": lambda r: r["inputs"].pop("lineageMeasurementVersion"),
-            "an unknown contract version": lambda r: r["inputs"].update(lineageContractVersion=2),
+            "an unknown contract version": lambda r: r["inputs"].update(lineageContractVersion=3),
             "a boolean contract version": lambda r: r["inputs"].update(lineageContractVersion=True),
             "a zero measurement version": lambda r: r["inputs"].update(lineageMeasurementVersion=0),
             "a text measurement version": lambda r: r["inputs"].update(lineageMeasurementVersion="1"),

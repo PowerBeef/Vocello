@@ -535,9 +535,10 @@
           "type": "string"
         },
         "lineageContractVersion": {
-          "description": "Comparison-key composition version of the per-kind lineage identity (scripts/lib/lineage_identity.py). Optional: absent on legacy records, whose comparison key stays byte-identical; when present, the other three lineage fields are present too.",
+          "description": "Comparison-key composition version of the per-kind lineage identity (scripts/lib/lineage_identity.py). Optional: absent on legacy records, whose comparison key stays byte-identical; when present, the other three lineage fields are present too. Version 2 adds a forced or emulated memory tier (run.runtimePolicy) and the run's seed policy to the key; version-1 records keep theirs.",
           "enum": [
-            1
+            1,
+            2
           ]
         },
         "lineageHarnessHash": {
@@ -708,7 +709,7 @@
         },
         "runtimePolicy": {
           "additionalProperties": false,
-          "description": "Run-level memory-tier provenance from the engine rows' own stamps: the device class the rows ran under, whether QWENVOICE_FORCE_MEMORY_CLASS forced it or QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB emulated a smaller Mac (both forced), and the emulated RAM in MB. Optional; absent on records published before 2026-09-25 and never part of the comparison key.",
+          "description": "Run-level memory-tier provenance from the engine rows' own stamps: the device class the rows ran under, whether QWENVOICE_FORCE_MEMORY_CLASS forced it or QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB emulated a smaller Mac (both forced), and the emulated RAM in MB. Optional; absent on records published before 2026-09-25. Lineage contract 2 keys a forced or emulated tier apart from the host's; contract 1 never read it.",
           "properties": {
             "deviceClass": {
               "enum": [

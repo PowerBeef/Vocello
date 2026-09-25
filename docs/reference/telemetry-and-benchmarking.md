@@ -686,9 +686,9 @@ reuse `QVOICE_IOS_MEMORY_GUARD_FORCE_BAND=guarded` and `QVOICE_IOS_MEMORY_GUARD_
 (the Mac hosts the same store). Emulated rows stamp `deviceClassForced=true` and
 `simulatedPhysicalMemoryMB`, and their records are exploratory, never canonical, never a baseline and
 never comparable with real-hardware records: the engine or macOS UI benchmark record's
-`run.runtimePolicy` carries `simulatedPhysicalMemoryMB` beside the forced floor tier. They keep the M6
-profile's comparison key string (lineage v1 never reads the block) and HISTORY names the emulation in
-their classification. The procedure is in the benchmarking procedure, §4.4.
+`run.runtimePolicy` carries `simulatedPhysicalMemoryMB` beside the forced floor tier. Lineage contract 2
+keys them apart from the M6's own records (contract-1 and legacy records keep their stored keys), and
+HISTORY names the emulation in their classification. The procedure is in the benchmarking procedure, §4.4.
 
 The claims are limited to **policy and footprint**: the floor tier's policy values (256 MB MLX cache,
 the per-generation clear, the 0.6 s streaming interval, the skipped dedicated custom prewarm, the

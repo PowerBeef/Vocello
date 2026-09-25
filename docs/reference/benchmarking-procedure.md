@@ -125,7 +125,8 @@ timing records. Engine and macOS UI benchmark records published since 2026-09-25
 `run.runtimePolicy` (`deviceClass`, `deviceClassForced`, and `simulatedPhysicalMemoryMB` on an
 emulated smaller Mac), taken from the rows' own stamps, so a record proves which memory tier it
 measured; the validator refuses a native tier on the wrong platform and a forced tier on a comparable
-record, and the comparison key never includes the block.
+record. Lineage contract 2 keys a forced or emulated tier (its `deviceClass` and
+`simulatedPhysicalMemoryMB`) apart from the host's own records; a native tier adds nothing to the key.
 
 ---
 
@@ -301,14 +302,14 @@ Each is a consent-bound lane like its unemulated form. The rows stamp `deviceCla
 `simulatedPhysicalMemoryMB` and `simulatedMetalWorkingSetMB`; the publisher classifies every such
 record `exploratory` (never canonical, never comparable, never a baseline or a chart point) and the
 record's `run.runtimePolicy`, on engine and macOS UI benchmark records alike, names
-`simulatedPhysicalMemoryMB` beside the forced floor tier. Lineage v1 never reads `run.runtimePolicy`,
-so an emulated or forced record stores the M6 profile's comparison key string, exactly as a forced
-class always has. It is still excluded from every comparison: it gets no baseline or deltas and is
-never another record's baseline. `benchmarks/HISTORY.md` lists it in the M6 section with the
-classification `exploratory (emulated 8192 MB)` (a forced class alone reads
-`exploratory (forced <tier>)`) and the comparison `excluded`. Giving these records a key of their own
-would change what the key reads, a `LINEAGE_CONTRACT_VERSION` bump that is the maintainer's decision
-(audit §4.4 item 5); a published key is never edited in place. The
+`simulatedPhysicalMemoryMB` beside the forced floor tier. Lineage contract 2 (2026-09-25, audit #11
+option b) reads that block: an emulated or forced record gets a comparison key of its own, so
+`benchmarks/HISTORY.md` groups the emulated-floor runs in their own M6 section instead of among the
+host's records. Records stamped with contract 1 (the first M6 gate records) and legacy records keep
+their stored keys; a published key is never edited in place. An emulated or forced record is still
+excluded from every comparison: it gets no baseline or deltas and is never another record's baseline,
+and HISTORY names its classification `exploratory (emulated 8192 MB)` (a forced class alone reads
+`exploratory (forced <tier>)`) with the comparison `excluded`. The
 band paths reuse the store's existing knobs: `QVOICE_IOS_MEMORY_GUARD_FORCE_BAND=guarded` or
 `QVOICE_IOS_MEMORY_GUARD_FORCE_CRITICAL_ONCE=1`, which the UI benchmark lane also hands to the app. A
 forced band trims or unloads, which fails memory qualification by design, so such a run is a
@@ -1000,7 +1001,9 @@ matrix, and hardware profile (executable hashes are provenance, never identity).
 also key on whole-tree project and harness hashes. Records stamped with a lineage contract
 (`inputs.lineageContractVersion`, `scripts/lib/lineage_identity.py`) key instead on what their kind
 measures: the project.yml build settings its lane builds, the take topology (the layer set) and the
-kind's reviewed measurement version. Harness and engine edits therefore keep a lineage (HISTORY
+kind's reviewed measurement version; contract 2 (the current one) adds a forced or emulated memory tier
+(`run.runtimePolicy`) and the run's seed policy (`run.seedPolicy`), while contract-1 records keep their
+keys. Harness and engine edits therefore keep a lineage (HISTORY
 marks "harness changed"), while a scheme, compiler-setting, topology, model or definition change
 starts a new one; a change that alters what a kind measures bumps its measurement version.
 `python3 scripts/benchmark_history.py lineage-replay [--kind K --platform P]` replays the current

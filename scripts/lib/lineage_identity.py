@@ -36,6 +36,17 @@ measure engine changes. The key composition of a published contract version is
 frozen; changing what the key reads bumps ``LINEAGE_CONTRACT_VERSION``. Legacy
 records carry no version and keep their stored keys byte for byte.
 
+Contract versions:
+
+- 1 (2026-09-25): the composition above.
+- 2 (2026-09-25, audit #11 option b and #29): contract 1 plus the memory tier a
+  forced or emulated run measured (``runtime_policy_identity``: the forced
+  ``deviceClass`` and the emulated ``simulatedPhysicalMemoryMB``; a native tier
+  adds nothing, so a native record with or without ``run.runtimePolicy`` keys
+  alike) and the run's seed policy (``run.seedPolicy``), so emulated-floor and
+  forced-tier records get a lineage of their own and a seeded matrix never
+  shares one with random seeds. Contract-1 records keep their stored keys.
+
 Every function takes a ``read(path) -> bytes | None`` callable, so the same
 identity is computed from the working tree at publication and from Git objects
 when committed records are replayed offline.
@@ -48,8 +59,8 @@ import json
 import re
 from typing import Callable, Iterable
 
-LINEAGE_CONTRACT_VERSION = 1
-SUPPORTED_LINEAGE_CONTRACT_VERSIONS = frozenset({1})
+LINEAGE_CONTRACT_VERSION = 2
+SUPPORTED_LINEAGE_CONTRACT_VERSIONS = frozenset({1, 2})
 NOT_APPLICABLE = "not-applicable"
 
 Reader = Callable[[str], "bytes | None"]
@@ -372,6 +383,20 @@ def lineage_inputs(kind: str, platform: str, read: Reader) -> dict[str, object] 
         "lineageHarnessHash": content_hash(paths, read),
         "lineageProjectHash": project_hash,
     }
+
+
+def runtime_policy_identity(run: dict[str, object]) -> list[object] | None:
+    """The memory-tier part of a contract-2 key (audit #11 option b).
+
+    None for a native tier or a record without ``run.runtimePolicy``: the
+    hardware profile already names the native tier. A forced class or an
+    emulated smaller Mac (``QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB``) names the
+    tier it ran under and the emulated RAM, so such records never share a
+    lineage with the host's own."""
+    policy = run.get("runtimePolicy")
+    if not isinstance(policy, dict) or policy.get("deviceClassForced") is not True:
+        return None
+    return [policy.get("deviceClass"), policy.get("simulatedPhysicalMemoryMB")]
 
 
 def topology(takes: Iterable[object]) -> list[str]:

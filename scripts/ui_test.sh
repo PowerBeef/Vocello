@@ -1285,7 +1285,10 @@ print(matches[0])
 PY
   )" || return 1
   rm -rf "$diagnostics"
-  "$ROOT_DIR/scripts/ios_device.sh" pull "$diagnostics" >/dev/null \
+  # Only what the gate reads (audit #21): the engine and app layers (rows and
+  # sample sidecars) and the run's own directory, not the whole growing tree.
+  "$ROOT_DIR/scripts/ios_device.sh" pull "$diagnostics" --subtree engine --subtree app \
+      --optional-subtree "$run_id" >/dev/null \
     || return 1
   if ! python3 "$ROOT_DIR/scripts/check_ios_ui_benchmark.py" "$diagnostics" \
       --run-id "$run_id" --modes "$modes" --lengths "$lengths" --warm "$warm" \

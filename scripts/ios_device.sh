@@ -22,6 +22,8 @@
 #   scripts/ios_device.sh console [spec] [--voice-id SAVED_VOICE_ID]
 #                                                 # attached launch, stream diagnostics stdout live
 #   scripts/ios_device.sh pull [dest]             # pull the app-container diagnostics mirror
+#   scripts/ios_device.sh pull DEST --subtree NAME... [--optional-subtree NAME...]
+#                                                 # pull only those diagnostics subtrees
 #   scripts/ios_device.sh bench [spec] [--label RUN_ID] [--memory-profile PROFILE]
 #                               [--voice-id SAVED_VOICE_ID]
 #   scripts/ios_device.sh lang-bench [--subset quick|full] [--label RUN_ID]
@@ -806,10 +808,48 @@ cmd_console() {
 # a bogus "File paths cannot contain '..'". IOSDeviceDiagnosticsRunner mirrors the sentinel +
 # engine telemetry to Library/Caches/Vocello/diagnostics in the app container, and we
 # pull from there. devicectl copies the SOURCE DIR'S CONTENTS into dest.
+#
+# pull DEST --subtree NAME... [--optional-subtree NAME...]: copy only those
+# diagnostics subtrees (audit #21: the UI benchmark reads engine/, app/ and its
+# run's own directory, not the whole growing tree). A missing optional subtree
+# is skipped; a missing required one fails the pull.
 cmd_pull() {
   local dest="${1:-$QVOICE_ARTIFACTS_DIAGNOSTICS/ios/device-diagnostics}"
+  [[ $# -gt 0 ]] && shift
+  local -a required=() optional=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --subtree) required+=("${2:?--subtree requires a name}"); shift 2 ;;
+      --optional-subtree) optional+=("${2:?--optional-subtree requires a name}"); shift 2 ;;
+      *) die "unknown pull option: $1" ;;
+    esac
+  done
   local dev; dev="$(resolve_device)"
   mkdir -p "$dest"
+  if [[ ${#required[@]} -gt 0 || ${#optional[@]} -gt 0 ]]; then
+    local subtree
+    for subtree in ${required[@]+"${required[@]}"} ${optional[@]+"${optional[@]}"}; do
+      [[ "$subtree" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,191}$ ]] \
+        || die "diagnostics subtree name is not safe for a device-container path: $subtree"
+    done
+    note "pulling diagnostics subtrees from app container → $dest"
+    for subtree in ${required[@]+"${required[@]}"}; do
+      mkdir -p "$dest/$subtree"
+      xcrun devicectl device copy from --device "$dev" \
+        --domain-type appDataContainer --domain-identifier "$BUNDLE_ID" \
+        --source "Library/Caches/Vocello/diagnostics/$subtree" --destination "$dest/$subtree" 1>&2 \
+        || die "could not pull diagnostics/$subtree (has a diagnostic run happened on THIS installed build?)"
+    done
+    for subtree in ${optional[@]+"${optional[@]}"}; do
+      mkdir -p "$dest/$subtree"
+      xcrun devicectl device copy from --device "$dev" \
+        --domain-type appDataContainer --domain-identifier "$BUNDLE_ID" \
+        --source "Library/Caches/Vocello/diagnostics/$subtree" --destination "$dest/$subtree" 1>&2 \
+        || { rm -rf "${dest:?}/$subtree"; note "diagnostics/$subtree is absent; skipped"; }
+    done
+    printf '%s\n' "$dest"
+    return 0
+  fi
   note "pulling diagnostics from app container → $dest"
   # 1>&2: keep devicectl chatter off this function's stdout (reserved for the path).
   xcrun devicectl device copy from --device "$dev" \

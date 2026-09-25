@@ -6,56 +6,6 @@ import QwenVoiceCore
 
 typealias PlaybackGenerationResult = QwenVoiceCore.GenerationResult
 
-struct LivePreviewEstimate: Equatable, Sendable {
-    let estimatedAudioDuration: TimeInterval
-
-    init?(text: String) {
-        let estimate = Self.estimatedAudioDuration(for: text)
-        guard estimate > 0 else { return nil }
-        estimatedAudioDuration = estimate
-    }
-
-    func requiredBufferDuration(
-        minimumBufferedDuration: TimeInterval,
-        maximumBufferedDuration: TimeInterval = 8,
-        fraction: Double = 0.35
-    ) -> TimeInterval {
-        guard estimatedAudioDuration > 0 else { return 0 }
-        let smoothBuffer = max(
-            minimumBufferedDuration,
-            min(maximumBufferedDuration, estimatedAudioDuration * fraction)
-        )
-        return min(estimatedAudioDuration, smoothBuffer)
-    }
-
-    private static func estimatedAudioDuration(for text: String) -> TimeInterval {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return 0 }
-
-        let words = trimmed
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { !$0.isEmpty }
-            .count
-        let nonWhitespaceCharacters = trimmed.reduce(into: 0) { count, character in
-            if !character.isWhitespace {
-                count += 1
-            }
-        }
-        let punctuationPauses = trimmed.reduce(into: 0) { count, character in
-            if ".!?;:,\n".contains(character) {
-                count += 1
-            }
-        }
-
-        let wordsPerSecond = 2.45
-        let charactersPerSecond = 16.0
-        let wordEstimate = Double(words) / wordsPerSecond
-        let characterEstimate = Double(nonWhitespaceCharacters) / charactersPerSecond
-        let pauseEstimate = Double(punctuationPauses) * 0.08
-        return max(0.8, max(wordEstimate, characterEstimate) + pauseEstimate)
-    }
-}
-
 /// Manages playback state for the persistent sidebar player bar.
 @MainActor
 final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
@@ -1716,3 +1666,7 @@ final class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDeleg
         }
     }
 }
+
+/// The long-form runner and its coordinator drive the shared player through
+/// this narrow protocol (PA-19), so `VocelloCoreTests` can run them without it.
+extension AudioPlayerViewModel: IOSLongFormAudioPlayback {}

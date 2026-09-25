@@ -525,6 +525,13 @@ targets:
       - path: Sources/iOSSupport/Models/TTSModel.swift
       - path: Sources/iOSSupport/Models/TTSContract.swift
       - path: Sources/iOSSupport/Services/AppPerformanceSignposts.swift
+      # PA-19: the long-form coordinator and runner over the fake engine store,
+      # a playback recorder and a private History. The shared player and the
+      # app-wide timeline, outbox and History stay out through
+      # IOSLongFormAudioPlayback and IOSLongFormProjectServices.
+      - path: Sources/iOS/Studio/IOSLongFormProject.swift
+      - path: Sources/SharedSupport/Services/LivePreviewEstimate.swift
+      - path: Sources/SharedSupport/Services/AudioQualityGate.swift
     dependencies:
       - target: QwenVoiceCore
       - package: GRDB

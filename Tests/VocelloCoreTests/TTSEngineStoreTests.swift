@@ -12,8 +12,9 @@ private struct StoreFixtureUnexpectedCall: Error {}
 
 /// App-memory headroom reported by the store's injected snapshot provider, in MiB.
 /// With `IOSMemoryBudgetPolicy.iPhoneShippingDefault`, 768 MiB or more is healthy,
-/// 384..<768 MiB guarded and less than 384 MiB critical.
-private final class MemoryHeadroomDial: Sendable {
+/// 384..<768 MiB guarded and less than 384 MiB critical. Shared with
+/// `IOSLongFormProjectRunnerTests`.
+final class MemoryHeadroomDial: Sendable {
     static let healthy: UInt64 = 4_096
     static let guarded: UInt64 = 512
     static let critical: UInt64 = 128
@@ -47,8 +48,9 @@ private final class MemoryHeadroomDial: Sendable {
 /// A fake engine host behind the real `AnyTTSEngineBackend` and `TTSEngineStore`.
 /// It records every call that reaches it and can hold a generation open until the
 /// test releases or cancels it, so the store's ownership is observable mid-take.
+/// `IOSLongFormProjectRunnerTests` subclasses it to write each take's WAV.
 @MainActor
-private class StoreFixtureEngine: TTSEngineRuntimeControlling, ActiveGenerationCancellable {
+class StoreFixtureEngine: TTSEngineRuntimeControlling, ActiveGenerationCancellable {
     struct BandTransition: Equatable {
         let from: IOSMemoryPressureBand
         let to: IOSMemoryPressureBand

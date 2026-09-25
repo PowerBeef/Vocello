@@ -13,7 +13,11 @@ import QwenVoiceCore
 /// seed, diagnostics mirror, export, haptics, presentation copy) go through
 /// `IOSLongFormPlatformHooks`, so the macOS app compiles this file by path
 /// with its own adapter (`MacStudioLongFormPlatformHooks`) and the iOS adapter
-/// (`IOSStudioLongFormPlatformHooks`) keeps the iOS behavior unchanged.
+/// (`IOSStudioLongFormPlatformHooks`) keeps the iOS behavior unchanged. The
+/// shared player and the collaborators both apps share (timeline, History,
+/// output location) go through `IOSLongFormAudioPlayback` and
+/// `IOSLongFormProjectServices`, so `VocelloCoreTests` compiles this file by
+/// path and runs it over a fake engine (PA-19).
 ///
 /// Scope note: in-session resume reuses saved takes, and single-segment
 /// regeneration mirrors the macOS replacement lineage: revision >= 2 with a
@@ -50,6 +54,55 @@ protocol IOSLongFormPlatformHooks: AnyObject {
     func projectAccepted(_ saved: Generation, joinedAudioPath: String)
     func notifySuccess()
     func notifyWarning()
+}
+
+// MARK: - Playback and shared services
+
+/// The shared audio player calls the runner and its coordinator make: live
+/// narration per segment and the joined-output handoff. `AudioPlayerViewModel`
+/// conforms in both apps; unit tests substitute a recorder (PA-19).
+@MainActor
+protocol IOSLongFormAudioPlayback: AnyObject, Sendable {
+    func beginGenerationPlayback(operationID: UUID, mode: GenerationMode)
+    func setLivePreviewEstimate(_ estimate: LivePreviewEstimate?)
+    func prepareStreamingPreview(
+        title: String,
+        shouldAutoPlay: Bool,
+        generationID: UUID?,
+        playbackOperationID: UUID?
+    )
+    func completeStreamingPreview(
+        result: GenerationResult,
+        title: String,
+        shouldAutoPlay: Bool,
+        playbackOperationID: UUID?
+    )
+    func abortLivePreviewIfNeeded()
+    func finishGenerationPreview(playbackOperationID: UUID)
+}
+
+/// The runner's collaborators that are the same on both platforms: the output
+/// location and auto-play preference (`AudioService`), the app-layer timeline
+/// (`AppGenerationTimeline`), the per-segment History write
+/// (`GenerationPersistence`) and History acceptance of the joined project
+/// (`DatabaseService`). `IOSLongFormProductionServices` makes exactly the calls
+/// the runner made inline before this seam; unit tests substitute a fake over
+/// a private History (PA-19).
+@MainActor
+protocol IOSLongFormProjectServices: AnyObject, Sendable {
+    var shouldAutoPlay: Bool { get }
+    func segmentOutputPath(subfolder: String, text: String) -> String
+    func recordSubmitted(id: UUID, mode: String) async
+    func recordCompleted(
+        id: UUID,
+        mode: String,
+        usedStreaming: Bool,
+        finishReason: String?,
+        summary: TelemetrySummary?
+    ) async
+    func recordFailed(id: UUID, finishReason: GenerationTerminalReason) async
+    func persistSegment(_ record: Generation, caller: String) async -> GenerationHistoryPersistenceOutcome
+    func acceptLongFormProject(_ candidate: LongFormHistoryAcceptance) async throws -> Generation
 }
 
 // MARK: - Segment state
@@ -258,9 +311,12 @@ final class IOSLongFormCoordinator {
     static let maxSegments = 100
 
     @ObservationIgnored private let hooks: any IOSLongFormPlatformHooks
+    @ObservationIgnored private let services: any IOSLongFormProjectServices
 
-    init(hooks: any IOSLongFormPlatformHooks) {
+    /// The apps use `init(hooks:)`, which passes `IOSLongFormProductionServices`.
+    init(hooks: any IOSLongFormPlatformHooks, services: any IOSLongFormProjectServices) {
         self.hooks = hooks
+        self.services = services
     }
 
     private(set) var isProcessing = false
@@ -313,7 +369,7 @@ final class IOSLongFormCoordinator {
     func start(
         request: IOSLongFormProjectRequest,
         ttsEngine: TTSEngineStore,
-        audioPlayer: AudioPlayerViewModel,
+        audioPlayer: any IOSLongFormAudioPlayback,
         studioCoordinator: StudioGenerationCoordinator
     ) {
         begin(
@@ -327,7 +383,7 @@ final class IOSLongFormCoordinator {
 
     func resume(
         ttsEngine: TTSEngineStore,
-        audioPlayer: AudioPlayerViewModel,
+        audioPlayer: any IOSLongFormAudioPlayback,
         studioCoordinator: StudioGenerationCoordinator
     ) {
         guard canResume, let request = lastRequest, let prior = outcome?.segments else { return }
@@ -346,7 +402,7 @@ final class IOSLongFormCoordinator {
     func regenerateSegment(
         index: Int,
         ttsEngine: TTSEngineStore,
-        audioPlayer: AudioPlayerViewModel,
+        audioPlayer: any IOSLongFormAudioPlayback,
         studioCoordinator: StudioGenerationCoordinator
     ) {
         guard canRegenerateSegments, !ttsEngine.hasActiveGeneration,
@@ -367,7 +423,8 @@ final class IOSLongFormCoordinator {
             ttsEngine: ttsEngine,
             audioPlayer: audioPlayer,
             cancellationState: cancellationState,
-            hooks: hooks
+            hooks: hooks,
+            services: services
         )
         segments = priorSegments
         progress = IOSLongFormProgressSnapshot(
@@ -417,7 +474,7 @@ final class IOSLongFormCoordinator {
     @discardableResult
     func cancel(
         ttsEngine: TTSEngineStore,
-        audioPlayer: AudioPlayerViewModel,
+        audioPlayer: any IOSLongFormAudioPlayback,
         studioCoordinator: StudioGenerationCoordinator,
         reason: GenerationCancellationReason = .user
     ) -> Bool {
@@ -435,7 +492,7 @@ final class IOSLongFormCoordinator {
     /// (`IOSStudioCancellationOrder`), so the engine records that reason.
     func startCancellation(
         ttsEngine: TTSEngineStore,
-        audioPlayer: AudioPlayerViewModel,
+        audioPlayer: any IOSLongFormAudioPlayback,
         studioCoordinator: StudioGenerationCoordinator,
         reason: GenerationCancellationReason
     ) -> Task<Void, Never>? {
@@ -469,7 +526,7 @@ final class IOSLongFormCoordinator {
         request: IOSLongFormProjectRequest,
         reusing prior: [IOSLongFormSegmentState]?,
         ttsEngine: TTSEngineStore,
-        audioPlayer: AudioPlayerViewModel,
+        audioPlayer: any IOSLongFormAudioPlayback,
         studioCoordinator: StudioGenerationCoordinator
     ) {
         guard !isProcessing, !ttsEngine.hasActiveGeneration else { return }
@@ -490,7 +547,8 @@ final class IOSLongFormCoordinator {
             ttsEngine: ttsEngine,
             audioPlayer: audioPlayer,
             cancellationState: cancellationState,
-            hooks: hooks
+            hooks: hooks,
+            services: services
         )
         segments = request.lines.enumerated().map { index, line in
             if let prior, index < prior.count, prior[index].isSaved, prior[index].line == line {
@@ -535,13 +593,13 @@ final class IOSLongFormCoordinator {
     private func finish(
         outcome: IOSLongFormOutcome,
         request: IOSLongFormProjectRequest,
-        audioPlayer: AudioPlayerViewModel,
+        audioPlayer: any IOSLongFormAudioPlayback,
         studioCoordinator: StudioGenerationCoordinator,
         studioAttempt: StudioGenerationAttemptToken
     ) {
         switch outcome {
         case .completed(_, let joinedAudioPath, let joinedDurationSeconds):
-            let shouldAutoPlay = AudioService.shouldAutoPlay
+            let shouldAutoPlay = services.shouldAutoPlay
             audioPlayer.completeStreamingPreview(
                 result: GenerationResult(
                     audioPath: joinedAudioPath,
@@ -590,20 +648,23 @@ actor IOSLongFormCancellationState {
 @MainActor
 final class IOSLongFormProjectRunner {
     private let ttsEngine: TTSEngineStore
-    private let audioPlayer: AudioPlayerViewModel
+    private let audioPlayer: any IOSLongFormAudioPlayback
     private let cancellationState: IOSLongFormCancellationState
     private let hooks: any IOSLongFormPlatformHooks
+    private let services: any IOSLongFormProjectServices
 
     init(
         ttsEngine: TTSEngineStore,
-        audioPlayer: AudioPlayerViewModel,
+        audioPlayer: any IOSLongFormAudioPlayback,
         cancellationState: IOSLongFormCancellationState,
-        hooks: any IOSLongFormPlatformHooks
+        hooks: any IOSLongFormPlatformHooks,
+        services: any IOSLongFormProjectServices
     ) {
         self.ttsEngine = ttsEngine
         self.audioPlayer = audioPlayer
         self.cancellationState = cancellationState
         self.hooks = hooks
+        self.services = services
     }
 
     private func evaluateQC(path: String, expectedPauseCount: Int) async -> AudioQualityGate.Report {
@@ -684,7 +745,7 @@ final class IOSLongFormProjectRunner {
             publish(active: index, message: hooks.presentation.generatingSegment(index + 1, total: total))
 
             let generationID = UUID()
-            let outputPath = LongFormHistoryAcceptance.uniqueAudioURL(basedOn: URL(fileURLWithPath: makeOutputPath(
+            let outputPath = LongFormHistoryAcceptance.uniqueAudioURL(basedOn: URL(fileURLWithPath: services.segmentOutputPath(
                 subfolder: request.model.outputSubfolder,
                 text: request.outputText(forSegment: index)
             ))).path
@@ -694,7 +755,7 @@ final class IOSLongFormProjectRunner {
                 audioPlayer.setLivePreviewEstimate(LivePreviewEstimate(text: line))
                 audioPlayer.prepareStreamingPreview(
                     title: hooks.segmentTitle(index: index, total: total),
-                    shouldAutoPlay: AudioService.shouldAutoPlay,
+                    shouldAutoPlay: services.shouldAutoPlay,
                     generationID: generationID, playbackOperationID: studioAttempt.rawValue
                 )
                 studioCoordinator.updateLiveItem(IOSStudioLivePreviewItem(
@@ -705,7 +766,7 @@ final class IOSLongFormProjectRunner {
                     waveformSeed: hooks.waveformSeed(for: line),
                     estimatedAudioDuration: LivePreviewEstimate(text: line)?.estimatedAudioDuration ?? 0
                 ), attempt: studioAttempt)
-                await AppGenerationTimeline.shared.recordSubmitted(
+                await services.recordSubmitted(
                     id: generationID,
                     mode: request.mode.rawValue
                 )
@@ -719,14 +780,14 @@ final class IOSLongFormProjectRunner {
                 )
                 let cancellationRequestedAfterTake = await cancellationState.wasRequested()
                 if Task.isCancelled || cancellationRequestedAfterTake {
-                    await AppGenerationTimeline.shared.recordFailed(id: generationID, finishReason: .cancelled)
+                    await services.recordFailed(id: generationID, finishReason: .cancelled)
                     hooks.segmentTelemetryFinalized(generationID: generationID, publishedAudioURL: nil)
                     try? FileManager.default.removeItem(atPath: result.audioPath)
                     audioPlayer.abortLivePreviewIfNeeded()
                     markCancelled(startingAt: index)
                     return .cancelled(segments: segments)
                 }
-                await AppGenerationTimeline.shared.recordCompleted(
+                await services.recordCompleted(
                     id: generationID,
                     mode: request.mode.rawValue,
                     usedStreaming: true,
@@ -760,14 +821,14 @@ final class IOSLongFormProjectRunner {
                 record.seed = Int64(bitPattern: request.plan.segments[index].evidence.effectiveSubseed)
                 segments[index].historyRecord = record
                 segments[index].generationID = generationID
-                let persistence = await GenerationPersistence.persist(record, caller: "IOSLongFormSegment")
+                let persistence = await services.persistSegment(record, caller: "IOSLongFormSegment")
                 try persistence.requireSavedLongFormSegment()
                 segments[index].status = .saved(audioPath: result.audioPath)
                 publish(active: index, message: hooks.presentation.generatedSegmentPending(index + 1, total: total))
             } catch {
                 audioPlayer.abortLivePreviewIfNeeded()
                 let cancellationRequested = await cancellationState.wasRequested()
-                await AppGenerationTimeline.shared.recordFailed(
+                await services.recordFailed(
                     id: generationID,
                     finishReason: (error is CancellationError || cancellationRequested) ? .cancelled : .failed
                 )
@@ -818,7 +879,7 @@ final class IOSLongFormProjectRunner {
                 joined: joinedRecord, joinedQCPassed: joinedReport.passed, ownedAudioURLs: [joined.outputURL]
             )
             if await cancellationState.wasRequested() { throw CancellationError() }
-            let saved = try await DatabaseService.shared.acceptLongFormProject(candidate)
+            let saved = try await services.acceptLongFormProject(candidate)
             candidateJoinedURL = nil
             hooks.projectAccepted(saved, joinedAudioPath: joined.outputURL.path)
             publish(active: nil, message: hooks.presentation.done)
@@ -896,7 +957,7 @@ final class IOSLongFormProjectRunner {
         publish(active: segmentIndex, message: hooks.presentation.regeneratingSegment(segmentIndex + 1, total: total))
 
         let generationID = UUID()
-        let outputPath = LongFormHistoryAcceptance.uniqueAudioURL(basedOn: URL(fileURLWithPath: makeOutputPath(
+        let outputPath = LongFormHistoryAcceptance.uniqueAudioURL(basedOn: URL(fileURLWithPath: services.segmentOutputPath(
             subfolder: request.model.outputSubfolder,
             text: request.outputText(forSegment: segmentIndex)
         ))).path
@@ -907,7 +968,7 @@ final class IOSLongFormProjectRunner {
             audioPlayer.setLivePreviewEstimate(LivePreviewEstimate(text: line))
             audioPlayer.prepareStreamingPreview(
                 title: hooks.segmentTitle(index: segmentIndex, total: total),
-                shouldAutoPlay: AudioService.shouldAutoPlay,
+                shouldAutoPlay: services.shouldAutoPlay,
                 generationID: generationID, playbackOperationID: studioAttempt.rawValue
             )
             studioCoordinator.updateLiveItem(IOSStudioLivePreviewItem(
@@ -918,7 +979,7 @@ final class IOSLongFormProjectRunner {
                 waveformSeed: hooks.waveformSeed(for: line),
                 estimatedAudioDuration: LivePreviewEstimate(text: line)?.estimatedAudioDuration ?? 0
             ), attempt: studioAttempt)
-            await AppGenerationTimeline.shared.recordSubmitted(
+            await services.recordSubmitted(
                 id: generationID,
                 mode: request.mode.rawValue
             )
@@ -934,7 +995,7 @@ final class IOSLongFormProjectRunner {
             let cancellationRequestedAfterTake = await cancellationState.wasRequested()
             candidateAudioURLs.append(URL(fileURLWithPath: result.audioPath))
             if Task.isCancelled || cancellationRequestedAfterTake {
-                await AppGenerationTimeline.shared.recordFailed(id: generationID, finishReason: .cancelled)
+                await services.recordFailed(id: generationID, finishReason: .cancelled)
                 hooks.segmentTelemetryFinalized(generationID: generationID, publishedAudioURL: nil)
                 try? FileManager.default.removeItem(atPath: result.audioPath)
                 audioPlayer.abortLivePreviewIfNeeded()
@@ -942,7 +1003,7 @@ final class IOSLongFormProjectRunner {
                 onSegmentsUpdated(segments)
                 return (.cancelled(segments: segments), priorReplacements)
             }
-            await AppGenerationTimeline.shared.recordCompleted(
+            await services.recordCompleted(
                 id: generationID,
                 mode: request.mode.rawValue,
                 usedStreaming: true,
@@ -1022,7 +1083,7 @@ final class IOSLongFormProjectRunner {
                 joined: joinedRecord, joinedQCPassed: joinedReport.passed, ownedAudioURLs: candidateAudioURLs
             )
             if await cancellationState.wasRequested() { throw CancellationError() }
-            let saved = try await DatabaseService.shared.acceptLongFormProject(candidate)
+            let saved = try await services.acceptLongFormProject(candidate)
             candidateAudioURLs.removeAll()
             hooks.projectAccepted(saved, joinedAudioPath: joined.outputURL.path)
             publish(active: nil, message: hooks.presentation.done)
@@ -1044,7 +1105,7 @@ final class IOSLongFormProjectRunner {
             // Assembly or History acceptance can fail after successful synthesis.
             // Do not overwrite the engine's completed boundary with a storage failure.
             if !generationCompleted {
-                await AppGenerationTimeline.shared.recordFailed(
+                await services.recordFailed(
                     id: generationID,
                     finishReason: (error is CancellationError || cancellationRequested) ? .cancelled : .failed
                 )

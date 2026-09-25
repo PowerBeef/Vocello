@@ -206,10 +206,11 @@ background-time grant, or when that grant ends while the app is still background
 grant covers finishes first. A write that meets the suspension rolls back and is classified as a
 transient `.locked` failure, never as damage; a short-form take stays in `history-outbox/`, and
 returning to `.active` resumes the database and reconciles History so it commits. A long-form
-acceptance that meets it is not rolled back (PA-30): its journal is marked resumable, the acceptance
-retries until History resumes, and if the run is stopped first, the reconcile after resume (or after
-a relaunch) completes it and keeps its audio. One the suspension stopped before anything was
-prepared retries the same way, or is discarded with its candidate when the run is cancelled.
+acceptance that meets it is not rolled back (PA-30): its journal is marked resumable on the writer,
+before any other History write can see it, the acceptance retries until History resumes, and if the
+run is stopped first, the reconcile after resume (or after a relaunch) completes it and keeps its
+audio. One the suspension stopped before anything was prepared retries the same way, or is
+discarded with its candidate when the run is cancelled.
 
 Short-form Built-in, Design, and Clone takes share one execution boundary in
 `IOSSingleTakeGenerationExecutor`. Views construct the exact mode request and perform any

@@ -70,44 +70,97 @@ struct LongFormHistoryAcceptanceStore: Sendable {
         var resumable = false
         var suspensionRetries = 0
         while true {
+            let outcome: AttemptOutcome
             do {
-                let saved = try await queue.write { db in try accept(input, in: db) }
-                try await queue.write { db in try reconcile(in: db) }
-                return saved
-            } catch {
-                guard HistoryPersistenceError.isSuspensionInterruption(error) else {
-                    if error is CancellationError {
-                        if resumable { throw LongFormAcceptanceError.interrupted }
-                        // Cancelled before anything was prepared: nothing to
-                        // recover, and the caller discards its candidate.
-                        if !hasJournal(for: input) { throw error }
-                    }
-                    return try await recover(input, using: queue, resumable: resumable)
+                let alreadyResumable = resumable
+                outcome = try await queue.writeWithoutTransaction { db in
+                    try attempt(input, alreadyResumable: alreadyResumable, in: db)
                 }
+                if case .accepted = outcome {
+                    do {
+                        try await queue.write { db in try reconcile(in: db) }
+                    } catch where HistoryPersistenceError.isSuspensionInterruption(error) {
+                        // Committed: the row is the witness, and the first
+                        // reconcile after resume retires the journal.
+                    }
+                }
+            } catch {
+                if error is CancellationError {
+                    if resumable { throw LongFormAcceptanceError.interrupted }
+                    // Cancelled before anything was prepared: nothing to
+                    // recover, and the caller discards its candidate.
+                    if !hasJournal(for: input) { throw error }
+                }
+                return try await recover(input, using: queue, resumable: resumable)
+            }
+            switch outcome {
+            case .accepted(let saved):
+                return saved
+            case .interrupted(marked: let marked):
                 // IOS-11: History was suspended. SQLite rolled back, and nothing
                 // is rolled back or discarded on top of that: a prepared
-                // acceptance is marked resumable, so any reconcile after resume
-                // completes it and its audio is kept, even across a relaunch
-                // (PA-30). This call retries until History resumes.
-                do {
-                    resumable = try markResumable(input) || resumable
-                } catch {
-                    throw LongFormAcceptanceError.recoveryRequired
-                }
-                suspensionRetries += 1
-                guard suspensionRetries <= Self.maximumSuspensionRetries else {
-                    if resumable { throw LongFormAcceptanceError.interrupted }
-                    // Nothing was prepared: the acceptance never started, and
-                    // the caller may discard its candidate.
-                    throw HistoryPersistenceError(operation: .write, failure: .locked)
-                }
-                do {
-                    try await Task.sleep(for: suspensionRetryInterval)
-                } catch {
-                    if resumable { throw LongFormAcceptanceError.interrupted }
-                    throw error
-                }
+                // acceptance is already marked resumable, so any reconcile after
+                // resume completes it and its audio is kept, even across a
+                // relaunch (PA-30). This call retries until History resumes.
+                resumable = resumable || marked
+            case .unmarkable:
+                throw LongFormAcceptanceError.recoveryRequired
             }
+            suspensionRetries += 1
+            guard suspensionRetries <= Self.maximumSuspensionRetries else {
+                if resumable { throw LongFormAcceptanceError.interrupted }
+                // Nothing was prepared: the acceptance never started, and
+                // the caller may discard its candidate.
+                throw HistoryPersistenceError(operation: .write, failure: .locked)
+            }
+            do {
+                try await Task.sleep(for: suspensionRetryInterval)
+            } catch {
+                if resumable { throw LongFormAcceptanceError.interrupted }
+                throw error
+            }
+        }
+    }
+
+    /// What one acceptance attempt on the writer came to.
+    private enum AttemptOutcome: Sendable {
+        case accepted(Generation)
+        /// A suspended History interrupted the attempt and SQLite rolled it
+        /// back (IOS-11). `marked`: this acceptance's journal is resumable.
+        case interrupted(marked: Bool)
+        /// The prepared journal could not be marked resumable; it stays as it
+        /// is, for the reconcile that rolls it back.
+        case unmarkable
+    }
+
+    /// One acceptance attempt, in one transaction, on the serial writer: the
+    /// transaction `DatabaseQueue.write` would open, with its interruption
+    /// handled before the writer is released. A suspension marks the prepared
+    /// journal resumable right there, so no other writer's reconcile can find
+    /// it unmarked and roll it back, deleting its audio, in between (PA-30).
+    private func attempt(
+        _ input: LongFormHistoryAcceptance,
+        alreadyResumable: Bool,
+        in db: Database
+    ) throws -> AttemptOutcome {
+        do {
+            var saved: Generation?
+            try db.inTransaction {
+                saved = try accept(input, in: db)
+                return .commit
+            }
+            guard let saved else { throw LongFormAcceptanceError.recoveryRequired }
+            return .accepted(saved)
+        } catch where HistoryPersistenceError.isSuspensionInterruption(error) {
+            // Marked once: a later interruption never reads the journal again.
+            guard !alreadyResumable else { return .interrupted(marked: true) }
+            let marked: Bool
+            do {
+                marked = try markResumable(input)
+            } catch {
+                return .unmarkable
+            }
+            return .interrupted(marked: marked)
         }
     }
 
@@ -159,7 +212,10 @@ struct LongFormHistoryAcceptanceStore: Sendable {
 
     /// Records that a suspended History interrupted the prepared acceptance of
     /// `input` (PA-30). `false` when nothing was prepared. A journal that cannot
-    /// be verified throws and stays as it is.
+    /// be verified throws and stays as it is. Call it only on the writer, as
+    /// the prepare and every reconcile run: there no reconcile can retire the
+    /// journal between the check and the write, so a journal that is gone is
+    /// never written back.
     func markResumable(_ input: LongFormHistoryAcceptance) throws -> Bool {
         guard hasJournal(for: input) else { return false }
         let url = journalURL(forJoinedAudioPath: input.joined.audioPath)

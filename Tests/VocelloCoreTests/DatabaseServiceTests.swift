@@ -164,6 +164,75 @@ final class DatabaseServiceTests: XCTestCase {
         XCTAssertEqual(try service.deleteGenerations(throughID: bound), [], "A resumed clear deletes nothing twice")
     }
 
+    // MARK: - Long-form recovery (PA-30)
+
+    private struct InjectedFailure: Error {}
+
+    /// A long-form acceptance a suspended History interrupted, prepared under the
+    /// service's root with its journal marked resumable.
+    private func interruptedAcceptance(in root: URL) throws -> LongFormHistoryAcceptanceTests.Fixture {
+        let f = try LongFormHistoryAcceptanceTests.makeFixture(
+            in: root,
+            journalRoot: root.appendingPathComponent("history-outbox/long-form", isDirectory: true)
+        )
+        XCTAssertThrowsError(try f.queue.write { db in
+            try f.store.prepare(f.input, in: db)
+            throw InjectedFailure()
+        })
+        XCTAssertTrue(try f.store.markResumable(f.input))
+        return f
+    }
+
+    func testLongFormRecoveryCompletesAnInterruptedAcceptanceInOneCall() throws {
+        let root = try makeRoot().resolvingSymlinksInPath()
+        let f = try interruptedAcceptance(in: root)
+        let service = DatabaseService(rootDirectory: root)
+
+        try service.reconcileLongFormRecovery()
+
+        XCTAssertFalse(f.store.hasPendingRecovery, "The rows commit, then the journal retires, in one call")
+        let rows = try service.fetchAllGenerations()
+        XCTAssertEqual(rows.count, 4, "The prior joined output, both segments and the new joined output")
+        XCTAssertEqual(rows.filter { $0.longFormRole == "joined" }.map(\.audioPath), [f.input.joined.audioPath])
+        XCTAssertEqual(rows.filter { $0.longFormRole == "superseded" }.map(\.audioPath), [f.oldJoined.path])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath), "The audio is kept")
+        XCTAssertNotEqual(try Data(contentsOf: f.input.manifestURL), f.oldManifest, "The new manifest stays")
+        XCTAssertNoThrow(try service.reconcileLongFormRecovery(), "Nothing is left to settle")
+        XCTAssertEqual(try service.fetchAllGenerations().count, 4)
+    }
+
+    func testLongFormRecoveryWithNothingPendingMakesNoWrite() throws {
+        // No database can be opened under a missing directory, so any write
+        // would throw: with nothing pending the service never reaches one.
+        let root = try makeRoot(creatingDirectory: false)
+        let service = DatabaseService(rootDirectory: root)
+        XCTAssertNoThrow(try service.reconcileLongFormRecovery())
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.path))
+    }
+
+    func testLongFormRecoveryFailsClosedOnAnUnreadableJournal() throws {
+        let root = try makeRoot()
+        let service = DatabaseService(rootDirectory: root)
+        var standalone = row("/nonexistent/standalone.wav", at: 0)
+        try service.saveGeneration(&standalone)
+        let journals = root.appendingPathComponent("history-outbox/long-form", isDirectory: true)
+        try FileManager.default.createDirectory(at: journals, withIntermediateDirectories: true)
+        let journal = journals.appendingPathComponent(String(repeating: "0", count: 64) + ".json")
+        let damaged = Data("damaged fixture journal".utf8)
+        try damaged.write(to: journal)
+
+        // The first pass throws, so the call ends there rather than retrying.
+        XCTAssertThrowsError(try service.reconcileLongFormRecovery()) { error in
+            XCTAssertEqual((error as? HistoryPersistenceError)?.operation, .write)
+        }
+        XCTAssertEqual(try Data(contentsOf: journal), damaged, "The journal stays for Retry or export")
+        XCTAssertEqual(
+            try service.fetchAllGenerations().map(\.audioPath),
+            ["/nonexistent/standalone.wav"],
+            "Unrelated History stays readable"
+        )
+    }
+
     func testAFailedOpenStaysFailedUntilAnExplicitReopen() throws {
         // The directory does not exist yet, so SQLite cannot create the database.
         let root = try makeRoot(creatingDirectory: false)

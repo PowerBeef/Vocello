@@ -306,6 +306,54 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         XCTAssertEqual(rows.first { $0.audioPath == f.oldJoined.path }?.longFormRole, "superseded")
     }
 
+    /// A suspension inside the acceptance's own transaction marks its journal
+    /// before the writer is released: the first writer that runs after it,
+    /// once History has resumed, completes the acceptance instead of rolling
+    /// it back and deleting its audio (PA-30).
+    func testSuspensionInsideCommitMarksTheJournalBeforeAnotherWriterRuns() async throws {
+        let f = try fixture(suspendable: true)
+        defer { NotificationCenter.default.post(name: Database.resumeNotification, object: nil) }
+        let queue = f.queue
+        let store = f.store
+        let otherWriterReconciled = expectation(description: "The writer queued behind the acceptance reconciled")
+        try f.queue.inDatabase { db in
+            // Suspends History while the acceptance supersedes the prior joined
+            // row, so the insert that follows is refused, and queues another
+            // writer right behind the acceptance, as a resume would.
+            db.add(function: DatabaseFunction("fixture_suspend_history", argumentCount: 0) { _ in
+                NotificationCenter.default.post(name: Database.suspendNotification, object: nil)
+                queue.asyncWriteWithoutTransaction { writer in
+                    NotificationCenter.default.post(name: Database.resumeNotification, object: nil)
+                    do {
+                        try writer.execute(sql: "DROP TRIGGER fixture_suspend_on_supersede")
+                        try writer.inTransaction {
+                            try store.reconcile(in: writer)
+                            return .commit
+                        }
+                        otherWriterReconciled.fulfill()
+                    } catch {
+                        XCTFail("The writer behind the acceptance failed: \(error)")
+                    }
+                }
+                return nil
+            })
+            try db.execute(sql: """
+                CREATE TRIGGER fixture_suspend_on_supersede BEFORE UPDATE ON generations
+                WHEN NEW.longFormRole = 'superseded' BEGIN SELECT fixture_suspend_history(); END
+                """)
+        }
+
+        let saved = try await f.store.commit(f.input, using: f.queue)
+        await fulfillment(of: [otherWriterReconciled], timeout: 10)
+        XCTAssertNotNil(saved.id)
+        XCTAssertTrue(try journalURLs(f.store).isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath), "The audio is kept")
+        XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), try f.input.manifest.canonicalJSONData())
+        let rows = try await f.queue.read { try Generation.fetchAll($0) }
+        XCTAssertEqual(rows.count, 4)
+        XCTAssertEqual(rows.filter { $0.longFormRole == "joined" }.map(\.audioPath), [f.input.joined.audioPath])
+    }
+
     /// The caller stops waiting while History is suspended (the app left the
     /// foreground): the acceptance reports it was interrupted, its candidate
     /// belongs to recovery, and the first reconcile after resume, even in a
@@ -452,7 +500,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         }
     }
 
-    private struct Fixture: Sendable {
+    struct Fixture: Sendable {
         let store: LongFormHistoryAcceptanceStore
         let queue: DatabaseQueue
         let input: LongFormHistoryAcceptance
@@ -478,6 +526,28 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).resolvingSymlinksInPath()
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         roots.append(root)
+        return try Self.makeFixture(
+            in: root,
+            journalRoot: root.appendingPathComponent("journal"),
+            qcPassed: qcPassed,
+            nonFiniteDuration: nonFiniteDuration,
+            joinedQCPassed: joinedQCPassed,
+            suspendable: suspendable
+        )
+    }
+
+    /// A QC-passed acceptance over fixture audio in `root`, whose History
+    /// (`history.sqlite`) holds the project's prior joined row and whose
+    /// manifest holds the prior accepted manifest. `DatabaseServiceTests`
+    /// builds one under its service's root to drive long-form recovery.
+    static func makeFixture(
+        in root: URL,
+        journalRoot: URL,
+        qcPassed: Bool = true,
+        nonFiniteDuration: Bool = false,
+        joinedQCPassed: Bool = true,
+        suspendable: Bool = false
+    ) throws -> Fixture {
         var configuration = Configuration()
         configuration.observesSuspensionNotifications = suspendable
         // File-backed, as History is: GRDB never observes suspension for an
@@ -527,7 +597,7 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
                     appliedGain: 1, verifiedNonSpeechFadeInFrames: 0, verifiedNonSpeechFadeOutFrames: 0)
             })
         let store = LongFormHistoryAcceptanceStore(
-            rootURL: root.appendingPathComponent("journal"),
+            rootURL: journalRoot,
             suspensionRetryInterval: .milliseconds(20)
         )
         return Fixture(store: store, queue: queue,

@@ -73,7 +73,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-      "sha256": "c98b1488dc9bf22864199571b8b992fd31a778445376af40894b4cf225b50960",
+      "sha256": "30be00453a3d8c81ced117c8a084c13d2aa8d0a120459c53b278cabc56ff7eea",
       "upstreamStatus": "modified"
     },
     {
@@ -153,7 +153,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",
-      "sha256": "bc6989fec29025d8e732b9995b0891cd80f72e5921c99fe8f61cae78cf3ce142",
+      "sha256": "d7186c846dfbd3ee563366c15db5f219d126bfa1c4c026736cf0b10347c1fe42",
       "upstreamStatus": "added"
     },
     {

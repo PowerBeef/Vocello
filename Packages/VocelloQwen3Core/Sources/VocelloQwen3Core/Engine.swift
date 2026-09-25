@@ -1519,7 +1519,7 @@ public actor VocelloQwen3Engine {
             try pending.session.cancellation.checkCancellation()
         case .token:
             if pending.firstModelTokenAndAudioCodeMS == nil {
-                pending.firstModelTokenAndAudioCodeMS = startedAt.elapsedMilliseconds
+                pending.firstModelTokenAndAudioCodeMS = startedAt.elapsedMillisecondsFloor
             }
             pending.generatedTokenCount += 1
             pendingGeneration = pending
@@ -1536,7 +1536,7 @@ public actor VocelloQwen3Engine {
             // required by the request-receipt contract, instead of leaving a
             // successful non-streaming take unverifiable.
             if pending.firstModelTokenAndAudioCodeMS == nil {
-                pending.firstModelTokenAndAudioCodeMS = startedAt.elapsedMilliseconds
+                pending.firstModelTokenAndAudioCodeMS = startedAt.elapsedMillisecondsFloor
             }
             if pending.codecTraceFrames.count < PendingGeneration.maximumCodecTraceFrames {
                 pending.codecTraceFrames.append(codes)
@@ -1565,7 +1565,7 @@ public actor VocelloQwen3Engine {
             try pending.session.cancellation.checkCancellation()
         case .audio(let samples):
             if pending.firstDecodedAudioFrameMS == nil {
-                pending.firstDecodedAudioFrameMS = startedAt.elapsedMilliseconds
+                pending.firstDecodedAudioFrameMS = startedAt.elapsedMillisecondsFloor
             }
             // Quality-first generation materializes the whole waveform at
             // once. Keep product output lossless while respecting the exact
@@ -1581,7 +1581,7 @@ public actor VocelloQwen3Engine {
                     ? VocelloQwen3StartupObservations(
                         firstModelTokenAndAudioCodeMilliseconds: pending.firstModelTokenAndAudioCodeMS,
                         firstDecodedAudioFrameMilliseconds: pending.firstDecodedAudioFrameMS
-                            ?? startedAt.elapsedMilliseconds
+                            ?? startedAt.elapsedMillisecondsFloor
                     )
                     : nil
                 let chunk = VocelloQwen3AudioChunkEvent(
@@ -1825,9 +1825,26 @@ private actor VocelloQwen3AbortCompletionBarrier {
 private struct VocelloQwen3EngineRuntimeFailure: Error, Sendable {}
 
 private extension ContinuousClock.Instant {
+    /// A span in whole milliseconds, rounded once like the package's other
+    /// timings (audit #61 fix 4); it used to truncate.
     var elapsedMilliseconds: Int {
+        max(0, Int(elapsedMillisecondsExact.rounded()))
+    }
+
+    /// An instant's offset in whole milliseconds, floored. The product adds a
+    /// startup boundary's offset (`first_model_token`,
+    /// `first_decoded_audio_frame`) to a floored reading of its own clock taken
+    /// before the engine opened; flooring both keeps each boundary at or before
+    /// every later mark on that clock, which floors too. A rounded offset
+    /// could land up to 1 ms after the next mark and reorder the startup
+    /// boundaries.
+    var elapsedMillisecondsFloor: Int {
+        max(0, Int(elapsedMillisecondsExact.rounded(.down)))
+    }
+
+    private var elapsedMillisecondsExact: Double {
         let duration = duration(to: .now)
-        return max(0, Int((Double(duration.components.seconds) * 1_000)
-            + (Double(duration.components.attoseconds) / 1e15)))
+        return (Double(duration.components.seconds) * 1_000)
+            + (Double(duration.components.attoseconds) / 1e15)
     }
 }

@@ -3454,6 +3454,20 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         // final flush, tail decode and tail eval run after the loop and must
         // not hide in-loop time that no span covers.
         var tokenLoopAttributedAtExit: Duration?
+        // Audit #61 fix 2: the awaited sink hand-offs inside the token loop
+        // (the `.token`, `.codecFrame`, `.chunkTimings` and `.audio` sends,
+        // the pipelined flush's sends and the codec-trace sink). Hand-offs
+        // after the loop exits (the final flush, `.info`, the tail chunk) are
+        // not counted. Their own keys; they stay out of
+        // `tokenLoopAttributedTotal()`, so `qwen_token_loop_unattributed`
+        // keeps its meaning and still contains this time.
+        var tokenLoopSinkHandoffTotal = Duration.zero
+        var tokenLoopSinkHandoffCount = 0
+        func recordSinkHandoff(since startedAt: ContinuousClock.Instant) {
+            guard tokenLoopAttributedAtExit == nil else { return }
+            tokenLoopSinkHandoffTotal += startedAt.elapsed
+            tokenLoopSinkHandoffCount += 1
+        }
         func qwenTokenLoopUnattributedMS() -> Int {
             let attributed = tokenLoopAttributedAtExit ?? tokenLoopAttributedTotal()
             return max(Duration.zero, tokenLoopTotal - attributed).roundedMilliseconds
@@ -3474,6 +3488,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 "qwen_stream_step_token_read_total": streamStepTokenReadTotal.roundedMilliseconds,
                 "qwen_stream_step_eos_read_total": streamStepEOSReadTotal.roundedMilliseconds,
                 "qwen_token_loop_unattributed": qwenTokenLoopUnattributedMS(),
+                "qwen_token_loop_sink_handoff_total": tokenLoopSinkHandoffTotal.roundedMilliseconds,
+                "qwen_token_loop_sink_handoff_count": tokenLoopSinkHandoffCount,
                 "qwen_stream_decoder_total": streamingDecoderTotal.roundedMilliseconds,
                 "qwen_audio_chunk_eval_total": audioChunkEvalTotal.roundedMilliseconds,
                 "qwen_stream_decoder_calls": streamingDecoderCallCount,
@@ -3621,10 +3637,14 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             try Task.checkCancellation()
             let materializedSamples = pending.audioChunk.asArray(Float.self)
             if let timings = pending.timings {
+                let handoffStartedAt = ContinuousClock.now
                 try await materializedEventSink(.chunkTimings(timings))
+                recordSinkHandoff(since: handoffStartedAt)
                 try Task.checkCancellation()
             }
+            let handoffStartedAt = ContinuousClock.now
             try await materializedEventSink(.audio(materializedSamples))
+            recordSinkHandoff(since: handoffStartedAt)
             try Task.checkCancellation()
         }
 
@@ -3798,7 +3818,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             }
             if let materializedEventSink {
                 try Task.checkCancellation()
+                let handoffStartedAt = ContinuousClock.now
                 try await materializedEventSink(.token(tokenId))
+                recordSinkHandoff(since: handoffStartedAt)
                 try Task.checkCancellation()
             } else {
                 onToken?(tokenId)
@@ -3830,11 +3852,15 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                let materializedEventSink,
                let materializedCodeFrame {
                 try Task.checkCancellation()
+                let handoffStartedAt = ContinuousClock.now
                 try await materializedEventSink(.codecFrame(materializedCodeFrame))
+                recordSinkHandoff(since: handoffStartedAt)
                 try Task.checkCancellation()
             } else if let codecTraceSink, let materializedCodeFrame {
                 try Task.checkCancellation()
+                let handoffStartedAt = ContinuousClock.now
                 try await codecTraceSink(materializedCodeFrame)
+                recordSinkHandoff(since: handoffStartedAt)
                 try Task.checkCancellation()
             }
             samplerScratch.appendRepetitionTokenID(tokenId)
@@ -3953,7 +3979,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                             deferredChunkTimings = timings
                         } else if let materializedEventSink {
                             try Task.checkCancellation()
+                            let handoffStartedAt = ContinuousClock.now
                             try await materializedEventSink(.chunkTimings(timings))
+                            recordSinkHandoff(since: handoffStartedAt)
                             try Task.checkCancellation()
                         } else {
                             onAudioChunkTimings?(timings)
@@ -3966,7 +3994,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                             timings: deferredChunkTimings
                         )
                     } else if let materializedEventSink, let materializedSamples {
+                        let handoffStartedAt = ContinuousClock.now
                         try await materializedEventSink(.audio(materializedSamples))
+                        recordSinkHandoff(since: handoffStartedAt)
                         try Task.checkCancellation()
                     } else {
                         onAudioChunk?(audioChunk)

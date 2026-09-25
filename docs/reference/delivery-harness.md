@@ -917,6 +917,25 @@ is `uncalibrated`, issue `quality_gate_uncalibrated.prosody`); a raised flag sti
 failed analysis is still unavailable. The perturbation suite with a detection curve per flag and a
 monotone check in semitones, which would let a profile declare `calibrated`, belong to AV-07.
 
+### 5.3 Speaker and script-length strata (audit #40, 2026-09-25)
+
+The arousal and pitch floors read raw Hz and seconds calibrated on Aiden (about 146 Hz) and one
+text, yet apply across nine speakers and three lengths: the same movement in semitones is a larger
+Hz delta for a higher voice. Following the audit's recommendation (the maintainer delegated the
+decision), `delivery_matrix_report.py` reports `strata`: every cell's features per speaker and script
+length (at least five takes per stratum), beside report-only scale-free counterparts computed from
+the sidecar's raw metrics (`pitch_variation_delta_semitones`, `pitch_range_delta_semitones`,
+`rate_ratio`, `duration_ratio`; never separability input), with a confound index per feature: the
+range of the stratum medians over the pooled interquartile range. `scaleFreeComparisons` sets each
+raw feature beside the counterpart that should replace it (`pitch_variation_delta_hz` →
+`pitch_variation_delta_semitones`, `arousal_score` → `pitch_shift_semitones`, `rate_delta_hz` →
+`rate_ratio`). The refit floors and a new profile version follow only a sweep that measures the
+confound. Committed records cannot: they carry no speaker name and every delivery campaign ran the
+medium text, so the replay reports one stratum and states the data needed, which is every judged
+cell for at least two Built-in Voice speakers of different pitch registers and at least two script
+lengths, with at least five seeds per speaker, length and cell, from the bench-prosody sidecars
+(`custom_delivery_matrix.py run` across the roster, repeated per length).
+
 ## 6. Analyzer accuracy and authority boundary
 
 `analyze_prosody.py` is deterministic, bounded-memory PCM analysis. Its synthetic

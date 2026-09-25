@@ -251,5 +251,59 @@ class MatrixReportTests(unittest.TestCase):
         self.assertEqual(adherence["takesWithPerTakeFlags"], 1)
 
 
+class StratifiedConfoundTests(unittest.TestCase):
+    """Audit #40: features in Hz depend on the speaker's register; semitones do not."""
+
+    def test_the_confound_index_separates_raw_from_scale_free_features(self):
+        from delivery_matrix_report import stratified_features
+
+        records = []
+        for speaker, register_hz in (("aiden", 146.0), ("vivian", 230.0)):
+            for seed in range(6):
+                # The same +2.4 semitone-ish movement is a larger Hz delta for a higher voice.
+                shift_st = 0.2 + 0.01 * seed
+                records.append({
+                    "preset": "sad", "intensity": "normal", "seed": seed, "speakerID": speaker,
+                    "length": "medium",
+                    "features": {"pitch_variation_delta_hz": -register_hz * 0.04 - 0.1 * seed,
+                                 "intensity_factor": 1.0},
+                    "scaleFreeFeatures": {"pitch_variation_delta_semitones": -0.5 - 0.01 * seed,
+                                          "pitch_shift_semitones": shift_st},
+                })
+        report = stratified_features(records)
+        self.assertTrue(report["confoundMeasurable"])
+        self.assertIsNone(report["dataNeeded"])
+        cell = report["cells"]["sad.normal"]
+        self.assertEqual(cell["strata"], ["aiden|medium", "vivian|medium"])
+        comparison = cell["scaleFreeComparisons"]["pitch_variation_delta_hz"]
+        self.assertGreater(comparison["rawConfoundIndex"], comparison["scaleFreeConfoundIndex"])
+        self.assertNotIn("intensity_factor", cell["features"])
+
+    def test_one_stratum_says_what_data_is_needed(self):
+        from delivery_matrix_report import stratified_features
+
+        records = [{"preset": "calm", "intensity": "normal", "seed": seed, "speakerID": None,
+                    "length": "medium", "features": {"arousal_score": -1.0}} for seed in range(8)]
+        report = stratified_features(records)
+        self.assertFalse(report["confoundMeasurable"])
+        self.assertIn("two Built-in Voice speakers", report["dataNeeded"])
+
+    def test_sidecar_rows_carry_scale_free_counterparts(self):
+        from delivery_separability import records_from_sidecar
+
+        rows = [{
+            "delivery": "sad.normal", "seed": 1, "speakerID": "vivian", "length": "medium", "model": "m",
+            "deliveryGate": {"metrics": {"pitch_shift_semitones": -0.4, "pitch_variation_delta_hz": -6.0}},
+            "deliveryMetrics": {"f0_std_semitones": 1.5, "rate_syllable_rate_hz": 3.6, "durationSec": 7.2},
+            "neutralMetrics": {"f0_std_semitones": 2.0, "rate_syllable_rate_hz": 4.0, "durationSec": 6.0},
+        }]
+        record = records_from_sidecar(rows)[0]
+        self.assertEqual(record["length"], "medium")
+        self.assertEqual(record["scaleFreeFeatures"]["pitch_variation_delta_semitones"], -0.5)
+        self.assertAlmostEqual(record["scaleFreeFeatures"]["rate_ratio"], 0.9)
+        self.assertAlmostEqual(record["scaleFreeFeatures"]["duration_ratio"], 1.2)
+        self.assertEqual(record["features"], rows[0]["deliveryGate"]["metrics"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -637,6 +637,36 @@ def evaluate_separability(
     }
 
 
+def scale_free_features(row, features):
+    """Semitone and ratio counterparts of the Hz and seconds deltas (audit #40).
+
+    The expectation floors read raw Hz and seconds calibrated on one speaker
+    (Aiden, about 146 Hz) and one text; the same movement in semitones is a
+    larger Hz delta for a higher voice and a larger seconds delta for a longer
+    script. These report-only features let a stratified report show whether
+    normalizing removes the speaker and length dependence.
+    """
+    instructed = row.get("deliveryMetrics") or {}
+    neutral = row.get("neutralMetrics") or {}
+    scale_free = {}
+
+    def number(value):
+        return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+    if "pitch_shift_semitones" in features:
+        scale_free["pitch_shift_semitones"] = float(features["pitch_shift_semitones"])
+    for name, key in (("pitch_variation_delta_semitones", "f0_std_semitones"),
+                      ("pitch_range_delta_semitones", "f0_range_semitones")):
+        left, right = number(instructed.get(key)), number(neutral.get(key))
+        if left is not None and right is not None:
+            scale_free[name] = left - right
+    for name, key in (("rate_ratio", "rate_syllable_rate_hz"), ("duration_ratio", "durationSec")):
+        left, right = number(instructed.get(key)), number(neutral.get(key))
+        if left is not None and right:
+            scale_free[name] = left / right
+    return scale_free
+
+
 def records_from_sidecar(rows, fallback_seed=None):
     """Build separability records from ``bench-prosody.json`` rows."""
     records = []
@@ -664,7 +694,11 @@ def records_from_sidecar(rows, fallback_seed=None):
             "seed": seed,
             "speakerID": row.get("speakerID"),
             "model": row.get("model"),
+            "length": row.get("length"),
             "features": features,
+            # Report-only scale-free counterparts of the Hz/seconds features
+            # (audit #40), for the stratified confound report; never separability input.
+            "scaleFreeFeatures": scale_free_features(row, features),
             "deliveryPassed": gate.get("passed"),
             "deliveryFlags": list(gate.get("flags") or []),
         })

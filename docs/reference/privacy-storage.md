@@ -81,7 +81,9 @@ Maintained macOS subtrees and preferences:
   QC and manifest serialization precede the atomic manifest and transactional History update.
   Before History reads or writes, reconciliation either confirms the database commit or restores
   the prior manifest and removes only newly owned, unreferenced candidate audio. Accepted audio
-  is never deleted as rollback cleanup. Corrupt/unrecoverable journals remain for visible recovery;
+  is never deleted as rollback cleanup. A journal marked resumable (the acceptance was interrupted
+  by the iPhone's History suspension, IOS-11) is completed instead, with the acceptance's own checks,
+  and keeps its audio (PA-30). Corrupt/unrecoverable journals remain for visible recovery;
   their private paths and generation records never enter telemetry or tracked evidence.
   Unrelated standalone History remains readable; project reads and all mutations remain gated.
   Explicit Export Recovery Files includes bounded regular-file journals without interpreting their

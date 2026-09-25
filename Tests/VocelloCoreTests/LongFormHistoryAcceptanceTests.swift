@@ -240,48 +240,156 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         XCTAssertThrowsError(try GenerationHistoryPersistenceOutcome.unableToQueue.requireSavedLongFormSegment())
     }
 
-    // MARK: - Suspension (IOS-11)
+    // MARK: - Suspension (IOS-11, PA-30)
 
-    /// Suspension before the acceptance: nothing is prepared, the prior project
-    /// is untouched, and the same candidate is accepted once History resumes.
-    func testSuspensionBeforeAcceptanceChangesNothingAndTheCandidateStaysAcceptable() async throws {
+    /// Suspension before the acceptance: nothing is prepared while History is
+    /// suspended, and the acceptance waits and completes once History resumes,
+    /// so its candidate is never orphaned.
+    func testSuspensionBeforeAcceptanceWaitsAndAcceptsAfterResume() async throws {
         let f = try fixture(suspendable: true)
         NotificationCenter.default.post(name: Database.suspendNotification, object: nil)
         // A throwing step below must not leave every observing queue in the test process suspended.
         defer { NotificationCenter.default.post(name: Database.resumeNotification, object: nil) }
-        do {
-            _ = try await f.store.commit(f.input, using: f.queue)
-            XCTFail("A suspended database must refuse the acceptance")
-        } catch {
-            XCTAssertEqual(error as? LongFormAcceptanceError, .recoveryRequired)
-        }
-        XCTAssertTrue(try journalURLs(f.store).isEmpty)
+        let acceptance = startCommit(f)
+        try await Task.sleep(for: .milliseconds(150))
+        XCTAssertTrue(try journalURLs(f.store).isEmpty, "Nothing is prepared while suspended")
         XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), f.oldManifest)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath))
-        NotificationCenter.default.post(name: Database.resumeNotification, object: nil)
 
-        XCTAssertEqual(try rowCount(f.queue), 1)
-        let saved = try await f.store.commit(f.input, using: f.queue)
-        XCTAssertNotNil(saved.id)
+        NotificationCenter.default.post(name: Database.resumeNotification, object: nil)
+        let failure = await acceptance.value
+        XCTAssertNil(failure)
         XCTAssertEqual(try rowCount(f.queue), 4)
         XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), try f.input.manifest.canonicalJSONData())
+        XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath))
+        XCTAssertTrue(try journalURLs(f.store).isEmpty)
     }
 
-    /// Suspension inside the acceptance transaction: SQLite rolls the rows back,
-    /// recovery fails closed while suspended, and after resume the journal
-    /// restores the prior project. No partial project is ever readable.
-    func testSuspensionInsideAcceptanceRollsBackAndRecoveryRestoresThePriorProject() throws {
+    /// Suspension before the acceptance, then the caller stops waiting: nothing
+    /// was prepared, so the store reports a plain cancellation and changes nothing.
+    func testSuspensionBeforeAcceptanceThenCancellationChangesNothing() async throws {
+        let f = try fixture(suspendable: true)
+        NotificationCenter.default.post(name: Database.suspendNotification, object: nil)
+        defer { NotificationCenter.default.post(name: Database.resumeNotification, object: nil) }
+        let acceptance = startCommit(f)
+        try await Task.sleep(for: .milliseconds(100))
+        acceptance.cancel()
+        let failure = await acceptance.value
+        XCTAssertNotNil(failure as? CancellationError, "Nothing to recover: the caller discards its candidate")
+        XCTAssertTrue(try journalURLs(f.store).isEmpty)
+        XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), f.oldManifest)
+    }
+
+    /// Suspension inside the acceptance transaction: SQLite rolls the rows back
+    /// and the journal survives. The acceptance is marked resumable instead of
+    /// being rolled back, waits while History stays suspended, and completes
+    /// after resume with its audio kept.
+    func testSuspensionInsideAcceptanceIsCompletedAfterResumeNotRolledBack() async throws {
         let f = try fixture(suspendable: true)
         defer { NotificationCenter.default.post(name: Database.resumeNotification, object: nil) }
+        try interruptAcceptanceBySuspension(f)
+        let plainJournal = journalSize(f.store)
+        XCTAssertGreaterThan(plainJournal, 0)
+        let acceptance = startCommit(f)
+        try await waitUntil { self.journalSize(f.store) > plainJournal }
+        XCTAssertThrowsError(try f.queue.write { db in try f.store.reconcile(in: db) })
+        XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath))
+
+        NotificationCenter.default.post(name: Database.resumeNotification, object: nil)
+        let failure = await acceptance.value
+        XCTAssertNil(failure)
+        XCTAssertTrue(try journalURLs(f.store).isEmpty)
+        XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), try f.input.manifest.canonicalJSONData())
+        XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath))
+        let rows = try await f.queue.read { try Generation.fetchAll($0) }
+        XCTAssertEqual(rows.count, 4)
+        XCTAssertEqual(rows.filter { $0.longFormRole == "joined" }.map(\.audioPath), [f.input.joined.audioPath])
+        XCTAssertEqual(rows.first { $0.audioPath == f.oldJoined.path }?.longFormRole, "superseded")
+    }
+
+    /// The caller stops waiting while History is suspended (the app left the
+    /// foreground): the acceptance reports it was interrupted, its candidate
+    /// belongs to recovery, and the first reconcile after resume, even in a
+    /// relaunched process, completes it rather than deleting its audio.
+    func testInterruptedAcceptanceIsCompletedByTheReconcileAfterResume() async throws {
+        let f = try fixture(suspendable: true)
+        defer { NotificationCenter.default.post(name: Database.resumeNotification, object: nil) }
+        try interruptAcceptanceBySuspension(f)
+        let plainJournal = journalSize(f.store)
+        XCTAssertGreaterThan(plainJournal, 0)
+        let acceptance = startCommit(f)
+        try await waitUntil { self.journalSize(f.store) > plainJournal }
+        acceptance.cancel()
+        let failure = await acceptance.value
+        XCTAssertEqual(failure as? LongFormAcceptanceError, .interrupted)
+        XCTAssertTrue(LongFormAcceptanceError.interrupted.leavesCandidateToRecovery)
+        XCTAssertEqual(try journalURLs(f.store).count, 1)
+
+        NotificationCenter.default.post(name: Database.resumeNotification, object: nil)
+        let relaunched = LongFormHistoryAcceptanceStore(rootURL: f.store.rootURL)
+        XCTAssertTrue(relaunched.hasPendingRecovery)
+        try f.queue.write { db in try relaunched.reconcile(in: db) }
+        XCTAssertEqual(try rowCount(f.queue), 4, "The rows are saved")
+        XCTAssertEqual(try journalURLs(f.store).count, 1, "Retired once a later reconcile sees them committed")
+        try f.queue.write { db in try relaunched.reconcile(in: db) }
+        XCTAssertTrue(try journalURLs(f.store).isEmpty)
+        XCTAssertEqual(try rowCount(f.queue), 4)
+        XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), try f.input.manifest.canonicalJSONData())
+        XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath))
+    }
+
+    /// A resumable acceptance the acceptance itself would have refused (a
+    /// segment row changed identity) rolls back as it would have without the
+    /// suspension, and no part of the project is left in History.
+    func testResumableAcceptanceItselfRefusedRollsBackWithoutPartialRows() throws {
+        let f = try fixture()
         XCTAssertThrowsError(try f.queue.write { db in
             try f.store.prepare(f.input, in: db)
-            NotificationCenter.default.post(name: Database.suspendNotification, object: nil)
-            _ = try f.store.saveRows(f.input, in: db)
-        }) { error in
-            XCTAssertEqual(HistoryPersistenceError.classify(error, operation: .write).failure, .locked)
+            throw InjectedFailure()
+        })
+        XCTAssertTrue(try f.store.markResumable(f.input))
+        var conflicting = try XCTUnwrap(f.input.segments.last)
+        conflicting.seed = 42
+        try f.queue.write { db in try conflicting.insert(db) }
+
+        // A read on the writer goes on after recovery; it must not keep the
+        // earlier segments the failed completion inserted.
+        _ = try f.queue.write { db in try f.store.readableHistory(in: db) }
+        XCTAssertTrue(try journalURLs(f.store).isEmpty)
+        XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), f.oldManifest)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: f.input.joined.audioPath))
+        XCTAssertEqual(try rowCount(f.queue), 2, "The prior joined output and the conflicting row only")
+    }
+
+    /// A resumable acceptance whose audio is gone fails closed: the journal and
+    /// every remaining file stay for Retry or export, and no row is added.
+    func testResumableAcceptanceWithMissingAudioFailsClosed() throws {
+        let f = try fixture()
+        XCTAssertThrowsError(try f.queue.write { db in
+            try f.store.prepare(f.input, in: db)
+            throw InjectedFailure()
+        })
+        XCTAssertTrue(try f.store.markResumable(f.input))
+        try FileManager.default.removeItem(atPath: f.input.segments[0].audioPath)
+
+        XCTAssertThrowsError(try f.queue.write { db in try f.store.reconcile(in: db) }) { error in
+            XCTAssertEqual(error as? LongFormAcceptanceError, .recoveryRequired)
         }
+        XCTAssertEqual(try journalURLs(f.store).count, 1)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: f.input.joined.audioPath))
+        XCTAssertEqual(try rowCount(f.queue), 1)
+    }
+
+    /// A journal nothing marked resumable (the process died right after the
+    /// interruption) keeps the crash behaviour: recovery fails closed while
+    /// suspended, then restores the prior project after resume.
+    func testUnmarkedInterruptedAcceptanceRollsBackAfterResume() throws {
+        let f = try fixture(suspendable: true)
+        defer { NotificationCenter.default.post(name: Database.resumeNotification, object: nil) }
+        try interruptAcceptanceBySuspension(f)
         XCTAssertEqual(try journalURLs(f.store).count, 1, "The journal survives for recovery")
-        XCTAssertThrowsError(try f.queue.write { db in try f.store.reconcile(in: db) })
+        XCTAssertThrowsError(try f.queue.write { db in try f.store.reconcile(in: db) }) { error in
+            XCTAssertTrue(HistoryPersistenceError.isSuspensionInterruption(error), "Suspension is not damage")
+        }
         XCTAssertEqual(try journalURLs(f.store).count, 1, "Recovery never runs half-way while suspended")
 
         NotificationCenter.default.post(name: Database.resumeNotification, object: nil)
@@ -290,6 +398,58 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: f.input.manifestURL), f.oldManifest)
         XCTAssertEqual(try rowCount(f.queue), 1)
         XCTAssertTrue(FileManager.default.fileExists(atPath: f.oldJoined.path))
+    }
+
+    /// Prepares the acceptance, then suspends History inside its transaction,
+    /// as a suspension that lands mid-acceptance does. History stays suspended.
+    private func interruptAcceptanceBySuspension(_ f: Fixture) throws {
+        XCTAssertThrowsError(try f.queue.write { db in
+            try f.store.prepare(f.input, in: db)
+            NotificationCenter.default.post(name: Database.suspendNotification, object: nil)
+            _ = try f.store.saveRows(f.input, in: db)
+        }) { error in
+            XCTAssertEqual(HistoryPersistenceError.classify(error, operation: .write).failure, .locked)
+            XCTAssertTrue(HistoryPersistenceError.isSuspensionInterruption(error))
+        }
+    }
+
+    /// A non-throwing task that hands back its error: the shape the pinned CI
+    /// compiler's region-isolation checker accepts.
+    private func startCommit(_ f: Fixture) -> Task<(any Error)?, Never> {
+        Task { () -> (any Error)? in
+            do {
+                _ = try await f.store.commit(f.input, using: f.queue)
+                return nil
+            } catch {
+                return error
+            }
+        }
+    }
+
+    /// The size of the one journal; 0 while the store is replacing it. Marking
+    /// an acceptance resumable adds its segment rows, so the journal grows.
+    private func journalSize(_ store: LongFormHistoryAcceptanceStore) -> Int {
+        let journals = ((try? FileManager.default.contentsOfDirectory(
+            at: store.rootURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []).filter { $0.pathExtension == "json" }
+        guard journals.count == 1 else { return 0 }
+        return (try? journals[0].resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+    }
+
+    private func waitUntil(
+        timeout: Duration = .seconds(10),
+        _ condition: () -> Bool
+    ) async throws {
+        let deadline = ContinuousClock.now + timeout
+        while !condition() {
+            guard ContinuousClock.now < deadline else {
+                XCTFail("Timed out waiting for the condition")
+                return
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
     }
 
     private struct Fixture: Sendable {
@@ -366,7 +526,11 @@ final class LongFormHistoryAcceptanceTests: XCTestCase {
                     insertedPauseOutputRange: .init(lowerBound: 24_000, upperBound: 24_000), sourceRMS: 0.1,
                     appliedGain: 1, verifiedNonSpeechFadeInFrames: 0, verifiedNonSpeechFadeOutFrames: 0)
             })
-        return Fixture(store: .init(rootURL: root.appendingPathComponent("journal")), queue: queue,
+        let store = LongFormHistoryAcceptanceStore(
+            rootURL: root.appendingPathComponent("journal"),
+            suspensionRetryInterval: .milliseconds(20)
+        )
+        return Fixture(store: store, queue: queue,
             input: .init(manifestURL: manifestURL, manifest: .init(plan: plan.evidence, execution: execution, assembly: assembly),
                          segments: records, joined: joined, joinedQCPassed: joinedQCPassed, ownedAudioURLs: [joinedURL]),
             oldJoined: oldJoined, oldManifest: oldManifest)

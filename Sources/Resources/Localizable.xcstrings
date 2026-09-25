@@ -11437,6 +11437,204 @@
         }
       }
     },
+    "vocello.history.clear_pending_title": {
+      "comment": "History recovery banner title when a clear of History was interrupted and still has to finish.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clearing History did not finish"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’effacement de l’historique n’est pas terminé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se terminó de vaciar el historial"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Leeren des Verlaufs wurde nicht abgeschlossen"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lo svuotamento della cronologia non è terminato"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A limpeza do histórico não terminou"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清空历史记录未完成"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "履歴の消去が完了していません"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기록 지우기가 완료되지 않았습니다"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Очистка истории не завершена"
+          }
+        }
+      }
+    },
+    "vocello.history.clear_pending_detail": {
+      "comment": "History recovery banner detail for an interrupted clear; Retry resumes it and never removes takes saved after it started.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry to finish clearing History. Takes saved after the clear started are kept."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réessayez pour terminer l’effacement de l’historique. Les prises enregistrées après le début de l’effacement sont conservées."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reintenta para terminar de vaciar el historial. Las tomas guardadas después de empezar a vaciarlo se conservan."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Versuche es erneut, um das Leeren des Verlaufs abzuschließen. Aufnahmen, die nach Beginn des Leerens gespeichert wurden, bleiben erhalten."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Riprova per completare lo svuotamento della cronologia. I take salvati dopo l’inizio dello svuotamento vengono conservati."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tente novamente para terminar de limpar o histórico. As tomadas salvas depois do início da limpeza são mantidas."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请重试以完成清空历史记录。开始清空后保存的条目会保留。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再試行すると履歴の消去が完了します。消去の開始後に保存したテイクは保持されます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다시 시도하면 기록 지우기를 마칩니다. 지우기를 시작한 뒤 저장한 테이크는 유지됩니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Повторите, чтобы завершить очистку истории. Дубли, сохранённые после начала очистки, останутся."
+          }
+        }
+      }
+    },
+    "vocello.history.unreadable_audio_removals": {
+      "comment": "History recovery banner detail: a private list of audio files waiting for deletion was unreadable, so those files stay on the device; Retry dismisses the notice and deletes no audio.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello could not read its list of audio files from deleted takes, so it did not delete them. Retry to dismiss this notice."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello n’a pas pu lire sa liste de fichiers audio de prises supprimées ; il ne les a donc pas supprimés. Réessayez pour masquer cet avis."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello no pudo leer su lista de archivos de audio de tomas eliminadas, así que no los eliminó. Reintenta para descartar este aviso."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello konnte seine Liste der Audiodateien gelöschter Aufnahmen nicht lesen und hat sie daher nicht gelöscht. Versuche es erneut, um diesen Hinweis auszublenden."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello non è riuscito a leggere l’elenco dei file audio dei take eliminati, quindi non li ha eliminati. Riprova per chiudere questo avviso."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Vocello não conseguiu ler a lista de arquivos de áudio de tomadas excluídas, então não os excluiu. Tente novamente para dispensar este aviso."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello 无法读取已删除条目的音频文件列表，因此未删除这些文件。请重试以关闭此提示。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello は削除したテイクの音声ファイル一覧を読み取れなかったため、それらを削除していません。再試行するとこのお知らせを閉じます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello가 삭제한 테이크의 오디오 파일 목록을 읽지 못해 해당 파일을 삭제하지 않았습니다. 다시 시도하면 이 알림을 닫습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vocello не удалось прочитать список аудиофайлов удалённых дублей, поэтому они не удалены. Повторите, чтобы скрыть это уведомление."
+          }
+        }
+      }
+    },
     "vocello.long_form.segment_history_failed": {
       "comment": "Successful segment synthesis is distinct from History persistence and whole-project acceptance.",
       "extractionState": "manual",
@@ -12104,67 +12302,133 @@
       }
     },
     "vocello.long_form.recovery_required": {
-      "comment": "An interrupted or invalid long-form transaction needs reconciliation; retained audio must not be deleted.",
+      "comment": "A long-form transaction needs reconciliation before the project can change; the project's takes already saved in History are never deleted by it.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Long-form storage needs recovery. Open History and retry before changing this project. Its audio has been retained."
+            "value": "Long-form storage needs recovery. Open History and retry before changing this project. Its saved takes are kept."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le stockage du projet long nécessite une récupération. Ouvrez l’historique et réessayez avant de modifier ce projet. Son audio a été conservé."
+            "value": "Le stockage du projet long nécessite une récupération. Ouvrez l’historique et réessayez avant de modifier ce projet. Ses prises enregistrées sont conservées."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "El almacenamiento del audio largo necesita recuperación. Abre el historial y reintenta antes de cambiar este proyecto. Su audio se ha conservado."
+            "value": "El almacenamiento del audio largo necesita recuperación. Abre el historial y reintenta antes de cambiar este proyecto. Sus tomas guardadas se conservan."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Der Langtextspeicher muss wiederhergestellt werden. Öffne den Verlauf und versuche es erneut, bevor du dieses Projekt änderst. Das Audio wurde erhalten."
+            "value": "Der Langtextspeicher muss wiederhergestellt werden. Öffne den Verlauf und versuche es erneut, bevor du dieses Projekt änderst. Seine gespeicherten Aufnahmen bleiben erhalten."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "L’archiviazione del progetto lungo richiede un recupero. Apri la cronologia e riprova prima di modificarlo. L’audio è stato conservato."
+            "value": "L’archiviazione del progetto lungo richiede un recupero. Apri la cronologia e riprova prima di modificarlo. I suoi take salvati vengono conservati."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O armazenamento do projeto longo precisa de recuperação. Abra o histórico e tente novamente antes de alterar este projeto. O áudio foi preservado."
+            "value": "O armazenamento do projeto longo precisa de recuperação. Abra o histórico e tente novamente antes de alterar este projeto. Suas tomadas salvas são mantidas."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "长文本存储需要恢复。请在修改项目之前打开历史记录并重试。音频已保留。"
+            "value": "长文本存储需要恢复。请在修改项目之前打开历史记录并重试。已保存的条目会保留。"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "長文プロジェクトの保存領域に復旧が必要です。変更する前に履歴を開いて再試行してください。音声は保持されています。"
+            "value": "長文プロジェクトの保存領域に復旧が必要です。変更する前に履歴を開いて再試行してください。保存済みのテイクは保持されます。"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "긴 원고 저장소를 복구해야 합니다. 이 프로젝트를 변경하기 전에 기록을 열고 재시도하세요. 오디오는 보관되었습니다."
+            "value": "긴 원고 저장소를 복구해야 합니다. 이 프로젝트를 변경하기 전에 기록을 열고 재시도하세요. 저장된 테이크는 유지됩니다."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Хранилище длинного проекта требует восстановления. Откройте историю и повторите попытку до изменения проекта. Аудио сохранено."
+            "value": "Хранилище длинного проекта требует восстановления. Откройте историю и повторите попытку до изменения проекта. Сохранённые дубли остаются."
+          }
+        }
+      }
+    },
+    "vocello.long_form.acceptance_interrupted": {
+      "comment": "History was suspended while a finished long-form project was being saved; it completes automatically after the app returns and its audio is never deleted.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saving this project to History was interrupted. Vocello finishes saving it when the app is active again, and its audio has been kept."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’enregistrement de ce projet dans l’historique a été interrompu. Vocello le terminera quand l’app sera de nouveau active, et son audio a été conservé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se interrumpió el guardado de este proyecto en el historial. Vocello lo terminará cuando la app vuelva a estar activa, y su audio se ha conservado."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Speichern dieses Projekts im Verlauf wurde unterbrochen. Vocello schließt es ab, sobald die App wieder aktiv ist, und das Audio wurde erhalten."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il salvataggio di questo progetto nella cronologia è stato interrotto. Vocello lo completerà quando l’app sarà di nuovo attiva, e l’audio è stato conservato."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O salvamento deste projeto no histórico foi interrompido. O Vocello vai concluí-lo quando o app estiver ativo novamente, e o áudio foi preservado."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将此项目保存到历史记录时被中断。应用再次激活后，Vocello 会完成保存，音频已保留。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このプロジェクトの履歴への保存が中断されました。アプリが再びアクティブになると Vocello が保存を完了します。音声は保持されています。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 프로젝트를 기록에 저장하는 작업이 중단되었습니다. 앱이 다시 활성화되면 Vocello가 저장을 마치며, 오디오는 보관되었습니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Сохранение проекта в историю прервано. Vocello завершит его, когда приложение снова станет активным; аудио сохранено."
           }
         }
       }
@@ -20625,6 +20889,72 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "vocello.ui.historyClearFailed": {
+      "comment": "iOS alert title when clearing History was refused or failed; its message says what was preserved. Presentation only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History Was Not Cleared"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’historique n’a pas été effacé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se vació el historial"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verlauf wurde nicht geleert"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cronologia non svuotata"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O histórico não foi limpo"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未清空历史记录"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "履歴を消去できませんでした"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "기록을 지우지 못했습니다"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "История не очищена"
           }
         }
       }

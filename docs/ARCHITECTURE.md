@@ -831,8 +831,9 @@ removal list before the transaction retires; an interrupted cleanup resumes befo
 append can replay, and a resume past the row deletion never deletes rows again. A WAV that cannot
 be removed, after a clear or a single-row delete, stays on that list: the user is told, the recovery
 banner counts it, and every reconcile retries it, never while a row or a queued take still
-references the path. An unreadable list is set aside unparsed and counted as a recovery issue, and
-a fresh list starts (AUD-05).
+references the path. An unreadable list is set aside unparsed and a fresh list starts (AUD-05); the
+banner reports it under its own notice until Retry from that notice discards the set-aside lists,
+which hold paths only, without deleting the audio they named (PA-30).
 
 **`UserDefaults` keys**: `vocello.voiceCloningConsent.v1` (visible Settings-owned clone-consent
 acknowledgment; below the views `AnyTTSEngineBackend` reads it through `VoiceCloningConsentPolicy`

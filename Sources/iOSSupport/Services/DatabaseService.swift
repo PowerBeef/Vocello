@@ -91,6 +91,23 @@ final class DatabaseService: @unchecked Sendable {
         try await longFormAcceptance.commit(input, using: requireQueue(for: .write))
     }
 
+    /// Settles pending long-form recovery on the writer (PA-30): an acceptance a
+    /// suspended History interrupted completes, a committed one is finished, a
+    /// failed one rolls back. Completing takes two writes, one that commits the
+    /// rows and one that then retires the journal. Nothing pending: no write.
+    func reconcileLongFormRecovery() throws {
+        for _ in 0..<2 where longFormAcceptance.hasPendingRecovery {
+            let dbQueue = try requireQueue(for: .write)
+            do {
+                try dbQueue.write { db in
+                    try longFormAcceptance.reconcile(in: db)
+                }
+            } catch {
+                throw HistoryPersistenceError.classify(error, operation: .write)
+            }
+        }
+    }
+
     /// Synchronous variant. Kept for legacy / migration call sites that
     /// can't be moved to async (e.g. from `@MainActor` synchronous
     /// contexts during init). New off-main callers should prefer

@@ -829,8 +829,13 @@ final class IOSLongFormProjectRunner {
                     ?? Double(joined.evidence.outputFrameCount) / Double(joined.evidence.sampleRate)
             )
         } catch {
-            if error as? LongFormAcceptanceError == .recoveryRequired { candidateJoinedURL = nil }
+            let acceptanceError = error as? LongFormAcceptanceError
+            // Recovery keeps, or completes after resume, what it owns (PA-30).
+            if acceptanceError?.leavesCandidateToRecovery == true { candidateJoinedURL = nil }
             if error is CancellationError { return .cancelled(segments: segments) }
+            if acceptanceError == .interrupted {
+                return .failed(segments: segments, message: hooks.presentation.longFormAcceptanceInterrupted)
+            }
             return .failed(
                 segments: segments,
                 message: hooks.presentation.assemblyFailed(error.localizedDescription)
@@ -1031,7 +1036,9 @@ final class IOSLongFormProjectRunner {
                 replacements
             )
         } catch {
-            if error as? LongFormAcceptanceError == .recoveryRequired { candidateAudioURLs.removeAll() }
+            let acceptanceError = error as? LongFormAcceptanceError
+            // Recovery keeps, or completes after resume, what it owns (PA-30).
+            if acceptanceError?.leavesCandidateToRecovery == true { candidateAudioURLs.removeAll() }
             audioPlayer.abortLivePreviewIfNeeded()
             let cancellationRequested = await cancellationState.wasRequested()
             // Assembly or History acceptance can fail after successful synthesis.
@@ -1048,10 +1055,10 @@ final class IOSLongFormProjectRunner {
             if error is CancellationError || Task.isCancelled || cancellationRequested {
                 return (.cancelled(segments: segments), priorReplacements)
             }
-            return (
-                .failed(segments: segments, message: hooks.presentation.generationFailureMessage(error)),
-                priorReplacements
-            )
+            let message = acceptanceError == .interrupted
+                ? hooks.presentation.longFormAcceptanceInterrupted
+                : hooks.presentation.generationFailureMessage(error)
+            return (.failed(segments: segments, message: message), priorReplacements)
         }
     }
 

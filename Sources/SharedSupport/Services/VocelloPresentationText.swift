@@ -298,8 +298,32 @@ struct VocelloPresentationText: Sendable {
 
     var longFormRecoveryRequired: String {
         localization.string(localized: "vocello.long_form.recovery_required",
-               defaultValue: "Long-form storage needs recovery. Open History and retry before changing this project. Its audio has been retained.",
-               comment: "An interrupted or invalid long-form transaction needs reconciliation; retained audio must not be deleted.")
+               defaultValue: "Long-form storage needs recovery. Open History and retry before changing this project. Its saved takes are kept.",
+               comment: "A long-form transaction needs reconciliation before the project can change; the project's takes already saved in History are never deleted by it.")
+    }
+
+    var longFormAcceptanceInterrupted: String {
+        localization.string(localized: "vocello.long_form.acceptance_interrupted",
+               defaultValue: "Saving this project to History was interrupted. Vocello finishes saving it when the app is active again, and its audio has been kept.",
+               comment: "History was suspended while a finished long-form project was being saved; it completes automatically after the app returns and its audio is never deleted.")
+    }
+
+    var historyClearPendingTitle: String {
+        localization.string(localized: "vocello.history.clear_pending_title",
+               defaultValue: "Clearing History did not finish",
+               comment: "History recovery banner title when a clear of History was interrupted and still has to finish.")
+    }
+
+    var historyClearPendingDetail: String {
+        localization.string(localized: "vocello.history.clear_pending_detail",
+               defaultValue: "Retry to finish clearing History. Takes saved after the clear started are kept.",
+               comment: "History recovery banner detail for an interrupted clear; Retry resumes it and never removes takes saved after it started.")
+    }
+
+    var historyUnreadableAudioRemovals: String {
+        localization.string(localized: "vocello.history.unreadable_audio_removals",
+               defaultValue: "Vocello could not read its list of audio files from deleted takes, so it did not delete them. Retry to dismiss this notice.",
+               comment: "History recovery banner detail: a private list of audio files waiting for deletion was unreadable, so those files stay on the device; Retry dismisses the notice and deletes no audio.")
     }
 
     var longFormSegmentGenerated: String {
@@ -697,6 +721,7 @@ extension VocelloPresentationText {
     static var dismissPlayerDetail: String { Self().dismissPlayerDetail }
     static var longFormSaveFailed: String { Self().longFormSaveFailed }
     static var longFormRecoveryRequired: String { Self().longFormRecoveryRequired }
+    static var longFormAcceptanceInterrupted: String { Self().longFormAcceptanceInterrupted }
     static var longFormSegmentGenerated: String { Self().longFormSegmentGenerated }
     static var importReferenceAudioTitle: String { Self().importReferenceAudioTitle }
     static var importReferenceAudioDetail: String { Self().importReferenceAudioDetail }

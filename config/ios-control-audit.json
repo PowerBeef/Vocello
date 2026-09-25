@@ -73,8 +73,8 @@
       "path": "Sources/iOS/History/HistoryScreen.swift",
       "screen": "History",
       "scenario": "stateful",
-      "reason": "History search, filters, rows, menus, recovery, Show More paging, and confirm-only clear actions are source-bound here.",
-      "interactiveOccurrenceCount": 13
+      "reason": "History search, filters, rows, menus, recovery, Show More paging, confirm-only clear actions, and the failed-clear alert are source-bound here.",
+      "interactiveOccurrenceCount": 15
     },
     {
       "path": "Sources/iOS/IOSDesignSystemPrimitives.swift",
@@ -518,7 +518,7 @@
     },
     {
       "id": "history-surface",
-      "identifierPattern": "history(SearchField|ModeFilter|ClearMenu|ClearConfirm|ClearCancel|ClearIncompleteDismiss|RetryButton|Recovery_retry|Recovery_export|ShowMoreButton)",
+      "identifierPattern": "history(SearchField|ModeFilter|ClearMenu|ClearConfirm|ClearCancel|ClearIncompleteDismiss|ClearFailedDismiss|RetryButton|Recovery_retry|Recovery_export|ShowMoreButton)",
       "sourceToken": "historySearchField",
       "screen": "History",
       "prerequisite": "History tab",

@@ -81,6 +81,9 @@ enum GenerationHistoryRecovery {
 
     static func reconcile() async -> GenerationHistoryReconciliationResult {
         await unqueued.retry { try enqueue($0) }
+        // A long-form acceptance a suspended History interrupted completes here
+        // after resume (PA-30); one that cannot stays visible as pending recovery.
+        try? DatabaseService.shared.reconcileLongFormRecovery()
         let result = await coordinator.reconcile()
         return GenerationHistoryReconciliationResult(committed: result.committed, snapshot: await snapshot())
     }
@@ -93,7 +96,15 @@ enum GenerationHistoryRecovery {
             availableAudioCount: durable.availableAudioCount + available,
             issueCount: durable.issueCount, clearRecoveryPending: durable.clearRecoveryPending,
             unqueuedCount: unqueuedCount, longFormRecoveryPending: longFormStore.hasPendingRecovery,
-            pendingAudioRemovalCount: durable.pendingAudioRemovalCount)
+            pendingAudioRemovalCount: durable.pendingAudioRemovalCount,
+            unreadableAudioRemovalCount: durable.unreadableAudioRemovalCount)
+    }
+
+    /// Retry on the notice about removal lists that could not be read (PA-30):
+    /// the user has seen it, so the lists are discarded. The audio they named
+    /// is not deleted. A failure leaves the notice for another Retry.
+    static func discardUnreadableAudioRemovals() async {
+        try? await coordinator.discardUnreadableAudioRemovals()
     }
 
     static func pendingAudioURLs() async -> [URL] {

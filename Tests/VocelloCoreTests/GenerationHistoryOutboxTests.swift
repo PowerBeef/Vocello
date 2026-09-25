@@ -348,7 +348,9 @@ final class GenerationHistoryOutboxTests: XCTestCase {
 
         XCTAssertEqual(outcome.failedFileRemovals, 0)
         XCTAssertFalse(outcome.snapshot.clearRecoveryPending, "The clear finished")
-        XCTAssertEqual(outcome.snapshot.issueCount, 1, "The unreadable list is reported")
+        XCTAssertEqual(outcome.snapshot.unreadableAudioRemovalCount, 1, "The unreadable list is reported")
+        XCTAssertEqual(outcome.snapshot.issueCount, 0, "Not as an issue Retry could fix (PA-30)")
+        XCTAssertEqual(outcome.snapshot.notice, .unreadableAudioRemovals)
         XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.audioURL.path))
         let setAside = try FileManager.default.contentsOfDirectory(atPath: fixture.store.rootURL.path)
             .filter { $0.hasSuffix(".unreadable") }
@@ -365,6 +367,117 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         XCTAssertEqual(state.counts.deletes, deletesBefore)
         XCTAssertEqual(state.counts.rows, 1)
         XCTAssertTrue(FileManager.default.fileExists(atPath: later.path))
+    }
+
+    /// PA-30: a removal list that cannot be read used to count as an issue
+    /// forever, behind copy that asked for a Retry that could not fix it. It is
+    /// its own notice now, reconciles leave it for the user to see, and Retry
+    /// from that notice discards the lists (paths only) without deleting audio.
+    func testUnreadableRemovalNoticeIsDiscardedOnRetryWithoutTouchingAudio() async throws {
+        let fixture = try makeFixture()
+        let coordinator = makeCoordinator(store: fixture.store, state: CommitState())
+        let removalList = fixture.store.rootURL.appendingPathComponent("audio-removals.json")
+        try Data("not-json".utf8).write(to: removalList)
+
+        let seen = await coordinator.reconcile()
+        XCTAssertEqual(seen.snapshot.notice, .unreadableAudioRemovals)
+        XCTAssertEqual(seen.snapshot.issueCount, 0)
+        XCTAssertTrue(seen.snapshot.onlyAudioRemovalsPending)
+        let unchanged = await coordinator.reconcile()
+        XCTAssertEqual(unchanged.snapshot.notice, .unreadableAudioRemovals, "A reconcile alone never dismisses it")
+
+        // A later delete sets the damaged list aside and starts a fresh one.
+        let deleted = try makeAudio(in: fixture, named: "deleted.wav")
+        try await coordinator.retainAudioRemoval(deleted.path)
+        let both = await coordinator.snapshot()
+        XCTAssertEqual(both.unreadableAudioRemovalCount, 1)
+        XCTAssertEqual(both.pendingAudioRemovalCount, 1)
+        XCTAssertEqual(both.notice, .unreadableAudioRemovals, "The notice the user must see first")
+
+        try await coordinator.discardUnreadableAudioRemovals()
+        let discarded = await coordinator.snapshot()
+        XCTAssertEqual(discarded.unreadableAudioRemovalCount, 0)
+        XCTAssertEqual(discarded.notice, .audioRemovals(1), "The readable list is kept")
+        let setAside = try FileManager.default.contentsOfDirectory(atPath: fixture.store.rootURL.path)
+            .filter { $0.hasSuffix(".unreadable") }
+        XCTAssertTrue(setAside.isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path), "No audio is deleted by the discard")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: deleted.path))
+
+        let retried = await coordinator.reconcile()
+        XCTAssertEqual(retried.snapshot, .empty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: deleted.path), "The readable list still works")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.audioURL.path))
+    }
+
+    /// PA-30: an interrupted clear with nothing queued fell through to the
+    /// queued-takes copy with a zero count on both platforms.
+    func testPendingClearHasItsOwnNoticeAndNoNoticeEverCountsZero() async throws {
+        let fixture = try makeFixture()
+        let state = CommitState()
+        _ = try state.commit(fixture.generation)
+        let coordinator = makeCoordinator(store: fixture.store, state: state)
+        state.setFailure(true)
+        do {
+            _ = try await coordinator.clearAll(deleteAudio: true)
+            XCTFail("The failing delete must refuse the clear")
+        } catch {}
+
+        let interrupted = await coordinator.snapshot()
+        XCTAssertTrue(interrupted.clearRecoveryPending)
+        XCTAssertEqual(interrupted.pendingCount, 0)
+        XCTAssertEqual(interrupted.notice, .clearPending)
+        XCTAssertFalse(interrupted.onlyAudioRemovalsPending)
+
+        state.setFailure(false)
+        let resumed = await coordinator.reconcile()
+        XCTAssertNil(resumed.snapshot.notice, "Retry resumes the clear")
+        XCTAssertEqual(state.counts.rows, 0)
+
+        func snapshot(
+            pending: Int = 0,
+            issues: Int = 0,
+            clearPending: Bool = false,
+            unqueued: Int = 0,
+            longForm: Bool = false,
+            removals: Int = 0,
+            unreadable: Int = 0
+        ) -> GenerationHistoryRecoverySnapshot {
+            GenerationHistoryRecoverySnapshot(
+                pendingCount: pending,
+                availableAudioCount: pending,
+                issueCount: issues,
+                clearRecoveryPending: clearPending,
+                unqueuedCount: unqueued,
+                longFormRecoveryPending: longForm,
+                pendingAudioRemovalCount: removals,
+                unreadableAudioRemovalCount: unreadable
+            )
+        }
+        XCTAssertNil(snapshot().notice)
+        XCTAssertFalse(snapshot().needsAttention)
+        XCTAssertEqual(snapshot(pending: 2, clearPending: true).notice, .clearPending)
+        XCTAssertEqual(snapshot(pending: 2, removals: 1).notice, .queuedTakes(2))
+        XCTAssertEqual(snapshot(clearPending: true, removals: 3).notice, .clearPending)
+        XCTAssertEqual(snapshot(removals: 3, unreadable: 1).notice, .unreadableAudioRemovals)
+        XCTAssertEqual(snapshot(removals: 3).notice, .audioRemovals(3))
+        XCTAssertEqual(snapshot(issues: 1, clearPending: true).notice, .unverifiedRecord)
+        XCTAssertEqual(snapshot(pending: 1, unqueued: 1).notice, .unqueued)
+        XCTAssertEqual(snapshot(unqueued: 1, longForm: true).notice, .longFormRecovery)
+        for attention in [
+            snapshot(pending: 1), snapshot(issues: 1), snapshot(clearPending: true), snapshot(unqueued: 1),
+            snapshot(longForm: true), snapshot(removals: 1), snapshot(unreadable: 1),
+        ] {
+            XCTAssertTrue(attention.needsAttention)
+            switch attention.notice {
+            case .queuedTakes(let count), .audioRemovals(let count):
+                XCTAssertGreaterThan(count, 0)
+            case nil:
+                XCTFail("A state that needs attention always has a notice")
+            default:
+                break
+            }
+        }
     }
 
     /// A clear transaction resumed after its rows were deleted never deletes

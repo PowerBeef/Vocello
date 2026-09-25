@@ -282,14 +282,13 @@ struct MacHistoryScreen: View {
             VStack(alignment: .leading, spacing: VocelloTheme.Spacing.md) {
                 if recoverySnapshot.needsAttention {
                     MacHistoryRecoveryBanner(
-                        title: recoverySnapshot.onlyAudioRemovalsPending
-                            ? MacInterfaceText.historyAudioRemovalTitle
-                            : MacInterfaceText.historyFinishedAudioWaiting,
+                        title: recoveryTitle,
                         message: recoveryMessage,
                         canReveal: recoverySnapshot.availableAudioCount > 0
-                            || recoverySnapshot.pendingAudioRemovalCount > 0,
+                            || recoverySnapshot.pendingAudioRemovalCount > 0
+                            || recoverySnapshot.unreadableAudioRemovalCount > 0,
                         canExport: !recoveryAudioURLs.isEmpty,
-                        onRetry: { reloadHistory(reopenFailedStore: true) },
+                        onRetry: { retryRecovery() },
                         onReveal: { MacHistoryFileActions.openOutputsFolder() },
                         onExport: exportPendingAudio
                     )
@@ -549,26 +548,42 @@ struct MacHistoryScreen: View {
         .accessibilityIdentifier("history_longFormSegmentsToggle_\(String(projectID.prefix(8)))")
     }
 
+    private var recoveryTitle: String {
+        switch recoverySnapshot.notice {
+        case .clearPending:
+            return MacInterfaceText.presentation.historyClearPendingTitle
+        case .audioRemovals, .unreadableAudioRemovals:
+            return MacInterfaceText.historyAudioRemovalTitle
+        default:
+            return MacInterfaceText.historyFinishedAudioWaiting
+        }
+    }
+
+    /// One state per notice, chosen by the snapshot (PA-30): a pending clear has
+    /// its own copy and no count is ever zero.
     private var recoveryMessage: String {
-        if recoverySnapshot.longFormRecoveryPending {
+        switch recoverySnapshot.notice {
+        case .longFormRecovery:
             return VocelloPresentationText.longFormRecoveryDetail
-        }
-        if recoverySnapshot.unqueuedCount > 0 {
+        case .unqueued:
             return VocelloPresentationText.historyUnqueuedDetail
-        }
-        if recoverySnapshot.issueCount > 0 {
+        case .unverifiedRecord:
             return MacInterfaceText.historyRecoveryUnverified
-        }
-        if recoverySnapshot.pendingCount == 0, recoverySnapshot.pendingAudioRemovalCount > 0 {
-            let removals = recoverySnapshot.pendingAudioRemovalCount
-            return removals == 1
+        case .clearPending:
+            return MacInterfaceText.presentation.historyClearPendingDetail
+        case .queuedTakes(let count):
+            return count == 1
+                ? MacInterfaceText.historyRecoveryQueuedOne
+                : MacInterfaceText.historyRecoveryQueuedMany(String(count))
+        case .unreadableAudioRemovals:
+            return MacInterfaceText.presentation.historyUnreadableAudioRemovals
+        case .audioRemovals(let count):
+            return count == 1
                 ? MacInterfaceText.historyAudioRemovalOne
-                : MacInterfaceText.historyAudioRemovalMany(String(removals))
+                : MacInterfaceText.historyAudioRemovalMany(String(count))
+        case nil:
+            return ""
         }
-        let count = recoverySnapshot.pendingCount
-        return count == 1
-            ? MacInterfaceText.historyRecoveryQueuedOne
-            : MacInterfaceText.historyRecoveryQueuedMany(String(count))
     }
 }
 
@@ -842,6 +857,19 @@ private extension MacHistoryScreen {
             guard !Task.isCancelled else { return }
             recoverySnapshot = snapshot
             recoveryAudioURLs = urls
+        }
+    }
+
+    /// Retry from the recovery banner. It also dismisses the notice about
+    /// removal lists that could not be read, which the user has now seen; the
+    /// audio those lists named is not deleted (PA-30).
+    func retryRecovery() {
+        let discardsUnreadableLists = recoverySnapshot.notice == .unreadableAudioRemovals
+        Task {
+            if discardsUnreadableLists {
+                await GenerationHistoryRecovery.discardUnreadableAudioRemovals()
+            }
+            reloadHistory(reopenFailedStore: true)
         }
     }
 

@@ -172,17 +172,56 @@ struct GenerationHistoryRecoverySnapshot: Equatable, Sendable {
     var longFormRecoveryPending: Bool = false
     /// Audio of deleted takes that could not be removed yet; Retry removes it.
     var pendingAudioRemovalCount: Int = 0
+    /// Removal lists that could not be read (PA-30). They hold paths, never
+    /// audio, and the files they named stay where they are. Reported until the
+    /// user retries from that notice, which discards the lists.
+    var unreadableAudioRemovalCount: Int = 0
 
     var needsAttention: Bool {
-        pendingCount > 0 || unqueuedCount > 0 || issueCount > 0 || clearRecoveryPending || longFormRecoveryPending
-            || pendingAudioRemovalCount > 0
+        notice != nil
     }
 
     /// Only audio of deleted takes is waiting: nothing is queued for History.
     var onlyAudioRemovalsPending: Bool {
-        pendingAudioRemovalCount > 0 && pendingCount == 0 && unqueuedCount == 0 && issueCount == 0
-            && !clearRecoveryPending && !longFormRecoveryPending
+        switch notice {
+        case .audioRemovals, .unreadableAudioRemovals:
+            return true
+        default:
+            return false
+        }
     }
+
+    /// What the recovery banner reports, most urgent first. Both History
+    /// screens word it from here, so neither falls through to another state's
+    /// copy or shows a zero count (PA-30).
+    var notice: GenerationHistoryRecoveryNotice? {
+        if longFormRecoveryPending { return .longFormRecovery }
+        if unqueuedCount > 0 { return .unqueued }
+        if issueCount > 0 { return .unverifiedRecord }
+        if clearRecoveryPending { return .clearPending }
+        if pendingCount > 0 { return .queuedTakes(pendingCount) }
+        if unreadableAudioRemovalCount > 0 { return .unreadableAudioRemovals }
+        if pendingAudioRemovalCount > 0 { return .audioRemovals(pendingAudioRemovalCount) }
+        return nil
+    }
+}
+
+/// The one state the History recovery banner describes (PA-30).
+enum GenerationHistoryRecoveryNotice: Equatable, Sendable {
+    /// A long-form project awaits recovery.
+    case longFormRecovery
+    /// Finished audio whose History record could not even be queued.
+    case unqueued
+    /// A queued record or the clear marker could not be verified.
+    case unverifiedRecord
+    /// A clear of History has not finished; Retry resumes it.
+    case clearPending
+    /// Finished takes queued for History; always at least one.
+    case queuedTakes(Int)
+    /// A list of audio to delete could not be read; Retry dismisses the notice.
+    case unreadableAudioRemovals
+    /// Audio of deleted takes waiting for removal; always at least one.
+    case audioRemovals(Int)
 }
 
 struct GenerationHistoryReconciliationResult: Sendable {
@@ -429,10 +468,10 @@ struct GenerationHistoryOutboxStore: Sendable {
     }
 
     /// Adds paths to the pending list. A list that cannot be read is set aside
-    /// (`unreadableAudioRemovalCount()` reports it as a recovery issue) and a
-    /// fresh list starts: the paths it held stay unknown, so nothing they name
-    /// is deleted, but a damaged list never blocks the clear or the delete that
-    /// has to record new paths (AUD-05).
+    /// (`unreadableAudioRemovalCount()` reports it) and a fresh list starts:
+    /// the paths it held stay unknown, so nothing they name is deleted, but a
+    /// damaged list never blocks the clear or the delete that has to record
+    /// new paths (AUD-05).
     func appendPendingAudioRemovals(_ audioPaths: [String]) throws {
         let existing: [String]
         do {
@@ -444,15 +483,43 @@ struct GenerationHistoryOutboxStore: Sendable {
         try writePendingAudioRemovals(existing + audioPaths)
     }
 
-    /// Removal lists set aside because they could not be read. They are kept,
-    /// never parsed again, and never deleted by the app.
+    /// Removal lists set aside because they could not be read. They are never
+    /// parsed again, and kept until the user has seen the notice about them
+    /// (`discardUnreadableAudioRemovals()`).
     func unreadableAudioRemovalCount() -> Int {
+        unreadableAudioRemovalURLs().count
+    }
+
+    /// Discards the removal lists that could not be read, once the user has
+    /// seen that notice and chosen Retry (PA-30). A list the app cannot read now
+    /// is set aside first, as an append would. A list holds only paths, never
+    /// audio, and the files it named are not touched: they stay where they are,
+    /// as the notice says. Only regular files are removed, never through a link.
+    func discardUnreadableAudioRemovals() throws {
+        do {
+            _ = try loadPendingAudioRemovals()
+        } catch {
+            try setAsideUnreadableAudioRemovals()
+        }
+        for url in unreadableAudioRemovalURLs() {
+            if case .failed = GenerationHistoryAudioFile.removeRegularFile(atPath: url.path) {
+                throw GenerationHistoryOutboxError.unavailable
+            }
+        }
+    }
+
+    private func unreadableAudioRemovalURLs() -> [URL] {
         let urls = (try? FileManager.default.contentsOfDirectory(
             at: rootURL,
             includingPropertiesForKeys: nil,
             options: [.skipsHiddenFiles]
         )) ?? []
-        return urls.count { $0.pathExtension == Self.unreadableExtension }
+        return urls.filter { url in
+            var info = stat()
+            return url.pathExtension == Self.unreadableExtension
+                && lstat(url.path, &info) == 0
+                && (info.st_mode & S_IFMT) == S_IFREG
+        }
     }
 
     /// `scan()` reads only `.json` and `.writing` files, so a set-aside list is
@@ -686,21 +753,30 @@ actor GenerationHistoryRecoveryCoordinator {
             clearPending = true
             clearIssueCount = 1
         }
+        // A removal list that cannot be read has its own notice, not an issue:
+        // nothing Retry commits can fix it, and it never blocks a clear (PA-30).
         let removalCount: Int
-        var removalIssueCount = store.unreadableAudioRemovalCount()
+        var unreadableRemovals = store.unreadableAudioRemovalCount()
         do {
             removalCount = try store.loadPendingAudioRemovals().count
         } catch {
             removalCount = 0
-            removalIssueCount += 1
+            unreadableRemovals += 1
         }
         return GenerationHistoryRecoverySnapshot(
             pendingCount: scan.entries.count,
             availableAudioCount: available,
-            issueCount: scan.issueCount + missing + clearIssueCount + removalIssueCount,
+            issueCount: scan.issueCount + missing + clearIssueCount,
             clearRecoveryPending: clearPending,
-            pendingAudioRemovalCount: removalCount
+            pendingAudioRemovalCount: removalCount,
+            unreadableAudioRemovalCount: unreadableRemovals
         )
+    }
+
+    /// The user retried from the notice about removal lists that could not be
+    /// read: the lists go, the audio they named stays (PA-30).
+    func discardUnreadableAudioRemovals() throws {
+        try store.discardUnreadableAudioRemovals()
     }
 
     func pendingAudioURLs() -> [URL] {

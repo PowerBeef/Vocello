@@ -117,6 +117,14 @@ struct HistoryPersistenceError: LocalizedError, Equatable, Sendable {
         return HistoryPersistenceError(operation: operation, failure: .unavailable)
     }
 
+    /// IOS-11: `error` is the suspended History database refusing or
+    /// interrupting a statement. SQLite rolled the transaction back, nothing
+    /// changed, and the same work succeeds once History resumes. A cancelled
+    /// task sees `CancellationError` instead, never this.
+    static func isSuspensionInterruption(_ error: Error) -> Bool {
+        isInterruption(error as NSError)
+    }
+
     /// GRDB's `DatabaseError` bridges to this domain with the extended SQLite
     /// result code, whose low byte is the primary code.
     static let sqliteErrorDomain = "GRDB.DatabaseError"

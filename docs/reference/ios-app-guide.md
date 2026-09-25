@@ -206,7 +206,10 @@ background-time grant, or when that grant ends while the app is still background
 grant covers finishes first. A write that meets the suspension rolls back and is classified as a
 transient `.locked` failure, never as damage; a short-form take stays in `history-outbox/`, and
 returning to `.active` resumes the database and reconciles History so it commits. A long-form
-acceptance that meets it fails closed through its journal exactly as a crash would.
+acceptance that meets it is not rolled back (PA-30): its journal is marked resumable, the acceptance
+retries until History resumes, and if the run is stopped first, the reconcile after resume (or after
+a relaunch) completes it and keeps its audio. One the suspension stopped before anything was
+prepared retries the same way, or is discarded with its candidate when the run is cancelled.
 
 Short-form Built-in, Design, and Clone takes share one execution boundary in
 `IOSSingleTakeGenerationExecutor`. Views construct the exact mode request and perform any
@@ -317,6 +320,11 @@ Published single takes are written to the local `history-outbox/`, when storage 
 idempotent SQLite commit. Startup and History entry reconcile pending rows. If attention remains,
 `historyRecovery_banner` exposes `historyRecovery_retry` and `historyRecovery_export`; clear-all
 uses a resumable database-first marker so a database failure cannot delete audio behind live rows.
+The banner states one notice chosen by `GenerationHistoryRecoverySnapshot.notice`: a clear that did
+not finish has its own copy (Retry resumes it) and no count is ever zero. A clear that is refused or
+fails shows an alert with the typed error (`historyClearFailedDismiss`). A removal list that could
+not be read is reported by its own notice until Retry from it discards the list; the audio it named
+is not deleted (PA-30).
 If the outbox write itself fails, the app-wide `historyUnqueued_banner` offers
 `historyUnqueued_retry` and `historyUnqueued_export` while successful audio stays playable.
 That retry identity is app-session memory, not crash-safe recovery; export before quitting if

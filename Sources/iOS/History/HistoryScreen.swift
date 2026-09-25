@@ -187,6 +187,10 @@ private struct IOSHistoryLibrarySection: View {
     /// deleted (PA-21, AUD-05). Never silent; `audioNotDeletedMessage` says which.
     @State private var isAudioNotDeletedPresented = false
     @State private var audioNotDeletedMessage = ""
+    /// A clear that was refused or failed is never silent (PA-30); the message
+    /// is the typed error, which says what was preserved.
+    @State private var isClearFailurePresented = false
+    @State private var clearFailureMessage = ""
     @State private var databaseUnavailable = false
     @State private var recoverySnapshot: GenerationHistoryRecoverySnapshot = .empty
     @State private var recoveryAudioURLs: [URL] = []
@@ -296,6 +300,12 @@ private struct IOSHistoryLibrarySection: View {
                 }
                 .padding(.bottom, 8)
             }
+            .alert(IOSInterfaceText.historyClearFailed, isPresented: $isClearFailurePresented) {
+                Button(IOSInterfaceText.ok, role: .cancel) {}
+                    .accessibilityIdentifier("historyClearFailedDismiss")
+            } message: {
+                Text(clearFailureMessage)
+            }
         }
         .onAppear { reload() }
         .onReceive(NotificationCenter.default.publisher(for: .generationSaved)) { _ in
@@ -340,7 +350,7 @@ private struct IOSHistoryLibrarySection: View {
                 .font(.caption)
                 .foregroundStyle(Theme.Text.secondary)
             HStack(spacing: 10) {
-                Button(IOSInterfaceText.retry) { reload(reopenFailedStore: true) }
+                Button(IOSInterfaceText.retry) { retryRecovery() }
                     .iosAdaptiveUtilityButtonStyle(tint: Theme.Brand.library)
                     .accessibilityIdentifier("historyRecovery_retry")
                 if !recoveryAudioURLs.isEmpty {
@@ -365,26 +375,51 @@ private struct IOSHistoryLibrarySection: View {
     }
 
     private var recoveryTitle: String {
-        recoverySnapshot.onlyAudioRemovalsPending
-            ? IOSInterfaceText.historyAudioRemovalTitle
-            : IOSInterfaceText.historyWaiting
+        switch recoverySnapshot.notice {
+        case .clearPending:
+            return IOSAppLanguage.shared.presentation.historyClearPendingTitle
+        case .audioRemovals, .unreadableAudioRemovals:
+            return IOSInterfaceText.historyAudioRemovalTitle
+        default:
+            return IOSInterfaceText.historyWaiting
+        }
     }
 
+    /// One state per notice, chosen by the snapshot (PA-30): a pending clear has
+    /// its own copy and no count is ever zero.
     private var recoveryMessage: String {
-        if recoverySnapshot.longFormRecoveryPending {
-            return IOSAppLanguage.shared.presentation.longFormRecoveryDetail
-        }
-        if recoverySnapshot.unqueuedCount > 0 {
-            return IOSAppLanguage.shared.presentation.historyUnqueuedDetail
-        }
-        if recoverySnapshot.issueCount > 0 {
+        let presentation = IOSAppLanguage.shared.presentation
+        switch recoverySnapshot.notice {
+        case .longFormRecovery:
+            return presentation.longFormRecoveryDetail
+        case .unqueued:
+            return presentation.historyUnqueuedDetail
+        case .unverifiedRecord:
             return IOSInterfaceText.historyRecoveryProblem
+        case .clearPending:
+            return presentation.historyClearPendingDetail
+        case .queuedTakes(let count):
+            return IOSInterfaceText.queuedTakes(count)
+        case .unreadableAudioRemovals:
+            return presentation.historyUnreadableAudioRemovals
+        case .audioRemovals(let count):
+            return IOSInterfaceText.historyAudioRemovalPending(count)
+        case nil:
+            return ""
         }
-        if recoverySnapshot.pendingCount == 0, recoverySnapshot.pendingAudioRemovalCount > 0 {
-            return IOSInterfaceText.historyAudioRemovalPending(recoverySnapshot.pendingAudioRemovalCount)
+    }
+
+    /// Retry from the recovery banner. It also dismisses the notice about
+    /// removal lists that could not be read, which the user has now seen; the
+    /// audio those lists named is not deleted (PA-30).
+    private func retryRecovery() {
+        let discardsUnreadableLists = recoverySnapshot.notice == .unreadableAudioRemovals
+        Task {
+            if discardsUnreadableLists {
+                await GenerationHistoryRecovery.discardUnreadableAudioRemovals()
+            }
+            reload(reopenFailedStore: true)
         }
-        let count = recoverySnapshot.pendingCount
-        return IOSInterfaceText.queuedTakes(count)
     }
 
     /// Clears the whole history and its audio (see `isClearConfirmationPresented`).
@@ -407,12 +442,17 @@ private struct IOSHistoryLibrarySection: View {
                     }
                 }
             } catch {
+                // The typed `GenerationHistoryOutboxError` copy says what was kept.
+                let message = error.localizedDescription
                 await MainActor.run {
                     // A pending clear may have finished before this request
                     // failed: read what remains, and let the recovery banner
                     // show what is still pending (AUD-05).
                     NotificationCenter.default.post(name: .generationHistoryRecoveryChanged, object: nil)
                     loadPage(reconciling: false)
+                    // Never silent (PA-30), as on macOS.
+                    clearFailureMessage = message
+                    isClearFailurePresented = true
                 }
             }
         }

@@ -144,7 +144,10 @@ entry retry pending writes; if recovery still needs attention, the visible banne
 reveal the local outputs folder, or export the pending audio. Clear-all records a resumable
 database-first transaction before removing pending entries or files. Audio a clear or a single
 delete could not remove is reported, counted by the same banner and retried on every reconcile
-(AUD-05).
+(AUD-05). The banner states one notice shared with iOS (`GenerationHistoryRecoverySnapshot.notice`):
+a clear that did not finish has its own copy and Retry resumes it, no count is ever zero, and a
+removal list that could not be read is reported until Retry from it discards the list without
+deleting the audio it named (PA-30).
 If enqueue itself fails, `historyUnqueued_banner` appears above the main content with
 `historyUnqueued_retry` and `historyUnqueued_export`. Audio remains playable; the exact retry
 record is app-session memory only until safely queued. No storage failure is reported as failed

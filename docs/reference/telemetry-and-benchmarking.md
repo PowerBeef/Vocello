@@ -395,8 +395,14 @@ where time goes; use **Instruments signposts** (see [`benchmarking-procedure.md`
   Metal, and process-resource capture success/coverage are independent, so one failed API cannot
   masquerade as a zero value. Generation-scoped CPU, page-fault, context-switch, and block-I/O
   deltas remain process-owned.
-- **Boundary samples** — capture immediately around model load, first chunk, final WAV, and trim,
-  so short cold-load or finalize peaks are not dependent on the 500 ms constrained-device tick.
+- **Boundary samples** — capture immediately around model load, first chunk, final WAV, and trim.
+  They sit at stage edges, not at the allocation spike, so sampled peaks still miss allocations
+  shorter than the 500 ms constrained-device tick: in committed records 2,035 of 3,634 takes sampled
+  a Metal peak below the exact `mlxPeakMB` (the MLX allocator's own per-request high-water mark),
+  by a median of about 120-460 MB per record kind. Treat sampled peaks as lower bounds and
+  `mlxPeakMB` as the exact MLX figure. `benchmark_history.py validate` and `record` warn (without
+  failing) when a take's `peakGPUAllocatedMB` is below its `mlxPeakMB`, and `benchmark_history.py
+  peak-miss-report [--json]` reports the count for every committed record without rewriting any.
 - **Verbose raw series** — `verbose` mode writes every sample (`tMS`, `scheduledElapsedNS`,
   `capturedElapsedNS`, absolute `capturedUptimeNS`, `latenessNS`, `kind`, `boundary`,
   `processRole`, resident/physical-footprint/compressed/headroom/Metal values, total RAM, implied

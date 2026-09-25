@@ -2878,6 +2878,119 @@ def memory_contract_status(record: dict[str, Any]) -> str:
     )
 
 
+def sampled_peak_misses(record: dict[str, Any]) -> dict[str, Any]:
+    """Takes whose sampled Metal peak sits below the exact MLX peak (audit #3).
+
+    `mlxPeakMB` is MLX's own allocator high-water mark, reset for every
+    request, and Metal-allocated memory is never below MLX's active memory.
+    A sampled `peakGPUAllocatedMB` below it therefore proves that the periodic
+    sampler missed the take's real peak. The footprint comparison is reported
+    beside it for context only. Read-only: records are never rewritten.
+    """
+    compared = 0
+    missed: list[dict[str, Any]] = []
+    footprint_missed = 0
+    for take in record.get("takes", []):
+        metrics = take.get("metrics") if isinstance(take.get("metrics"), dict) else {}
+        exact = metrics.get("mlxPeakMB")
+        sampled = metrics.get("peakGPUAllocatedMB")
+        if not all(
+            isinstance(value, (int, float)) and not isinstance(value, bool)
+            for value in (exact, sampled)
+        ):
+            continue
+        compared += 1
+        footprint = metrics.get("peakPhysicalFootprintMB")
+        if (
+            isinstance(footprint, (int, float)) and not isinstance(footprint, bool)
+            and float(footprint) < float(exact)
+        ):
+            footprint_missed += 1
+        gap = float(exact) - float(sampled)
+        if gap > 0:
+            missed.append({
+                "takeIndex": take.get("takeIndex"),
+                "cell": take.get("cell"),
+                "metalGapMB": gap,
+            })
+    gaps = [item["metalGapMB"] for item in missed]
+    return {
+        "runID": record.get("run", {}).get("id"),
+        "kind": record.get("run", {}).get("kind"),
+        "platform": record.get("run", {}).get("platform"),
+        "comparedTakeCount": compared,
+        "missedTakeCount": len(missed),
+        "footprintMissedTakeCount": footprint_missed,
+        "medianGapMB": statistics.median(gaps) if gaps else 0.0,
+        "maximumGapMB": max(gaps, default=0.0),
+        "takes": missed,
+    }
+
+
+def sampled_peak_warning(summary: dict[str, Any]) -> str | None:
+    if not summary["missedTakeCount"]:
+        return None
+    return (
+        f"benchmark history: WARN: {summary['runID']}: {summary['missedTakeCount']} of "
+        f"{summary['comparedTakeCount']} takes sampled a Metal peak below the exact MLX peak "
+        f"(median gap {summary['medianGapMB']:.0f} MB, maximum {summary['maximumGapMB']:.0f} MB); "
+        "the sampled memory peaks understate those takes"
+    )
+
+
+def sampled_peak_report(records: list[tuple[Path, dict[str, Any]]]) -> dict[str, Any]:
+    """Offline backfill of the missed-peak count over committed records."""
+    per_record = [
+        summary for _, record in records
+        if (summary := sampled_peak_misses(record))["comparedTakeCount"]
+    ]
+    groups: dict[str, dict[str, Any]] = {}
+    for summary in per_record:
+        group = groups.setdefault(
+            f"{summary['kind']}/{summary['platform']}",
+            {"recordCount": 0, "comparedTakeCount": 0, "missedTakeCount": 0,
+             "footprintMissedTakeCount": 0, "gaps": []},
+        )
+        group["recordCount"] += 1
+        group["comparedTakeCount"] += summary["comparedTakeCount"]
+        group["missedTakeCount"] += summary["missedTakeCount"]
+        group["footprintMissedTakeCount"] += summary["footprintMissedTakeCount"]
+        group["gaps"].extend(item["metalGapMB"] for item in summary["takes"])
+    totals = {}
+    for name, group in sorted(groups.items()):
+        gaps = group.pop("gaps")
+        group["medianGapMB"] = statistics.median(gaps) if gaps else 0.0
+        group["maximumGapMB"] = max(gaps, default=0.0)
+        totals[name] = group
+    return {
+        "records": [
+            {key: value for key, value in summary.items() if key != "takes"}
+            for summary in per_record
+        ],
+        "totals": totals,
+    }
+
+
+def print_sampled_peak_report(report: dict[str, Any]) -> None:
+    print("| Run | Kind | Platform | Takes | Metal peak missed | Median gap MB | Max gap MB |")
+    print("|---|---|---|---:|---:|---:|---:|")
+    for item in report["records"]:
+        print(
+            f"| {item['runID']} | {item['kind']} | {item['platform']} | "
+            f"{item['comparedTakeCount']} | {item['missedTakeCount']} | "
+            f"{item['medianGapMB']:.1f} | {item['maximumGapMB']:.1f} |"
+        )
+    print()
+    print("| Kind/platform | Records | Takes | Metal peak missed | Footprint below MLX peak | Median gap MB | Max gap MB |")
+    print("|---|---:|---:|---:|---:|---:|---:|")
+    for name, group in report["totals"].items():
+        print(
+            f"| {name} | {group['recordCount']} | {group['comparedTakeCount']} | "
+            f"{group['missedTakeCount']} | {group['footprintMissedTakeCount']} | "
+            f"{group['medianGapMB']:.1f} | {group['maximumGapMB']:.1f} |"
+        )
+
+
 def trend_summary(record: dict[str, Any]) -> str:
     comparison = record["comparison"]
     baseline = comparison.get("baselineRunID")
@@ -3105,6 +3218,12 @@ def parse_arguments(argv: list[str]) -> argparse.Namespace:
     rebuild_parser = subparsers.add_parser("rebuild-index", help="rebuild the generated Markdown index")
     rebuild_parser.add_argument("--check", action="store_true")
 
+    peak_parser = subparsers.add_parser(
+        "peak-miss-report",
+        help="read-only report of takes whose sampled Metal peak is below the exact MLX peak",
+    )
+    peak_parser.add_argument("--json", action="store_true", help="print the report as JSON")
+
     annotate_parser = subparsers.add_parser("annotate", help="attach a listening verdict")
     annotate_parser.add_argument("--run-id", required=True)
     annotate_parser.add_argument("--listening", choices=sorted(LISTENING_STATUSES), required=True)
@@ -3116,15 +3235,40 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_arguments(argv if argv is not None else sys.argv[1:])
     try:
         if args.command == "record":
-            print(record_manifest(args.artifact_dir.resolve()).relative_to(REPO_ROOT))
+            destination = record_manifest(args.artifact_dir.resolve())
+            # Advisory only, on stderr: callers read the record path from stdout.
+            if warning := sampled_peak_warning(sampled_peak_misses(load_json(destination))):
+                print(warning, file=sys.stderr)
+            print(destination.relative_to(REPO_ROOT))
         elif args.command == "validate":
             if args.all:
-                validate_all()
-                print(f"benchmark history: PASS ({len(all_record_paths())} records)")
+                records = read_all_records()
+                validate_all(records)
+                report = sampled_peak_report(records)
+                affected = [item for item in report["records"] if item["missedTakeCount"]]
+                if affected:
+                    print(
+                        f"benchmark history: WARN: {len(affected)} of {len(report['records'])} "
+                        f"memory-bearing records have takes whose sampled Metal peak is below the "
+                        f"exact MLX peak ({sum(item['missedTakeCount'] for item in affected)} of "
+                        f"{sum(item['comparedTakeCount'] for item in report['records'])} takes); "
+                        "see peak-miss-report",
+                        file=sys.stderr,
+                    )
+                print(f"benchmark history: PASS ({len(records)} records)")
             else:
                 path = args.record.resolve()
-                validate_record(load_json(path), expected_path=path if RUNS_ROOT in path.parents else None)
+                record = load_json(path)
+                validate_record(record, expected_path=path if RUNS_ROOT in path.parents else None)
+                if warning := sampled_peak_warning(sampled_peak_misses(record)):
+                    print(warning, file=sys.stderr)
                 print(f"benchmark history: PASS ({path})")
+        elif args.command == "peak-miss-report":
+            report = sampled_peak_report(read_all_records())
+            if args.json:
+                print(json.dumps(report, indent=2, sort_keys=True))
+            else:
+                print_sampled_peak_report(report)
         elif args.command == "rebuild-index":
             rebuild_index(check=args.check)
             print("benchmark history index: PASS" if args.check else "benchmark history index rebuilt")

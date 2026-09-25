@@ -847,6 +847,58 @@ class BenchmarkHistoryTests(unittest.TestCase):
             with self.subTest(count=count), self.assertRaises(history.HistoryError):
                 self.publish(candidate, candidate["run"]["id"])
 
+    def test_sampled_peak_below_the_exact_mlx_peak_is_reported_not_fatal(self) -> None:
+        record = record_fixture(
+            run_id="peak-miss-fixture",
+            takes=[generation_take(1), generation_take(2), generation_take(3)],
+        )
+        missed, caught, unmeasured = record["takes"]
+        missed["metrics"].update({
+            "mlxPeakMB": 2500.0, "peakGPUAllocatedMB": 2300.0, "peakPhysicalFootprintMB": 2400.0,
+        })
+        caught["metrics"].update({
+            "mlxPeakMB": 2500.0, "peakGPUAllocatedMB": 2600.0, "peakPhysicalFootprintMB": 2900.0,
+        })
+        unmeasured["metrics"].update({"peakGPUAllocatedMB": 2000.0})
+        summary = history.sampled_peak_misses(record)
+        self.assertEqual(summary["comparedTakeCount"], 2)
+        self.assertEqual(summary["missedTakeCount"], 1)
+        self.assertEqual(summary["footprintMissedTakeCount"], 1)
+        self.assertEqual(summary["takes"], [{
+            "takeIndex": 1, "cell": missed["cell"], "metalGapMB": 200.0,
+        }])
+        self.assertEqual(summary["maximumGapMB"], 200.0)
+        self.assertIsNotNone(history.sampled_peak_warning(summary))
+
+        clean = copy.deepcopy(record)
+        clean["takes"][0]["metrics"]["peakGPUAllocatedMB"] = 2500.0
+        self.assertEqual(history.sampled_peak_misses(clean)["missedTakeCount"], 0)
+        self.assertIsNone(history.sampled_peak_warning(history.sampled_peak_misses(clean)))
+
+        no_memory = record_fixture(run_id="peak-miss-none")
+        report = history.sampled_peak_report([
+            (Path("a.json"), record), (Path("b.json"), clean), (Path("c.json"), no_memory),
+        ])
+        self.assertEqual(
+            [item["runID"] for item in report["records"]],
+            ["peak-miss-fixture", "peak-miss-fixture"],
+        )
+        group = report["totals"]["ui-generation/macos"]
+        self.assertEqual(
+            (group["recordCount"], group["comparedTakeCount"], group["missedTakeCount"]),
+            (2, 4, 1),
+        )
+
+        # A published record with a missed peak still validates: the warning
+        # is advisory and the stored record is never rewritten.
+        path = self.publish(record, "peak-miss-fixture")
+        before = path.read_bytes()
+        with mock.patch("sys.stderr"), mock.patch("sys.stdout"):
+            self.assertEqual(history.main(["validate", "--all"]), 0)
+            self.assertEqual(history.main(["validate", str(path)]), 0)
+            self.assertEqual(history.main(["peak-miss-report", "--json"]), 0)
+        self.assertEqual(path.read_bytes(), before)
+
     def test_schema_v3_generation_records_require_the_quality_identity(self) -> None:
         valid = quality_v3_language_fixture("language-quality-v3")
         path = self.publish(valid, "language-quality-v3")

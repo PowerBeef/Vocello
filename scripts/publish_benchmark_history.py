@@ -1359,6 +1359,10 @@ def write_and_record(
             str(artifact_dir),
         ])
         raise PublicationError(f"history publication failed: {detail}\nrepair: {repair}")
+    if completed.stderr.strip():
+        # Registry advisories (for example a sampled peak below the exact MLX
+        # peak) never fail publication but must stay visible to the operator.
+        print(completed.stderr.strip(), file=sys.stderr)
     return manifest_path
 
 

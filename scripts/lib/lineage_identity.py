@@ -271,7 +271,8 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # snapshots, which suspended the target), every iPhone profile stops
     # recording once its take's sentinel appears instead of recording the idle
     # app to the time limit, and a CPU trace reports the take's cycles per
-    # rusage CPU-second.
+    # rusage CPU-second. The recording first probes that sentinel at the take's
+    # predicted end, then every 3 s, instead of every 3 s from the resume.
     ("instrument-profile", "ios"): 2,
 }
 

@@ -395,6 +395,37 @@ cmd_logs() {
   note "saved $out"
 }
 
+# profile_instrument_args KIND
+# Sets PROFILE_INSTRUMENT_ARGS, the xctrace record instrument arguments of a
+# profile KIND (cpu|memory|witness), and PROFILE_CAPTURE_INSTRUMENTS, the capture
+# label publication checks. Every kind records os_signpost. The CPU and memory
+# kinds add CPU Profiler; the witness perturbs only by emitting its signposts, no
+# CPU sampler (audit #50: the CPU Profiler cost warm tokens/s 29-80%). A memory
+# profile records Allocations and VM Tracker through Apple's Allocations
+# template, which configures VM Tracker with automatic snapshots disabled. A
+# standalone VM Tracker instrument on a Blank trace enables stop-the-world
+# automatic snapshots, which can suspend the exact target for 1-2 seconds and
+# leave its in-process sampler blind for longer than the memory contract's
+# unobserved-gap gate allows.
+profile_instrument_args() {
+  local kind="$1" cpu_instrument="CPU Profiler"
+  case "$kind" in
+    memory)
+      PROFILE_INSTRUMENT_ARGS=(--template "Allocations" --instrument "$cpu_instrument")
+      PROFILE_CAPTURE_INSTRUMENTS="$cpu_instrument + Allocations + VM Tracker + os_signpost"
+      ;;
+    witness)
+      PROFILE_INSTRUMENT_ARGS=()
+      PROFILE_CAPTURE_INSTRUMENTS="os_signpost"
+      ;;
+    *)
+      PROFILE_INSTRUMENT_ARGS=(--instrument "$cpu_instrument")
+      PROFILE_CAPTURE_INSTRUMENTS="$cpu_instrument + os_signpost"
+      ;;
+  esac
+  PROFILE_INSTRUMENT_ARGS+=(--instrument os_signpost)
+}
+
 # profile [--kind cpu|memory|witness] [--keep-trace] [--allow-dirty] [spec]: Instruments/xctrace trace
 # of a headless generation via the `vocello` CLI (engine in-process, the same engine code the
 # app runs). The engine emits os_signpost intervals under subsystem com.qwenvoice.engine
@@ -440,31 +471,9 @@ cmd_profile() {
   local mode="${spec%%:*}"
   local rest="${spec#*:}"
   local variant="${rest%%:*}"
-  local cpu_instrument="CPU Profiler"
-  local allocations_instrument="Allocations"
-  local vm_tracker_instrument="VM Tracker"
-  local memory_template="Allocations"
-  local -a instrument_args
-  local capture_instruments="$cpu_instrument + os_signpost"
-  if [[ "$kind" == "memory" ]]; then
-    # Apple's Allocations template already owns both Allocations and VM Tracker,
-    # and configures VM Tracker with automatic snapshots disabled. Adding a
-    # standalone VM Tracker instrument to a Blank trace enables stop-the-world
-    # automatic snapshots, which can suspend the exact target for 1-2 seconds
-    # and leave its honest 500 ms in-process sampler blind for longer than the
-    # memory contract's unobserved-gap gate (twice the cadence, at least 500 ms)
-    # allows.
-    instrument_args=(--template "$memory_template" --instrument "$cpu_instrument")
-    capture_instruments="$cpu_instrument + $allocations_instrument + $vm_tracker_instrument + os_signpost"
-  elif [[ "$kind" == "witness" ]]; then
-    # The witness perturbs only by emitting its signposts: no CPU sampler
-    # (audit #50: the CPU Profiler cost warm tokens/s 29-80%).
-    instrument_args=()
-    capture_instruments="os_signpost"
-  else
-    instrument_args=(--instrument "$cpu_instrument")
-  fi
-  instrument_args+=(--instrument os_signpost)
+  profile_instrument_args "$kind"
+  local -a instrument_args=("${PROFILE_INSTRUMENT_ARGS[@]}")
+  local capture_instruments="$PROFILE_CAPTURE_INSTRUMENTS"
   local duration="${QVOICE_MAC_PROFILE_DURATION:-90}"
   # Three warm takes, so a profile's per-take interval statistics are not one
   # sample (audit #99).

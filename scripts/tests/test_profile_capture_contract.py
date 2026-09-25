@@ -63,9 +63,6 @@ class ProfileCaptureContractTests(unittest.TestCase):
             (REPO / "scripts" / "macos_test.sh").read_text(encoding="utf-8"),
             "cmd_profile",
         )
-        self.assertIn('local cpu_instrument="CPU Profiler"', profile)
-        self.assertIn('instrument_args=(--instrument "$cpu_instrument")', profile)
-        self.assertIn('instrument_args+=(--instrument os_signpost)', profile)
         self.assertIn('--attach "$target_pid"', profile)
         self.assertIn('--no-prompt', profile)
         self.assertIn('"$QVOICE_BUILD_ROOT/vocello" bench', profile)
@@ -98,9 +95,6 @@ class ProfileCaptureContractTests(unittest.TestCase):
             (REPO / "scripts" / "ios_device.sh").read_text(encoding="utf-8"),
             "cmd_profile",
         )
-        self.assertIn('local cpu_instrument="CPU Profiler"', profile)
-        self.assertIn('local -a instrument_args=(--instrument "$cpu_instrument")', profile)
-        self.assertIn('instrument_args+=(--instrument os_signpost)', profile)
         self.assertIn('--attach "$target_pid"', profile)
         self.assertIn('--no-prompt', profile)
         self.assertIn("grep -q '^Starting recording'", profile)
@@ -117,9 +111,6 @@ class ProfileCaptureContractTests(unittest.TestCase):
                 profile = shell_function(text, "cmd_profile")
                 # macOS also accepts the signpost-only witness kind (audit #50).
                 self.assertRegex(profile, r'case "\$kind" in cpu\|memory(\|witness)?\)')
-                self.assertIn('local allocations_instrument="Allocations"', profile)
-                self.assertIn('local vm_tracker_instrument="VM Tracker"', profile)
-                self.assertIn('instrument_args+=(--instrument os_signpost)', profile)
                 self.assertIn('--template "$capture_instruments"', profile)
                 self.assertIn('--target-pid', profile)
                 self.assertIn('--profile-kind "$kind"', profile)
@@ -131,15 +122,6 @@ class ProfileCaptureContractTests(unittest.TestCase):
         )
         self.assertIn('profile_length="long"', mac_profile)
         self.assertIn('profile_warm="0"', mac_profile)
-        self.assertIn('local memory_template="Allocations"', mac_profile)
-        self.assertIn(
-            'instrument_args=(--template "$memory_template" --instrument "$cpu_instrument")',
-            mac_profile,
-        )
-        self.assertNotIn(
-            'instrument_args+=(--instrument "$allocations_instrument" --instrument "$vm_tracker_instrument")',
-            mac_profile,
-        )
         self.assertIn('QVOICE_MAC_MEMORY_PROFILE_DURATION:-180', mac_profile)
         self.assertIn('default_profile_grace_timeout=60', mac_profile)
         publisher = (REPO / "scripts" / "publish_benchmark_history.py").read_text(
@@ -150,19 +132,46 @@ class ProfileCaptureContractTests(unittest.TestCase):
             publisher,
         )
 
-        # The iPhone memory profile uses the Allocations template too (audit #51).
-        ios_profile = shell_function(
-            (REPO / "scripts" / "ios_device.sh").read_text(encoding="utf-8"),
-            "cmd_profile",
+    @staticmethod
+    def profile_instruments(script: str, kind: str) -> tuple[list[str], str]:
+        """What a profile kind hands xctrace record, and the label it publishes."""
+        helper = shell_function(
+            (REPO / "scripts" / script).read_text(encoding="utf-8"), "profile_instrument_args",
         )
-        self.assertIn(
-            'instrument_args=(--template "$memory_template" --instrument "$cpu_instrument")',
-            ios_profile,
+        completed = subprocess.run(
+            [
+                "bash", "-c",
+                "set -euo pipefail; " + helper + '\nprofile_instrument_args "$1"; '
+                'printf \'%s\\n\' "$PROFILE_CAPTURE_INSTRUMENTS" "${PROFILE_INSTRUMENT_ARGS[@]}"',
+                "test", kind,
+            ],
+            text=True, capture_output=True, check=True,
         )
-        self.assertNotIn(
-            'instrument_args+=(--instrument "$allocations_instrument" --instrument "$vm_tracker_instrument")',
-            ios_profile,
-        )
+        label, *arguments = completed.stdout.splitlines()
+        return arguments, label
+
+    def test_profile_kinds_pass_their_instruments_to_xctrace(self) -> None:
+        cpu = ["--instrument", "CPU Profiler", "--instrument", "os_signpost"]
+        # A memory profile records Allocations and VM Tracker only through Apple's
+        # Allocations template, whose VM Tracker takes no automatic snapshots;
+        # standalone instruments would (audit #51, d52340a0).
+        memory = ["--template", "Allocations", "--instrument", "CPU Profiler",
+                  "--instrument", "os_signpost"]
+        cases = {
+            ("macos_test.sh", "cpu"): (cpu, "CPU Profiler + os_signpost"),
+            ("macos_test.sh", "memory"): (
+                memory, "CPU Profiler + Allocations + VM Tracker + os_signpost",
+            ),
+            # The witness records signposts alone, no sampler (audit #50).
+            ("macos_test.sh", "witness"): (["--instrument", "os_signpost"], "os_signpost"),
+            ("ios_device.sh", "cpu"): (cpu, "CPU Profiler + os_signpost"),
+            ("ios_device.sh", "memory"): (
+                memory, "CPU Profiler + Allocations + VM Tracker + os_signpost",
+            ),
+        }
+        for (script, kind), expected in cases.items():
+            with self.subTest(script=script, kind=kind):
+                self.assertEqual(self.profile_instruments(script, kind), expected)
 
     def test_memory_qualification_is_separate_from_instruments_profiles(self) -> None:
         mac = (REPO / "scripts" / "macos_test.sh").read_text(encoding="utf-8")
@@ -376,10 +385,100 @@ class ProfileCaptureContractTests(unittest.TestCase):
             "wait_device_diagnostics_sentinel", "ios-wait-zero", marker=None, exits=False,
             predicted="0",
         )
+        # It fails (the stubbed die exits 1) without pulling a tree it never saw.
         self.assertEqual(completed.returncode, 1, completed.stderr)
-        self.assertIn("no sentinel after 60s", completed.stderr)
+        self.assertEqual(completed.stdout, "")
+        self.assertNotIn("full-pull", calls)
         # One immediate probe, then one every 3 s up to 60 s.
         self.assertEqual(calls.count("probe device-diagnostics-done.json"), 21)
+
+    def record_until_take_ends(
+        self, *, tracer: str, predicted: str, sentinel_on_probe: int = 0,
+    ) -> tuple[int, list[str], bool]:
+        """Drive the iPhone profile's stop-at-take-end loop against a stand-in
+        xctrace (a child process) and a stubbed sentinel probe and clock.
+
+        `tracer` is what the stand-in does: `stop` saves the trace and exits 54
+        on SIGINT (as xctrace does after a Stop), `unsaved` exits 54 on SIGINT
+        without a trace, `limit` exits 0 on its own at once (the time limit),
+        `fails` exits 54 on its own. The sentinel appears on probe
+        `sentinel_on_probe` (never when 0). Returns the loop's status, the
+        stubbed sleeps and probes in order, and whether the trace exists."""
+        ios = (REPO / "scripts" / "ios_device.sh").read_text(encoding="utf-8")
+        helpers = "".join(
+            ios[start:ios.index("\n}\n\n", start) + 3]
+            for start in (
+                ios.index("device_poll_step() {\n"), ios.index("record_until_take_ends() {\n"),
+            )
+        )
+        stand_in = (
+            "import os, signal, sys, time\n"
+            "trace, ready, behavior = sys.argv[1:4]\n"
+            "def stop(*_):\n"
+            "    if behavior == 'stop':\n"
+            "        os.makedirs(trace, exist_ok=True)\n"
+            "    sys.exit(54)\n"
+            "signal.signal(signal.SIGINT, stop)\n"
+            "open(ready, 'w').close()\n"
+            "if behavior == 'limit':\n"
+            "    sys.exit(0)\n"
+            "if behavior == 'fails':\n"
+            "    sys.exit(54)\n"
+            "time.sleep(30)\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            calls, dest, trace, ready = (root / "calls.log", root / "dest", root / "run.trace",
+                                         root / "ready")
+            dest.mkdir()
+            stubs = (
+                "note() { printf '%s\\n' \"$*\" >&2; }; "
+                f"sleep() {{ printf 'sleep %s\\n' \"$1\" >>'{calls}'; }}; "
+                f"probe_device_sentinel() {{ printf 'probe\\n' >>'{calls}'; "
+                f"  if (( {sentinel_on_probe} > 0 && $(grep -c '^probe$' '{calls}') >= {sentinel_on_probe} )); then "
+                "    mkdir -p \"$2/$1\"; printf '{}' >\"$2/$1/device-diagnostics-done.json\"; fi; }; "
+            )
+            script = (
+                "set -euo pipefail; " + stubs + helpers
+                + f'\npython3 -c "$1" "{trace}" "{ready}" {tracer} &\n'
+                "tracer_pid=$!\n"
+                f"while [[ ! -e '{ready}' ]]; do command sleep 0.01; done\n"
+                "status=0\n"
+                f"record_until_take_ends \"$tracer_pid\" ios-profile-fixture '{dest}' fixture-device "
+                f"'{trace}' {predicted} || status=$?\n"
+                "printf '%s\\n' \"$status\"\n"
+            )
+            completed = subprocess.run(
+                ["bash", "-c", script, "test", stand_in],
+                text=True, capture_output=True, timeout=60,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            log = calls.read_text(encoding="utf-8").splitlines() if calls.exists() else []
+            return int(completed.stdout.strip()), log, trace.is_dir()
+
+    def test_ios_profile_first_probes_its_take_at_the_predicted_end(self) -> None:
+        # audit #87 for the profile: no devicectl copy during most of the
+        # profiled take. The first probe waits the predicted 12 s, later ones
+        # 3 s; the sentinel stops the recording with SIGINT, and the 54 xctrace
+        # then exits with is a pass because this stop sent it and the trace saved.
+        status, calls, saved = self.record_until_take_ends(
+            tracer="stop", predicted="12", sentinel_on_probe=2,
+        )
+        self.assertEqual((status, saved), (0, True))
+        self.assertEqual(calls, ["sleep 12", "probe", "sleep 3", "probe"])
+
+    def test_ios_profile_accepts_54_only_after_its_own_stop_with_a_saved_trace(self) -> None:
+        # A stop that saved no trace keeps xctrace's 54.
+        status, _, saved = self.record_until_take_ends(
+            tracer="unsaved", predicted="12", sentinel_on_probe=1,
+        )
+        self.assertEqual((status, saved), (54, False))
+        # xctrace exiting 54 on its own is a failure, not a stop.
+        status, _, _ = self.record_until_take_ends(tracer="fails", predicted="12")
+        self.assertEqual(status, 54)
+        # Reaching the time limit before the take ended is xctrace's own 0.
+        status, _, _ = self.record_until_take_ends(tracer="limit", predicted="12")
+        self.assertEqual(status, 0)
 
     def test_ios_waits_poll_only_their_markers_and_pull_the_tree_once(self) -> None:
         for function, marker in (

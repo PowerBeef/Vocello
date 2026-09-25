@@ -71,6 +71,9 @@
 #                                (optional) Speech asset bootstrap timeout seconds (default 1800)
 #   QVOICE_IOS_PROFILE_START_TIMEOUT
 #                                (optional) maximum tracer-start wait seconds (default 30)
+#   QVOICE_IOS_PROFILE_PREDICTED_SECONDS
+#                                (optional) seconds after resume before a profile first
+#                                probes its take's sentinel (default 10, provisional)
 #   QVOICE_IOS_DEVICE_DIAGNOSTICS_CLONE_VOICE_ID
 #                                exact prepared saved-voice identifier required for clone diagnostics
 
@@ -2367,12 +2370,68 @@ cmd_logs() {
   note "saved $out"
 }
 
+# profile_instrument_args KIND
+# Sets PROFILE_INSTRUMENT_ARGS, the xctrace record instrument arguments of a
+# profile KIND (cpu|memory), and PROFILE_CAPTURE_INSTRUMENTS, the capture label
+# publication checks. Every kind records CPU Profiler and os_signpost. As on
+# macOS (d52340a0), a memory profile adds Allocations and VM Tracker through
+# Apple's Allocations template, never as standalone instruments: those take
+# stop-the-world automatic VM snapshots that blind the in-process sampler (414 ms
+# lateness profiled against 5.7-48 ms unprofiled), and the template carries both
+# tracks with automatic snapshots disabled (audit #51).
+profile_instrument_args() {
+  local kind="$1" cpu_instrument="CPU Profiler"
+  PROFILE_INSTRUMENT_ARGS=(--instrument "$cpu_instrument")
+  PROFILE_CAPTURE_INSTRUMENTS="$cpu_instrument + os_signpost"
+  if [[ "$kind" == "memory" ]]; then
+    PROFILE_INSTRUMENT_ARGS=(--template "Allocations" --instrument "$cpu_instrument")
+    PROFILE_CAPTURE_INSTRUMENTS="$cpu_instrument + Allocations + VM Tracker + os_signpost"
+  fi
+  PROFILE_INSTRUMENT_ARGS+=(--instrument os_signpost)
+}
+
+# record_until_take_ends XCTRACE_PID RUN_ID DEST DEVICE TRACE PREDICTED
+# The app never exits after its take, so a profile used to record the idle app
+# to the time limit (audit #52). While xctrace (XCTRACE_PID, a child of this
+# shell) records, this polls the take's small sentinel and, once it exists,
+# stops the recording with SIGINT, which saves the trace as a Stop does. The
+# first probe lands at PREDICTED seconds, the take's predicted end, and later
+# ones every few seconds (device_poll_step, audit #87), so no devicectl copy
+# competes with most of the profiled take. Returns xctrace's status, with the
+# 54 it exits after that SIGINT accepted as 0 only when this stop sent it and
+# TRACE was saved.
+record_until_take_ends() {
+  local xctrace_pid="$1" run_id="$2" dest="$3" dev="$4" trace="$5" predicted="$6"
+  local recorded=0 stopped_early=0 tracer_status=0 step probes=0
+  while kill -0 "$xctrace_pid" >/dev/null 2>&1; do
+    step="$(device_poll_step "$probes" "$predicted")"
+    probes=$((probes + 1))
+    sleep "$step"
+    recorded=$((recorded + step))
+    kill -0 "$xctrace_pid" >/dev/null 2>&1 || break
+    probe_device_sentinel "$run_id" "$dest" "$dev" || true
+    if [[ -n "$(find "$dest" -type f -path "*/${run_id}/device-diagnostics-done.json" 2>/dev/null | head -1)" ]]; then
+      note "take finished after ~${recorded}s of recording; stopping the trace"
+      stopped_early=1
+      kill -INT "$xctrace_pid" >/dev/null 2>&1 || true
+      break
+    fi
+  done
+  wait "$xctrace_pid" || tracer_status=$?
+  if (( stopped_early == 1 && tracer_status == 54 )) && [[ -d "$trace" ]]; then
+    tracer_status=0
+  fi
+  return "$tracer_status"
+}
+
 # profile [--kind cpu|memory] [spec]: record an Instruments/xctrace trace while device diagnostics runs one
 # generation on-device (burns-in safe — headless, screen dark). The lane always records
 # CPU Profiler and os_signpost in one trace; memory profiles also record Allocations and
 # VM Tracker through Apple's Allocations template, whose VM Tracker takes no automatic
 # snapshots (audit #51; publication checks the captured setting). The recording stops
-# once the take's sentinel appears, not at the time limit (audit #52).
+# once the take's sentinel appears, not at the time limit (audit #52), and the first
+# sentinel probe waits for the take's predicted end, QVOICE_IOS_PROFILE_PREDICTED_SECONDS
+# after the target resumes (default 10, provisional until a measured lane tunes it).
 # QVOICE_IOS_PROFILE_DURATION caps the capture window (seconds, default 90),
 # and QVOICE_IOS_MEMORY_PROFILE_DURATION may override it for memory captures. The engine
 # emits OSSignpost intervals under
@@ -2399,27 +2458,18 @@ cmd_profile() {
     || die "profile disk-space preflight failed before launching the target"
   require_diagnostic_clone_voice "$spec"
   require_team
-  local cpu_instrument="CPU Profiler"
-  local allocations_instrument="Allocations"
-  local vm_tracker_instrument="VM Tracker"
-  local memory_template="Allocations"
-  local -a instrument_args=(--instrument "$cpu_instrument")
-  local capture_instruments="$cpu_instrument + os_signpost"
-  if [[ "$kind" == "memory" ]]; then
-    # As on macOS (d52340a0): standalone VM Tracker instruments take
-    # stop-the-world automatic snapshots that blind the in-process sampler (414 ms
-    # lateness profiled against 5.7-48 ms unprofiled); Apple's Allocations
-    # template carries both memory tracks with automatic snapshots disabled.
-    instrument_args=(--template "$memory_template" --instrument "$cpu_instrument")
-    capture_instruments="$cpu_instrument + $allocations_instrument + $vm_tracker_instrument + os_signpost"
-  fi
-  instrument_args+=(--instrument os_signpost)
+  profile_instrument_args "$kind"
+  local -a instrument_args=("${PROFILE_INSTRUMENT_ARGS[@]}")
+  local capture_instruments="$PROFILE_CAPTURE_INSTRUMENTS"
   local duration="${QVOICE_IOS_PROFILE_DURATION:-90}"
   [[ "$kind" != "memory" ]] || duration="${QVOICE_IOS_MEMORY_PROFILE_DURATION:-$duration}"
   local tracer_start_timeout="${QVOICE_IOS_PROFILE_START_TIMEOUT:-30}"
+  local predicted_take="${QVOICE_IOS_PROFILE_PREDICTED_SECONDS:-10}"
   [[ "$duration" =~ ^[1-9][0-9]*$ ]] || die "QVOICE_IOS_PROFILE_DURATION must be a positive whole number of seconds"
   [[ "$tracer_start_timeout" =~ ^[1-9][0-9]*$ ]] \
     || die "QVOICE_IOS_PROFILE_START_TIMEOUT must be a positive whole number of seconds"
+  [[ "$predicted_take" =~ ^[0-9]+$ ]] \
+    || die "QVOICE_IOS_PROFILE_PREDICTED_SECONDS must be a whole number of seconds"
   local dev; dev="$(resolve_device)"
   command -v xctrace >/dev/null 2>&1 \
     || die "xctrace not found — install Xcode and use Instruments for native profiling"
@@ -2541,29 +2591,10 @@ PY
   xcrun devicectl device process resume --device "$dev" --pid "$target_pid" \
     >"$artifacts/resume.log" 2>&1 \
     || { kill "$xctrace_pid" >/dev/null 2>&1 || true; die "could not resume the profiled target"; }
-  # The app never exits after its take, so the recording used to run to the
-  # time limit: tens of idle seconds per profile (audit #52). Poll the take's
-  # small sentinel while xctrace records and, once it exists, stop the
-  # recording with SIGINT, which saves the trace as a Stop does (xctrace then
-  # exits 54, accepted only after this stop and with a saved trace).
-  local recorded=0 stopped_early=0 tracer_status=0 step
-  step="$(device_poll_step 1 0)"
-  while kill -0 "$xctrace_pid" >/dev/null 2>&1; do
-    sleep "$step"
-    recorded=$((recorded + step))
-    kill -0 "$xctrace_pid" >/dev/null 2>&1 || break
-    probe_device_sentinel "$run_id" "$dest" "$dev" || true
-    if [[ -n "$(find "$dest" -type f -path "*/${run_id}/device-diagnostics-done.json" 2>/dev/null | head -1)" ]]; then
-      note "take finished after ~${recorded}s of recording; stopping the trace"
-      stopped_early=1
-      kill -INT "$xctrace_pid" >/dev/null 2>&1 || true
-      break
-    fi
-  done
-  wait "$xctrace_pid" || tracer_status=$?
-  if (( stopped_early == 1 && tracer_status == 54 )) && [[ -d "$trace" ]]; then
-    tracer_status=0
-  fi
+  # Stop the recording once the take ends, first probing at its predicted end.
+  local tracer_status=0
+  record_until_take_ends "$xctrace_pid" "$run_id" "$dest" "$dev" "$trace" "$predicted_take" \
+    || tracer_status=$?
   (( tracer_status == 0 )) || die "xctrace failed (status $tracer_status; see $artifacts/xctrace.log)"
   xctrace_pid=""
   PROFILE_TRACE_XCTRACE_PID=""

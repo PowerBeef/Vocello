@@ -443,7 +443,8 @@
           "config/ui-perf-thresholds.json",
           "config/ui-perf-thresholds-ios.json",
           "scripts/check_macos_ui_perf.py",
-          "scripts/check_ios_ui_perf.py"
+          "scripts/check_ios_ui_perf.py",
+          "scripts/lib/ui_perf_thresholds.py"
         ],
         "requiredEvidence": [
           "macos-ui-performance",

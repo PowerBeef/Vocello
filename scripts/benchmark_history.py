@@ -477,6 +477,9 @@ METRIC_KEYS = {
     "uiHitchTimeMSPerS", "uiMaxGapMS", "uiP95GapMSApprox", "uiFramesDelivered",
     "uiExpectedFrames", "uiProbeCoverage", "uiRefreshIntervalMS",
     "uiWindowDurationMS", "uiActionCount",
+    # In-window excess frame time per scripted action (records since
+    # 2026-09-25, audit #79; never backfilled).
+    "uiHitchMSPerAction",
 }
 UI_PERF_REQUIRED_METRICS = {
     "uiHitchTimeMSPerS", "uiMaxGapMS", "uiFramesDelivered", "uiExpectedFrames",
@@ -1067,6 +1070,8 @@ def default_inputs(record: dict[str, Any]) -> dict[str, Any]:
         REPO_ROOT / "Sources" / "iOSSupport" / "Services" / "IOSUIPerfHistorySeeder.swift",
         REPO_ROOT / "Tests" / "VocelloiOSUITests" / "VocelloiOSPerfUITests.swift",
         REPO_ROOT / "config" / "ui-perf-thresholds-ios.json",
+        # Ceiling calibration and derivation shared by both perf checkers (audit #34, #77).
+        REPO_ROOT / "scripts" / "lib" / "ui_perf_thresholds.py",
         REPO_ROOT / "Sources" / "QwenVoiceCore" / "BenchMatrixSpec.swift",
         REPO_ROOT / "Sources" / "VocelloCLI" / "BenchCommand.swift",
         REPO_ROOT / "Sources" / "QwenVoiceCore" / "GenerationTelemetryRecord.swift",

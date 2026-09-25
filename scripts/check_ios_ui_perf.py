@@ -56,6 +56,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_THRESHOLDS_PATH = REPO_ROOT / "config" / "ui-perf-thresholds-ios.json"
+UI_PERF_RUNS = REPO_ROOT / "benchmarks" / "runs" / "ui-perf"
+if str(REPO_ROOT / "scripts") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+from lib import ui_perf_thresholds as calibration_rules  # noqa: E402
 
 EXPECTED_SCENARIOS = [
     "ios-idle-baseline",
@@ -255,6 +259,9 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
         "medianBlockCadenceHz": cadence,
         "hitchTimeMSPerS": round(excess_ms / (covered_ms / 1000.0), 3)
         if covered_ms else None,
+        # In-window excess frame time per scripted action (audit #79).
+        "hitchMSPerAction": round(excess_ms / marker["actionCount"], 3)
+        if isinstance(marker.get("actionCount"), int) and marker["actionCount"] > 0 else None,
         "maxGapMS": round(max_gap, 2),
         "p95GapMSApprox": approximate_p95_gap_ms(histogram, refresh_ms),
         "gapHistogram": histogram,
@@ -308,6 +315,8 @@ def load_thresholds(path: Path) -> dict:
     for key in ("hitchCeilingMSPerS", "maxGapCeilingMS"):
         if set(thresholds.get(key, {})) != set(confirmatory):
             raise GateError(f"thresholds contract {key} must cover exactly the confirmatory scenarios: {path}")
+    if problems := calibration_rules.validate_calibration_fields(thresholds):
+        raise GateError(f"thresholds contract {'; '.join(problems)}: {path}")
     return thresholds
 
 
@@ -398,12 +407,13 @@ def take_metrics(summary: dict) -> dict:
         "cpuSystemSeconds": round(summary["cpuSystemMS"] / 1000.0, 3),
     }
     optional = {
+        "uiHitchMSPerAction": summary.get("hitchMSPerAction"),
         "uiP95GapMSApprox": summary.get("p95GapMSApprox"),
         "physicalFootprintStartMB": summary.get("footprintStartMB"),
         "peakPhysicalFootprintMB": summary.get("footprintPeakMB"),
         "physicalFootprintDeltaMB": summary.get("footprintDeltaMB"),
-        "uiMaximumDelayedHeartbeatMS": summary.get("launchMaxStallMS"),
-        "delayedHeartbeatCount": summary.get("launchStalls50"),
+        # The probe watchdog's launch-scoped summary is not mapped onto the
+        # generation-scoped heartbeat metrics (audit #80).
     }
     metrics.update({key: value for key, value in optional.items() if value is not None})
     return metrics
@@ -417,10 +427,12 @@ def build_evidence_manifest(
     probe_digest: str,
     profile_id: str,
     hardware: dict,
+    run_warnings: list[str] | None = None,
 ) -> dict:
     """Registry-ready evidence (IUI-6): the platform-ios twin of the macOS
     UI-7 manifest — kind ui-perf, canonical matrix scope, one take per
-    scenario, take identity exactly what validate_ui_perf_semantics checks."""
+    scenario, take identity exactly what validate_ui_perf_semantics checks.
+    `run_warnings` carries run-level codes such as `uiperf.uncalibrated:<profile>`."""
     takes = []
     for index, summary in enumerate(scenarios, start=1):
         scenario = summary["scenario"]
@@ -440,7 +452,9 @@ def build_evidence_manifest(
             "metrics": take_metrics(summary),
             "warnings": warnings,
         })
-    run_warnings = sorted({code for codes in scenario_warnings.values() for code in codes})
+    run_warnings = sorted(
+        {code for codes in scenario_warnings.values() for code in codes} | set(run_warnings or [])
+    )
     status = "passedWithWarnings" if run_warnings else "passed"
     return {
         "schemaVersion": 1,
@@ -491,7 +505,19 @@ def verify_canonical_iphone(diagnostics: Path, run_id: str) -> str:
         raise GateError(f"canonical iPhone verification failed: {error}") from None
 
 
+def canonical_profile_id() -> str:
+    """The registry's canonical iPhone profile (a registry lookup, no device probe)."""
+    import publish_benchmark_history as publisher
+
+    return str(publisher.canonical_hardware_profile("ios")["id"])
+
+
 def main() -> int:
+    if "--derive-thresholds" in sys.argv[1:]:
+        return calibration_rules.derive_main(
+            sys.argv[1:], platform="ios", default_thresholds=DEFAULT_THRESHOLDS_PATH,
+            load_thresholds=load_thresholds, runs_root=UI_PERF_RUNS,
+        )
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--xcodebuild-log", required=True)
     parser.add_argument("--diagnostics", required=True,
@@ -539,7 +565,7 @@ def main() -> int:
             raise GateError(f"unexpected scenario markers: {', '.join(unexpected)}")
 
         scenarios = []
-        scenario_warnings: dict[str, list[str]] = {}
+        cadence_warnings: dict[str, list[str]] = {}
         environment_rows: list[dict] = []
         probe_hash = hashlib.sha256()
         for name in EXPECTED_SCENARIOS:
@@ -559,9 +585,7 @@ def main() -> int:
                     f"{COVERAGE_FLOOR:.0%} of the marked window"
                 )
             summary["probeFile"] = probe_path.name
-            warnings = evaluate_cadence(summary) + evaluate_thresholds(summary, thresholds)
-            summary["thresholdWarnings"] = warnings
-            scenario_warnings[name] = warnings
+            cadence_warnings[name] = evaluate_cadence(summary)
             scenarios.append(summary)
             probe_hash.update(probe_path.read_bytes())
             if args.copy_probe_files_to:
@@ -571,6 +595,21 @@ def main() -> int:
     except GateError as error:
         print(f"ios ui-perf gate FAILED: {error}", file=sys.stderr)
         return 1
+
+    # The ceilings apply only on the profile and refresh interval they were
+    # derived on; anywhere else the run says so once instead (audit #77).
+    calibration = calibration_rules.calibration(
+        thresholds, canonical_profile_id(), [row["refreshIntervalMS"] for row in scenarios],
+    )
+    scenario_warnings: dict[str, list[str]] = {}
+    for summary in scenarios:
+        warnings = list(cadence_warnings[summary["scenario"]])
+        if calibration["calibrated"]:
+            warnings += evaluate_thresholds(summary, thresholds)
+        warnings += calibration_rules.footprint_growth_warning(summary, thresholds)
+        summary["thresholdWarnings"] = warnings
+        scenario_warnings[summary["scenario"]] = warnings
+    extra_run_warnings = [calibration["code"]] if calibration["code"] else []
 
     evidence_profile = None
     hardware_context = None
@@ -590,7 +629,9 @@ def main() -> int:
                 print(f"ios ui-perf gate FAILED: {error}", file=sys.stderr)
                 return 1
 
-    run_warnings = sorted({code for codes in scenario_warnings.values() for code in codes})
+    run_warnings = sorted(
+        {code for codes in scenario_warnings.values() for code in codes} | set(extra_run_warnings)
+    )
     report = {
         "schemaVersion": 1,
         "platform": "ios",
@@ -604,6 +645,10 @@ def main() -> int:
             "path": str(args.thresholds) if args.thresholds else None,
             "warnOnly": True,
             "warnings": run_warnings,
+            "calibrated": calibration["calibrated"],
+            "calibrationProfile": calibration["calibrationProfile"],
+            "calibrationRefreshIntervalMS": calibration["calibrationRefreshIntervalMS"],
+            "uncalibratedReasons": calibration["reasons"],
         },
         "measurement": "main-run-loop CADisplayLink cadence pinned to the app's "
         "60 Hz cap (UI-thread hitch proxy; not render-server presents; "
@@ -632,6 +677,7 @@ def main() -> int:
             probe_digest=probe_hash.hexdigest(),
             profile_id=evidence_profile,
             hardware=hardware_context,
+            run_warnings=extra_run_warnings,
         )
         evidence_path = output.parent / "benchmark-evidence.json"
         evidence_path.write_text(

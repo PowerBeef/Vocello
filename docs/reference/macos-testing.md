@@ -192,10 +192,24 @@ Registry posture (UI-7): the structural gate is unchanged (every scenario
 present once, probe coverage ≥90% of each window, monotonic blocks, sane
 refresh interval). On a PASS the checker evaluates the **warn-only** ceilings
 in [`config/ui-perf-thresholds.json`](../../config/ui-perf-thresholds.json)
-(calibrated on the retired Mac mini M2 8 GB and provisional on the canonical Mac mini M6 until
-roadmap item AV-17 re-derives them; a breach marks the run
-`passedWithWarnings`, never fails it) and — on the canonical hardware profile
-only — emits `benchmark-evidence.json`, which the lane publishes as a
+(a breach marks the run `passedWithWarnings`, never fails it). The contract names the profile and
+refresh interval its ceilings were derived on (`calibrationProfile`,
+`calibrationRefreshIntervalMS`); a run on any other, which today means every run on the canonical
+Mac mini M6 because the ceilings come from the retired M2, carries one
+`uiperf.uncalibrated:<profile>` code instead of ceiling verdicts. Roadmap item AV-17 step 3
+re-derives them from at least three counted M6 sessions:
+`python3 scripts/check_macos_ui_perf.py --derive-thresholds <run IDs...> --write
+config/ui-perf-thresholds.json` (rule `spread-v1`: per confirmatory scenario, the median times
+max(1.3, 1 + 3 × the run-to-run relative range), hitch rounded up to 0.5 ms/s with a 5 ms/s floor,
+gap to 10 ms with a 40 ms floor; `--rule v3` reproduces the committed M2 ceilings). A confirmatory
+window whose footprint grows past `footprintGrowthCeilingMB` (250 MB) gets a warn-only
+`uiperf.footprint:<scenario>` code: since the engine moved in-process, sidebar-navigation's own
+product warms grow it by about 1-2.4 GB. Scenarios that repeat a cycle (sidebar-navigation,
+delivery-menu, composer-typing) mark each cycle, and the report lists a hitch rate per cycle;
+records also carry `uiHitchMSPerAction`, the window's excess frame time per scripted action. The
+probe watchdog's launch-scoped summary stays in the report and is never published under the
+generation-scoped heartbeat names. On the canonical hardware profile
+only, the checker emits `benchmark-evidence.json`, which the lane publishes as a
 PASS-only `ui-perf` registry record (one take per scenario, no
 model/telemetry/QC claims). Non-canonical hosts keep local-only reports, and
 dirty-source or late publications classify `exploratory` as usual. Since
@@ -206,7 +220,8 @@ its own contract (`config/ui-perf-thresholds-ios.json`; see
 measures main-run-loop display-link cadence, a UI-thread hitch proxy;
 compositor ground truth remains an Instruments Hitches/Core Animation trace.
 
-Baseline protocol: one discarded warm-up run, then five counted runs (fixed
+Baseline protocol: one discarded warm-up run, then at least three counted runs, five when the
+session allows (the derivation refuses fewer than three; fixed
 scenario order, AC power, cursor parked, `caffeinate` held by the lane); report
 per-scenario median and IQR; discard any counted run whose thermal state left
 nominal, that failed, or that ran during concurrent machine use, and replace it
@@ -214,7 +229,7 @@ with a fresh counted run. **Copy `ui-perf-report.json` out of the run directory
 after every counted run**: retention keeps only the newest passing perf run per
 lane, so a multi-run session that skips the copy loses its earlier reports (the
 probe JSONL under the debug diagnostics store remains the recoverable raw
-source). Thresholds are set only after repeated baselines establish spread.
+source). Ceilings come only from the counted runs' own spread, through `--derive-thresholds`.
 
 | Lane | Scope |
 | --- | --- |

@@ -185,19 +185,28 @@ class IOSUIPerfFixture(unittest.TestCase):
 
     def test_thresholds_remain_warn_only_when_supplied(self):
         thresholds = self.root / "thresholds.json"
-        thresholds.write_text(json.dumps({
+        contract = {
             "schemaVersion": 1,
             "warnOnly": True,
+            "calibrationProfile": "iphone-17-pro",
+            "calibrationRefreshIntervalMS": 16.67,
             "confirmatoryScenarios": ["ios-idle-baseline"],
             "hitchCeilingMSPerS": {"ios-idle-baseline": 5.0},
             "maxGapCeilingMS": {"ios-idle-baseline": 40.0},
-        }))
+        }
+        thresholds.write_text(json.dumps(contract))
         log = self.write_run(hitch_by_scenario={"ios-idle-baseline": 50.0})
         status, report = self.run_checker(log, thresholds=thresholds)
         self.assertEqual(status, 0)
         self.assertEqual(report["status"], "passedWithWarnings")
         self.assertEqual(
             report["thresholds"]["warnings"], ["uiperf.hitch:ios-idle-baseline(50/5)"])
+        # audit #77: ceilings from another profile give one uncalibrated code, no verdicts.
+        thresholds.write_text(json.dumps({**contract, "calibrationProfile": "iphone-15-pro"}))
+        status, report = self.run_checker(log, thresholds=thresholds)
+        self.assertEqual(status, 0)
+        self.assertFalse(report["thresholds"]["calibrated"])
+        self.assertEqual(report["thresholds"]["warnings"], ["uiperf.uncalibrated:iphone-15-pro"])
 
     def test_shipped_contract_binds_exactly_the_confirmatory_scenarios(self):
         contract = json.loads(
@@ -209,6 +218,9 @@ class IOSUIPerfFixture(unittest.TestCase):
         self.assertEqual(checker.exploratory_scenarios(contract), {"ios-player-scrub", "ios-generation-active"})
         self.assertEqual(set(contract["hitchCeilingMSPerS"]), confirmatory)
         self.assertEqual(set(contract["maxGapCeilingMS"]), confirmatory)
+        # audit #77: the contract names the profile its ceilings belong to.
+        loaded = checker.load_thresholds(Path(checker.REPO_ROOT) / "config" / "ui-perf-thresholds-ios.json")
+        self.assertEqual(loaded["calibrationProfile"], "iphone-17-pro")
 
     def test_scenario_set_matches_the_registry_contract(self):
         import benchmark_history

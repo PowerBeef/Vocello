@@ -124,6 +124,10 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
 - **UI timing gates are declared.** The macOS UI benchmark's stall gate takes its statistic, limit and
   calibration profile from `config/macos-ui-stall-gate.json` (provisionally no heartbeat delayed more
   than 250 ms, uncalibrated until one exploratory M6 run calibrates it); every take runs the Speed variant.
+  ui-perf ceilings stay warn-only and come from the run-to-run spread of at least three counted runs on
+  their calibration profile (`--derive-thresholds`, rule `spread-v1`: median × max(1.3, 1 + 3 × relative
+  range)); a run on another profile or refresh interval carries `uiperf.uncalibrated:<profile>` instead
+  of ceiling verdicts.
 - **Consent-bound lanes.** `scripts/ui_test.sh`, `scripts/ios_device.sh`, `scripts/macos_test.sh
   memory|lang-bench` and `release.yml` run only on explicit request, in the lead session, with no
   parallel agent active. Timing lanes refuse to start on a busy host (`require_quiet_host` in

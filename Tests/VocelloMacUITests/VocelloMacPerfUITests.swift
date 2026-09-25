@@ -47,15 +47,44 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
         actionCount: Int,
         _ body: () -> Void
     ) {
-        let start = Int64(Date().timeIntervalSince1970 * 1000)
+        let start = Self.epochMS()
         body()
-        let end = Int64(Date().timeIntervalSince1970 * 1000)
+        let end = Self.epochMS()
         VocelloUIPerfScenarioMarker(
             scenario: name,
             windowStartEpochMS: start,
             windowEndEpochMS: end,
             actionCount: actionCount
         ).emit()
+    }
+
+    /// A measured window made of repeated cycles; the marker carries each
+    /// cycle's sub-window so the checker reports within-run spread (audit #34(b)).
+    private func measuredCycles(
+        _ name: String,
+        cycles: Int,
+        actionsPerCycle: Int,
+        _ body: (Int) -> Void
+    ) {
+        var marks: [VocelloUIPerfCycle] = []
+        let start = Self.epochMS()
+        for cycle in 0..<cycles {
+            let cycleStart = Self.epochMS()
+            body(cycle)
+            marks.append(VocelloUIPerfCycle(startEpochMS: cycleStart, endEpochMS: Self.epochMS()))
+        }
+        let end = Self.epochMS()
+        VocelloUIPerfScenarioMarker(
+            scenario: name,
+            windowStartEpochMS: start,
+            windowEndEpochMS: end,
+            actionCount: cycles * actionsPerCycle,
+            cycles: marks
+        ).emit()
+    }
+
+    private static func epochMS() -> Int64 {
+        Int64(Date().timeIntervalSince1970 * 1000)
     }
 
     // MARK: - Scenarios
@@ -72,11 +101,9 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
         let cycle: [VocelloMacScreen] = [
             .customVoice, .voiceDesign, .voiceCloning, .history, .voices, .settings,
         ]
-        measuredWindow("sidebar-navigation", actionCount: cycle.count * 3) {
-            for _ in 0..<3 {
-                for screen in cycle {
-                    navigate(to: screen)
-                }
+        measuredCycles("sidebar-navigation", cycles: 3, actionsPerCycle: cycle.count) { _ in
+            for screen in cycle {
+                navigate(to: screen)
             }
         }
     }
@@ -132,25 +159,23 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
         navigate(to: .customVoice)
         let picker = element("delivery_tonePicker")
         XCTAssertTrue(VocelloUIWait.exists(picker, timeout: 20))
-        measuredWindow("delivery-menu", actionCount: 10) {
-            for repetition in 0..<10 {
-                XCTAssertTrue(VocelloUIPrimaryAction.perform(on: picker, timeout: 10))
-                Thread.sleep(forTimeInterval: 0.4)
-                if repetition == 4 || repetition == 9 {
-                    // Twice, select a different tone so dependent re-render
-                    // cost (advisory caption, tint) is inside the window.
-                    let target = repetition == 4 ? "Calm" : "Happy"
-                    let item = app.menuItems[target].firstMatch
-                    if item.exists {
-                        item.click()
-                    } else {
-                        app.typeKey(.escape, modifierFlags: [])
-                    }
+        measuredCycles("delivery-menu", cycles: 10, actionsPerCycle: 1) { repetition in
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: picker, timeout: 10))
+            Thread.sleep(forTimeInterval: 0.4)
+            if repetition == 4 || repetition == 9 {
+                // Twice, select a different tone so dependent re-render
+                // cost (advisory caption, tint) is inside the window.
+                let target = repetition == 4 ? "Calm" : "Happy"
+                let item = app.menuItems[target].firstMatch
+                if item.exists {
+                    item.click()
                 } else {
                     app.typeKey(.escape, modifierFlags: [])
                 }
-                Thread.sleep(forTimeInterval: 0.3)
+            } else {
+                app.typeKey(.escape, modifierFlags: [])
             }
+            Thread.sleep(forTimeInterval: 0.3)
         }
     }
 
@@ -179,11 +204,9 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
         XCTAssertTrue(VocelloUIWait.exists(editor, timeout: 20))
         editor.click()
         let burst = "The quick brown fox rehearses a long steady line for interface measurement purposes today. "
-        measuredWindow("composer-typing", actionCount: 4) {
-            for _ in 0..<4 {
-                app.typeText(burst)
-                Thread.sleep(forTimeInterval: 0.5)
-            }
+        measuredCycles("composer-typing", cycles: 4, actionsPerCycle: 1) { _ in
+            app.typeText(burst)
+            Thread.sleep(forTimeInterval: 0.5)
         }
     }
 

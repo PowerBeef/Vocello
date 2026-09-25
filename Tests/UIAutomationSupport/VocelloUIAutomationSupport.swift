@@ -640,13 +640,24 @@ public struct VocelloUIPerfScenarioMarker: Codable {
     public let windowStartEpochMS: Int64
     public let windowEndEpochMS: Int64
     public let actionCount: Int
+    /// Optional sub-windows of a scenario that repeats one cycle of actions;
+    /// the checker reports a hitch rate per cycle (audit #34(b)). Omitted from
+    /// the JSON when nil, so markers without cycles are unchanged.
+    public let cycles: [VocelloUIPerfCycle]?
 
-    public init(scenario: String, windowStartEpochMS: Int64, windowEndEpochMS: Int64, actionCount: Int) {
+    public init(
+        scenario: String,
+        windowStartEpochMS: Int64,
+        windowEndEpochMS: Int64,
+        actionCount: Int,
+        cycles: [VocelloUIPerfCycle]? = nil
+    ) {
         self.schemaVersion = 1
         self.scenario = scenario
         self.windowStartEpochMS = windowStartEpochMS
         self.windowEndEpochMS = windowEndEpochMS
         self.actionCount = actionCount
+        self.cycles = cycles
     }
 
     public func emit() {
@@ -655,6 +666,18 @@ public struct VocelloUIPerfScenarioMarker: Codable {
         // stdout is fully buffered under the runner's pipe; a crash later in
         // the run must not take the markers of completed scenarios with it.
         fflush(stdout)
+    }
+}
+
+/// One repeated cycle inside a marked UI-perf window, in wall-clock epoch
+/// milliseconds; cycles are ordered, disjoint and inside their window.
+public struct VocelloUIPerfCycle: Codable {
+    public let startEpochMS: Int64
+    public let endEpochMS: Int64
+
+    public init(startEpochMS: Int64, endEpochMS: Int64) {
+        self.startEpochMS = startEpochMS
+        self.endEpochMS = endEpochMS
     }
 }
 

@@ -12,10 +12,16 @@ Phase-2 posture (UI-7, 2026-08-05):
 * **The gate stays structural**: every expected scenario present exactly
   once, probe coverage of each marked window >= the floor, monotonic block
   timestamps, a sane refresh interval.
-* **Thresholds are warn-only** (``config/ui-perf-thresholds.json``, derived
-  from the baseline-v2 medians): a ceiling breach marks the scenario and run
-  ``passedWithWarnings`` and never fails the gate or blocks publication.
-  Promotion to hard ceilings waits for repeated baseline sessions.
+* **Thresholds are warn-only** (``config/ui-perf-thresholds.json``): a ceiling
+  breach marks the scenario and run ``passedWithWarnings`` and never fails the
+  gate or blocks publication. Promotion to hard ceilings waits for repeated
+  baseline sessions. The contract names the profile and refresh interval it was
+  derived on; on any other, the run carries one ``uiperf.uncalibrated:<profile>``
+  code instead of ceiling verdicts (audit #77). ``--derive-thresholds RECORD...``
+  derives a contract from at least three counted runs (``scripts/lib/
+  ui_perf_thresholds.py``: the run-to-run spread with a 1.3x floor, audit #34).
+* A confirmatory scenario whose window grows the footprint past
+  ``footprintGrowthCeilingMB`` gets a warn-only ``uiperf.footprint`` code (#33).
 * **Registry publication** (``--emit-evidence``): on the canonical hardware
   profile the checker writes ``benchmark-evidence.json`` for
   ``benchmark_history.py record`` (kind ``ui-perf``, one take per scenario,
@@ -38,6 +44,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_THRESHOLDS_PATH = REPO_ROOT / "config" / "ui-perf-thresholds.json"
+UI_PERF_RUNS = REPO_ROOT / "benchmarks" / "runs" / "ui-perf"
+if str(REPO_ROOT / "scripts") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+from lib import ui_perf_thresholds as calibration_rules  # noqa: E402
 
 EXPECTED_SCENARIOS = [
     "idle-baseline",
@@ -148,6 +158,48 @@ def exploratory_scenarios(thresholds: dict) -> set[str]:
     return set(EXPECTED_SCENARIOS) - set(thresholds["confirmatoryScenarios"])
 
 
+def overlap_fraction(block: dict, start: int, end: int) -> float:
+    span = int(block["endEpochMS"]) - int(block["startEpochMS"])
+    if span <= 0:
+        return 0.0
+    overlap = min(int(block["endEpochMS"]), end) - max(int(block["startEpochMS"]), start)
+    return max(0.0, min(1.0, overlap / span))
+
+
+def cycle_hitch_rates(marker: dict, blocks: list[dict]) -> list[float] | None:
+    """Per-cycle hitch time for a scenario that marks its repeated cycles (audit #34(b)).
+
+    Optional marker field `cycles`: [{startEpochMS, endEpochMS}, ...], ordered,
+    non-overlapping and inside the scenario window. Each cycle is apportioned
+    exactly like the window, so the rates are within-run samples of the same
+    statistic. Markers without cycles (every record before this) return None.
+    """
+    cycles = marker.get("cycles")
+    if cycles is None:
+        return None
+    scenario = marker["scenario"]
+    start, end = int(marker["windowStartEpochMS"]), int(marker["windowEndEpochMS"])
+    if not isinstance(cycles, list) or not cycles:
+        raise GateError(f"scenario '{scenario}': cycles must be a non-empty list")
+    rates = []
+    previous_end = start
+    for cycle in cycles:
+        try:
+            cycle_start, cycle_end = int(cycle["startEpochMS"]), int(cycle["endEpochMS"])
+        except (KeyError, TypeError, ValueError):
+            raise GateError(f"scenario '{scenario}': malformed cycle marker") from None
+        if not previous_end <= cycle_start < cycle_end <= end:
+            raise GateError(f"scenario '{scenario}': cycles must be ordered, disjoint and inside the window")
+        previous_end = cycle_end
+        touching = [b for b in blocks if b["endEpochMS"] > cycle_start and b["startEpochMS"] < cycle_end]
+        covered = sum(
+            min(int(b["endEpochMS"]), cycle_end) - max(int(b["startEpochMS"]), cycle_start) for b in touching
+        )
+        excess = sum(b["sumExcessMS"] * overlap_fraction(b, cycle_start, cycle_end) for b in touching)
+        rates.append(round(excess / (covered / 1000.0), 3) if covered > 0 else 0.0)
+    return rates
+
+
 def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str]) -> dict:
     start = int(marker["windowStartEpochMS"])
     end = int(marker["windowEndEpochMS"])
@@ -170,14 +222,7 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
     # the covered span, so a 500 ms block outside the window can neither
     # inflate nor dilute the scenario. maxGapMS stays unclipped: a gap cannot
     # be apportioned, so it is the worst gap of any block touching the window.
-    def fraction(block: dict) -> float:
-        span = int(block["endEpochMS"]) - int(block["startEpochMS"])
-        if span <= 0:
-            return 0.0
-        overlap = min(int(block["endEpochMS"]), end) - max(int(block["startEpochMS"]), start)
-        return max(0.0, min(1.0, overlap / span))
-
-    fractions = {id(b): fraction(b) for b in window}
+    fractions = {id(b): overlap_fraction(b, start, end) for b in window}
     covered_ms = sum(
         min(int(b["endEpochMS"]), end) - max(int(b["startEpochMS"]), start)
         for b in window
@@ -214,6 +259,8 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
     summary_rows = [r for r in rows if r.get("kind") == "summary"]
     stall = summary_rows[0] if summary_rows else {}
     scenario = marker["scenario"]
+    action_count = marker.get("actionCount")
+    cycle_rates = cycle_hitch_rates(marker, blocks)
     return {
         "scenario": scenario,
         "designation": "exploratory" if scenario in exploratory else "confirmatory",
@@ -223,6 +270,11 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
         "expectedFrames": expected,
         "hitchTimeMSPerS": round(excess_ms / (covered_ms / 1000.0), 3)
         if covered_ms else None,
+        # In-window excess frame time per scripted action (audit #79): unlike
+        # ms/s, harness pacing between actions cannot dilute it.
+        "hitchMSPerAction": round(excess_ms / action_count, 3)
+        if isinstance(action_count, int) and action_count > 0 else None,
+        **({"cycleHitchTimeMSPerS": cycle_rates} if cycle_rates is not None else {}),
         "maxGapMS": round(max_gap, 2),
         "p95GapMSApprox": approximate_p95_gap_ms(histogram, refresh_ms),
         "gapHistogram": histogram,
@@ -235,11 +287,13 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
         if len(footprints) > 1 else None,
         "thermalStates": sorted({b.get("thermalState", "unknown") for b in window}),
         # Whole-launch scoped, not window-scoped: the probe's private
-        # watchdog runs launch-to-termination.
+        # watchdog runs launch-to-termination (and its summary is written only
+        # when the probe finishes, which the test driver's terminate skips).
+        # Report-only: never published under the generation-scoped names.
         "launchStalls50": stall.get("delayedHeartbeatCount50"),
         "launchStalls250": stall.get("delayedHeartbeatCount250"),
         "launchMaxStallMS": stall.get("maximumDelayedHeartbeatMS"),
-        "actionCount": marker.get("actionCount"),
+        "actionCount": action_count,
     }, coverage
 
 
@@ -253,6 +307,8 @@ def load_thresholds(path: Path) -> dict:
     for key in ("hitchCeilingMSPerS", "maxGapCeilingMS"):
         if set(thresholds.get(key, {})) != set(confirmatory):
             raise GateError(f"thresholds contract {key} must cover exactly the confirmatory scenarios: {path}")
+    if problems := calibration_rules.validate_calibration_fields(thresholds):
+        raise GateError(f"thresholds contract {'; '.join(problems)}: {path}")
     return thresholds
 
 
@@ -324,13 +380,14 @@ def take_metrics(summary: dict) -> dict:
         "cpuUserSeconds": round(summary["cpuUserMS"] / 1000.0, 3),
         "cpuSystemSeconds": round(summary["cpuSystemMS"] / 1000.0, 3),
     }
+    # The probe watchdog's launch-scoped summary is not mapped onto the
+    # generation-scoped heartbeat metrics (audit #80).
     optional = {
+        "uiHitchMSPerAction": summary.get("hitchMSPerAction"),
         "uiP95GapMSApprox": summary.get("p95GapMSApprox"),
         "physicalFootprintStartMB": summary.get("footprintStartMB"),
         "peakPhysicalFootprintMB": summary.get("footprintPeakMB"),
         "physicalFootprintDeltaMB": summary.get("footprintDeltaMB"),
-        "uiMaximumDelayedHeartbeatMS": summary.get("launchMaxStallMS"),
-        "delayedHeartbeatCount": summary.get("launchStalls50"),
     }
     metrics.update({key: value for key, value in optional.items() if value is not None})
     return metrics
@@ -344,7 +401,9 @@ def build_evidence_manifest(
     probe_digest: str,
     profile_id: str,
     hardware: dict | None = None,
+    run_warnings: list[str] | None = None,
 ) -> dict:
+    """`run_warnings` carries run-level codes such as `uiperf.uncalibrated:<profile>`."""
     takes = []
     for index, summary in enumerate(scenarios, start=1):
         scenario = summary["scenario"]
@@ -364,7 +423,9 @@ def build_evidence_manifest(
             "metrics": take_metrics(summary),
             "warnings": warnings,
         })
-    run_warnings = sorted({code for codes in scenario_warnings.values() for code in codes})
+    run_warnings = sorted(
+        {code for codes in scenario_warnings.values() for code in codes} | set(run_warnings or [])
+    )
     status = "passedWithWarnings" if run_warnings else "passed"
     return {
         "schemaVersion": 1,
@@ -400,7 +461,19 @@ def build_evidence_manifest(
     }
 
 
+def canonical_profile_id(platform: str = "macos") -> str:
+    """The registry's canonical profile (a registry lookup, no live probe)."""
+    import publish_benchmark_history as publisher
+
+    return str(publisher.canonical_hardware_profile(platform)["id"])
+
+
 def main() -> int:
+    if "--derive-thresholds" in sys.argv[1:]:
+        return calibration_rules.derive_main(
+            sys.argv[1:], platform="macos", default_thresholds=DEFAULT_THRESHOLDS_PATH,
+            load_thresholds=load_thresholds, runs_root=UI_PERF_RUNS,
+        )
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--xcodebuild-log", required=True)
     parser.add_argument("--diagnostics", required=True)
@@ -437,7 +510,6 @@ def main() -> int:
 
         exploratory = exploratory_scenarios(thresholds)
         scenarios = []
-        scenario_warnings: dict[str, list[str]] = {}
         environment_rows: list[dict] = []
         probe_hash = hashlib.sha256()
         for name in EXPECTED_SCENARIOS:
@@ -457,9 +529,6 @@ def main() -> int:
                     f"{COVERAGE_FLOOR:.0%} of the marked window"
                 )
             summary["probeFile"] = probe_path.name
-            warnings = evaluate_thresholds(summary, thresholds)
-            summary["thresholdWarnings"] = warnings
-            scenario_warnings[name] = warnings
             scenarios.append(summary)
             probe_hash.update(probe_path.read_bytes())
             if args.copy_probe_files_to:
@@ -471,14 +540,34 @@ def main() -> int:
         print(f"ui-perf gate FAILED: {error}", file=sys.stderr)
         return 1
 
-    run_warnings = sorted({code for codes in scenario_warnings.values() for code in codes})
+    # The ceilings apply only on the profile and refresh interval they were
+    # derived on; anywhere else the run says so once instead (audit #77).
+    calibration = calibration_rules.calibration(
+        thresholds, canonical_profile_id(), [row["refreshIntervalMS"] for row in scenarios],
+    )
+    scenario_warnings: dict[str, list[str]] = {}
+    for summary in scenarios:
+        warnings = evaluate_thresholds(summary, thresholds) if calibration["calibrated"] else []
+        warnings += calibration_rules.footprint_growth_warning(summary, thresholds)
+        summary["thresholdWarnings"] = warnings
+        scenario_warnings[summary["scenario"]] = warnings
+    extra_run_warnings = [calibration["code"]] if calibration["code"] else []
+    run_warnings = sorted(
+        {code for codes in scenario_warnings.values() for code in codes} | set(extra_run_warnings)
+    )
     report = {
         "schemaVersion": 1,
         "evidence": "registry" if args.emit_evidence else "local-only",
         "hardwareContext": {k: v for k, v in hardware_context.items() if k != "profileID"},
         "runID": args.run_id,
         "status": "passedWithWarnings" if run_warnings else "passed",
-        "thresholds": {"path": str(args.thresholds), "warnOnly": True, "warnings": run_warnings},
+        "thresholds": {
+            "path": str(args.thresholds), "warnOnly": True, "warnings": run_warnings,
+            "calibrated": calibration["calibrated"],
+            "calibrationProfile": calibration["calibrationProfile"],
+            "calibrationRefreshIntervalMS": calibration["calibrationRefreshIntervalMS"],
+            "uncalibratedReasons": calibration["reasons"],
+        },
         "measurement": "main-run-loop display-link cadence (UI-thread hitch proxy; "
         "not compositor presents; interaction-issued XCUITest accessibility "
         "queries execute on the app main thread — scenarios minimize them "
@@ -489,6 +578,8 @@ def main() -> int:
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if not calibration["calibrated"]:
+        print(f"  ceilings not applied ({calibration['code']}): {'; '.join(calibration['reasons'])}")
     for row in scenarios:
         flag = " !" + ",".join(row["thresholdWarnings"]) if row["thresholdWarnings"] else ""
         print(
@@ -498,7 +589,6 @@ def main() -> int:
         )
 
     if args.emit_evidence:
-        sys.path.insert(0, str(REPO_ROOT / "scripts"))
         import publish_benchmark_history as publisher
         try:
             profile_id = publisher.verify_canonical_hardware("macos")["profileID"]
@@ -513,6 +603,7 @@ def main() -> int:
                 probe_digest=probe_hash.hexdigest(),
                 profile_id=profile_id,
                 hardware={k: v for k, v in hardware_context.items() if k != "profileID"},
+                run_warnings=extra_run_warnings,
             )
             evidence_path = output.parent / "benchmark-evidence.json"
             evidence_path.write_text(

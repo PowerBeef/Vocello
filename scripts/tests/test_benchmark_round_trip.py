@@ -241,6 +241,30 @@ class UICheckerRoundTripTests(unittest.TestCase):
             fixture.tearDown()
         record, _size = publish_through_registry(manifest, screenshots=True, run_lane="perf")
         self.assertEqual(record["run"]["kind"], "ui-perf")
+        self.assertIn("uiHitchMSPerAction", record["takes"][1]["metrics"])
+
+    def test_uncalibrated_macos_ui_perf_manifest_publishes(self) -> None:
+        """audit #77: M2 ceilings on the M6 publish one run-level uncalibrated code."""
+        fixture = mac_perf.UIPerfFixture("run_checker")
+        fixture.setUp()
+        try:
+            fixture.thresholds.write_text(json.dumps(
+                {**fixture.contract, "calibrationProfile": "mac-mini-m2-8gb"}
+            ))
+            log = fixture.write_run(hitch_by_scenario={"idle-baseline": 50.0})
+            live_publisher = sys.modules.get("publish_benchmark_history", publisher)
+            with mock.patch.object(
+                live_publisher, "verify_canonical_hardware", return_value={"profileID": "mac-mini-m6-16gb"}
+            ):
+                status, _report = fixture.run_checker(log, emit=True)
+            self.assertEqual(status, 0)
+            manifest = json.loads((fixture.root / "benchmark-evidence.json").read_text(encoding="utf-8"))
+        finally:
+            fixture.tearDown()
+        record, _size = publish_through_registry(manifest, screenshots=True, run_lane="perf")
+        self.assertEqual(record["run"]["warnings"], ["uiperf.uncalibrated:mac-mini-m2-8gb"])
+        self.assertEqual(record["run"]["status"], "passedWithWarnings")
+        self.assertTrue(all(take["warnings"] == [] for take in record["takes"]))
 
     def test_ios_ui_perf_manifest_publishes(self) -> None:
         fixture = ios_perf.IOSUIPerfFixture("run_checker")

@@ -63,8 +63,9 @@ resolved once per process:
 
 | Source | Effect |
 |---|---|
-| `QWENVOICE_DEBUG=1` (env) | On in any process that inherits it (e.g. `./scripts/build.sh run`). |
-| In-process latch | `vocello bench` latches its `--telemetry` mode through `TelemetryGate.applyHandshakeMode(_:)` (a non-off mode only). There is no persisted Settings tap-toggle. |
+| `QWENVOICE_DEBUG=1` (env) | On in any process that inherits it (e.g. `./scripts/build.sh run`), unless `QWENVOICE_NATIVE_TELEMETRY_MODE=off` says otherwise. |
+| In-process latch | `vocello bench` latches its `--telemetry` mode through `TelemetryGate.applyHandshakeMode(_:)`; a latched `off` keeps telemetry off for the rest of the process. There is no persisted Settings tap-toggle. |
+| `QWENVOICE_NATIVE_TELEMETRY_MODE=off` (alias: `disabled`) | Off, and it wins over `QWENVOICE_DEBUG=1`: the debug switch still unlocks registered runtime overrides (`RuntimeDebugGate`, which keeps needing the internal-diagnostics build), but it cannot turn back on telemetry a run disabled. |
 | `QWENVOICE_NATIVE_TELEMETRY_MODE=lightweight\|verbose` (aliases: `light`, `full`, `deep`) | Forces sampling/persistence on regardless of the gate. |
 
 The engine runs **in process on macOS and iOS** (the macOS XPC service was retired on 2026-09-15 and the
@@ -81,9 +82,14 @@ all telemetry code is compiled out of distributed binaries.
 | `lightweight` (default when gate on) | `lightweight` / `light` | device‑tiered cadence | no |
 | `verbose` | `verbose` / `full` / `deep` | device‑tiered cadence | **yes** (sidecar) |
 
-`NativeTelemetryWorkPlan` makes the off contract explicit: no sampler, sink,
-per-chunk QC, or expensive derived diagnostics are constructed. The deterministic
-overhead lane verifies that optimization and waveform parity:
+`NativeTelemetryWorkPlan` makes the off contract explicit: no recorder, sampler, sink,
+per-chunk QC, or expensive derived diagnostics are constructed. The engine builds its stage
+recorder only when the gate is on and the mode is not off, and writes engine rows, raw sample
+sidecars, streaming v9 sidecars and the published-WAV digest only through the plan's `writesSink`.
+`vocello bench --telemetry off` sets the off mode and latches it, so the off arm stays off although
+its runtime overrides set `QWENVOICE_DEBUG=1`. The deterministic overhead lane verifies that
+optimization and waveform parity, and fails if an off arm leaves any file under
+`diagnostics/engine`; every arm's timings come from the CLI observer (`bench-results.json`):
 
 ```sh
 scripts/macos_test.sh telemetry-overhead

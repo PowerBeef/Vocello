@@ -47,8 +47,13 @@ enum BenchCodecReplay {
 
     @MainActor
     static func run(_ args: Args) async throws {
+        // The replay is telemetry evidence, so an explicit
+        // QWENVOICE_NATIVE_TELEMETRY_MODE=off refuses it even with QWENVOICE_DEBUG=1.
         guard RuntimeDebugGate.isEnabled(), TelemetryGate.resolvedEnabled else {
-            throw CLIError("Codec replay requires an internal-diagnostics build and QWENVOICE_DEBUG=1.")
+            throw CLIError(
+                "Codec replay requires an internal-diagnostics build, QWENVOICE_DEBUG=1 "
+                + "and telemetry that is not explicitly off."
+            )
         }
         let takeURL = URL(fileURLWithPath: try args.require("codec-replay", "collected take JSON"))
         let expectedDigest = try args.require("take-sha256", "original take digest")

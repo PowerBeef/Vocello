@@ -119,6 +119,16 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
     private let diagnosticAppSupportBox: DiagnosticAppSupportBox?
     private let markingConfiguration: AudioMarkingConfiguration?
 
+    /// Engine rows are written only through the work plan: no recorder (telemetry
+    /// off, or an off mode) means no sink write, whatever `QWENVOICE_DEBUG` says.
+    private var telemetryWorkPlan: NativeTelemetryWorkPlan {
+        NativeTelemetryWorkPlan(
+            mode: NativeTelemetryMode.current(),
+            recorderPresent: telemetryRecorder != nil,
+            sampleIntervalAvailable: telemetrySampler != nil
+        )
+    }
+
     init(
         generationID: UUID,
         requestID: Int,
@@ -362,7 +372,7 @@ final class GenerationOutputAdapter: GenerationOutputAdapting, @unchecked Sendab
         guard NativeGenerationTerminalClassifier.shouldPublish(
             error: error,
             policy: telemetryTerminalPolicy
-        ), TelemetryGate.resolvedEnabled,
+        ), telemetryWorkPlan.writesSink,
            let appSupportDirectory = diagnosticAppSupportBox?.url,
            await terminalGate.claim() else { return }
 
@@ -1328,6 +1338,16 @@ struct StreamingExecutionContext: Sendable {
     let diagnosticAppSupportBox: DiagnosticAppSupportBox?
     let markingConfiguration: AudioMarkingConfiguration?
 
+    /// The terminal writers' view of the same plan `run` computes once: engine
+    /// rows exist only when the plan writes the sink.
+    private var telemetryWorkPlan: NativeTelemetryWorkPlan {
+        NativeTelemetryWorkPlan(
+            mode: NativeTelemetryMode.current(),
+            recorderPresent: telemetryRecorder != nil,
+            sampleIntervalAvailable: telemetrySampler != nil
+        )
+    }
+
     private func scratchBuffer(sampleRate: Int) -> PCM16ScratchBuffer {
         let leadingSilencePolicy: PCM16LeadingSilenceGate.Policy =
             request.mode == .clone ? .cloneEdgeV1 : .disabled
@@ -1420,9 +1440,18 @@ struct StreamingExecutionContext: Sendable {
     ) async throws -> GenerationResult {
         let benchNotes = BenchRunContext.telemetryNotes()
         let benchRunID = benchNotes["benchRunID"] ?? "not-bench"
+        let telemetryMode = NativeTelemetryMode.current()
+        // The one telemetry decision for this execution: engine rows, v9 chunk
+        // observations, audio-channel statistics, codec traces, rejected-audio
+        // evidence and the published-WAV digest exist only when it writes the sink.
+        let telemetryWorkPlan = NativeTelemetryWorkPlan(
+            mode: telemetryMode,
+            recorderPresent: telemetryRecorder != nil,
+            sampleIntervalAvailable: telemetrySampler != nil
+        )
         let diagnosticRunID = StartupReliabilityDiagnosticEvidence.captureRunID(
             environment: ProcessInfo.processInfo.environment,
-            telemetryEnabled: TelemetryGate.resolvedEnabled
+            telemetryEnabled: telemetryWorkPlan.writesSink
         )
         let benchTakeIndex = benchNotes["benchTakeIndex"] ?? "not-bench"
         let benchCell = benchNotes["benchCell"] ?? "not-bench"
@@ -1449,13 +1478,7 @@ struct StreamingExecutionContext: Sendable {
         var signpostTimingsMS: [String: Int] = [:]
         let outputURL = URL(fileURLWithPath: request.outputPath)
         let sampleRate = model.sampleRate
-        let telemetryMode = NativeTelemetryMode.current()
         let telemetryClock = telemetryRecorder?.clock
-        let telemetryWorkPlan = NativeTelemetryWorkPlan(
-            mode: telemetryMode,
-            recorderPresent: telemetryRecorder != nil,
-            sampleIntervalAvailable: telemetrySampler != nil
-        )
         // Per-chunk decode timeline + final stats. Only populated when telemetry is
         // on (recorder non-nil), so there is zero per-chunk cost when gated off.
         let telemetryActive = telemetryWorkPlan.computesDerivedDiagnostics
@@ -1698,7 +1721,7 @@ struct StreamingExecutionContext: Sendable {
                     } else {
                         previewDisposition = .notRequested
                     }
-                    if TelemetryGate.resolvedEnabled {
+                    if telemetryWorkPlan.writesSink {
                         let mlxInstants = Self.mlxChunkInstants(
                             timings: chunk.timings,
                             materializedAtNS: materializedAtNS
@@ -1728,7 +1751,7 @@ struct StreamingExecutionContext: Sendable {
             latestInfo = terminal.generationInfo
             finalizedDiagnostics = terminal.diagnostics ?? finalizedDiagnostics
             if request.captureCodecTrace == true,
-               TelemetryGate.resolvedEnabled,
+               telemetryWorkPlan.writesSink,
                let diagnosticRunID,
                let trace = terminal.codecTrace,
                let appSupportDirectory = diagnosticAppSupportBox?.url,
@@ -1764,7 +1787,7 @@ struct StreamingExecutionContext: Sendable {
                     "Qwen3-TTS failed before producing a complete final audio result."
                 )
             }
-            if TelemetryGate.resolvedEnabled {
+            if telemetryWorkPlan.writesSink {
                 let channelStats = await audio.statistics()
                 audioChannelSummary = AudioChannelSummaryV9(
                     capacityFrames: UInt64(max(0, channelStats.capacityFrames)),
@@ -1936,7 +1959,7 @@ struct StreamingExecutionContext: Sendable {
             await telemetrySampler?.captureBoundary("after_audio_qc")
             guard finalAudioQC.verdict != .fail else {
                 rejectedAudioQC = finalAudioQC
-                if TelemetryGate.resolvedEnabled,
+                if telemetryWorkPlan.writesSink,
                    let diagnosticRunID,
                    let appSupportDirectory = diagnosticAppSupportBox?.url,
                    let evidence = try? StartupReliabilityDiagnosticEvidence.persistRejectedAudio(
@@ -2056,7 +2079,7 @@ struct StreamingExecutionContext: Sendable {
             "outputReadableWAV": "true",
             "outputAtomicallyPublished": "true",
         ]
-        let publishedWAVDigest: String? = TelemetryGate.resolvedEnabled
+        let publishedWAVDigest: String? = telemetryWorkPlan.writesSink
             ? try? SamplingTakeEvidence.sha256FileDigest(at: outputURL)
             : nil
         if let wavDigest = publishedWAVDigest {
@@ -2285,7 +2308,7 @@ struct StreamingExecutionContext: Sendable {
             error: error,
             policy: telemetryTerminalPolicy
         ) else { return }
-        var failureNotes = TelemetryGate.resolvedEnabled
+        var failureNotes = telemetryWorkPlan.writesSink
             ? GenerationTelemetryPrivacy.failureNotes(message: error.localizedDescription)
             : [:]
         if let runtimeError = error as? NativeRuntimeError {
@@ -2361,7 +2384,7 @@ struct StreamingExecutionContext: Sendable {
         streamingAudioChannel: AudioChannelSummaryV9? = nil,
         streamingTerminals: GenerationTerminalTimelineV9? = nil
     ) async {
-        guard TelemetryGate.resolvedEnabled else { return }
+        guard telemetryWorkPlan.writesSink else { return }
         guard let appSupportDirectory = diagnosticAppSupportBox?.url else { return }
         guard await telemetryTerminalGate.claim() else { return }
         let effectiveBooleanFlags = booleanFlags.merging(diagnosticBooleanFlags ?? [:]) { _, terminal in terminal }

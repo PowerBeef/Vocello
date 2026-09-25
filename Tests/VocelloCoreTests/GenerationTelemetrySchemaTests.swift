@@ -181,6 +181,81 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
         XCTAssertTrue(verbose.computesDerivedDiagnostics)
     }
 
+    /// Audit #20: the full default matrix plans 58 verbose generations. A bench
+    /// run sized to its plan keeps every sidecar publication needs, where the
+    /// ad-hoc budget keeps only the newest 48.
+    func testBenchRunSidecarBudgetKeepsEverySidecarOfTheDefaultMatrix() async throws {
+        XCTAssertEqual(BenchMatrixSpec.plannedGenerationCount(
+            modes: BenchMatrixSpec.defaultModes,
+            variantCount: 2,
+            lengths: BenchMatrixSpec.defaultLengths,
+            warm: BenchMatrixSpec.defaultWarmReps,
+            deliveryCellCount: 0,
+            ttfcProbe: false
+        ), 58)
+        let budget = try XCTUnwrap(GenerationTelemetrySidecarBudget.benchRun(plannedSidecars: 60))
+        let sample = telemetrySample(tMS: 0, capturedNS: 0, kind: .boundary, boundary: "session_start")
+
+        let benchRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sidecar-budget-bench-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: benchRoot) }
+        let benchSink = GenerationTelemetryJSONLSink()
+        await benchSink.useSidecarBudget(budget)
+        for index in 0..<60 {
+            await benchSink.persistRawSamples(
+                [sample], generationID: "take-\(index)", appSupportDirectory: benchRoot, subdirectory: "engine"
+            )
+        }
+        XCTAssertEqual(try sidecarCount(in: benchRoot), 60)
+
+        let adHocRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sidecar-budget-adhoc-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: adHocRoot) }
+        let adHocSink = GenerationTelemetryJSONLSink()
+        for index in 0..<60 {
+            await adHocSink.persistRawSamples(
+                [sample], generationID: "take-\(index)", appSupportDirectory: adHocRoot, subdirectory: "engine"
+            )
+        }
+        XCTAssertEqual(try sidecarCount(in: adHocRoot), GenerationTelemetrySidecarBudget.adHoc.maxFiles)
+    }
+
+    /// A plan larger than one run can keep is refused before any model loads;
+    /// a small plan never shrinks the ad-hoc budget; delivery cells and the
+    /// TTFC probe count toward the plan.
+    func testBenchRunSidecarBudgetRefusesAPlanItCannotKeep() throws {
+        let ceiling = GenerationTelemetrySidecarBudget.maximumRunSidecarFiles
+        XCTAssertNil(GenerationTelemetrySidecarBudget.benchRun(plannedSidecars: ceiling + 1))
+        let largest = try XCTUnwrap(GenerationTelemetrySidecarBudget.benchRun(plannedSidecars: ceiling))
+        XCTAssertEqual(largest.maxFiles, ceiling)
+        XCTAssertGreaterThanOrEqual(
+            largest.maxTotalBytes,
+            ceiling * (GenerationTelemetrySidecarBudget.adHoc.maxTotalBytes / GenerationTelemetrySidecarBudget.adHoc.maxFiles)
+        )
+        XCTAssertEqual(
+            GenerationTelemetrySidecarBudget.benchRun(plannedSidecars: 11),
+            GenerationTelemetrySidecarBudget.adHoc
+        )
+        // Custom: cold + 3 warm + 3 delivery; Clone: 3 warm; one TTFC probe per mode.
+        XCTAssertEqual(BenchMatrixSpec.plannedGenerationCount(
+            modes: ["custom", "clone"],
+            variantCount: 1,
+            lengths: ["medium"],
+            warm: 3,
+            deliveryCellCount: 3,
+            ttfcProbe: true
+        ), 12)
+    }
+
+    private func sidecarCount(in appSupportDirectory: URL) throws -> Int {
+        let directory = appSupportDirectory
+            .appendingPathComponent("diagnostics", isDirectory: true)
+            .appendingPathComponent("engine", isDirectory: true)
+        return try FileManager.default.contentsOfDirectory(atPath: directory.path)
+            .filter { $0.hasPrefix("samples-") && $0.hasSuffix(".jsonl") }
+            .count
+    }
+
     func testTransportAdapterPreservesGapAndTerminalSemantics() {
         let metrics = GenerationTelemetryCompatibilityAdapter.transport(
             finishReason: "cancelled",

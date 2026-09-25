@@ -1,5 +1,45 @@
 import Foundation
 
+/// How many verbose `samples-<id>.jsonl` sidecars one diagnostics directory keeps.
+///
+/// Ad-hoc diagnostics keep the newest 48 (64 MiB) so they can never fill a disk.
+/// A benchmark run needs the exact sidecar of every take it plans to publish, so
+/// `vocello bench` sizes the budget to its own plan before any model loads; the
+/// plan is refused when it exceeds `maximumRunSidecarFiles`, which keeps the run
+/// budget bounded too. Pruning stays newest-first, so an older run's sidecars kept
+/// with `--keep` go before any of the current run's.
+public struct GenerationTelemetrySidecarBudget: Equatable, Sendable {
+    public let maxFiles: Int
+    public let maxTotalBytes: Int
+
+    public static let adHoc = GenerationTelemetrySidecarBudget(
+        maxFiles: 48,
+        maxTotalBytes: 64 * 1_024 * 1_024
+    )
+
+    /// Upper bound on one benchmark run's sidecars. The default full matrix plans
+    /// 58 generations; a larger plan is split into separate runs.
+    public static let maximumRunSidecarFiles = 256
+
+    /// The budget for a benchmark run that plans `plannedSidecars` generations,
+    /// never smaller than the ad-hoc budget; nil when the plan exceeds
+    /// `maximumRunSidecarFiles`. Bytes scale with the ad-hoc per-sidecar allowance.
+    public static func benchRun(plannedSidecars: Int) -> GenerationTelemetrySidecarBudget? {
+        guard plannedSidecars <= maximumRunSidecarFiles else { return nil }
+        let files = max(adHoc.maxFiles, plannedSidecars)
+        let bytesPerSidecar = adHoc.maxTotalBytes / adHoc.maxFiles
+        return GenerationTelemetrySidecarBudget(
+            maxFiles: files,
+            maxTotalBytes: max(adHoc.maxTotalBytes, files * bytesPerSidecar)
+        )
+    }
+
+    public init(maxFiles: Int, maxTotalBytes: Int) {
+        self.maxFiles = maxFiles
+        self.maxTotalBytes = maxTotalBytes
+    }
+}
+
 /// Shared, runtime-gated, append-only writer for per-generation telemetry rows.
 ///
 /// Complements the runtime-gated native event stream with one durable summary per
@@ -24,16 +64,15 @@ public actor GenerationTelemetryJSONLSink {
     /// - Per JSONL log (`generations.jsonl` × layer, `generations-merged.jsonl`):
     ///   trimmed from the front when it exceeds `maxLogBytes`. `QWENVOICE_DIAGNOSTICS_MAX_MB`
     ///   scales this (per-log MB); unset ⇒ 8 MB.
-    /// - Verbose sidecars (`samples-<id>.jsonl`): newest `maxSidecarFiles` kept, total
-    ///   capped at `maxSidecarTotalBytes`.
+    /// - Verbose sidecars (`samples-<id>.jsonl`): newest `sidecarBudget.maxFiles` kept,
+    ///   total capped at `sidecarBudget.maxTotalBytes` (`GenerationTelemetrySidecarBudget`).
     public static let maxLogBytes: Int = {
         let mb = RuntimeDebugGate.observabilityValue(for: "QWENVOICE_DIAGNOSTICS_MAX_MB")
             .flatMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
             .map { max(1, $0) } ?? 8
         return mb * 1_024 * 1_024
     }()
-    public static let maxSidecarFiles = 48
-    public static let maxSidecarTotalBytes = 64 * 1_024 * 1_024
+    private var sidecarBudget = GenerationTelemetrySidecarBudget.adHoc
 
     public init() {
         let encoder = JSONEncoder()
@@ -71,6 +110,13 @@ public actor GenerationTelemetryJSONLSink {
         }
     }
 
+    /// Replace the verbose-sidecar budget for the rest of this process. Only a
+    /// benchmark run that owns its diagnostics directory calls this, with the
+    /// budget sized to its plan.
+    public func useSidecarBudget(_ budget: GenerationTelemetrySidecarBudget) {
+        sidecarBudget = budget
+    }
+
     /// Opt-in verbose path: persist the raw per-sample memory/timing series to a
     /// per-generation sidecar `samples-<generationID>.jsonl` (one `TelemetrySample`
     /// per line). Separate file so the main `generations.jsonl` stays compact and
@@ -82,6 +128,21 @@ public actor GenerationTelemetryJSONLSink {
         subdirectory: String
     ) {
         guard TelemetryGate.resolvedEnabled else { return }
+        persistRawSamples(
+            samples,
+            generationID: generationID,
+            appSupportDirectory: appSupportDirectory,
+            subdirectory: subdirectory
+        )
+    }
+
+    /// The ungated write behind `writeRawSamples`, a seam for deterministic tests.
+    func persistRawSamples(
+        _ samples: [TelemetrySample],
+        generationID: String,
+        appSupportDirectory: URL?,
+        subdirectory: String
+    ) {
         guard let appSupportDirectory, !samples.isEmpty else { return }
 
         let directory = appSupportDirectory
@@ -99,11 +160,7 @@ public actor GenerationTelemetryJSONLSink {
                 blob.append(line)
             }
             try Self.coordinatedWrite(blob, to: url, options: .atomic)
-            Self.pruneSidecars(
-                in: directory,
-                maxFiles: Self.maxSidecarFiles,
-                maxTotalBytes: Self.maxSidecarTotalBytes
-            )
+            Self.pruneSidecars(in: directory, budget: sidecarBudget)
         } catch {
             Self.logError("Could not write raw samples for '\(generationID)': \(DiagnosticPrivacy.summary(of: error))")
         }
@@ -197,7 +254,7 @@ public actor GenerationTelemetryJSONLSink {
     }
 
     /// Delete oldest `samples-*.jsonl` sidecars until within both budgets.
-    private static func pruneSidecars(in directory: URL, maxFiles: Int, maxTotalBytes: Int) {
+    static func pruneSidecars(in directory: URL, budget: GenerationTelemetrySidecarBudget) {
         let fm = FileManager.default
         guard let entries = try? fm.contentsOfDirectory(
             at: directory,
@@ -219,7 +276,7 @@ public actor GenerationTelemetryJSONLSink {
         var runningBytes = 0
         for (offset, sidecar) in sidecars.enumerated() {
             runningBytes += byteSize(sidecar)
-            if offset >= maxFiles || runningBytes > maxTotalBytes {
+            if offset >= budget.maxFiles || runningBytes > budget.maxTotalBytes {
                 try? fm.removeItem(at: sidecar)
             }
         }

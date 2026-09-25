@@ -236,7 +236,12 @@ enum BenchCommand {
             )
         }
         if telemetryOff {
+            // The off arm must construct no recorder, sampler or sink even though
+            // the runtime overrides below set QWENVOICE_DEBUG=1: the explicit off
+            // mode and the latched `.off` both win over the debug switch
+            // (TelemetryGate), whichever resolves first.
             setenv("QWENVOICE_NATIVE_TELEMETRY_MODE", "off", 1)
+            TelemetryGate.applyHandshakeMode(.off)
         } else {
             TelemetryGate.applyHandshakeMode(telemetryVerbose ? .verbose : .lightweight)
             if telemetryVerbose { setenv("QWENVOICE_NATIVE_TELEMETRY_MODE", "verbose", 1) }
@@ -325,6 +330,28 @@ enum BenchCommand {
         )
         if memoryQualification != nil, requestedCustomSpeakerID != nil {
             throw CLIError("--speaker cannot alter the fixed retained-memory qualification fixture")
+        }
+        // Publication needs the exact verbose sidecar of every take, and the
+        // ad-hoc budget keeps only the newest 48. Size this run's budget to its
+        // plan before any model loads, or refuse a plan too large to keep.
+        if telemetryVerbose {
+            let plannedGenerations = BenchMatrixSpec.plannedGenerationCount(
+                modes: modes,
+                variantCount: variants.count,
+                lengths: lengths,
+                warm: warm,
+                deliveryCellCount: deliveryItems.count,
+                ttfcProbe: ttfc
+            )
+            guard let sidecarBudget = GenerationTelemetrySidecarBudget.benchRun(
+                plannedSidecars: plannedGenerations
+            ) else {
+                throw CLIError(
+                    "this matrix plans \(plannedGenerations) verbose generations; one run keeps at most "
+                    + "\(GenerationTelemetrySidecarBudget.maximumRunSidecarFiles) sidecars, so split it into smaller runs"
+                )
+            }
+            await GenerationTelemetryJSONLSink.shared.useSidecarBudget(sidecarBudget)
         }
 
         // Bench path isolation is independent of telemetry. In particular,

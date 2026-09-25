@@ -70,6 +70,28 @@ class TelemetryOverheadIdentityTests(unittest.TestCase):
             stream.setframerate(24_000)
             stream.writeframes(frames)
 
+    def test_off_arm_engine_telemetry_leftovers_are_listed(self) -> None:
+        data_dir = self.root
+        self.assertEqual(overhead.engine_telemetry_leftovers(data_dir / "missing"), [])
+        self.assertEqual(overhead.engine_telemetry_leftovers(data_dir), [])
+        # bench-results.json belongs to the CLI observer, never the engine sink.
+        (data_dir / "diagnostics" / "bench-results.json").write_text("{}", encoding="utf-8")
+        self.assertEqual(overhead.engine_telemetry_leftovers(data_dir), [])
+        self.write_rows([engine_row("generation-1")])
+        sidecar = data_dir / "diagnostics" / "engine" / "samples-generation-1.jsonl"
+        sidecar.write_text("{}\n", encoding="utf-8")
+        v9 = data_dir / "diagnostics" / "engine" / "streaming-telemetry-v9" / "generation-1.json"
+        v9.parent.mkdir()
+        v9.write_text("{}", encoding="utf-8")
+        self.assertEqual(
+            overhead.engine_telemetry_leftovers(data_dir),
+            [
+                "diagnostics/engine/generations.jsonl",
+                "diagnostics/engine/samples-generation-1.jsonl",
+                "diagnostics/engine/streaming-telemetry-v9/generation-1.json",
+            ],
+        )
+
     def test_artifact_root_comes_from_validated_build_policy(self) -> None:
         self.assertEqual(
             overhead.managed_output_path("QVOICE_ARTIFACTS_MACOS"),

@@ -86,6 +86,31 @@ public enum BenchMatrixSpec {
     ) -> Int {
         matrix(modes: modes, lengths: lengths, warm: warm).count
     }
+
+    /// Generations one `vocello bench` invocation plans, each of which writes one
+    /// verbose sidecar: per mode × variant, the Custom/Design cold take, `warm`
+    /// takes per length and one take per delivery cell (Custom/Design only), plus
+    /// one TTFC probe per mode × variant. Mirrors `BenchCommand.run`'s loops; the
+    /// full default matrix (three modes, two variants, three lengths, warm 3) is 58.
+    public static func plannedGenerationCount(
+        modes: [String],
+        variantCount: Int,
+        lengths: [String],
+        warm: Int,
+        deliveryCellCount: Int,
+        ttfcProbe: Bool
+    ) -> Int {
+        let hasColdLength = !lengths.isEmpty
+        let perVariant = modes.reduce(0) { count, mode in
+            let instructable = mode != "clone"
+            return count
+                + (instructable && hasColdLength ? 1 : 0)
+                + lengths.count * max(0, warm)
+                + (instructable ? max(0, deliveryCellCount) : 0)
+        }
+        let probes = ttfcProbe ? modes.count : 0
+        return (perVariant + probes) * max(0, variantCount)
+    }
 }
 
 public enum BenchMatrixValidationError: Error, CustomStringConvertible {

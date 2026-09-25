@@ -2,7 +2,8 @@ import Foundation
 
 /// Debug-only benchmark hook: force an explicit model unload immediately before the next
 /// generation so telemetry records `warmState=cold`. Honored only when durable telemetry
-/// is enabled (`TelemetryGate`) and the explicit runtime master gate is active.
+/// is enabled (`TelemetryGate`, which an explicit telemetry-off mode keeps off even under
+/// `QWENVOICE_DEBUG`) and the explicit runtime master gate is active.
 public enum BenchForceColdPolicy {
     private static let environmentKey = "QWENVOICE_BENCH_FORCE_COLD"
     private static let lock = NSLock()

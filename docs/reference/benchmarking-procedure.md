@@ -894,7 +894,11 @@ an automated gate and does not authorize overriding a deterministic failure or w
 | `build/**/*.xcresult`, screenshots | UI evidence retained locally under bounded lane retention |
 | `build/**/profiles/` | Compact local profile summaries; raw `*.trace` is success-ephemeral unless `--keep-trace` was explicit |
 
-Auto-pruned: `generations.jsonl` ~8 MB cap; verbose sidecars newest-48 / 64 MB.
+Auto-pruned: `generations.jsonl` ~8 MB cap; verbose sidecars newest-48 / 64 MB for ad-hoc
+diagnostics. `vocello bench --telemetry verbose` sizes the sidecar budget to its own plan before any
+model loads (at least one sidecar per planned take and TTFC probe, the same per-sidecar byte
+allowance) and refuses a plan above 256 generations, so a full default matrix (58 takes) keeps every
+sidecar publication needs (`GenerationTelemetrySidecarBudget`).
 
 ### Committed (bounded)
 

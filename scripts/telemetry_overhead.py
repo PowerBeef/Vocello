@@ -266,6 +266,21 @@ def load_model_runtime_identity(
     return first
 
 
+def engine_telemetry_leftovers(data_dir: Path) -> list[str]:
+    """Files under `diagnostics/engine` of one bench data directory.
+
+    The telemetry-off arm must construct no recorder, sampler or sink, so it
+    leaves no engine JSONL row, raw sample sidecar or streaming v9 sidecar; its
+    timings come from the CLI's own observer in `bench-results.json`.
+    """
+    engine = data_dir / "diagnostics" / "engine"
+    if not engine.is_dir():
+        return []
+    return sorted(
+        path.relative_to(data_dir).as_posix() for path in engine.rglob("*") if path.is_file()
+    )
+
+
 def run_lane(args: argparse.Namespace) -> dict:
     started_at = utc_now()
     nonce = hashlib.sha256(os.urandom(32)).hexdigest()[:8]
@@ -317,6 +332,13 @@ def run_lane(args: argparse.Namespace) -> dict:
                 raise RuntimeError(f"{mode} bench failed in rotation {rotation_index} with exit {completed.returncode}")
 
             manifest = load_bench_results(data_dir)
+            if mode == "off":
+                leftovers = engine_telemetry_leftovers(data_dir)
+                if leftovers:
+                    raise RuntimeError(
+                        f"telemetry-off arm in rotation {rotation_index} left "
+                        f"{len(leftovers)} engine telemetry file(s): {', '.join(leftovers[:5])}"
+                    )
             warm_takes = [
                 take for take in manifest["takes"]
                 if take.get("warmState") == "warm" and take.get("delivery") is None

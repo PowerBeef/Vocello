@@ -17,6 +17,16 @@ public struct NativeTelemetryWorkPlan: Equatable, Sendable {
         computesChunkQC = enabled && mode == .verbose
         computesDerivedDiagnostics = enabled
     }
+
+    /// Whether a generation builds its stage recorder at all. The recorder is
+    /// what makes `writesSink` true, so an off mode never constructs one even
+    /// while the process gate is on (a gate resolved before a host latched off).
+    public static func buildsRecorder(
+        telemetryEnabled: Bool,
+        mode: NativeTelemetryMode
+    ) -> Bool {
+        telemetryEnabled && mode != .off
+    }
 }
 import OSLog
 

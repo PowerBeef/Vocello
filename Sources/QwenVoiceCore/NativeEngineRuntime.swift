@@ -756,8 +756,12 @@ actor NativeEngineRuntime {
         // load / prewarm) so the full backend timeline is measured from one origin.
         // Propagate to the load coordinator so its cache/tokenizer/model-load marks
         // share this recorder, and carry it to the session (same start clock as its
-        // memory sampler). Nil — and therefore zero overhead — when telemetry is off.
-        let telemetryRecorder: NativeTelemetryRecorder? = TelemetryGate.resolvedEnabled
+        // memory sampler). Nil — and therefore zero overhead — when telemetry is off;
+        // the work plan's `writesSink` needs this recorder, so no engine row follows.
+        let telemetryRecorder: NativeTelemetryRecorder? = NativeTelemetryWorkPlan.buildsRecorder(
+            telemetryEnabled: TelemetryGate.resolvedEnabled,
+            mode: NativeTelemetryMode.current()
+        )
             ? NativeTelemetryRecorder(clock: NativeTelemetryClock())
             : nil
         self.telemetryRecorder = telemetryRecorder
@@ -1175,7 +1179,11 @@ actor NativeEngineRuntime {
             if NativeGenerationTerminalClassifier.shouldPublish(
                 error: error,
                 policy: telemetryTerminalPolicy
-            ), TelemetryGate.resolvedEnabled,
+            ), NativeTelemetryWorkPlan(
+                mode: NativeTelemetryMode.current(),
+                recorderPresent: telemetryRecorder != nil,
+                sampleIntervalAvailable: telemetrySampler != nil
+            ).writesSink,
                let appSupportDirectory = diagnosticAppSupportBox?.url {
                 var failureNotes = GenerationTelemetryPrivacy.failureNotes(
                     message: error.localizedDescription

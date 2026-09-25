@@ -698,9 +698,12 @@ the same exact-PID trace, and forces verbose run-scoped samples. New publishable
 telemetry schema v8 and evidence manifest v2: exact start/periodic/boundary/stop sidecars, summary
 agreement, zero capture failures, and at least 95% sampler coverage. Critical pressure, an app memory
 warning/exit, `hardTrim`, or `fullUnload` fails publication; guarded pressure, `softTrim`, or 95–<100%
-coverage is explicit warning evidence. The record retains footprint/resident start, end, delta, and
-peak; compressed/GPU peaks; minimum headroom and peak process-budget utilization; sampler coverage;
-and pressure/trim/warning/exit counters. iPhone admission is also strict, on the app's own
+coverage is explicit warning evidence. The exception is the routine post-generation cache clear the
+iPhone tier runs after every take (source `post-generation`, reason `post_generation_cache_clear`):
+since 2026-09-25 it is counted as `policyCacheClearCount` with no pressure level and no warning.
+The record retains footprint/resident start, end, delta, and peak; compressed/GPU peaks; minimum
+headroom and peak process-budget utilization; sampler coverage; and pressure/trim/warning/exit
+counters. iPhone admission is also strict, on the app's own
 shipping budget bands (`config/ios-memory-budget-policy.json`): physical footprint ≥5,200 MiB,
 minimum headroom <384 MiB, or Metal working-set ratio ≥0.8 fails; footprint ≥4,500 MiB or
 headroom <768 MiB warns. The lane requires 15 GiB free before device launch. After validation and

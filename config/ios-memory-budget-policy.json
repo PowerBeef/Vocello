@@ -1,10 +1,12 @@
 {
   "schemaVersion": 1,
   "policyID": "iphone-shipping-default",
-  "description": "The iPhone memory budget bands, in MiB. IOSMemoryBudgetPolicy.iPhoneShippingDefault (Sources/QwenVoiceCore/IOSMemorySnapshot.swift) and the unload quiescence evaluator use these numbers, and a Swift test pins them to this file; scripts/benchmark_memory.py gates published iOS evidence on them: a critical band fails publication and a guarded band warns.",
+  "description": "The iPhone memory budget, in MiB and fractions. IOSMemoryBudgetPolicy.iPhoneShippingDefault (Sources/QwenVoiceCore/IOSMemorySnapshot.swift) and the unload quiescence evaluator use the headroom, footprint and Metal bands for the app's own admission and trims, and a Swift test pins them to this file. Published iOS evidence is judged on the measured process budget instead (audit #68): a take's peak budget utilization (footprint over footprint plus what remains before the process limit) fails publication at evidenceCriticalBudgetUtilization and warns at evidenceGuardedBudgetUtilization, and its minimum headroom fails below guardedHeadroomMB and warns below healthyHeadroomMB. IOSMemoryBudgetPolicy.EvidenceBudgetUtilization declares the same fractions for the band persisted on telemetry rows, and scripts/benchmark_memory.py gates on them.",
   "healthyHeadroomMB": 768,
   "guardedHeadroomMB": 384,
   "guardedFootprintMB": 4500,
   "criticalFootprintMB": 5200,
-  "criticalGPUWorkingSetUsageRatio": 0.8
+  "criticalGPUWorkingSetUsageRatio": 0.8,
+  "evidenceCriticalBudgetUtilization": 0.92,
+  "evidenceGuardedBudgetUtilization": 0.8
 }

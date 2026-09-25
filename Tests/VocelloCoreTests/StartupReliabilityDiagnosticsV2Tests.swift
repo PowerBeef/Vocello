@@ -480,6 +480,15 @@ assert take_path.read_bytes()==original
             IOSUnloadQuiescenceEvaluator.maximumGuardedFootprintMB,
             try Double(mebibytes("guardedFootprintMB"))
         )
+        // Audit #68: the evidence gate on the measured process budget.
+        XCTAssertEqual(
+            IOSMemoryBudgetPolicy.EvidenceBudgetUtilization.critical,
+            try XCTUnwrap(contract["evidenceCriticalBudgetUtilization"] as? Double)
+        )
+        XCTAssertEqual(
+            IOSMemoryBudgetPolicy.EvidenceBudgetUtilization.guarded,
+            try XCTUnwrap(contract["evidenceGuardedBudgetUtilization"] as? Double)
+        )
     }
 
     func testUnloadQuiescenceRejectsOwnershipHeadroomCacheAndFootprintFailures() {

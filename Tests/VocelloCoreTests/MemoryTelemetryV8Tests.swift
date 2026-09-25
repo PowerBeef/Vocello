@@ -278,6 +278,48 @@ final class MemoryTelemetryV8Tests: XCTestCase {
         XCTAssertNil(legacy.boundaryCaptureTotalNS)
     }
 
+    func testEvidenceBandJudgesTheMeasuredBudgetNotAbsoluteFootprintOrMetal() throws {
+        // Audit #68: a take's evidence band is its peak share of its own
+        // process budget plus its minimum headroom.
+        let policy = IOSMemoryBudgetPolicy.iPhoneShippingDefault
+        XCTAssertEqual(policy.worstBand(headroomMinMB: 1_500, peakBudgetUtilization: 0.79), .healthy)
+        XCTAssertEqual(policy.worstBand(headroomMinMB: 1_500, peakBudgetUtilization: 0.85), .guarded)
+        XCTAssertEqual(policy.worstBand(headroomMinMB: 1_500, peakBudgetUtilization: 0.93), .critical)
+        XCTAssertEqual(policy.worstBand(headroomMinMB: 700, peakBudgetUtilization: 0.5), .guarded)
+        XCTAssertEqual(policy.worstBand(headroomMinMB: 300, peakBudgetUtilization: 0.5), .critical)
+        XCTAssertNil(policy.worstBand(headroomMinMB: nil, peakBudgetUtilization: nil))
+
+        func sample(
+            footprint: Double, headroom: Double, remaining: Double?, kernelPeak: Double
+        ) -> TelemetrySample {
+            TelemetrySample(
+                tMS: 0,
+                residentMB: footprint,
+                physFootprintMB: footprint,
+                compressedMB: 0,
+                headroomMB: headroom,
+                gpuAllocatedMB: nil,
+                gpuRecommendedWorkingSetMB: nil,
+                kernelPhysFootprintPeakMB: kernelPeak,
+                processLimitRemainingMB: remaining,
+                threads: 0
+            )
+        }
+        // The same-call remaining bytes win over the separate headroom reading.
+        let sampled = try XCTUnwrap(NativeTelemetrySampler.peakBudgetUtilization([
+            sample(footprint: 4_000, headroom: 2_000, remaining: 1_000, kernelPeak: 4_000),
+            sample(footprint: 3_000, headroom: 3_000, remaining: 2_000, kernelPeak: 4_000),
+        ]))
+        XCTAssertEqual(sampled, 0.8, accuracy: 1e-9)
+        // A kernel ledger that rose inside the window adds its exact peak over
+        // the tightest budget: here 4,800 of 5,000.
+        let exact = try XCTUnwrap(NativeTelemetrySampler.peakBudgetUtilization([
+            sample(footprint: 4_000, headroom: 1_000, remaining: nil, kernelPeak: 4_000),
+            sample(footprint: 4_100, headroom: 1_000, remaining: nil, kernelPeak: 4_800),
+        ]))
+        XCTAssertEqual(exact, 0.96, accuracy: 1e-9)
+    }
+
     func testFloorTiersSampleAtTheSixteenGigabyteCadence() {
         // Audit #3 part 4: the time periodic ticks save buys the floor tiers
         // the 250 ms cadence.

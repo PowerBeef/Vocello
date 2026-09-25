@@ -51,6 +51,9 @@ KERNEL_LEDGER_TOLERANCE_MB = 1.0
 # the footprint: the process-lifetime physical-footprint high-water mark and
 # the graphics-tagged footprint.
 KERNEL_PEAK_SAMPLE_KEY = "kernelPhysFootprintPeakMB"
+# The kernel's limit_bytes_remaining, read in the same call as the footprint
+# (iPhone samples since 2026-09-25, audit #68).
+LIMIT_REMAINING_SAMPLE_KEY = "processLimitRemainingMB"
 GRAPHICS_SAMPLE_KEY = "graphicsFootprintMB"
 # The end-of-take MLX snapshot (retained-memory-v2), in order of preference:
 # after the routine post-generation cache clear, else after the stream.
@@ -63,6 +66,8 @@ IOS_MEMORY_BUDGET_POLICY_PATH = (
 IOS_MEMORY_BUDGET_KEYS = (
     "healthyHeadroomMB", "guardedHeadroomMB", "guardedFootprintMB", "criticalFootprintMB",
     "criticalGPUWorkingSetUsageRatio",
+    # The evidence gate on the measured process budget (audit #68).
+    "evidenceGuardedBudgetUtilization", "evidenceCriticalBudgetUtilization",
 )
 
 ENGINE_BOUNDARY_REQUIREMENTS: dict[str, frozenset[str]] = {
@@ -234,6 +239,8 @@ def load_ios_memory_budget(path: Path | None = None) -> dict[str, float]:
         bands["guardedHeadroomMB"] < bands["healthyHeadroomMB"]
         and bands["guardedFootprintMB"] < bands["criticalFootprintMB"]
         and bands["criticalGPUWorkingSetUsageRatio"] <= 1
+        and bands["evidenceGuardedBudgetUtilization"]
+        < bands["evidenceCriticalBudgetUtilization"] <= 1
     ):
         raise MemoryEvidenceError("iOS memory budget policy bands are out of order")
     return bands
@@ -982,7 +989,19 @@ def _validate_layer(
         if (end_of_take := _mlx_end_of_take(row, generation_id)) is not None:
             metrics["mlxEndActiveMB"], metrics["mlxEndCacheMB"] = end_of_take
     if platform == "ios":
-        budget = [used + available for used, available in zip(footprint, headroom, strict=True)]
+        # The budget each sample measured: footprint plus what remained before
+        # the process limit, from the same task_vm_info call when the sample
+        # carries it (audit #68), else from the separate headroom reading.
+        remaining = [
+            float(sample[LIMIT_REMAINING_SAMPLE_KEY])
+            if isinstance(sample.get(LIMIT_REMAINING_SAMPLE_KEY), (int, float))
+            and not isinstance(sample.get(LIMIT_REMAINING_SAMPLE_KEY), bool)
+            and math.isfinite(float(sample[LIMIT_REMAINING_SAMPLE_KEY]))
+            and float(sample[LIMIT_REMAINING_SAMPLE_KEY]) >= 0
+            else available
+            for sample, available in zip(samples, headroom, strict=True)
+        ]
+        budget = [used + left for used, left in zip(footprint, remaining, strict=True)]
         utilization = [used / total if total > 0 else 0.0 for used, total in zip(footprint, budget, strict=True)]
         metrics.update({
             "headroomStartMB": headroom[0],
@@ -992,6 +1011,17 @@ def _validate_layer(
             "impliedProcessLimitMB": min(implied_limits),
             "totalDeviceRAMMB": min(total_ram),
         })
+        same_call = [
+            abs(float(sample[LIMIT_REMAINING_SAMPLE_KEY]) - available)
+            for sample, available in zip(samples, headroom, strict=True)
+            if isinstance(sample.get(LIMIT_REMAINING_SAMPLE_KEY), (int, float))
+            and not isinstance(sample.get(LIMIT_REMAINING_SAMPLE_KEY), bool)
+        ]
+        if same_call:
+            # How far the kernel's limit_bytes_remaining and os_proc_available_memory
+            # disagree on one sample: the device run that proves they measure
+            # the same budget reads this (audit #68).
+            metrics["processLimitRemainingDriftMB"] = max(same_call)
     return LayerEvidence(
         layer, digest, tuple(samples), metrics, tuple(warnings),
         tuple(kernel_peaks), tuple(graphics),
@@ -1251,28 +1281,30 @@ def qualify_take_memory(
         )
     warnings = sorted(set(pressure_warnings).union(*(layer.warnings for layer in layers)))
     if platform == "ios":
-        # The app's own shipping bands: critical fails publication, guarded warns.
+        # The measured process budget (audit #68): the peak share of the
+        # take's own limit, exact through the kernel ledger when it rose inside
+        # the take, and the minimum headroom. The absolute footprint bands and
+        # the Metal working-set ratio stay app-side admission bands only: every
+        # iPhone reports an 8 GiB Metal working set against a 6 GiB limit.
         bands = load_ios_memory_budget()
-        peak_footprint = float(metrics["peakPhysicalFootprintMB"])
+        utilization = float(metrics["peakProcessBudgetUtilization"])
+        limit = float(metrics["impliedProcessLimitMB"])
+        if metrics.get("kernelPhysFootprintPeakExact") == 1 and limit > 0:
+            utilization = max(utilization, float(metrics["kernelPhysFootprintPeakMB"]) / limit)
+        metrics["peakProcessBudgetUtilization"] = utilization
         minimum_headroom = float(metrics["minimumHeadroomMB"])
-        metal_ratio = float(metrics["gpuWorkingSetUsageRatioPeak"])
-        if peak_footprint >= bands["criticalFootprintMB"]:
+        if utilization >= bands["evidenceCriticalBudgetUtilization"]:
             raise MemoryEvidenceError(
-                f"generation {generation_id}: physical footprint reached the critical band "
-                f"({bands['criticalFootprintMB']:g} MiB)"
+                f"generation {generation_id}: the take used {utilization:.3f} of its process "
+                f"budget (fails at {bands['evidenceCriticalBudgetUtilization']:g})"
             )
         if minimum_headroom < bands["guardedHeadroomMB"]:
             raise MemoryEvidenceError(
                 f"generation {generation_id}: process headroom fell below "
                 f"{bands['guardedHeadroomMB']:g} MiB"
             )
-        if metal_ratio >= bands["criticalGPUWorkingSetUsageRatio"]:
-            raise MemoryEvidenceError(
-                f"generation {generation_id}: Metal working-set ratio reached "
-                f"{bands['criticalGPUWorkingSetUsageRatio']:g}"
-            )
-        if peak_footprint >= bands["guardedFootprintMB"]:
-            warnings.append("memory.footprint.guarded")
+        if utilization >= bands["evidenceGuardedBudgetUtilization"]:
+            warnings.append("memory.budget.guarded")
         if minimum_headroom < bands["healthyHeadroomMB"]:
             warnings.append("memory.headroom.guarded")
         warnings = sorted(set(warnings))

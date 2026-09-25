@@ -751,15 +751,14 @@ public struct GenerationMemoryMetrics: Hashable, Codable, Sendable {
         self.mlxStageCount = mlxMemoryByStage?.count ?? 0
     }
 
-    /// The shipping pressure bands are an iOS process-budget policy. macOS
-    /// retains the same raw footprint and Metal metrics, but must not be judged
-    /// against iPhone absolute limits.
+    /// The evidence band is an iOS process-budget policy (the measured budget
+    /// utilization and headroom, audit #68). macOS retains the same raw
+    /// footprint and Metal metrics, but is not judged against an iPhone budget.
     static func worstPressureBand(for summary: TelemetrySummary?) -> IOSMemoryPressureBand? {
         #if os(iOS)
         IOSMemoryBudgetPolicy.iPhoneShippingDefault.worstBand(
             headroomMinMB: summary?.headroomMinMB,
-            physFootprintPeakMB: summary?.physFootprintPeakMB,
-            gpuWorkingSetUsageRatioPeak: summary?.gpuWorkingSetUsageRatioPeak
+            peakBudgetUtilization: summary?.peakProcessBudgetUtilization
         )
         #else
         nil

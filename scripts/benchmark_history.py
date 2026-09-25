@@ -464,6 +464,10 @@ METRIC_KEYS = {
     # The summed cost of a take's boundary memory captures, which the
     # generation path awaits inline (records since 2026-09-25, audit #65).
     "samplerBoundaryCaptureTotalMS",
+    # The largest same-sample gap between the kernel's limit_bytes_remaining
+    # and os_proc_available_memory on an iPhone take (records since
+    # 2026-09-25, audit #68).
+    "processLimitRemainingDriftMB",
     "residentStartMB", "residentEndMB", "residentDeltaMB",
     "physicalFootprintStartMB", "physicalFootprintEndMB", "physicalFootprintDeltaMB",
     "gpuRecommendedWorkingSetMB", "gpuWorkingSetUsageRatioPeak", "memoryTimeToPeakMS",

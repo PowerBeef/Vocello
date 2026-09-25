@@ -715,10 +715,16 @@ iPhone tier runs after every take (source `post-generation`, reason `post_genera
 since 2026-09-25 it is counted as `policyCacheClearCount` with no pressure level and no warning.
 The record retains footprint/resident start, end, delta, and peak; compressed/GPU peaks; minimum
 headroom and peak process-budget utilization; sampler coverage; and pressure/trim/warning/exit
-counters. iPhone admission is also strict, on the app's own
-shipping budget bands (`config/ios-memory-budget-policy.json`): physical footprint ≥5,200 MiB,
-minimum headroom <384 MiB, or Metal working-set ratio ≥0.8 fails; footprint ≥4,500 MiB or
-headroom <768 MiB warns. The lane requires 15 GiB free before device launch. After validation and
+counters. iPhone admission is also strict, on the measured process budget
+(`config/ios-memory-budget-policy.json`, audit #68): a peak budget utilization (footprint over
+footprint plus what remains before the process limit, from the same `task_vm_info` call as
+`limit_bytes_remaining` when the sample carries it, and the exact kernel peak when it rose inside the
+take) ≥0.92 or minimum headroom <384 MiB fails; utilization ≥0.80 or headroom <768 MiB warns. The
+absolute footprint bands (4,500 and 5,200 MiB) and the Metal working-set ratio stay the app's own
+admission bands only: every iPhone reports an 8 GiB Metal working set against its 6 GiB limit, and
+the 5 GB floor device's limit sits below 5,200 MiB. A take also publishes
+`processLimitRemainingDriftMB`, the largest same-sample gap between `limit_bytes_remaining` and
+`os_proc_available_memory`, which the first device run checks. The lane requires 15 GiB free before device launch. After validation and
 history publication the memory profile keeps its raw trace by default (retention policy
 `keptByDefault`), because xctrace cannot export its allocation and VM tables and the trace is its only
 memory evidence; its digest/settings/extracted summary and retention status remain in compact

@@ -613,53 +613,60 @@ class MemoryEvidenceTests(unittest.TestCase):
         )
         self.assertEqual(qualified[0].status, "qualified")
 
+    def qualify_ios_budget(
+        self, footprint: float, headroom: float, *, remaining_offset: float | None = None,
+    ) -> object:
+        """Qualify one iPhone take; the fixture's footprint rises and its
+        headroom falls by one MB per sample, over about twenty samples."""
+        sidecar = samples(
+            role="engine", boundaries=ENGINE_BOUNDARIES, ios=True,
+            footprint=footprint, headroom=headroom,
+        )
+        if remaining_offset is not None:
+            for sample in sidecar:
+                sample["processLimitRemainingMB"] = sample["headroomMB"] + remaining_offset
+        engine = row(
+            f"generation-budget-{int(footprint)}-{int(headroom)}", sidecar, layer="engine", ios=True,
+        )
+        self.write_sidecar("engine", engine["generationID"], sidecar)
+        return qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")[0][0]
+
     def test_ios_guarded_threshold_warns_and_critical_threshold_fails(self) -> None:
-        engine, guarded = self.ios_fixture()
-        guarded = samples(
-            role="engine", boundaries=ENGINE_BOUNDARIES, ios=True,
-            footprint=4600.0, headroom=700.0,
-        )
-        engine = row(engine["generationID"], guarded, layer="engine", ios=True)
-        self.write_sidecar("engine", engine["generationID"], guarded)
-        qualified, _ = qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")
-        self.assertEqual(qualified[0].status, "qualifiedWithWarnings")
-        self.assertIn("memory.headroom.guarded", qualified[0].warnings)
+        # audit #68: the gate is the take's peak share of its own process budget.
+        guarded = self.qualify_ios_budget(4600.0, 700.0)  # 4619 / 5300 = 0.87
+        self.assertEqual(guarded.status, "qualifiedWithWarnings")
+        self.assertIn("memory.budget.guarded", guarded.warnings)
+        self.assertIn("memory.headroom.guarded", guarded.warnings)
+        # 5519 / 5980 = 0.923, while the headroom (461 MiB) clears its own band.
+        with self.assertRaisesRegex(MemoryEvidenceError, "process budget"):
+            self.qualify_ios_budget(5500.0, 480.0)
+        # An absolute footprint the old 5,200 MiB band failed is judged by its
+        # budget: 5349 / 6830 = 0.78 on a device that grants 6.8 GB.
+        roomy = self.qualify_ios_budget(5330.0, 1500.0)
+        self.assertEqual(roomy.status, "qualified")
+        self.assertAlmostEqual(roomy.metrics["peakProcessBudgetUtilization"], 5349 / 6830, places=6)
 
-        critical = samples(
-            role="engine", boundaries=ENGINE_BOUNDARIES, ios=True,
-            footprint=5330.0, headroom=700.0,
-        )
-        engine = row(engine["generationID"], critical, layer="engine", ios=True)
-        self.write_sidecar("engine", engine["generationID"], critical)
-        with self.assertRaises(MemoryEvidenceError):
-            qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")
-
-    def test_ios_footprint_bands_are_the_declared_shipping_policy(self) -> None:
-        # V-4: the gate uses the app's MiB bands (4,500 guarded, 5,200 critical),
-        # not its former 4.5/5.2 GiB copies. The fixture's peak is footprint + 19.
+    def test_ios_evidence_gate_is_the_declared_budget_policy(self) -> None:
+        # One threshold source: the app's bands and the evidence fractions come
+        # from config/ios-memory-budget-policy.json (V-4, audit #68).
         bands = load_ios_memory_budget()
         self.assertEqual(
             (bands["guardedFootprintMB"], bands["criticalFootprintMB"],
              bands["healthyHeadroomMB"], bands["guardedHeadroomMB"],
-             bands["criticalGPUWorkingSetUsageRatio"]),
-            (4500.0, 5200.0, 768.0, 384.0, 0.8),
+             bands["criticalGPUWorkingSetUsageRatio"],
+             bands["evidenceGuardedBudgetUtilization"],
+             bands["evidenceCriticalBudgetUtilization"]),
+            (4500.0, 5200.0, 768.0, 384.0, 0.8, 0.8, 0.92),
         )
-
-        def qualify(footprint: float) -> object:
-            sidecar = samples(
-                role="engine", boundaries=ENGINE_BOUNDARIES, ios=True, footprint=footprint,
-            )
-            engine = row(f"generation-band-{int(footprint)}", sidecar, layer="engine", ios=True)
-            self.write_sidecar("engine", engine["generationID"], sidecar)
-            return qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")[0][0]
-
-        below = qualify(4470.0)  # peak 4489
-        self.assertNotIn("memory.footprint.guarded", below.warnings)
-        guarded = qualify(4490.0)  # peak 4509: guarded now, silent under 4.5 GiB
-        self.assertIn("memory.footprint.guarded", guarded.warnings)
-        self.assertEqual(guarded.status, "qualifiedWithWarnings")
-        with self.assertRaises(MemoryEvidenceError):
-            qualify(5190.0)  # peak 5209: critical now, accepted under 5.2 GiB
+        # The same-call limit_bytes_remaining wins over the separate headroom
+        # reading for the budget, and their drift is published.
+        take = self.qualify_ios_budget(4000.0, 1500.0, remaining_offset=-100.0)
+        self.assertAlmostEqual(
+            take.metrics["peakProcessBudgetUtilization"], 4019 / (4019 + 1381), places=6,
+        )
+        self.assertEqual(take.metrics["processLimitRemainingDriftMB"], 100.0)
+        without = self.qualify_ios_budget(4000.0, 1500.0)
+        self.assertNotIn("processLimitRemainingDriftMB", without.metrics)
 
     def test_ios_memory_budget_contract_fails_closed(self) -> None:
         cases = {
@@ -670,7 +677,17 @@ class MemoryEvidenceTests(unittest.TestCase):
                              "criticalGPUWorkingSetUsageRatio": 0.8},
             "inverted": {"schemaVersion": 1, "healthyHeadroomMB": 384, "guardedHeadroomMB": 768,
                          "guardedFootprintMB": 4500, "criticalFootprintMB": 5200,
-                         "criticalGPUWorkingSetUsageRatio": 0.8},
+                         "criticalGPUWorkingSetUsageRatio": 0.8,
+                         "evidenceGuardedBudgetUtilization": 0.8,
+                         "evidenceCriticalBudgetUtilization": 0.92},
+            "no-evidence-gate": {"schemaVersion": 1, "healthyHeadroomMB": 768, "guardedHeadroomMB": 384,
+                                 "guardedFootprintMB": 4500, "criticalFootprintMB": 5200,
+                                 "criticalGPUWorkingSetUsageRatio": 0.8},
+            "inverted-evidence-gate": {"schemaVersion": 1, "healthyHeadroomMB": 768, "guardedHeadroomMB": 384,
+                                       "guardedFootprintMB": 4500, "criticalFootprintMB": 5200,
+                                       "criticalGPUWorkingSetUsageRatio": 0.8,
+                                       "evidenceGuardedBudgetUtilization": 0.95,
+                                       "evidenceCriticalBudgetUtilization": 0.92},
         }
         for name, document in cases.items():
             path = self.root / f"policy-{name}.json"

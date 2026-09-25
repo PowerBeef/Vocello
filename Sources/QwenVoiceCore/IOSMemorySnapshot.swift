@@ -52,6 +52,14 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
     /// The graphics-tagged footprint ledger (IOAccelerator/Metal memory counted
     /// in the footprint), from the same call. nil when unavailable.
     public let graphicsFootprintBytes: UInt64?
+    /// The kernel's `limit_bytes_remaining`: how far this process's footprint
+    /// may still grow before its memory limit, read in the same `task_vm_info`
+    /// call as `physFootprintBytes`, so the two describe one instant (audit
+    /// #68), unlike `availableHeadroomBytes`, which comes from a separate
+    /// `os_proc_available_memory` call. iPhone only (macOS processes run
+    /// without that limit); clamped like the headroom under a simulated
+    /// process limit. nil when unavailable.
+    public let processLimitRemainingBytes: UInt64?
 
     public init(
         processRole: IOSMemoryProcessRole = .currentProcess,
@@ -66,7 +74,8 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
         gpuRecommendedWorkingSetBytes: UInt64?,
         hasUnifiedMemory: Bool?,
         kernelPhysFootprintPeakBytes: UInt64? = nil,
-        graphicsFootprintBytes: UInt64? = nil
+        graphicsFootprintBytes: UInt64? = nil,
+        processLimitRemainingBytes: UInt64? = nil
     ) {
         self.processRole = processRole
         self.pid = pid
@@ -81,6 +90,11 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
         self.hasUnifiedMemory = hasUnifiedMemory
         self.kernelPhysFootprintPeakBytes = kernelPhysFootprintPeakBytes
         self.graphicsFootprintBytes = graphicsFootprintBytes
+        self.processLimitRemainingBytes = processLimitRemainingBytes
+    }
+
+    public var processLimitRemainingMB: Double? {
+        Self.bytesToMB(processLimitRemainingBytes)
     }
 
     public var kernelPhysFootprintPeakMB: Double? {
@@ -182,12 +196,21 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
         let device = device ?? defaultMetalDevice
         let metrics = taskMemoryMetrics()
         var headroom = availableProcessMemory()
+        #if os(iOS)
+        var limitRemaining = metrics.limitBytesRemaining
+        #else
+        var limitRemaining: UInt64? = nil
+        #endif
         if let simLimit = simulatedProcessLimitBytes,
-           let realHeadroom = headroom,
            let footprint = metrics.physFootprintBytes {
-            let realLimit = footprint + realHeadroom
-            let effectiveLimit = min(realLimit, simLimit)
-            headroom = effectiveLimit > footprint ? effectiveLimit - footprint : 0
+            if let realHeadroom = headroom {
+                let effectiveLimit = min(footprint + realHeadroom, simLimit)
+                headroom = effectiveLimit > footprint ? effectiveLimit - footprint : 0
+            }
+            if let realRemaining = limitRemaining {
+                let effectiveLimit = min(footprint + realRemaining, simLimit)
+                limitRemaining = effectiveLimit > footprint ? effectiveLimit - footprint : 0
+            }
         }
         // A Mac emulating the 8 GB floor (`QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB`,
         // audit #11) reports the emulated RAM and Metal working set, so the
@@ -207,7 +230,8 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
             },
             hasUnifiedMemory: device?.hasUnifiedMemory,
             kernelPhysFootprintPeakBytes: metrics.kernelPhysFootprintPeakBytes,
-            graphicsFootprintBytes: metrics.graphicsFootprintBytes
+            graphicsFootprintBytes: metrics.graphicsFootprintBytes,
+            processLimitRemainingBytes: limitRemaining
         )
     }
 
@@ -217,6 +241,7 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
         var compressedBytes: UInt64?
         var kernelPhysFootprintPeakBytes: UInt64?
         var graphicsFootprintBytes: UInt64?
+        var limitBytesRemaining: UInt64?
     }
 
     private static func taskMemoryMetrics() -> TaskMemoryMetrics {
@@ -260,8 +285,22 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
                     of: \task_vm_info_data_t.ledger_tag_graphics_footprint
                 ),
                 filledBytes: filledBytes
+            ),
+            limitBytesRemaining: filledValue(
+                info.limit_bytes_remaining,
+                fieldOffset: MemoryLayout<task_vm_info_data_t>.offset(
+                    of: \task_vm_info_data_t.limit_bytes_remaining
+                ),
+                filledBytes: filledBytes
             )
         )
+    }
+
+    /// An unsigned field, only when the kernel filled it.
+    static func filledValue(_ value: UInt64, fieldOffset: Int?, filledBytes: Int) -> UInt64? {
+        guard let fieldOffset,
+              fieldOffset + MemoryLayout<UInt64>.size <= filledBytes else { return nil }
+        return value
     }
 
     /// A signed ledger value, only when the kernel filled its field and it is
@@ -391,6 +430,27 @@ public struct IOSMemoryBudgetPolicy: Hashable, Codable, Sendable {
         public static let criticalGPUWorkingSetUsageRatio = 0.80
     }
 
+    /// The evidence gate on the measured process budget (audit #68). A take's
+    /// peak budget utilization is its footprint over its own process limit
+    /// (footprint plus what remains before that limit, the budget the device
+    /// grants this process): `critical` fails publication and `guarded` warns.
+    /// `config/ios-memory-budget-policy.json` declares the same fractions for
+    /// scripts/benchmark_memory.py, and a test pins them. They replace the
+    /// absolute footprint bands and the Metal working-set ratio for evidence:
+    /// every iPhone reports an 8 GiB Metal working set against a 6 GiB process
+    /// limit, and the 5 GB floor device's limit sits below the 5,200 MiB band.
+    /// The app's own admission and trim bands are unchanged.
+    public enum EvidenceBudgetUtilization {
+        public static let critical = 0.92
+        public static let guarded = 0.80
+    }
+
+    /// A sample's share of its process budget, nil without both readings.
+    public static func budgetUtilization(footprintMB: Double?, remainingMB: Double?) -> Double? {
+        guard let footprintMB, let remainingMB, footprintMB + remainingMB > 0 else { return nil }
+        return footprintMB / (footprintMB + remainingMB)
+    }
+
     public static let iPhoneShippingDefault = IOSMemoryBudgetPolicy(
         healthyHeadroomBytes: ShippingBandMiB.healthyHeadroom * 1_048_576,
         guardedHeadroomBytes: ShippingBandMiB.guardedHeadroom * 1_048_576,
@@ -399,35 +459,31 @@ public struct IOSMemoryBudgetPolicy: Hashable, Codable, Sendable {
         aggregateCriticalFootprintBytes: ShippingBandMiB.criticalFootprint * 1_048_576
     )
 
-    /// Worst pressure band over a whole generation, computed from the telemetry
-    /// sampler's summary extremes (headroom minimum, physFootprint peak, GPU
-    /// working-set usage peak). Used to persist the band on engine telemetry rows
-    /// (audit P1-6) — mirrors `band(for:)` + `aggregateBand` thresholds.
+    /// Worst evidence band over a whole generation, persisted on engine
+    /// telemetry rows (audit P1-6): the peak budget utilization against
+    /// `EvidenceBudgetUtilization` and the minimum headroom against this
+    /// policy's headroom bands (audit #68). Neither the absolute footprint nor
+    /// the Metal working-set ratio judges evidence any more.
     public func worstBand(
         headroomMinMB: Double?,
-        physFootprintPeakMB: Double?,
-        gpuWorkingSetUsageRatioPeak: Double?
+        peakBudgetUtilization: Double?
     ) -> IOSMemoryPressureBand? {
-        guard headroomMinMB != nil || physFootprintPeakMB != nil || gpuWorkingSetUsageRatioPeak != nil else {
+        guard headroomMinMB != nil || peakBudgetUtilization != nil else {
             return nil
         }
         var band = IOSMemoryPressureBand.healthy
-        if let ratio = gpuWorkingSetUsageRatioPeak, ratio >= criticalGPUWorkingSetUsageRatio {
-            band = .critical
+        if let peakBudgetUtilization {
+            if peakBudgetUtilization >= Self.EvidenceBudgetUtilization.critical {
+                band = .critical
+            } else if peakBudgetUtilization >= Self.EvidenceBudgetUtilization.guarded {
+                band = .guarded
+            }
         }
         if let headroomMinMB {
             let headroomBytes = UInt64(max(headroomMinMB, 0) * 1_048_576)
             if headroomBytes < guardedHeadroomBytes {
                 band = maxBand(band, .critical)
             } else if headroomBytes < healthyHeadroomBytes {
-                band = maxBand(band, .guarded)
-            }
-        }
-        if let physFootprintPeakMB {
-            let footprintBytes = UInt64(max(physFootprintPeakMB, 0) * 1_048_576)
-            if let aggregateCriticalFootprintBytes, footprintBytes >= aggregateCriticalFootprintBytes {
-                band = maxBand(band, .critical)
-            } else if let aggregateGuardedFootprintBytes, footprintBytes >= aggregateGuardedFootprintBytes {
                 band = maxBand(band, .guarded)
             }
         }

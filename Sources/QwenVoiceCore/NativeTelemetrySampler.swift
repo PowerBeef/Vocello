@@ -137,6 +137,9 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
     public let kernelPhysFootprintPeakMB: Double?
     /// The graphics-tagged footprint ledger at capture, from the same call.
     public let graphicsFootprintMB: Double?
+    /// The kernel's `limit_bytes_remaining` from the same `task_vm_info` call
+    /// as `physFootprintMB` (iPhone only, audit #68).
+    public let processLimitRemainingMB: Double?
     /// How long this capture took on the monotonic clock (audit #65): the
     /// probe's own cost, which boundary captures pay inline on the generation
     /// path. nil in rows written before 2026-09-25.
@@ -181,6 +184,7 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
         gpuWorkingSetUsageRatio: Double? = nil,
         kernelPhysFootprintPeakMB: Double? = nil,
         graphicsFootprintMB: Double? = nil,
+        processLimitRemainingMB: Double? = nil,
         captureDurationNS: UInt64? = nil,
         threads: Int,
         thermalState: String? = nil,
@@ -212,6 +216,7 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
         self.gpuWorkingSetUsageRatio = gpuWorkingSetUsageRatio
         self.kernelPhysFootprintPeakMB = kernelPhysFootprintPeakMB
         self.graphicsFootprintMB = graphicsFootprintMB
+        self.processLimitRemainingMB = processLimitRemainingMB
         self.captureDurationNS = captureDurationNS
         self.threads = threads
         self.thermalState = thermalState
@@ -247,6 +252,7 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
         case gpuWorkingSetUsageRatio
         case kernelPhysFootprintPeakMB
         case graphicsFootprintMB
+        case processLimitRemainingMB
         case captureDurationNS
         case threads
         case thermalState
@@ -284,6 +290,7 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
         self.gpuWorkingSetUsageRatio = try container.decodeIfPresent(Double.self, forKey: .gpuWorkingSetUsageRatio)
         self.kernelPhysFootprintPeakMB = try container.decodeIfPresent(Double.self, forKey: .kernelPhysFootprintPeakMB)
         self.graphicsFootprintMB = try container.decodeIfPresent(Double.self, forKey: .graphicsFootprintMB)
+        self.processLimitRemainingMB = try container.decodeIfPresent(Double.self, forKey: .processLimitRemainingMB)
         self.captureDurationNS = try container.decodeIfPresent(UInt64.self, forKey: .captureDurationNS)
         self.threads = try container.decode(Int.self, forKey: .threads)
         self.thermalState = try container.decodeIfPresent(String.self, forKey: .thermalState)
@@ -318,6 +325,7 @@ public struct TelemetrySample: Hashable, Codable, Sendable {
         try container.encodeIfPresent(gpuWorkingSetUsageRatio, forKey: .gpuWorkingSetUsageRatio)
         try container.encodeIfPresent(kernelPhysFootprintPeakMB, forKey: .kernelPhysFootprintPeakMB)
         try container.encodeIfPresent(graphicsFootprintMB, forKey: .graphicsFootprintMB)
+        try container.encodeIfPresent(processLimitRemainingMB, forKey: .processLimitRemainingMB)
         try container.encodeIfPresent(captureDurationNS, forKey: .captureDurationNS)
         try container.encode(threads, forKey: .threads)
         try container.encodeIfPresent(thermalState, forKey: .thermalState)
@@ -628,6 +636,12 @@ public struct TelemetrySummary: Hashable, Codable, Sendable {
     public let kernelPhysFootprintPeakMB: Double?
     /// The graphics-tagged footprint ledger at the last sample.
     public let graphicsFootprintEndMB: Double?
+    /// The window's peak share of the process budget (audit #68): the highest
+    /// footprint over footprint plus what remained before the limit, preferring
+    /// the same-call `processLimitRemainingMB` to the separate headroom reading.
+    /// When the kernel footprint ledger rose inside the window, its exact peak
+    /// over the tightest limit counts too. nil without budget readings.
+    public let peakProcessBudgetUtilization: Double?
     /// The summed `captureDurationNS` of this window's boundary samples, which
     /// the generation path awaits inline (audit #65). nil when no boundary
     /// sample recorded its cost.
@@ -686,7 +700,8 @@ public struct TelemetrySummary: Hashable, Codable, Sendable {
         kernelPhysFootprintPeakStartMB: Double? = nil,
         kernelPhysFootprintPeakMB: Double? = nil,
         graphicsFootprintEndMB: Double? = nil,
-        boundaryCaptureTotalNS: UInt64? = nil
+        boundaryCaptureTotalNS: UInt64? = nil,
+        peakProcessBudgetUtilization: Double? = nil
     ) {
         self.processRole = processRole
         self.residentStartMB = residentStartMB
@@ -741,6 +756,7 @@ public struct TelemetrySummary: Hashable, Codable, Sendable {
         self.kernelPhysFootprintPeakMB = kernelPhysFootprintPeakMB
         self.graphicsFootprintEndMB = graphicsFootprintEndMB
         self.boundaryCaptureTotalNS = boundaryCaptureTotalNS
+        self.peakProcessBudgetUtilization = peakProcessBudgetUtilization
     }
 
     public static func empty(stageMarks: [NativeTelemetryStageMark]) -> TelemetrySummary {
@@ -1108,8 +1124,32 @@ public actor NativeTelemetrySampler {
             graphicsFootprintEndMB: samples.last?.graphicsFootprintMB,
             boundaryCaptureTotalNS: boundaryCaptureDurations.isEmpty
                 ? nil
-                : boundaryCaptureDurations.reduce(0, &+)
+                : boundaryCaptureDurations.reduce(0, &+),
+            peakProcessBudgetUtilization: Self.peakBudgetUtilization(samples)
         )
+    }
+
+    /// Audit #68: the measured budget, sampled and, when the kernel ledger rose
+    /// inside the window, exact.
+    static func peakBudgetUtilization(_ samples: [TelemetrySample]) -> Double? {
+        var limits: [Double] = []
+        var peak: Double?
+        for sample in samples {
+            guard let footprint = sample.physFootprintMB,
+                  let remaining = sample.processLimitRemainingMB ?? sample.headroomMB,
+                  let utilization = IOSMemoryBudgetPolicy.budgetUtilization(
+                      footprintMB: footprint, remainingMB: remaining
+                  ) else { continue }
+            limits.append(footprint + remaining)
+            peak = max(peak ?? utilization, utilization)
+        }
+        if let first = samples.first?.kernelPhysFootprintPeakMB,
+           let last = samples.last?.kernelPhysFootprintPeakMB,
+           last > first,
+           let tightest = limits.min(), tightest > 0 {
+            peak = max(peak ?? 0, last / tightest)
+        }
+        return peak
     }
 
     private static func delta(start: Double?, end: Double?) -> Double? {
@@ -1147,8 +1187,10 @@ public actor NativeTelemetrySampler {
         #if os(iOS)
         let pressureBand = IOSMemoryBudgetPolicy.iPhoneShippingDefault.worstBand(
             headroomMinMB: sample.headroomMB,
-            physFootprintPeakMB: sample.physFootprintMB,
-            gpuWorkingSetUsageRatioPeak: metalRatio(for: sample)
+            peakBudgetUtilization: IOSMemoryBudgetPolicy.budgetUtilization(
+                footprintMB: sample.physFootprintMB,
+                remainingMB: sample.processLimitRemainingMB ?? sample.headroomMB
+            )
         )
         #else
         let pressureBand: IOSMemoryPressureBand? = nil
@@ -1241,6 +1283,7 @@ public actor NativeTelemetrySampler {
             gpuWorkingSetUsageRatio: snapshot.gpuWorkingSetUsageRatio,
             kernelPhysFootprintPeakMB: snapshot.kernelPhysFootprintPeakMB,
             graphicsFootprintMB: snapshot.graphicsFootprintMB,
+            processLimitRemainingMB: snapshot.processLimitRemainingMB,
             captureDurationNS: captureDurationNS,
             threads: threadCapture?.count ?? 0,
             thermalState: ThermalStateSnapshot.string(for: ProcessInfo.processInfo.thermalState)

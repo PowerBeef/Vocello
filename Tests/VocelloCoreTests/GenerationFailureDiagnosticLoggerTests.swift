@@ -277,6 +277,48 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
         )
     }
 
+    /// A clone reference moved or deleted after it was chosen, or one that
+    /// fails without a typed cause, is about the reference audio: the copy never
+    /// sends people to repair or reinstall the model.
+    func testClonePreparationFailuresPresentAsReferenceAudio() {
+        typealias Reason = GenerationFailurePresentationReason
+        XCTAssertEqual(
+            Reason(NativeRuntimeError.wrapping(CocoaError(.fileNoSuchFile), stage: .clonePreparation, message: "fixture")),
+            .referenceAudioMissing
+        )
+        XCTAssertEqual(
+            Reason(NativeRuntimeError.wrapping(CocoaError(.fileReadNoSuchFile), stage: .clonePreparation, message: "fixture")),
+            .referenceAudioMissing
+        )
+        XCTAssertEqual(
+            Reason(NativeRuntimeError.wrapping(CocoaError(.fileReadNoPermission), stage: .clonePreparation, message: "fixture")),
+            .referenceAudioUnreadable
+        )
+        XCTAssertEqual(
+            Reason(NativeRuntimeError(
+                stage: .clonePreparation,
+                message: "Clone generation needs resolved native clone conditioning."
+            )),
+            .referenceAudioUnreadable
+        )
+        // The journal code of the wrapped error is unchanged.
+        XCTAssertEqual(
+            GenerationFailureDiagnosticLogger.errorMetadata(for: CocoaError(.fileNoSuchFile)).code,
+            "generation.unknown"
+        )
+        // A missing file outside clone preparation is not a reference, and an
+        // MLX failure while conditioning stays a model-preparation failure.
+        XCTAssertEqual(
+            Reason(NativeRuntimeError.wrapping(CocoaError(.fileNoSuchFile), stage: .upstreamModelLoad, message: "fixture")),
+            .preparationFailure
+        )
+        XCTAssertNil(Reason(CocoaError(.fileNoSuchFile)))
+        XCTAssertEqual(
+            Reason(NativeRuntimeError.capturedRuntimeFailure(.mlx, stage: .clonePreparation, audioPublished: false)),
+            .preparationFailure
+        )
+    }
+
     func testPresentationReasonCoversTypedHostErrorsAndLeavesOthersUntyped() {
         typealias Reason = GenerationFailurePresentationReason
         XCTAssertEqual(Reason(TTSEngineError.insufficientMemory("fixture")), .insufficientMemory)
@@ -286,6 +328,13 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
         XCTAssertEqual(Reason(AudioPreparationError.missingInputFile("/private/fixture.wav")), .referenceAudioMissing)
         XCTAssertEqual(Reason(CocoaError(.fileWriteOutOfSpace)), .storageFull)
         XCTAssertEqual(Reason(CocoaError(.fileWriteNoPermission)), .storageUnavailable)
+        XCTAssertEqual(Reason(CocoaError(.fileWriteVolumeReadOnly)), .storageUnavailable)
+        // A read-permission failure shares the journal code but is not about writing output.
+        XCTAssertEqual(
+            GenerationFailureDiagnosticLogger.errorMetadata(for: CocoaError(.fileReadNoPermission)).code,
+            "storage.permission_denied"
+        )
+        XCTAssertNil(Reason(CocoaError(.fileReadNoPermission)))
         // Host copy (a consent refusal, a request rejection) is already localized.
         XCTAssertNil(Reason(TTSEngineError.unsupportedRequest("fixture")))
         XCTAssertNil(Reason(TTSEngineError.generationFailed("fixture")))

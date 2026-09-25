@@ -408,10 +408,27 @@ public enum GenerationFailurePresentationReason: String, Sendable, CaseIterable 
             self = Self.reason(for: runtimeError)
             return
         }
+        // The journal files a read-permission failure under
+        // `storage.permission_denied` with the write failures, but nothing was
+        // being written: it keeps its own text (a wrapped one resolves by stage).
+        if Self.cocoaErrorCode(of: error) == .fileReadNoPermission {
+            return nil
+        }
         guard let reason = Self(typedCode: GenerationFailureDiagnosticLogger.errorMetadata(for: error).code) else {
             return nil
         }
         self = reason
+    }
+
+    /// Reason of the error a `NativeRuntimeError` wraps at `stage`. A clone
+    /// reference moved or deleted after it was chosen fails when it is
+    /// fingerprinted, with a file-system error rather than a typed one; only
+    /// at clone preparation does a missing file mean the reference.
+    static func wrapped(_ underlying: Error, stage: NativeRuntimeStage) -> Self? {
+        if stage == .clonePreparation, Self.isMissingFileError(underlying) {
+            return .referenceAudioMissing
+        }
+        return Self(underlying)
     }
 
     private static func reason(for runtimeError: NativeRuntimeError) -> Self {
@@ -428,12 +445,32 @@ public enum GenerationFailurePresentationReason: String, Sendable, CaseIterable 
             case .unclassified: return .audioQualityRejected
             }
         case .runtimeFailed:
-            if let wrapped = runtimeError.wrappedPresentationReason,
-               wrapped != .runtimeFailure, wrapped != .preparationFailure {
-                return wrapped
+            if let wrapped = runtimeError.wrappedPresentationReason {
+                if wrapped != .runtimeFailure, wrapped != .preparationFailure {
+                    return wrapped
+                }
+            } else if runtimeError.stage == .clonePreparation, runtimeError.runtimeFailure == nil {
+                // An untyped clone-preparation failure (the reference could not
+                // be fingerprinted, decoded or paired with its transcript) is
+                // about the reference audio, not the installed model.
+                return .referenceAudioUnreadable
             }
             return runtimeError.stage.precedesGeneration ? .preparationFailure : .runtimeFailure
         }
+    }
+
+    private static func cocoaErrorCode(of error: Error) -> CocoaError.Code? {
+        let nsError = error as NSError
+        guard nsError.domain == NSCocoaErrorDomain else { return nil }
+        return CocoaError.Code(rawValue: nsError.code)
+    }
+
+    private static func isMissingFileError(_ error: Error) -> Bool {
+        if let code = cocoaErrorCode(of: error) {
+            return code == .fileNoSuchFile || code == .fileReadNoSuchFile
+        }
+        let nsError = error as NSError
+        return nsError.domain == NSPOSIXErrorDomain && nsError.code == Int(ENOENT)
     }
 
     /// Typed codes from `GenerationFailureDiagnosticLogger.errorMetadata(for:)`

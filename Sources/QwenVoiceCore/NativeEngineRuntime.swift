@@ -135,7 +135,9 @@ struct NativeRuntimeError: LocalizedError, Sendable {
         self.stage = stage
         self.message = message
         self.underlyingDescription = underlying.map { String(reflecting: $0) }
-        self.wrappedPresentationReason = underlying.flatMap { GenerationFailurePresentationReason($0) }
+        self.wrappedPresentationReason = underlying.flatMap {
+            GenerationFailurePresentationReason.wrapped($0, stage: stage)
+        }
         self.underlyingDisposition = disposition
             ?? underlying.map(NativeGenerationTerminalClassifier.disposition(of:))
             ?? .failure

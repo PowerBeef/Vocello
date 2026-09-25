@@ -34,6 +34,7 @@ for path in (SCRIPTS, SCRIPTS / "tests"):
 import benchmark_history as history  # noqa: E402
 import publish_benchmark_history as publisher  # noqa: E402
 import test_check_ios_ui_benchmark as ios_ui  # noqa: E402
+import test_check_ios_ui_perf as ios_perf  # noqa: E402
 import test_check_macos_ui_bench as mac_ui  # noqa: E402
 import test_check_macos_ui_perf as mac_perf  # noqa: E402
 from test_publish_benchmark_history import (  # noqa: E402
@@ -240,6 +241,22 @@ class UICheckerRoundTripTests(unittest.TestCase):
             fixture.tearDown()
         record, _size = publish_through_registry(manifest, screenshots=True, run_lane="perf")
         self.assertEqual(record["run"]["kind"], "ui-perf")
+
+    def test_ios_ui_perf_manifest_publishes(self) -> None:
+        fixture = ios_perf.IOSUIPerfFixture("run_checker")
+        fixture.setUp()
+        try:
+            log = fixture.write_run()
+            with mock.patch.object(
+                ios_perf.checker, "verify_canonical_iphone", return_value="iphone-17-pro"
+            ):
+                status, _report = fixture.run_checker(log, require_canonical=True, emit_evidence=True)
+            self.assertEqual(status, 0)
+            manifest = json.loads((fixture.root / "benchmark-evidence.json").read_text(encoding="utf-8"))
+        finally:
+            fixture.tearDown()
+        record, _size = publish_through_registry(manifest, screenshots=True, run_lane="perf")
+        self.assertEqual((record["run"]["kind"], record["run"]["platform"]), ("ui-perf", "ios"))
 
     def test_a_renamed_metric_is_refused_at_the_round_trip(self) -> None:
         """The mutation the round trip exists for: a producer that drifts from the

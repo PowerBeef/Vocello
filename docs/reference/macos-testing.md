@@ -172,11 +172,21 @@ fails the lane; a planned take reads `playbackCaptureStatus: unavailable`.
 
 ## UI-performance lane (`macos perf`)
 
-Nine XCUITest-driven scenarios measure SwiftUI frame health, resource usage, and
-animation smoothness: idle-baseline, sidebar-navigation, history-scroll (400 seeded
-rows; exploratory), history-filter (exploratory), delivery-menu, settings-scroll,
-composer-typing, window-resize (exploratory), and generation-active (exploratory;
-gate ON, engine busy). Scroll scenarios drive a WINDOW-anchored coordinate, never
+Eleven XCUITest-driven scenarios measure SwiftUI frame health, resource usage, and
+animation smoothness: idle-baseline, sidebar-navigation (pure UI: proactive warms
+suppressed with `QWENVOICE_SUPPRESS_WARMUP`, audit #33), harness-control (exploratory,
+audit #32: sidebar-navigation's readiness queries with no click, so its hitch time is
+the harness's own accessibility cost), history-scroll (400 seeded rows; exploratory),
+history-filter (exploratory), delivery-menu, settings-scroll, composer-typing,
+window-resize (exploratory), sidebar-navigation-warms (exploratory: the same navigation
+with the product's warms on, run late because it loads models) and generation-active
+(exploratory; gate ON, engine busy). The navigation scenarios and the control mark
+phases inside their windows (`query` for readiness polls, `action` for clicks,
+`verify` for the wait on the destination), and the report lists each phase's hitch
+rate. Every scenario prints its setup stamps (`VOCELLO_UIPERF_SETUP=`), and the
+report's `lanePhases` names each scenario's launch, settle, setup and window, the
+windows' share of that time and the required-step ledger's step durations (audit #82;
+report only). Scroll scenarios drive a WINDOW-anchored coordinate, never
 `scrollViews.firstMatch`: element-addressed events re-resolve their query per
 event and that accessibility walk executes on the app's main thread, polluting
 the measurement (Time Profiler evidence 2026-08-05). The History scenarios stay
@@ -208,7 +218,8 @@ accepts only canonical records of one comparison lineage (one `comparison.key`),
 exploratory sessions and other builds never shape the contract. A confirmatory
 window whose footprint grows past `footprintGrowthCeilingMB` (250 MB) gets a warn-only
 `uiperf.footprint:<scenario>` code: since the engine moved in-process, sidebar-navigation's own
-product warms grow it by about 1-2.4 GB. Scenarios that repeat a cycle (sidebar-navigation,
+product warms grew it by about 1-2.4 GB, which is why it now runs with warms suppressed and
+sidebar-navigation-warms measures them apart. Scenarios that repeat a cycle (sidebar-navigation,
 delivery-menu, composer-typing) mark each cycle, and the report lists a hitch rate per cycle;
 records also carry `uiHitchMSPerAction`, the window's excess frame time per scripted action, and the
 generation-active take names the memory samplers' cadence during its take (`samplerTargetIntervalMS`,

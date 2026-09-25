@@ -60,6 +60,7 @@ UI_PERF_RUNS = REPO_ROOT / "benchmarks" / "runs" / "ui-perf"
 if str(REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from lib import ui_perf_thresholds as calibration_rules  # noqa: E402
+from lib import ui_perf_lane  # noqa: E402
 
 EXPECTED_SCENARIOS = [
     "ios-idle-baseline",
@@ -536,6 +537,10 @@ def main() -> int:
     )
     parser.add_argument("--label", default="")
     parser.add_argument(
+        "--step-ledger", type=Path, default=None,
+        help="the lane's required-steps.json; its step durations join the report's lanePhases (audit #82)",
+    )
+    parser.add_argument(
         "--require-canonical", action="store_true",
         help="fail closed unless the pulled run manifest and the live paired "
         "device resolve to the canonical iPhone hardware profile",
@@ -656,6 +661,11 @@ def main() -> int:
         "main thread — scenarios minimize them inside measured windows, and "
         "residual query cost marks a scenario exploratory)",
         "scenarios": scenarios,
+        # Where the lane's time went (audit #82): report only.
+        "lanePhases": ui_perf_lane.lane_phases(
+            ui_perf_lane.parse_setup_markers(Path(args.xcodebuild_log)),
+            ui_perf_lane.load_ledger(args.step_ledger), EXPECTED_SCENARIOS,
+        ),
     }
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)

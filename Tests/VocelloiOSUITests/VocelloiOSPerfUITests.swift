@@ -40,7 +40,17 @@ final class VocelloiOSPerfUITests: VocelloiOSUITestCase {
         return runID
     }
 
+    /// The running scenario's setup stamps (audit #82).
+    private var setupStamps: [String: Int64] = [:]
+    private var setupScenario = ""
+
+    private static func epochMS() -> Int64 {
+        Int64(Date().timeIntervalSince1970 * 1000)
+    }
+
     private func beginScenario(_ name: String, seedHistory: Bool = false) {
+        setupScenario = name
+        setupStamps = ["launchStart": Self.epochMS()]
         var environment = [
             "QWENVOICE_UIPERF_FRAME_PROBE": name,
             // Run-scoped device manifest: the checker proves canonical
@@ -51,9 +61,20 @@ final class VocelloiOSPerfUITests: VocelloiOSUITestCase {
             environment["QWENVOICE_UIPERF_SEED_HISTORY"] = String(Self.seededHistoryRows)
         }
         beginSession(additionalEnvironment: environment)
+        setupStamps["launchReady"] = Self.epochMS()
         // Post-launch settle: launch transient and first-layout churn stay
         // out of every marked window.
         Thread.sleep(forTimeInterval: 3.0)
+        setupStamps["settled"] = Self.epochMS()
+    }
+
+    /// Prints the scenario's marker and, with it, where the scenario's lane
+    /// time went before and during its window (audit #82).
+    private func emit(_ marker: VocelloUIPerfScenarioMarker) {
+        marker.emit()
+        setupStamps["windowStart"] = marker.windowStartEpochMS
+        setupStamps["windowEnd"] = marker.windowEndEpochMS
+        VocelloUIPerfSetupMarker(scenario: setupScenario, stamps: setupStamps).emit()
     }
 
     private func measuredWindow(
@@ -61,15 +82,15 @@ final class VocelloiOSPerfUITests: VocelloiOSUITestCase {
         actionCount: Int,
         _ body: () -> Void
     ) {
-        let start = Int64(Date().timeIntervalSince1970 * 1000)
+        let start = Self.epochMS()
         body()
-        let end = Int64(Date().timeIntervalSince1970 * 1000)
-        VocelloUIPerfScenarioMarker(
+        let end = Self.epochMS()
+        emit(VocelloUIPerfScenarioMarker(
             scenario: name,
             windowStartEpochMS: start,
             windowEndEpochMS: end,
             actionCount: actionCount
-        ).emit()
+        ))
     }
 
     /// Vertical sweep through a coordinate anchored on the APPLICATION
@@ -279,11 +300,11 @@ final class VocelloiOSPerfUITests: VocelloiOSUITestCase {
         let start = Int64(Date().timeIntervalSince1970 * 1000)
         _ = generateAndWaitForCompletedPlayer(timeout: 300)
         let end = Int64(Date().timeIntervalSince1970 * 1000)
-        VocelloUIPerfScenarioMarker(
+        emit(VocelloUIPerfScenarioMarker(
             scenario: "ios-generation-active",
             windowStartEpochMS: start,
             windowEndEpochMS: end,
             actionCount: 1
-        ).emit()
+        ))
     }
 }

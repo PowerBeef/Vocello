@@ -1215,6 +1215,7 @@ validate_macos_ui_perf() {
     --run-started-epoch-ms "$perf_run_started_epoch_ms" \
     --output "$out/ui-perf-report.json" \
     --copy-probe-files-to "$out/diagnostics/ui-perf" \
+    --step-ledger "$step_ledger" \
     --label "$label" \
     --emit-evidence \
     >"$out/ui-perf-gate.txt" 2>&1
@@ -1337,6 +1338,7 @@ validate_ios_ui_perf() {
     --run-id "$run_id" \
     --run-started-epoch-ms "$perf_run_started_epoch_ms" \
     --output "$out/ui-perf-report.json" \
+    --step-ledger "$step_ledger" \
     --label "$label" \
     --require-canonical \
     --emit-evidence \

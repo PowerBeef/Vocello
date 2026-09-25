@@ -644,13 +644,19 @@ public struct VocelloUIPerfScenarioMarker: Codable {
     /// the checker reports a hitch rate per cycle (audit #34(b)). Omitted from
     /// the JSON when nil, so markers without cycles are unchanged.
     public let cycles: [VocelloUIPerfCycle]?
+    /// Optional named spans inside the window (audit #32): the harness's own
+    /// accessibility queries (`query`) apart from the actions and the app's
+    /// reaction to them (`action`), so the checker can say how much of the
+    /// window's hitch time fell while the harness queried. Omitted when nil.
+    public let phases: [VocelloUIPerfPhase]?
 
     public init(
         scenario: String,
         windowStartEpochMS: Int64,
         windowEndEpochMS: Int64,
         actionCount: Int,
-        cycles: [VocelloUIPerfCycle]? = nil
+        cycles: [VocelloUIPerfCycle]? = nil,
+        phases: [VocelloUIPerfPhase]? = nil
     ) {
         self.schemaVersion = 1
         self.scenario = scenario
@@ -658,6 +664,7 @@ public struct VocelloUIPerfScenarioMarker: Codable {
         self.windowEndEpochMS = windowEndEpochMS
         self.actionCount = actionCount
         self.cycles = cycles
+        self.phases = phases
     }
 
     public func emit() {
@@ -678,6 +685,43 @@ public struct VocelloUIPerfCycle: Codable {
     public init(startEpochMS: Int64, endEpochMS: Int64) {
         self.startEpochMS = startEpochMS
         self.endEpochMS = endEpochMS
+    }
+}
+
+/// One named span inside a marked UI-perf window (audit #32), in wall-clock
+/// epoch milliseconds; phases are ordered, disjoint and inside their window.
+public struct VocelloUIPerfPhase: Codable {
+    public let name: String
+    public let startEpochMS: Int64
+    public let endEpochMS: Int64
+
+    public init(name: String, startEpochMS: Int64, endEpochMS: Int64) {
+        self.name = name
+        self.startEpochMS = startEpochMS
+        self.endEpochMS = endEpochMS
+    }
+}
+
+/// Where one UI-perf scenario's lane time went (audit #82): wall-clock epoch
+/// stamps from the scenario's launch to the end of its measured window, printed
+/// as one `VOCELLO_UIPERF_SETUP=<base64>` line the checker folds into the report.
+public struct VocelloUIPerfSetupMarker: Codable {
+    public let schemaVersion: Int
+    public let scenario: String
+    /// Ordered stamps: `launchStart`, `launchReady`, `settled`, `windowStart`,
+    /// `windowEnd` (a scenario may add its own setup steps between them).
+    public let stamps: [String: Int64]
+
+    public init(scenario: String, stamps: [String: Int64]) {
+        self.schemaVersion = 1
+        self.scenario = scenario
+        self.stamps = stamps
+    }
+
+    public func emit() {
+        guard let data = try? JSONEncoder().encode(self) else { return }
+        print("VOCELLO_UIPERF_SETUP=\(data.base64EncodedString())")
+        fflush(stdout)
     }
 }
 

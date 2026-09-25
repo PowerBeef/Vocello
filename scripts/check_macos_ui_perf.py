@@ -30,6 +30,14 @@ Phase-2 posture (UI-7, 2026-08-05):
   classifies ``exploratory`` via the standard source provenance.
 * The probe measures main-run-loop display-link cadence — a proxy for
   UI-thread hitching, not compositor-level presents (stated in the report).
+* harness-control (exploratory, audit #32) makes sidebar-navigation's readiness
+  queries with no click, so its hitch time is the harness's accessibility cost;
+  markers may name phases (`query`, `action`, `verify`) whose hitch rates the
+  report lists per scenario. sidebar-navigation runs with proactive warms
+  suppressed, sidebar-navigation-warms (exploratory) with them on (audit #33).
+* The report's `lanePhases` names where lane time went: each scenario's launch,
+  settle, setup and window from its `VOCELLO_UIPERF_SETUP=` stamps, and the
+  required-step ledger's step durations (audit #82).
 """
 from __future__ import annotations
 
@@ -48,18 +56,23 @@ UI_PERF_RUNS = REPO_ROOT / "benchmarks" / "runs" / "ui-perf"
 if str(REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from lib import ui_perf_thresholds as calibration_rules  # noqa: E402
+from lib import ui_perf_lane  # noqa: E402
 
 EXPECTED_SCENARIOS = [
     "idle-baseline",
     "sidebar-navigation",
+    "harness-control",
     "history-scroll",
     "history-filter",
     "delivery-menu",
     "settings-scroll",
     "composer-typing",
     "window-resize",
+    "sidebar-navigation-warms",
     "generation-active",
 ]
+# The named spans a marker may carry inside its window (audit #32).
+PHASE_NAMES = frozenset({"query", "action", "verify"})
 # The History scenarios are exploratory because a 400-row list under
 # XCUITest cannot be measured clean: per-interaction element queries and
 # the post-search-clear accessibility maintenance for 400 re-rendered rows
@@ -166,6 +179,55 @@ def overlap_fraction(block: dict, start: int, end: int) -> float:
     return max(0.0, min(1.0, overlap / span))
 
 
+def span_hitch(blocks: list[dict], start: int, end: int) -> tuple[float, int]:
+    """(in-span excess frame time, covered ms) of one span, apportioned like a window."""
+    touching = [b for b in blocks if b["endEpochMS"] > start and b["startEpochMS"] < end]
+    covered = sum(min(int(b["endEpochMS"]), end) - max(int(b["startEpochMS"]), start) for b in touching)
+    excess = sum(b["sumExcessMS"] * overlap_fraction(b, start, end) for b in touching)
+    return excess, covered
+
+
+def phase_hitch_rates(marker: dict, blocks: list[dict]) -> dict | None:
+    """Per phase name, the phases' total duration and hitch rate (audit #32).
+
+    Optional marker field `phases`: [{name, startEpochMS, endEpochMS}, ...],
+    ordered, disjoint (a phase may start where the previous ended) and inside
+    the window. Report-only: no record metric or ceiling reads it."""
+    phases = marker.get("phases")
+    if phases is None:
+        return None
+    scenario = marker["scenario"]
+    start, end = int(marker["windowStartEpochMS"]), int(marker["windowEndEpochMS"])
+    if not isinstance(phases, list) or not phases:
+        raise GateError(f"scenario '{scenario}': phases must be a non-empty list")
+    totals: dict[str, dict[str, float]] = {}
+    previous_end = start
+    for phase in phases:
+        try:
+            name = phase["name"]
+            phase_start, phase_end = int(phase["startEpochMS"]), int(phase["endEpochMS"])
+        except (KeyError, TypeError, ValueError):
+            raise GateError(f"scenario '{scenario}': malformed phase marker") from None
+        if name not in PHASE_NAMES:
+            raise GateError(f"scenario '{scenario}': unknown phase {name!r}")
+        if not previous_end <= phase_start <= phase_end <= end:
+            raise GateError(f"scenario '{scenario}': phases must be ordered, disjoint and inside the window")
+        previous_end = phase_end
+        excess, covered = span_hitch(blocks, phase_start, phase_end)
+        entry = totals.setdefault(name, {"durationMS": 0.0, "excessMS": 0.0, "coveredMS": 0.0})
+        entry["durationMS"] += phase_end - phase_start
+        entry["excessMS"] += excess
+        entry["coveredMS"] += covered
+    return {
+        name: {
+            "durationMS": int(entry["durationMS"]),
+            "hitchTimeMSPerS": round(entry["excessMS"] / (entry["coveredMS"] / 1000.0), 3)
+            if entry["coveredMS"] > 0 else None,
+        }
+        for name, entry in sorted(totals.items())
+    }
+
+
 def cycle_hitch_rates(marker: dict, blocks: list[dict]) -> list[float] | None:
     """Per-cycle hitch time for a scenario that marks its repeated cycles (audit #34(b)).
 
@@ -261,6 +323,7 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
     scenario = marker["scenario"]
     action_count = marker.get("actionCount")
     cycle_rates = cycle_hitch_rates(marker, blocks)
+    phase_rates = phase_hitch_rates(marker, blocks)
     return {
         "scenario": scenario,
         "designation": "exploratory" if scenario in exploratory else "confirmatory",
@@ -275,6 +338,9 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
         "hitchMSPerAction": round(excess_ms / action_count, 3)
         if isinstance(action_count, int) and action_count > 0 else None,
         **({"cycleHitchTimeMSPerS": cycle_rates} if cycle_rates is not None else {}),
+        # Report-only per-phase hitch (audit #32): how much fell while the
+        # harness queried, acted or verified.
+        **({"phases": phase_rates} if phase_rates is not None else {}),
         "maxGapMS": round(max_gap, 2),
         "p95GapMSApprox": approximate_p95_gap_ms(histogram, refresh_ms),
         "gapHistogram": histogram,
@@ -510,6 +576,10 @@ def main() -> int:
     )
     parser.add_argument("--label", default="")
     parser.add_argument(
+        "--step-ledger", type=Path, default=None,
+        help="the lane's required-steps.json; its step durations join the report's lanePhases (audit #82)",
+    )
+    parser.add_argument(
         "--emit-evidence", action="store_true",
         help="write benchmark-evidence.json beside the report when the live "
         "host matches the canonical hardware profile (registry publication "
@@ -558,6 +628,10 @@ def main() -> int:
                 destination.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(probe_path, destination / probe_path.name)
         hardware_context = run_hardware_context(environment_rows, scenarios, "pending")
+        phases = ui_perf_lane.lane_phases(
+            ui_perf_lane.parse_setup_markers(Path(args.xcodebuild_log)),
+            ui_perf_lane.load_ledger(args.step_ledger), EXPECTED_SCENARIOS,
+        )
     except GateError as error:
         print(f"ui-perf gate FAILED: {error}", file=sys.stderr)
         return 1
@@ -596,6 +670,7 @@ def main() -> int:
         "inside measured windows, and residual query cost marks a scenario "
         "exploratory)",
         "scenarios": scenarios,
+        "lanePhases": phases,
     }
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)

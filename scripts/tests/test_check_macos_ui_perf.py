@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import check_macos_ui_perf as checker  # noqa: E402
 from lib import ui_perf_thresholds as rules  # noqa: E402
+from lib import ui_perf_lane as lane  # noqa: E402
 
 
 def make_marker(scenario: str, start: int, end: int, actions: int = 4) -> str:
@@ -349,6 +350,63 @@ class WindowArithmeticTests(unittest.TestCase):
             with self.subTest(cycles=cycles), self.assertRaises(checker.GateError):
                 checker.summarize_scenario(dict(self.marker(0, 2_000), cycles=cycles), blocks, exploratory=set())
 
+    def test_phase_markers_split_the_window_by_what_the_harness_did(self):
+        """audit #32: query, action and verify spans, each apportioned like the window."""
+        blocks = make_blocks(0, 4)
+        blocks[0]["sumExcessMS"] = 100.0      # 0-500 ms: the query span
+        blocks[2]["sumExcessMS"] = 300.0      # 1000-1500 ms: the action span
+        marker = dict(self.marker(0, 2_000), phases=[
+            {"name": "query", "startEpochMS": 0, "endEpochMS": 500},
+            {"name": "action", "startEpochMS": 1_000, "endEpochMS": 1_500},
+            {"name": "verify", "startEpochMS": 1_500, "endEpochMS": 2_000},
+        ])
+        summary, _ = checker.summarize_scenario(marker, blocks, exploratory=set())
+        self.assertEqual(summary["phases"], {
+            "action": {"durationMS": 500, "hitchTimeMSPerS": 600.0},
+            "query": {"durationMS": 500, "hitchTimeMSPerS": 200.0},
+            "verify": {"durationMS": 500, "hitchTimeMSPerS": 0.0},
+        })
+        legacy, _ = checker.summarize_scenario(self.marker(0, 2_000), blocks, exploratory=set())
+        self.assertNotIn("phases", legacy)
+        for phases in (
+            [],
+            [{"name": "idle", "startEpochMS": 0, "endEpochMS": 500}],
+            [{"name": "query", "startEpochMS": 500, "endEpochMS": 2_500}],
+            [{"name": "query", "startEpochMS": 600, "endEpochMS": 900},
+             {"name": "action", "startEpochMS": 0, "endEpochMS": 500}],
+        ):
+            with self.subTest(phases=phases), self.assertRaises(checker.GateError):
+                checker.summarize_scenario(dict(self.marker(0, 2_000), phases=phases), blocks, exploratory=set())
+
+    def test_lane_phases_name_where_the_lane_time_went(self):
+        """audit #82: setup stamps per scenario and the step ledger's durations."""
+        stamps = {
+            "idle-baseline": {"launchStart": 0, "launchReady": 4_000, "settled": 7_000,
+                              "windowStart": 8_000, "windowEnd": 23_000},
+            "sidebar-navigation": {"launchStart": 30_000, "launchReady": 33_000, "settled": 36_000,
+                                   "windowStart": 36_000, "windowEnd": 46_000},
+            "history-scroll": {"launchStart": 50_000},
+        }
+        ledger = {
+            "startedAt": "2026-09-25T10:00:00Z",
+            "results": {
+                "xcuitest": {"status": "passed", "completedAt": "2026-09-25T10:05:00Z"},
+                "build": {"status": "passed", "completedAt": "2026-09-25T10:01:30Z"},
+            },
+        }
+        phases = lane.lane_phases(stamps, ledger, checker.EXPECTED_SCENARIOS)
+        self.assertEqual([item["scenario"] for item in phases["scenarios"]], ["idle-baseline", "sidebar-navigation"])
+        self.assertEqual(phases["scenarios"][0], {
+            "scenario": "idle-baseline", "launchMS": 4_000, "settleMS": 3_000, "setupMS": 1_000,
+            "windowMS": 15_000, "totalMS": 23_000,
+        })
+        self.assertEqual(phases["windowShare"], round(25_000 / 39_000, 4))
+        self.assertEqual(phases["steps"], [
+            {"step": "build", "status": "passed", "secondsSincePrevious": 90.0},
+            {"step": "xcuitest", "status": "passed", "secondsSincePrevious": 210.0},
+        ])
+        self.assertEqual(lane.lane_phases({}, None, checker.EXPECTED_SCENARIOS), {"scenarios": [], "windowShare": None})
+
     def test_a_missing_refresh_interval_fails_closed(self):
         blocks = make_blocks(0, 4)
         for block in blocks:
@@ -484,8 +542,11 @@ class ThresholdsContractTests(unittest.TestCase):
     def test_shipped_contract_owns_the_confirmatory_designation(self):
         contract = checker.load_thresholds(checker.DEFAULT_THRESHOLDS_PATH)
         exploratory = checker.exploratory_scenarios(contract)
-        self.assertEqual(
-            exploratory, {"window-resize", "generation-active", "history-filter", "history-scroll"})
+        self.assertEqual(exploratory, {
+            "window-resize", "generation-active", "history-filter", "history-scroll",
+            # audit #32 and #33: the harness control and the warm-on navigation.
+            "harness-control", "sidebar-navigation-warms",
+        })
         self.assertEqual(set(contract["hitchCeilingMSPerS"]), set(contract["confirmatoryScenarios"]))
 
     def test_contract_with_a_ceiling_for_an_undesignated_scenario_is_refused(self):

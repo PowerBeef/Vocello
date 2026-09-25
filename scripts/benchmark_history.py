@@ -535,12 +535,21 @@ UI_PERF_SCENARIOS_BY_PLATFORM = {
         "idle-baseline", "sidebar-navigation", "history-scroll", "history-filter",
         "delivery-menu", "settings-scroll", "composer-typing", "window-resize",
         "generation-active",
+        # Since 2026-09-25: the harness-only control (audit #32) and navigation
+        # with the product's warms on (audit #33), both exploratory.
+        "harness-control", "sidebar-navigation-warms",
     },
     "ios": {
         "ios-idle-baseline", "ios-tab-navigation", "ios-history-scroll",
         "ios-voices-scroll", "ios-settings-scroll", "ios-composer-typing",
         "ios-sheet-present-dismiss", "ios-player-scrub", "ios-generation-active",
     },
+}
+# Scenarios a platform's earlier records measured without: a record carries
+# either the full current set or the full set without these, never a mix.
+UI_PERF_SCENARIOS_ADDED = {
+    "macos": {"harness-control", "sidebar-navigation-warms"},
+    "ios": set(),
 }
 MEMORY_REQUIRED_METRICS = {
     "residentStartMB", "residentEndMB", "residentDeltaMB", "peakResidentMB",
@@ -2377,7 +2386,8 @@ def validate_ui_perf_semantics(record: dict[str, Any]) -> None:
         raise HistoryError("ui-perf must not claim generation telemetry or audio-QC")
     takes = record["takes"]
     scenarios = [str(take.get("cell", "")).removeprefix("ui-perf/") for take in takes]
-    if len(takes) != len(expected_scenarios) or set(scenarios) != expected_scenarios:
+    allowed_sets = [expected_scenarios, expected_scenarios - UI_PERF_SCENARIOS_ADDED[run["platform"]]]
+    if len(set(scenarios)) != len(takes) or set(scenarios) not in allowed_sets:
         raise HistoryError("ui-perf requires exactly one take per probe scenario")
     for take, scenario in zip(takes, scenarios):
         expected_identity = {

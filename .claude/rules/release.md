@@ -146,9 +146,10 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   native builds outside the host-wide lock (XcodeBuildMCP builds bypass it).
 - Editing, committing or integrating agent work while a UI or benchmark lane runs: publication compares
   the pre- and post-run tree fingerprints, and a mismatch demotes the record to exploratory.
-- Publishing a canonical macOS UI benchmark record without, in the same commit, repinning
-  `RTF_RECORD`, running `generate_readme_charts.py` and updating the website medians and record id;
-  the chart check fails otherwise. New records store `comparison.deltaMetrics: trend-v1` to stay under
+- Publishing a canonical macOS UI benchmark record without, in the same commit, running
+  `generate_readme_charts.py` (public medians pool the warm takes of up to five canonical records of
+  the newest record's lineage, never one run) and updating the website medians and anchor id; the chart
+  check fails otherwise. New records store `comparison.deltaMetrics: trend-v1` to stay under
   the 256 KiB cap.
 - Leaving a dated doc orphaned or stubbed: delete an unlinked dated doc, mark a linked one
   `status: historical`, and never leave "(removed …)" stubs.

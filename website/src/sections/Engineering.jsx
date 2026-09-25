@@ -2,9 +2,11 @@ import React from "react";
 
 /*
   Measured performance, from the repository's tracked benchmark records:
-  - RTF bars: benchmarks/runs/ui-generation/macos-xcui-benchmark-20260914-062114-379db820.json
-    (the newest canonical matrix; `python3 scripts/generate_readme_charts.py --check` names the
-    newest canonical record and must agree with this pin).
+  - RTF bars: the warm-take medians `python3 scripts/generate_readme_charts.py` prints, pooled
+    over up to five canonical records that share the newest one's comparison key (the anchor,
+    named in the provenance line below). Today the pool is one record,
+    benchmarks/runs/ui-generation/macos-xcui-benchmark-20260914-062114-379db820.json; the
+    generator's `--check` fails when a new canonical record changes the charts.
     RTF is the standard real-time factor: seconds of generation per second of audio, lower is
     faster, below 1.0 audio is produced quicker than it plays. This record was published after the
     2026-09-12 RTF cutover (`run.rtfDefinition: wall/audio`), so each value is the per-cell median
@@ -14,7 +16,7 @@ import React from "react";
     chart. The gate survives as one figcaption sentence below.
   Values are warm-take medians measured on the Mac mini M2 (8 GB), the support floor and the
   canonical host until 2026-09-22. The Mac mini M6 (16 GB) is canonical since then; its records
-  start a new series, and `--check` forces a repin here when the first one lands (roadmap AV-17).
+  start a new series, and `--check` forces an update here when the first one lands (roadmap AV-17).
   This section is a maintained whole-package surface (docs/reference/macos-release-qa.md
   "Technical sections are maintained surfaces"): refresh facts each release, never a
   single-release billboard.

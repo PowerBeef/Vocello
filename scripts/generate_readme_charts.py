@@ -8,13 +8,19 @@ derived artifacts. Python stdlib only — no plotting dependency joins the
 toolchain for this.
 
 Data provenance:
-  - The RTF chart reads the pinned canonical macOS ui-generation record
-    (RTF_RECORD). `--check` fails when a newer canonical record exists on the
-    canonical macOS profile of benchmarks/hardware-profiles.json or, while that
-    profile has none yet, on the pinned record's own profile, so the pin cannot
-    silently age and the first record on a newly canonical host forces a repin.
-    Records from different hardware profiles are never compared; the subtitle
-    names the pinned record's own hardware. RTF is the standard
+  - The RTF chart pools canonical macOS ui-generation records (audit #72): its
+    anchor is the newest canonical record on the canonical macOS profile of
+    benchmarks/hardware-profiles.json (while that profile has none yet, the
+    newest canonical record on any profile), and the pool is the anchor plus
+    the canonical records just before it on the same profile that share its
+    comparison key, at most POOL_SIZE records; a lineage change resets the
+    pool. Each bar is the median of every warm take of its cell across the
+    pool, so one run's noise no longer moves the public numbers at each new
+    record. The anchor is derived, never pinned: a new canonical record changes
+    the charts, so `--check` fails until they are regenerated (and the website
+    medians updated from the printed values). Records from different hardware
+    profiles are never pooled; the subtitle names the anchor's hardware and
+    the footer the anchor and the pool size. RTF is the standard
     real-time factor (generation seconds per audio second, lower is faster).
     A record published before the 2026-09-12 cutover stores the inverted
     decode-loop speedup under `rtf`; for those the chart derives a standard
@@ -54,11 +60,9 @@ if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 from lib import rtf as rtf_semantics  # noqa: E402
 
-# Newest canonical macOS UI matrix: on the canonical hardware profile once it
-# has one, else on this record's own profile. `--check` refuses a stale pin
-# (see newest_canonical_record); the hardware comes from the registry and the
-# record, never from a constant here.
-RTF_RECORD = "macos-xcui-benchmark-20260914-062114-379db820"
+# At most this many canonical records (the anchor and its same-lineage
+# predecessors) pool into the published medians.
+POOL_SIZE = 5
 LONGFORM_RUN_ID = "macos-xcui-smoke-20260725-062451-8f15c1fd"
 # (audio seconds, engine phys-footprint end MB, peak MB) per segment.
 LONGFORM_SEGMENTS = (
@@ -134,50 +138,70 @@ def hardware_label(record: dict) -> str:
     return f"{match.group(1)} {match.group(2)}"
 
 
-def load_rtf_medians(record_id: str) -> tuple[dict[str, float], bool]:
-    """Per-cell median standard RTF and whether it was derived from a legacy record."""
-    payload = load_record(record_id)
+def load_rtf_medians(record_ids: list[str], records_dir: Path | None = None) -> tuple[dict[str, float], bool]:
+    """Per-cell median standard RTF over every take of the records, and whether it was derived.
+
+    Pooled records share one comparison key, so they share one RTF definition."""
     per_cell: dict[str, list[float]] = {}
-    derived = not rtf_semantics.is_standard(payload)
-    for take in payload["takes"]:
-        value, _ = rtf_semantics.take_rtf(payload, take)
-        if value is None:
-            raise SystemExit(f"error: {record_id} take {take.get('cell')} has no standard RTF")
-        per_cell.setdefault(re.sub(r"#\d+$", "", take["cell"]), []).append(value)
+    derived = False
+    for record_id in record_ids:
+        payload = load_record(record_id, records_dir)
+        derived = derived or not rtf_semantics.is_standard(payload)
+        for take in payload["takes"]:
+            value, _ = rtf_semantics.take_rtf(payload, take)
+            if value is None:
+                raise SystemExit(f"error: {record_id} take {take.get('cell')} has no standard RTF")
+            per_cell.setdefault(re.sub(r"#\d+$", "", take["cell"]), []).append(value)
     return {key: statistics.median(values) for key, values in per_cell.items()}, derived
 
 
-def newest_canonical_record(
-    records_dir: Path | None = None,
-    pinned: str | None = None,
-    profiles_path: Path | None = None,
-) -> str:
-    """Run id of the newest canonical macOS ui-generation record the chart may show.
-
-    Prefers the canonical macOS profile. Until that profile has a canonical
-    record, it falls back to the pinned record's own profile, so a retired
-    host's pin stays valid history while the first record on the new canonical
-    host forces a repin. Profiles are never mixed.
-    """
-    records_dir = records_dir or RECORDS_DIR
-    pinned = pinned or RTF_RECORD
-    by_profile: dict[str, list[tuple[str, str]]] = {}
-    for path in records_dir.glob("macos-*.json"):
+def canonical_records(records_dir: Path | None = None) -> dict[str, list[tuple[str, str, str]]]:
+    """(finishedAt, run id, comparison key) of each canonical macOS UI record, per profile, oldest first."""
+    by_profile: dict[str, list[tuple[str, str, str]]] = {}
+    for path in (records_dir or RECORDS_DIR).glob("macos-*.json"):
         payload = json.loads(path.read_text(encoding="utf-8"))
         run = payload["run"]
         if run.get("classification") == "canonical":
-            profile_id = payload.get("hardware", {}).get("profileID")
-            by_profile.setdefault(profile_id, []).append((run["finishedAt"], run["id"]))
-    canonical = by_profile.get(canonical_macos_profile_id(profiles_path))
-    if canonical:
-        return max(canonical)[1]
-    pinned_path = records_dir / f"{pinned}.json"
-    if pinned_path.is_file():
-        pinned_profile = load_record(pinned, records_dir).get("hardware", {}).get("profileID")
-        fallback = by_profile.get(pinned_profile)
-        if fallback:
-            return max(fallback)[1]
-    raise SystemExit("error: no canonical macOS ui-generation record found")
+            by_profile.setdefault(payload.get("hardware", {}).get("profileID"), []).append(
+                (run["finishedAt"], run["id"], (payload.get("comparison") or {}).get("key", ""))
+            )
+    return {profile: sorted(rows) for profile, rows in by_profile.items()}
+
+
+def chart_pool(records_dir: Path | None = None, profiles_path: Path | None = None) -> list[str]:
+    """Run ids the chart pools, anchor (newest) first.
+
+    The anchor is the newest canonical record on the canonical macOS profile or,
+    until that profile has one, the newest canonical record on any profile. The
+    pool walks back from it through the same profile's canonical records while
+    they share its comparison key, so a lineage change resets it. Profiles are
+    never mixed."""
+    by_profile = canonical_records(records_dir)
+    profile = canonical_macos_profile_id(profiles_path)
+    if not by_profile.get(profile):
+        if not by_profile:
+            raise SystemExit("error: no canonical macOS ui-generation record found")
+        profile = max(by_profile, key=lambda name: by_profile[name][-1])
+    rows = by_profile[profile]
+    anchor_key = rows[-1][2]
+    pool: list[str] = []
+    for _, run_id, key in reversed(rows):
+        if key != anchor_key or len(pool) == POOL_SIZE:
+            break
+        pool.append(run_id)
+    return pool
+
+
+def website_medians_text(pool: list[str], medians: dict[str, float]) -> str:
+    """The warm medians and provenance website/src/sections/Engineering.jsx must show."""
+    rows = [
+        f"  {MODE_LABELS[mode]}: " + ", ".join(f"{medians[f'{mode}/{length}/warm']:.2f}" for length in LENGTHS)
+        for mode in MODES
+    ]
+    return "\n".join([
+        f"Website medians (short, medium, long) from {len(pool)} record(s), anchor {pool[0][-8:]}:",
+        *rows,
+    ])
 
 
 def readme_alt_text(medians: dict[str, float]) -> str:
@@ -232,7 +256,9 @@ def text(x: float, y: float, value: str, *, fill: str, size: int = 12,
 
 def rtf_chart(theme_name: str) -> str:
     theme = THEMES[theme_name]
-    medians, derived = load_rtf_medians(RTF_RECORD)
+    pool = chart_pool()
+    anchor = pool[0]
+    medians, derived = load_rtf_medians(pool)
     width, height = 720, 440
     left, right, top = 110.0, 84.0, 64.0
     x0, x1 = left, width - right
@@ -243,7 +269,7 @@ def rtf_chart(theme_name: str) -> str:
 
     parts = svg_open(width, height)
     parts.append(text(16, 28, "Faster than playback in every mode", fill=theme["ink"], size=16, weight="600"))
-    hardware = hardware_label(load_record(RTF_RECORD))
+    hardware = hardware_label(load_record(anchor))
     parts.append(text(16, 47, f"Warm real-time factor: seconds of generation per second of audio (lower is faster) · {hardware}",
                       fill=theme["muted"], size=12))
 
@@ -281,8 +307,11 @@ def rtf_chart(theme_name: str) -> str:
         parts.append(text(16, height - 6,
                           "RTF derived from each take's app submit→completed span (record predates the 2026-09-12 RTF cutover)",
                           fill=theme["muted"], size=10))
-    parts.append(text(width - 16, height - 6,
-                      f"record {RTF_RECORD[-8:]} · benchmarks/HISTORY.md",
+    provenance = (
+        f"record {anchor[-8:]}" if len(pool) == 1
+        else f"median of {len(pool)} records through {anchor[-8:]}"
+    )
+    parts.append(text(width - 16, height - 6, f"{provenance} · benchmarks/HISTORY.md",
                       fill=theme["muted"], size=10, anchor="end"))
     parts.extend(("</g>", "</svg>"))
     return "\n".join(parts) + "\n"
@@ -440,16 +469,9 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="fail if committed charts are stale")
     args = parser.parse_args()
 
-    newest = newest_canonical_record()
-    if newest != RTF_RECORD:
-        print(
-            f"error: RTF_RECORD pins {RTF_RECORD} but the newest canonical record is {newest}; "
-            "update the pin in scripts/generate_readme_charts.py and website/src/sections/Engineering.jsx",
-            file=sys.stderr,
-        )
-        return 1
+    pool = chart_pool()
     rendered = render_all()
-    medians, _ = load_rtf_medians(RTF_RECORD)
+    medians, _ = load_rtf_medians(pool)
     readme = render_readme(medians)
     if args.check:
         stale = [
@@ -461,7 +483,11 @@ def main() -> int:
             stale.append("README.md (rtf-chart block)")
         if stale:
             print(f"error: README charts are stale: {', '.join(sorted(stale))}", file=sys.stderr)
-            print("run: python3 scripts/generate_readme_charts.py", file=sys.stderr)
+            print(
+                f"run: python3 scripts/generate_readme_charts.py (anchor {pool[0]}, pool of {len(pool)}), "
+                "then copy the medians it prints into website/src/sections/Engineering.jsx",
+                file=sys.stderr,
+            )
             return 1
         print(f"README charts: fresh ({len(rendered)} files + README block)")
         return 0
@@ -471,6 +497,7 @@ def main() -> int:
         (OUTPUT_DIR / name).write_text(content, encoding="utf-8")
     README_PATH.write_text(readme, encoding="utf-8")
     print(f"Rendered {len(rendered)} chart files → {OUTPUT_DIR.relative_to(ROOT)} and the README rtf-chart block")
+    print(website_medians_text(pool, medians))
     return 0
 
 

@@ -39,13 +39,12 @@ class GenerateReadmeChartsTests(unittest.TestCase):
 
     def test_charts_cite_their_data_provenance(self) -> None:
         rendered = MODULE.render_all()
-        self.assertIn(MODULE.RTF_RECORD[-8:], rendered["rtf-by-mode-dark.svg"])
+        self.assertIn(MODULE.chart_pool()[0][-8:], rendered["rtf-by-mode-dark.svg"])
         self.assertIn("benchmarks/HISTORY.md", rendered["rtf-by-mode-dark.svg"])
         self.assertIn(MODULE.LONGFORM_RUN_ID[-8:], rendered["longform-memory-dark.svg"])
 
-    def test_pinned_record_is_the_newest_canonical_and_the_readme_block_is_fresh(self) -> None:
-        self.assertEqual(MODULE.newest_canonical_record(), MODULE.RTF_RECORD)
-        medians, _ = MODULE.load_rtf_medians(MODULE.RTF_RECORD)
+    def test_the_readme_block_is_fresh_for_the_pooled_medians(self) -> None:
+        medians, _ = MODULE.load_rtf_medians(MODULE.chart_pool())
         self.assertEqual(
             MODULE.README_PATH.read_text(encoding="utf-8"), MODULE.render_readme(medians),
             "README rtf-chart block is stale — run scripts/generate_readme_charts.py",
@@ -77,32 +76,42 @@ class GenerateReadmeChartsTests(unittest.TestCase):
 
 
 def write_record(directory: Path, run_id: str, profile: str, finished_at: str,
-                 classification: str = "canonical") -> None:
+                 classification: str = "canonical", key: str = "lineage-a",
+                 rtf: float = 0.5) -> None:
     marketing = {
         "mac-mini-m2-8gb": "Mac mini (M2, 8 GB)",
         "mac-mini-m6-16gb": "Mac mini (M6, 16 GB)",
     }[profile]
     (directory / f"{run_id}.json").write_text(json.dumps({
-        "run": {"id": run_id, "finishedAt": finished_at, "classification": classification},
+        "run": {
+            "id": run_id, "kind": "ui-generation", "finishedAt": finished_at,
+            "classification": classification, "rtfDefinition": "wall/audio",
+        },
         "hardware": {"profileID": profile, "marketingName": marketing},
+        "comparison": {"key": key},
+        "takes": [
+            {"cell": f"{mode}/{length}/warm#{index}", "metrics": {"rtf": rtf + index / 100}}
+            for mode in MODULE.MODES for length in MODULE.LENGTHS for index in range(3)
+        ],
     }), encoding="utf-8")
 
 
-class CanonicalRecordSelectionTests(unittest.TestCase):
-    PINNED = "macos-xcui-benchmark-20260914-062114-pinned00"
+class ChartPoolTests(unittest.TestCase):
+    """The public medians pool recent canonical records of one lineage (audit #72)."""
 
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.records = Path(self.temporary.name)
         write_record(self.records, "macos-xcui-benchmark-20260801-000000-olderm2", "mac-mini-m2-8gb",
-                     "2026-08-01T00:00:00Z")
-        write_record(self.records, self.PINNED, "mac-mini-m2-8gb", "2026-09-14T06:35:58Z")
+                     "2026-08-01T00:00:00Z", key="lineage-old")
+        write_record(self.records, "macos-xcui-benchmark-20260914-000000-latestm2", "mac-mini-m2-8gb",
+                     "2026-09-14T06:35:58Z")
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def newest(self) -> str:
-        return MODULE.newest_canonical_record(self.records, self.PINNED)
+    def pool(self) -> list[str]:
+        return MODULE.chart_pool(self.records)
 
     def test_registry_names_the_m6_as_canonical_and_the_chart_labels_its_own_record(self) -> None:
         self.assertEqual(MODULE.canonical_macos_profile_id(), "mac-mini-m6-16gb")
@@ -114,35 +123,54 @@ class CanonicalRecordSelectionTests(unittest.TestCase):
             MODULE.hardware_label({"hardware": {"marketingName": "Mac mini (M6, 16 GB)"}}),
             "Mac mini M6, 16 GB",
         )
-        pinned = MODULE.load_record(MODULE.RTF_RECORD)
-        self.assertIn(MODULE.hardware_label(pinned), MODULE.render_all()["rtf-by-mode-dark.svg"])
+        anchor = MODULE.load_record(MODULE.chart_pool()[0])
+        self.assertIn(MODULE.hardware_label(anchor), MODULE.render_all()["rtf-by-mode-dark.svg"])
 
-    def test_without_a_canonical_profile_record_the_pin_falls_back_to_its_own_profile(self) -> None:
-        self.assertEqual(self.newest(), self.PINNED)
+    def test_without_a_canonical_profile_record_the_anchor_is_the_newest_canonical(self) -> None:
+        self.assertEqual(self.pool(), ["macos-xcui-benchmark-20260914-000000-latestm2"])
         write_record(self.records, "macos-xcui-benchmark-20260920-000000-m6partial", "mac-mini-m6-16gb",
                      "2026-09-20T00:00:00Z", classification="focused")
-        self.assertEqual(self.newest(), self.PINNED)
-        write_record(self.records, "macos-xcui-benchmark-20260915-000000-newerm2", "mac-mini-m2-8gb",
-                     "2026-09-15T00:00:00Z")
-        self.assertEqual(self.newest(), "macos-xcui-benchmark-20260915-000000-newerm2")
+        self.assertEqual(self.pool(), ["macos-xcui-benchmark-20260914-000000-latestm2"])
 
-    def test_the_first_canonical_m6_record_forces_a_repin(self) -> None:
+    def test_the_first_canonical_m6_record_becomes_the_anchor_and_fails_the_check(self) -> None:
         first_m6 = "macos-xcui-benchmark-20260923-000000-firstm6"
         write_record(self.records, first_m6, "mac-mini-m6-16gb", "2026-09-23T00:00:00Z")
-        # A later M2 record never competes with the canonical profile's series.
+        # A later M2 record never competes with the canonical profile's series,
+        # and M2 records never join an M6 pool even under an equal key.
         write_record(self.records, "macos-xcui-benchmark-20260930-000000-laterm2", "mac-mini-m2-8gb",
                      "2026-09-30T00:00:00Z")
-        self.assertEqual(self.newest(), first_m6)
+        self.assertEqual(self.pool(), [first_m6])
         stderr = io.StringIO()
         with (
             mock.patch.object(MODULE, "RECORDS_DIR", self.records),
-            mock.patch.object(MODULE, "RTF_RECORD", self.PINNED),
             mock.patch("sys.argv", ["generate_readme_charts.py", "--check"]),
             contextlib.redirect_stderr(stderr),
         ):
             self.assertEqual(MODULE.main(), 1)
         self.assertIn(first_m6, stderr.getvalue())
-        self.assertIn("update the pin", stderr.getvalue())
+        self.assertIn("Engineering.jsx", stderr.getvalue())
+
+    def test_the_pool_holds_one_lineage_up_to_the_pool_size(self) -> None:
+        for day in range(15, 22):
+            write_record(self.records, f"macos-xcui-benchmark-202609{day}-000000-same{day}",
+                         "mac-mini-m2-8gb", f"2026-09-{day}T00:00:00Z")
+        pool = self.pool()
+        self.assertEqual(len(pool), MODULE.POOL_SIZE)
+        self.assertEqual(pool[0], "macos-xcui-benchmark-20260921-000000-same21")
+        # A lineage change resets the pool to the new anchor alone.
+        write_record(self.records, "macos-xcui-benchmark-20260922-000000-newkey", "mac-mini-m2-8gb",
+                     "2026-09-22T00:00:00Z", key="lineage-b")
+        self.assertEqual(self.pool(), ["macos-xcui-benchmark-20260922-000000-newkey"])
+
+    def test_pooled_medians_take_every_take_of_the_pool(self) -> None:
+        write_record(self.records, "macos-xcui-benchmark-20260915-000000-second", "mac-mini-m2-8gb",
+                     "2026-09-15T00:00:00Z", rtf=0.7)
+        pool = self.pool()
+        self.assertEqual(len(pool), 2)
+        medians, derived = MODULE.load_rtf_medians(pool, self.records)
+        self.assertFalse(derived)
+        # Takes 0.50, 0.51, 0.52 and 0.70, 0.71, 0.72: the pooled median, not either record's.
+        self.assertAlmostEqual(medians["custom/short/warm"], 0.61)
 
 
 if __name__ == "__main__":

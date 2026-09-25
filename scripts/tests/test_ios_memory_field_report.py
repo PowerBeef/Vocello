@@ -104,6 +104,39 @@ class IOSMemoryFieldReportTests(unittest.TestCase):
         )
         self.assertNotIn(str(root), completed.stdout)
 
+    def test_copies_of_one_interval_count_once_and_the_newest_copy_wins(self) -> None:
+        # Each lane pull copies the same rolling document (audit #70).
+        def document(updated_at: str, memory_limit_exits: int) -> str:
+            return json.dumps({
+                "schemaVersion": 1,
+                "updatedAt": updated_at,
+                "records": [{
+                    "kind": "metricPayload",
+                    "intervalStart": "2026-07-10T00:00:00Z",
+                    "intervalEnd": "2026-07-11T00:00:00Z",
+                    "peakMemoryMB": 3500.0,
+                    "backgroundExitCounts": {"memoryResourceLimit": memory_limit_exits},
+                }],
+            })
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for lane, updated_at, exits in (
+                ("memory-a", "2026-07-11T01:00:00Z", 1),
+                ("memory-b", "2026-07-12T01:00:00Z", 2),
+                ("memory-c", "2026-07-11T02:00:00Z", 1),
+            ):
+                summary = root / lane / "diagnostics" / "metrickit-memory-exit-summaries.json"
+                summary.parent.mkdir(parents=True)
+                summary.write_text(document(updated_at, exits), encoding="utf-8")
+            completed = self.run_report(root)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["sourceFileCount"], 3)
+        self.assertEqual(payload["recordCount"], 1)
+        self.assertEqual(payload["duplicateRecordCount"], 2)
+        self.assertEqual(payload["backgroundExitCounts"], {"memoryResourceLimit": 2})
+
     def test_malformed_selected_evidence_fails(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "diagnostics" / "memory-field" / "bad.json"

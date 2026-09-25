@@ -517,7 +517,9 @@ a bounded privacy-reduced memory/exit summary; raw payload JSON, call stacks, id
 are not retained for this purpose. After an explicit device pull,
 `scripts/ios_device.sh memory-field-report [pulled-diagnostics]` reads local files only. It does not
 contact the phone, does not publish benchmark history, and reports `notYetDelivered` nonfatally when
-MetricKit has not delivered a payload. Daily values are not run-correlated and cannot qualify or
+MetricKit has not delivered a payload. Each lane pull copies the same rolling document, so the report
+counts one record per (kind, interval start, interval end), keeps the newest document's copy and
+reports the rest as `duplicateRecordCount`. Daily values are not run-correlated and cannot qualify or
 retroactively fail an individual take.
 
 ### Frontend responsiveness and playback health

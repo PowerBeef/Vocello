@@ -60,7 +60,9 @@ def candidate_files(source: Path) -> list[Path]:
     return sorted(set(candidates))
 
 
-def load_rows(path: Path) -> list[dict[str, Any]]:
+def load_rows(path: Path) -> tuple[list[dict[str, Any]], str]:
+    """The records of one local file and its document's `updatedAt` ("" when absent)."""
+    updated_at = ""
     try:
         if path.suffix.lower() == ".jsonl":
             values = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -68,13 +70,48 @@ def load_rows(path: Path) -> list[dict[str, Any]]:
             payload = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(payload, dict) and isinstance(payload.get("records"), list):
                 values = payload["records"]
+                updated_at = timestamp(payload.get("updatedAt"), "updatedAt") or ""
             else:
                 values = [payload]
     except (OSError, json.JSONDecodeError) as error:
         raise ReportError(f"invalid local memory field evidence: {path.name}: {error}") from error
     if any(not isinstance(value, dict) for value in values):
         raise ReportError(f"invalid local memory field records: {path.name}")
-    return values
+    return values, updated_at
+
+
+def unique_records(paths: list[Path]) -> tuple[list[dict[str, Any]], int]:
+    """One record per (kind, intervalStart, intervalEnd), the newest document's copy.
+
+    Each lane pull copies the same rolling summary document, so a source that is
+    a parent of several lane directories holds the same interval several times
+    (audit #70). The app's document uses that triple as its identity. A record
+    without both interval bounds has no identity and is kept as is.
+    """
+    keyed: dict[tuple[str, str, str], tuple[str, int, dict[str, Any]]] = {}
+    unkeyed: list[tuple[int, dict[str, Any]]] = []
+    order = 0
+    duplicates = 0
+    for path in paths:
+        rows, updated_at = load_rows(path)
+        for row in rows:
+            order += 1
+            start = timestamp(row.get("intervalStart"), "intervalStart")
+            end = timestamp(row.get("intervalEnd"), "intervalEnd")
+            if start is None or end is None:
+                unkeyed.append((order, row))
+                continue
+            key = (str(row.get("kind") or ""), start, end)
+            if key in keyed:
+                duplicates += 1
+                if updated_at <= keyed[key][0]:
+                    continue
+            keyed[key] = (updated_at, order, row)
+    ordered = sorted(
+        [(position, row) for _, position, row in keyed.values()] + unkeyed,
+        key=lambda item: item[0],
+    )
+    return [row for _, row in ordered], duplicates
 
 
 def timestamp(value: Any, field: str) -> str | None:
@@ -164,6 +201,7 @@ def build_report(source: Path) -> dict[str, Any]:
             "status": "notYetDelivered",
             "sourceFileCount": 0,
             "recordCount": 0,
+            "duplicateRecordCount": 0,
             "peakMemoryMB": None,
             "foregroundExitCounts": {},
             "backgroundExitCounts": {},
@@ -178,43 +216,42 @@ def build_report(source: Path) -> dict[str, Any]:
     background: dict[str, int] = {}
     diagnostics: dict[str, int] = {}
     ui_responsiveness: dict[str, float] = {}
-    record_count = 0
-    for path in paths:
-        for row in load_rows(path):
-            record_count += 1
-            if (value := timestamp(row.get("intervalStart"), "intervalStart")) is not None:
-                starts.append(value)
-            if (value := timestamp(row.get("intervalEnd"), "intervalEnd")) is not None:
-                ends.append(value)
-            if (value := bounded_peak(row.get("peakMemoryMB"))) is not None:
-                peaks.append(value)
-            add_counts(
-                foreground,
-                counter_map(
-                    first_mapping(row, ("foregroundExitCounts", "foregroundExits")),
-                    FOREGROUND_KEYS,
-                    "foregroundExitCounts",
-                ),
-            )
-            add_counts(
-                background,
-                counter_map(
-                    first_mapping(row, ("backgroundExitCounts", "backgroundExits")),
-                    BACKGROUND_KEYS,
-                    "backgroundExitCounts",
-                ),
-            )
-            add_counts(
-                diagnostics,
-                counter_map(row.get("diagnosticCounts"), DIAGNOSTIC_KEYS, "diagnosticCounts"),
-            )
-            add_ui_responsiveness(ui_responsiveness, row.get("uiResponsiveness"))
+    rows, duplicate_count = unique_records(paths)
+    for row in rows:
+        if (value := timestamp(row.get("intervalStart"), "intervalStart")) is not None:
+            starts.append(value)
+        if (value := timestamp(row.get("intervalEnd"), "intervalEnd")) is not None:
+            ends.append(value)
+        if (value := bounded_peak(row.get("peakMemoryMB"))) is not None:
+            peaks.append(value)
+        add_counts(
+            foreground,
+            counter_map(
+                first_mapping(row, ("foregroundExitCounts", "foregroundExits")),
+                FOREGROUND_KEYS,
+                "foregroundExitCounts",
+            ),
+        )
+        add_counts(
+            background,
+            counter_map(
+                first_mapping(row, ("backgroundExitCounts", "backgroundExits")),
+                BACKGROUND_KEYS,
+                "backgroundExitCounts",
+            ),
+        )
+        add_counts(
+            diagnostics,
+            counter_map(row.get("diagnosticCounts"), DIAGNOSTIC_KEYS, "diagnosticCounts"),
+        )
+        add_ui_responsiveness(ui_responsiveness, row.get("uiResponsiveness"))
 
     return {
         "schemaVersion": 1,
-        "status": "available" if record_count else "notYetDelivered",
+        "status": "available" if rows else "notYetDelivered",
         "sourceFileCount": len(paths),
-        "recordCount": record_count,
+        "recordCount": len(rows),
+        "duplicateRecordCount": duplicate_count,
         "intervalStart": min(starts) if starts else None,
         "intervalEnd": max(ends) if ends else None,
         "peakMemoryMB": max(peaks) if peaks else None,

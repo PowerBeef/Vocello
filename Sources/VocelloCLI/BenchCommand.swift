@@ -483,12 +483,21 @@ enum BenchCommand {
                         ))
                     }
                 }
-                // The ordinary Clone matrix is warm-only. Establish model residency
-                // explicitly, without an unrecorded generation or a seed-consuming
-                // warm-up take. Retained-memory qualification deliberately measures
-                // its first Clone take cold and must not use this preparation.
+                // The ordinary Clone matrix is warm-only. Establish model residency,
+                // then prime the reference the way Studio does before its first
+                // take: priming runs the same clone prewarm a take would otherwise
+                // pay inside warm#0 and marks it done, so every warm take measures
+                // the same warm path (audit #55). No take is generated, and
+                // sampling stays request-local with every take's explicit seed.
+                // Retained-memory qualification deliberately measures its first
+                // Clone take cold and must not use this preparation.
                 if mode == .clone, memoryQualification == nil {
                     try await runtime.engine.loadModel(id: modelID)
+                    if case .clone(let reference) = payload {
+                        try await runtime.engine.ensureCloneReferencePrimed(
+                            modelID: modelID, reference: reference
+                        )
+                    }
                 }
 
                 // Warm samples per requested length.

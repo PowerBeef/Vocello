@@ -136,7 +136,7 @@ final class DatabaseServiceTests: XCTestCase {
         XCTAssertEqual(try service.referencedAudioPaths(among: candidates), referenced)
     }
 
-    func testDeletesRemoveOneRowOrEveryRow() throws {
+    func testDeletesRemoveOneRowOrABoundedClear() throws {
         let service = try makeService()
         var ids: [Int64] = []
         for index in 0..<3 {
@@ -153,8 +153,15 @@ final class DatabaseServiceTests: XCTestCase {
         try service.deleteGeneration(id: ids[1])
         XCTAssertEqual(try service.fetchAllGenerations().count, 2, "Deleting a missing row is harmless")
 
-        try service.deleteAllGenerations()
-        XCTAssertEqual(try service.fetchAllGenerations(), [])
+        // Clear-all is bounded by the newest id it saw: it removes those rows,
+        // reports their audio, and keeps a take saved after the bound (AUD-05).
+        let bound = ids[2]
+        var later = row("/nonexistent/delete-later.wav", at: 10)
+        try service.saveGeneration(&later)
+        let removed = try service.deleteGenerations(throughID: bound)
+        XCTAssertEqual(Set(removed), ["/nonexistent/delete-0.wav", "/nonexistent/delete-2.wav"])
+        XCTAssertEqual(try service.fetchAllGenerations().map(\.audioPath), ["/nonexistent/delete-later.wav"])
+        XCTAssertEqual(try service.deleteGenerations(throughID: bound), [], "A resumed clear deletes nothing twice")
     }
 
     func testAFailedOpenStaysFailedUntilAnExplicitReopen() throws {
@@ -169,7 +176,7 @@ final class DatabaseServiceTests: XCTestCase {
         XCTAssertThrowsError(try service.saveGeneration(&generation)) { error in
             XCTAssertEqual((error as? HistoryPersistenceError)?.operation, .write)
         }
-        XCTAssertThrowsError(try service.deleteAllGenerations()) { error in
+        XCTAssertThrowsError(try service.deleteGenerations(throughID: 1)) { error in
             XCTAssertEqual((error as? HistoryPersistenceError)?.operation, .delete)
         }
 

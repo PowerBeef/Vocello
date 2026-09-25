@@ -1095,8 +1095,10 @@ also key on whole-tree project and harness hashes. Records stamped with a lineag
 (`inputs.lineageContractVersion`, `scripts/lib/lineage_identity.py`) key instead on what their kind
 measures: the project.yml build settings its lane builds, the take topology (the layer set) and the
 kind's reviewed measurement version; contract 2 (the current one) adds a forced or emulated memory tier
-(`run.runtimePolicy`) and the run's seed policy (`run.seedPolicy`), while contract-1 records keep their
-keys. Harness and engine edits therefore keep a lineage (HISTORY
+(`run.runtimePolicy`), the run's seed policy (`run.seedPolicy`) and the cell aggregate version
+(`evidence.cellAggregateVersion`), while contract-1 records keep their keys. A contract-2 record at the
+defaults (a native tier, no seed policy, aggregate 1) keeps the contract-1 key, so the M6 engine gate
+lineage continues across the contract bump; a contract-1 record cannot carry a seed policy or aggregate 2. Harness and engine edits therefore keep a lineage (HISTORY
 marks "harness changed"), while a scheme, compiler-setting, topology, model or definition change
 starts a new one; a change that alters what a kind measures bumps its measurement version.
 `python3 scripts/benchmark_history.py lineage-replay [--kind K --platform P]` replays the current

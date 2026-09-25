@@ -2817,8 +2817,9 @@ class BenchmarkHistoryTests(unittest.TestCase):
         record["inputs"]["lineageContractVersion"] = 2
         record["run"]["runtimePolicy"] = {"deviceClass": "mid_16gb_mac", "deviceClassForced": False}
         key = history.comparison_key(record)
-        # Contract 2 never collides with the contract-1 key of the same record.
-        self.assertNotEqual(key, stamped["comparison"]["key"])
+        # At the defaults (a native tier, no seed policy, aggregate 1) contract 2
+        # keeps the contract-1 key, so the engine gate lineage continues.
+        self.assertEqual(key, stamped["comparison"]["key"])
 
         def keyed(mutate) -> str:
             candidate = copy.deepcopy(record)
@@ -2832,7 +2833,9 @@ class BenchmarkHistoryTests(unittest.TestCase):
             "deviceClass": "floor_8gb_mac", "deviceClassForced": True, "simulatedPhysicalMemoryMB": 8192,
         }))
         seeded = keyed(lambda r: r["run"].update(seedPolicy="cell-hash-v1"))
-        self.assertEqual(len({key, forced, emulated, seeded}), 4)
+        aggregated = keyed(lambda r: r["evidence"].update(cellAggregateVersion=2))
+        self.assertEqual(len({key, forced, emulated, seeded, aggregated}), 5)
+        self.assertEqual(keyed(lambda r: r["evidence"].update(cellAggregateVersion=1)), key)
         # The same composition under contract 1 ignores both.
         v1 = copy.deepcopy(record)
         v1["inputs"]["lineageContractVersion"] = 1
@@ -2842,6 +2845,62 @@ class BenchmarkHistoryTests(unittest.TestCase):
         # Schema v1 is frozen history: a v1 record is never stamped.
         legacy = json.loads(self.publish(record_fixture(run_id="lineage-v1-20260712"), "lineage-v1").read_text())
         self.assertFalse(history.LINEAGE_INPUT_KEYS & set(legacy["inputs"]))
+
+    def test_a_default_contract_2_gate_record_links_to_the_contract_1_gate_records(self) -> None:
+        """The next M6 engine gate record takes its baseline from the contract-1
+        gate records, and lineage-replay links exactly as the live registry does."""
+        files = {
+            "project.yml": (Path(history.REPO_ROOT) / "project.yml").read_text(encoding="utf-8"),
+            "scripts/macos_test.sh": "lane",
+        }
+        commits = {"1" * 40: files, "2" * 40: files}
+
+        class FakeReader:
+            def has_commit(self, commit: str) -> bool:
+                return commit in commits
+
+            def read(self, commit: str, path: str) -> bytes | None:
+                value = commits.get(commit, {}).get(path)
+                return value.encode("utf-8") if value is not None else None
+
+            def close(self) -> None:
+                pass
+
+        lineage = history.lineage_identity.lineage_inputs(
+            "engine-generation", "macos", lambda path: FakeReader().read("1" * 40, path),
+        )
+        assert lineage is not None
+        gate = json.loads((FROZEN_RECORDS / "macos-engine-lineage-v1.json").read_text())
+        self.assertEqual(gate["inputs"]["lineageContractVersion"], 1)
+
+        def gate_record(run_id: str, finished: str, commit: str, contract: int, **run) -> dict:
+            record = copy.deepcopy(gate)
+            record["run"].update(id=run_id, finishedAt=finished, **run)
+            record["source"]["commit"] = commit
+            record["inputs"].update(lineage, lineageContractVersion=contract)
+            record["comparison"]["key"] = history.comparison_key(record)
+            return record
+
+        records = [
+            (Path(f"{record['run']['id']}.json"), record) for record in (
+                gate_record("gate-v1-a", "2026-09-25T17:14:10Z", "1" * 40, 1),
+                gate_record("gate-v1-b", "2026-09-25T17:23:29Z", "1" * 40, 1),
+                gate_record("gate-v2", "2026-09-26T09:00:00Z", "2" * 40, 2),
+                gate_record("gate-v2-seeded", "2026-09-26T10:00:00Z", "2" * 40, 2, seedPolicy="cell-hash-v1"),
+            )
+        ]
+        live = [history.expected_comparison_metadata(record, records) for _, record in records]
+        expected_baselines = [None, "gate-v1-a", "gate-v1-b", None]
+        self.assertEqual([item["baselineRunID"] for item in live], expected_baselines)
+        self.assertEqual(live[2]["key"], live[0]["key"])
+        self.assertNotEqual(live[3]["key"], live[0]["key"])
+
+        with mock.patch.object(history, "GitBlobReader", FakeReader):
+            report = history.lineage_replay(records, kind="engine-generation", platform="macos", classification=None)
+        rows = report["records"]
+        self.assertEqual([row["runID"] for row in rows], [record["run"]["id"] for _, record in records])
+        self.assertEqual([row["lineageBaselineRunID"] for row in rows], expected_baselines)
+        self.assertEqual([row["lineageKey"] for row in rows], [item["key"] for item in live])
 
     def test_the_lineage_key_ignores_provenance_but_not_what_is_measured(self) -> None:
         record = json.loads(
@@ -2907,6 +2966,11 @@ class BenchmarkHistoryTests(unittest.TestCase):
             "an absent harness hash": lambda r: r["inputs"].update(lineageHarnessHash="not-applicable"),
             "schema v1": lambda r: r.update(schemaVersion=1),
             "a kind without a lineage": lambda r: r["run"].update(kind="prosody-calibration", platform="ios"),
+            # Contract 1 predates both, and a default contract-2 record shares its key.
+            "contract 1 with a seed policy": lambda r: (
+                r["inputs"].update(lineageContractVersion=1), r["run"].update(seedPolicy="generated")),
+            "contract 1 with cell aggregate 2": lambda r: (
+                r["inputs"].update(lineageContractVersion=1), r["evidence"].update(cellAggregateVersion=2)),
         }
         for name, mutate in invalid.items():
             candidate = copy.deepcopy(record)

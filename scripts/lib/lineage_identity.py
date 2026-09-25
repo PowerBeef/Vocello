@@ -48,7 +48,9 @@ Contract versions:
   forced-tier records get a lineage of their own, a seeded matrix never shares
   one with random seeds, and medians that leave the take after a cold take out
   never compare with medians that kept it. Contract-1 records keep their
-  stored keys.
+  stored keys, and a contract-2 record at all three defaults keeps the
+  contract-1 key (benchmark_history.lineage_v2_identity), so the lineages
+  that measured the same thing continue across the bump.
 
 Every function takes a ``read(path) -> bytes | None`` callable, so the same
 identity is computed from the working tree at publication and from Git objects

@@ -563,7 +563,7 @@
           "type": "string"
         },
         "lineageContractVersion": {
-          "description": "Comparison-key composition version of the per-kind lineage identity (scripts/lib/lineage_identity.py). Optional: absent on legacy records, whose comparison key stays byte-identical; when present, the other three lineage fields are present too. Version 2 adds a forced or emulated memory tier (run.runtimePolicy) and the run's seed policy to the key; version-1 records keep theirs.",
+          "description": "Comparison-key composition version of the per-kind lineage identity (scripts/lib/lineage_identity.py). Optional: absent on legacy records, whose comparison key stays byte-identical; when present, the other three lineage fields are present too. Version 2 adds a forced or emulated memory tier (run.runtimePolicy), the run's seed policy (run.seedPolicy) and the cell aggregate version (evidence.cellAggregateVersion) to the key; a version-2 record at the defaults (a native tier, no seed policy, aggregate 1) keeps the version-1 key, and version-1 records keep theirs.",
           "enum": [
             1,
             2

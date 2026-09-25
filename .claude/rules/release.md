@@ -89,8 +89,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   key with new ones. A comparison key names what its kind measures (`scripts/lib/lineage_identity.py`: the
   project.yml build settings its lane builds, the take topology and a reviewed per-kind measurement version
   beside hardware, OS, toolchain, matrix, corpus, models, evidence and memory contracts and metric
-  definitions; contract 2 adds a forced or emulated memory tier and the run's seed policy; never engine
-  sources or pins), and legacy and contract-1 keys stay byte-identical. Once a record of a kind
+  definitions; contract 2 adds a forced or emulated memory tier, the run's seed policy and the cell
+  aggregate version, and keeps the contract-1 key at their defaults; never engine sources or pins), and
+  legacy and contract-1 keys stay byte-identical. Once a record of a kind
   carries the lineage stamp, a change that moves what that kind measures (an in-window driver step, a
   probe, the metric mapping or aggregation) bumps its measurement version in the same change
   (`scripts/dev.sh check` names changed files on a kind's path list); changing what the key reads bumps

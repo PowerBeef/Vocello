@@ -869,6 +869,17 @@ def validate_lineage_inputs(record: dict[str, Any]) -> None:
         or version not in lineage_identity.SUPPORTED_LINEAGE_CONTRACT_VERSIONS
     ):
         raise HistoryError(f"inputs.lineageContractVersion is unsupported: {version!r}")
+    # Contract 1 predates the seed policy and cell aggregate 2 and its key
+    # ignores them, while a contract-2 record at the defaults keeps the
+    # contract-1 key: a contract-1 record carrying either would share a lineage
+    # with records measured differently.
+    if version == 1 and (
+        "seedPolicy" in record["run"]
+        or (record.get("evidence") or {}).get("cellAggregateVersion", 1) != 1
+    ):
+        raise HistoryError(
+            "a lineage contract 1 record cannot carry run.seedPolicy or a cell aggregate version above 1"
+        )
     if not lineage_identity.has_lineage(record["run"]["kind"], record["run"]["platform"]):
         raise HistoryError("this record kind and platform define no lineage identity")
     measurement = inputs["lineageMeasurementVersion"]
@@ -1862,13 +1873,26 @@ def lineage_v2_identity(record: dict[str, Any]) -> dict[str, Any]:
     run.runtimePolicy), a seeded matrix (run.seedPolicy) never shares a
     lineage with random per-take seeds, and cells that leave the take after a
     cold take out of their medians never compare with cells that kept it.
-    Contract-1 records keep their keys."""
+    Contract-1 records keep their keys.
+
+    A record at all three defaults (a native tier, no seed policy, aggregate 1)
+    measures what contract 1 measured, so it keeps the contract-1 identity and
+    continues that lineage: the next engine gate record takes its baseline from
+    the contract-1 gate records. Only the non-default values key apart: a
+    forced tier never publishes comparably (validate_runtime_policy), and a
+    contract-1 record cannot carry a seed policy or aggregate 2
+    (validate_lineage_inputs)."""
     identity = lineage_v1_identity(record)
-    identity["lineageContractVersion"] = 2
-    identity["runtimePolicy"] = lineage_identity.runtime_policy_identity(record["run"])
-    identity["seedPolicy"] = record["run"].get("seedPolicy")
+    runtime_policy = lineage_identity.runtime_policy_identity(record["run"])
+    seed_policy = record["run"].get("seedPolicy")
     # How the cells summarize the takes (audit #30): the medians differ.
-    identity["cellAggregateVersion"] = record["evidence"].get("cellAggregateVersion", 1)
+    aggregate_version = record["evidence"].get("cellAggregateVersion", 1)
+    if runtime_policy is None and seed_policy is None and aggregate_version == 1:
+        return identity
+    identity["lineageContractVersion"] = 2
+    identity["runtimePolicy"] = runtime_policy
+    identity["seedPolicy"] = seed_policy
+    identity["cellAggregateVersion"] = aggregate_version
     return identity
 
 

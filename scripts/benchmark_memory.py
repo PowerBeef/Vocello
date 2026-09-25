@@ -124,6 +124,8 @@ def is_policy_cache_clear(level: str, source: str, reason: str) -> bool:
         and source == POLICY_CACHE_CLEAR_SOURCE
         and reason == POLICY_CACHE_CLEAR_REASON
     )
+
+
 MEMORY_EVENT_KINDS = frozenset({
     "pressure-signal",
     "application-warning",

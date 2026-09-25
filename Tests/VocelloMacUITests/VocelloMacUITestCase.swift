@@ -20,6 +20,9 @@ class VocelloMacUITestCase: XCTestCase {
     private(set) var session: VocelloUIApplicationSession!
     private var pendingAutoplayPreferenceRestore: Bool?
     private var pendingInterfaceLanguageRestore: String?
+    /// Studio modes whose visible variant the benchmark switched to Speed, with
+    /// the variant kind to restore.
+    private var pendingVariantRestore: [VocelloMacScreen: String] = [:]
     private static let interfaceLanguageNames = [
         "system": "System Default", "en": "English", "fr": "Français", "es": "Español",
         "de": "Deutsch", "it": "Italiano", "pt-BR": "Português (Brasil)", "zh-Hans": "简体中文",
@@ -70,6 +73,7 @@ class VocelloMacUITestCase: XCTestCase {
             selectInterfaceLanguage(original)
         }
         restorePendingAutoplayPreference()
+        restorePendingVariantChoices()
     }
 
     /// Selects a genuine menu item by its stable identifier, then reads its visible value.
@@ -226,6 +230,61 @@ class VocelloMacUITestCase: XCTestCase {
             "settings_packageStatus_pro_clone_speed",
         ] {
             XCTAssertTrue(VocelloUIWait.value(element(id), contains: "Ready", timeout: 60))
+        }
+    }
+
+    /// Makes Speed the active variant of each measured Studio mode through the
+    /// visible toolbar switch, before the first take (audit #17). The 16 GB tier
+    /// recommends Quality, so an installed Quality package would otherwise run
+    /// every take, and the checker refuses those only after the whole matrix.
+    /// The stored per-mode choice survives the take relaunches; the original
+    /// visible choice is restored when the session ends. Never toggles "Prefer
+    /// lower-memory models", which clears every stored choice.
+    func selectVisibleSpeedVariant(for modes: [VocelloUIBenchMatrix.Mode]) {
+        for mode in modes {
+            let screen = Self.studioScreen(for: mode)
+            navigate(to: screen)
+            let speed = button("\(screen.rawValue)_speedVariantButton")
+            XCTAssertTrue(VocelloUIWait.exists(speed, timeout: 20))
+            if speed.isSelected { continue }
+            let original = Self.variantKinds.first { kind in
+                let candidate = button("\(screen.rawValue)_\(kind)VariantButton")
+                return candidate.exists && candidate.isSelected
+            }
+            if let original { pendingVariantRestore[screen] = original }
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: speed, timeout: 20))
+            XCTAssertTrue(
+                VocelloUIWait.condition("\(screen.rawValue) Speed variant to become active", timeout: 15) {
+                    speed.isSelected
+                }
+            )
+        }
+    }
+
+    private func restorePendingVariantChoices() {
+        guard session != nil else { return }
+        for (screen, kind) in pendingVariantRestore.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
+            navigate(to: screen)
+            let original = button("\(screen.rawValue)_\(kind)VariantButton")
+            if !original.isSelected {
+                XCTAssertTrue(VocelloUIPrimaryAction.perform(on: original, timeout: 20))
+                XCTAssertTrue(
+                    VocelloUIWait.condition("\(screen.rawValue) \(kind) variant to be restored", timeout: 15) {
+                        original.isSelected
+                    }
+                )
+            }
+            if original.isSelected { pendingVariantRestore[screen] = nil }
+        }
+    }
+
+    private static let variantKinds = ["speed", "quality", "compact_speed", "compact_quality"]
+
+    private static func studioScreen(for mode: VocelloUIBenchMatrix.Mode) -> VocelloMacScreen {
+        switch mode {
+        case .custom: .customVoice
+        case .design: .voiceDesign
+        case .clone: .voiceCloning
         }
     }
 

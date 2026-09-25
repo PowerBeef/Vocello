@@ -38,6 +38,9 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
         }
 
         assertVisibleSpeedModelReadiness()
+        // Every take runs Speed whatever the tier recommends (audit #17); the
+        // first take relaunches the app, so this setup never reaches a take.
+        selectVisibleSpeedVariant(for: configuration.modes)
         ensureCloneConsentEnabled()
         assertSavedCloneVoice()
         // The schema-v8 gate requires a genuine playback-scheduled milestone on

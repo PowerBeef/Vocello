@@ -327,7 +327,12 @@ final class ModelManagerViewModel {
     }
 
     private func explicitVariantID(for mode: GenerationMode) -> String? {
-        MacModelVariantPreferences.selectedVariantID(for: mode)
+        // The choice lives in UserDefaults, which Observation cannot see; the
+        // revision is its observable proxy, so a view that resolves the active
+        // variant (the toolbar's Speed/Quality switch) redraws when a pick
+        // changes it, not only on the next unrelated model-status change.
+        _ = activeVariantRevision
+        return MacModelVariantPreferences.selectedVariantID(for: mode)
     }
 
     func recommendedVariant(for mode: GenerationMode) -> TTSModel? {

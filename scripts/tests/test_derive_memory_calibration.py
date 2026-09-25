@@ -18,9 +18,15 @@ import publish_benchmark_history as publisher  # noqa: E402
 POLICY = json.loads((ROOT / "config" / "memory-qualification-policy.json").read_text(encoding="utf-8"))
 
 
+NATIVE_TIER = {"macos": "mid_16gb_mac", "ios": "iphone_pro"}
+ABSENT = object()
+
+
 def record(*, platform: str = "macos", gaps: dict[int, float] | None = None,
            ends: dict[str, list[float]] | None = None, contract: int = 2,
-           classification: str = "canonical") -> dict:
+           classification: str = "canonical", runtime_policy: object = None) -> dict:
+    """A memory-qualification record; the runtime policy defaults to the
+    platform's unforced canonical tier, and ABSENT leaves it out."""
     ends = ends or {"custom": [100.0, 101.0, 100.5], "design": [120.0, 120.0, 120.0],
                     "clone": [140.0, 146.0, 141.0]}
     takes = []
@@ -42,9 +48,14 @@ def record(*, platform: str = "macos", gaps: dict[int, float] | None = None,
                     "mlxEndActiveMB": end,
                 },
             })
+    run = {"kind": "memory-qualification", "platform": platform,
+           "id": f"{platform}-memory-qualification-fixture", "classification": classification}
+    if runtime_policy is None:
+        runtime_policy = {"deviceClass": NATIVE_TIER[platform], "deviceClassForced": False}
+    if runtime_policy is not ABSENT:
+        run["runtimePolicy"] = runtime_policy
     return {
-        "run": {"kind": "memory-qualification", "platform": platform,
-                "id": f"{platform}-memory-qualification-fixture", "classification": classification},
+        "run": run,
         "evidence": {"memoryContractVersion": contract},
         "takes": takes,
     }
@@ -91,11 +102,57 @@ class DeriveMemoryCalibrationTests(unittest.TestCase):
         self.assertEqual(updated["retainedMemoryV2"]["calibration"]["ios"]["status"], "uncalibrated")
         self.assertEqual(POLICY["unobservedGapBound"]["status"], "provisional")
 
-    def test_an_iphone_record_calibrates_only_its_own_retained_bounds(self) -> None:
-        report = calibration.derive(record(platform="ios"), POLICY)
+    def test_an_iphone_record_calibrates_the_floor_tiers_and_its_own_retained_bounds(self) -> None:
+        # A 900 ms gap x 1.25 = 1,125 ms: the floor tiers' floor becomes 1,150 ms.
+        report = calibration.derive(record(platform="ios", gaps={5: 900.0}), POLICY)
+        self.assertEqual(report["unobservedGap"]["tier"], "floorTiers")
+        self.assertEqual(report["unobservedGap"]["proposed"], {"floorMS": 1_150.0})
         updated = calibration.apply_to_policy(POLICY, report)
-        self.assertEqual(updated["unobservedGapBound"], POLICY["unobservedGapBound"])
+        general = {key: value for key, value in updated["unobservedGapBound"].items() if key != "floorTiers"}
+        self.assertEqual(
+            general,
+            {key: value for key, value in POLICY["unobservedGapBound"].items() if key != "floorTiers"},
+        )
+        tiers = updated["unobservedGapBound"]["floorTiers"]
+        self.assertEqual(
+            (tiers["floorMS"], tiers["status"], tiers["calibrationRunID"]),
+            (1_150.0, "calibrated", report["runID"]),
+        )
         self.assertEqual(updated["retainedMemoryV2"]["calibration"]["ios"]["status"], "calibrated")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "policy.json"
+            path.write_text(json.dumps(updated), encoding="utf-8")
+            bound = benchmark_memory.load_unobserved_gap_bound(path)
+        self.assertEqual(bound.limit_ms(250.0, floor_tier=True), 1_150.0)
+        self.assertEqual(bound.limit_ms(250.0), 500.0)
+        # Quiet iPhone gaps bring the tier down to the general floor.
+        quiet = calibration.derive(record(platform="ios"), POLICY)
+        self.assertEqual(quiet["unobservedGap"]["proposed"], {"floorMS": 500.0})
+
+    def test_an_8gb_mac_record_calibrates_the_floor_tiers_not_the_general_bound(self) -> None:
+        report = calibration.derive(
+            record(gaps={5: 610.0},
+                   runtime_policy={"deviceClass": "floor_8gb_mac", "deviceClassForced": False}),
+            POLICY,
+        )
+        self.assertEqual(report["unobservedGap"]["tier"], "floorTiers")
+        # 610 ms x 1.25 = 762.5 ms, rounded up to 800 ms.
+        self.assertEqual(report["unobservedGap"]["proposed"], {"floorMS": 800.0})
+        updated = calibration.apply_to_policy(POLICY, report)
+        self.assertEqual(updated["unobservedGapBound"]["status"], "provisional")
+        self.assertEqual(updated["unobservedGapBound"]["floorTiers"]["floorMS"], 800.0)
+
+    def test_a_forced_or_unstamped_tier_calibrates_no_gap_bound(self) -> None:
+        for label, runtime_policy in (
+            ("forced floor on a larger Mac", {"deviceClass": "floor_8gb_mac", "deviceClassForced": True}),
+            ("no runtime policy", ABSENT),
+        ):
+            with self.subTest(label=label):
+                report = calibration.derive(record(runtime_policy=runtime_policy), POLICY)
+                self.assertIsNone(report["unobservedGap"]["tier"])
+                self.assertIsNone(report["unobservedGap"]["proposed"])
+                updated = calibration.apply_to_policy(POLICY, report)
+                self.assertEqual(updated["unobservedGapBound"], POLICY["unobservedGapBound"])
 
     def test_it_refuses_records_that_cannot_calibrate(self) -> None:
         with self.assertRaises(calibration.CalibrationError):

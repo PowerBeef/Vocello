@@ -25,6 +25,9 @@ from benchmark_memory import (  # noqa: E402
 )
 
 
+# Drops a policy block from a patched fixture policy.
+ABSENT = object()
+
 ENGINE_BOUNDARIES = [
     "before_preparation", "before_model_load", "after_model_load",
     "before_mode_preparation", "before_prewarm", "after_prewarm",
@@ -298,12 +301,22 @@ class MemoryEvidenceTests(unittest.TestCase):
         self.assertEqual(qualified[0].metrics["samplerMissedDeadlineCount"], 2)
         self.assertEqual(qualified[0].metrics["samplerMaximumUnobservedGapMS"], 40.0)
 
-    def gap_policy(self, **block: object) -> Any:
-        """A policy file declaring only the unobserved-gap bound, patched in."""
-        declared = {
+    def gap_policy(self, floor_tiers: object = None, **block: object) -> Any:
+        """A policy file declaring only the unobserved-gap bound, patched in.
+
+        `floor_tiers` patches the floor-tier block's keys; ABSENT drops the block."""
+        tiers: dict[str, Any] = {
+            "deviceClasses": ["floor_8gb_mac", "iphone_pro"], "floorMS": 1000,
+            "status": "provisional", "calibrationRunID": None,
+        }
+        if isinstance(floor_tiers, dict):
+            tiers.update(floor_tiers)
+        declared: dict[str, Any] = {
             "targetIntervalMultiple": 2.0, "floorMS": 500,
             "status": "provisional", "calibrationRunID": None,
         }
+        if floor_tiers is not ABSENT:
+            declared["floorTiers"] = tiers
         declared.update(block)
         path = self.root / "memory-qualification-policy.json"
         path.write_text(json.dumps({"unobservedGapBound": declared}), encoding="utf-8")
@@ -324,7 +337,7 @@ class MemoryEvidenceTests(unittest.TestCase):
 
     def test_an_unobserved_gap_above_the_policy_bound_fails(self) -> None:
         engine, base = self.ios_fixture()
-        with self.gap_policy():
+        with self.gap_policy(floor_tiers={"floorMS": 500}):
             # A 500 ms cadence: twice it, 1,000 ms, is the bound.
             qualified, _ = qualify_memory_rows(
                 rows=[self.with_stop_after(engine, base, 1_000)],
@@ -337,29 +350,89 @@ class MemoryEvidenceTests(unittest.TestCase):
                     rows=[self.with_stop_after(engine, base, 1_001)],
                     diagnostics=self.root, platform="ios",
                 )
-            # A 100 ms cadence: the 500 ms floor, not twice the cadence, bounds it,
-            # so one scheduler stall on a fast-cadence host does not fail a take.
+        # A 100 ms cadence on a Mac above the floor tiers: the 500 ms floor, not
+        # twice the cadence, bounds it, so one scheduler stall on a fast-cadence
+        # host does not fail a take.
+        with self.gap_policy():
+            for label, app_times, qualifies in (
+                ("quiet", None, True), ("790 ms stall", [0, 5, 400, 810, 1_600], False),
+            ):
+                with self.subTest(label=label):
+                    engine, engine_samples, app, app_samples = self.macos_pair(
+                        "generation-fast-cadence", app_times_ms=app_times,
+                    )
+                    engine["notes"]["deviceClass"] = "high_memory_mac"
+                    for layer in (engine, app):
+                        layer["summary"]["targetIntervalNS"] = 100_000_000
+                    if qualifies:
+                        qualified, _ = self.qualify_macos(engine, engine_samples, app, app_samples)
+                        self.assertEqual(qualified[0].metrics["samplerUnobservedGapLimitMS"], 500.0)
+                    else:
+                        with self.assertRaises(MemoryEvidenceError):
+                            self.qualify_macos(engine, engine_samples, app, app_samples)
+
+    def test_the_floor_tiers_keep_their_own_floor_until_calibrated(self) -> None:
+        # The iPhone and the 8 GB Mac moved from 500 ms to a 250 ms cadence on
+        # 2026-09-25. Twice it would halve their bound to 500 ms while only the
+        # M6 is calibrated, so their tier keeps a 1,000 ms floor.
+        engine, base = self.ios_fixture()
+        with self.gap_policy():
             qualified, _ = qualify_memory_rows(
-                rows=[self.with_stop_after(engine, base, 450, target_ns=100_000_000)],
+                rows=[self.with_stop_after(engine, base, 900, target_ns=250_000_000)],
                 diagnostics=self.root, platform="ios",
             )
-            self.assertEqual(qualified[0].metrics["samplerUnobservedGapLimitMS"], 500.0)
+            self.assertEqual(qualified[0].metrics["samplerMaximumUnobservedGapMS"], 900.0)
+            self.assertEqual(qualified[0].metrics["samplerUnobservedGapLimitMS"], 1_000.0)
             with self.assertRaises(MemoryEvidenceError):
                 qualify_memory_rows(
-                    rows=[self.with_stop_after(engine, base, 501, target_ns=100_000_000)],
+                    rows=[self.with_stop_after(engine, base, 1_001, target_ns=250_000_000)],
                     diagnostics=self.root, platform="ios",
                 )
+            # A Mac takes its tier from the device class its engine row stamps:
+            # a 790 ms stall at 250 ms passes the 8 GB floor tier and fails the
+            # M6's 16 GB tier, as it does a row without the stamp.
+            for device_class, qualifies in (
+                ("floor_8gb_mac", True), ("mid_16gb_mac", False), (None, False),
+            ):
+                with self.subTest(device_class=device_class):
+                    engine, engine_samples, app, app_samples = self.macos_pair(
+                        f"generation-tier-{device_class}", app_times_ms=[0, 5, 400, 810, 1_600],
+                    )
+                    if device_class is not None:
+                        engine["notes"]["deviceClass"] = device_class
+                    for layer in (engine, app):
+                        layer["summary"]["targetIntervalNS"] = 250_000_000
+                    if qualifies:
+                        qualified, _ = self.qualify_macos(engine, engine_samples, app, app_samples)
+                        metrics = qualified[0].metrics
+                        self.assertEqual(metrics["samplerMaximumUnobservedGapMS"], 790.0)
+                        self.assertEqual(metrics["samplerUnobservedGapLimitMS"], 1_000.0)
+                    else:
+                        with self.assertRaises(MemoryEvidenceError):
+                            self.qualify_macos(engine, engine_samples, app, app_samples)
+        # A calibrated floor tier bounds its takes by the recorded floor.
+        with self.gap_policy(floor_tiers={
+            "floorMS": 600, "status": "calibrated", "calibrationRunID": "ios-memory-qualification-x",
+        }):
+            bound = load_unobserved_gap_bound()
+            self.assertEqual(bound.limit_ms(250.0, floor_tier=True), 600.0)
+            self.assertEqual(bound.limit_ms(250.0), 500.0)
 
     def test_a_malformed_unobserved_gap_bound_fails_closed(self) -> None:
         engine, base = self.ios_fixture()
         fixture = self.with_stop_after(engine, base, 100)
-        cases = {
+        cases: dict[str, dict[str, Any]] = {
             "multiple below one": {"targetIntervalMultiple": 0.5},
             "negative floor": {"floorMS": -1},
             "boolean floor": {"floorMS": True},
             "unknown status": {"status": "draft"},
             "calibrated without run": {"status": "calibrated"},
             "provisional with run": {"calibrationRunID": "mac-memory-qualification-x"},
+            "no floor tiers": {"floor_tiers": ABSENT},
+            "tier floor below the floor": {"floor_tiers": {"floorMS": 400}},
+            "unknown tier class": {"floor_tiers": {"deviceClasses": ["iphone_pro", "floor_4gb_mac"]}},
+            "tiers without the iPhone": {"floor_tiers": {"deviceClasses": ["floor_8gb_mac"]}},
+            "tier calibrated without run": {"floor_tiers": {"status": "calibrated"}},
         }
         for label, block in cases.items():
             with self.subTest(label=label), self.gap_policy(**block):

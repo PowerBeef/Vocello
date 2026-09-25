@@ -250,7 +250,8 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # memory-qualification wait no longer copy the whole diagnostics tree from
     # the phone every 10 s while the take runs; they poll only their markers.
     # 3 (2026-09-25): the sampler change, and iPhone evidence judged on the
-    # measured process budget instead of absolute bands (audit #68).
+    # measured process budget instead of absolute bands (audit #68); the floor
+    # tiers keep a 1,000 ms unobserved-gap floor at their new 250 ms cadence.
     ("engine-generation", "ios"): 3,
     ("memory-qualification", "ios"): 3,
     # 2 (2026-09-25, audit #89): the whisper recognition time excludes model

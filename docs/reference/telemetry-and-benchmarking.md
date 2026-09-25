@@ -512,9 +512,12 @@ preparation/model-load/session/final-WAV and first-output/terminal boundaries; a
 Contract v2 judges each take's one memory series. Timer health: no gap between two consecutive
 samples (`samplerMaximumUnobservedGapMS`) may exceed the bound in
 `config/memory-qualification-policy.json` `unobservedGapBound`, max(twice the sampler's target
-interval, 500 ms); a longer gap fails publication, and each take records the bound it met as
-`samplerUnobservedGapLimitMS`. The bound is provisional until the first consented memory lane on the
-canonical M6 (250 ms cadence) calibrates it. Periodic coverage (`samplerCoverage`,
+interval, 500 ms), or max(twice the interval, 1,000 ms) on the floor tiers (an iPhone, or a Mac whose
+engine row stamps `floor_8gb_mac`); a longer gap fails publication, and each take records the bound it
+met as `samplerUnobservedGapLimitMS`. The bound is provisional until the first consented memory lane on
+the canonical M6 (250 ms cadence) calibrates it; the floor tiers moved from a 500 ms to a 250 ms
+cadence on 2026-09-25 and keep their 1,000 ms floor until an unforced iPhone or 8 GB Mac record
+calibrates it (`scripts/derive_memory_calibration.py`). Periodic coverage (`samplerCoverage`,
 `samplerMissedDeadlineCount`) is still published but no longer gates, because it counts deadlines
 honoured rather than whether the peak was seen. Peak fidelity: `gpuPeakCaptureMissMB` is how far the sampled Metal peak fell below the exact
 `mlxPeakMB` (0 when it caught it). When the sampler read the kernel ledgers (samplers since

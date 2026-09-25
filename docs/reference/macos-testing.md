@@ -317,8 +317,8 @@ New publishable generation runs use telemetry schema v8 and evidence manifest v2
 `samples-<generationID>.jsonl` files must begin/end with one start/stop sample, contain the required
 load/stream/finalization boundaries, match summary counts, have zero capture failures, and leave no
 gap between samples above the policy's unobserved-gap bound (twice the sampler cadence, at least
-500 ms, provisional until the first consented M6 memory lane calibrates it;
-`config/memory-qualification-policy.json`). The app and engine samples of the one hosting
+500 ms, or 1,000 ms on an 8 GB Mac, provisional until the first consented M6 memory lane calibrates
+it; `config/memory-qualification-policy.json`). The app and engine samples of the one hosting
 process form one series in absolute-uptime order; they are never summed.
 Critical pressure, app memory warning/exit, `hardTrim`, or `fullUnload` fails publication, and so
 does a marking peak-equality breach (CP-2: within every take, no post-marking footprint sample may

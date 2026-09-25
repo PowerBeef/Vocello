@@ -708,7 +708,8 @@ iPhone profile stops recording once its take's sentinel appears rather than at t
 (audit #52). The lane forces verbose run-scoped samples. New publishable device runs require
 telemetry schema v8 and evidence manifest v2: exact start/periodic/boundary/stop sidecars, summary
 agreement, zero capture failures, and no gap between samples above the policy's unobserved-gap bound
-(twice the sampler cadence, at least 500 ms; `config/memory-qualification-policy.json`). Critical
+(twice the sampler cadence, at least 1,000 ms on the iPhone until an iPhone record calibrates it;
+`config/memory-qualification-policy.json`). Critical
 pressure, an app memory warning/exit, `hardTrim`, or `fullUnload` fails publication; guarded pressure
 or `softTrim` is explicit warning evidence. The exception is the routine post-generation cache clear the
 iPhone tier runs after every take (source `post-generation`, reason `post_generation_cache_clear`):

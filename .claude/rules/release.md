@@ -106,7 +106,8 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   digest-bound sidecar), manifest v2, exact sidecar digests, memory contract v2 (one series per
   process; no gap between samples above `unobservedGapBound` in
   `config/memory-qualification-policy.json`, twice the cadence with a 500 ms floor, provisional until
-  an M6 lane calibrates it; each take's sampled peaks published against the exact high-water marks,
+  an M6 lane calibrates it, and a 1,000 ms floor on the iPhone and 8 GB Mac until a record of theirs
+  calibrates it; each take's sampled peaks published against the exact high-water marks,
   MLX's per-request peak and the kernel footprint ledger when sampled, a ledger below a sample
   failing), zero capture failures, no critical pressure, warning, `hardTrim` or `fullUnload`;
   contract-v1 records keep their ≥95% coverage rule. Marking evidence keeps the take peak

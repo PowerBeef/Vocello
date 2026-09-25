@@ -13,7 +13,8 @@ app sidecar adds its samples, its coverage and its submit/terminal order.  A
 take qualifies when no gap between consecutive samples exceeds the policy's
 unobserved-gap bound (`unobservedGapBound` in
 config/memory-qualification-policy.json: a multiple of the sampler cadence with
-an absolute floor, provisional until a consented lane calibrates it), and each
+an absolute floor, higher on the floor tiers, provisional until a consented lane
+calibrates it), and each
 take publishes the bound it met and how far its sampled peaks fell short of the
 exact high-water marks (the MLX allocator's per-request peak and, when the
 sampler read it, the kernel's physical-footprint ledger peak).
@@ -38,12 +39,16 @@ REQUIRED_TELEMETRY_SCHEMA = 8
 # Timer health (contract v2): the longest stretch in which the process's memory
 # went unobserved, between any two consecutive samples of its one series, may
 # not exceed the policy's bound: max(multiple x the sampler's target interval,
-# an absolute floor). Each take records the bound it met.
+# an absolute floor), the floor tiers (8 GB Mac, iPhone) keeping their own floor
+# until a record of theirs calibrates it. Each take records the bound it met.
 MEMORY_QUALIFICATION_POLICY_PATH = (
     Path(__file__).resolve().parents[1] / "config" / "memory-qualification-policy.json"
 )
 UNOBSERVED_GAP_POLICY_KEY = "unobservedGapBound"
+UNOBSERVED_GAP_FLOOR_TIERS_KEY = "floorTiers"
 UNOBSERVED_GAP_STATUSES = frozenset({"provisional", "calibrated"})
+# `NativeDeviceMemoryClass` raw values (Sources/QwenVoiceCore/SemanticTypes.swift).
+NATIVE_DEVICE_CLASSES = frozenset({"floor_8gb_mac", "mid_16gb_mac", "high_memory_mac", "iphone_pro"})
 # The kernel footprint ledger peak and the sampled footprint come from the same
 # task_info call; a ledger peak below a sample (beyond rounding) is a broken read.
 KERNEL_LEDGER_TOLERANCE_MB = 1.0
@@ -180,9 +185,38 @@ class UnobservedGapBound:
 
     target_interval_multiple: float
     floor_ms: float
+    floor_tier_floor_ms: float
+    floor_tier_device_classes: frozenset[str]
 
-    def limit_ms(self, target_interval_ms: float) -> float:
-        return max(self.target_interval_multiple * target_interval_ms, self.floor_ms)
+    def is_floor_tier(self, platform: str, device_class: Any) -> bool:
+        """Whether a take belongs to a floor tier: every iPhone, and a Mac whose
+        engine row stamps a floor-tier device class (forced or not)."""
+        return platform == "ios" or device_class in self.floor_tier_device_classes
+
+    def limit_ms(self, target_interval_ms: float, *, floor_tier: bool = False) -> float:
+        floor = self.floor_tier_floor_ms if floor_tier else self.floor_ms
+        return max(self.target_interval_multiple * target_interval_ms, floor)
+
+
+def _gap_number(block: dict[str, Any], key: str, minimum: float, location: str) -> float:
+    value = block.get(key)
+    if (
+        isinstance(value, bool) or not isinstance(value, (int, float))
+        or not math.isfinite(value) or value < minimum
+    ):
+        raise MemoryEvidenceError(f"{location}.{key} must be a finite number of at least {minimum:g}")
+    return float(value)
+
+
+def _require_gap_calibration_status(block: dict[str, Any], location: str) -> None:
+    status = block.get("status")
+    run_id = block.get("calibrationRunID")
+    if status not in UNOBSERVED_GAP_STATUSES or (
+        (status == "calibrated") != (isinstance(run_id, str) and bool(run_id))
+    ) or (status == "provisional" and run_id is not None):
+        raise MemoryEvidenceError(
+            f"{location} status must be provisional (no run ID) or calibrated (with its run ID)"
+        )
 
 
 def load_unobserved_gap_bound(path: Path | None = None) -> UnobservedGapBound:
@@ -197,27 +231,29 @@ def load_unobserved_gap_bound(path: Path | None = None) -> UnobservedGapBound:
         raise MemoryEvidenceError(
             f"memory qualification policy has no {UNOBSERVED_GAP_POLICY_KEY} block"
         )
-    values: dict[str, float] = {}
-    for key, minimum in (("targetIntervalMultiple", 1.0), ("floorMS", 0.0)):
-        value = block.get(key)
-        if (
-            isinstance(value, bool) or not isinstance(value, (int, float))
-            or not math.isfinite(value) or value < minimum
-        ):
-            raise MemoryEvidenceError(
-                f"{UNOBSERVED_GAP_POLICY_KEY}.{key} must be a finite number of at least {minimum:g}"
-            )
-        values[key] = float(value)
-    status = block.get("status")
-    run_id = block.get("calibrationRunID")
-    if status not in UNOBSERVED_GAP_STATUSES or (
-        (status == "calibrated") != (isinstance(run_id, str) and bool(run_id))
-    ) or (status == "provisional" and run_id is not None):
+    multiple = _gap_number(block, "targetIntervalMultiple", 1.0, UNOBSERVED_GAP_POLICY_KEY)
+    floor = _gap_number(block, "floorMS", 0.0, UNOBSERVED_GAP_POLICY_KEY)
+    _require_gap_calibration_status(block, UNOBSERVED_GAP_POLICY_KEY)
+    tiers_location = f"{UNOBSERVED_GAP_POLICY_KEY}.{UNOBSERVED_GAP_FLOOR_TIERS_KEY}"
+    tiers = block.get(UNOBSERVED_GAP_FLOOR_TIERS_KEY)
+    if not isinstance(tiers, dict):
+        raise MemoryEvidenceError(f"memory qualification policy has no {tiers_location} block")
+    classes = tiers.get("deviceClasses")
+    if (
+        not isinstance(classes, list) or not classes
+        or not all(isinstance(value, str) for value in classes)
+        or len(set(classes)) != len(classes)
+        or not set(classes) <= NATIVE_DEVICE_CLASSES
+        or "iphone_pro" not in classes
+    ):
         raise MemoryEvidenceError(
-            f"{UNOBSERVED_GAP_POLICY_KEY} status must be provisional (no run ID) "
-            "or calibrated (with its run ID)"
+            f"{tiers_location}.deviceClasses must list distinct native device classes, "
+            "the iPhone's included"
         )
-    return UnobservedGapBound(values["targetIntervalMultiple"], values["floorMS"])
+    # A floor tier's floor never undercuts the general floor.
+    tier_floor = _gap_number(tiers, "floorMS", floor, tiers_location)
+    _require_gap_calibration_status(tiers, tiers_location)
+    return UnobservedGapBound(multiple, floor, tier_floor, frozenset(classes))
 
 
 def load_ios_memory_budget(path: Path | None = None) -> dict[str, float]:
@@ -1247,13 +1283,16 @@ def qualify_take_memory(
     target_ms = float(metrics["samplerTargetIntervalMS"])
     gap_ms = float(metrics["samplerMaximumUnobservedGapMS"])
     gap_bound = load_unobserved_gap_bound()
-    limit_ms = gap_bound.limit_ms(target_ms)
+    notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+    floor_tier = gap_bound.is_floor_tier(platform, notes.get("deviceClass"))
+    limit_ms = gap_bound.limit_ms(target_ms, floor_tier=floor_tier)
     if gap_ms > limit_ms + 1e-9:
+        floor_ms = gap_bound.floor_tier_floor_ms if floor_tier else gap_bound.floor_ms
         raise MemoryEvidenceError(
             f"generation {generation_id}: the process memory went unobserved for "
             f"{gap_ms:.1f} ms, more than the {limit_ms:g} ms bound "
             f"(max({gap_bound.target_interval_multiple:g}x the {target_ms:g} ms sampler "
-            f"cadence, {gap_bound.floor_ms:g} ms))"
+            f"cadence, {floor_ms:g} ms{' on a floor tier' if floor_tier else ''}))"
         )
     metrics["samplerUnobservedGapLimitMS"] = limit_ms
     _apply_peak_fidelity(metrics, kernel, graphics, generation_id)

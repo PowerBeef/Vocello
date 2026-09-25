@@ -552,7 +552,8 @@ allocation/VM peaks. The lane uses Apple's Allocations template for its Allocati
 tracks because that template disables automatic VM snapshots; adding standalone VM Tracker to a
 Blank trace enables stop-the-world snapshots that create real holes in the target's 500 ms sampler.
 Publication verifies the captured template setting and applies the same unobserved-gap gate as
-every memory-qualified take (no gap above the policy bound: twice the cadence, at least 500 ms). The
+every memory-qualified take (no gap above the policy bound: twice the cadence, at least 500 ms, or
+1,000 ms on the floor tiers). The
 memory profile's default 180-second safety cap is only a maximum; exact-target exit ends the recording
 early. The separate `scripts/macos_test.sh memory` lane owns repeated retained growth.
 
@@ -906,15 +907,19 @@ CLI/profile runs remain owning-engine-process evidence.
 Sidecar and summary counts must agree, capture failures must be zero, and no gap between two
 consecutive samples of the series may exceed the unobserved-gap bound declared in
 `config/memory-qualification-policy.json` (`unobservedGapBound`: twice the sampler cadence, at least
-500 ms, so a single stall at the 100 ms cadence of Macs above 16 GB does not fail a take). The bound
-is provisional: the first consented memory lane on the canonical M6 calibrates it, and each take
-records the bound it met as `samplerUnobservedGapLimitMS`. After that lane,
-`python3 scripts/derive_memory_calibration.py benchmarks/runs/memory-qualification/<run-id>.json`
-prints what the run measured and the bounds it proposes: the gap multiple (never below 2, the
-floor unchanged) that covers every take's longest gap with a 1.25 margin, and each mode's
-retained-memory-v2 bound (the mode's MLX growth plus three times its end-of-take spread, rounded up
-to 8 MB, at least 16 MB). `--write` records them in the policy as calibrated with the run ID (the gap
-bound only from a macOS record); the maintainer commits the policy with the record. Each take also publishes
+500 ms, so a single stall at the 100 ms cadence of Macs above 16 GB does not fail a take). The floor
+tiers (the iPhone, and a Mac whose engine row stamps `floor_8gb_mac`) keep a 1,000 ms floor
+(`floorTiers`): they moved from a 500 ms to a 250 ms cadence on 2026-09-25, and only the M6 has
+calibration data. The bound is provisional: the first consented memory lane on the canonical M6
+calibrates it, and each take records the bound it met as `samplerUnobservedGapLimitMS`. After that
+lane, `python3 scripts/derive_memory_calibration.py benchmarks/runs/memory-qualification/<run-id>.json`
+prints what the run measured and the bounds it proposes: from a Mac above the floor tiers, the gap
+multiple (never below 2, the floor unchanged) that covers every take's longest gap with a 1.25
+margin; from an iPhone or 8 GB Mac record, the floor tiers' floor (the largest such bound rounded up
+to 50 ms, never below 500 ms); and each mode's retained-memory-v2 bound (the mode's MLX growth plus
+three times its end-of-take spread, rounded up to 8 MB, at least 16 MB). `--write` records them in the
+policy as calibrated with the run ID; a forced or emulated tier, or a record without its runtime
+policy, calibrates no gap bound. The maintainer commits the policy with the record. Each take also publishes
 how far its sampled peaks fell below the exact high-water marks (`gpuPeakCaptureMissMB` against
 `mlxPeakMB`, and the kernel footprint ledger when sampled). Guarded pressure or `softTrim` produces
 `passedWithWarnings`; the routine post-generation cache clear is counted as `policyCacheClearCount`

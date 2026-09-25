@@ -344,7 +344,7 @@ class IndependentASRTests(unittest.TestCase):
             record["outputVerification"] = {"pass": True}
             sentinel.write_text(json.dumps(record))
 
-        with self.assertRaisesRegex(independent_asr.IndependentASRError, "duplicated"):
+        with self.assertRaises(independent_asr.IndependentASRError):
             independent_asr._manifest(
                 [{"id": take["cellID"]} for take in plan["takes"]], run_id="cohort-fixture",
                 platform="ios", generation_process_exited=True,

@@ -21,9 +21,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   `main` is the gate. `scripts/dev.sh ci` reproduces it serially.
 - `./scripts/check_project_inputs.sh` is the deterministic contract gate: product contracts,
   `scripts/repo_invariants.sh` (exact greps for product invariants), `scripts/privacy_scan.py`, the
-  roadmap validator and the Python suite (`pytest -n auto`; `research` and `darwin_only` lanes by marker
-  in `scripts/tests/conftest.py`). `--local` selects Python tests from the dirty tree and is refused in
-  CI; `--python all|darwin-only|selected|none` picks the lane; `QVOICE_GATES=quick` skips the full suite
+  roadmap validator and the Python suite (`pytest -n auto`, on Linux and macOS alike; the `research`
+  lane by marker in `scripts/tests/conftest.py`). `--local` selects Python tests from the dirty tree and
+  is refused in CI; `--python all|selected|none` picks the lane; `QVOICE_GATES=quick` skips the full suite
   locally while `scripts/` and `config/` are clean. Add a check only when it protects a product
   invariant; never a check that asserts the wording of another script or workflow.
 - `ci.yml`: pushes to `main` gate; `pull_request` (never `pull_request_target`) runs only the Linux jobs
@@ -86,8 +86,11 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
 - **Records measure what they claim.** `rtf` is wall ÷ audio (lower is faster) and every RTF-bearing record
   since 2026-09-12 declares `run.rtfDefinition` (`ui-perf` and `prosody-calibration` publish no RTF); legacy records are never rewritten and never share a comparison
   key with new ones. `toolchain.optimization` comes from the build receipt (`last-build.json`, executable
-  digest bound) via `scripts/lib/build_provenance.py`; the gate bench compares medians of three warm takes
-  and reports a loaded or throttled host as inconclusive (exit 3), never as pass or fail.
+  digest bound) via `scripts/lib/build_provenance.py`; the gate bench is seeded, compares medians of five
+  warm takes against a baseline pooled from at least three seeded runs on one clean commit (thresholds
+  floored by the between-run spread and printed), and reports a loaded, throttled or low-power host as
+  inconclusive (`GATE: INCONCLUSIVE`, exit 3), never as pass or fail. A timing take whose own one-minute
+  load exceeded the core count marks its engine record exploratory.
 - **Memory-qualified publication.** Telemetry schema v8 or newer (records are v8; streaming v9 is a
   digest-bound sidecar), manifest v2, exact sidecar digests, ≥95% coverage, zero capture failures, no
   critical pressure, warning, `hardTrim` or `fullUnload`; 95–<100% coverage is `passedWithWarnings`. Marking evidence keeps the take peak
@@ -109,8 +112,9 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   parallel agent active. Timing lanes refuse to start on a busy host (`require_quiet_host` in
   `scripts/lib/host_preflight.sh`: a 1-minute load above twice the core count, a kernel memory-pressure
   level above 1, another holder of the host-wide native lock or a locked agent worktree refuses;
-  `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues; the gate summarizer then reports a loaded or throttled host as inconclusive,
-  exit 3, from the run's own load sample, and the record keeps `loadAverage1M`). Runner PASS
+  `QVOICE_ALLOW_BUSY_HOST=1` records the numbers and continues; the gate summarizer then reports a loaded,
+  throttled or low-power host as inconclusive, exit 3, from the busiest judged warm take's own load, and
+  each take keeps its `loadAverage1M`). Runner PASS
   requires diagnostics, crash deltas and restoration; no retries; a failed run keeps its artifacts;
   changed source needs new run IDs. XCUITest is never a packaging, notarization or upload prerequisite.
 - **TSan.** `config/tsan-policy.json` names the subset, the tests that skip under the sanitizer and the

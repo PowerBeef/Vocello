@@ -143,7 +143,7 @@
       "title": "Toolchain follow-up: Xcode 27, macOS 27, iOS 27 and newer MLX packages",
       "status": "planned",
       "blockedBy": [],
-      "gate": "config/toolchain.json pins a CI toolchain that GitHub's runners provide; the macOS and iOS deployment targets stay at 26 in project.yml; any mlx-swift, mlx-swift-lm or swift-transformers move is one authorized change reviewed with the gate benchmark (medians of three warm takes) and a clean unit lane; scripts/dev.sh ci is green on the new pin.",
+      "gate": "config/toolchain.json pins a CI toolchain that GitHub's runners provide; the macOS and iOS deployment targets stay at 26 in project.yml; any mlx-swift, mlx-swift-lm or swift-transformers move is one authorized change reviewed with the gate benchmark (medians of five warm takes against a seeded pooled baseline) and a clean unit lane; scripts/dev.sh ci is green on the new pin.",
       "sourceOfTruth": [
         "config/toolchain.json",
         "project.yml",
@@ -151,7 +151,7 @@
         "scripts/macos_test.sh"
       ],
       "notes": "Opened 2026-09-15 after the maintainer's Mac moved to macOS 27 with Xcode 27.0 (27A266a, Swift 6.4, macOS 27.0 SDK) and the iPhone to iOS 27; the app's minimum stays 26 (maintainer note). Maintainer decision: newer dependency versions are welcome when they do not jeopardize the project. Local state: the app builds cleanly on Xcode 27 with the deployment targets at 26; Xcode 27 needs `xcodebuild -downloadComponent MetalToolchain` once; SwiftPM defaults to the Swift Build engine, so the unit lane pins `--build-system native` while the switch exists (4743110a5). CI stays on the pinned Xcode 26.6 / Swift 6.3.3 until the runners offer 27. Not started. Re-homed 2026-09-15 from macos-ios-convergence-2026-09 when that plan completed; the phone-side re-verification and the toolchain bump are release-first work.",
-      "updated": "2026-09-15"
+      "updated": "2026-09-25"
     },
     {
       "id": "RF-02",
@@ -1119,7 +1119,7 @@
         "BT-03",
         "BT-04"
       ],
-      "gate": "On mac-mini-m6-16gb (live `publish_benchmark_history.py verify-hardware --platform macos` PASS): (1) QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate, then re-save benchmarks/baselines/mac-gate-bench.json from a three-take run; (2) one clean scripts/ui_test.sh macos benchmark publishes the first canonical M6 ui-generation record, and in the same commit RTF_RECORD, the charts, README prose and the website medians, record id and headline are repinned to it; (3) counted scripts/ui_test.sh macos perf sessions re-derive config/ui-perf-thresholds.json with calibrationProfile mac-mini-m6-16gb; (4) scripts/macos_test.sh memory publishes the first M6 memory-qualification record after a maintainer decision on keeping retained-memory-v1 (5% of 16 GiB) or adopting a floor-anchored v2; (5) the delivery evaluator's compact qualification runs repeat on M6; (6) decide whether a forced floor8GBMac diagnostic lane covers the 8 GB support floor. M2 records are never rewritten or compared.",
+      "gate": "On mac-mini-m6-16gb (live `publish_benchmark_history.py verify-hardware --platform macos` PASS): (1) QWENVOICE_GATE_BENCH_SEED=1 scripts/macos_test.sh gate at least three times on one clean commit seeds a pooled baseline (five warm takes each), committed as benchmarks/baselines/mac-gate-bench.json with its published records; (2) one clean scripts/ui_test.sh macos benchmark publishes the first canonical M6 ui-generation record, and in the same commit RTF_RECORD, the charts, README prose and the website medians, record id and headline are repinned to it; (3) counted scripts/ui_test.sh macos perf sessions re-derive config/ui-perf-thresholds.json with calibrationProfile mac-mini-m6-16gb; (4) scripts/macos_test.sh memory publishes the first M6 memory-qualification record after a maintainer decision on keeping retained-memory-v1 (5% of 16 GiB) or adopting a floor-anchored v2; (5) the delivery evaluator's compact qualification runs repeat on M6; (6) decide whether a forced floor8GBMac diagnostic lane covers the 8 GB support floor. M2 records are never rewritten or compared.",
       "sourceOfTruth": [
         "benchmarks/hardware-profiles.json",
         "scripts/generate_readme_charts.py",

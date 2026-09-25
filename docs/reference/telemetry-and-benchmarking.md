@@ -367,9 +367,11 @@ Caveats that still apply:
 - **Lazy MLX** — substage columns (`talkerForward`, `codePredictor`, `streamStepEval`, Mimi
   decoder) measure Swift wall time around lazy graph ops; they sum to less than
   `qwen_token_loop_total` when work is pipelined across iterations.
-- **`.info.generateTime`** — emitted mid‑stream before the trailing decoder flush; retained
-  only as a fallback. When it differs from the token loop, `qwen_stream_decoder_drain_ms`
-  captures the gap.
+- **`.info.generateTime`** — a ContinuousClock span from KV-cache setup to the end of the token
+  loop, emitted before the trailing decoder flush; retained only as a fallback and as the span behind
+  `tokensPerSecond`. `qwen_token_loop_total` sums in-loop iterations only, so the two spans never
+  isolate a decoder drain (the former `qwen_stream_decoder_drain_ms` key could not be positive and
+  was removed on 2026-09-25).
 - **Stage marks** — `streamGenerationEnded` closes before WAV finalize; do not compare
   `streamStartup→streamCompleted` to decode ms (finalize I/O inflates the old span).
 

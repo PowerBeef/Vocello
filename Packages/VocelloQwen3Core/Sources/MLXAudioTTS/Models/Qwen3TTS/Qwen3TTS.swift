@@ -3323,8 +3323,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             try Task.checkCancellation()
         }
 
-        // Initialize cache and timing
-        let startTime = Date()
+        // Initialize cache and timing. The span feeds tokensPerSecond, so it is
+        // monotonic (ContinuousClock), never wall-clock Date().
+        let startTime = ContinuousClock.now
         let cache: [any KVCache]
         if let talkerKVWindow = memoryPolicy.talkerKVGeneratedWindow {
             // Sliding-window talker KV (constrained tiers): keep = the conditioning
@@ -3973,14 +3974,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
 
         // Emit generation info
-        let generateTime = Date().timeIntervalSince(startTime)
-        let tokenCount = generatedCodeCount
-        let info = AudioGenerationInfo(
-            promptTokenCount: 0, // Not tracked for VoiceDesign
-            generationTokenCount: tokenCount,
-            prefillTime: 0, // Included in generateTime
-            generateTime: generateTime,
-            tokensPerSecond: Double(tokenCount) / generateTime,
+        let info = Qwen3GenerationThroughput.info(
+            generationTokenCount: generatedCodeCount,
+            span: startTime.duration(to: .now),
             peakMemoryUsage: Double(Memory.peakMemory) / 1e9
         )
         if let materializedEventSink {
@@ -6170,6 +6166,27 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     }
 }
 
+/// The `.info` throughput of one generation span. The span is measured on
+/// ContinuousClock: native.md forbids `Date()` for any throughput figure, and
+/// `tokensPerSecond` is published (audit #60).
+enum Qwen3GenerationThroughput {
+    static func info(
+        generationTokenCount: Int,
+        span: Duration,
+        peakMemoryUsage: Double
+    ) -> AudioGenerationInfo {
+        let generateTime = span.totalSeconds
+        return AudioGenerationInfo(
+            promptTokenCount: 0, // Not tracked for VoiceDesign
+            generationTokenCount: generationTokenCount,
+            prefillTime: 0, // Included in generateTime
+            generateTime: generateTime,
+            tokensPerSecond: Double(generationTokenCount) / generateTime,
+            peakMemoryUsage: peakMemoryUsage
+        )
+    }
+}
+
 private extension ContinuousClock.Instant {
     var elapsedMilliseconds: Int {
         duration(to: .now).roundedMilliseconds
@@ -6182,5 +6199,12 @@ private extension Duration {
         let secondsMS = Double(components.seconds) * 1_000
         let attosecondsMS = Double(components.attoseconds) / 1_000_000_000_000_000
         return Int((secondsMS + attosecondsMS).rounded())
+    }
+
+    /// Unrounded seconds, for throughput spans measured on ContinuousClock.
+    var totalSeconds: Double {
+        let components = components
+        return Double(components.seconds)
+            + Double(components.attoseconds) / 1_000_000_000_000_000_000
     }
 }

@@ -230,6 +230,7 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         let frames: [[Int32]]
         let samples: [Float]
         let finishReason: AudioGenerationFinishReason
+        let info: AudioGenerationInfo?
     }
 
     private func generate(
@@ -250,7 +251,12 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
             isolation: nil
         )
         let samples = completion.audio.asArray(Float.self)
-        return Take(frames: frames.withLock { $0 }, samples: samples, finishReason: completion.finishReason)
+        return Take(
+            frames: frames.withLock { $0 },
+            samples: samples,
+            finishReason: completion.finishReason,
+            info: completion.info
+        )
     }
 
     // MARK: - Talker
@@ -324,6 +330,39 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         let upsample = try XCTUnwrap(model.speechTokenizer?.decodeUpsampleRate)
         XCTAssertEqual(first.samples.count, first.frames.count * upsample)
         XCTAssertTrue(first.samples.allSatisfy { $0.isFinite && abs($0) <= 1 })
+
+        // The `.info` throughput comes from one monotonic span (audit #60).
+        let info = try XCTUnwrap(first.info)
+        XCTAssertGreaterThan(info.generationTokenCount, 0)
+        XCTAssertTrue(info.generateTime.isFinite && info.generateTime > 0)
+        XCTAssertEqual(
+            info.tokensPerSecond,
+            Double(info.generationTokenCount) / info.generateTime,
+            accuracy: 1e-9
+        )
+    }
+
+    func testGenerationThroughputConvertsTheContinuousClockSpanExactly() {
+        let info = Qwen3GenerationThroughput.info(
+            generationTokenCount: 150,
+            span: .milliseconds(1_500),
+            peakMemoryUsage: 2.5
+        )
+        XCTAssertEqual(info.generateTime, 1.5)
+        XCTAssertEqual(info.tokensPerSecond, 100)
+        XCTAssertEqual(info.generationTokenCount, 150)
+        XCTAssertEqual(info.peakMemoryUsage, 2.5)
+        XCTAssertEqual(info.promptTokenCount, 0)
+        XCTAssertEqual(info.prefillTime, 0)
+
+        // Sub-second components are kept, not truncated to whole seconds.
+        let fractional = Qwen3GenerationThroughput.info(
+            generationTokenCount: 9,
+            span: Duration(secondsComponent: 2, attosecondsComponent: 250_000_000_000_000_000),
+            peakMemoryUsage: 0
+        )
+        XCTAssertEqual(fractional.generateTime, 2.25)
+        XCTAssertEqual(fractional.tokensPerSecond, 4)
     }
 
     func testDifferentRequestSeedsSampleDifferentCodecTraces() async throws {

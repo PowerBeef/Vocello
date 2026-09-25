@@ -2030,22 +2030,15 @@ struct StreamingExecutionContext: Sendable {
         // token-loop total, generated-code count) are only finalized post-loop, so
         // the pre-loop `timingOverridesMS` snapshot misses them entirely.
         signpostTimingsMS["native_generation_stream_ms"] = generationStreamStartedAt.elapsedMilliseconds
-        var finalTimingsMS = Self.finalizedGenerationTimings(
+        // No "decoder drain" key: `qwen_token_loop_total` sums in-loop iterations
+        // only, while `.info.generateTime` spans from cache setup to the loop's
+        // end, so their difference can never isolate a drain (audit #60).
+        let finalTimingsMS = Self.finalizedGenerationTimings(
             base: timingOverridesMS,
             modelDiagnostics: finalizedDiagnostics,
             signpost: signpostTimingsMS,
             includeModelDiagnostics: telemetryActive
         )
-        if telemetryActive,
-           let info = latestInfo,
-           let tokenLoopMS = finalTimingsMS["qwen_token_loop_total"],
-           tokenLoopMS > 0 {
-            let infoMS = Int((info.generateTime * 1_000).rounded())
-            let drainMS = max(0, tokenLoopMS - infoMS)
-            if drainMS > 0 {
-                finalTimingsMS["qwen_stream_decoder_drain_ms"] = drainMS
-            }
-        }
         let finalBooleanFlags = booleanFlags.merging(finalizedDiagnostics.booleanFlags) { _, new in new }
         let finalStringFlags = stringFlags.merging(finalizedDiagnostics.stringFlags) { _, new in new }
 
@@ -3103,9 +3096,11 @@ struct StreamingExecutionContext: Sendable {
     ) -> [String: Double] {
         var metrics: [String: Double] = ["audioSeconds": audioSeconds]
 
-        // Decode wall time: prefer the model's finalized token-loop total (includes
-        // pipelined decoder drain after the `.info` event), else `.info.generateTime`,
-        // else the streamStartup→streamGenerationEnded span (excludes WAV finalize).
+        // Decode wall time: prefer the model's finalized token-loop total (in-loop
+        // iterations only: no cache setup before the loop, no trailing decoder
+        // flush after it), else `.info.generateTime` (ContinuousClock, cache setup
+        // to the loop's end), else the streamStartup→streamGenerationEnded span
+        // (excludes WAV finalize).
         let decodeWallSeconds: Double
         if let tokenLoopMS = modelTimingsMS["qwen_token_loop_total"], tokenLoopMS > 0 {
             decodeWallSeconds = Double(tokenLoopMS) / 1_000

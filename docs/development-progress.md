@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-09-22
+reviewed: 2026-09-25
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -16,6 +16,24 @@ Checkpoints older than the ones below live in git history (`git log -p -- docs/d
 last full copy at commit 25a895ed).
 
 ## Resume now
+
+### September 25, evening — benchmark audit and the first M6 gate baseline
+
+The maintainer asked for an in-depth audit of the benchmark harnesses and telemetry probes
+([audit](audits/2026-09-25-benchmark-telemetry-audit.md), plan `benchmark-telemetry-audit-2026-09`,
+items BT-01 to BT-06) and decided its open rules: one memory series per process, a maximum
+unobserved gap plus peak fidelity instead of 95 % coverage, comparison keys narrowed per kind with
+legacy keys byte-identical, pooled published medians, memory-profile traces kept, a stricter
+per-take load limit, five warm takes, a provisional 250 ms stall statistic that reports only until
+an M6 run calibrates it, the 8 GB floor emulated on the M6, retained-memory v2 and ui-perf ceilings
+from the run-to-run spread. BT-01, BT-02 and BT-04 landed their code (memory contract v2, the seeded
+pooled gate, lineage contract v1); BT-03, BT-05 and BT-06 are partly landed. AV-17 step 1 is done:
+three seeded gate runs on one clean commit seeded the first canonical Mac mini M6 gate baseline
+(ce66096c). Wave 8 (worktree agents) covers BT-05's delivery-supervisor batch, the floor-emulation
+knob, the report-only stall gate and the remaining BT-03/BT-06 code items. Blocked on the
+maintainer: Automation Mode (the M6 UI runs that calibrate the stall gate and AV-17 steps 2–4),
+PA-10's GitHub settings, the clone-voice fixture enrollment, the PA-32 decision and every iPhone
+item.
 
 ### Paused September 24 — resume at RF-13
 
@@ -57,9 +75,7 @@ Lanes: the first M6 smoke run never reached a test (Automation Mode needs authen
 now refuses that before building; maintainer: `sudo automationmodetool
 enable-automationmode-without-authentication`), and the first M6 gate run passed every code gate
 but lacked the benchmark model (now installed; the clone-voice fixture still failed to enroll).
-Next: rerun the gate bench and re-save the M6 baseline (AV-17 step 1), then the smoke run once
-Automation Mode is set; PA-10's environment, secrets and tag ruleset stay with the maintainer; an
-audit of the benchmark harnesses and telemetry probes is in progress.
+The gate rerun and the audit are recorded in the evening checkpoint above.
 
 ### Current state (September 23)
 

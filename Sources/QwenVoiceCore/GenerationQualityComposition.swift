@@ -19,17 +19,23 @@ public enum GenerationQualityComposition {
         public let flags: [String]
         public let analyzerAlgorithmVersion: Int
         public let metrics: [String: Double]
+        /// `calibrated` only when the profile carries per-flag detection evidence
+        /// (audit #41); `uncalibrated` otherwise. Absent from sidecars written
+        /// before 2026-09-25, which were uncalibrated too.
+        public let calibrationStatus: String?
 
         public init(
             passed: Bool,
             flags: [String],
             analyzerAlgorithmVersion: Int,
-            metrics: [String: Double]
+            metrics: [String: Double],
+            calibrationStatus: String? = nil
         ) {
             self.passed = passed
             self.flags = flags
             self.analyzerAlgorithmVersion = analyzerAlgorithmVersion
             self.metrics = metrics
+            self.calibrationStatus = calibrationStatus
         }
     }
 
@@ -43,7 +49,11 @@ public enum GenerationQualityComposition {
     /// Maps one sidecar prosody verdict into typed deep evidence for the
     /// `.prosody` gate. Quality flags (monotone, rushed, flat, pause issues)
     /// are warnings, exactly as the history publisher folds them; only the
-    /// analysis-failure flags escalate to `.unavailable`.
+    /// analysis-failure flags escalate to `.unavailable`. A clean verdict is a
+    /// pass only from a calibrated gate: the shipped thresholds sit outside the
+    /// observed data (one flag in 902 takes) and were never shown to detect
+    /// what they name, so a clean uncalibrated verdict composes as
+    /// `.uncalibrated`, never `.pass` (audit #41, 2026-09-25).
     public static func prosodyEvidence(
         gate: ProsodySidecarGate,
         evidenceDigest: String? = nil
@@ -52,7 +62,7 @@ public enum GenerationQualityComposition {
         if !analysisFailureFlags.isDisjoint(with: gate.flags) {
             outcome = .unavailable
         } else if gate.passed && gate.flags.isEmpty {
-            outcome = .pass
+            outcome = gate.calibrationStatus == "calibrated" ? .pass : .uncalibrated
         } else {
             outcome = .warning
         }

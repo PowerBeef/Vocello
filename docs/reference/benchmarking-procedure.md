@@ -356,7 +356,8 @@ also receives the per-preset adherence verdict (`deliveryGate` beside `qualityGa
 `bench-prosody.json`; a diagnostic since gate v3) and its cell's verdict (`deliveryCellGate`, the
 adherence verdict; [`delivery-harness.md`](delivery-harness.md) §5.1), and the run composes
 canonical-depth registry verdicts across all seven gates (`bench-quality-composed.json`; a cell too
-small to judge composes as `uncalibrated`).
+small to judge, and a clean verdict of the uncalibrated prosody gate, compose as `uncalibrated`,
+never as a pass).
 
 ### 4.6b Fidelity lanes (engine/artifact promotion battery)
 

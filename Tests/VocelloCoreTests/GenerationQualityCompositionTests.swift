@@ -24,14 +24,61 @@ final class GenerationQualityCompositionTests: XCTestCase {
     private func gate(
         passed: Bool,
         flags: [String] = [],
-        metrics: [String: Double] = [:]
+        metrics: [String: Double] = [:],
+        calibrationStatus: String? = "calibrated"
     ) -> GenerationQualityComposition.ProsodySidecarGate {
         GenerationQualityComposition.ProsodySidecarGate(
             passed: passed,
             flags: flags,
             analyzerAlgorithmVersion: 4,
-            metrics: metrics
+            metrics: metrics,
+            calibrationStatus: calibrationStatus
         )
+    }
+
+    /// Audit #41: the shipped prosody gate cannot observe what a pass claims.
+    func testACleanUncalibratedProsodyVerdictIsNotAPass() throws {
+        for status in [nil, "uncalibrated"] as [String?] {
+            let evidence = GenerationQualityComposition.prosodyEvidence(
+                gate: gate(passed: true, calibrationStatus: status)
+            )
+            XCTAssertEqual(evidence.outcome, .uncalibrated, "\(String(describing: status))")
+        }
+        // A raised flag is still a warning, and a failed analysis still unavailable.
+        XCTAssertEqual(
+            GenerationQualityComposition.prosodyEvidence(
+                gate: gate(passed: false, flags: ["monotone"], calibrationStatus: "uncalibrated")
+            ).outcome,
+            .warning
+        )
+        let json = """
+        {"passed": true, "flags": [], "analyzerAlgorithmVersion": 4, "metrics": {},
+         "calibrationStatus": "uncalibrated", "fixtureTruePositiveRates": null}
+        """
+        let decoded = try JSONDecoder().decode(
+            GenerationQualityComposition.ProsodySidecarGate.self, from: Data(json.utf8)
+        )
+        XCTAssertEqual(decoded.calibrationStatus, "uncalibrated")
+        let digest = String(repeating: "9", count: 64)
+        let report = GenerationQualityReportProducer.deepReport(
+            generationID: UUID(),
+            policy: GenerationQualityReportProducer.standardPolicy(requiresLanguageASR: false),
+            finishReason: .eos,
+            hitTokenCap: false,
+            audioQC: Self.cleanAudioQC(durationSeconds: 4.0),
+            wavDigest: digest,
+            usedStreaming: true,
+            chunkCount: 5,
+            audioChannel: nil,
+            deepEvidence: [
+                .prosody: GenerationQualityComposition.prosodyEvidence(
+                    gate: decoded, evidenceDigest: digest
+                ),
+            ]
+        )
+        let verdict = try QualityGateRegistry.evaluate(report)
+        XCTAssertEqual(verdict.outcome, GenerationQualityOutcome.uncalibrated)
+        XCTAssertEqual(verdict.issues, ["quality_gate_uncalibrated.prosody"])
     }
 
     func testCleanGateMapsToPassWithTypedMeasurements() {

@@ -861,6 +861,23 @@ win-rate); the annotations never decide. Fewer than five takes of a cell are `in
   untouched second sweep under the threshold-change authority; until then the verdict warns
   and never fails.
 
+### 5.2 The prosody gate composes as uncalibrated (audit #41, 2026-09-25)
+
+The reference-free prosody gate (`prosody_quality_gate.py`: monotone, rushed, flat, long pause,
+high pause ratio) raised one flag in 902 committed delivery takes; three of its flags need values
+outside the observed range, and its only calibration used 2+2 clips with a true-positive rate of 0.5.
+"prosody: pass" therefore claimed more than the gate can observe. Following the audit's
+recommendation (the maintainer delegated the decision on 2026-09-25), every verdict states
+`calibrationStatus`, which is `calibrated` only when the profile declares per-flag detection
+evidence (`threshold_calibration`: a true-positive rate and fixture count for every flag and the
+digest of the evidence; `prosody_profile.py` validates it) and `uncalibrated` otherwise, with
+`fixtureTruePositiveRates` beside it. The builtin profile declares none. The canonical composition
+(`GenerationQualityComposition.prosodyEvidence`) reads a clean verdict of an uncalibrated gate as
+`.uncalibrated`, which never blocks and never reads as a pass (an otherwise passing registry verdict
+is `uncalibrated`, issue `quality_gate_uncalibrated.prosody`); a raised flag still warns and a
+failed analysis is still unavailable. The perturbation suite with a detection curve per flag and a
+monotone check in semitones, which would let a profile declare `calibrated`, belong to AV-07.
+
 ## 6. Analyzer accuracy and authority boundary
 
 `analyze_prosody.py` is deterministic, bounded-memory PCM analysis. Its synthetic

@@ -39,6 +39,50 @@ def write_sine(path, freq, duration, amplitude=0.5, pause_ranges=None):
         w.writeframes(b"".join(v.to_bytes(2, "little", signed=True) for v in pcm))
 
 
+class ProsodyGateCalibrationTests(unittest.TestCase):
+    """Audit #41: a clean verdict of an uncalibrated gate is not a pass."""
+
+    VALID = {
+        "f0_std_hz": 30.0, "f0_turning_points_per_sec": 3.0,
+        "rate_syllable_rate_hz": 4.0, "pauses_pause_speech_ratio": 0.1,
+        "energy_envelope_roughness": 0.3, "rate_local_rate_cv": 0.3,
+        "pauses_max_pause_seconds": 0.4,
+    }
+
+    def test_the_builtin_profile_is_uncalibrated(self):
+        report = evaluate_metrics(self.VALID)
+        self.assertTrue(report["passed"])
+        self.assertEqual(report["flags"], [])
+        self.assertEqual(report["calibrationStatus"], "uncalibrated")
+        self.assertIsNone(report["fixtureTruePositiveRates"])
+        self.assertIn("not a pass", report["reason"])
+        failed = evaluate_metrics({**self.VALID, "f0_std_hz": float("nan")})
+        self.assertEqual(failed["calibrationStatus"], "uncalibrated")
+
+    def test_a_profile_with_per_flag_detection_evidence_is_calibrated(self):
+        from prosody_profile import PROSODY_GATE_FLAGS, validate_profile
+        profile = builtin_profile()
+        profile["threshold_calibration"] = {
+            "status": "calibrated",
+            "fixtureTruePositiveRates": {flag: 0.9 for flag in PROSODY_GATE_FLAGS},
+            "fixtureCounts": {flag: 60 for flag in PROSODY_GATE_FLAGS},
+            "evidenceDigest": "a" * 64,
+        }
+        validate_profile(profile)
+        report = evaluate_metrics(self.VALID, profile)
+        self.assertEqual(report["calibrationStatus"], "calibrated")
+        self.assertEqual(report["fixtureTruePositiveRates"]["monotone"], 0.9)
+        self.assertEqual(report["reason"], "prosody gate passed")
+        for broken in (
+            {"status": "calibrated"},
+            {**profile["threshold_calibration"], "fixtureTruePositiveRates": {"monotone": 0.9}},
+            {**profile["threshold_calibration"], "evidenceDigest": "not-a-digest"},
+            {"status": "maybe"},
+        ):
+            with self.subTest(broken=broken), self.assertRaises(ValueError):
+                validate_profile({**profile, "threshold_calibration": broken})
+
+
 class ProsodyQualityGateTests(unittest.TestCase):
     def test_invalid_measurements_cannot_pass_or_emit_nonfinite_json(self):
         valid = {

@@ -16,7 +16,27 @@ Usage:
 import sys, json, argparse, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from analyze_prosody import ANALYZER_ALGORITHM_VERSION, analyze
-from prosody_profile import builtin_profile, load_profile, threshold
+from prosody_profile import PROSODY_GATE_FLAGS, builtin_profile, load_profile, threshold
+
+# The gate's thresholds sit outside the observed data: one flag in 902 delivery
+# takes, and the only calibration used 2+2 clips with a true-positive rate of
+# 0.5 (audit #41). A verdict with no flag therefore cannot claim a pass: every
+# report states `calibrationStatus`, which is `calibrated` only when the profile
+# declares per-flag detection evidence (`threshold_calibration`, from a
+# perturbation suite with a detection curve per flag, AV-07), and the
+# composition reads an uncalibrated clean verdict as `uncalibrated`, never
+# PASS. Decided 2026-09-25 by the audit's recommendation.
+
+
+def calibration_fields(prof):
+    """`calibrationStatus` and the per-flag fixture true-positive rates of a profile."""
+    block = prof.get("threshold_calibration") if isinstance(prof, dict) else None
+    if isinstance(block, dict) and block.get("status") == "calibrated":
+        return {
+            "calibrationStatus": "calibrated",
+            "fixtureTruePositiveRates": dict(sorted(block["fixtureTruePositiveRates"].items())),
+        }
+    return {"calibrationStatus": "uncalibrated", "fixtureTruePositiveRates": None}
 
 
 def evaluate(path, profile=None):
@@ -34,6 +54,7 @@ def evaluate(path, profile=None):
             "flags": ["analysis_failed"],
             "reason": pros["error"],
             "metrics": {},
+            **calibration_fields(prof),
         }
 
     return evaluate_metrics(pros, prof)
@@ -74,6 +95,7 @@ def evaluate_metrics(pros, prof=None):
             "flags": ["metrics_incomplete"],
             "reason": "gate inputs missing, non-numeric or non-finite",
             "metrics": {},
+            **calibration_fields(prof),
         }
 
     flags = []
@@ -117,6 +139,13 @@ def evaluate_metrics(pros, prof=None):
         if source_key in pros:
             summary_metrics[summary_key] = pros[source_key]
 
+    calibration = calibration_fields(prof)
+    if flags:
+        reason = "; ".join(flags)
+    elif calibration["calibrationStatus"] == "calibrated":
+        reason = "prosody gate passed"
+    else:
+        reason = "no prosody flag; the gate is uncalibrated, so this is not a pass"
     return {
         "clip": pros.get("clip", ""),
         "analyzerAlgorithmVersion": pros.get(
@@ -124,8 +153,9 @@ def evaluate_metrics(pros, prof=None):
         ),
         "passed": len(flags) == 0,
         "flags": flags,
-        "reason": "; ".join(flags) if flags else "prosody gate passed",
+        "reason": reason,
         "metrics": summary_metrics,
+        **calibration,
     }
 
 

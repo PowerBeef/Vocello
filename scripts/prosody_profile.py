@@ -213,6 +213,8 @@ BUILTIN_PROFILE = {
 
 
 _EXPECTATION_TIERS = ("required", "supporting")
+# The flags the reference-free prosody gate raises (scripts/prosody_quality_gate.py).
+PROSODY_GATE_FLAGS = ("monotone", "rushed", "flat", "long_pause", "high_pause_ratio")
 
 
 _ADDON_BLOCKS = (
@@ -322,6 +324,41 @@ def _validate_separability(block):
         raise ValueError("separability.minimum_cell_recall must fall in (0, 1]")
 
 
+def _validate_threshold_calibration(block):
+    """Optional per-flag detection evidence for the prosody gate (audit #41).
+
+    `calibrated` needs a true-positive rate in [0, 1] for every gate flag, the
+    fixture count behind each, and the digest of the evidence that measured
+    them; anything else is `uncalibrated`. The builtin profile carries none.
+    """
+    if not isinstance(block, dict):
+        raise ValueError("threshold_calibration must be an object")
+    status = block.get("status")
+    if status not in ("calibrated", "uncalibrated"):
+        raise ValueError("threshold_calibration.status must be calibrated or uncalibrated")
+    if status == "uncalibrated":
+        return
+    rates = block.get("fixtureTruePositiveRates")
+    counts = block.get("fixtureCounts")
+    digest = block.get("evidenceDigest")
+    if (
+        not isinstance(rates, dict) or set(rates) != set(PROSODY_GATE_FLAGS)
+        or not all(
+            isinstance(value, (int, float)) and not isinstance(value, bool) and 0.0 <= value <= 1.0
+            for value in rates.values()
+        )
+    ):
+        raise ValueError("threshold_calibration needs a true-positive rate for every prosody flag")
+    if (
+        not isinstance(counts, dict) or set(counts) != set(PROSODY_GATE_FLAGS)
+        or not all(isinstance(value, int) and not isinstance(value, bool) and value > 0
+                   for value in counts.values())
+    ):
+        raise ValueError("threshold_calibration needs a positive fixture count for every prosody flag")
+    if not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
+        raise ValueError("threshold_calibration.evidenceDigest must be a SHA-256 digest")
+
+
 def validate_profile(profile):
     """Return profile if valid, else raise ValueError with a clear message."""
     if not isinstance(profile, dict):
@@ -349,6 +386,8 @@ def validate_profile(profile):
     _validate_neutral_consistency(profile["neutral_consistency"])
     _validate_clone_fidelity(profile["clone_fidelity"])
     _validate_separability(profile["separability"])
+    if "threshold_calibration" in profile:
+        _validate_threshold_calibration(profile["threshold_calibration"])
     analyzer_version = profile.get("analyzer_algorithm_version")
     if analyzer_version is not None and (
         not isinstance(analyzer_version, int) or analyzer_version < 1

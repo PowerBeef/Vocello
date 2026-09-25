@@ -1478,7 +1478,7 @@
       "id": "BT-03",
       "plan": "benchmark-telemetry-audit-2026-09",
       "title": "UI benchmark and ui-perf lanes ready for the M6",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [],
       "gate": "The first canonical M6 UI benchmark validates in one pass under a declared stall contract with every take on the Speed variant, and M6 perf records carry an M6 calibration profile rather than M2 verdicts.",
       "sourceOfTruth": [
@@ -1487,7 +1487,7 @@
         "config/ui-perf-thresholds.json",
         "scripts/ui_test.sh"
       ],
-      "notes": "Audit #6 #17 #18 #21 #28-#35 #72 #74 #75 #77-#83 V-1 V-3 V-8 V-9. Maintainer decisions 2026-09-25: a provisional 250 ms stall statistic in a config contract until one exploratory M6 run calibrates it (#6); ui-perf ceilings from the run-to-run spread with a 1.25-1.3x floor (#34); pooled published medians (#72). Landed 2026-09-25: the declared stall contract with a distinct 'rows not yet present' exit and the stall distribution kept on a failing run (#6), censored heartbeats counted (#18), every take on Speed selected through the visible switch and checked (#17), the UI base test cases hashed (#21 part), spread-derived ceilings from counted runs of one lineage (#34 a-b), pooled RTF medians that never span builds or dependency pins (#72). Replay: the provisional 250 ms limit fails all 16 canonical M2 runs (189 of 464 takes). Maintainer decision 2026-09-25: the provisional stall limit reports only (never fails a run) until the first exploratory M6 run calibrates it. Open: that report-only mode and calibrating the limit, #21 part 4, #17's chart label, #28-#33, #74-#83.",
+      "notes": "Audit #6 #17 #18 #21 #28-#35 #72 #74 #75 #77-#83 V-1 V-3 V-8 V-9. Maintainer decisions 2026-09-25: a provisional 250 ms stall limit that reports only until an exploratory M6 UI run calibrates it (#6); ui-perf ceilings from run-to-run spread, 1.25-1.3x floor (#34); pooled medians (#72); the 8 GB floor emulated on the M6 (#11 b). Landed 2026-09-25: the stall contract, report-only while provisional (#6); censored heartbeats (#18); Speed checked per take and named in the chart label (#17); base test cases hashed (#21 part); spread-derived ceilings (#34 a-b); pooled medians (#72); the QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB floor knob: forced, exploratory rows that share the host key string but never compare (#11; separate keys need a LINEAGE_CONTRACT_VERSION bump, a maintainer call); per-take load kept, a busy take makes the run exploratory (#28); build skip on build inputs (#75); uniform pacing, phase stamps (#74 #31); sampler cadence (#33); effective seed, after-cold flag (#29 #30). Open: the calibration run; decisions #29 seed knob, #30 matrix/IQR, #31 part 2, #33 part 2; #32; #74 part 4; iOS parts of #28/#33; #21 part 4; #77 #78 #80-#82.",
       "updated": "2026-09-25"
     },
     {
@@ -1533,7 +1533,7 @@
         "Sources/QwenVoiceCore/NativeTelemetry.swift",
         "scripts/ios_device.sh"
       ],
-      "notes": "Audit #12 #45 #48-#52 #56 #60-#62 #69 #87 #95-#100 V-2. Headlines: the Instruments profile lanes publish only row counts and discard the one independent timing witness; signposts are not paired with JSONL timings; device-lane waits poll more than the sentinel. Device parts wait for the iPhone. 2026-09-25 landed: tokensPerSecond on ContinuousClock (#60), the startup windows RTF excludes and run.ttfcDefinition (#58, #59).",
+      "notes": "Audit #12 #45 #48-#52 #56 #60-#62 #69 #87 #95-#100 V-2. Landed 2026-09-25: tokensPerSecond on ContinuousClock (#60), the startup windows RTF excludes and run.ttfcDefinition (#58 #59); wave 8: the token read has its own timer and allocation-free signpost (V-2); hot-loop totals are Durations rounded once at export, so decodeWallSeconds and decodeSpeedupX shift by under 1 ms per take while the gate's tokps reads its own generation-info span; the observed step wait under .pipelined with outputAdapterIdentityVersion 2 (#49 #62 part); chunk eval exported and decode/eval/flush signposts (#61 #95 #48 parts); profile lanes publish per-take signpost interval statistics with the 36x(tokens+1) check sized by each take's end reason (#12 #96 #99 #100 parts); device-lane waits poll only their markers and stop when the PID exits (#45 #56 #87 parts). Open: v9 derived-instant provenance (#62/#49 rest); #61 fixes 2 and 4; #48 rest; 36 per-step intervals still allocate via OSSignposter; #96 duration key unverified against a real TOC; #99/#50 witness profile; #87 cadence; #45 crash delta; #51 #52 #60 rest #69 #97 #98; a kept-trace profile run and the iPhone waits prove the gate (consent-bound).",
       "updated": "2026-09-25"
     }
   ]

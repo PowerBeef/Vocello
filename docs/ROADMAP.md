@@ -191,7 +191,7 @@ Narrative authority: [`docs/audits/2026-09-25-benchmark-telemetry-audit.md`](aud
 | --- | --- | --- | --- |
 | `BT-01` | in-flight | Trustworthy memory evidence | — |
 | `BT-02` | in-flight | Engine gate and CLI bench ready for the M6 re-seed | — |
-| `BT-03` | planned | UI benchmark and ui-perf lanes ready for the M6 | — |
+| `BT-03` | in-flight | UI benchmark and ui-perf lanes ready for the M6 | — |
 | `BT-04` | in-flight | Lineage identity, history and CI evidence tests | — |
 | `BT-05` | in-flight | Audio, language and delivery QC accuracy | — |
 | `BT-06` | in-flight | Timing attribution, profiles and device-lane observers | — |
@@ -204,7 +204,7 @@ Narrative authority: [`docs/audits/2026-09-25-benchmark-telemetry-audit.md`](aud
 - **`BT-02`** (in-flight) — Engine gate and CLI bench ready for the M6 re-seed.
   gate: Offline comparator replay shows no false regression and flags a synthetic +6% RTF, a gate with a missing model stops within seconds with a finalized ledger, and the AV-17 session seeds the M6 baseline from at least 3 seeded runs on identical source with the thresholds printed.
 
-- **`BT-03`** (planned) — UI benchmark and ui-perf lanes ready for the M6.
+- **`BT-03`** (in-flight) — UI benchmark and ui-perf lanes ready for the M6.
   gate: The first canonical M6 UI benchmark validates in one pass under a declared stall contract with every take on the Speed variant, and M6 perf records carry an M6 calibration profile rather than M2 verdicts.
 
 - **`BT-04`** (in-flight) — Lineage identity, history and CI evidence tests.

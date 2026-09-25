@@ -1751,8 +1751,9 @@ struct StreamingExecutionContext: Sendable {
                         // token, taken as the sink returns and before any
                         // telemetry mark: the hand-off instant a first-chunk
                         // observer is joined on (audit #48), preview PCM or not.
-                        // A take with neither telemetry nor preview reads none.
-                        let handedOffAtNS: UInt64? = telemetryWorkPlan.writesSink || previewAudio != nil
+                        // Both stamps are consumed only by telemetry, so a take
+                        // that writes none (the app's streaming path) reads none.
+                        let handedOffAtNS: UInt64? = telemetryWorkPlan.writesSink
                             ? DispatchTime.now().uptimeNanoseconds
                             : nil
                         transportPublishedAtNS = handedOffAtNS

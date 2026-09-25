@@ -22,7 +22,8 @@ public enum GenerationStreamingTelemetryV9Publication: Sendable {
     /// `transportPublishedAtNS`, the instant its event returned from the product
     /// sink, with or without preview PCM; `previewPublishedAtNS` is that same
     /// read, now taken before chunk 0's first-published-chunk mark instead of
-    /// after it. The complete sidecar is unchanged.
+    /// after it. The complete sidecar's schema is unchanged; chunk 0's preview
+    /// stamp moves earlier by that ordering.
     public static let outputAdapterIdentityVersion = 4
 
     public enum PublicationError: Error, Equatable, Sendable {

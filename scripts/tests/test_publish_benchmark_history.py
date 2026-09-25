@@ -664,6 +664,85 @@ class PublisherTests(unittest.TestCase):
         row["notes"]["samplingSeedSource"] = "requested"
         self.assertEqual(self.publish_gate_fixture(row, seed=19790615, snapshot=snapshot)["takes"][0]["seed"], 19790615)
 
+    def publish_loaded_run(self, loads: list[float]) -> dict:
+        """A multi-take engine run whose takes each recorded their own load."""
+        diagnostics = self.root / f"diagnostics-{len(loads)}-{max(loads)}"
+        output_dir = diagnostics / "outputs"
+        diagnostics.mkdir()
+        rows, result_takes, qualified = [], [], []
+        for index, load in enumerate(loads):
+            cell = f"custom/speed/medium/warm#{index}"
+            row = engine_row(f"take-{index}", cell=cell)
+            row["notes"]["benchTakeIndex"] = str(index + 1)
+            row["summary"]["runEnvironment"] = {
+                "loadAverage1Minute": load, "lowPowerModeEnabled": False, "thermalState": "nominal",
+            }
+            rows.append(row)
+            self.make_wave(output_dir / f"take-{index}.wav")
+            result_takes.append({
+                "takeIndex": index + 1, "generationID": f"take-{index}", "cell": cell,
+                "mode": "custom", "modelID": "pro_custom_speed", "variant": "speed",
+                "length": "medium", "warmState": "warm", "wallSeconds": 1.0,
+                "audioSeconds": 2.0, "firstChunkMS": 100, "outputFileName": f"take-{index}.wav",
+            })
+            qualified.append(SimpleNamespace(
+                generation_id=f"take-{index}", metrics={}, sidecar_digest="f" * 64,
+                status="qualified", warnings=(),
+            ))
+        results = diagnostics / "bench-results.json"
+        results.write_text(json.dumps({
+            "schemaVersion": 1, "runID": "run-one", "label": "fixture",
+            "startedAt": "2026-07-12T12:00:00Z", "finishedAt": "2026-07-12T12:01:00Z",
+            "telemetryMode": "verbose", "seed": None, "streaming": True,
+            "executableSHA256": "a" * 64, "fixtureDigests": {}, "takes": result_takes,
+        }))
+        args = SimpleNamespace(
+            results=results, run_id="run-one", diagnostics=diagnostics, output_dir=output_dir,
+            platform="macos", artifact_dir=diagnostics, snapshot=self.root / "missing-source.json",
+            label="fixture",
+        )
+        captured, write_patch = self.capture_manifest()
+        with (
+            mock.patch.object(publisher, "load_engine_rows", return_value=rows),
+            mock.patch.object(publisher, "qualify_memory_rows", return_value=(qualified, {
+                "memoryContractVersion": 1, "memoryQualified": True,
+                "sampleSidecarCount": len(loads), "sampleSidecarsDigest": "e" * 64,
+                "digestPayload": [{"generationID": row["generationID"], "digest": "f" * 64} for row in rows],
+            })),
+            mock.patch.object(publisher, "source_from_snapshot", return_value=source_fixture()),
+            mock.patch.object(publisher, "crash_delta_from_snapshot", return_value={"passed": True, "count": 0}),
+            self.hardware_patch(),
+            write_patch,
+            contextlib.redirect_stderr(io.StringIO()),
+        ):
+            publisher.engine_command(args)
+        return captured["manifest"]["historyRecord"]
+
+    def test_a_take_above_the_per_take_load_limit_marks_the_record_exploratory(self) -> None:
+        cores = publisher.canonical_hardware_profile("macos")["cpuCores"]
+        limit = publisher.EXPLORATORY_TAKE_LOAD_PER_CORE * cores
+        # Every take at or under the limit: the registry derives the classification.
+        quiet = self.publish_loaded_run([2.0, limit, 3.5])
+        self.assertNotIn("classification", quiet["run"])
+        self.assertEqual([take["metrics"]["loadAverage1M"] for take in quiet["takes"]], [2.0, limit, 3.5])
+        # One busy take in the middle of the run is enough; the first sample alone
+        # (the run's hardware.loadAverage1M) would have missed it.
+        busy = self.publish_loaded_run([2.0, limit + 0.5, 3.5])
+        self.assertEqual(busy["run"]["classification"], "exploratory")
+        self.assertEqual(
+            publisher.takes_above_exploratory_load(busy["takes"], cores), [(2, limit + 0.5)],
+        )
+        # The limit classifies timing records only; a profile stays instrumented
+        # and a memory-qualification record keeps its derived classification.
+        rows = [engine_row("take-0")]
+        self.assertEqual(
+            publisher.engine_record_classification("instrument-profile", "macos", busy["takes"], rows),
+            "instrumented",
+        )
+        self.assertIsNone(
+            publisher.engine_record_classification("memory-qualification", "macos", busy["takes"], rows),
+        )
+
     def test_engine_without_a_seed_or_host_snapshot_publishes_as_before(self) -> None:
         record = self.publish_gate_fixture(
             engine_row("selected"), seed=None, snapshot=self.root / "missing-source.json",

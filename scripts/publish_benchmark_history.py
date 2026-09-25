@@ -845,6 +845,51 @@ def runtime_policy_provenance(rows: Iterable[dict[str, Any]]) -> dict[str, Any] 
     return {"deviceClass": classes.pop(), "deviceClassForced": forced}
 
 
+# The stricter per-take host-load limit (maintainer decision 2026-09-25, BT-02,
+# audit #28): a timing take whose own one-minute load average exceeded this many
+# times the canonical profile's core count marks its record exploratory. The
+# start-of-run refusal (require_quiet_host) and the gate's INCONCLUSIVE verdict
+# stay at twice the core count.
+EXPLORATORY_TAKE_LOAD_PER_CORE = 1.0
+
+
+def takes_above_exploratory_load(takes: Iterable[dict[str, Any]], cpu_cores: int) -> list[tuple[int, float]]:
+    """(takeIndex, load) of every take measured above the stricter per-take limit.
+
+    Only takes that carry their own `metrics.loadAverage1M` are judged; evidence
+    without per-take load keeps its classification."""
+    limit = EXPLORATORY_TAKE_LOAD_PER_CORE * cpu_cores
+    busy = []
+    for take in takes:
+        load = finite_number((take.get("metrics") or {}).get("loadAverage1M"))
+        if load is not None and load > limit:
+            busy.append((int(take.get("takeIndex", 0)), load))
+    return busy
+
+
+def engine_record_classification(
+    kind: str, platform: str, takes: list[dict[str, Any]], rows: Iterable[dict[str, Any]],
+) -> str | None:
+    """The classification an engine record carries; None lets the registry
+    derive it from the source state and matrix scope."""
+    if kind == "instrument-profile":
+        return "instrumented"
+    if uses_forced_memory_profile(rows):
+        return "exploratory"
+    if kind == "engine-generation":
+        cores = int(canonical_hardware_profile(platform)["cpuCores"])
+        busy = takes_above_exploratory_load(takes, cores)
+        if busy:
+            listed = ", ".join(f"take {index} at {load:.2f}" for index, load in busy)
+            print(
+                f"note: {listed} exceeded the per-take load limit of "
+                f"{EXPLORATORY_TAKE_LOAD_PER_CORE:g}x{cores} cores; the record is exploratory",
+                file=sys.stderr,
+            )
+            return "exploratory"
+    return None
+
+
 def prompt_corpus_digest(rows: Iterable[dict[str, Any]]) -> str:
     ordered: list[str] = []
     for row in rows:
@@ -1720,11 +1765,7 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
         ),
         executable_paths={"vocello": "build/vocello"} if args.platform == "macos" else {"Vocello": "build/cache/xcode/ios-device/Build/Products/Release-iphoneos/Vocello.app/Vocello"},
         optimization=optimization,
-        classification=(
-            "instrumented" if kind == "instrument-profile"
-            else "exploratory" if uses_forced_memory_profile(selected)
-            else None
-        ),
+        classification=engine_record_classification(kind, args.platform, takes, selected),
         memory_evidence={**compact_memory_evidence(memory_run), **retention_evidence},
         ttfc_definition=engine_ttfc_definition(args.platform, takes),
         runtime_policy=runtime_policy_provenance(selected),
@@ -1829,11 +1870,7 @@ def ios_engine_command(
         ),
         executable_paths={"Vocello": "build/cache/xcode/ios-device/Build/Products/Release-iphoneos/Vocello.app/Vocello"},
         optimization=validated_ios_app_optimization(),
-        classification=(
-            "instrumented" if kind == "instrument-profile"
-            else "exploratory" if uses_forced_memory_profile(rows)
-            else None
-        ),
+        classification=engine_record_classification(kind, "ios", [take], rows),
         memory_evidence=compact_memory_evidence(memory_run),
         runtime_policy=runtime_policy_provenance(rows),
     )

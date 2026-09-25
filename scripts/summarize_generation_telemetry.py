@@ -1140,8 +1140,10 @@ def baseline_identity_from_evidence(payload):
 
     Source and executable digests are deliberately excluded: a regression
     baseline must survive source changes to detect their performance impact.
-    The optimization, topology, hardware, model artifact, matrix/corpus, and
-    evidence semantics remain exact so unlike lanes can never compare.
+    The optimization, topology, hardware, device tier, model artifact,
+    matrix/corpus, and evidence semantics remain exact so unlike lanes can never
+    compare. The device tier comes from the record's `run.runtimePolicy`
+    provenance, which the publisher derives from the rows' own stamps.
     """
     if not isinstance(payload, dict):
         raise ValueError("baseline identity requires an evidence manifest")
@@ -1161,11 +1163,17 @@ def baseline_identity_from_evidence(payload):
     optimization = toolchain.get("optimization")
     if optimization not in {"-O", "-Onone"}:
         raise ValueError("baseline identity has an unsupported optimization")
+    runtime_policy = run.get("runtimePolicy")
+    if not isinstance(runtime_policy, dict):
+        raise ValueError("baseline identity evidence has no runtimePolicy")
+    if runtime_policy.get("deviceClassForced") is not False:
+        raise ValueError("baseline identity evidence ran under a forced memory class")
     identity = {
         "kind": run.get("kind"),
         "platform": run.get("platform"),
         "matrixScope": run.get("matrixScope"),
         "hardwareProfile": hardware.get("profileID"),
+        "deviceClass": runtime_policy.get("deviceClass"),
         **host_identity(),
         "optimization": optimization,
         "matrixHash": inputs.get("matrixHash"),
@@ -1191,6 +1199,9 @@ def baseline_identity_from_evidence(payload):
 
 
 HOST_IDENTITY_KEYS = ("osVersion", "xcodeVersion")
+# Added 2026-09-25 (audit #19). A baseline saved before it compares without it,
+# like a baseline saved before the host keys, and the caller says so.
+RUNTIME_POLICY_IDENTITY_KEYS = ("deviceClass",)
 
 
 def host_identity():
@@ -1297,6 +1308,9 @@ def baseline_cells(payload, *, current_identity=None, require_identity=False):
         # let the caller say so.
         for key in HOST_IDENTITY_KEYS:
             comparable_current.pop(key, None)
+    for key in RUNTIME_POLICY_IDENTITY_KEYS:
+        if key not in identity:
+            comparable_current.pop(key, None)
     if identity != comparable_current:
         raise ValueError("baseline optimization/topology identity differs from current evidence")
     return cells
@@ -1305,6 +1319,22 @@ def baseline_cells(payload, *, current_identity=None, require_identity=False):
 def baseline_lacks_host_identity(payload):
     identity = payload.get("identity") if isinstance(payload, dict) else None
     return isinstance(identity, dict) and not any(key in identity for key in HOST_IDENTITY_KEYS)
+
+
+def baseline_lacks_device_class(payload):
+    identity = payload.get("identity") if isinstance(payload, dict) else None
+    return isinstance(identity, dict) and any(
+        key not in identity for key in RUNTIME_POLICY_IDENTITY_KEYS
+    )
+
+
+def forced_memory_class_rows(runs):
+    """Rows that ran under QWENVOICE_FORCE_MEMORY_CLASS (audit #19).
+
+    A forced tier changes policy values, not the hardware, so such rows are
+    exploratory evidence: a regression baseline is never saved from them and
+    never compared with them."""
+    return [run for run in runs if run.get("deviceClassForced")]
 
 
 def compare_summaries(
@@ -1562,6 +1592,16 @@ def main():
     if skipped_failed:
         print(f"(skipped {skipped_failed} non-success engine row(s) with finishReason failed/superseded/cancelled)")
     prosody_rows = load_prosody(diag_dir)
+
+    if args.save_baseline or args.compare_baseline:
+        forced = forced_memory_class_rows(runs)
+        if forced:
+            print(
+                f"FAIL: {len(forced)} selected row(s) ran under a forced memory class "
+                "(QWENVOICE_FORCE_MEMORY_CLASS); a regression baseline is never saved "
+                "from or compared with forced rows."
+            )
+            return 1
 
     if args.save_baseline:
         summary = build_summary(cells)
@@ -1853,6 +1893,11 @@ def main():
                 print(
                     "\nnote: legacy baseline has no OS/Xcode identity; "
                     "re-save it to bind the comparison to this toolchain."
+                )
+            if baseline_lacks_device_class(baseline_payload):
+                print(
+                    "\nnote: baseline predates the device-class identity; "
+                    "re-save it to bind the comparison to this memory tier."
                 )
             baseline_definition = baseline_rtf_definition(baseline_payload)
             if baseline_definition != rtf_semantics.STANDARD_RTF_DEFINITION:

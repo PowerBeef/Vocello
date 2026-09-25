@@ -764,6 +764,35 @@ def uses_forced_memory_profile(rows: Iterable[dict[str, Any]]) -> bool:
     return False
 
 
+def runtime_policy_provenance(rows: Iterable[dict[str, Any]]) -> dict[str, Any] | None:
+    """Run-level memory-tier provenance from the rows' own stamps (audit #19).
+
+    Every engine row stamps the device class it ran under and whether
+    QWENVOICE_FORCE_MEMORY_CLASS forced it, so a record can prove its tier
+    instead of implying it from the hardware profile. Rows that predate the
+    stamp yield no block; a partly stamped or mixed-tier selection is refused.
+    History is never keyed on this block.
+    """
+    classes: set[str] = set()
+    stamped = unstamped = 0
+    forced = False
+    for row in rows:
+        notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+        device_class = notes.get("deviceClass")
+        if isinstance(device_class, str) and device_class:
+            stamped += 1
+            classes.add(device_class)
+        else:
+            unstamped += 1
+        if str(notes.get("deviceClassForced", "false")).lower() == "true":
+            forced = True
+    if not stamped:
+        return None
+    if unstamped or len(classes) != 1:
+        raise PublicationError("selected engine rows do not share one stamped device class")
+    return {"deviceClass": classes.pop(), "deviceClassForced": forced}
+
+
 def prompt_corpus_digest(rows: Iterable[dict[str, Any]]) -> str:
     ordered: list[str] = []
     for row in rows:
@@ -1255,6 +1284,7 @@ def record_shell(
     crash_delta: dict[str, Any] | None = None,
     memory_evidence: dict[str, Any] | None = None,
     ttfc_definition: str | None = None,
+    runtime_policy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     effective_label = label or run_id
     if ttfc_definition is not None and ttfc_definition not in rtf_semantics.TTFC_DEFINITIONS:
@@ -1310,6 +1340,7 @@ def record_shell(
             "rtfDefinition": rtf_semantics.STANDARD_RTF_DEFINITION,
             **({"ttfcDefinition": ttfc_definition} if ttfc_definition else {}),
             **({"classification": classification} if classification else {}),
+            **({"runtimePolicy": runtime_policy} if runtime_policy is not None else {}),
         },
         "toolchain": {"optimization": optimization},
         "hardware": {
@@ -1530,6 +1561,7 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
         ),
         memory_evidence={**compact_memory_evidence(memory_run), **retention_evidence},
         ttfc_definition=engine_ttfc_definition(args.platform, takes),
+        runtime_policy=runtime_policy_provenance(selected),
     )
     return write_and_record(
         args.artifact_dir, manifest,
@@ -1637,6 +1669,7 @@ def ios_engine_command(
             else None
         ),
         memory_evidence=compact_memory_evidence(memory_run),
+        runtime_policy=runtime_policy_provenance(rows),
     )
     return write_and_record(
         args.artifact_dir, manifest,

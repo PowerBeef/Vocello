@@ -120,7 +120,10 @@ host is the canonical profile.
 Records also capture current OS build, thermal/low-power state, sanitized transport, toolchain,
 executables, input/model fingerprints, and source state. A dirty success is `exploratory`, not a
 canonical trend point. Profiles and forced-memory-class diagnostics are not compared with normal
-timing records.
+timing records. Engine records published since 2026-09-25 also carry `run.runtimePolicy`
+(`deviceClass`, `deviceClassForced`), taken from the rows' own stamps, so a record proves which
+memory tier it measured; the validator refuses a native tier on the wrong platform and a forced
+tier on a comparable record, and the comparison key never includes the block.
 
 ---
 
@@ -261,7 +264,11 @@ QWENVOICE_DEBUG=1 \
   --label "floor-tier"
 ```
 
-Summarizer header shows `tier: floor_8gb_mac ⚠ forced`.
+Summarizer header shows `tier: floor_8gb_mac ⚠ forced`. `--save-baseline` and
+`--compare-baseline` refuse forced rows (exit 1): a forced tier changes policy values, not the
+hardware, so it never seeds or meets a regression baseline. The governed baseline identity also
+binds the native `deviceClass` from the evidence's `run.runtimePolicy`; a baseline saved before
+that key compares without it and the summarizer says so.
 
 ### 4.5 Memory-pressure exercise
 

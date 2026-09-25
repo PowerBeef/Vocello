@@ -968,6 +968,30 @@ class PublisherTests(unittest.TestCase):
         simulated["notes"]["simulatedProcessLimitMB"] = "5000"
         self.assertTrue(publisher.uses_forced_memory_profile([simulated]))
 
+    def test_runtime_policy_provenance_comes_from_the_rows_own_stamps(self) -> None:
+        def stamped(generation_id: str, device_class: str | None, forced: str = "false") -> dict:
+            row = engine_row(generation_id)
+            if device_class is not None:
+                row["notes"].update({"deviceClass": device_class, "deviceClassForced": forced})
+            return row
+
+        self.assertIsNone(publisher.runtime_policy_provenance([engine_row("legacy")]))
+        self.assertEqual(
+            publisher.runtime_policy_provenance([stamped("a", "floor_8gb_mac"), stamped("b", "floor_8gb_mac")]),
+            {"deviceClass": "floor_8gb_mac", "deviceClassForced": False},
+        )
+        self.assertEqual(
+            publisher.runtime_policy_provenance([stamped("a", "mid_16gb_mac", "true")]),
+            {"deviceClass": "mid_16gb_mac", "deviceClassForced": True},
+        )
+        for rows in (
+            [stamped("a", "floor_8gb_mac"), stamped("b", "mid_16gb_mac")],
+            [stamped("a", "floor_8gb_mac"), stamped("b", None)],
+        ):
+            with self.subTest(rows=[row["notes"].get("deviceClass") for row in rows]):
+                with self.assertRaises(publisher.PublicationError):
+                    publisher.runtime_policy_provenance(rows)
+
     @staticmethod
     def sysctl_run(values: dict[tuple[str, ...], str]):
         def run(command, **_kwargs):

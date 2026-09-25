@@ -108,6 +108,9 @@ SECTION_KEYS = {
         # What `ttfcMS` measures (lib/rtf.py TTFC_DEFINITIONS); schema v2+
         # records since 2026-09-25 that carry a ttfcMS. Absent on older records.
         "ttfcDefinition",
+        # Memory-tier provenance (audit #19): optional, schema v2 and later,
+        # never part of the comparison key.
+        "runtimePolicy",
     },
     "hardware": {
         "profileID", "modelIdentifier", "marketingName", "chip", "memoryBytes",
@@ -261,7 +264,7 @@ SCHEMA_PROPERTY_KEYS = {
     "traceSummary": TRACE_SUMMARY_KEYS,
 }
 SCHEMA_REQUIRED_KEYS = {
-    "run": SECTION_KEYS["run"] - {"rtfDefinition", "ttfcDefinition"},
+    "run": SECTION_KEYS["run"] - {"rtfDefinition", "ttfcDefinition", "runtimePolicy"},
     "hardware": SECTION_KEYS["hardware"],
     "source": SECTION_KEYS["source"],
     "toolchain": SECTION_KEYS["toolchain"],
@@ -308,7 +311,7 @@ V2_ONLY_EVIDENCE_KEYS = {
     "streamingTelemetryV9PublicationReadyCount",
 }
 # schema-v1 is frozen history; the first-chunk definition arrived after it.
-V2_ONLY_RUN_KEYS = {"ttfcDefinition"}
+V2_ONLY_RUN_KEYS = {"ttfcDefinition", "runtimePolicy"}
 V2_ONLY_TAKE_KEYS = {
     "memoryStatus", "sampleSidecarDigest",
     "streamingTelemetryV9SidecarDigest", "samplingPromotionPackaged", "samplingWAVDigest",
@@ -586,6 +589,30 @@ def require_schema_object(value: Any, location: str) -> dict[str, Any]:
     return value
 
 
+# `NativeDeviceMemoryClass` raw values (Sources/QwenVoiceCore/SemanticTypes.swift).
+RUNTIME_DEVICE_CLASSES = {"floor_8gb_mac", "mid_16gb_mac", "high_memory_mac", "iphone_pro"}
+RUNTIME_POLICY_KEYS = {"deviceClass", "deviceClassForced"}
+
+
+def validate_runtime_policy(run: dict[str, Any]) -> None:
+    """Check run.runtimePolicy, the memory-tier provenance (audit #19).
+
+    A native tier must match the platform; a forced tier is exploratory
+    evidence and can never join a comparison lineage."""
+    policy = run["runtimePolicy"]
+    if not isinstance(policy, dict) or set(policy) != RUNTIME_POLICY_KEYS:
+        raise HistoryError("run.runtimePolicy must name exactly deviceClass and deviceClassForced")
+    device_class = policy["deviceClass"]
+    forced = policy["deviceClassForced"]
+    if device_class not in RUNTIME_DEVICE_CLASSES or not isinstance(forced, bool):
+        raise HistoryError("run.runtimePolicy has an unsupported device class")
+    if forced:
+        if run.get("classification") not in {"exploratory", "instrumented", "partial"}:
+            raise HistoryError("a forced memory class can only publish non-comparable evidence")
+    elif (device_class == "iphone_pro") != (run.get("platform") == "ios"):
+        raise HistoryError("run.runtimePolicy device class does not match the platform")
+
+
 def load_schema_contract(version: int | None = None) -> dict[str, Any]:
     """Parse one history schema and prove it matches the executable allowlist.
 
@@ -640,6 +667,12 @@ def load_schema_contract(version: int | None = None) -> dict[str, Any]:
     for field, expected in enum_contracts.items():
         if set(run_properties.get(field, {}).get("enum", [])) != expected:
             raise HistoryError(f"benchmark schema run.{field} enum drifted from the executable validator")
+    if version >= 2:
+        policy_properties = run_properties.get("runtimePolicy", {}).get("properties", {})
+        if set(policy_properties.get("deviceClass", {}).get("enum", [])) != RUNTIME_DEVICE_CLASSES:
+            raise HistoryError(
+                "benchmark schema run.runtimePolicy.deviceClass enum drifted from the executable validator"
+            )
     if set(definitions["listening"]["properties"]["status"].get("enum", [])) != LISTENING_STATUSES:
         raise HistoryError("benchmark schema listening statuses drifted from the executable validator")
     if set(definitions["audioQC"]["properties"]["verdict"].get("enum", [])) != QC_VERDICTS:
@@ -2325,6 +2358,8 @@ def validate_record(
             for take in record.get("takes", []) if isinstance(take, dict)
         ):
             raise HistoryError("run.ttfcDefinition declares a ttfcMS that no take carries")
+    if "runtimePolicy" in run:
+        validate_runtime_policy(run)
 
     profiles = load_profiles()
     hardware = record["hardware"]

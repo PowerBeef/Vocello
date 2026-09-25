@@ -974,6 +974,62 @@ class BenchmarkHistoryTests(unittest.TestCase):
             self.assertEqual(history.main(["peak-miss-report", "--json"]), 0)
         self.assertEqual(path.read_bytes(), before)
 
+    def test_runtime_policy_provenance_is_validated_and_never_keys_history(self) -> None:
+        valid = record_fixture(run_id="policy-native-20260712", kind="language")
+        valid["schemaVersion"] = 2
+        valid["evidence"].update({
+            "telemetrySchemaVersion": 8,
+            "memoryContractVersion": 1,
+            "memoryQualified": True,
+            "sampleSidecarCount": 1,
+            "sampleSidecarsDigest": "a" * 64,
+        })
+        take = valid["takes"][0]
+        take["memoryStatus"] = "qualified"
+        take["sampleSidecarDigest"] = "b" * 64
+        take["metrics"].update({key: 0.0 for key in history.MEMORY_REQUIRED_METRICS})
+        take["metrics"].update({
+            "samplerCoverage": 1.0, "samplerSampleCount": 10.0,
+            "samplerBoundarySampleCount": 8.0, "samplerPeriodicSampleCount": 1.0,
+            "gpuRecommendedWorkingSetMB": 4096.0, "mlxActivePeakMB": 100.0,
+            "mlxCachePeakMB": 10.0, "mlxPeakMB": 110.0,
+        })
+        native = {"deviceClass": "floor_8gb_mac", "deviceClassForced": False}
+        valid["run"]["runtimePolicy"] = native
+        published = json.loads(self.publish(valid, "policy-native").read_text())
+        self.assertEqual(published["run"]["runtimePolicy"], native)
+        # History is never keyed on the policy block.
+        unstamped = copy.deepcopy(published)
+        unstamped["run"].pop("runtimePolicy")
+        self.assertEqual(history.comparison_key(published), history.comparison_key(unstamped))
+
+        forced = copy.deepcopy(valid)
+        forced["run"].update({
+            "id": "policy-forced-20260712", "classification": "exploratory",
+            "runtimePolicy": {"deviceClass": "mid_16gb_mac", "deviceClassForced": True},
+        })
+        forced["takes"][0]["generationID"] = "generation-forced"
+        self.publish(forced, "policy-forced")
+
+        for name, policy in (
+            ("wrong-platform", {"deviceClass": "iphone_pro", "deviceClassForced": False}),
+            ("forced-comparable", {"deviceClass": "mid_16gb_mac", "deviceClassForced": True}),
+            ("unknown-class", {"deviceClass": "m6_mac", "deviceClassForced": False}),
+            ("extra-key", {**native, "mlxCacheLimitMB": 1024}),
+            ("string-flag", {"deviceClass": "floor_8gb_mac", "deviceClassForced": "false"}),
+        ):
+            candidate = copy.deepcopy(valid)
+            candidate["run"]["id"] = f"policy-{name}-20260712"
+            candidate["run"]["runtimePolicy"] = policy
+            with self.subTest(name=name), self.assertRaises(history.HistoryError):
+                self.publish(candidate, f"policy-{name}")
+
+        # Schema-v1 history predates the block and can never declare it.
+        legacy = record_fixture(run_id="policy-v1-20260712")
+        legacy["run"]["runtimePolicy"] = native
+        with self.assertRaises(history.HistoryError):
+            self.publish(legacy, "policy-v1")
+
     def test_schema_v3_generation_records_require_the_quality_identity(self) -> None:
         valid = quality_v3_language_fixture("language-quality-v3")
         path = self.publish(valid, "language-quality-v3")

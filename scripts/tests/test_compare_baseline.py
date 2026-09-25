@@ -228,10 +228,13 @@ def test_save_and_compare_baseline_cli():
             assert sgt.main() == 2
 
 
-def _evidence(optimization="-O"):
+def _evidence(optimization="-O", device_class="floor_8gb_mac", forced=False):
     return {
         "historyRecord": {
-            "run": {"kind": "engine-generation", "platform": "macos", "matrixScope": "focused"},
+            "run": {
+                "kind": "engine-generation", "platform": "macos", "matrixScope": "focused",
+                "runtimePolicy": {"deviceClass": device_class, "deviceClassForced": forced},
+            },
             "hardware": {"profileID": "mac-mini-m2-8gb"},
             "toolchain": {"optimization": optimization},
             "inputs": {"matrixHash": "a" * 64, "corpusHash": "b" * 64},
@@ -266,6 +269,69 @@ def test_governed_baseline_binds_optimization_and_topology():
         assert "differs" in str(error)
     else:
         raise AssertionError("cross-optimization baseline unexpectedly passed")
+
+
+def test_device_class_binds_the_governed_identity():
+    cells = [_make_cell(("custom", "fixture", "warm", "medium"), 1.0, 2.0, 3.0, 4.0, "pass")]
+    document = sgt.baseline_document(cells, _evidence())
+    assert document["identity"]["deviceClass"] == "floor_8gb_mac"
+    assert not sgt.baseline_lacks_device_class(document)
+    other_tier = sgt.baseline_identity_from_evidence(_evidence(device_class="mid_16gb_mac"))
+    try:
+        sgt.baseline_cells(document, current_identity=other_tier, require_identity=True)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("a baseline from another memory tier unexpectedly compared")
+    # A baseline saved before the device-class identity still compares, and the
+    # caller notes it.
+    legacy = {**document, "identity": dict(document["identity"])}
+    legacy["identity"].pop("deviceClass")
+    assert sgt.baseline_lacks_device_class(legacy)
+    assert sgt.baseline_cells(legacy, current_identity=other_tier, require_identity=True) == cells
+
+
+def test_governed_identity_refuses_forced_or_unstamped_evidence():
+    unstamped = _evidence()
+    unstamped["historyRecord"]["run"].pop("runtimePolicy")
+    for evidence in (_evidence(forced=True), unstamped):
+        try:
+            sgt.baseline_identity_from_evidence(evidence)
+        except ValueError:
+            continue
+        raise AssertionError("forced or unstamped evidence unexpectedly produced an identity")
+
+
+def test_forced_memory_class_rows_are_never_saved_or_compared():
+    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "telemetry_variants.jsonl")
+    with open(fixture_path, "r", encoding="utf-8") as handle:
+        rows = [json.loads(line) for line in handle if line.strip()]
+    with tempfile.TemporaryDirectory() as tmp:
+        engine_dir = os.path.join(tmp, "engine")
+        os.makedirs(engine_dir)
+        baseline_path = os.path.join(tmp, "baseline.json")
+        shutil.copy(fixture_path, os.path.join(engine_dir, "generations.jsonl"))
+        with mock.patch.object(
+            sys, "argv", ["summarize_generation_telemetry.py", tmp, "--save-baseline", baseline_path]
+        ):
+            assert sgt.main() == 0
+        # One forced row among the selection refuses both routes.
+        rows[0]["notes"]["deviceClassForced"] = "true"
+        with open(os.path.join(engine_dir, "generations.jsonl"), "w", encoding="utf-8") as handle:
+            handle.write("".join(json.dumps(row) + "\n" for row in rows))
+        forced_baseline = os.path.join(tmp, "forced-baseline.json")
+        with mock.patch.object(
+            sys, "argv", ["summarize_generation_telemetry.py", tmp, "--save-baseline", forced_baseline]
+        ):
+            assert sgt.main() == 1
+        assert not os.path.exists(forced_baseline)
+        with mock.patch.object(
+            sys, "argv", ["summarize_generation_telemetry.py", tmp, "--compare-baseline", baseline_path]
+        ):
+            assert sgt.main() == 1
+        # The plain summary still reports forced rows.
+        with mock.patch.object(sys, "argv", ["summarize_generation_telemetry.py", tmp]):
+            assert sgt.main() == 0
 
 
 def test_governed_baseline_rejects_legacy_unidentified_metrics():

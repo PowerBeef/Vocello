@@ -640,6 +640,28 @@
             "wall/audio"
           ]
         },
+        "runtimePolicy": {
+          "additionalProperties": false,
+          "description": "Run-level memory-tier provenance from the engine rows' own stamps: the device class the rows ran under and whether QWENVOICE_FORCE_MEMORY_CLASS forced it. Optional; absent on records published before 2026-09-25 and never part of the comparison key.",
+          "properties": {
+            "deviceClass": {
+              "enum": [
+                "floor_8gb_mac",
+                "high_memory_mac",
+                "iphone_pro",
+                "mid_16gb_mac"
+              ]
+            },
+            "deviceClassForced": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "deviceClass",
+            "deviceClassForced"
+          ],
+          "type": "object"
+        },
         "startedAt": {
           "format": "date-time",
           "type": "string"

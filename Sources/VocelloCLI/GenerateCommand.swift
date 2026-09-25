@@ -47,6 +47,12 @@ enum GenerateCommand {
     /// What a `--stream` run observes off `engine.events`.
     struct StreamObservation: Sendable {
         let firstChunkMS: Double?
+        /// The observer's mach uptime (`DispatchTime`) when it saw the first
+        /// chunk: the clock the engine stamps the v9 chunk-0
+        /// `previewPublishedAtNS` hand-off on, so the publisher can measure
+        /// this observer's lag behind the hand-off (`ttfcObserverLagMS`,
+        /// audit #48).
+        let firstChunkUptimeNS: UInt64?
         let chunkCount: Int
     }
 
@@ -58,7 +64,9 @@ enum GenerateCommand {
     @MainActor
     static func generateObservingFirstChunk(
         _ runtime: CLIRuntime, _ request: GenerationRequest
-    ) async throws -> (result: GenerationResult, firstChunkMS: Double?, chunkCount: Int?) {
+    ) async throws -> (
+        result: GenerationResult, firstChunkMS: Double?, chunkCount: Int?, firstChunkUptimeNS: UInt64?
+    ) {
         // Refuse before subscribing: a refused request never reaches the engine, so
         // its event stream would never deliver the terminal event the drain awaits.
         try runtime.voiceCloningConsent.admitGeneration(request)
@@ -68,19 +76,33 @@ enum GenerateCommand {
             let events = runtime.engine.events(for: wantedID!)
             return Task.detached(priority: .utility) {
                 var firstChunkMS: Double?
+                var firstChunkUptimeNS: UInt64?
                 var count = 0
                 for await event in events {
                     switch event {
                     case .chunk:
-                        if firstChunkMS == nil { firstChunkMS = submitted.elapsedSeconds * 1000 }
+                        if firstChunkMS == nil {
+                            // ttfcMS reads its clock first, so the added
+                            // uptime read never lengthens it.
+                            firstChunkMS = submitted.elapsedSeconds * 1000
+                            firstChunkUptimeNS = DispatchTime.now().uptimeNanoseconds
+                        }
                         count += 1
                     case .completed, .cancelled, .failed:
-                        return StreamObservation(firstChunkMS: firstChunkMS, chunkCount: count)
+                        return StreamObservation(
+                            firstChunkMS: firstChunkMS,
+                            firstChunkUptimeNS: firstChunkUptimeNS,
+                            chunkCount: count
+                        )
                     default:
                         continue
                     }
                 }
-                return StreamObservation(firstChunkMS: firstChunkMS, chunkCount: count)
+                return StreamObservation(
+                    firstChunkMS: firstChunkMS,
+                    firstChunkUptimeNS: firstChunkUptimeNS,
+                    chunkCount: count
+                )
             }
         }() : nil
 
@@ -93,12 +115,14 @@ enum GenerateCommand {
         }
         var firstChunkMS: Double?
         var chunkCount: Int?
+        var firstChunkUptimeNS: UInt64?
         if let streamTask {
             let obs = await streamTask.value
             firstChunkMS = obs.firstChunkMS
             chunkCount = obs.chunkCount
+            firstChunkUptimeNS = obs.firstChunkUptimeNS
         }
-        return (result, firstChunkMS, chunkCount)
+        return (result, firstChunkMS, chunkCount, firstChunkUptimeNS)
     }
 
     @MainActor
@@ -156,7 +180,7 @@ enum GenerateCommand {
 
         note("generating (\(text.count) chars)\(streaming ? ", streaming" : "")…")
         let started = ContinuousClock.now
-        let (result, firstChunkMS, chunkCount) = try await generateObservingFirstChunk(runtime, request)
+        let (result, firstChunkMS, chunkCount, _) = try await generateObservingFirstChunk(runtime, request)
         let wall = started.elapsedSeconds
 
         // Fail closed on the CM-7 shape: success must never be claimed for a

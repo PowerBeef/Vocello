@@ -499,11 +499,15 @@ class PublisherTests(unittest.TestCase):
                 "wallSeconds": 1.0,
                 "audioSeconds": 2.0,
                 "firstChunkMS": 100,
+                "firstChunkUptimeNS": 9_000_004_000_000,
                 "outputFileName": "take.wav",
             }],
         }))
         unrelated = [engine_row(f"old-{index}", run_id="old") for index in range(300)]
         selected = engine_row("selected")
+        selected["streamingTelemetryV9"] = {"chunks": [{
+            "index": 0, "transportSequence": 0, "previewPublishedAtNS": 9_000_000_000_000,
+        }]}
         args = SimpleNamespace(
             results=results, run_id="run-one", diagnostics=diagnostics,
             output_dir=output_dir, platform="macos", artifact_dir=diagnostics,
@@ -534,6 +538,8 @@ class PublisherTests(unittest.TestCase):
         record = captured["manifest"]["historyRecord"]
         self.assertEqual([take["generationID"] for take in record["takes"]], ["selected"])
         self.assertEqual(record["takes"][0]["metrics"]["ttfcMS"], 100.0)
+        # The observer's lag behind the engine's first-chunk hand-off (audit #48).
+        self.assertEqual(record["takes"][0]["metrics"]["ttfcObserverLagMS"], 4.0)
         # Standard RTF comes from the engine row (request wall ÷ audio), never from
         # the bench take's wall clock; the decode speedup keeps its own key.
         metrics = record["takes"][0]["metrics"]

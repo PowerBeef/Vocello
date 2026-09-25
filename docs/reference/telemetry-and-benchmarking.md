@@ -252,19 +252,25 @@ appearing authoritative.
 
 ### 6.0 os_signpost interval mirrors (`timingsMS`)
 
-In addition to the MLX decode counters, v5 records the client/server boundary
-intervals captured by `NativeTelemetrySignpostInterval` so a JSONL row can be read
-back into Instruments‑style spans without the trace file:
+Beside the MLX decode counters, the runtime and output adapter time each lifecycle
+span twice: an `os_signpost` interval (subsystem `com.qwenvoice.engine`, carrying the
+run, generation, take and cell correlation fields) and a `timingsMS` key read where that
+interval closes, so a JSONL row and a trace time the same span (audit #48):
 
-| Key | Meaning |
+| Key | Interval |
 |---|---|
-| `clientWaitMS` | Time from user submit to the engine accepting the request. |
-| `requestMS` | Engine total request wall time. |
-| `serverGenerationMS` | Core model generation (token loop + decode). |
-| `outputStreamingMS` | From first output byte to stream complete. |
-| `totalMS` | End‑to‑end request span. |
+| `native_prepare_generation_ms` | `Native Prepare Generation` |
+| `native_model_load_ms` | `Native Model Load` |
+| `native_clone_conditioning_ms` | `Native Clone Conditioning` |
+| `native_explicit_prewarm_ms` | `Native Explicit Prewarm` |
+| `native_generation_stream_ms` | `Native Generation Stream` |
+| `native_final_wav_finish_ms` | `Native Final WAV Finish` |
 
-These are optional and only emitted when the corresponding signpost interval was logged.
+Each key appears only when its span ran. The pairs are written by hand at each site,
+because every interval carries correlation arguments; the unused generic helper
+(`withMirroredSignpost`, which could not carry them) was removed on 2026-09-25. The
+macOS CLI bench also publishes `ttfcObserverLagMS`, the part of `ttfcMS` its own
+first-chunk observer adds after the engine handed chunk 0 to the product sink.
 
 ### 6.1 Stage timeline (`stageMarks`)
 
@@ -820,9 +826,8 @@ committed bounded quality summaries and baselines remain permitted.
 - **New derived KPI:** extend `computeDerivedMetrics` in `GenerationOutputAdapter`
   (`Sources/QwenVoiceCore/GenerationOutputAdapter.swift`).
 - **New signpost interval:** open the interval and read the clock around the same code, and
-  close it where the timing is captured (`withMirroredSignpost` does both for a scoped span;
-  `native_prepare_generation_ms` and the Qwen3 loop spans do it by hand), so the trace and the
-  `timingsMS` key time the same span (audit #48). Inside the token loop use the allocation-free
+  close it where the timing is captured (as `native_prepare_generation_ms` and the Qwen3 loop
+  spans do), so the trace and the `timingsMS` key time the same span (audit #48). Inside the token loop use the allocation-free
   `os_signpost` entry point: `OSSignposter.beginInterval` allocates per call.
 - **New field on the record:** add an optional field to `GenerationTelemetryRecord` (so old
   rows still decode) and bump `currentSchemaVersion`.

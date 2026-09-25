@@ -420,6 +420,9 @@ METRIC_KEYS = {
     # (records since 2026-09-25); `prewarmMS` keeps timing the explicit prewarm.
     "excludedStartupMS", "modelLoadWindowMS", "prewarmWindowMS",
     "tokensPerSecond", "ttfcMS", "submitToFirstChunkMS", "submitToCompletedMS",
+    # The CLI first-chunk observer's lag behind the engine's first-chunk
+    # hand-off, part of ttfcMS (records since 2026-09-25, audit #48); signed.
+    "ttfcObserverLagMS",
     "playbackScheduledMS", "firstChunkToPlaybackScheduledMS", "requestToFirstChunkMS",
     "decodeWallSeconds", "audioSeconds", "generatedTokens", "backendWallMS",
     "modelLoadMS", "prewarmMS", "finalizationMS", "postprocessMS",

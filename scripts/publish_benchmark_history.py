@@ -763,6 +763,9 @@ def row_metrics(row: dict[str, Any], take: dict[str, Any] | None = None) -> dict
     candidates.update(rtf_semantics.startup_windows_ms(row) or {})
     if take is not None:
         candidates["ttfcMS"] = take.get("firstChunkMS")
+        # The observer's share of ttfcMS: its lag behind the engine's
+        # first-chunk hand-off (audit #48). Absent unless both sides exist.
+        candidates["ttfcObserverLagMS"] = rtf_semantics.ttfc_observer_lag_ms(row, take)
     return {
         key: number for key, value in candidates.items()
         if (number := finite_number(value)) is not None

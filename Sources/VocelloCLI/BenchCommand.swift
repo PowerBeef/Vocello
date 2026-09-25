@@ -40,6 +40,9 @@ enum BenchCommand {
         let audioSeconds: Double
         let wallSeconds: Double
         let firstChunkMS: Double?
+        /// The observer's mach uptime at the first chunk; the publisher joins
+        /// it with the engine row's v9 chunk-0 hand-off (`ttfcObserverLagMS`).
+        let firstChunkUptimeNS: UInt64?
         let outputFileName: String
         let environment: BenchTakeEnvironment
     }
@@ -684,7 +687,7 @@ enum BenchCommand {
                         mode: mode, modelID: modelID, text: probeText, outputPath: out,
                         shouldStream: true, streamingInterval: GenerationSemantics.appStreamingInterval,
                         payload: payload, generationID: UUID(), seed: seed)
-                    let (_, ms, _) = try await GenerateCommand.generateObservingFirstChunk(runtime, request)
+                    let (_, ms, _, _) = try await GenerateCommand.generateObservingFirstChunk(runtime, request)
                     rows.append(TTFCRow(mode: mode.rawValue, variant: quality ? "quality" : "speed",
                                         modelID: modelID, firstChunkMS: ms))
                     note("  ttfc \(mode.rawValue)/\(quality ? "Q" : "S"): \(ms.map { String(format: "%.0f", $0) } ?? "-")ms")
@@ -762,13 +765,16 @@ enum BenchCommand {
         let started = ContinuousClock.now
         let result: GenerationResult
         var firstChunkMS: Double?
+        var firstChunkUptimeNS: UInt64?
         do {
             if shouldStream {
                 // Drain engine.events so the bounded macOS stream does not retain preview/chunk
                 // events across matrix takes (see GenerateCommand.generateObservingFirstChunk).
-                let (genResult, observedFirstChunkMS, _) = try await GenerateCommand.generateObservingFirstChunk(runtime, request)
+                let (genResult, observedFirstChunkMS, _, observedFirstChunkUptimeNS) =
+                    try await GenerateCommand.generateObservingFirstChunk(runtime, request)
                 result = genResult
                 firstChunkMS = observedFirstChunkMS
+                firstChunkUptimeNS = observedFirstChunkUptimeNS
             } else {
                 result = try await runtime.generate(request)
             }
@@ -803,6 +809,7 @@ enum BenchCommand {
             audioSeconds: result.durationSeconds,
             wallSeconds: wall,
             firstChunkMS: firstChunkMS,
+            firstChunkUptimeNS: firstChunkUptimeNS,
             outputFileName: URL(fileURLWithPath: out).lastPathComponent,
             environment: environment
         )

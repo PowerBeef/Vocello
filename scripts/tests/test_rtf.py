@@ -66,6 +66,32 @@ class RequestWallTests(unittest.TestCase):
         self.assertIsNone(rtf.startup_windows_ms({"stageMarks": [mark("startup.model_loaded", 5)]}))
         self.assertIsNone(rtf.startup_windows_ms({}))
 
+    def test_ttfc_observer_lag_joins_the_observer_with_the_first_published_chunk(self) -> None:
+        # audit #48: the CLI observer's uptime at its first chunk minus the
+        # engine's stamp after it handed transport sequence 0 to the sink.
+        row = {"streamingTelemetryV9": {"chunks": [
+            {"index": 0, "transportSequence": 0, "previewPublishedAtNS": 5_000_000_000},
+            {"index": 1, "transportSequence": 1, "previewPublishedAtNS": 6_000_000_000},
+        ]}}
+        take = {"firstChunkUptimeNS": 5_002_500_000}
+        self.assertEqual(rtf.ttfc_observer_lag_ms(row, take), 2.5)
+        # The observer can wake before the producer takes its stamp.
+        self.assertEqual(rtf.ttfc_observer_lag_ms(row, {"firstChunkUptimeNS": 4_999_750_000}), -0.25)
+        # A clone take whose first raw chunk was empty publishes sequence 0
+        # from a later chunk index.
+        clone = {"streamingTelemetryV9": {"chunks": [
+            {"index": 1, "transportSequence": 0, "previewPublishedAtNS": 5_000_000_000},
+        ]}}
+        self.assertEqual(rtf.ttfc_observer_lag_ms(clone, take), 2.5)
+        # Either side missing: no lag, never a zero.
+        self.assertIsNone(rtf.ttfc_observer_lag_ms(row, {}))
+        self.assertIsNone(rtf.ttfc_observer_lag_ms(row, None))
+        self.assertIsNone(rtf.ttfc_observer_lag_ms({}, take))
+        skipped = {"streamingTelemetryV9": {"chunks": [
+            {"index": 0, "transportSequence": 0, "previewDisposition": "not-requested"},
+        ]}}
+        self.assertIsNone(rtf.ttfc_observer_lag_ms(skipped, take))
+
     def test_generation_ended_is_the_fallback_terminal_mark(self) -> None:
         marks = [mark("startup.request_validated", 0), mark("streamGenerationEnded", 4_000)]
         self.assertEqual(rtf.request_wall_seconds_from_marks(marks), 4.0)

@@ -112,6 +112,37 @@ def startup_windows_ms(row: dict[str, Any]) -> dict[str, float] | None:
     return result
 
 
+def ttfc_observer_lag_ms(row: dict[str, Any], take: dict[str, Any] | None) -> float | None:
+    """How far the CLI's first-chunk observer trails the engine's hand-off (audit #48).
+
+    The observer's mach uptime when it saw the first chunk (the bench take's
+    `firstChunkUptimeNS`) minus the engine's own stamp after it handed the
+    first published chunk (transport sequence 0) to the product sink (the
+    row's v9 `previewPublishedAtNS`), both `DispatchTime` uptime nanoseconds.
+    `ttfcMS` is taken at the observer, so this is the observer's share of it.
+    Negative when the observer woke before the producer took its stamp. None
+    when either side is missing (no stream, preview data skipped, an older
+    CLI or row).
+    """
+    if not isinstance(take, dict):
+        return None
+    observed = take.get("firstChunkUptimeNS")
+    if isinstance(observed, bool) or not isinstance(observed, int) or observed <= 0:
+        return None
+    transition = row.get("streamingTelemetryV9")
+    chunks = transition.get("chunks") if isinstance(transition, dict) else None
+    if not isinstance(chunks, list):
+        return None
+    first = next(
+        (chunk for chunk in chunks if isinstance(chunk, dict) and chunk.get("transportSequence") == 0),
+        None,
+    )
+    published = first.get("previewPublishedAtNS") if first is not None else None
+    if isinstance(published, bool) or not isinstance(published, int) or published <= 0:
+        return None
+    return round((observed - published) / 1_000_000.0, 3)
+
+
 def request_wall_seconds(row: dict[str, Any]) -> float | None:
     derived = row.get("derivedMetrics") or {}
     value = _finite(derived.get("requestWallSeconds"))

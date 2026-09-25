@@ -201,6 +201,9 @@ struct IOSSettingsValueRow: View {
     let subtitle: String?
     let accessibilityIdentifier: String
     let value: String
+    /// What VoiceOver speaks as the value when the subtitle carries state the
+    /// label replaces; the visible value otherwise.
+    var accessibilityValue: String? = nil
     var accessibilityHint: String? = nil
     var action: (() -> Void)? = nil
 
@@ -211,7 +214,7 @@ struct IOSSettingsValueRow: View {
         }
         .accessibilityIdentifier(accessibilityIdentifier)
         .accessibilityLabel(title)
-        .accessibilityValue(value)
+        .accessibilityValue(accessibilityValue ?? value)
         .accessibilityHint(accessibilityHint ?? "")
     }
 

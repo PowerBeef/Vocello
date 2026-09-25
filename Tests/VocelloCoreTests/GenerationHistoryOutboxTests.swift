@@ -1214,6 +1214,39 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         XCTAssertFalse(decidesWithUnreadableRows, "History rows that cannot all be read")
     }
 
+    /// PA-30: a single delete that runs while the decision awaits the History
+    /// rows can set aside a removal list it could not read and start a fresh
+    /// one. The audio the set-aside list named is unknown, so nothing is
+    /// decided, although the fresh list itself reads cleanly.
+    func testLeftoverAudioIsNotDecidedWhenAListIsSetAsideDuringTheRowRead() async throws {
+        let fixture = try makeFixture()
+        let (entered, enteredContinuation) = AsyncStream<Void>.makeStream()
+        let (release, releaseContinuation) = AsyncStream<Void>.makeStream()
+        let coordinator = GenerationHistoryRecoveryCoordinator(
+            store: fixture.store,
+            commitGeneration: { _, generation in generation },
+            fetchAllGenerations: {
+                enteredContinuation.yield()
+                for await _ in release { break }
+                return []
+            },
+            deleteGenerationsThrough: { _ in [] },
+            referencedAudioPaths: { _ in [] }
+        )
+        try Data("not-json".utf8).write(to: fixture.store.rootURL.appendingPathComponent("audio-removals.json"))
+        let deleted = try makeAudio(in: fixture, named: "deleted.wav")
+
+        let decision = Task { await coordinator.withReferencedAudioPaths { _ in true } }
+        for await _ in entered { break }
+        try await coordinator.retainAudioRemoval(deleted.path)
+        XCTAssertEqual(fixture.store.unreadableAudioRemovalCount(), 1, "The delete set the list aside")
+        XCTAssertEqual(try fixture.store.loadPendingAudioRemovals(), [deleted.path])
+        releaseContinuation.yield()
+        let decided = await decision.value
+
+        XCTAssertNil(decided, "The audio the set-aside list named stays where it is")
+    }
+
     /// Whether `withReferencedAudioPaths` ran its decision at all.
     private func decides(_ coordinator: GenerationHistoryRecoveryCoordinator) async -> Bool {
         await coordinator.withReferencedAudioPaths { _ in true } ?? false

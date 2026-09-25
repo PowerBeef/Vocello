@@ -756,13 +756,18 @@ struct SettingsScreen: View {
                 )
 
                 if let leftoverAudio {
+                    let files = IOSInterfaceText.leftoverAudioFiles(leftoverAudio.count)
+                    let size = IOSSettingsFormatters.fileSize(leftoverAudio.byteCount)
                     IOSSettingsDivider()
                     IOSSettingsValueRow(
                         symbol: "trash",
                         title: IOSInterfaceText.leftoverAudioTitle,
-                        subtitle: IOSInterfaceText.leftoverAudioFiles(leftoverAudio.count),
+                        subtitle: files,
                         accessibilityIdentifier: "iosSettings_leftoverAudioRow",
-                        value: IOSSettingsFormatters.fileSize(leftoverAudio.byteCount),
+                        value: size,
+                        // The label replaces the subtitle, so VoiceOver hears
+                        // the file count with the size.
+                        accessibilityValue: [files, size].joined(separator: ", "),
                         accessibilityHint: IOSInterfaceText.leftoverAudioHint,
                         action: { isLeftoverAudioConfirmationPresented = true }
                     )

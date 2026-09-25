@@ -186,6 +186,25 @@ final class IOSLeftoverAudioAnalysisTests: XCTestCase {
         ))
     }
 
+    /// The finished review belongs to the App Support root it reviewed: a run
+    /// on an isolated root (an XCUITest override) never ends the offer for the
+    /// user's own, which a process-wide preference would.
+    func testReviewIsRecordedOnlyInTheRootItReviewed() throws {
+        let isolated = try makeRoot()
+        let own = try makeRoot()
+        XCTAssertFalse(IOSLeftoverAudioAnalysis.isReviewed(appSupportRoot: isolated))
+
+        try IOSLeftoverAudioAnalysis.markReviewed(appSupportRoot: isolated)
+
+        XCTAssertTrue(IOSLeftoverAudioAnalysis.isReviewed(appSupportRoot: isolated))
+        XCTAssertFalse(IOSLeftoverAudioAnalysis.isReviewed(appSupportRoot: own), "Another root is still offered")
+        XCTAssertEqual(
+            IOSLeftoverAudioAnalysis.reviewedMarkerURL(appSupportRoot: isolated).deletingLastPathComponent().path,
+            isolated.path,
+            "Beside the root's outputs/, never inside a take folder"
+        )
+    }
+
     private func entry(
         _ path: String,
         kind: IOSLeftoverAudioAnalysis.Kind = .regularFile,

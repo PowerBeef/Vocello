@@ -570,7 +570,7 @@
       "role": "row and buttons",
       "action": "Inspect the one-time offer; never remove or keep user audio on a user device",
       "expectedResult": "Count and size shown; audio removed only after Remove Audio; Keep Files ends the offer; Cancel changes nothing; a failure is reported",
-      "expectedSemantics": "Label, size value, count subtitle, hint, and destructive confirmation",
+      "expectedSemantics": "Label, count subtitle, count-and-size value, hint, and destructive confirmation",
       "minimumTargetPoints": 44,
       "mutationClass": "confirm-only",
       "scenario": "stateful",

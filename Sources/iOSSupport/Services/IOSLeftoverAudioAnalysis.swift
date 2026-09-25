@@ -55,6 +55,25 @@ enum IOSLeftoverAudioAnalysis {
     /// History takes, long-form projects included, are WAV files.
     static let audioExtensions: Set<String> = ["wav"]
 
+    /// The finished one-time review is an empty file in the App Support root
+    /// whose `outputs/` it reviewed, never a process-wide preference: an
+    /// isolated root (an XCUITest or diagnostics override) never ends the
+    /// offer for the user's own, and a restore brings the record back with
+    /// the audio it covers.
+    static let reviewedMarkerName = "leftover-audio-reviewed"
+
+    static func isReviewed(appSupportRoot: URL) -> Bool {
+        FileManager.default.fileExists(atPath: reviewedMarkerURL(appSupportRoot: appSupportRoot).path)
+    }
+
+    static func markReviewed(appSupportRoot: URL) throws {
+        try Data().write(to: reviewedMarkerURL(appSupportRoot: appSupportRoot), options: .atomic)
+    }
+
+    static func reviewedMarkerURL(appSupportRoot: URL) -> URL {
+        appSupportRoot.appendingPathComponent(reviewedMarkerName, isDirectory: false)
+    }
+
     /// The audio nothing uses: regular WAV files last written before this app
     /// session started, whose file name no reference names. Matching names
     /// rather than whole paths keeps a file whose row recorded it under an

@@ -819,6 +819,9 @@ actor GenerationHistoryRecoveryCoordinator {
         } catch {
             return nil
         }
+        // That delete may also have set aside a list it could not read, and
+        // started a fresh one: the paths the set-aside list named are unknown.
+        guard store.unreadableAudioRemovalCount() == 0 else { return nil }
         return decide(referenced)
     }
 

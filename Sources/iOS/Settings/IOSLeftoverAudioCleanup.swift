@@ -12,25 +12,28 @@ import QwenVoiceCore
 /// not finished, or History, its outbox or its removal list cannot be read
 /// fully, nothing is offered and nothing is removed.
 enum IOSLeftoverAudioCleanup {
-    /// Set once the one-time review is done: the user removed the audio
-    /// without a failure or chose Keep Files, or none was found. A persisted
-    /// flag is the simplest correct way to never ask again, since a decline
-    /// leaves the files in place. Nothing this offer exists for comes back:
-    /// iPhone clears always delete their audio since PA-21, and audio a
-    /// delete could not remove waits on the durable removal list instead.
-    static let reviewedDefaultsKey = "vocello.ios.leftoverAudioReviewed"
-
     /// When this app session started; `QVoiceiOSApp.init` reads it first.
     /// Audio written since is never offered, so a take still in flight, not
     /// yet in History or the outbox, is never mistaken for a leftover.
     static let sessionStart = Date()
 
+    /// Set once the one-time review is done: the user removed the audio
+    /// without a failure or chose Keep Files, or none was found. A persisted
+    /// record is the simplest correct way to never ask again, since a decline
+    /// leaves the files in place. Nothing this offer exists for comes back:
+    /// iPhone clears always delete their audio since PA-21, and audio a
+    /// delete could not remove waits on the durable removal list instead.
+    /// It lives in the App Support root it reviewed
+    /// (`IOSLeftoverAudioAnalysis.reviewedMarkerName`), so a run on an
+    /// isolated root never ends the offer for the user's own.
     static var isReviewed: Bool {
-        UserDefaults.standard.bool(forKey: reviewedDefaultsKey)
+        IOSLeftoverAudioAnalysis.isReviewed(appSupportRoot: AppPaths.appSupportDir)
     }
 
     static func markReviewed() {
-        UserDefaults.standard.set(true, forKey: reviewedDefaultsKey)
+        // A record that cannot be written leaves the offer for a later visit;
+        // the offer itself removes nothing without a confirmation.
+        try? IOSLeftoverAudioAnalysis.markReviewed(appSupportRoot: AppPaths.appSupportDir)
     }
 
     /// The audio to offer, or nil: already reviewed, nothing left, or History

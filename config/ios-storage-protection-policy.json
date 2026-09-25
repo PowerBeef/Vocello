@@ -10,7 +10,7 @@
       "backup": "inherited",
       "protection": "completeUntilFirstUserAuthentication",
       "recursive": false,
-      "purpose": "Container root and History database sidecars"
+      "purpose": "Container root, History database sidecars and the one-time leftover-audio review marker (PA-30)"
     },
     {
       "id": "models",

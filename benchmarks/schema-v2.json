@@ -162,11 +162,6 @@
           "enum": [
             "trend-v1"
           ]
-        },
-        "derivedCells": {
-          "enum": [
-            "aggregate-v1"
-          ]
         }
       },
       "required": [

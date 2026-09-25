@@ -549,21 +549,16 @@ class BenchmarkHistoryTests(unittest.TestCase):
         stored = path.read_bytes()
         published = json.loads(stored)
 
+        # This is the exact regression: presentation whitespace alone would
+        # exceed the contract, while no allowlisted evidence needs removing.
+        pretty = (json.dumps(published, indent=2, sort_keys=True) + "\n").encode()
+        self.assertGreater(len(pretty), history.MAX_RECORD_BYTES)
         self.assertLessEqual(len(stored), history.MAX_RECORD_BYTES)
         self.assertEqual(stored, history.stored_json_bytes(published))
         self.assertEqual(len(published["takes"]), 29)
-        # Audit #76: a new record stores no derived cells; readers derive the
-        # same 11 aggregates from its takes.
-        self.assertEqual(published["cells"], [])
-        self.assertEqual(published["comparison"]["derivedCells"], history.DERIVED_CELLS_VERSION)
-        derived = history.record_cells(published)
-        self.assertEqual(derived, history.aggregate_cells(published["takes"], history.cell_aggregate_version(published)))
-        self.assertEqual(len(derived), 11)
+        self.assertEqual(len(published["cells"]), 11)
         self.assertEqual(set(published["takes"][0]["metrics"]), metric_keys)
-        self.assertEqual(set(derived[0]["statistics"]), metric_keys)
-        # Storing them would have cost this record a third of its bytes.
-        stored_cells = history.stored_json_bytes({**published, "cells": derived})
-        self.assertGreater(len(stored_cells), len(stored) * 1.3)
+        self.assertEqual(set(published["cells"][0]["statistics"]), metric_keys)
         self.assertIn("output", published["takes"][0])
         self.assertIn("audioQC", published["takes"][0])
 
@@ -571,37 +566,6 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.assertEqual(history.record_manifest(directory), path)
         self.assertEqual(path.read_bytes(), before)
         history.validate_all()
-
-    def test_derived_cells_replace_the_stored_block_without_touching_legacy_records(self) -> None:
-        # Audit #76: new records declare derivedCells and store none; a record
-        # with stored cells (every legacy one) keeps its exact-equality rule.
-        manifest = self.profile_producer_manifest("derived-cells", quality=True, policy="summaryOnly")
-        published = json.loads(
-            history.record_manifest(self.write_manifest(manifest, "derived-cells")).read_text()
-        )
-        self.assertEqual(published["cells"], [])
-        self.assertEqual(published["comparison"]["derivedCells"], "aggregate-v1")
-
-        legacy = copy.deepcopy(published)
-        legacy["comparison"].pop("derivedCells")
-        legacy["cells"] = history.aggregate_cells(legacy["takes"], history.cell_aggregate_version(legacy))
-        self.assertEqual(history.record_cells(legacy), history.record_cells(published))
-        # A derived-cells record compares against a legacy baseline cell by cell.
-        self.assertEqual(
-            set(history.comparison_deltas(published, legacy)),
-            {cell["key"] for cell in legacy["cells"]},
-        )
-        for name, mutate in (
-            ("stored-and-declared", lambda value: value.__setitem__(
-                "cells", history.aggregate_cells(value["takes"], history.cell_aggregate_version(value)))),
-            ("unknown-declaration", lambda value: value["comparison"].__setitem__(
-                "derivedCells", "aggregate-v2")),
-            ("legacy-without-cells", lambda value: value["comparison"].pop("derivedCells")),
-        ):
-            broken = copy.deepcopy(published)
-            mutate(broken)
-            with self.subTest(name=name), self.assertRaises(history.HistoryError):
-                history.validate_record(broken)
 
     def test_take_seed_is_optional_but_must_be_uint64(self) -> None:
         valid = record_fixture(run_id="seed-valid")

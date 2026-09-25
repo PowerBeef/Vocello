@@ -165,7 +165,7 @@ SECTION_KEYS = {
         # How the cells summarize the takes (audit #30); absent means 1.
         "cellAggregateVersion",
     },
-    "comparison": {"key", "comparable", "baselineRunID", "deltas", "deltaMetrics"},
+    "comparison": {"key", "comparable", "baselineRunID", "deltas", "deltaMetrics", "derivedCells"},
     "listening": {"status", "note", "annotatedAt"},
 }
 MODEL_KEYS = {
@@ -320,7 +320,8 @@ SCHEMA_REQUIRED_KEYS = {
     },
     # deltaMetrics is declared only by records published from 2026-09-14 on;
     # older records keep their full delta blocks and never claim it.
-    "comparison": SECTION_KEYS["comparison"] - {"deltaMetrics"},
+    # derivedCells is declared only by records published from 2026-09-25 on.
+    "comparison": SECTION_KEYS["comparison"] - {"deltaMetrics", "derivedCells"},
     "listening": SECTION_KEYS["listening"],
     "model": MODEL_KEYS,
     "take": {"takeIndex", "generationID", "cell", "status", "metrics", "warnings"},
@@ -407,7 +408,7 @@ def schema_property_keys(version: int) -> dict[str, set[str]]:
         properties["run"] -= V2_ONLY_RUN_KEYS
         properties["inputs"] -= LINEAGE_INPUT_KEYS
         properties["evidence"] -= V2_ONLY_EVIDENCE_KEYS
-        properties["comparison"] -= {"deltaMetrics"}   # legacy records never declare it
+        properties["comparison"] -= {"deltaMetrics", "derivedCells"}   # legacy records never declare them
         properties["take"] -= V2_ONLY_TAKE_KEYS | V3_ONLY_TAKE_KEYS
         properties["trace"] -= V2_ONLY_TRACE_KEYS
         properties["traceSummary"] -= V2_ONLY_TRACE_SUMMARY_KEYS
@@ -1691,6 +1692,26 @@ def metric_summary(values: list[float], version: int = 1) -> dict[str, float | i
     }
 
 
+# Records published since 2026-09-25 (audit #76) store no `cells`: the block is
+# `aggregate_cells(takes, cell_aggregate_version(record))`, 35-40% of a record's
+# bytes, and every reader derives it instead. Such a record stores `cells: []`
+# and declares `comparison.derivedCells: "aggregate-v1"`; a record without the
+# declaration keeps its stored cells, which must equal the aggregate, byte for
+# byte.
+DERIVED_CELLS_VERSION = "aggregate-v1"
+
+
+def record_cells(record: dict[str, Any]) -> list[dict[str, Any]]:
+    """A record's cell aggregates: derived from its takes under its own cell
+    aggregate version when it declares `comparison.derivedCells`, else the
+    cells it stores."""
+    if (record.get("comparison") or {}).get("derivedCells") == DERIVED_CELLS_VERSION:
+        takes = record.get("takes")
+        return aggregate_cells(takes, cell_aggregate_version(record)) if isinstance(takes, list) else []
+    cells = record.get("cells")
+    return cells if isinstance(cells, list) else []
+
+
 def aggregate_cells(takes: list[dict[str, Any]], version: int = 1) -> list[dict[str, Any]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for take in takes:
@@ -1972,10 +1993,10 @@ def allowed_delta_metrics(record: dict[str, Any]) -> frozenset[str] | None:
 def comparison_deltas(
     record: dict[str, Any], baseline: dict[str, Any],
 ) -> dict[str, dict[str, dict[str, float]]]:
-    baseline_cells = {cell["key"]: cell for cell in baseline.get("cells", [])}
+    baseline_cells = {cell["key"]: cell for cell in record_cells(baseline)}
     allowed = allowed_delta_metrics(record)
     deltas: dict[str, dict[str, dict[str, float]]] = {}
-    for cell in record.get("cells", []):
+    for cell in record_cells(record):
         prior = baseline_cells.get(cell["key"])
         if not prior:
             continue
@@ -2022,6 +2043,9 @@ def expected_comparison_metadata(
     declared = (record.get("comparison") or {}).get("deltaMetrics")
     if declared is not None:
         expected["deltaMetrics"] = declared
+    derived_cells = (record.get("comparison") or {}).get("derivedCells")
+    if derived_cells is not None:
+        expected["derivedCells"] = derived_cells
     if not expected["comparable"]:
         return expected
     current_order = (record["run"]["finishedAt"], record["run"]["id"])
@@ -2147,7 +2171,11 @@ def build_record(manifest_path: Path) -> dict[str, Any]:
         evidence["screenshotDigests"] = outer.get("screenshotDigests") or screenshot_digests(artifact_dir)
     evidence["selectedEvidenceDigest"] = selected_evidence_digest(record)
 
-    if not record.get("cells"):
+    # New v2+ records store no derived cells (audit #76); the v1 shape keeps them.
+    if int(record.get("schemaVersion", 1)) >= 2:
+        record["cells"] = []
+        record.setdefault("comparison", {})["derivedCells"] = DERIVED_CELLS_VERSION
+    elif not record.get("cells"):
         record["cells"] = aggregate_cells(record["takes"], cell_aggregate_version(record))
     has_warning = bool(run["warnings"]) or any(
         take.get("warnings") or take.get("audioQC", {}).get("verdict") == "warn"
@@ -3229,7 +3257,14 @@ def validate_record(
     if aggregate_version >= 2 and version < 2:
         raise HistoryError("schema-v1 records cannot declare a cell aggregate version")
     validate_cold_take_flags(takes, aggregate_version)
-    if cells != aggregate_cells(takes, aggregate_version):
+    derived_cells = (record.get("comparison") or {}).get("derivedCells")
+    if derived_cells is not None:
+        # Audit #76: the declaration replaces the stored block; readers derive it.
+        if derived_cells != DERIVED_CELLS_VERSION:
+            raise HistoryError(f"comparison.derivedCells is unknown: {derived_cells!r}")
+        if cells:
+            raise HistoryError("a record that derives its cells must not store them")
+    elif cells != aggregate_cells(takes, aggregate_version):
         raise HistoryError("cell aggregates do not match the exact ordered takes")
 
     evidence = record["evidence"]
@@ -3865,7 +3900,7 @@ def trend_summary(record: dict[str, Any], baseline_record: dict[str, Any] | None
         terms["RAM"] = "peakPhysicalFootprintMB"
     take_counts = {
         cell.get("key"): cell.get("count", 0)
-        for cell in record.get("cells", []) if isinstance(cell, dict)
+        for cell in record_cells(record) if isinstance(cell, dict)
     }
     collected: dict[str, list[float]] = {term: [] for term in terms}
     too_small = False

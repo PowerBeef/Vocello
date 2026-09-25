@@ -120,6 +120,11 @@ reject stale comparison metadata. New records key on what their kind measures
 reviewed per-kind measurement version); `lineage-replay` recomputes that identity for committed
 records from their own source commits without writing anything.
 
+Records published since 2026-09-25 store no per-cell aggregates: `cells` is `[]` and
+`comparison.derivedCells: "aggregate-v1"` says every reader (the validator, comparison deltas and
+the HISTORY index) derives them from the takes, which cost a record a third of its bytes. Earlier
+records keep their stored `cells`, which must still equal that aggregate exactly.
+
 See [`docs/reference/benchmarking-procedure.md`](../docs/reference/benchmarking-procedure.md)
 for the operator runbook (workflows, preflight, reading results) and
 [`docs/reference/telemetry-and-benchmarking.md`](../docs/reference/telemetry-and-benchmarking.md)

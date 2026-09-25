@@ -1742,10 +1742,20 @@ struct StreamingExecutionContext: Sendable {
                         )
                     )
 
+                    var transportPublishedAtNS: UInt64?
                     var previewPublishedAtNS: UInt64?
                     let previewDisposition: PreviewPublicationDispositionV9
                     if request.shouldStream {
                         await chunkSink(chunkEvent)
+                        // At most one clock read per streamed chunk, never per
+                        // token, taken as the sink returns and before any
+                        // telemetry mark: the hand-off instant a first-chunk
+                        // observer is joined on (audit #48), preview PCM or not.
+                        // A take with neither telemetry nor preview reads none.
+                        let handedOffAtNS: UInt64? = telemetryWorkPlan.writesSink || previewAudio != nil
+                            ? DispatchTime.now().uptimeNanoseconds
+                            : nil
+                        transportPublishedAtNS = handedOffAtNS
                         if transportSequence == 0 {
                             await telemetryRecorder?.mark(
                                 stage: GenerationStartupBoundary.firstPublishedStreamChunk.telemetryStage
@@ -1754,7 +1764,7 @@ struct StreamingExecutionContext: Sendable {
                         if previewAudio == nil {
                             previewDisposition = .notRequested
                         } else {
-                            previewPublishedAtNS = DispatchTime.now().uptimeNanoseconds
+                            previewPublishedAtNS = handedOffAtNS
                             previewDisposition = .publishedToProductSink
                         }
                     } else {
@@ -1779,6 +1789,7 @@ struct StreamingExecutionContext: Sendable {
                                 mlxMaterializationDurationNS: mlxInstants?.materializationDurationNS,
                                 materializedAtNS: materializedAtNS,
                                 writtenAtNS: writtenAtNS,
+                                transportPublishedAtNS: transportPublishedAtNS,
                                 previewPublishedAtNS: previewPublishedAtNS,
                                 previewDisposition: previewDisposition,
                                 mlxInstantProvenance: mlxInstants == nil ? nil : .derivedFromStepDurations

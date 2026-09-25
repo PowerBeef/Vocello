@@ -579,8 +579,11 @@ class PublisherTests(unittest.TestCase):
         }))
         unrelated = [engine_row(f"old-{index}", run_id="old") for index in range(300)]
         selected = engine_row("selected")
+        # The bench forces QWENVOICE_STREAMING_PREVIEW_DATA=off, so its rows
+        # carry the hand-off stamp and no preview stamp.
         selected["streamingTelemetryV9"] = {"chunks": [{
-            "index": 0, "transportSequence": 0, "previewPublishedAtNS": 9_000_000_000_000,
+            "index": 0, "transportSequence": 0, "transportPublishedAtNS": 9_000_000_000_000,
+            "previewDisposition": "not-requested",
         }]}
         args = SimpleNamespace(
             results=results, run_id="run-one", diagnostics=diagnostics,

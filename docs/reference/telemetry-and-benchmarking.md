@@ -211,7 +211,9 @@ older rows stay readable but are marked memory-contract-incomplete and excluded 
 > engine's per-chunk step durations, and `materializedAtNS` is the output adapter's receipt of the
 > chunk. Since output-adapter identity version 3 each such chunk says so with
 > `mlxInstantProvenance: derived-from-step-durations`; older sidecars carry the same derived values
-> without the label (audit #49/#62). History may bind those sidecar digests; the
+> without the label (audit #49/#62). Since version 4 every streamed chunk in the nested transition
+> also carries `transportPublishedAtNS`, its hand-off to the product sink, with or without preview
+> PCM (audit #48). History may bind those sidecar digests; the
 > top-level JSONL schema is not flipped to 9. Sampling promotion packaging stamps
 > `samplingPromotionPackaged=true` after `SamplingTakeEvidence.validatedForPromotion()`.
 
@@ -270,7 +272,12 @@ Each key appears only when its span ran. The pairs are written by hand at each s
 because every interval carries correlation arguments; the unused generic helper
 (`withMirroredSignpost`, which could not carry them) was removed on 2026-09-25. The
 macOS CLI bench also publishes `ttfcObserverLagMS`, the part of `ttfcMS` its own
-first-chunk observer adds after the engine handed chunk 0 to the product sink.
+first-chunk observer adds after the engine handed chunk 0 to the product sink: the
+observer's uptime at its first chunk minus chunk 0's nested-v9 `transportPublishedAtNS`,
+the one clock read the output adapter takes as each streamed chunk's event returns from
+the sink. The bench turns preview PCM off, so it joins on that stamp and never on
+`previewPublishedAtNS`, which only preview-bearing chunks carry. Rows written before
+output-adapter identity version 4 have no hand-off stamp and publish no lag.
 
 ### 6.1 Stage timeline (`stageMarks`)
 

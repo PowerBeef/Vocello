@@ -18,7 +18,12 @@ public enum GenerationStreamingTelemetryV9Publication: Sendable {
     /// 3 (BT-06, audit #49/#62): every chunk that carries those instants also
     /// labels them `mlxInstantProvenance: derived-from-step-durations`, in the
     /// nested transition and in the complete sidecar. The values are unchanged.
-    public static let outputAdapterIdentityVersion = 3
+    /// 4 (audit #48): every streamed chunk in the nested transition carries
+    /// `transportPublishedAtNS`, the instant its event returned from the product
+    /// sink, with or without preview PCM; `previewPublishedAtNS` is that same
+    /// read, now taken before chunk 0's first-published-chunk mark instead of
+    /// after it. The complete sidecar is unchanged.
+    public static let outputAdapterIdentityVersion = 4
 
     public enum PublicationError: Error, Equatable, Sendable {
         case validationFailed

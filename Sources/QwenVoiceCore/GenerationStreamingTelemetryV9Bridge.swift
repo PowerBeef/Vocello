@@ -91,6 +91,13 @@ public struct ShippingChunkObservationV9: Codable, Hashable, Sendable {
     /// arrival), not an MLX completion event.
     public let materializedAtNS: UInt64
     public let writtenAtNS: UInt64
+    /// When the chunk event returned from the product sink (the output
+    /// adapter's one clock read after the hand-off), for every streamed chunk
+    /// whether or not it carried preview PCM (audit #48). Nil when the take did
+    /// not stream, and in rows written before output-adapter identity version 4.
+    public let transportPublishedAtNS: UInt64?
+    /// The same hand-off instant, present only when the event carried preview
+    /// PCM (`previewDisposition == .publishedToProductSink`).
     public let previewPublishedAtNS: UInt64?
     public let previewDisposition: PreviewPublicationDispositionV9
     /// How the MLX instants were obtained; nil when they are absent or were
@@ -111,6 +118,7 @@ public struct ShippingChunkObservationV9: Codable, Hashable, Sendable {
         mlxMaterializationDurationNS: UInt64? = nil,
         materializedAtNS: UInt64,
         writtenAtNS: UInt64,
+        transportPublishedAtNS: UInt64? = nil,
         previewPublishedAtNS: UInt64? = nil,
         previewDisposition: PreviewPublicationDispositionV9,
         mlxInstantProvenance: MLXChunkInstantProvenanceV9? = nil
@@ -127,6 +135,7 @@ public struct ShippingChunkObservationV9: Codable, Hashable, Sendable {
         self.mlxMaterializationDurationNS = mlxMaterializationDurationNS
         self.materializedAtNS = materializedAtNS
         self.writtenAtNS = writtenAtNS
+        self.transportPublishedAtNS = transportPublishedAtNS
         self.previewPublishedAtNS = previewPublishedAtNS
         self.previewDisposition = previewDisposition
         self.mlxInstantProvenance = mlxInstantProvenance
@@ -153,6 +162,14 @@ public struct ShippingChunkObservationV9: Codable, Hashable, Sendable {
         }
         guard writtenAtNS >= materializedAtNS else {
             throw TelemetryV9ValidationError.invalidOrdering("shipping-chunk-write")
+        }
+        if let transportPublishedAtNS {
+            // The event is handed off after the write, and preview PCM rides
+            // that event, so a preview stamp never precedes the hand-off.
+            guard transportPublishedAtNS >= writtenAtNS,
+                  previewPublishedAtNS.map({ $0 >= transportPublishedAtNS }) ?? true else {
+                throw TelemetryV9ValidationError.invalidOrdering("shipping-chunk-transport")
+            }
         }
         if let previewPublishedAtNS {
             guard previewDisposition == .publishedToProductSink,

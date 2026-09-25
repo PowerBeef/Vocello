@@ -232,7 +232,9 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     ("ui-generation", "ios"): 2,
     # Also 2 for audit #39: delivery takes publish the remaining
     # expectation-bound paired features and their per-take adherence flags as a
-    # diagnostic count; the cell verdict, not each take's flags, warns.
+    # diagnostic count; the cell verdict, not each take's flags, warns. And for
+    # audit #48: ttfcObserverLagMS joins the observer on the hand-off stamp
+    # every streamed chunk carries, so the preview-less bench publishes it.
     ("engine-generation", "macos"): 2,
     ("memory-qualification", "macos"): 2,
     # 2 (2026-09-25, audit #12/#99): the CPU profile records three warm takes

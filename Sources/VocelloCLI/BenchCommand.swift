@@ -41,7 +41,8 @@ enum BenchCommand {
         let wallSeconds: Double
         let firstChunkMS: Double?
         /// The observer's mach uptime at the first chunk; the publisher joins
-        /// it with the engine row's v9 chunk-0 hand-off (`ttfcObserverLagMS`).
+        /// it with the engine row's v9 chunk-0 `transportPublishedAtNS`
+        /// hand-off (`ttfcObserverLagMS`).
         let firstChunkUptimeNS: UInt64?
         let outputFileName: String
         let environment: BenchTakeEnvironment

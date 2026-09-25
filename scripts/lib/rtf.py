@@ -116,13 +116,14 @@ def ttfc_observer_lag_ms(row: dict[str, Any], take: dict[str, Any] | None) -> fl
     """How far the CLI's first-chunk observer trails the engine's hand-off (audit #48).
 
     The observer's mach uptime when it saw the first chunk (the bench take's
-    `firstChunkUptimeNS`) minus the engine's own stamp after it handed the
-    first published chunk (transport sequence 0) to the product sink (the
-    row's v9 `previewPublishedAtNS`), both `DispatchTime` uptime nanoseconds.
-    `ttfcMS` is taken at the observer, so this is the observer's share of it.
-    Negative when the observer woke before the producer took its stamp. None
-    when either side is missing (no stream, preview data skipped, an older
-    CLI or row).
+    `firstChunkUptimeNS`) minus the engine's own stamp as it handed the first
+    published chunk (transport sequence 0) to the product sink (the row's v9
+    `transportPublishedAtNS`, which every streamed chunk carries whether or not
+    it holds preview PCM: the bench turns preview data off), both
+    `DispatchTime` uptime nanoseconds. `ttfcMS` is taken at the observer, so
+    this is the observer's share of it. Negative when the observer woke before
+    the producer took its stamp. None when either side is missing (no stream,
+    or a CLI or row older than output-adapter identity version 4).
     """
     if not isinstance(take, dict):
         return None
@@ -137,7 +138,7 @@ def ttfc_observer_lag_ms(row: dict[str, Any], take: dict[str, Any] | None) -> fl
         (chunk for chunk in chunks if isinstance(chunk, dict) and chunk.get("transportSequence") == 0),
         None,
     )
-    published = first.get("previewPublishedAtNS") if first is not None else None
+    published = first.get("transportPublishedAtNS") if first is not None else None
     if isinstance(published, bool) or not isinstance(published, int) or published <= 0:
         return None
     return round((observed - published) / 1_000_000.0, 3)

@@ -49,9 +49,9 @@ enum GenerateCommand {
         let firstChunkMS: Double?
         /// The observer's mach uptime (`DispatchTime`) when it saw the first
         /// chunk: the clock the engine stamps the v9 chunk-0
-        /// `previewPublishedAtNS` hand-off on, so the publisher can measure
-        /// this observer's lag behind the hand-off (`ttfcObserverLagMS`,
-        /// audit #48).
+        /// `transportPublishedAtNS` hand-off on (with or without preview PCM,
+        /// which the bench turns off), so the publisher can measure this
+        /// observer's lag behind the hand-off (`ttfcObserverLagMS`, audit #48).
         let firstChunkUptimeNS: UInt64?
         let chunkCount: Int
     }

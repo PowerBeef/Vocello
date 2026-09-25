@@ -607,6 +607,83 @@ final class GenerationStreamingTelemetryV9Tests: XCTestCase {
         XCTAssertFalse(transition.unavailable.contains { $0.field == .exactChunkAudioRanges })
     }
 
+    func testEveryStreamedChunkCarriesItsHandOffWithOrWithoutPreview() throws {
+        // audit #48: the bench turns preview PCM off, so the observer-lag join
+        // reads the hand-off stamp every streamed chunk carries.
+        let observations = [
+            ShippingChunkObservationV9(
+                index: 0,
+                transportSequence: 0,
+                audioStartFrame: 0,
+                audioEndFrameExclusive: 12_000,
+                materializedAtNS: 10,
+                writtenAtNS: 20,
+                transportPublishedAtNS: 22,
+                previewDisposition: .notRequested
+            ),
+            ShippingChunkObservationV9(
+                index: 1,
+                transportSequence: 1,
+                audioStartFrame: 12_000,
+                audioEndFrameExclusive: 24_000,
+                materializedAtNS: 50,
+                writtenAtNS: 60,
+                transportPublishedAtNS: 62,
+                previewPublishedAtNS: 62,
+                previewDisposition: .publishedToProductSink
+            ),
+        ]
+        let transition = try XCTUnwrap(GenerationStreamingTelemetryV9Bridge.make(
+            generationID: "A57D9599-E428-4D74-A7DE-69A6BD801F54",
+            layer: .engine,
+            notes: [:],
+            frontend: nil,
+            transport: nil,
+            terminals: GenerationTerminalTimelineV9(
+                modelTerminalAtNS: 70,
+                productTerminalAtNS: 80,
+                modelOutcome: .eos,
+                productOutcome: .completed
+            ),
+            chunkObservations: observations
+        ))
+        XCTAssertEqual(transition.chunks.map(\.transportPublishedAtNS), [22, 62])
+        XCTAssertEqual(transition.frameFlow.audioFramesPreviewPublished, 12_000)
+        let decoded = try JSONDecoder().decode(
+            GenerationStreamingTelemetryTransitionV9.self,
+            from: try JSONEncoder().encode(transition)
+        )
+        XCTAssertEqual(decoded.chunks.map(\.transportPublishedAtNS), [22, 62])
+
+        // A hand-off before the write, or preview PCM stamped before the
+        // event that carried it was handed off, is refused.
+        let misordered: [(transport: UInt64, preview: UInt64?)] = [(19, nil), (63, 62)]
+        for stamps in misordered {
+            let chunk = ShippingChunkObservationV9(
+                index: 0,
+                transportSequence: 0,
+                audioStartFrame: 0,
+                audioEndFrameExclusive: 12_000,
+                materializedAtNS: 10,
+                writtenAtNS: 20,
+                transportPublishedAtNS: stamps.transport,
+                previewPublishedAtNS: stamps.preview,
+                previewDisposition: stamps.preview == nil ? .notRequested : .publishedToProductSink
+            )
+            XCTAssertThrowsError(try GenerationStreamingTelemetryTransitionV9(
+                generationID: UUID(),
+                identities: transition.identities,
+                chunks: [chunk],
+                unavailable: []
+            )) { error in
+                XCTAssertEqual(
+                    error as? TelemetryV9ValidationError,
+                    .invalidOrdering("shipping-chunk-transport")
+                )
+            }
+        }
+    }
+
     func testLegacyV8RowWithoutNestedTransitionRemainsDecodableAndBridgeIsPrivacySafe() throws {
         let legacy = #"{"schemaVersion":8,"generationID":"legacy","layer":"engine","processName":"fixture","processIdentifier":1,"recordedAt":"2026-07-17T00:00:00Z","stageMarks":[],"timingsMS":{},"counters":{},"notes":{}}"#
         let decoded = try JSONDecoder().decode(GenerationTelemetryRecord.self, from: Data(legacy.utf8))

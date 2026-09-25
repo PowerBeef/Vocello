@@ -319,7 +319,7 @@ CLI is run from a Vocello checkout (skipped when `--telemetry off` or repository
 | `--label <opaque-id>` | stamp a privacy-safe identifier using only letters, numbers, `.`, `_`, and `-` |
 | `--run-id <id>` | supply a collision-resistant run ID for orchestration; normal invocations mint one automatically |
 | `--force-class` | **dev/diagnostic only** — force a constrained memory tier on any Mac: `8gb` · `16gb` · `high` · `iphone` (sets the `QWENVOICE_FORCE_MEMORY_CLASS` knob, read in-process by the engine; stamps `notes.deviceClass`) |
-| `--telemetry` | `off` · `lightweight` · `verbose` (default; raw per-sample sidecars) |
+| `--telemetry` | `off` · `lightweight` · `verbose` (default; raw per-sample sidecars). `off` builds no recorder, sampler or sink and writes no engine row even though the bench's runtime overrides set `QWENVOICE_DEBUG=1`; `verbose` sizes the sidecar budget to the planned generations and refuses a plan above 256 |
 | `--seed` | deterministic sampling seed applied to every benchmark take |
 | `--no-stream` | accumulate the full result before decoding (old bench behavior) |
 | `--ttfc` | add an engine first-chunk-latency probe per cell → table + `bench-ttfc.json` in the diagnostics directory |

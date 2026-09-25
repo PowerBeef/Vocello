@@ -15,34 +15,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import derive_audio_qc_bounds as bounds  # noqa: E402
 
-SWIFT_BANDS = """
-    static func slowSecondsPerUnit(for scriptClass: ScriptClass) -> Double {
-        switch scriptClass {
-        case .alphabetic: return 0.145
-        case .chinese: return 0.45
-        case .japanese, .korean: return 0.40
-        }
-    }
-    static func minimumJudgedUnits(for scriptClass: ScriptClass) -> Int {
-        scriptClass == .alphabetic ? 20 : 8
-    }
-"""
-MATRIX_SOURCE = """
-        ("short", "The train left the station at dawn."),
-        ("medium", "The morning train slipped quietly out of the station, carrying a handful of sleepy travelers toward the coast."),
-        ("long", "A long macOS text with many words in it for the long cell of the benchmark matrix."),
-"""
-UI_SOURCE = """
-    #if os(iOS)
-    private static let longBenchmarkText =
-        "An iOS long text."
-    #else
-    private static let longBenchmarkText =
-        "A long macOS text."
-    #endif
-"""
-
-
 def record(run_id: str, finished: str, takes: list[dict], *, kind: str = "ui-generation",
            platform: str = "macos") -> dict:
     return {"run": {"id": run_id, "kind": kind, "platform": platform, "finishedAt": finished},
@@ -58,37 +30,35 @@ def take(length: str, seconds: float, *, cell: str = "custom/medium/warm#0", ver
     return value
 
 
-class SwiftSourceTests(unittest.TestCase):
-    def test_bands_and_texts_are_read_from_swift(self) -> None:
-        bands = bounds.speaking_rate_bands(SWIFT_BANDS)
-        self.assertEqual(bands["alphabetic"], {"slowSecondsPerUnit": 0.145, "minimumJudgedUnits": 20})
-        self.assertEqual(bands["korean"], {"slowSecondsPerUnit": 0.40, "minimumJudgedUnits": 8})
-        texts = bounds.benchmark_texts(MATRIX_SOURCE, UI_SOURCE)
-        self.assertEqual(texts["ios-ui-long"], "An iOS long text.")
-        self.assertEqual(bounds.text_units(texts["medium"]), 91)
-        with self.assertRaises(bounds.BoundsError):
-            bounds.speaking_rate_bands("no bands here")
-        with self.assertRaises(bounds.BoundsError):
-            bounds.benchmark_texts("", UI_SOURCE)
-
-    def test_the_live_sources_still_parse(self) -> None:
-        bands = bounds.speaking_rate_bands(bounds.ADAPTER_SOURCE.read_text(encoding="utf-8"))
-        self.assertEqual(set(bands), {"alphabetic", "chinese", "japanese", "korean"})
-        texts = bounds.benchmark_texts(
-            bounds.BENCH_MATRIX_SOURCE.read_text(encoding="utf-8"),
-            bounds.UI_CORPUS_SOURCE.read_text(encoding="utf-8"),
+class MirroredConstantsTests(unittest.TestCase):
+    def test_the_mirror_holds_the_documented_values(self) -> None:
+        """The tool never reads Swift source (release rule): it mirrors the values
+        docs/reference/audio-qc-engineering.md documents under "Replay constants",
+        and a qualified Swift change updates both with this pin."""
+        self.assertEqual(bounds.SPEAKING_RATE_BANDS, {
+            "alphabetic": {"slowSecondsPerUnit": 0.145, "minimumJudgedUnits": 20},
+            "chinese": {"slowSecondsPerUnit": 0.45, "minimumJudgedUnits": 8},
+            "japanese": {"slowSecondsPerUnit": 0.40, "minimumJudgedUnits": 8},
+            "korean": {"slowSecondsPerUnit": 0.40, "minimumJudgedUnits": 8},
+        })
+        self.assertEqual(bounds.BENCHMARK_TEXT_UNITS,
+                         {"short": 28, "medium": 91, "long": 278, "ios-ui-long": 126})
+        self.assertEqual(
+            (bounds.ENGINE_SAMPLE_RATE, bounds.SLEW_CLAMP, bounds.CLICK_EVENT_GAP_SAMPLES,
+             bounds.CLICK_ENVELOPE_COEFFICIENT, bounds.LOW_ENERGY_CLICK_ENVELOPE),
+            (24_000, 0.42, 240, 1.0 / 240.0, 0.02),
         )
-        self.assertEqual(set(texts), {"short", "medium", "long", "ios-ui-long"})
+        self.assertEqual(bounds.CLICK_FRACTION_BOUNDS, {"warnFraction": 0.0005, "failFraction": 0.005})
 
 
 class SpeakingRateTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.texts = bounds.benchmark_texts(MATRIX_SOURCE, UI_SOURCE)
-        self.bands = bounds.speaking_rate_bands(SWIFT_BANDS)
+        self.bands = bounds.SPEAKING_RATE_BANDS
 
     def report(self, records: list[tuple[str, dict]]) -> dict:
         rows, skipped = bounds.speaking_rate_rows(
-            records, texts=self.texts, language_matrix={"cells": []}, language_corpus={"languages": []},
+            records, text_units_by_length=bounds.BENCHMARK_TEXT_UNITS,
+            language_matrix={"cells": []}, language_corpus={"languages": []},
             corpus_digest="0" * 64, cut="2026-09-25T08:35:53Z",
         )
         return bounds.speaking_rate_report(rows, self.bands, skipped, "2026-09-25T08:35:53Z")
@@ -96,7 +66,7 @@ class SpeakingRateTests(unittest.TestCase):
     def test_a_run_on_warns_and_the_untouched_split_stays_apart(self) -> None:
         seeded = record("seeded", "2026-09-14T05:18:14Z", [
             take("medium", 6.5), take("medium", 6.6), take("medium", 14.96),  # 0.164 s per unit
-            take("short", 2.0, cell="custom/short/warm#0"),  # under 20 units: reported, never judged
+            take("short", 2.0, cell="custom/short/warm#0"),  # 28 units, well under the band
         ])
         later = record("later", "2026-09-25T20:05:52Z", [take("medium", 6.4)])
         overhead = record("overhead", "2026-07-01T00:00:00Z", [take("medium", 30.0)], kind="telemetry-overhead")

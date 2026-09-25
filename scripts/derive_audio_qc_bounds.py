@@ -23,8 +23,11 @@ Commands:
                  optionally WAV files (such as the retained codec A/B takes)
                  through a mirror of the Swift clustered click counter.
 
-Swift owns the thresholds; this tool reads them from the Swift source so the
-replay can never drift from the bands it screens against.
+Swift owns the thresholds, the benchmark texts and the click counter. This tool
+never reads Swift source: it mirrors the values documented in
+`docs/reference/audio-qc-engineering.md` ("Replay constants"), and one test
+pins the mirror to them. A qualified change edits the Swift source, the
+documented values and this mirror in the same reviewed change.
 """
 
 from __future__ import annotations
@@ -36,7 +39,6 @@ import hashlib
 import json
 import math
 from pathlib import Path
-import re
 import statistics
 import sys
 from typing import Any, Iterable
@@ -44,9 +46,6 @@ import wave
 
 REPO = Path(__file__).resolve().parents[1]
 RECORDS = REPO / "benchmarks" / "runs"
-ADAPTER_SOURCE = REPO / "Sources" / "QwenVoiceCore" / "GenerationOutputAdapter.swift"
-BENCH_MATRIX_SOURCE = REPO / "Sources" / "QwenVoiceCore" / "BenchMatrixSpec.swift"
-UI_CORPUS_SOURCE = REPO / "Tests" / "UIAutomationSupport" / "VocelloUIAutomationSupport.swift"
 LANGUAGE_MATRIX = REPO / "config" / "language-bench-matrix.json"
 LANGUAGE_CORPUS = REPO / "config" / "language-bench-corpus.json"
 
@@ -60,6 +59,17 @@ GENERATION_KINDS = frozenset({
 })
 # Screening multiples of each class's warn band.
 SPEAKING_RATE_CANDIDATE_FACTORS = (1.25, 1.5, 2.0)
+# The QC v8 speaking-rate bands of `AudioSpeakingRateQC`: the warn band in
+# seconds per unit and the fewest units a take needs to be judged.
+SPEAKING_RATE_BANDS = {
+    "alphabetic": {"slowSecondsPerUnit": 0.145, "minimumJudgedUnits": 20},
+    "chinese": {"slowSecondsPerUnit": 0.45, "minimumJudgedUnits": 8},
+    "japanese": {"slowSecondsPerUnit": 0.40, "minimumJudgedUnits": 8},
+    "korean": {"slowSecondsPerUnit": 0.40, "minimumJudgedUnits": 8},
+}
+# Letters and digits (`text_units`) of each benchmark text: the CLI and macOS UI
+# bench corpus by length, and the shorter iOS UI long text.
+BENCHMARK_TEXT_UNITS = {"short": 28, "medium": 91, "long": 278, "ios-ui-long": 126}
 # Audio QC runs at the engine's fixed 24 kHz output rate.
 ENGINE_SAMPLE_RATE = 24_000
 # Clustered-click mirror of `PCM16StreamLimiter` (audit #85): the slew clamp, the
@@ -72,6 +82,8 @@ LOW_ENERGY_CLICK_ENVELOPE = 0.02
 # clamp up to PCM16 rounding.
 PCM16_CLAMP_TOLERANCE = 2.0 / 32767.0
 CLICK_CANDIDATES_PER_SECOND = (0.5, 1.0, 2.0, 5.0)
+# The per-sample click bound: slew-limited samples as a fraction of the take.
+CLICK_FRACTION_BOUNDS = {"warnFraction": 0.0005, "failFraction": 0.005}
 # The calibration floors the audio-QC calibration guidance sets per class.
 MINIMUM_CONFIRMATION_PER_CLASS = 60
 
@@ -81,37 +93,8 @@ class BoundsError(RuntimeError):
 
 
 # --------------------------------------------------------------------------- #
-# Swift sources (thresholds and benchmark texts)
+# Text units
 # --------------------------------------------------------------------------- #
-
-def speaking_rate_bands(source: str) -> dict[str, dict[str, float]]:
-    """The warn band and minimum judged units per script class, from Swift."""
-    bands: dict[str, float] = {}
-    for classes, value in re.findall(r"case (\.[a-z]+(?:, \.[a-z]+)*): return ([0-9.]+)", source):
-        for name in re.findall(r"\.([a-z]+)", classes):
-            bands[name] = float(value)
-    minimum = re.search(r"scriptClass == \.alphabetic \? (\d+) : (\d+)", source)
-    required = {"alphabetic", "chinese", "japanese", "korean"}
-    if minimum is None or not required <= set(bands):
-        raise BoundsError("AudioSpeakingRateQC bands were not found in the Swift source")
-    return {
-        name: {
-            "slowSecondsPerUnit": bands[name],
-            "minimumJudgedUnits": int(minimum.group(1) if name == "alphabetic" else minimum.group(2)),
-        }
-        for name in sorted(required)
-    }
-
-
-def benchmark_texts(matrix_source: str, ui_source: str) -> dict[str, str]:
-    """`short`/`medium`/`long` of the CLI and macOS UI bench, plus the iOS UI long text."""
-    texts = dict(re.findall(r'\("(short|medium|long)", "([^"]+)"\)', matrix_source))
-    ios = re.search(r'#if os\(iOS\).*?longBenchmarkText =\s*"([^"]+)"', ui_source, re.S)
-    if set(texts) != {"short", "medium", "long"} or ios is None:
-        raise BoundsError("benchmark texts were not found in the Swift sources")
-    texts["ios-ui-long"] = ios.group(1)
-    return texts
-
 
 def text_units(text: str) -> int:
     """Letters and digits, the unit `AudioSpeakingRateQC.measure` counts."""
@@ -172,7 +155,7 @@ def summary(values: list[float]) -> dict[str, Any]:
 # --------------------------------------------------------------------------- #
 
 def speaking_rate_rows(
-    records: Iterable[tuple[str, dict[str, Any]]], *, texts: dict[str, str],
+    records: Iterable[tuple[str, dict[str, Any]]], *, text_units_by_length: dict[str, int],
     language_matrix: dict[str, Any], language_corpus: dict[str, Any], corpus_digest: str,
     cut: str,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
@@ -219,7 +202,7 @@ def speaking_rate_rows(
                     skip("no-benchmark-text")
                     continue
                 key = "ios-ui-long" if (kind == "ui-generation" and platform == "ios" and length == "long") else length
-                units = text_units(texts[key])
+                units = text_units_by_length[key]
             if not units:
                 skip("no-units")
                 continue
@@ -391,7 +374,7 @@ def load_labels(path: Path | None) -> dict[str, dict[str, str]]:
 
 def clicks_report(record_rows: list[dict[str, Any]], wav_rows: list[dict[str, Any]],
                   labels: dict[str, dict[str, str]], labels_digest: str | None) -> dict[str, Any]:
-    fraction_bounds = {"warnFraction": 0.0005, "failFraction": 0.005}
+    fraction_bounds = CLICK_FRACTION_BOUNDS
     report: dict[str, Any] = {
         "schemaVersion": REPORT_SCHEMA,
         "measure": "clickEventsPerSecond",
@@ -502,15 +485,12 @@ def main(argv: list[str] | None = None) -> int:
             cut_text = cut.strftime("%Y-%m-%dT%H:%M:%SZ")
             rows, skipped = speaking_rate_rows(
                 records,
-                texts=benchmark_texts(BENCH_MATRIX_SOURCE.read_text(encoding="utf-8"),
-                                      UI_CORPUS_SOURCE.read_text(encoding="utf-8")),
+                text_units_by_length=BENCHMARK_TEXT_UNITS,
                 language_matrix=json.loads(LANGUAGE_MATRIX.read_text(encoding="utf-8")),
                 language_corpus=json.loads(LANGUAGE_CORPUS.read_text(encoding="utf-8")),
                 corpus_digest=sha256_file(LANGUAGE_CORPUS), cut=cut_text,
             )
-            report = speaking_rate_report(
-                rows, speaking_rate_bands(ADAPTER_SOURCE.read_text(encoding="utf-8")), skipped, cut_text,
-            )
+            report = speaking_rate_report(rows, SPEAKING_RATE_BANDS, skipped, cut_text)
             print(f"speaking-rate: takes={report['takes']} warned={len(report['warned'])} "
                   f"skipped={report['skipped']}")
             for name, block in report["classes"].items():

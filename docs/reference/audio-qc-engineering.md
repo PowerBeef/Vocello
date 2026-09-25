@@ -797,8 +797,8 @@ to 2.6x their cell's median. No failing bound exists; one needs the authority be
 
 **Failing bound: screened, not qualified (2026-09-25).** The maintainer delegated the decision to
 the audit's recommendation (#10: set any fail bound under this authority), so the bound was screened
-offline with `scripts/derive_audio_qc_bounds.py speaking-rate`, which reads the bands and benchmark
-texts from the Swift sources and replays the committed records read-only. It reproduces the seeding
+offline with `scripts/derive_audio_qc_bounds.py speaking-rate`, which replays the committed records
+read-only against the replay constants below. It reproduces the seeding
 (3,725 takes before the QC v8 commit, the same 8 warned takes) and splits off the 24 takes
 published since (the M6 gate records), none warned. The evidence does not qualify a failing bound:
 the warned takes are not separated from ordinary ones (the slowest unwarned alphabetic take is 0.140
@@ -828,6 +828,18 @@ calibrated on the retained codec A/B takes (the decision was delegated to that r
 takes clamp at all; clamped samples per second median 0.74, p99 20.0, max 25.0) and runs WAV files,
 such as the retained A/B takes with a `--labels` file, through a mirror of the counter to screen
 per-second candidates; the result feeds this authority, never a bound directly.
+
+**Replay constants.** `derive_audio_qc_bounds.py` never reads Swift source. It mirrors these
+Swift-owned values, and `scripts/tests/test_derive_audio_qc_bounds.py` pins the mirror to them; a
+qualified change edits the Swift source, this list and the mirror together:
+
+- speaking-rate warn bands (`AudioSpeakingRateQC`): 0.145 s per unit alphabetic, 0.45 Chinese,
+  0.40 Japanese and Korean; judged from 20 alphabetic or 8 CJK units;
+- benchmark text units (letters and digits): short 28, medium 91, long 278 (`BenchMatrixSpec`,
+  also the macOS UI bench), iOS UI long 126;
+- click counter (`PCM16StreamLimiter`, 24 kHz): slew clamp 0.42, events at most 240 samples apart,
+  envelope coefficient 1/240, low-energy envelope 0.02; the per-sample click bound warns above a
+  0.0005 and fails above a 0.005 fraction of the take.
 
 ### Threshold-change authority
 

@@ -404,6 +404,29 @@ class CheckIOSUIBenchmarkTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("no promptChars", result.stdout + result.stderr)
 
+    def test_each_take_keeps_its_load_and_a_busy_take_makes_the_run_exploratory(self) -> None:
+        """audit #28 (iPhone): the per-take load rule of engine and macOS UI records."""
+        result = self.run_checker(self.expected_order, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        record = self.last_manifest["historyRecord"]
+        self.assertTrue(all(take["metrics"]["loadAverage1M"] == 1.0 for take in record["takes"]))
+        self.assertNotIn("classification", record["run"])
+
+        profiles = json.loads((ROOT / "benchmarks" / "hardware-profiles.json").read_text(encoding="utf-8"))
+        limit = next(
+            profile["cpuCores"] for profile in profiles["profiles"]
+            if profile["platform"] == "ios" and profile.get("canonical") is True
+        )
+
+        def busy_second_take(rows: list[dict]) -> None:
+            rows[1]["summary"]["runEnvironment"]["loadAverage1Minute"] = limit + 0.5
+
+        result = self.run_checker(self.expected_order, mutate_engine_after_upgrade=busy_second_take, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        record = self.last_manifest["historyRecord"]
+        self.assertEqual(record["takes"][1]["metrics"]["loadAverage1M"], limit + 0.5)
+        self.assertEqual(record["run"]["classification"], "exploratory")
+
     def test_takes_sample_under_the_seed_policy_the_lane_selected(self) -> None:
         """audit #29: seed = hash(cell) per take; generated seeds differ per take."""
         from lib import bench_seed

@@ -321,6 +321,9 @@ def tracked_metrics(engine: dict, app: dict) -> dict[str, float | int]:
     add("samplerEffectiveMedianIntervalMS", summary.get("effectiveIntervalNS"), 1 / 1_000_000)
     add("samplerMaximumLatenessMS", summary.get("maximumLatenessNS"), 1 / 1_000_000)
     add("samplerMaximumDriftMS", summary.get("maximumDriftNS"), 1 / 1_000_000)
+    # The take's own one-minute load on the phone (audit #28); the run's
+    # hardware block keeps only the busiest take's.
+    add("loadAverage1M", (summary.get("runEnvironment") or {}).get("loadAverage1Minute"))
     resources = summary.get("processResourceUsage") or {}
     add("cpuUserSeconds", resources.get("userCPUTimeMS"), 1 / 1_000)
     add("cpuSystemSeconds", resources.get("systemCPUTimeMS"), 1 / 1_000)
@@ -512,6 +515,10 @@ def build_manifest(
         if playback_start_source in {"liveStream", "finalFile"}:
             history_take["playbackStartSource"] = playback_start_source
         history_takes.append(history_take)
+    busy_takes = takes_above_load_limit(history_takes)
+    if busy_takes:
+        listed = ", ".join(f"take {index} at {load:.2f}" for index, load in busy_takes)
+        print(f"note: {listed} exceeded the per-take load limit; the record is exploratory")
     history_record = {
         "schemaVersion": history_record_schema_version(history_takes),
         "run": {
@@ -527,6 +534,8 @@ def build_manifest(
             "rtfDefinition": rtf_semantics.STANDARD_RTF_DEFINITION,
             # How every take chose its sampling seed (audit #29).
             **({"seedPolicy": seed_policy} if seed_policy is not None else {}),
+            # A take above the per-take load limit is exploratory evidence (audit #28).
+            **({"classification": "exploratory"} if busy_takes else {}),
         },
         "hardware": hardware,
         "toolchain": {"optimization": optimization},
@@ -575,6 +584,16 @@ def build_manifest(
         "takes": takes,
         "historyRecord": history_record,
     }
+
+
+def takes_above_load_limit(history_takes: list[dict]) -> list[tuple[int, float]]:
+    """(takeIndex, load) of every take whose own one-minute load exceeded the
+    per-take limit (audit #28, the engine and macOS UI records' rule): the
+    canonical iPhone profile's core count. Such a run's record is exploratory."""
+    import publish_benchmark_history as publisher
+
+    cores = int(publisher.canonical_hardware_profile("ios")["cpuCores"])
+    return publisher.takes_above_exploratory_load(history_takes, cores)
 
 
 def take_seed(row: dict) -> dict:

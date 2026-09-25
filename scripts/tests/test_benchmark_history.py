@@ -434,6 +434,23 @@ class BenchmarkHistoryTests(unittest.TestCase):
             [".claude/rules/backend-mlx.md", ".local-fixture", "CLAUDE.md"],
         )
 
+    def test_rebuild_index_validates_each_unchanged_record_once(self) -> None:
+        # Audit #73: rebuild-index validated the whole registry twice and
+        # recomputed comparison keys once per pair of records.
+        self.publish(record_fixture(run_id="once-a-20260712"), "once-a")
+        second = record_fixture(run_id="once-b-20260712")
+        second["takes"][0]["generationID"] = "generation-once-b"
+        self.publish(second, "once-b")
+        with (
+            mock.patch.object(history, "validate_record", wraps=history.validate_record) as validated,
+            mock.patch.object(history, "comparison_key", wraps=history.comparison_key) as keyed,
+        ):
+            history.rebuild_index(check=True)
+        self.assertEqual(validated.call_count, 2)
+        # Linear, not per pair: per record one key in its validation, one for the
+        # reconciliation and one for its fixed-point check.
+        self.assertEqual(keyed.call_count, 3 * 2)
+
     def test_record_is_atomic_valid_and_idempotent(self) -> None:
         directory = self.write_manifest({"historyRecord": record_fixture()})
         first = history.record_manifest(directory)

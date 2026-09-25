@@ -1610,9 +1610,17 @@ def comparison_deltas(
 
 def expected_comparison_metadata(
     record: dict[str, Any], existing: list[tuple[Path, dict[str, Any]]],
+    *, keys: dict[int, str] | None = None,
 ) -> dict[str, Any]:
-    """Derive comparison metadata from record content, independent of arrival order."""
-    key = comparison_key(record)
+    """Derive comparison metadata from record content, independent of arrival order.
+
+    `keys` maps `id(record)` to its precomputed comparison key, so reconciling
+    the registry computes each key once instead of once per pair of records."""
+    def key_of(candidate: dict[str, Any]) -> str:
+        cached = keys.get(id(candidate)) if keys is not None else None
+        return cached if cached is not None else comparison_key(candidate)
+
+    key = key_of(record)
     expected: dict[str, Any] = {
         "key": key,
         "comparable": record_is_comparable(record),
@@ -1629,7 +1637,7 @@ def expected_comparison_metadata(
         candidate for _, candidate in existing
         if candidate.get("run", {}).get("id") != record["run"]["id"]
         and record_is_comparable(candidate)
-        and comparison_key(candidate) == key
+        and key_of(candidate) == key
         and (candidate["run"]["finishedAt"], candidate["run"]["id"]) < current_order
     ]
     if not candidates:
@@ -2909,8 +2917,10 @@ def comparison_reconciliation_updates(
     records: list[tuple[Path, dict[str, Any]]],
 ) -> list[tuple[Path, dict[str, Any]]]:
     updates: list[tuple[Path, dict[str, Any]]] = []
+    # The key reads only non-comparison content, so it is computed once per record.
+    keys = {id(record): comparison_key(record) for _, record in records}
     for path, record in records:
-        expected = expected_comparison_metadata(record, records)
+        expected = expected_comparison_metadata(record, records, keys=keys)
         if record.get("comparison") == expected:
             continue
         replacement = copy.deepcopy(record)
@@ -3180,7 +3190,14 @@ def rebuild_index(*, check: bool = False) -> None:
     reconciled = [
         (path, update_by_path.get(path, record)) for path, record in records
     ]
-    validate_all(reconciled)
+    # Every record was validated above and a replacement changes only its
+    # comparison block and digest, so only replacements are validated again
+    # (run IDs and evidence digests, the uniqueness keys, are untouched).
+    for path, replacement in updates:
+        validate_record(replacement, expected_path=path)
+    # Reconciliation reads only non-comparison content: one pass is a fixed point.
+    if comparison_reconciliation_updates(reconciled):
+        raise HistoryError("comparison reconciliation did not reach a fixed point")
     if updates and check:
         relative = updates[0][0].relative_to(RUNS_ROOT)
         raise HistoryError(f"comparison metadata is stale for {relative}; run rebuild-index")

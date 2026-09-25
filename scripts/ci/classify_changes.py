@@ -242,6 +242,11 @@ def _is_research(path: str) -> bool:
         name = name.removeprefix("test_")
     if path.startswith("scripts/") and any(name.startswith(p) for p in RESEARCH_PREFIXES):
         return True
+    # Shared libraries (jsonio, language_metrics, audio_qc, ...) are imported by
+    # research tooling under names the prefixes cannot see; the local check
+    # already selects their research consumers, so CI runs them too.
+    if path.startswith("scripts/lib/") and path.endswith(".py"):
+        return True
     return path.startswith("config/") and any(name.startswith(p) for p in RESEARCH_CONFIG)
 
 

@@ -35,6 +35,7 @@ from benchmark_memory import (  # noqa: E402
     qualify_memory_rows,
 )
 from lib import jsonio  # noqa: E402
+from lib import bench_seed  # noqa: E402
 
 DEFAULT_MODES = ["custom", "design", "clone"]
 DEFAULT_LENGTHS = ["short", "medium", "long"]
@@ -375,6 +376,7 @@ def build_manifest(
     *,
     optimization: str,
     memory_qualification: tuple | None = None,
+    seed_policy: str | None = None,
 ) -> dict:
     # The gate already qualified these rows; reuse its result (audit #21).
     memory_evidence, memory_run = memory_qualification or qualify_memory_rows(
@@ -493,6 +495,9 @@ def build_manifest(
             "warnings": take_warnings,
             "memoryStatus": memory.status,
             "sampleSidecarDigest": memory.sidecar_digest,
+            # A seed the benchmark requested and the engine confirmed (audit
+            # #29): every take under the cell-hash-v1 policy.
+            **take_seed(row),
             **take_quality_identity(row),
         }
         if playback_start_source in {"liveStream", "finalFile"}:
@@ -511,6 +516,8 @@ def build_manifest(
             "finishedAt": finished_at,
             "warnings": memory_run["warnings"],
             "rtfDefinition": rtf_semantics.STANDARD_RTF_DEFINITION,
+            # How every take chose its sampling seed (audit #29).
+            **({"seedPolicy": seed_policy} if seed_policy is not None else {}),
         },
         "hardware": hardware,
         "toolchain": {"optimization": optimization},
@@ -558,6 +565,18 @@ def build_manifest(
     }
 
 
+def take_seed(row: dict) -> dict:
+    """`{"seed": n}` for a take whose request named its seed, else nothing."""
+    notes = row.get("notes") or {}
+    if notes.get("samplingSeedSource") != "requested":
+        return {}
+    try:
+        seed = int(str(notes.get("samplingSeed")))
+    except (TypeError, ValueError):
+        return {}
+    return {"seed": seed} if 0 <= seed <= (1 << 64) - 1 else {}
+
+
 def take_quality_identity(row: dict) -> dict:
     """The typed quality-registry identity this engine row published with (shared fold)."""
     return quality_identity_fields(row)
@@ -582,6 +601,10 @@ def main() -> int:
     parser.add_argument("--warm", type=int, default=3)
     parser.add_argument("--label", default="")
     parser.add_argument("--generation-map", type=Path, required=True)
+    parser.add_argument(
+        "--seed-policy", choices=bench_seed.LANE_SEED_POLICIES, default=None,
+        help="the seed policy the lane selected (audit #29); every take must have sampled under it",
+    )
     parser.add_argument("--evidence-manifest", type=Path, metavar="PATH")
     parser.add_argument(
         "--build-provenance", type=Path, metavar="PATH",
@@ -683,7 +706,6 @@ def main() -> int:
         failures.append("engine generationIDs are not unique")
 
     actual_cells: list[tuple[str, str, str, int]] = []
-    seeds_by_mode: dict[str, set[str]] = {}
     for index, row in enumerate(engine_rows):
         notes = row.get("notes") or {}
         mapped_cell = expected_cells[index] if index < expected_count else ("?", "?", "?", 0)
@@ -710,9 +732,6 @@ def main() -> int:
                         f"take {index + 1} prompt length {prompt_chars} chars is a {bucket} prompt, "
                         f"not the {expected_cell[1]} cell it was recorded under"
                     )
-            seed = notes.get("samplingSeed")
-            if seed is not None:
-                seeds_by_mode.setdefault(str(expected_cell[0]), set()).add(str(seed))
             explicit_cell = notes.get("benchCell")
             if explicit_cell is not None and explicit_cell != cell_name(expected_cell):
                 failures.append(
@@ -762,11 +781,18 @@ def main() -> int:
                 f"{row.get('generationID', '?')}: benchmark publication requires telemetry "
                 f"schema v{REQUIRED_TELEMETRY_SCHEMA} or newer"
             )
-    # Checked once the whole matrix is known; the per-take identity and schema
-    # checks above belong to every row, not to this loop (V-1).
-    for mode, seeds in sorted(seeds_by_mode.items()):
-        if len(seeds) > 1:
-            failures.append(f"mode {mode} used {len(seeds)} different sampling seeds; the matrix freezes one seed per mode")
+    # The seed policy, checked once the whole matrix is known (audit #29, V-1).
+    # Every generation draws its own effective seed, so the earlier rule that a
+    # mode keeps one seed could never pass; under cell-hash-v1 each take must
+    # have sampled with its cell's seed instead.
+    seed_policy = None
+    if len(engine_rows) == expected_count:
+        seed_policy, seed_failures = bench_seed.run_seed_policy([
+            (cell_name(cell), row.get("notes") or {})
+            for cell, row in zip(expected_cells, engine_rows, strict=True)
+        ])
+        failures.extend(seed_failures)
+        failures.extend(bench_seed.expected_policy_failure(args.seed_policy, seed_policy))
 
     valid_ids = [value for value in generation_ids if isinstance(value, str) and value]
     failures.extend(validate_layer("app", app_rows, valid_ids, expected_count))
@@ -811,6 +837,7 @@ def main() -> int:
             app_rows,
             optimization=optimization,
             memory_qualification=memory_qualification,
+            seed_policy=seed_policy,
         )
         write_json_atomic(args.evidence_manifest, manifest)
         print(f"evidence={args.evidence_manifest}")

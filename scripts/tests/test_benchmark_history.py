@@ -2483,6 +2483,43 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.assertEqual(history.lineage_v1_comparison_key(stamped_v1), stamped_v1["comparison"]["key"])
         history.validate_lineage_inputs(stamped_v1)
 
+    def test_the_seed_policy_matches_the_published_take_seeds(self) -> None:
+        """audit #29: run.seedPolicy is checked against every take's seed."""
+        from lib import bench_seed
+
+        record = json.loads((FROZEN_RECORDS / "macos-engine-lineage-v1.json").read_text())
+        for take in record["takes"]:
+            take.pop("seed", None)
+        record["run"]["seedPolicy"] = "generated"
+        history.validate_seed_policy(record)
+
+        seeded = copy.deepcopy(record)
+        seeded["run"]["seedPolicy"] = "cell-hash-v1"
+        for take in seeded["takes"]:
+            take["seed"] = bench_seed.cell_seed(take["cell"])
+        history.validate_seed_policy(seeded)
+        requested = copy.deepcopy(seeded)
+        requested["run"]["seedPolicy"] = "requested"
+        history.validate_seed_policy(requested)
+
+        invalid = {
+            "a generated run publishing a seed": lambda r: r["takes"][0].update(seed=7),
+            "an unknown policy": lambda r: r["run"].update(seedPolicy="fixed"),
+        }
+        for name, mutate in invalid.items():
+            candidate = copy.deepcopy(record)
+            mutate(candidate)
+            with self.subTest(case=name), self.assertRaises(history.HistoryError):
+                history.validate_seed_policy(candidate)
+        for name, mutate in {
+            "a take off its cell's seed": lambda r: r["takes"][0].update(seed=r["takes"][0]["seed"] + 1),
+            "a take without its seed": lambda r: r["takes"][0].pop("seed"),
+        }.items():
+            candidate = copy.deepcopy(seeded)
+            mutate(candidate)
+            with self.subTest(case=name), self.assertRaises(history.HistoryError):
+                history.validate_seed_policy(candidate)
+
     def test_contract_2_keys_the_forced_tier_and_the_seed_policy(self) -> None:
         stamped = json.loads((FROZEN_RECORDS / "macos-engine-lineage-v1.json").read_text())
         record = copy.deepcopy(stamped)

@@ -172,6 +172,14 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
         ]) { _, take in take }
         environment["QVOICE_MAC_BENCH_LABEL"] = label
         environment["QWENVOICE_BENCH_FORCE_COLD"] = take.warmState == .cold ? "1" : "0"
+        // The seed policy scripts/ui_test.sh selects (audit #29): the app
+        // samples each take with the seed of the cell the current-take file
+        // names, so two runs of one build produce the same take per cell.
+        if let policy = VocelloUIBenchMatrix.seedPolicy(
+            environment: ProcessInfo.processInfo.environment, keyPrefix: "QVOICE_MAC_BENCH"
+        ) {
+            environment[VocelloUIBenchMatrix.seedPolicyAppKey] = policy
+        }
         if take.mode != .clone {
             environment["QWENVOICE_SUPPRESS_WARMUP"] = "1"
         }

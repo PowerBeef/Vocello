@@ -240,6 +240,35 @@ class UICheckerRoundTripTests(unittest.TestCase):
             "deviceClass": "floor_8gb_mac", "deviceClassForced": True, "simulatedPhysicalMemoryMB": 8192,
         })
 
+    def test_a_seeded_macos_ui_benchmark_publishes_its_seed_policy(self) -> None:
+        """audit #29: the cell-hash-v1 seeds survive the registry's check."""
+        from lib import bench_seed
+
+        def seeded(layers: dict[str, list[dict]]) -> None:
+            make_rows_realistic(layers["engine"])
+            for row in layers["engine"]:
+                row["notes"].update({
+                    "samplingSeed": str(bench_seed.cell_seed(row["notes"]["benchCell"])),
+                    "samplingSeedSource": "requested", "samplingSeedPolicy": "cell-hash-v1",
+                })
+
+        checker = mac_ui.CheckMacOSUIBenchmarkTests("run_checker")
+        result = checker.run_checker(
+            checker.expected_order, mutate_layers=seeded, evidence=True,
+            extra_args=["--seed-policy", "cell-hash-v1"],
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        record, _size = publish_through_registry(checker.last_manifest, screenshots=True)
+        self.assertEqual(record["run"]["seedPolicy"], "cell-hash-v1")
+        self.assertEqual(
+            [take["seed"] for take in record["takes"]],
+            [bench_seed.cell_seed(take["cell"]) for take in record["takes"]],
+        )
+        # A seeded matrix keys apart from the same matrix on random seeds.
+        unseeded = copy.deepcopy(record)
+        unseeded["run"]["seedPolicy"] = "generated"
+        self.assertNotEqual(history.comparison_key(unseeded), record["comparison"]["key"])
+
     def test_canonical_macos_ui_benchmark_fits_the_record_cap(self) -> None:
         checker = mac_ui.CheckMacOSUIBenchmarkTests("run_checker")
         cells = canonical_cells()

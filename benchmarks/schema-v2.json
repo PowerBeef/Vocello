@@ -707,6 +707,14 @@
             "wall/audio"
           ]
         },
+        "seedPolicy": {
+          "description": "How every take chose its sampling seed (scripts/lib/bench_seed.py, audit #29): generated (random per take), requested (a seed each request named) or cell-hash-v1 (the benchmark seed policy: each take's seed hashes its cell ID, and every take publishes it). Optional; lineage contract 2 keys it.",
+          "enum": [
+            "cell-hash-v1",
+            "generated",
+            "requested"
+          ]
+        },
         "runtimePolicy": {
           "additionalProperties": false,
           "description": "Run-level memory-tier provenance from the engine rows' own stamps: the device class the rows ran under, whether QWENVOICE_FORCE_MEMORY_CLASS forced it or QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB emulated a smaller Mac (both forced), and the emulated RAM in MB. Optional; absent on records published before 2026-09-25. Lineage contract 2 keys a forced or emulated tier apart from the host's; contract 1 never read it.",

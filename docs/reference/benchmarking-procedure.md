@@ -644,8 +644,13 @@ from the take's start: manifest published, session ready, script entered, submit
 playback ended, settled, end) and the lane keeps them as `take-phases.jsonl` beside the run, so
 per-take harness overhead is measured rather than inferred (audit #31); they time the harness around
 the measured windows, never inside them. The evidence manifest also names each take's effective seed
-and its source from the engine's receipt (generated per take today, so a run-on can be reproduced; a
-requested seed is published as the take's `seed`, audit #29) and flags the first warm take after a cold
+and its source from the engine's receipt, so a run-on can be reproduced. The lane runs under the seed
+policy `cell-hash-v1` by default (audit #29, `--seed-policy generated` opts out): the runner hands the
+registered `QWENVOICE_BENCH_SEED_POLICY` knob to the app, every take samples with the seed of its cell
+(`scripts/lib/bench_seed.py`), the checker refuses a take that sampled with any other seed (an app
+built without internal diagnostics ignores the knob and fails here), and the record names
+`run.seedPolicy` and each take's `seed`; lineage contract 2 keys a seeded matrix apart from random
+seeds. The iPhone lane does the same through a per-process cell schedule. The manifest flags the first warm take after a cold
 take (`followsColdTake`, audit #30): in the 16 canonical M2 records it is the slowest take of its cell
 in 14 (custom/short) and 11 (design/short) runs. The flag describes; nothing is excluded from medians.
 

@@ -43,6 +43,7 @@ from benchmark_memory import (  # noqa: E402
 from lib import rtf as rtf_semantics
 from lib import jsonio  # noqa: E402
 from lib import lineage_identity  # noqa: E402
+from lib import bench_seed  # noqa: E402
 from lib import trace_intervals  # noqa: E402
 from lib.language_metrics import LANGUAGE_CHECK_KINDS  # noqa: E402
 from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
@@ -125,6 +126,9 @@ SECTION_KEYS = {
         # Memory-tier provenance (audit #19): optional, schema v2 and later.
         # Lineage contract 2 keys a forced or emulated tier apart (audit #11).
         "runtimePolicy",
+        # How every take chose its sampling seed (lib/bench_seed.py, audit #29):
+        # optional, schema v2 and later; lineage contract 2 keys it.
+        "seedPolicy",
     },
     "hardware": {
         "profileID", "modelIdentifier", "marketingName", "chip", "memoryBytes",
@@ -291,7 +295,7 @@ SCHEMA_PROPERTY_KEYS = {
     "traceSummary": TRACE_SUMMARY_KEYS,
 }
 SCHEMA_REQUIRED_KEYS = {
-    "run": SECTION_KEYS["run"] - {"rtfDefinition", "ttfcDefinition", "runtimePolicy"},
+    "run": SECTION_KEYS["run"] - {"rtfDefinition", "ttfcDefinition", "runtimePolicy", "seedPolicy"},
     "hardware": SECTION_KEYS["hardware"],
     "source": SECTION_KEYS["source"],
     "toolchain": SECTION_KEYS["toolchain"],
@@ -340,7 +344,7 @@ V2_ONLY_EVIDENCE_KEYS = {
     "streamingTelemetryV9PublicationReadyCount",
 }
 # schema-v1 is frozen history; the first-chunk definition arrived after it.
-V2_ONLY_RUN_KEYS = {"ttfcDefinition", "runtimePolicy"}
+V2_ONLY_RUN_KEYS = {"ttfcDefinition", "runtimePolicy", "seedPolicy"}
 V2_ONLY_TAKE_KEYS = {
     "memoryStatus", "sampleSidecarDigest",
     "streamingTelemetryV9SidecarDigest", "samplingPromotionPackaged", "samplingWAVDigest",
@@ -708,6 +712,30 @@ def validate_runtime_policy(run: dict[str, Any]) -> None:
             raise HistoryError("a forced memory class can only publish non-comparable evidence")
     elif (device_class == "iphone_pro") != (run.get("platform") == "ios"):
         raise HistoryError("run.runtimePolicy device class does not match the platform")
+
+
+def validate_seed_policy(record: dict[str, Any]) -> None:
+    """Check run.seedPolicy against the takes' published seeds (audit #29).
+
+    cell-hash-v1 publishes every take's seed and each must be its cell's
+    (lib/bench_seed.py, the Swift policy's hash); generated publishes none;
+    requested publishes every take's."""
+    policy = record["run"]["seedPolicy"]
+    if policy not in bench_seed.SEED_POLICIES:
+        raise HistoryError(f"run.seedPolicy is unsupported: {policy!r}")
+    takes = record.get("takes", [])
+    if policy == bench_seed.GENERATED:
+        if any("seed" in take for take in takes):
+            raise HistoryError("run.seedPolicy generated cannot publish a take seed")
+        return
+    if any("seed" not in take for take in takes):
+        raise HistoryError(f"run.seedPolicy {policy} needs every take's seed")
+    if policy == bench_seed.CELL_HASH_V1:
+        for take in takes:
+            if take["seed"] != bench_seed.cell_seed(take["cell"]):
+                raise HistoryError(
+                    f"take {take['cell']} seed {take['seed']} is not its {policy} seed"
+                )
 
 
 def validate_lineage_inputs(record: dict[str, Any]) -> None:
@@ -2661,6 +2689,8 @@ def validate_record(
             raise HistoryError("run.ttfcDefinition declares a ttfcMS that no take carries")
     if "runtimePolicy" in run:
         validate_runtime_policy(run)
+    if "seedPolicy" in run:
+        validate_seed_policy(record)
 
     profiles = load_profiles()
     hardware = record["hardware"]

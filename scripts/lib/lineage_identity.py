@@ -75,6 +75,11 @@ GENERATION_TELEMETRY = (
     "scripts/benchmark_memory.py",
     "scripts/lib/rtf.py",
 )
+# The UI benchmark's seed policy (audit #29): the app side and the checkers' mirror.
+UI_BENCH_SEED_POLICY = (
+    "Sources/QwenVoiceCore/BenchSeedPolicy.swift",
+    "scripts/lib/bench_seed.py",
+)
 # The shared XCUITest driver code that runs inside every measured UI window.
 UI_AUTOMATION = (
     "Tests/UIAutomationSupport/VocelloPlaybackCaptureSupport.swift",
@@ -138,6 +143,7 @@ LINEAGE_PATHS: dict[tuple[str, str], tuple[str, ...]] = {
         "Tests/VocelloMacUITests/VocelloMacUITestCase.swift",
         "Tests/VocelloMacUITests/VocelloMacBenchmarkUITests.swift",
         "Tests/VocelloMacUITests/VocelloPlaybackCaptureSession.swift",
+        *UI_BENCH_SEED_POLICY,
         *APP_TIMELINE,
         *GENERATION_TELEMETRY,
     ),
@@ -147,6 +153,7 @@ LINEAGE_PATHS: dict[tuple[str, str], tuple[str, ...]] = {
         *UI_AUTOMATION,
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "Tests/VocelloiOSUITests/VocelloiOSBenchmarkUITests.swift",
+        *UI_BENCH_SEED_POLICY,
         *APP_TIMELINE,
         *GENERATION_TELEMETRY,
     ),

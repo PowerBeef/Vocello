@@ -2459,6 +2459,11 @@ struct StreamingExecutionContext: Sendable {
             // are reproducible from their evidence.
             tierNotes["samplingSeed"] = effectiveSeed
             tierNotes["samplingSeedSource"] = request.seed == nil ? "generated" : "requested"
+            // The benchmark seed policy the process ran under (audit #29); the
+            // lane checker recomputes the seed from the take's cell.
+            if let seedPolicy = BenchSeedPolicy.activePolicy {
+                tierNotes["samplingSeedPolicy"] = seedPolicy
+            }
         }
         if let talkerTopK = effectiveStringFlags["sampling_talker_top_k"] {
             tierNotes["samplingTalkerTopK"] = talkerTopK

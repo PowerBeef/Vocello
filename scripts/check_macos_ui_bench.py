@@ -35,6 +35,7 @@ from benchmark_memory import (  # noqa: E402
     qualify_memory_rows,
 )
 from lib import jsonio  # noqa: E402
+from lib import bench_seed  # noqa: E402
 
 DEFAULT_MODES = ["custom", "design", "clone"]
 DEFAULT_LENGTHS = ["short", "medium", "long"]
@@ -849,6 +850,7 @@ def build_manifest(
     memory_qualification: tuple | None = None,
     stall_gate: dict | None = None,
     runtime_policy: dict | None = None,
+    seed_policy: str | None = None,
 ) -> dict:
     # The gate already qualified these rows; reuse its result (audit #21).
     memory_evidence, memory_run = memory_qualification or qualify_memory_rows(
@@ -1038,6 +1040,9 @@ def build_manifest(
             "finishedAt": finished_at,
             "warnings": run_warnings,
             "rtfDefinition": rtf_semantics.STANDARD_RTF_DEFINITION,
+            # How every take chose its sampling seed (audit #29); lineage
+            # contract 2 keys a seeded matrix apart from random seeds.
+            **({"seedPolicy": seed_policy} if seed_policy is not None else {}),
             # A forced or emulated memory tier (audit #11) or a take above the
             # per-take load limit (audit #28) is exploratory evidence.
             **({"classification": "exploratory"} if exploratory else {}),
@@ -1123,6 +1128,10 @@ def main() -> int:
     parser.add_argument(
         "--stall-contract", type=Path, default=DEFAULT_STALL_CONTRACT, metavar="PATH",
         help="the stall gate's statistic, limit and calibration profile (config/macos-ui-stall-gate.json)",
+    )
+    parser.add_argument(
+        "--seed-policy", choices=bench_seed.LANE_SEED_POLICIES, default=None,
+        help="the seed policy the lane selected (audit #29); every take must have sampled under it",
     )
     parser.add_argument(
         "--variant", choices=MODEL_VARIANTS, default=DEFAULT_VARIANT,
@@ -1361,6 +1370,16 @@ def main() -> int:
             )
     stall_gate = stall_gate_summary(stall_contract, stall_observed, censored_heartbeats)
 
+    # The seed policy (audit #29): under cell-hash-v1 every take sampled with its
+    # cell's seed; the lane's selection must match what the rows ran.
+    seed_policy = None
+    if len(engine_rows) == expected:
+        seed_policy, seed_failures = bench_seed.run_seed_policy([
+            (cell, row.get("notes") or {}) for cell, row in zip(expected_cell_order, engine_rows, strict=True)
+        ])
+        failures.extend(seed_failures)
+        failures.extend(bench_seed.expected_policy_failure(args.seed_policy, seed_policy))
+
     # The record's tier provenance (audit #19, #11): a selection that does not
     # share one stamped tier and one emulation cannot publish a record.
     runtime_policy = None
@@ -1442,6 +1461,7 @@ def main() -> int:
             memory_qualification=memory_qualification,
             stall_gate=stall_gate,
             runtime_policy=runtime_policy,
+            seed_policy=seed_policy,
         )
         write_json_atomic(args.evidence_manifest, manifest)
         print(f"evidence={args.evidence_manifest}")

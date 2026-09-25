@@ -164,6 +164,7 @@ class CheckIOSUIBenchmarkTests(unittest.TestCase):
         evidence: bool = False,
         modes: str = "custom,clone",
         lengths: str = "short,medium",
+        extra_args: list[str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         self.last_manifest = None
         with tempfile.TemporaryDirectory() as temp:
@@ -238,6 +239,7 @@ class CheckIOSUIBenchmarkTests(unittest.TestCase):
                     "--label",
                     "fixture",
                 ])
+            command.extend(extra_args or [])
             result = subprocess.run(
                 command,
                 capture_output=True,
@@ -402,16 +404,50 @@ class CheckIOSUIBenchmarkTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("no promptChars", result.stdout + result.stderr)
 
-    def test_each_mode_freezes_one_sampling_seed(self) -> None:
+    def test_takes_sample_under_the_seed_policy_the_lane_selected(self) -> None:
+        """audit #29: seed = hash(cell) per take; generated seeds differ per take."""
+        from lib import bench_seed
+
         cells = self.FULL_CELLS
+        names = [f"{mode}/{length}/{state}#0" for mode, length, state in cells]
 
-        def two_seeds(rows):
-            rows[1]["notes"]["samplingSeed"] = "42"
-            rows[2]["notes"]["samplingSeed"] = "43"
+        def generated(rows):
+            for index, row in enumerate(rows, start=1):
+                row["notes"].update({"samplingSeed": str(1000 + index), "samplingSeedSource": "generated"})
 
-        result = self.run_checker(cells, mutate_rows=two_seeds)
+        # Every generation draws its own effective seed, so distinct seeds in a
+        # mode are the normal generated case (the old one-seed rule never held).
+        result = self.run_checker(cells, mutate_rows=generated, evidence=True, extra_args=["--seed-policy", "generated"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        record = self.last_manifest["historyRecord"]
+        self.assertEqual(record["run"]["seedPolicy"], "generated")
+        self.assertTrue(all("seed" not in take for take in record["takes"]))
+
+        def policy(rows):
+            for row, name in zip(rows, names, strict=True):
+                row["notes"].update({
+                    "samplingSeed": str(bench_seed.cell_seed(name)), "samplingSeedSource": "requested",
+                    "samplingSeedPolicy": "cell-hash-v1",
+                })
+
+        result = self.run_checker(cells, mutate_rows=policy, evidence=True, extra_args=["--seed-policy", "cell-hash-v1"])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        record = self.last_manifest["historyRecord"]
+        self.assertEqual(record["run"]["seedPolicy"], "cell-hash-v1")
+        self.assertEqual([take["seed"] for take in record["takes"]], [bench_seed.cell_seed(name) for name in names])
+
+        def off_schedule(rows):
+            policy(rows)
+            rows[2]["notes"]["samplingSeed"] = str(bench_seed.cell_seed(names[1]))
+
+        result = self.run_checker(cells, mutate_rows=off_schedule, extra_args=["--seed-policy", "cell-hash-v1"])
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("different sampling seeds", result.stdout + result.stderr)
+        self.assertIn("not its cell-hash-v1 seed", result.stdout + result.stderr)
+
+        # A build that ignored the knob sampled random seeds under a policy run.
+        result = self.run_checker(cells, mutate_rows=generated, extra_args=["--seed-policy", "cell-hash-v1"])
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("selected seed policy cell-hash-v1", result.stdout + result.stderr)
 
     def test_every_take_gets_the_model_identity_check_with_one_seed_per_mode(self) -> None:
         # V-1: the per-take identity and schema checks once ran only when a mode
@@ -565,6 +601,7 @@ modes=custom
 lengths=short
 warm=1
 label=fixture
+seed_policy=cell-hash-v1
 {function}
 if validate_ios_benchmark; then
   touch "$out/passed"

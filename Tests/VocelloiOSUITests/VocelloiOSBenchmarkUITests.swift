@@ -58,7 +58,7 @@ final class VocelloiOSBenchmarkUITests: VocelloiOSUITestCase {
                 || previousTake?.mode != take.mode
 
             if requiresNewSession {
-                launchApp(additionalEnvironment: [
+                var environment = [
                     "QVOICE_MAC_BENCH_RUN_ID": runID,
                     "QVOICE_IOS_BENCH_LABEL": label,
                     "QWENVOICE_BENCH_FORCE_COLD": take.warmState == .cold ? "1" : "0",
@@ -66,7 +66,19 @@ final class VocelloiOSBenchmarkUITests: VocelloiOSUITestCase {
                     // contexts + proactive-warm gate decisions) so UI-lane
                     // triage can read it from the pullable caches mirror.
                     "QVOICE_IOS_DEVICE_RUN_ID": runID,
-                ])
+                ]
+                // The seed policy scripts/ui_test.sh selects (audit #29). The
+                // app cannot read the runner's take file, so it gets this
+                // process's cells in take order and samples each generation
+                // with the next cell's seed.
+                if let policy = VocelloUIBenchMatrix.seedPolicy(
+                    environment: processEnvironment, keyPrefix: "QVOICE_IOS_BENCH"
+                ) {
+                    let cells = takes[offset...].prefix(while: { $0.mode == take.mode }).map(\.cellID)
+                    environment[VocelloUIBenchMatrix.seedPolicyAppKey] = policy
+                    environment[VocelloUIBenchMatrix.seedCellsAppKey] = cells.joined(separator: ",")
+                }
+                launchApp(additionalEnvironment: environment)
                 preparedMode = nil
             }
 

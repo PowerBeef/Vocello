@@ -991,6 +991,23 @@ public enum VocelloUIBenchMatrix {
         }
     }
 
+    /// The app's registered benchmark seed-policy knob (`BenchSeedPolicy`,
+    /// audit #29) and, for a process that runs several takes without a
+    /// current-take file (the iPhone), its ordered cell schedule.
+    public static let seedPolicyAppKey = "QWENVOICE_BENCH_SEED_POLICY"
+    public static let seedCellsAppKey = "QWENVOICE_BENCH_SEED_CELLS"
+
+    /// The seed policy the runner selected through `<prefix>_SEED_POLICY`, or
+    /// nil for random per-take seeds (`generated` or absent).
+    public static func seedPolicy(environment: [String: String], keyPrefix: String) -> String? {
+        guard let raw = environment["\(keyPrefix)_SEED_POLICY"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !raw.isEmpty, raw != "generated" else {
+            return nil
+        }
+        return raw
+    }
+
     public static let voiceDesignBrief =
         "A warm, calm middle-aged male narrator with a clear, measured pace."
     public static let cloneVoiceID = "A_warm_elderly_woman"

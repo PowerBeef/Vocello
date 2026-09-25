@@ -31,7 +31,7 @@ Usage:
   scripts/ui_test.sh macos marketing [--scenario all|models]
   scripts/ui_test.sh macos localization
   scripts/ui_test.sh macos smoke [--scenario layout|studio-content|generation-errors] [--long-form-segments N]
-  scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
+  scripts/ui_test.sh macos benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v1|generated]
   scripts/ui_test.sh macos perf
   scripts/ui_test.sh ios localization
   scripts/ui_test.sh ios smoke
@@ -39,7 +39,7 @@ Usage:
   scripts/ui_test.sh ios smoke --scenario foreground-exit
   scripts/ui_test.sh ios smoke --scenario update-models
   scripts/ui_test.sh ios smoke --preinstalled-candidate VERIFIED_RELEASE_DIRECTORY [--retain-result]
-  scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID]
+  scripts/ui_test.sh ios benchmark [--modes custom,design,clone] [--lengths short,medium,long] [--warm 3] [--label RUN_ID] [--seed-policy cell-hash-v1|generated]
   scripts/ui_test.sh ios perf [--label RUN_ID]
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
   scripts/ui_test.sh ios startup-parity --script-file UNTRACKED.txt
@@ -71,6 +71,8 @@ visible Files-import flow; stage the reference WAV and .txt sidecar in the app's
 the lane begins in Studio Clone, imports, auto-transcribes, saves, generates, previews, and deletes
 that throwaway voice through visible production UI.
 No lane retries automatically. A failed run keeps its log, xcresult, screenshots, and diagnostics.
+`benchmark --seed-policy` (default cell-hash-v1, audit #29) samples every take with a seed derived
+from its cell through the registered QWENVOICE_BENCH_SEED_POLICY knob; `generated` keeps random seeds.
 `smoke --scenario history-transcript` only observes one retained harbor-fixture History row.
 It generates no audio and exports its raw transcript untracked; success is an observation, not full smoke acceptance.
 `--preinstalled-candidate` is a separate, black-box navigation proof, not instrumented smoke.
@@ -106,6 +108,7 @@ modes="custom,design,clone"
 lengths="short,medium,long"
 warm=3
 label=""
+seed_policy="cell-hash-v1"
 long_form_segments=""
 perf_run_started_epoch_ms=0
 cohort_takes=20
@@ -147,6 +150,8 @@ while [[ $# -gt 0 ]]; do
     --warm=*) warm="${1#*=}"; shift ;;
     --label) label="${2:?--label requires a value}"; shift 2 ;;
     --label=*) label="${1#*=}"; shift ;;
+    --seed-policy) seed_policy="${2:?--seed-policy requires a value}"; shift 2 ;;
+    --seed-policy=*) seed_policy="${1#*=}"; shift ;;
     --takes) cohort_takes="${2:?--takes requires a value}"; shift 2 ;;
     --takes=*) cohort_takes="${1#*=}"; shift ;;
     --take-limit) control_take_limit="${2:?--take-limit requires a value}"; control_take_limit_explicit=1; shift 2 ;;
@@ -164,6 +169,8 @@ while [[ $# -gt 0 ]]; do
 done
 validate_benchmark_label "$label"
 validate_benchmark_label "$control_resume"
+[[ "$seed_policy" == "cell-hash-v1" || "$seed_policy" == "generated" ]] \
+  || die "--seed-policy must be cell-hash-v1 or generated"
 if [[ -n "$candidate_evidence" ]]; then
   [[ "$platform" == "ios" && "$lane" == "smoke" && -d "$candidate_evidence" ]] \
     || die "--preinstalled-candidate requires ios smoke and verified release evidence"
@@ -1220,6 +1227,7 @@ validate_macos_benchmark() {
         --crash-delta-passed \
         --stall-contract "$ROOT_DIR/config/macos-ui-stall-gate.json" \
         --variant speed \
+        --seed-policy "$seed_policy" \
         --playback-capture-dir "$out/playback-capture" \
         --outputs-dir "$HOME/Library/Application Support/QwenVoice-Debug/outputs" \
         >"$out/benchmark-gate.txt" 2>&1 || status=$?
@@ -1262,6 +1270,7 @@ PY
   if ! python3 "$ROOT_DIR/scripts/check_ios_ui_benchmark.py" "$diagnostics" \
       --run-id "$run_id" --modes "$modes" --lengths "$lengths" --warm "$warm" \
       --generation-map "$generation_map" \
+      --seed-policy "$seed_policy" \
       --label "${label:-$run_id}" --evidence-manifest "$evidence" \
       --build-provenance "$out/last-build.json" \
       --crash-delta-passed \
@@ -1461,6 +1470,9 @@ elif [[ "$platform" == "macos" ]]; then
     export TEST_RUNNER_QVOICE_MAC_BENCH_LENGTHS="$lengths"
     export TEST_RUNNER_QVOICE_MAC_BENCH_WARM="$warm"
     export TEST_RUNNER_QVOICE_MAC_BENCH_LABEL="${label:-$run_id}"
+    # The benchmark seed policy (audit #29): the runner hands the registered
+    # knob to the app, which samples each take with its cell's seed.
+    export TEST_RUNNER_QVOICE_MAC_BENCH_SEED_POLICY="$seed_policy"
     # Played-audio capture (PC-01): the runner taps the app's own output per take
     # and writes take-NN-<cell>.wav/.json here; absent captures never fail the lane.
     mkdir -p "$out/playback-capture"
@@ -1624,6 +1636,9 @@ else
     export TEST_RUNNER_QVOICE_IOS_BENCH_LENGTHS="$lengths"
     export TEST_RUNNER_QVOICE_IOS_BENCH_WARM="$warm"
     export TEST_RUNNER_QVOICE_IOS_BENCH_LABEL="${label:-$run_id}"
+    # The benchmark seed policy (audit #29): each mode's process gets its cells
+    # in take order and samples each generation with the next cell's seed.
+    export TEST_RUNNER_QVOICE_IOS_BENCH_SEED_POLICY="$seed_policy"
   elif [[ "$lane" == "delivery-cohort" ]]; then
     only_test="VocelloiOSUITests/VocelloiOSDeliveryCohortUITests/testNeutralCustomDeliveryCohort"
     export TEST_RUNNER_QVOICE_IOS_COHORT_RUN_ID="$run_id"

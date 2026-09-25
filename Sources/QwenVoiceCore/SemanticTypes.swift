@@ -1627,6 +1627,30 @@ public struct GenerationRequest: Hashable, Codable, Sendable {
             deliveryInstructionCellID: deliveryInstructionCellID
         )
     }
+
+    /// The same request sampling with an explicit seed (the internal benchmark
+    /// seed policy, `BenchSeedPolicy`, audit #29).
+    public func withSeed(_ seed: UInt64) -> GenerationRequest {
+        GenerationRequest(
+            mode: mode,
+            modelID: modelID,
+            text: text,
+            outputPath: outputPath,
+            shouldStream: shouldStream,
+            streamingInterval: streamingInterval,
+            batchIndex: batchIndex,
+            batchTotal: batchTotal,
+            streamingTitle: streamingTitle,
+            languageHint: languageHint,
+            payload: payload,
+            generationID: generationID,
+            seed: seed,
+            variation: variation,
+            suppressStreamingPreview: suppressStreamingPreview,
+            captureCodecTrace: captureCodecTrace,
+            deliveryInstructionCellID: deliveryInstructionCellID
+        )
+    }
 }
 
 public struct GenerationProgress: Hashable, Codable, Sendable {

@@ -1089,9 +1089,11 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     }
 
     public func generate(_ request: GenerationRequest) async throws -> GenerationResult {
-        let request = request.generationID == nil
-            ? request.withGenerationID(UUID())
-            : request
+        // The internal benchmark seed policy (audit #29) returns the request
+        // unchanged unless its registered knob is set under internal diagnostics.
+        let request = BenchSeedPolicy.applying(
+            to: request.generationID == nil ? request.withGenerationID(UUID()) : request
+        )
         let deliveryGenerationID = request.generationID!
         eventRouter.beginGeneration(deliveryGenerationID)
         let cancellationIngress = GenerationCancellationIngress()

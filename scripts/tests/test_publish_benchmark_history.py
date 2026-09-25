@@ -3506,6 +3506,22 @@ class PublisherTests(unittest.TestCase):
         with self.assertRaises(publisher.PublicationError):
             self.extract_intervals(require_cpu_samples=False)
 
+    def test_profile_takes_name_the_capture_that_perturbed_them(self) -> None:
+        # audit #50/#69: a profile keeps its memory qualification, and each
+        # take says which Instruments capture its metrics were measured under.
+        takes = [{"warnings": ["qc.fixture"], "status": "passedWithWarnings"}, {"warnings": [], "status": "passed"}]
+        publisher.label_instrumented_takes(takes, {"captureSettings": {"profileKind": "witness"}})
+        self.assertEqual(
+            [take["warnings"] for take in takes],
+            [["qc.fixture", "trace.instrumented:witness"], ["trace.instrumented:witness"]],
+        )
+        self.assertEqual({take["status"] for take in takes}, {"passedWithWarnings"})
+        unchanged = [{"warnings": [], "status": "passed"}]
+        publisher.label_instrumented_takes(unchanged, None)
+        self.assertEqual(unchanged, [{"warnings": [], "status": "passed"}])
+        with self.assertRaises(publisher.PublicationError):
+            publisher.label_instrumented_takes(unchanged, {"captureSettings": {}})
+
     def test_a_profile_matrix_names_its_profile_kind(self) -> None:
         cells = ["custom/speed/medium/cold#0", "custom/speed/medium/warm#0"]
         plain = publisher.engine_matrix_hash(cells, "verbose", True, 19790615)

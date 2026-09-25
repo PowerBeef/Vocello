@@ -1281,6 +1281,24 @@ def apply_memory_qualification(
         take["status"] = "passedWithWarnings" if take["warnings"] else "passed"
 
 
+def label_instrumented_takes(takes: list[dict[str, Any]], trace: dict[str, Any] | None) -> None:
+    """Name what perturbed a profile's takes on each take (audit #50, #69).
+
+    A profile keeps its memory qualification, but its sampler and timing
+    metrics were measured under Instruments: `trace.instrumented:<kind>` says
+    which capture (cpu: CPU Profiler; memory: CPU Profiler, Allocations and VM
+    Tracker; witness: os_signpost alone) wherever the take's metrics travel."""
+    if trace is None:
+        return
+    settings = trace.get("captureSettings")
+    kind = settings.get("profileKind") if isinstance(settings, dict) else None
+    if not isinstance(kind, str) or not kind:
+        raise PublicationError("profile trace evidence does not name its profile kind")
+    for take in takes:
+        take["warnings"] = sorted(set(take.get("warnings", [])) | {f"trace.instrumented:{kind}"})
+        take["status"] = "passedWithWarnings"
+
+
 def compact_memory_evidence(memory_run: dict[str, Any]) -> dict[str, Any]:
     return {
         key: memory_run[key]
@@ -1827,6 +1845,8 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
     except MemoryEvidenceError as error:
         raise PublicationError(str(error)) from error
     apply_memory_qualification(takes, qualified_memory)
+    if kind == "instrument-profile":
+        label_instrumented_takes(takes, trace)
     retention_evidence: dict[str, Any] = {}
     memory_policy_digest = "not-applicable"
     if kind == "memory-qualification":
@@ -2002,6 +2022,8 @@ def ios_engine_command(
     except MemoryEvidenceError as error:
         raise PublicationError(str(error)) from error
     apply_memory_qualification([take], qualified_memory)
+    if kind == "instrument-profile":
+        label_instrumented_takes([take], trace)
     fixture_digest = sentinel.get("fixtureDigest")
     require_fixture_cross_check(
         [take],

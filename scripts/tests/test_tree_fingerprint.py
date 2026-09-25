@@ -75,5 +75,45 @@ class TreeFingerprintTests(unittest.TestCase):
         self.assertEqual(before, self.fingerprint())
 
 
+class BuildInputsFingerprintTests(TreeFingerprintTests):
+    """audit #75: the UI build skip keys on build inputs, not the whole tree."""
+
+    def commit(self, relative: str, text: str) -> None:
+        path = self.root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        subprocess.run(["git", "-C", self.root, "add", relative], check=True)
+        subprocess.run(["git", "-C", self.root, "commit", "-qm", relative], check=True)
+
+    def build_inputs(self) -> str:
+        return MODULE.build_inputs_fingerprint(self.root)
+
+    def test_a_publication_or_roadmap_commit_keeps_the_identity(self) -> None:
+        before = self.build_inputs()
+        whole_tree = self.fingerprint()
+        self.commit("benchmarks/runs/ui-generation/run.json", "{}\n")
+        self.commit("benchmarks/HISTORY.md", "index\n")
+        self.commit("docs/charts/chart.svg", "<svg/>\n")
+        self.commit("website/src/page.jsx", "page\n")
+        self.commit("config/roadmap.json", "{}\n")
+        (self.root / "docs" / "notes.md").write_text("draft\n", encoding="utf-8")
+        self.assertEqual(before, self.build_inputs())
+        self.assertNotEqual(whole_tree, self.fingerprint())
+
+    def test_any_build_input_change_moves_the_identity(self) -> None:
+        before = self.build_inputs()
+        (self.root / "tracked.txt").write_text("edited\n", encoding="utf-8")
+        edited = self.build_inputs()
+        self.assertNotEqual(before, edited)
+        subprocess.run(["git", "-C", self.root, "commit", "-qam", "edit"], check=True)
+        # Committing the same content keeps the identity: it binds content, not the commit.
+        self.assertEqual(edited, self.build_inputs())
+        (self.root / "Sources").mkdir()
+        (self.root / "Sources" / "New.swift").write_text("let x = 1\n", encoding="utf-8")
+        self.assertNotEqual(edited, self.build_inputs())
+        self.commit("config/other-contract.json", "{}\n")
+        self.assertNotEqual(edited, self.build_inputs())
+
+
 if __name__ == "__main__":
     unittest.main()

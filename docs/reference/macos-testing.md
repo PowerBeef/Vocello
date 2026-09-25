@@ -253,8 +253,10 @@ fails fast with the same evidence when the app window is obscured, and an interr
 sentinel names any unrelated modal that blocks an interaction (it never answers TCC dialogs —
 those stay human-answered). The macOS lanes run an advisory `ui-preflight` step that warns when
 the app's microphone or speech-recognition TCC grant is undecided, execute in two phases
-(a skippable `build-for-testing` keyed to a source fingerprint, then `test-without-building`, so
-repeat runs on an unchanged tree skip the rebuild entirely), and write a per-test verdict sidecar
+(a skippable `build-for-testing` keyed to the build inputs' content fingerprint,
+`tree_fingerprint.py --build-inputs`, then `test-without-building`, so repeat runs skip the rebuild
+while no build input changed; a commit that only publishes records or touches docs, the website or
+the roadmap keeps the skip), and write a per-test verdict sidecar
 (`test-results.json`) next to `run.json`.
 
 Benchmark accepts `--modes`, `--lengths`, `--warm`, and `--label`. Filters are explicit diagnostic

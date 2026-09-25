@@ -1506,10 +1506,12 @@ WAV
   # followed by test-without-building against the already-built products.
   # Ordinary CI never invokes this script; the workflow-YML guard on
   # test-without-building is unaffected.
-  # The shared helper binds HEAD, staged/unstaged bytes, and untracked content.
-  # One implementation prevents UI-build and commit-gate cache semantics from
-  # drifting apart.
-  mac_fingerprint="$(python3 "$ROOT_DIR/scripts/tree_fingerprint.py" --root "$ROOT_DIR")"
+  # The shared helper binds the build inputs' tracked, staged/unstaged and
+  # untracked content; `--build-inputs` leaves out the commit ID and the paths
+  # no build reads (published records, docs, website, roadmap), so a
+  # publication commit alone keeps the skip (audit #75). One implementation
+  # prevents UI-build and commit-gate cache semantics from drifting apart.
+  mac_fingerprint="$(python3 "$ROOT_DIR/scripts/tree_fingerprint.py" --root "$ROOT_DIR" --build-inputs)"
   mac_build_marker="$MAC_DERIVED/.vocello-ui-build-fingerprint"
   mac_products_ready="$(find "$MAC_DERIVED/Build/Products" -maxdepth 1 \
     -name 'VocelloMacUI_*.xctestrun' -print -quit 2>/dev/null || true)"

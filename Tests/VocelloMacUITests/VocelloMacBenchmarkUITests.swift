@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Darwin
 @preconcurrency import XCTest
@@ -89,10 +90,8 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
             }
             phases.mark("manifestReadyMS")
 
-            let previous = offset > 0 ? takes[offset - 1] : nil
-            let requiresNewSession = offset == 0
-                || take.warmState == .cold
-                || (take.mode == .clone && previous?.mode != .clone)
+            let requiresNewSession = Self.startsSession(takes, at: offset)
+            let capturesPlayback = Self.capturesPlayback(takes, at: offset)
             if requiresNewSession {
                 relaunchApp(
                     additionalEnvironment: launchEnvironment(
@@ -110,12 +109,15 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
                 preparedMode = take.mode
             }
             phases.relaunched = requiresNewSession
+            phases.captured = capturesPlayback
             phases.mark("sessionReadyMS")
 
             XCTContext.runActivity(named: "Take \(takeIndex): \(take.cellID)") { _ in
-                replaceScript(with: take.text)
+                pasteScript(take.text)
                 phases.mark("scriptReadyMS")
-                capture?.beginTake(index: takeIndex, cell: take.cellID, warmState: take.warmState.rawValue)
+                if capturesPlayback {
+                    capture?.beginTake(index: takeIndex, cell: take.cellID, warmState: take.warmState.rawValue)
+                }
                 generateAndWaitForCompletion(
                     mode: take.mode,
                     timeout: timeout(for: take),
@@ -126,21 +128,32 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
                     onAfterGenerateClick: { capture?.markSubmitReturned() }
                 )
                 phases.mark("completedMS")
-                // Every take plays out before the next begins, whether or not the
-                // capture is live (audit #74): the idle gap before the next take,
-                // and so its pacing, never depends on the recording grant.
-                let playbackEnded = waitForPlaybackToFinish(timeout: timeout(for: take))
-                phases.mark("playbackEndedMS")
-                if let capture, !capture.isIdle {
-                    // The tap stops once the captured audio itself has been quiet
-                    // for half a second after the player stopped.
-                    _ = VocelloUIWait.condition("captured audio to fall silent after playback", timeout: 5) {
-                        capture.capturedAudioIsQuiet(forLast: 0.5)
+                if capturesPlayback {
+                    // A captured take plays out before the next begins, whether or
+                    // not the tap is live (audit #74): the idle gap before the next
+                    // take, and so its pacing, never depends on the recording grant.
+                    let playbackEnded = waitForPlaybackToFinish(timeout: timeout(for: take))
+                    phases.mark("playbackEndedMS")
+                    if let capture, !capture.isIdle {
+                        // The tap stops once the captured audio itself has been quiet
+                        // for half a second after the player stopped.
+                        _ = VocelloUIWait.condition("captured audio to fall silent after playback", timeout: 5) {
+                            capture.capturedAudioIsQuiet(forLast: 0.5)
+                        }
+                        capture.endTake(playbackEnded: playbackEnded)
+                    } else {
+                        capture?.endTake(playbackEnded: playbackEnded)
+                        // The same half-second tail the capture's quiet check waits.
+                        _ = XCTWaiter.wait(for: [XCTestExpectation(description: "post-playback settle")], timeout: 0.5)
                     }
-                    capture.endTake(playbackEnded: playbackEnded)
                 } else {
-                    capture?.endTake(playbackEnded: playbackEnded)
-                    // The same half-second tail the capture's quiet check waits.
+                    // Every other take stops its playback at completion through
+                    // the visible player control and settles the same half second
+                    // (audit #31): one captured repetition per cell is the played-
+                    // audio evidence, and the rest no longer wait out their audio.
+                    // Which takes play out is fixed by the matrix, never by the grant.
+                    stopPlayback()
+                    phases.mark("playbackEndedMS")
                     _ = XCTWaiter.wait(for: [XCTestExpectation(description: "post-playback settle")], timeout: 0.5)
                 }
                 phases.mark("settledMS")
@@ -155,6 +168,71 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
             phases.mark("endMS")
             phases.emit()
         }
+    }
+
+    /// Whether a take starts a new app session: the first take, a cold take,
+    /// and the first Clone take after another mode (the saved voice is chosen
+    /// on a fresh launch).
+    static func startsSession(_ takes: [VocelloUIBenchMatrix.Take], at offset: Int) -> Bool {
+        let take = takes[offset]
+        return offset == 0
+            || take.warmState == .cold
+            || (take.mode == .clone && takes[offset - 1].mode != .clone)
+    }
+
+    /// Whether a take's played audio is captured (audit #31, #74): the last warm
+    /// repetition of each mode and length, never a take that starts a session.
+    /// A relaunched app has no Core Audio process object until its first
+    /// playback, so a tap armed on a session's first take attaches mid-take; a
+    /// later take's process has already opened its device, so the tap is live
+    /// before submit. `scripts/check_macos_ui_bench.py` mirrors this plan.
+    static func capturesPlayback(_ takes: [VocelloUIBenchMatrix.Take], at offset: Int) -> Bool {
+        let take = takes[offset]
+        guard take.warmState == .warm, !startsSession(takes, at: offset) else { return false }
+        return !takes[(offset + 1)...].contains {
+            $0.warmState == .warm && $0.mode == take.mode && $0.length == take.length
+        }
+    }
+
+    /// Enters the take's script with one genuine paste (Cmd-A, Cmd-V) instead of
+    /// typing it a key at a time (audit #31: about 1,450 keystrokes a run), and
+    /// leaves a script that already matches alone. Both happen before the take's
+    /// submit, outside every measured window. The general pasteboard's previous
+    /// text is put back once the paste has landed.
+    private func pasteScript(_ text: String) {
+        let editor = element("textInput_textEditor")
+        if (editor.value as? String) != text {
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: editor, timeout: 20))
+            let pasteboard = NSPasteboard.general
+            let previous = pasteboard.string(forType: .string)
+            pasteboard.clearContents()
+            pasteboard.setString(text, forType: .string)
+            editor.typeKey("a", modifierFlags: .command)
+            editor.typeKey("v", modifierFlags: .command)
+            _ = VocelloUIWait.settles("pasted script to land", timeout: 10) {
+                editor.value as? String == text
+            }
+            pasteboard.clearContents()
+            if let previous {
+                pasteboard.setString(previous, forType: .string)
+            }
+        }
+        XCTAssertTrue(VocelloUIWait.condition("script to match entered text", timeout: 10) {
+            editor.value as? String == text
+        })
+    }
+
+    /// Pauses the take's playback through the visible player control, if it is
+    /// still playing. The control is labelled with the action it performs, so
+    /// "Play" means playback is not running (every lane pins English).
+    private func stopPlayback() {
+        let inline = button("studio_inlinePlayer_playPause")
+        let control = inline.exists ? inline : button("sidebarPlayer_playPause")
+        guard control.exists, control.label != "Play" else { return }
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: control, timeout: 10))
+        XCTAssertTrue(VocelloUIWait.condition("playback to stop", timeout: 10) {
+            !control.exists || control.label == "Play"
+        })
     }
 
     private func launchEnvironment(
@@ -202,6 +280,14 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
             XCTFail("Could not encode benchmark take manifest")
             return false
         }
+        // An unsandboxed runner (scripts/ui_test.sh re-signed it and says so)
+        // writes the file itself instead of relaying it through the log and
+        // polling for the shell (audit #31); the relay stays the fallback.
+        if Self.writesManifestDirectly, writeCurrentTakeManifest(data) {
+            print("VOCELLO_BENCH_TAKE_FILE_WRITTEN take=\(takeIndex)")
+            fflush(stdout)
+            return true
+        }
         print("VOCELLO_BENCH_TAKE_MANIFEST=\(data.base64EncodedString())")
         fflush(stdout)
         return VocelloUIWait.condition(
@@ -209,6 +295,20 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
             timeout: 10
         ) {
             (try? Data(contentsOf: Self.takeFile)) == data
+        }
+    }
+
+    private static var writesManifestDirectly: Bool {
+        ProcessInfo.processInfo.environment["QVOICE_MAC_BENCH_DIRECT_MANIFEST"] == "1"
+    }
+
+    /// Writes the current-take file atomically and reads it back.
+    private func writeCurrentTakeManifest(_ data: Data) -> Bool {
+        do {
+            try data.write(to: Self.takeFile, options: .atomic)
+            return (try? Data(contentsOf: Self.takeFile)) == data
+        } catch {
+            return false
         }
     }
 
@@ -235,6 +335,8 @@ private final class VocelloBenchTakePhases {
     private let cell: String
     private var offsetsMS: [String: Int] = [:]
     var relaunched = false
+    /// Whether the take played out for the played-audio capture (audit #31).
+    var captured = false
 
     init(takeIndex: Int, cell: String) {
         start = clock.now
@@ -252,6 +354,7 @@ private final class VocelloBenchTakePhases {
             "takeIndex": takeIndex,
             "cell": cell,
             "relaunched": relaunched,
+            "captured": captured,
             "startEpochMS": startEpochMS,
         ]
         for (phase, offset) in offsetsMS {

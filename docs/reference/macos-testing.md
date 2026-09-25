@@ -162,12 +162,13 @@ voice, attaches the captures for export and publishes nothing. Its run record ca
 `evidenceClass: marketing-assets`; it is never acceptance, promotion or benchmark evidence.
 
 The benchmark lane also records what the app actually plays: the test runner taps the app's own
-audio output for every take (Core Audio process tap, physical output muted while tapped, one
+audio output for one take per cell (the last warm repetition that does not start an app session;
+Core Audio process tap, physical output muted while tapped, one
 manual System Audio Recording grant for the lane-re-signed `com.qwenvoice.app.uitests.xctrunner`), writes the captures under the run's
 `playback-capture/` directory and the checker compares each one with the published take WAV
 (`playbackCapture*` metrics, warn codes, and since 2026-09-14 a gate on captured takes; the smoke lane captures its completed-generation take as well; see
 [`benchmarking-procedure.md`](benchmarking-procedure.md) §4.10). A missing or denied capture never
-fails the lane; the take reads `playbackCaptureStatus: unavailable`.
+fails the lane; a planned take reads `playbackCaptureStatus: unavailable`.
 
 ## UI-performance lane (`macos perf`)
 

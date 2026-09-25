@@ -805,17 +805,43 @@ def evaluate_playback_capture(
             "summary": summary, "gateFailures": gate}
 
 
+def starts_session(cells: list[str], position: int) -> bool:
+    """Whether the take at 0-based `position` starts a new app session: the first
+    take, a cold take, or the first Clone take after another mode
+    (`VocelloMacBenchmarkUITests.startsSession`)."""
+    if position == 0 or "/cold#" in cells[position]:
+        return True
+    return cells[position].startswith("clone/") and not cells[position - 1].startswith("clone/")
+
+
+def capture_plan(cells: list[str]) -> set[int]:
+    """The 1-based takes whose played audio the runner captures (audit #31, #74):
+    the last warm repetition of each mode and length, never a take that starts a
+    session (a relaunched app opens its audio device only at its first playback,
+    so the tap would attach mid-take). `VocelloMacBenchmarkUITests.capturesPlayback`
+    applies the same plan; every other take stops its playback at completion."""
+    last: dict[str, int] = {}
+    for position, cell in enumerate(cells):
+        if "/warm#" in cell:
+            last[cell.rsplit("#", 1)[0]] = position
+    return {position + 1 for position in last.values() if not starts_session(cells, position)}
+
+
 def evaluate_all_captures(
     cells: list[str], engine_rows: list[dict], app_rows: list[dict],
     playback_capture_dir: Path | None, outputs_dir: Path | None,
 ) -> dict[int, dict]:
-    """Every take's capture evidence, keyed by take index, before the verdict is decided."""
+    """The capture evidence of every planned take, keyed by take index, before the
+    verdict is decided; takes outside the capture plan carry none."""
     if playback_capture_dir is None:
         return {}
     captures = playback_capture.collect_captures(playback_capture_dir)
     app_by_id = {row.get("generationID"): row for row in app_rows}
+    planned = capture_plan(cells)
     results: dict[int, dict] = {}
     for index, (row, cell) in enumerate(zip(engine_rows, cells, strict=True), start=1):
+        if index not in planned:
+            continue
         mode = cell.split("/")[0]
         output = row.get("outputMetrics") or {}
         app_row = app_by_id.get(row.get("generationID")) or {}
@@ -1022,7 +1048,9 @@ def build_manifest(
             "runID": run_id,
             "takes": capture_summary,
             "captured": sum(1 for item in capture_summary if item.get("status") == "captured"),
-            "expected": len(cells),
+            # One captured repetition per cell (audit #31): the plan, not every take.
+            "expected": len(capture_plan(cells)),
+            "plannedTakes": sorted(capture_plan(cells)),
             "gate": {
                 "coverageMin": playback_capture.GATE_COVERAGE_MIN,
                 "residualMaxDBFS": playback_capture.GATE_RESIDUAL_MAX_DBFS,

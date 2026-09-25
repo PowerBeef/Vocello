@@ -1063,14 +1063,38 @@ class PlaybackCaptureEvidenceTests(CheckMacOSUIBenchmarkTests):
             self.assertNotIn("playback.capture.misaligned", captured["warnings"])
             self.assertAlmostEqual(captured["metrics"]["playbackCaptureFirstAudibleMS"], 30.0, delta=pc_frame_ms() + 1)
             for other in (takes[0], *takes[2:]):
-                self.assertEqual(other["playbackCaptureStatus"], "unavailable")
                 self.assertNotIn("playbackCaptureDigest", other)
                 self.assertFalse([k for k in other["metrics"] if k.startswith("playbackCapture")])
+            # One captured repetition per cell (audit #31): the last warm take of
+            # each cell that does not start a session. The cold take and the
+            # first Clone take (both relaunch the app) are outside the plan and
+            # carry no capture fields; a planned take without a sidecar reads
+            # unavailable.
+            self.assertEqual(
+                [take.get("playbackCaptureStatus") for take in takes],
+                [None, "captured", "unavailable", None, "unavailable"],
+            )
             summary = json.loads((captures / "summary.json").read_text())
-            self.assertEqual((summary["captured"], summary["expected"]), (1, 5))
+            self.assertEqual((summary["captured"], summary["expected"]), (1, 3))
+            self.assertEqual(summary["plannedTakes"], [2, 3, 5])
             self.assertEqual(summary["gate"]["failedTakes"], [])
             self.assertEqual(summary["gate"]["coverageMin"], 0.98)
-            self.assertEqual(summary["takes"][1]["reference"].endswith("_fixture.wav"), True)
+            planned = {item["takeIndex"]: item for item in summary["takes"]}
+            self.assertTrue(planned[2]["reference"].endswith("_fixture.wav"))
+
+    def test_the_capture_plan_is_one_repetition_per_cell_never_a_session_start(self) -> None:
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import check_macos_ui_bench as checker
+        cells = checker.expected_cells(["custom", "design", "clone"], ["short", "medium", "long"], 3)
+        plan = checker.capture_plan(cells)
+        self.assertEqual(sorted(cells[index - 1] for index in plan), sorted(
+            f"{mode}/{length}/warm#2" for mode in ("custom", "design", "clone") for length in ("short", "medium", "long")
+        ))
+        # With one repetition, the first Clone take relaunches the app and is not captured.
+        single = checker.expected_cells(["custom", "clone"], ["short", "medium"], 1)
+        self.assertEqual(sorted(single[index - 1] for index in checker.capture_plan(single)), [
+            "clone/medium/warm#0", "custom/medium/warm#0", "custom/short/warm#0",
+        ])
 
     def test_a_lane_without_a_capture_directory_adds_no_capture_fields(self) -> None:
         result = self.run_checker(self.expected_order, evidence=True)

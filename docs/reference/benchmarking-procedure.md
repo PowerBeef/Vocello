@@ -636,14 +636,26 @@ distinct "rows not yet present" exit (75), for about ten seconds. Timing lanes a
 their own build settle (up to 90 s, down to the core count) and re-apply the quiet-host rule after
 build-for-testing, before the first take.
 
-Every take plays out before the next begins, with a half-second tail, whether or not the played-audio
-capture is live, so the idle gap between takes never depends on the recording grant (audit #74). The
-app row keeps the take identity it was submitted under, and the checker refuses a run whose app and
-engine rows name different takes. The runner prints each take's harness phases (monotonic offsets
-from the take's start: manifest published, session ready, script entered, submit, completion seen,
-playback ended, settled, end) and the lane keeps them as `take-phases.jsonl` beside the run, so
-per-take harness overhead is measured rather than inferred (audit #31); they time the harness around
-the measured windows, never inside them. The evidence manifest also names each take's effective seed
+One repetition of each cell is captured (audit #31): the last warm repetition of each mode and
+length, never a take that starts an app session (the first take, a cold take, the first Clone take).
+Those takes play out before the next begins, with a half-second tail; every other take pauses its
+playback through the visible player control at completion and settles the same half second. Which
+takes play out is fixed by the matrix, never by the recording grant, so the idle gap before a take
+never depends on whether the tap is live (audit #74). A relaunched app has no Core Audio process
+object until its first playback, so a tap armed on a session's first take would attach mid-take;
+the plan never captures one, and every captured take's tap is live before its submit (audit #74 part
+4). Making the app open its output device at launch instead would move the device-open cost out of
+the first take's measured playback-scheduling latency and change the shipped audio lifecycle, so
+the app is left as it is. The runner pastes each take's script with one genuine paste (Cmd-A,
+Cmd-V, restoring the pasteboard's text) instead of typing it a key at a time, and an unsandboxed
+runner (the lane re-signed it) writes the current-take file itself instead of relaying it through
+the log and polling; a sandboxed one keeps the relay. The app row keeps the take identity it was
+submitted under, and the checker refuses a run whose app and engine rows name different takes. The
+runner prints each take's harness phases (monotonic offsets from the take's start: manifest
+published, session ready, script entered, submit, completion seen, playback ended, settled, end,
+and whether the take was captured) and the lane keeps them as `take-phases.jsonl` beside the run,
+so per-take harness overhead is measured rather than inferred (audit #31); they time the harness
+around the measured windows, never inside them. The evidence manifest also names each take's effective seed
 and its source from the engine's receipt, so a run-on can be reproduced. The lane runs under the seed
 policy `cell-hash-v1` by default (audit #29, `--seed-policy generated` opts out): the runner hands the
 registered `QWENVOICE_BENCH_SEED_POLICY` knob to the app, every take samples with the seed of its cell
@@ -689,13 +701,15 @@ XCTest activity. The command accepts `--modes`, `--lengths`, `--warm`, `--label`
 `--matrix-version`; without filters it runs exactly 29 takes. Cold Custom and Design cells are exact-path relaunches; a cell cannot
 complete without its matching deterministic History/WAV assertion.
 
-**Played-audio capture.** The runner taps the app's own output for every take through a Core Audio
-process tap (`mutedWhenTapped`), so the speakers stay silent while a take is captured; the tap's
+**Played-audio capture.** The runner taps the app's own output for one take per cell (the plan
+above) through a Core Audio process tap (`mutedWhenTapped`), so the speakers stay silent while a
+take is captured; the tap's
 destruction restores audible output. The runner (`com.qwenvoice.app.uitests.xctrunner`, re-signed
 unsandboxed by the lane) needs one manual **System Audio Recording** grant, added in System Settings
 after the first lane run because a process tap never prompts (see
-[`macos-permissions.md`](macos-permissions.md)); until granted, the lane passes and every take's
-`playbackCaptureStatus` is `unavailable` or `silent`. A captured take that fails the played-audio gate
+[`macos-permissions.md`](macos-permissions.md)); until granted, the lane passes and every planned
+take's `playbackCaptureStatus` is `unavailable` or `silent` (takes outside the plan carry no capture
+fields). A captured take that fails the played-audio gate
 (coverage < 0.98, residual > −25 dBFS, a dropout, or an audible onset more than 500 ms from the
 scheduling stamp; thresholds from the three canonical runs of 2026-09-14) fails the lane. Artifacts land under
 `<run-artifact-dir>/playback-capture/` (`capture-run.json`, `take-NN-<cell>.wav` and `.json`,

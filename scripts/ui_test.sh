@@ -577,6 +577,11 @@ prepare_runner_for_playback_capture() {
   else
     note "runner re-signed with '$identity' (sandbox off): the System Audio Recording grant follows the identity across rebuilds"
   fi
+  # The unsandboxed runner can write the benchmark's current-take file itself
+  # instead of relaying it through the log (audit #31); a sandboxed one relays.
+  if [[ "$lane" == "benchmark" ]]; then
+    export TEST_RUNNER_QVOICE_MAC_BENCH_DIRECT_MANIFEST=1
+  fi
 }
 
 # A build-for-testing interrupted between Xcode's Info.plist rewrite and its

@@ -353,7 +353,9 @@ buffer; it is **not** proof that acoustic output was audible. The engine row's `
 backend-only, while the macOS transport row's `requestToFirstChunkMS` begins at request acceptance.
 
 **Played-audio capture (PC-01, macOS benchmark lane).** The XCUITest runner taps the app's own audio
-output during every take (a Core Audio process tap with the physical output muted), writes
+output during one take per cell (since 2026-09-25, audit #31: the last warm repetition of each mode
+and length that does not start an app session; other takes carry no capture fields) (a Core Audio
+process tap with the physical output muted), writes
 `take-NN-<cell>.wav` plus a sidecar under `<run>/playback-capture/`, and
 `scripts/lib/playback_capture.py` compares the capture with the published take WAV. The take then
 carries `playbackCaptureStatus` (`captured`, `silent`, `unavailable`, `referenceUnresolved`,

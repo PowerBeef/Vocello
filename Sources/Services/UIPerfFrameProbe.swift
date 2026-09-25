@@ -198,11 +198,14 @@ final class UIPerfFrameProbe: NSObject {
             gapHistogram[bucket] += 1
         }
         if Double(nowEpochMS - blockStartEpochMS) >= Self.blockDurationMS {
-            flushBlock(endEpochMS: nowEpochMS)
+            flushBlock(endEpochMS: nowEpochMS, heartbeats: watchdog.drainInterval())
         }
     }
 
-    private func flushBlock(endEpochMS: Int64) {
+    private func flushBlock(
+        endEpochMS: Int64,
+        heartbeats: MainThreadStallWatchdog.IntervalHeartbeats
+    ) {
         let cpu = Self.cpuTimesMS()
         var row: [String: Any] = [
             "kind": "block",
@@ -229,7 +232,6 @@ final class UIPerfFrameProbe: NSObject {
         }
         // The block's own heartbeats (audit #80): completed count and each
         // heartbeat delayed past 50 ms as [completion epoch ms, delay ms].
-        let heartbeats = watchdog.drainInterval()
         row["heartbeatCount"] = heartbeats.completedHeartbeatCount
         row["delayedHeartbeats"] = heartbeats.delayedHeartbeats.map { [$0.completedEpochMS, Int64($0.delayMS)] }
         if heartbeats.droppedEventCount > 0 {
@@ -257,8 +259,12 @@ final class UIPerfFrameProbe: NSObject {
         guard !finished else { return }
         finished = true
         let endEpochMS = Int64(Date().timeIntervalSince1970 * 1000)
-        if framesDelivered > 0 {
-            flushBlock(endEpochMS: endEpochMS)
+        // The tail block is written when it holds frames or heartbeats: a
+        // heartbeat that completed after the last frame (a stall ending as
+        // the app leaves) is window evidence the checker would otherwise lose.
+        let heartbeats = watchdog.drainInterval()
+        if framesDelivered > 0 || heartbeats.completedHeartbeatCount > 0 {
+            flushBlock(endEpochMS: endEpochMS, heartbeats: heartbeats)
         }
         var summary: [String: Any] = [
             "kind": "summary",

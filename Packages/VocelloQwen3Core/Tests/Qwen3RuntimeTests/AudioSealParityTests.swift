@@ -6,10 +6,15 @@
 // 0x56C0 message. Weights and fixtures are not committed (no bundled
 // weights); the tests locate them via QWENVOICE_AUDIOSEAL_FIXTURES and skip
 // cleanly when the directory is absent (ordinary CI), so this suite stays
-// deterministic-lane safe. The structural test always runs.
+// deterministic-lane safe. The structural test always runs, and so do the
+// synthetic-weight tests (PA-19): a seeded random generator written with the
+// shipping tensor names and layouts drives the weight loader, the windowed
+// embedder against the whole-buffer reference, and the facade transform the
+// product's publication marker calls (`VocelloQwen3AudioMarking.markedPCM`).
 
 import Foundation
 import MLX
+import VocelloQwen3Core
 import XCTest
 
 @testable import MLXAudioMark
@@ -122,5 +127,165 @@ final class AudioSealParityTests: XCTestCase {
                 XCTAssertEqual(out.dim(1), expected, "k\(kernel)/s\(stride) on T=\(frames)")
             }
         }
+    }
+
+    // MARK: - Synthetic weights (always run)
+
+    /// 32 000 samples = 100 frames, more than the default 64/8 window geometry
+    /// needs (80), so the shipping path really windows.
+    private func syntheticPCM(count: Int = 32_000) -> [Float] {
+        (0 ..< count).map { index in
+            let t = Float(index)
+            return 0.3 * sin(t * 0.05) + 0.05 * sin(t * 0.31)
+        }
+    }
+
+    private func syntheticWeightsURL(omitting omitted: String? = nil) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AudioSealSynthetic-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("audioseal_wm16_generator_fp16.safetensors")
+        var arrays = SyntheticAudioSealWeights.arrays()
+        if let omitted {
+            XCTAssertNotNil(arrays.removeValue(forKey: omitted), "fixture has no tensor \(omitted)")
+        }
+        try save(arrays: arrays, url: url)
+        return url
+    }
+
+    func testSyntheticGeneratorWindowedEmbeddingMatchesTheWholeBufferReference() throws {
+        let generator = try AudioSealGenerator(weightsURL: try syntheticWeightsURL())
+        let pcm = syntheticPCM()
+
+        let wholeDelta = generator.watermarkDelta(pcm: pcm)
+        XCTAssertEqual(wholeDelta.count, pcm.count)
+        XCTAssertTrue(wholeDelta.allSatisfy(\.isFinite))
+        XCTAssertTrue(wholeDelta.contains { $0 != 0 }, "the message must reach the watermark delta")
+        let whole = zip(pcm, wholeDelta).map { max(-1, min(1, $0 + $1)) }
+
+        // The shipping geometry and two finer ones: convolutions are local and
+        // the LSTMs run over the full frame sequence, so every window geometry
+        // with margins above the receptive field reproduces the whole buffer.
+        for (coreFrames, marginFrames) in [(64, 8), (16, 8), (24, 12)] {
+            let windowed = generator.watermark(pcm: pcm, coreFrames: coreFrames, marginFrames: marginFrames)
+            XCTAssertEqual(windowed.count, pcm.count)
+            XCTAssertTrue(windowed.allSatisfy { $0 >= -1 && $0 <= 1 }, "embedding clamps to full scale")
+            let error = zip(windowed, whole).map(-)
+            let snr = snrDB(reference: wholeDelta, error: error)
+            XCTAssertGreaterThanOrEqual(
+                snr, 55, "\(coreFrames)/\(marginFrames) windowing SNR \(snr) dB — windowing is no longer exact")
+        }
+        XCTAssertEqual(generator.watermark(pcm: pcm), generator.watermark(pcm: pcm), "embedding is deterministic")
+    }
+
+    func testFacadeTransformMarksWithTheShippingEmbedderAndKeepsTheSampleCount() throws {
+        let url = try syntheticWeightsURL()
+        let pcm = syntheticPCM()
+
+        let marked = try VocelloQwen3AudioMarking.markedPCM(pcm, weightsURL: url)
+        XCTAssertEqual(marked.count, pcm.count, "the publication marker rejects any length change")
+        XCTAssertTrue(marked.allSatisfy { $0.isFinite && $0 >= -1 && $0 <= 1 })
+        XCTAssertNotEqual(marked, pcm, "marking must change the audio")
+
+        let reference = try AudioSealGenerator(weightsURL: url).watermark(pcm: pcm)
+        let difference = zip(marked, reference).map { abs($0 - $1) }.max() ?? .infinity
+        XCTAssertLessThanOrEqual(difference, 1e-6, "the facade runs the shipping windowed embedder")
+        XCTAssertEqual(VocelloQwen3AudioMarking.payload, AudioSealGenerator.messagePayload)
+        XCTAssertEqual(VocelloQwen3AudioMarking.payload, 0x56C0)
+    }
+
+    func testMissingGeneratorTensorFailsClosed() throws {
+        let missing = "msg_processor.msg_processor.weight"
+        let url = try syntheticWeightsURL(omitting: missing)
+
+        XCTAssertThrowsError(try AudioSealGenerator(weightsURL: url)) { error in
+            guard case .missingTensor(let name)? = error as? AudioSealError else {
+                return XCTFail("unexpected error \(error)")
+            }
+            XCTAssertEqual(name, missing)
+        }
+        XCTAssertThrowsError(
+            try VocelloQwen3AudioMarking.markedPCM(syntheticPCM(count: 3_200), weightsURL: url),
+            "incomplete marking weights must never produce unmarked output"
+        )
+    }
+}
+
+/// Seeded random AudioSeal generator weights with the shipping tensor names and
+/// layouts (torch Conv1d `[cOut, cIn, K]`, ConvTranspose1d `[cIn, cOut, K]`, fp16
+/// like the delivered file). The convolution widths are reduced; the LSTM width
+/// (512), the bottleneck (128) and the 32-row message table are the
+/// architecture's own, because the generator hard-codes them.
+private enum SyntheticAudioSealWeights {
+    private static let lstmWidth = 512
+    private static let bottleneck = 128
+    /// Encoder stage input widths; the last stage widens to the LSTM.
+    private static let encoderWidths = [4, 8, 16, 32]
+    /// Decoder stage output widths after the LSTM.
+    private static let decoderWidths = [32, 16, 8, 4]
+    private static let strides = [2, 4, 5, 8]
+
+    static func arrays() -> [String: MLXArray] {
+        var arrays: [String: MLXArray] = [:]
+        var nextKey: UInt64 = 0xA5EA_1000
+
+        func random(_ shape: [Int], scale: Float) -> MLXArray {
+            nextKey += 1
+            return (MLXRandom.normal(shape, key: MLXRandom.key(nextKey)) * scale).asType(.float16)
+        }
+        func conv(_ prefix: String, out: Int, in inputs: Int, kernel: Int, scale: Float? = nil) {
+            let weightScale = scale ?? 1 / Float(inputs * kernel).squareRoot()
+            arrays["\(prefix).conv.conv.inner_conv.weight"] = random([out, inputs, kernel], scale: weightScale)
+            arrays["\(prefix).conv.conv.inner_conv.bias"] = random([out], scale: 0.01)
+        }
+        func convTranspose(_ prefix: String, in inputs: Int, out: Int, stride: Int) {
+            let kernel = 2 * stride
+            arrays["\(prefix).convtr.convtr.inner_conv.weight"] = random(
+                [inputs, out, kernel], scale: 1 / Float(inputs * 2).squareRoot())
+            arrays["\(prefix).convtr.convtr.inner_conv.bias"] = random([out], scale: 0.01)
+        }
+        func resnet(_ prefix: String, width: Int) {
+            conv("\(prefix).block.1", out: width / 2, in: width, kernel: 3)
+            conv("\(prefix).block.3", out: width, in: width / 2, kernel: 1)
+        }
+        func lstm(_ prefix: String) {
+            let scale = 1 / Float(lstmWidth).squareRoot()
+            for layer in 0 ..< 2 {
+                arrays["\(prefix).lstm.weight_ih_l\(layer)"] = random([4 * lstmWidth, lstmWidth], scale: scale)
+                arrays["\(prefix).lstm.weight_hh_l\(layer)"] = random([4 * lstmWidth, lstmWidth], scale: scale)
+                arrays["\(prefix).lstm.bias_ih_l\(layer)"] = random([4 * lstmWidth], scale: 0.01)
+                arrays["\(prefix).lstm.bias_hh_l\(layer)"] = random([4 * lstmWidth], scale: 0.01)
+            }
+        }
+
+        // Encoder: 0 input conv; stages (resnet, strided conv) at (1,3), (4,6),
+        // (7,9), (10,12); 13 LSTM; 15 output conv to the bottleneck.
+        conv("encoder.model.0", out: encoderWidths[0], in: 1, kernel: 7)
+        for (stage, stride) in strides.enumerated() {
+            let base = 1 + stage * 3
+            let width = encoderWidths[stage]
+            let next = stage + 1 < encoderWidths.count ? encoderWidths[stage + 1] : lstmWidth
+            resnet("encoder.model.\(base)", width: width)
+            conv("encoder.model.\(base + 2)", out: next, in: width, kernel: 2 * stride)
+        }
+        lstm("encoder.model.13")
+        conv("encoder.model.15", out: bottleneck, in: lstmWidth, kernel: 7)
+        arrays["msg_processor.msg_processor.weight"] = random([32, bottleneck], scale: 0.05)
+
+        // Decoder: 0 input conv; 1 LSTM; stages (transposed conv, resnet) at
+        // (3,4), (6,7), (9,10), (12,13); 15 output conv to one channel, scaled
+        // so the delta stays a small additive mark.
+        conv("decoder.model.0", out: lstmWidth, in: bottleneck, kernel: 7)
+        lstm("decoder.model.1")
+        for (stage, stride) in strides.reversed().enumerated() {
+            let base = 2 + stage * 3
+            let inputs = stage == 0 ? lstmWidth : decoderWidths[stage - 1]
+            let width = decoderWidths[stage]
+            convTranspose("decoder.model.\(base + 1)", in: inputs, out: width, stride: stride)
+            resnet("decoder.model.\(base + 2)", width: width)
+        }
+        conv("decoder.model.15", out: 1, in: decoderWidths[decoderWidths.count - 1], kernel: 7, scale: 0.05)
+        return arrays
     }
 }

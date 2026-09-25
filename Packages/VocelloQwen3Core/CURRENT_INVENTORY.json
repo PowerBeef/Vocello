@@ -178,7 +178,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/AudioSealParityTests.swift",
-      "sha256": "0c2fd8c07b733caaf0b35fc9fd2264514697d7e48eec0193bd4db0fa80ace274",
+      "sha256": "6bd6cf4a68300b89f18001b9cea6beaba851b0de4182d68a5520aa3bfa9fbe6b",
       "upstreamStatus": "added"
     },
     {
@@ -237,6 +237,11 @@
       "upstreamStatus": "added"
     },
     {
+      "path": "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift",
+      "sha256": "513e1065e2734d26fd41a9f370c1b17b187c4e52a1c3ad8704f17b55240992d2",
+      "upstreamStatus": "added"
+    },
+    {
       "path": "Tests/Qwen3RuntimeTests/Qwen3TalkerReplayDiagnosticTests.swift",
       "sha256": "3316594f888e4c2902281def60dd2901aa20afff5390a7134a97cb33e3d36742",
       "upstreamStatus": "added"
@@ -262,11 +267,11 @@
     "Examples/**"
   ],
   "summary": {
-    "added": 32,
+    "added": 33,
     "identical": 6,
     "modified": 12,
     "removed": 0,
-    "retained": 50
+    "retained": 51
   },
   "upstreamBaselineSHA256": "6136a2c2b2d56590deca279ef4ae809a11aff41132916a73619caf2012ef362a"
 }

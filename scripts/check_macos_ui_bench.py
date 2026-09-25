@@ -886,8 +886,9 @@ def build_manifest(
             "samplingSeed": seed,
             "samplingSeedSource": seed_source,
             # The first warm take after a cold take pays a settling cost (audit
-            # #30: custom/short/warm#0 is the slowest take in every canonical
-            # run); flagged here, never excluded.
+            # #30: in the 16 canonical M2 runs it is the slowest take of its
+            # cell in 14 for custom/short and 11 for design/short); flagged
+            # here, never excluded.
             "followsColdTake": index > 1 and "/cold#" in cells[index - 2],
         })
     run_warnings = list(memory_run["warnings"])

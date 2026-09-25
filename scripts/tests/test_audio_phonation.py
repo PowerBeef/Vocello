@@ -114,11 +114,17 @@ class PhonationTests(unittest.TestCase):
         block = (12000*np.sin(2*np.pi*150*np.arange(8000)/8000)).astype('<i2').tobytes()
         with tempfile.TemporaryDirectory() as directory:
             path = str(Path(directory)/'fixture.wav')
-            for seconds in (12, 24):
+            for pass_index, seconds in enumerate((12, 12, 24)):
                 with wave.open(path, 'wb') as wav:
                     wav.setnchannels(1); wav.setsampwidth(2); wav.setframerate(8000)
                     for _ in range(seconds):
                         wav.writeframesraw(block)
+                if pass_index == 0:
+                    # numpy's one-time lazy allocations land in whichever call
+                    # runs first in the process; they are not per-analysis
+                    # working memory, so an untraced warm-up absorbs them.
+                    analyze_phonation(path)
+                    continue
                 tracemalloc.start()
                 try:
                     report = analyze_phonation(path)

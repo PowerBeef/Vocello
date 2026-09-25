@@ -432,6 +432,8 @@
         "include": [
           "Sources/Views/**",
           "Sources/iOS/**",
+        "Sources/Services/MacStudio*.swift",
+        "Sources/Services/MacLineBatchRunner.swift",
           "Sources/iOSSupport/Services/*UIPerf*.swift",
           "Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift",
           "Sources/iOSSupport/Services/IOSStudioDraftPersistence.swift",

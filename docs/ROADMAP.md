@@ -15,6 +15,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
 | `audit-remediation-2026-09` | active | backend-and-platform | 3/12 (25%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 11/17 (65%) |
+| `benchmark-telemetry-audit-2026-09` | active | backend-and-platform | 0/6 (0%) |
 | `delivery-prompting-2026-08` | active | backend-mlx | 29/34 (85%) |
 | `engineering-review-remediation-2026-08` | active | backend-and-platform | 17/26 (65%) |
 | `ios-app-store-readiness-2026-08` | active | release-qa | 2/12 (17%) |
@@ -152,7 +153,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `AV-09` | parked | P2 — make stateful physical-device lanes independently repeatable | — |
 | `AV-13` | planned | XCUITest coverage for the identifiers never exercised (78 macOS, 34 iOS) | — |
 | `AV-14` | parked | re-baseline the benchmark harness under the standard RTF definition (consent-bound runs) | — |
-| `AV-17` | parked | First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs) | — |
+| `AV-17` | parked | First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs) | `BT-01`, `BT-02`, `BT-03`, `BT-04` |
 
 ### Open items in detail
 
@@ -177,6 +178,43 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 - **`AV-17`** (parked) — First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs).
   gate: On mac-mini-m6-16gb (live `publish_benchmark_history.py verify-hardware --platform macos` PASS): (1) QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate, then re-save benchmarks/baselines/mac-gate-bench.json from a three-take run; (2) one clean scripts/ui_test.sh macos benchmark publishes the first canonical M6 ui-generation record, and in the same commit RTF_RECORD, the charts, README prose and the website medians, record id and headline are repinned to it; (3) counted scripts/ui_test.sh macos perf sessions re-derive config/ui-perf-thresholds.json with calibrationProfile mac-mini-m6-16gb; (4) scripts/macos_test.sh memory publishes the first M6 memory-qualification record after a maintainer decision on keeping retained-memory-v1 (5% of 16 GiB) or adopting a floor-anchored v2; (5) the delivery evaluator's compact qualification runs repeat on M6; (6) decide whether a forced floor8GBMac diagnostic lane covers the 8 GB support floor. M2 records are never rewritten or compared.
   unparkWhen: The maintainer explicitly requests the M6 baseline runs and the production Mac models are Ready.
+
+## Benchmark and telemetry accuracy
+
+`benchmark-telemetry-audit-2026-09` · **active** · backend-and-platform · adopted 2026-09-25
+
+Make the benchmarking harnesses and telemetry probes measure exactly what their records claim, with enough statistical power and less wasted run time, before the first canonical Mac mini M6 records (AV-17) are published. Fixes land code-only first with offline replays of committed records as their proof; consent-bound lanes then validate them in one requested session.
+
+Narrative authority: [`docs/audits/2026-09-25-benchmark-telemetry-audit.md`](audits/2026-09-25-benchmark-telemetry-audit.md)
+
+| Item | Status | Title | Blocked by |
+| --- | --- | --- | --- |
+| `BT-01` | planned | Trustworthy memory evidence | — |
+| `BT-02` | planned | Engine gate and CLI bench ready for the M6 re-seed | — |
+| `BT-03` | planned | UI benchmark and ui-perf lanes ready for the M6 | — |
+| `BT-04` | planned | Lineage identity, history and CI evidence tests | — |
+| `BT-05` | planned | Audio, language and delivery QC accuracy | — |
+| `BT-06` | planned | Timing attribution, profiles and device-lane observers | — |
+
+### Open items in detail
+
+- **`BT-01`** (planned) — Trustworthy memory evidence.
+  gate: Offline replay puts the 8 in-process macOS UI records near 1.0 (peak over mlxPeakMB), routine cache clears raise no warnings, every committed record reports a peak-missed count, and all legacy records still validate; the next consented memory lane shows the kernel peak at or above mlxPeakMB on every take.
+
+- **`BT-02`** (planned) — Engine gate and CLI bench ready for the M6 re-seed.
+  gate: Offline comparator replay shows no false regression and flags a synthetic +6% RTF, a gate with a missing model stops within seconds with a finalized ledger, and the AV-17 session seeds the M6 baseline from at least 3 seeded runs on identical source with the thresholds printed.
+
+- **`BT-03`** (planned) — UI benchmark and ui-perf lanes ready for the M6.
+  gate: The first canonical M6 UI benchmark validates in one pass under a declared stall contract with every take on the Speed variant, and M6 perf records carry an M6 calibration profile rather than M2 verdicts.
+
+- **`BT-04`** (planned) — Lineage identity, history and CI evidence tests.
+  gate: Offline key replay links at least 9 of 16 canonical macOS UI records with legacy keys unchanged, test_benchmark_history runs 55 passed and 0 skipped on Linux, and every manifest producer round-trips through validate_record.
+
+- **`BT-05`** (planned) — Audio, language and delivery QC accuracy.
+  gate: Offline replay flags the known run-on takes and reproduces the paired prosody effects from the deliveryD* deltas exactly, a supervised run under fr_CA returns qualified, and the next lang-bench publishes a per-channel verdict from two families.
+
+- **`BT-06`** (planned) — Timing attribution, profiles and device-lane observers.
+  gate: The token read has its own timer and signpost, a kept-trace macOS profile publishes per-take interval statistics that pass the 36x(tokens+1) completeness check, the iOS memory profile passes the VM auto-snapshot guard, and the iOS memory, clone-conditioning and gate waits poll only the sentinel and check that the process is alive.
 
 ## Delivery instruction quality and Qwen3-TTS prompting
 

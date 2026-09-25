@@ -16,9 +16,16 @@ calibrated from measured same-voice vs different-voice separations instead of
 placeholders (audit #103 part 1; the maintainer delegated the decision to the
 audit's recommendation on 2026-09-25): by default eight built-in-speaker takes
 matched to the reference voice's gender (two controls, one cross-gender, were
-too few and too easy to fit a band), plus cross-clone negatives, clone takes of
-the other saved voices, which share every clone artifact and differ only in
-identity. Eight negatives is `clone_speaker_similarity`'s calibration minimum.
+too few and too easy to fit a band). Eight negatives is
+`clone_speaker_similarity`'s calibration minimum.
+
+Cross-clone negatives, clone takes of other saved voices, share every clone
+artifact and differ only in identity, so they are the hard case. Cloning a voice
+records the invocation's consent (`--confirm-consent`, PA-17), so the lane clones
+only voices the operator names: each `--cross-clone-voice NAME` is the
+operator's attestation that they own or may clone that voice. The lane never
+lists the voices directory to find more, and generates no cross-clone take by
+default.
 
 ADVISORY dev lane: not a CI gate, not a packaging prerequisite, never
 publishes benchmark history. Memory rule (M2 8 GB): generation and the ML
@@ -28,7 +35,8 @@ process has exited.
 
 Usage:
   python3 scripts/clone_fidelity_lane.py --voice A_warm_elderly_woman \
-      [--takes 6] [--controls 8] [--cross-clones 4] [--reference-gender female|male] \
+      [--takes 6] [--controls 8] [--reference-gender female|male] \
+      [--cross-clone-voice NAME ...] [--cross-clones N] \
       [--base-seed 20260810] [--label ID]
 """
 
@@ -46,13 +54,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from clone_prosody_fidelity import evaluate_takes
 
 # 2 (audit #103): gender-matched controls by default, and cross-clone negatives.
-LANE_VERSION = 2
+# 3 (2026-09-25 review): cross-clone negatives only for voices the operator names;
+# none by default, and no discovery of the other saved voices.
+LANE_VERSION = 3
 FIXED_TEXT = (
     "The harbor lights flickered as the evening ferry pulled away, and she "
     "wondered how many more crossings the old captain had left in him."
 )
 DEFAULT_MATCHED_CONTROLS = 8
-DEFAULT_CROSS_CLONES = 4
+# Cross-clone takes without a named voice: none. Each clone take attests consent.
+DEFAULT_CROSS_CLONES = 0
 SPEAKER_CONTRACT = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "Sources", "Resources", "qwenvoice_contract.json",
@@ -95,15 +106,34 @@ def matched_control_speakers(gender, genders=None):
     return matched
 
 
-def discover_cross_clone_voices(data_dir, voice):
-    """The other saved voices (their reference WAVs), in name order."""
-    directory = os.path.join(data_dir, "voices")
-    if not os.path.isdir(directory):
-        return []
-    return sorted(
-        name[:-4] for name in os.listdir(directory)
-        if name.endswith(".wav") and name[:-4] != voice
-    )
+def resolve_cross_clones(voice, named_voices, count=None):
+    """The operator-named cross-clone voices and how many takes to clone from them.
+
+    Each named voice is one the operator attests consent for, since every clone
+    take passes `--confirm-consent`. Nothing is inferred: no name, no cross-clone
+    take. `count` defaults to one take per named voice; a count without a named
+    voice, a count of zero beside named voices, the reference voice itself and a
+    repeated name are refused.
+    """
+    named = [str(name).strip() for name in (named_voices or ())]
+    if any(not name for name in named):
+        raise ValueError("--cross-clone-voice needs a saved voice name")
+    if len(set(named)) != len(named):
+        raise ValueError("each --cross-clone-voice may be named once")
+    if voice in named:
+        raise ValueError(f"{voice!r} is the reference voice, not a cross-clone negative")
+    if count is None:
+        count = len(named) if named else DEFAULT_CROSS_CLONES
+    if count < 0:
+        raise ValueError("--cross-clones cannot be negative")
+    if count and not named:
+        raise ValueError(
+            "cross-clone negatives clone other saved voices, which records consent for each: "
+            "name every voice you own or may clone with --cross-clone-voice NAME"
+        )
+    if named and not count:
+        raise ValueError("--cross-clones 0 contradicts a named --cross-clone-voice")
+    return named, count
 
 
 def repo_root():
@@ -125,7 +155,8 @@ def build_take_plan(voice, take_count, control_count, base_seed, *,
 
     Controls cycle through the built-in speakers of the reference's gender
     (inferred from the voice name unless given); cross-clone negatives cycle
-    through the other saved voices. Seeds advance per take within each kind.
+    through the voices the operator named (`resolve_cross_clones`). Seeds
+    advance per take within each kind.
     """
     if control_speakers is None:
         gender = reference_gender or infer_reference_gender(voice)
@@ -269,8 +300,13 @@ def main():
     parser.add_argument("--takes", type=int, default=6)
     parser.add_argument("--controls", type=int, default=DEFAULT_MATCHED_CONTROLS,
                         help="gender-matched built-in-speaker controls (default 8)")
-    parser.add_argument("--cross-clones", type=int, default=DEFAULT_CROSS_CLONES,
-                        help="clone takes of other saved voices as hard negatives (default 4)")
+    parser.add_argument("--cross-clone-voice", action="append", default=[], metavar="NAME",
+                        help="another saved voice to clone as a hard negative; repeat per voice. "
+                             "Naming a voice confirms you own or may clone it: the lane passes "
+                             "--confirm-consent for it. Voices are never discovered.")
+    parser.add_argument("--cross-clones", type=int, default=None,
+                        help="cross-clone takes, cycling over the named voices "
+                             "(default one per named voice; none without a name)")
     parser.add_argument("--reference-gender", choices=("female", "male"),
                         help="the reference voice's gender when its name does not state it")
     parser.add_argument("--base-seed", type=int, default=20_260_810)
@@ -299,15 +335,23 @@ def main():
             f"the gender of {args.voice!r} is not in its name; pass --reference-gender so the "
             "controls are matched (audit #103)"
         )
-    cross_clone_voices = discover_cross_clone_voices(args.data_dir, args.voice)
+    try:
+        cross_clone_voices, cross_clone_count = resolve_cross_clones(
+            args.voice, args.cross_clone_voice, args.cross_clones,
+        )
+    except ValueError as error:
+        raise SystemExit(str(error)) from None
     plan = build_take_plan(
         args.voice, args.takes, args.controls, args.base_seed,
         reference_gender=reference_gender,
-        cross_clone_voices=cross_clone_voices, cross_clone_count=args.cross_clones,
+        cross_clone_voices=cross_clone_voices, cross_clone_count=cross_clone_count,
     )
     if not args.skip_generation:
         if not os.path.isfile(vocello):
             raise SystemExit(f"vocello CLI not built: {vocello}")
+        for name in cross_clone_voices:
+            if not os.path.isfile(reference_path(args.data_dir, name)):
+                raise SystemExit(f"named cross-clone voice has no saved reference: {name}")
         generate_all(plan, run_dir, vocello)
 
     clone_paths = [os.path.join(run_dir, item["name"]) for item in plan if item["kind"] == "clone"]
@@ -336,7 +380,8 @@ def main():
         "controlPlan": {
             "matchedControls": len(control_paths),
             "crossCloneNegatives": len(cross_clone_paths),
-            "crossCloneVoicesAvailable": len(cross_clone_voices),
+            # Operator-named only: each one attested consent for its clone takes.
+            "crossCloneVoicesNamed": len(cross_clone_voices),
         },
         "speakerSimilarity": ecapa_section(reference, clone_paths, control_paths, cross_clone_paths),
         "emotionAdvisory": emotion_section(reference, clone_paths),

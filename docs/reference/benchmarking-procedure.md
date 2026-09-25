@@ -397,9 +397,12 @@ and SER column stay advisory; the clone lane reports AUC and equal error rate wi
 intervals whenever it has controls (`bandCalibrationReady` needs at least eight). Since
 2026-09-25 (audit #103 part 1, decided by the audit's recommendation) its default plan generates
 eight built-in-speaker controls matched to the reference voice's gender (read from the voice name,
-else `--reference-gender`) plus four cross-clone negatives, clone takes of the other saved voices,
-and reports the separation per kind (`controlSeparation`, `crossCloneSeparation`) and over every
-negative (`separation`); lane version 2. The lane embeds 16 kHz
+else `--reference-gender`), and reports the separation per kind (`controlSeparation`,
+`crossCloneSeparation`) and over every negative (`separation`). Cross-clone negatives, clone takes
+of other saved voices, need those voices named: every clone take passes `--confirm-consent`, so each
+`--cross-clone-voice NAME` (repeatable; one take per named voice unless `--cross-clones N`) is the
+operator's attestation that they own or may clone that voice. The lane never discovers saved voices
+and generates no cross-clone take by default (lane version 3). The lane embeds 16 kHz
 audio through the pinned polyphase resampler and loads the ECAPA snapshot from the local cache
 only.
 

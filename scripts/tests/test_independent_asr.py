@@ -177,6 +177,97 @@ class IndependentASRTests(unittest.TestCase):
         self.assertEqual(again["producer"]["cacheHits"], 1)
         self.assertEqual(again["cells"], evidence["cells"])
 
+    def test_cache_holds_the_worker_result_and_a_hit_is_derived_by_current_code(self) -> None:
+        """The derivation lives in the producer, outside the cache identity, so a
+        hit must re-derive rather than serve a stored derivation (review of #89)."""
+        independent_asr.transcribe_manifest(
+            manifest=self.manifest, config=self.config, cache=self.cache,
+            lock_root=self.root, supervisor=self.supervisor,
+        )
+        entries = list((self.root / "cache" / "layers").rglob("*.json"))
+        self.assertEqual(len(entries), 1)
+        payload = json.loads(entries[0].read_text())["payload"]
+        self.assertEqual(payload["decodedSampleCount"], 32_000)
+        self.assertIn("segments", payload)
+        for derived in ("id", "provenance", "processedDurationSeconds", "fullFileProcessed"):
+            self.assertNotIn(derived, payload)
+
+        derive = independent_asr._recognition
+
+        def edited(*args, **kwargs):
+            return {**derive(*args, **kwargs), "derivation": "edited"}
+
+        def must_not_launch(*_args, **_kwargs):
+            raise AssertionError("cache hit launched the recognizer")
+
+        with mock.patch.object(independent_asr, "_recognition", side_effect=edited):
+            again = independent_asr.transcribe_manifest(
+                manifest=self.manifest, config=self.config, cache=self.cache,
+                lock_root=self.root, supervisor=must_not_launch,
+            )
+        self.assertEqual(again["producer"]["cacheHits"], 1)
+        self.assertEqual(again["cells"]["en"]["recognitions"][0]["derivation"], "edited")
+
+    def test_byte_identical_audio_is_decoded_once_for_every_row(self) -> None:
+        """Pinned and Auto cells of one prompt group regenerate identical audio
+        (audit #86); two timed decodes of one identity cannot share a cache entry."""
+        twin = self.root / "twin.wav"
+        twin.write_bytes(self.wav.read_bytes())
+        manifest = copy.deepcopy(self.manifest)
+        manifest["rows"].append({**manifest["rows"][0], "id": "en-auto", "generationID": "gen-auto",
+                                 "audioPath": str(twin)})
+        job_rows: list[list[str]] = []
+        timings = iter([0.4, 0.7])
+
+        def timed(command, **kwargs):
+            job_rows.append([row["id"] for row in json.loads(Path(command[3]).read_text())["rows"]])
+            result = self.supervisor(command, **kwargs)
+            payload = json.loads(result.stdout)
+            for row in payload["rows"]:
+                row["wallSeconds"] = next(timings)
+            return SupervisedResult(result.report, json.dumps(payload).encode(), b"")
+
+        evidence = independent_asr.transcribe_manifest(
+            manifest=manifest, config=self.config, cache=self.cache,
+            lock_root=self.root, supervisor=timed,
+        )
+        self.assertEqual(job_rows, [["en"]])
+        pinned, auto = (evidence["cells"][key]["recognitions"][0] for key in ("en", "en-auto"))
+        self.assertEqual(evidence["cells"]["en-auto"]["generationID"], "gen-auto")
+        self.assertEqual(pinned, auto)
+        self.assertEqual(pinned["recognitionDurationSeconds"], 0.4)
+        again = independent_asr.transcribe_manifest(
+            manifest=manifest, config=self.config, cache=self.cache,
+            lock_root=self.root, supervisor=timed,
+        )
+        self.assertEqual((again["producer"]["cacheHits"], again["producer"]["modelLaunches"]), (2, 0))
+
+    def test_an_unqualified_recognition_never_confirms_a_negative_control(self) -> None:
+        """The publisher refuses a truncated decode; the cohort verdict must not
+        count it as the expected failure (review of #44)."""
+        def truncated(command, **kwargs):
+            result = self.supervisor(command, **kwargs)
+            payload = json.loads(result.stdout)
+            for row in payload["rows"]:
+                row["decodedSampleCount"] = 16_000
+                row["transcript"] = "The quiet"
+            return SupervisedResult(result.report, json.dumps(payload).encode(), b"")
+
+        manifest = copy.deepcopy(self.manifest)
+        manifest["rows"][0]["expectedOutcome"] = "fail"
+        evidence = independent_asr.transcribe_manifest(
+            manifest=manifest, config=self.config, cache=self.cache,
+            lock_root=self.root, supervisor=truncated,
+        )
+        verdict = independent_asr.witness_verdict(manifest, evidence)
+        self.assertEqual(verdict["status"], "unqualified")
+        self.assertEqual(verdict["rows"][0]["status"], "unqualified")
+        self.assertFalse(verdict["rows"][0]["expectationMet"])
+        self.assertIn("processed-duration-mismatch", verdict["rows"][0]["whisperIssues"])
+        # Nor with the in-app family agreeing on the failure.
+        manifest["rows"][0]["appleSpeechPass"] = False
+        self.assertEqual(independent_asr.witness_verdict(manifest, evidence)["status"], "unqualified")
+
     def test_truncated_decode_is_a_processed_duration_mismatch(self) -> None:
         """The mismatch check can fire now that the duration is measured (audit #89)."""
         def truncated(command, **kwargs):

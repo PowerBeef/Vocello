@@ -13,11 +13,14 @@ Design rules for the 8 GB support floor:
     after their generation loop.
   * Exactly one supervised subprocess (`delivery_resource_supervisor`) runs
     `independent_asr_worker.py`, which loads and warms the model once and
-    transcribes every uncached row; the parent never imports MLX.
-  * Results are cached in `DeliveryAnalysisCache` under an identity that binds
-    the audio bytes, the canonical derivative, the model, the runtime (the
-    worker's source, not this file's) and the per-language decode options, so
-    re-analysis launches nothing.
+    transcribes every uncached audio once (rows with byte-identical audio and
+    one language share a recognition); the parent never imports MLX.
+  * The worker's raw result is cached in `DeliveryAnalysisCache` under an
+    identity that binds the audio bytes, the canonical derivative, the model,
+    the runtime (the worker's source, not this file's) and the per-language
+    decode options, so re-analysis launches nothing. The recognition entry is
+    derived from it here after every hit as after every miss, so an edit to
+    the derivation is never served stale.
   * Evidence carries transcripts of tracked corpus scripts, digests and
     envelopes; never audio bytes or local paths. It stays untracked.
 
@@ -63,7 +66,9 @@ WORKER_SOURCE = SCRIPT_DIR / "independent_asr_worker.py"
 FAMILY = "whisper"
 ADAPTER_ID = "whisper-small-mlx"
 LAYER_ID = "independent-asr"
-LAYER_VERSION = "1"
+# 2 (2026-09-25): entries hold the worker's raw result, not the derived
+# recognition, so version-1 entries are never read as raw results.
+LAYER_VERSION = "2"
 REVIEW_POLICY = "automated-evidence-1"
 # Measured envelope for whisper-small on MLX is about 1 GiB; the compact-model
 # layer keeps its own contract-pinned 5 GiB ceiling in the supervisor.
@@ -407,9 +412,14 @@ def transcribe_manifest(
     code_to_language = _code_to_language(config)
     supervise = supervisor or run_supervised
 
-    pending: list[tuple[dict[str, Any], LayerIdentity, dict[str, str], str, Path]] = []
-    recognitions: dict[str, dict[str, Any]] = {}
-    cache_hits = 0
+    # One recognition per cache identity: the pinned and Auto cells of a prompt
+    # group regenerate byte-identical audio (audit #86), and two timed decodes
+    # of one identity could never share one cache entry.
+    identities: dict[str, LayerIdentity] = {}
+    provenances: dict[str, dict[str, str]] = {}
+    results: dict[LayerIdentity, dict[str, Any]] = {}
+    cached: set[LayerIdentity] = set()
+    pending: dict[LayerIdentity, tuple[str, str, Path]] = {}
     for row in manifest["rows"]:
         audio = Path(row["audioPath"])
         if not audio.is_file() or file_sha256(audio) != row["audioSHA256"]:
@@ -419,9 +429,9 @@ def transcribe_manifest(
             raise IndependentASRError(f"{row['id']}: adapter cannot lock {row['expectedLanguage']}")
         canonical = cache.canonicalize(audio)
         provenance = _provenance(config, language_code=code)
-        # The runtime digest covers the interpreter, the dependency pins and this
+        # The runtime digest covers the interpreter, the dependency pins and the
         # worker's source, so a recognizer code change is a cache miss, never a
-        # stale hit.
+        # stale hit; the entry holds only what the worker measured.
         identity = LayerIdentity(
             original_wav_sha256=canonical.original_wav_sha256,
             canonical_derivative_sha256=canonical.canonical_derivative_sha256,
@@ -430,12 +440,17 @@ def transcribe_manifest(
             model_revision=config["sourceRevision"], weights_sha256=config["weightsSHA256"],
             preprocessing_config_digest=provenance["configSHA256"],
         )
+        identities[row["id"]] = identity
+        provenances[row["id"]] = provenance
+        if identity in results or identity in pending:
+            continue
         retained = cache.load(identity)
         if retained is not None:
-            recognitions[row["id"]] = retained
-            cache_hits += 1
+            results[identity] = retained
+            cached.add(identity)
             continue
-        pending.append((row, identity, provenance, code, canonical.derivative_path))
+        pending[identity] = (row["id"], code, canonical.derivative_path)
+    cache_hits = sum(1 for row in manifest["rows"] if identities[row["id"]] in cached)
 
     envelope: dict[str, Any] | None = None
     model_load_seconds: Any = None
@@ -448,8 +463,8 @@ def transcribe_manifest(
                 "weights": str(config["weightsPath"]),
                 "decodeOptions": config.get("decodeOptions") or {},
                 "rows": [
-                    {"id": row["id"], "pcmPath": str(pcm), "language": code}
-                    for row, _identity, _provenance, code, pcm in pending
+                    {"id": job_id, "pcmPath": str(pcm), "language": code}
+                    for job_id, code, pcm in pending.values()
                 ],
             }), encoding="utf-8")
             command = [str(config["binaryPath"]), str(WORKER_SOURCE.resolve()), "--job", str(job_path)]
@@ -486,12 +501,24 @@ def transcribe_manifest(
         model_load_seconds = output.get("modelLoadSeconds")
         warmup_seconds = output.get("warmupSeconds")
         by_id = {item.get("id"): item for item in output.get("rows", []) if isinstance(item, dict)}
-        for row, identity, provenance, _code, _pcm in pending:
-            item = by_id.get(row["id"])
+        for identity, (job_id, _code, _pcm) in pending.items():
+            item = by_id.get(job_id)
             if item is None:
-                raise IndependentASRError(f"{row['id']}: recognizer produced no result")
-            entry = _recognition(row, item, provenance=provenance, code_to_language=code_to_language)
-            recognitions[row["id"]] = cache.store(identity, entry)
+                raise IndependentASRError(f"{job_id}: recognizer produced no result")
+            # The row label is not part of the result: one entry serves every
+            # row with this audio and language.
+            results[identity] = cache.store(
+                identity, {key: value for key, value in item.items() if key != "id"},
+            )
+
+    # Derived after a hit exactly as after a miss (see the module docstring).
+    recognitions = {
+        row["id"]: _recognition(
+            row, results[identities[row["id"]]], provenance=provenances[row["id"]],
+            code_to_language=code_to_language,
+        )
+        for row in manifest["rows"]
+    }
 
     producer = {
         "adapterID": config["adapterID"],
@@ -548,7 +575,10 @@ def witness_verdict(manifest: dict[str, Any], evidence: dict[str, Any]) -> dict[
     transcript; when the manifest carries the in-app Apple Speech verdict, the
     two families vote through the shared consensus rule. A row passes only when
     the families agree on its expected outcome; with one family the result is
-    labelled one witness, never consensus.
+    labelled one witness, never consensus. An unqualified recognition (a
+    truncated decode, an empty transcript, uncovered edges) is no witness at
+    all, as the publisher refuses it: its row is `unqualified` and never meets
+    its expectation, so a broken decode cannot confirm a negative control.
     """
     manifest = validate_manifest(manifest)
     cells = evidence.get("cells") if isinstance(evidence, dict) else None
@@ -567,12 +597,14 @@ def witness_verdict(manifest: dict[str, Any], evidence: dict[str, Any]) -> dict[
             duration_seconds=float(row["durationSeconds"]),
         )
         whisper = score_recognition(recognition, script=row["referenceText"], language=row["expectedLanguage"])
-        votes: dict[str, list[bool]] = {"whisper": [bool(whisper["passed"]) and not issues]}
+        votes: dict[str, list[bool]] = {"whisper": [bool(whisper["passed"])]}
         if isinstance(row.get("appleSpeechPass"), bool):
             votes["apple-speech"] = [row["appleSpeechPass"]]
         expected = "fail" if row.get("expectedOutcome") == "fail" else "pass"
         agreement = consensus(votes)
-        if len(votes) >= 2:
+        if issues:
+            status, met = "unqualified", False
+        elif len(votes) >= 2:
             status = agreement["status"]
             met = status == expected
         else:
@@ -585,7 +617,9 @@ def witness_verdict(manifest: dict[str, Any], evidence: dict[str, Any]) -> dict[
             "reasons": agreement["reasons"],
         })
     families = sorted({family for row in rows for family in row["families"]})
-    if any(row["status"] == "inconclusive" for row in rows):
+    if any(row["status"] == "unqualified" for row in rows):
+        overall = "unqualified"
+    elif any(row["status"] == "inconclusive" for row in rows):
         overall = "inconclusive"
     elif not all(row["expectationMet"] for row in rows):
         overall = "fail"

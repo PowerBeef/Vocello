@@ -158,7 +158,10 @@ is five distinct rows), and `independent_asr.py verdict` combines each take's wh
 its in-app Apple Speech verdict through the shared family rule: the cohort passes only when the two
 families agree on every take's expected outcome (`witnesses=apple-speech,whisper consensus=pass`),
 disagreement is `inconclusive` and fails the lane, and a cohort run without the in-app pass is
-labelled `one-witness` rather than reported as consensus (audit #44).
+labelled `one-witness` rather than reported as consensus (audit #44). A whisper recognition the
+publisher would refuse (a truncated decode, an empty transcript, uncovered edges) is no witness:
+its take is `unqualified`, which fails the lane whatever the take's expected outcome, so a broken
+decode never confirms a negative control.
 
 Gates:
 
@@ -249,7 +252,9 @@ available to the CLI (TCC). Spoken content is instead verified after every CLI p
 `scripts/independent_asr.py`: the pinned `whisper-small` MLX model
 (`config/delivery-evaluator-v2-candidates.json`, `whisper-small-mlx`) is loaded and warmed once in a
 supervised subprocess (`scripts/independent_asr_worker.py`, whose digest alone is the recognizer's
-cache and provenance identity), decodes each take with the language locked to the expected language,
+cache and provenance identity; the cache holds the worker's raw result and the producer derives each
+recognition from it on every read, and takes with byte-identical audio and one language share one
+decode), decodes each take with the language locked to the expected language,
 detects the language from the first 30 s, and reports what it measured: the decoded sample count (the
 processed duration the publisher checks against the WAV), the per-take recognition time without model
 load or warm-up (`modelLoadSeconds` and `warmupSeconds` are reported once per launch; the language

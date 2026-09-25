@@ -17,6 +17,7 @@
       ],
       "allowedRuntimeTargetDependencies": [
         "MLXAudioCore",
+        "MLXAudioMark",
         "MLXAudioTTS"
       ]
     },
@@ -42,6 +43,14 @@
         "MLXAudioCore",
         "MLXLMCommon",
         "MLXNN"
+      ]
+    },
+    "MLXAudioMark": {
+      "sourceRoot": "Sources/MLXAudioMark",
+      "allowedRuntimeTargetDependencies": [],
+      "allowedImports": [
+        "Foundation",
+        "MLX"
       ]
     },
     "MLXAudioTTS": {

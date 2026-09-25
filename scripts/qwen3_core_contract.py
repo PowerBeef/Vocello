@@ -796,6 +796,30 @@ def package_target_blocks(package: str) -> dict[str, str]:
     return blocks
 
 
+def target_inventory_errors(
+    package_blocks: dict[str, str],
+    package_contract: dict,
+    ownership_targets: dict,
+) -> list[str]:
+    """Package.swift, COMPATIBILITY and OWNERSHIP name the same targets in both directions."""
+    errors: list[str] = []
+    unlisted = sorted(set(package_blocks) - set(package_contract.get("targets", [])))
+    if unlisted:
+        errors.append(f"COMPATIBILITY targets omit Package.swift targets {unlisted}")
+    runtime_targets = {
+        name for name, block in package_blocks.items() if re.match(r"\.target\s*\(", block)
+    }
+    owned = set(ownership_targets)
+    missing = sorted((runtime_targets | set(package_contract.get("products", []))) - owned)
+    undeclared = sorted(owned - runtime_targets)
+    if missing or undeclared:
+        errors.append(
+            "OWNERSHIP target inventory must cover every Package.swift runtime target "
+            f"(missing {missing}, undeclared {undeclared})"
+        )
+    return errors
+
+
 def validate(repo_root: Path) -> list[str]:
     runtime = repo_root / RUNTIME_RELATIVE
     errors: list[str] = []
@@ -1050,9 +1074,9 @@ def validate(repo_root: Path) -> list[str]:
     if manifest.get("targets") != package_contract.get("targets"):
         errors.append("RUNTIME_MANIFEST targets differ from COMPATIBILITY")
 
+    package_blocks = package_target_blocks(package)
     target_contracts = ownership.get("targets", {})
-    if set(target_contracts) != set(package_contract.get("products", [])):
-        errors.append("OWNERSHIP target inventory must cover every production product target")
+    errors.extend(target_inventory_errors(package_blocks, package_contract, target_contracts))
     forbidden = set(ownership.get("forbiddenRepositoryImports", [])) | set(
         ownership.get("forbiddenFrameworkImports", [])
     )
@@ -1062,7 +1086,6 @@ def validate(repo_root: Path) -> list[str]:
             f"Package.swift declares forbidden repository or UI dependencies "
             f"{forbidden_manifest_dependencies}"
         )
-    package_blocks = package_target_blocks(package)
     runtime_target_names = set(target_contracts)
     for target, contract in target_contracts.items():
         source_reference = str(contract.get("sourceRoot", ""))

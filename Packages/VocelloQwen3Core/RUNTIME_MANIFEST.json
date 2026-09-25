@@ -32,6 +32,7 @@
     "VocelloQwen3Core",
     "MLXAudioCore",
     "MLXAudioCodecs",
+    "MLXAudioMark",
     "MLXAudioTTS",
     "Qwen3RuntimeTests"
   ],

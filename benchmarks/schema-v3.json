@@ -407,6 +407,13 @@
         "streamingTelemetryV9PublicationReadyCount": {
           "minimum": 0,
           "type": "integer"
+        },
+        "cellAggregateVersion": {
+          "description": "How the record's cells summarize its takes (audit #30). Absent means 1: every take of a cell, an IQR from two or more takes. 2: a take flagged followsColdTake stays out of its cell's statistics, and an IQR is published only from at least four takes (null below).",
+          "enum": [
+            1,
+            2
+          ]
         }
       },
       "required": [
@@ -834,6 +841,10 @@
         "detectedLanguages": {
           "description": "Language takes since 2026-09-25: the language each cited recognizer family detected (Apple Speech from its locked transcript, whisper from the audio), so a misattributed verdict is visible.",
           "type": "object"
+        },
+        "followsColdTake": {
+          "description": "UI benchmark takes since 2026-09-25 (audit #30): present and true only on the first take after a cold take, which pays a settling cost; cell aggregate 2 leaves it out of its cell's statistics.",
+          "const": true
         },
         "durationSeconds": {
           "minimum": 0,

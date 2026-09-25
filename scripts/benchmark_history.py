@@ -161,6 +161,8 @@ SECTION_KEYS = {
         "maximumRetainedGrowthFraction", "retentionPassed", "retainedMemoryV2",
         "streamingTelemetryV9SidecarCount", "streamingTelemetryV9SidecarsDigest",
         "streamingTelemetryV9PublicationReadyCount",
+        # How the cells summarize the takes (audit #30); absent means 1.
+        "cellAggregateVersion",
     },
     "comparison": {"key", "comparable", "baselineRunID", "deltas", "deltaMetrics"},
     "listening": {"status", "note", "annotatedAt"},
@@ -182,6 +184,9 @@ TAKE_KEYS = {
     "samplingSeedAgreement",
     "qualityRegistryOutcome", "qualityRegistryRequiredGates", "qualityRegistryIssues",
     "detectedLanguages",
+    # The first take after a cold take (audit #30); cell aggregate 2 leaves it
+    # out of its cell's statistics.
+    "followsColdTake",
 }
 OUTPUT_KEYS = {
     "readableWAV", "atomicPublish", "durationSeconds", "sampleRate", "channels",
@@ -307,7 +312,7 @@ SCHEMA_REQUIRED_KEYS = {
         "maximumRetainedGrowthMB", "maximumRetainedGrowthFraction", "retentionPassed",
         "retainedMemoryV2",
         "streamingTelemetryV9SidecarCount", "streamingTelemetryV9SidecarsDigest",
-        "streamingTelemetryV9PublicationReadyCount",
+        "streamingTelemetryV9PublicationReadyCount", "cellAggregateVersion",
     },
     # deltaMetrics is declared only by records published from 2026-09-14 on;
     # older records keep their full delta blocks and never claim it.
@@ -341,7 +346,7 @@ V2_ONLY_EVIDENCE_KEYS = {
     "maximumRetainedGrowthMB", "maximumRetainedGrowthFraction", "retentionPassed",
     "retainedMemoryV2",
     "streamingTelemetryV9SidecarCount", "streamingTelemetryV9SidecarsDigest",
-    "streamingTelemetryV9PublicationReadyCount",
+    "streamingTelemetryV9PublicationReadyCount", "cellAggregateVersion",
 }
 # schema-v1 is frozen history; the first-chunk definition arrived after it.
 V2_ONLY_RUN_KEYS = {"ttfcDefinition", "runtimePolicy", "seedPolicy"}
@@ -352,6 +357,7 @@ V2_ONLY_TAKE_KEYS = {
     # The language each recognizer family detected for a language take (records
     # since 2026-09-25, audit #42), so a misattributed verdict is visible.
     "detectedLanguages",
+    "followsColdTake",
 }
 # Phase 13: the typed quality-registry identity is a v3 addition; v1/v2
 # records must reject it as unknown so historical documents stay immutable.
@@ -712,6 +718,23 @@ def validate_runtime_policy(run: dict[str, Any]) -> None:
             raise HistoryError("a forced memory class can only publish non-comparable evidence")
     elif (device_class == "iphone_pro") != (run.get("platform") == "ios"):
         raise HistoryError("run.runtimePolicy device class does not match the platform")
+
+
+def validate_cold_take_flags(takes: list[dict[str, Any]], aggregate_version: int) -> None:
+    """`followsColdTake` marks exactly the take after a cold take (audit #30).
+
+    It is true when present and only on a take whose predecessor is cold; a
+    record aggregated under version 2 must flag every such take, since its
+    cell statistics leave the flagged takes out."""
+    for position, take in enumerate(takes):
+        follows = position > 0 and takes[position - 1].get("warmState") == "cold"
+        flag = take.get("followsColdTake")
+        if flag is not None and (flag is not True or not follows):
+            raise HistoryError(f"take {take.get('cell')} carries followsColdTake but does not follow a cold take")
+        if aggregate_version >= 2 and follows and flag is not True:
+            raise HistoryError(
+                f"take {take.get('cell')} follows a cold take; cell aggregate 2 needs followsColdTake"
+            )
 
 
 def validate_seed_policy(record: dict[str, Any]) -> None:
@@ -1583,9 +1606,31 @@ def iso_timestamp(value: Any, field: str) -> str:
     return parsed.astimezone(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def metric_summary(values: list[float]) -> dict[str, float | int]:
+# How a record's `cells` summarize its takes (`evidence.cellAggregateVersion`;
+# absent means 1, so every stored record keeps its aggregates).
+# 1: every take of a cell; an IQR from two or more takes (0 for one).
+# 2 (2026-09-25, audit #30): a take flagged `followsColdTake` (the first warm
+#    take after a cold take, which pays a settling cost) stays in the record
+#    but out of its cell's statistics, and an IQR is published only from at
+#    least four takes (None below).
+CELL_AGGREGATE_VERSIONS = frozenset({1, 2})
+CURRENT_CELL_AGGREGATE_VERSION = 2
+IQR_MINIMUM_COUNT = 4
+
+
+def cell_aggregate_version(record: dict[str, Any]) -> int:
+    version = (record.get("evidence") or {}).get("cellAggregateVersion", 1)
+    if isinstance(version, bool) or version not in CELL_AGGREGATE_VERSIONS:
+        raise HistoryError(f"evidence.cellAggregateVersion is unsupported: {version!r}")
+    return int(version)
+
+
+def metric_summary(values: list[float], version: int = 1) -> dict[str, float | int | None]:
     ordered = sorted(values)
-    if len(ordered) >= 2:
+    iqr: float | None
+    if version >= 2 and len(ordered) < IQR_MINIMUM_COUNT:
+        iqr = None
+    elif len(ordered) >= 2:
         quartiles = statistics.quantiles(ordered, n=4, method="inclusive")
         iqr = quartiles[2] - quartiles[0]
     else:
@@ -1596,7 +1641,7 @@ def metric_summary(values: list[float]) -> dict[str, float | int]:
     }
 
 
-def aggregate_cells(takes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def aggregate_cells(takes: list[dict[str, Any]], version: int = 1) -> list[dict[str, Any]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for take in takes:
         # The ordered take identity retains #repetition, but statistics describe
@@ -1609,6 +1654,8 @@ def aggregate_cells(takes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for key, group in grouped.items():
         metrics: dict[str, list[float]] = {}
         for take in group:
+            if version >= 2 and take.get("followsColdTake") is True:
+                continue
             for metric, value in take.get("metrics", {}).items():
                 if isinstance(value, (int, float)) and not isinstance(value, bool):
                     metrics.setdefault(metric, []).append(float(value))
@@ -1630,7 +1677,7 @@ def aggregate_cells(takes: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "length": first.get("length", "not-applicable"),
             "count": len(group),
             "status": "passedWithWarnings" if warnings or "warn" in verdicts else "passed",
-            "statistics": {name: metric_summary(values) for name, values in sorted(metrics.items())},
+            "statistics": {name: metric_summary(values, version) for name, values in sorted(metrics.items())},
             "worstQCVerdict": max(verdicts, key=lambda item: qc_rank.get(item, 99)),
             "worstThermalState": max(thermal, key=lambda item: thermal_rank.get(item, 99)),
             "maximumTrimLevel": max(trim_values, default=0),
@@ -1697,17 +1744,22 @@ def lineage_v2_comparison_key(record: dict[str, Any]) -> str:
 
 
 def lineage_v2_identity(record: dict[str, Any]) -> dict[str, Any]:
-    """Lineage contract v2: contract v1 plus the forced or emulated memory tier
-    and the run's seed policy (audit #11 option b, #29).
+    """Lineage contract v2: contract v1 plus the forced or emulated memory tier,
+    the run's seed policy and the cell aggregate version (audit #11 option b,
+    #29, #30).
 
     A forced class or an emulated smaller Mac keys apart from the host it ran
     on (a native tier adds None, so native records key alike with or without
-    run.runtimePolicy), and a seeded matrix (run.seedPolicy) never shares a
-    lineage with random per-take seeds. Contract-1 records keep their keys."""
+    run.runtimePolicy), a seeded matrix (run.seedPolicy) never shares a
+    lineage with random per-take seeds, and cells that leave the take after a
+    cold take out of their medians never compare with cells that kept it.
+    Contract-1 records keep their keys."""
     identity = lineage_v1_identity(record)
     identity["lineageContractVersion"] = 2
     identity["runtimePolicy"] = lineage_identity.runtime_policy_identity(record["run"])
     identity["seedPolicy"] = record["run"].get("seedPolicy")
+    # How the cells summarize the takes (audit #30): the medians differ.
+    identity["cellAggregateVersion"] = record["evidence"].get("cellAggregateVersion", 1)
     return identity
 
 
@@ -2046,7 +2098,7 @@ def build_record(manifest_path: Path) -> dict[str, Any]:
     evidence["selectedEvidenceDigest"] = selected_evidence_digest(record)
 
     if not record.get("cells"):
-        record["cells"] = aggregate_cells(record["takes"])
+        record["cells"] = aggregate_cells(record["takes"], cell_aggregate_version(record))
     has_warning = bool(run["warnings"]) or any(
         take.get("warnings") or take.get("audioQC", {}).get("verdict") == "warn"
         or take.get("audioQC", {}).get("warningCodes")
@@ -3097,7 +3149,11 @@ def validate_record(
             reject_unknown_keys(summary, STATISTIC_KEYS, f"cell.statistics.{metric}")
             if set(summary) != STATISTIC_KEYS:
                 raise HistoryError("cell statistic is missing count/median/IQR/min/max")
-    if cells != aggregate_cells(takes):
+    aggregate_version = cell_aggregate_version(record)
+    if aggregate_version >= 2 and version < 2:
+        raise HistoryError("schema-v1 records cannot declare a cell aggregate version")
+    validate_cold_take_flags(takes, aggregate_version)
+    if cells != aggregate_cells(takes, aggregate_version):
         raise HistoryError("cell aggregates do not match the exact ordered takes")
 
     evidence = record["evidence"]

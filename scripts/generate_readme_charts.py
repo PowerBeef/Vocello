@@ -166,7 +166,8 @@ def pool_variant_label(record_ids: list[str], records_dir: Path | None = None) -
 
 
 def load_rtf_medians(record_ids: list[str], records_dir: Path | None = None) -> tuple[dict[str, float], bool]:
-    """Per-cell median standard RTF over every take of the records, and whether it was derived.
+    """Per-cell median standard RTF over the records' takes (less any flagged
+    followsColdTake), and whether it was derived.
 
     Pooled records share one comparison key, so they share one RTF definition."""
     per_cell: dict[str, list[float]] = {}
@@ -175,6 +176,11 @@ def load_rtf_medians(record_ids: list[str], records_dir: Path | None = None) -> 
         payload = load_record(record_id, records_dir)
         derived = derived or not rtf_semantics.is_standard(payload)
         for take in payload["takes"]:
+            # The first warm take after a cold take pays a settling cost and
+            # stays out of the public medians, as it does out of its cell's
+            # statistics (audit #30; records before 2026-09-25 never flag it).
+            if take.get("followsColdTake") is True:
+                continue
             value, _ = rtf_semantics.take_rtf(payload, take)
             if value is None:
                 raise SystemExit(f"error: {record_id} take {take.get('cell')} has no standard RTF")

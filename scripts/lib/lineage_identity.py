@@ -39,13 +39,16 @@ records carry no version and keep their stored keys byte for byte.
 Contract versions:
 
 - 1 (2026-09-25): the composition above.
-- 2 (2026-09-25, audit #11 option b and #29): contract 1 plus the memory tier a
+- 2 (2026-09-25, audit #11 option b, #29 and #30): contract 1 plus the memory tier a
   forced or emulated run measured (``runtime_policy_identity``: the forced
   ``deviceClass`` and the emulated ``simulatedPhysicalMemoryMB``; a native tier
   adds nothing, so a native record with or without ``run.runtimePolicy`` keys
-  alike) and the run's seed policy (``run.seedPolicy``), so emulated-floor and
-  forced-tier records get a lineage of their own and a seeded matrix never
-  shares one with random seeds. Contract-1 records keep their stored keys.
+  alike), the run's seed policy (``run.seedPolicy``) and the cell aggregate
+  version (``evidence.cellAggregateVersion``), so emulated-floor and
+  forced-tier records get a lineage of their own, a seeded matrix never shares
+  one with random seeds, and medians that leave the take after a cold take out
+  never compare with medians that kept it. Contract-1 records keep their
+  stored keys.
 
 Every function takes a ``read(path) -> bytes | None`` callable, so the same
 identity is computed from the working tree at publication and from Git objects
@@ -75,10 +78,13 @@ GENERATION_TELEMETRY = (
     "scripts/benchmark_memory.py",
     "scripts/lib/rtf.py",
 )
-# The UI benchmark's seed policy (audit #29): the app side and the checkers' mirror.
-UI_BENCH_SEED_POLICY = (
+# The UI benchmark's seed policy (audit #29): the app side and the checkers'
+# mirror; and its declared matrices (audit #30).
+UI_BENCH_DESIGN = (
     "Sources/QwenVoiceCore/BenchSeedPolicy.swift",
     "scripts/lib/bench_seed.py",
+    "config/ui-bench-matrix.json",
+    "scripts/lib/ui_bench_matrix.py",
 )
 # The shared XCUITest driver code that runs inside every measured UI window.
 UI_AUTOMATION = (
@@ -143,7 +149,7 @@ LINEAGE_PATHS: dict[tuple[str, str], tuple[str, ...]] = {
         "Tests/VocelloMacUITests/VocelloMacUITestCase.swift",
         "Tests/VocelloMacUITests/VocelloMacBenchmarkUITests.swift",
         "Tests/VocelloMacUITests/VocelloPlaybackCaptureSession.swift",
-        *UI_BENCH_SEED_POLICY,
+        *UI_BENCH_DESIGN,
         *APP_TIMELINE,
         *GENERATION_TELEMETRY,
     ),
@@ -153,7 +159,7 @@ LINEAGE_PATHS: dict[tuple[str, str], tuple[str, ...]] = {
         *UI_AUTOMATION,
         "Tests/VocelloiOSUITests/VocelloiOSUITestCase.swift",
         "Tests/VocelloiOSUITests/VocelloiOSBenchmarkUITests.swift",
-        *UI_BENCH_SEED_POLICY,
+        *UI_BENCH_DESIGN,
         *APP_TIMELINE,
         *GENERATION_TELEMETRY,
     ),

@@ -514,6 +514,36 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         result = self.run_checker(self.expected_order, mutate_layers=late_read)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
 
+    def test_a_declared_matrix_allocation_orders_the_takes_and_is_focused(self) -> None:
+        """audit #30: a reallocated matrix version runs its own ordered cells."""
+        cells = [
+            "custom/medium/cold#0", "custom/short/warm#0", "custom/short/warm#1",
+            "custom/medium/warm#0", "clone/short/warm#0", "clone/medium/warm#0",
+        ]
+        args = ["--allocation", "custom/short=2", "--matrix-version", "proposal-5-3-2"]
+        result = self.run_checker(cells, evidence=True, extra_args=args)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        matrix = self.last_manifest["matrix"]
+        self.assertEqual(matrix["orderedCells"], cells)
+        self.assertEqual(matrix["warmAllocation"], {"custom/short": 2})
+        self.assertEqual(matrix["version"], "proposal-5-3-2")
+        self.assertEqual(self.last_manifest["historyRecord"]["run"]["matrixScope"], "focused")
+        # The uniform order no longer matches the declared matrix.
+        result = self.run_checker(self.expected_order, extra_args=args)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("benchmark cell order differs", result.stdout)
+
+    def test_the_record_leaves_the_take_after_a_cold_take_out_of_its_cell(self) -> None:
+        """audit #30: flagged in the tracked record, cell aggregate 2."""
+        result = self.run_checker(self.expected_order, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        record = self.last_manifest["historyRecord"]
+        self.assertEqual(record["evidence"]["cellAggregateVersion"], 2)
+        self.assertEqual(
+            [take.get("followsColdTake", False) for take in record["takes"]],
+            [False, True, False, False, False],
+        )
+
     def test_each_take_names_its_seed_and_whether_it_follows_a_cold_take(self) -> None:
         """audit #29 (effective seed) and #30 part 1 (the position effect, flagged)."""
         def generated(rows: list[dict]) -> None:

@@ -898,11 +898,16 @@ public enum VocelloUIBenchMatrix {
         public let modes: [Mode]
         public let lengths: [Length]
         public let warmRepetitions: Int
+        /// Warm repetitions per `mode/length` that override `warmRepetitions`
+        /// (a declared matrix version of `config/ui-bench-matrix.json`, audit
+        /// #30); empty for the uniform matrix.
+        public let warmAllocation: [String: Int]
 
         public init(
             modes: [Mode] = Mode.allCases,
             lengths: [Length] = Length.allCases,
-            warmRepetitions: Int = 3
+            warmRepetitions: Int = 3,
+            warmAllocation: [String: Int] = [:]
         ) throws {
             guard !modes.isEmpty else { throw ConfigurationError.emptyModes }
             guard !lengths.isEmpty else { throw ConfigurationError.emptyLengths }
@@ -915,9 +920,23 @@ public enum VocelloUIBenchMatrix {
             guard warmRepetitions >= 1 else {
                 throw ConfigurationError.invalidWarmRepetitions(warmRepetitions)
             }
+            let cells = Set(Mode.allCases.flatMap { mode in
+                Length.allCases.map { "\(mode.rawValue)/\($0.rawValue)" }
+            })
+            for (cell, repetitions) in warmAllocation {
+                guard cells.contains(cell), repetitions >= 1 else {
+                    throw ConfigurationError.invalidAllocation("\(cell)=\(repetitions)")
+                }
+            }
             self.modes = modes
             self.lengths = lengths
             self.warmRepetitions = warmRepetitions
+            self.warmAllocation = warmAllocation
+        }
+
+        /// The warm repetitions of one mode and length under this matrix.
+        public func warmRepetitions(mode: Mode, length: Length) -> Int {
+            warmAllocation["\(mode.rawValue)/\(length.rawValue)"] ?? warmRepetitions
         }
 
         public init(
@@ -943,7 +962,25 @@ public enum VocelloUIBenchMatrix {
             } else {
                 warm = 3
             }
-            try self.init(modes: modes, lengths: lengths, warmRepetitions: warm)
+            let allocation = try Self.parseAllocation(environment["\(keyPrefix)_ALLOCATION"])
+            try self.init(modes: modes, lengths: lengths, warmRepetitions: warm, warmAllocation: allocation)
+        }
+
+        /// `custom/short=5,custom/long=2` (scripts/ui_bench_allocation.py's
+        /// runner form); empty or absent for the uniform matrix.
+        private static func parseAllocation(_ raw: String?) throws -> [String: Int] {
+            var allocation: [String: Int] = [:]
+            for component in (raw ?? "").split(separator: ",") {
+                let entry = component.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !entry.isEmpty else { continue }
+                let parts = entry.split(separator: "=", omittingEmptySubsequences: false)
+                guard parts.count == 2, let repetitions = Int(parts[1]),
+                      allocation[String(parts[0])] == nil else {
+                    throw ConfigurationError.invalidAllocation(entry)
+                }
+                allocation[String(parts[0])] = repetitions
+            }
+            return allocation
         }
 
         private static func parseList<Value: RawRepresentable>(
@@ -972,6 +1009,7 @@ public enum VocelloUIBenchMatrix {
         case invalidWarmRepetitions(Int)
         case invalidInteger(String)
         case unknownValue(kind: String, value: String)
+        case invalidAllocation(String)
 
         public var description: String {
             switch self {
@@ -987,6 +1025,8 @@ public enum VocelloUIBenchMatrix {
                 return "benchmark integer is invalid: \(value)"
             case .unknownValue(let kind, let value):
                 return "unknown benchmark \(kind): \(value)"
+            case .invalidAllocation(let entry):
+                return "benchmark matrix allocation entry is invalid: \(entry)"
             }
         }
     }
@@ -1065,7 +1105,7 @@ public enum VocelloUIBenchMatrix {
                 )
             }
             for length in configuration.lengths {
-                for repetition in 0..<configuration.warmRepetitions {
+                for repetition in 0..<configuration.warmRepetitions(mode: mode, length: length) {
                     result.append(
                         Take(
                             mode: mode,

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "basis": "Declared UI benchmark matrices (audit #30). The canonical version keeps the 29-take matrix every published record measured: one cold medium take for Custom and Design, then three warm repetitions per mode and length. Other versions reallocate warm repetitions per mode and length; scripts/ui_test.sh <platform> benchmark --matrix-version NAME runs one, and its records are focused (never canonical) until the maintainer makes it canonicalVersion. scripts/ui_bench_allocation.py derive RECORD... computes an allocation from measured per-cell spread and per-take cost (minimax standard error under the canonical matrix's own time budget) and --write NAME adds it here as derived.",
+  "canonicalVersion": "uniform-v1",
+  "versions": {
+    "uniform-v1": {
+      "status": "canonical",
+      "description": "Three warm repetitions per mode and length plus one cold medium take for Custom and Design: 29 takes.",
+      "warmRepetitions": 3,
+      "warmAllocation": {}
+    },
+    "proposal-5-3-2": {
+      "status": "provisional",
+      "description": "Audit #30's proposed per-mode split, five short, three medium and two long warm takes: 30 warm plus 2 cold = 32 takes. Not derived from measured spread; the lead's re-measure run replaces it with a derived version.",
+      "warmRepetitions": 3,
+      "warmAllocation": {
+        "custom/short": 5,
+        "custom/medium": 3,
+        "custom/long": 2,
+        "design/short": 5,
+        "design/medium": 3,
+        "design/long": 2,
+        "clone/short": 5,
+        "clone/medium": 3,
+        "clone/long": 2
+      }
+    }
+  }
+}

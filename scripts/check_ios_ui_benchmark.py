@@ -36,9 +36,14 @@ from benchmark_memory import (  # noqa: E402
 )
 from lib import jsonio  # noqa: E402
 from lib import bench_seed  # noqa: E402
+from lib import ui_bench_matrix  # noqa: E402
 
 DEFAULT_MODES = ["custom", "design", "clone"]
 DEFAULT_LENGTHS = ["short", "medium", "long"]
+# The record's cell aggregate (benchmark_history.CELL_AGGREGATE_VERSIONS): the
+# take after a cold take stays out of its cell's statistics, and an IQR needs
+# four takes (audit #30).
+CELL_AGGREGATE_VERSION = 2
 THERMAL_RANK = {"unknown": -1, "nominal": 0, "fair": 1, "serious": 2, "critical": 3}
 TRIM_SEVERITY = {"softTrim": 1, "hardTrim": 2, "fullUnload": 3}
 
@@ -112,15 +117,14 @@ def length_bucket(chars: int) -> str:
 
 
 def expected_ordered_cells(
-    modes: list[str], lengths: list[str], warm: int
+    modes: list[str], lengths: list[str], warm: int, allocation: dict[str, int] | None = None,
 ) -> list[tuple[str, str, str, int]]:
+    """The ordered cells, under a declared matrix allocation when given (audit #30)."""
     cells: list[tuple[str, str, str, int]] = []
-    cold_length = "medium" if "medium" in lengths else lengths[0]
-    for mode in modes:
-        if mode != "clone":
-            cells.append((mode, cold_length, "cold", 0))
-        for length in lengths:
-            cells.extend((mode, length, "warm", repetition) for repetition in range(warm))
+    for name in ui_bench_matrix.expected_cells(modes, lengths, warm, allocation):
+        mode, length, state_repetition = name.split("/")
+        state, repetition = state_repetition.split("#")
+        cells.append((mode, length, state, int(repetition)))
     return cells
 
 
@@ -255,12 +259,11 @@ def validate_layer(
     return failures
 
 
-def matrix_scope(modes: list[str], lengths: list[str], warm: int) -> str:
-    return (
-        "canonical"
-        if modes == DEFAULT_MODES and lengths == DEFAULT_LENGTHS and warm == 3
-        else "focused"
-    )
+def matrix_scope(
+    modes: list[str], lengths: list[str], warm: int, allocation: dict[str, int] | None = None,
+) -> str:
+    """Canonical only for the declared canonical matrix of config/ui-bench-matrix.json."""
+    return "canonical" if ui_bench_matrix.is_canonical(modes, lengths, warm, allocation) else "focused"
 
 
 def memory_trim_metrics(engine: dict) -> tuple[int, int]:
@@ -377,6 +380,8 @@ def build_manifest(
     optimization: str,
     memory_qualification: tuple | None = None,
     seed_policy: str | None = None,
+    allocation: dict[str, int] | None = None,
+    matrix_version: str | None = None,
 ) -> dict:
     # The gate already qualified these rows; reuse its result (audit #21).
     memory_evidence, memory_run = memory_qualification or qualify_memory_rows(
@@ -409,9 +414,11 @@ def build_manifest(
             "outputDurationSeconds": output.get("durationSeconds"),
             "audioQC": {"verdict": qc.get("verdict"), "flags": qc.get("flags") or []},
             "layerCompleteness": completeness,
+            # The first warm take after a cold take (audit #30).
+            "followsColdTake": index > 1 and cells[index - 2][2] == "cold",
         })
     status = "passedWithWarnings" if warning_count else "pass"
-    scope = matrix_scope(modes, lengths, warm)
+    scope = matrix_scope(modes, lengths, warm, allocation)
     expected = len(cells)
     hardware = run_hardware_context(engine_rows)
     recorded = sorted(
@@ -498,6 +505,8 @@ def build_manifest(
             # A seed the benchmark requested and the engine confirmed (audit
             # #29): every take under the cell-hash-v1 policy.
             **take_seed(row),
+            # Cell aggregate 2 leaves it out of its cell's statistics (audit #30).
+            **({"followsColdTake": True} if take["followsColdTake"] else {}),
             **take_quality_identity(row),
         }
         if playback_start_source in {"liveStream", "finalFile"}:
@@ -535,6 +544,7 @@ def build_manifest(
             "memoryQualified": memory_run["memoryQualified"],
             "sampleSidecarCount": memory_run["sampleSidecarCount"],
             "sampleSidecarsDigest": memory_run["sampleSidecarsDigest"],
+            "cellAggregateVersion": CELL_AGGREGATE_VERSION,
         },
         "takes": history_takes,
     }
@@ -552,6 +562,8 @@ def build_manifest(
             "modes": modes,
             "lengths": lengths,
             "warm": warm,
+            **({"version": matrix_version} if matrix_version else {}),
+            "warmAllocation": dict(allocation or {}),
             "scope": scope,
             "expectedTakeCount": expected,
             "orderedCells": [cell_name(cell) for cell in cells],
@@ -602,6 +614,11 @@ def main() -> int:
     parser.add_argument("--label", default="")
     parser.add_argument("--generation-map", type=Path, required=True)
     parser.add_argument(
+        "--allocation", default="", metavar="MODE/LENGTH=N,...",
+        help="warm repetitions per mode and length of a declared matrix version (audit #30)",
+    )
+    parser.add_argument("--matrix-version", default="", help="the config/ui-bench-matrix.json version run")
+    parser.add_argument(
         "--seed-policy", choices=bench_seed.LANE_SEED_POLICIES, default=None,
         help="the seed policy the lane selected (audit #29); every take must have sampled under it",
     )
@@ -635,12 +652,13 @@ def main() -> int:
     try:
         modes = parse_list(args.modes, DEFAULT_MODES, "mode")
         lengths = parse_list(args.lengths, DEFAULT_LENGTHS, "length")
+        allocation = ui_bench_matrix.parse_allocation(args.allocation)
     except ValueError as error:
         parser.error(str(error))
     if args.warm < 1:
         parser.error("--warm must be at least 1")
 
-    expected_cells = expected_ordered_cells(modes, lengths, args.warm)
+    expected_cells = expected_ordered_cells(modes, lengths, args.warm, allocation)
     expected_count = len(expected_cells)
     try:
         generation_map = json.loads(args.generation_map.read_text(encoding="utf-8"))
@@ -838,6 +856,8 @@ def main() -> int:
             optimization=optimization,
             memory_qualification=memory_qualification,
             seed_policy=seed_policy,
+            allocation=allocation,
+            matrix_version=args.matrix_version or None,
         )
         write_json_atomic(args.evidence_manifest, manifest)
         print(f"evidence={args.evidence_manifest}")

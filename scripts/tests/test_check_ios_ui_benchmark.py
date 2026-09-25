@@ -602,6 +602,8 @@ lengths=short
 warm=1
 label=fixture
 seed_policy=cell-hash-v1
+matrix_allocation=
+matrix_version=uniform-v1
 {function}
 if validate_ios_benchmark; then
   touch "$out/passed"

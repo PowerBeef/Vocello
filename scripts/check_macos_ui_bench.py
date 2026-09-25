@@ -36,6 +36,7 @@ from benchmark_memory import (  # noqa: E402
 )
 from lib import jsonio  # noqa: E402
 from lib import bench_seed  # noqa: E402
+from lib import ui_bench_matrix  # noqa: E402
 
 DEFAULT_MODES = ["custom", "design", "clone"]
 DEFAULT_LENGTHS = ["short", "medium", "long"]
@@ -56,6 +57,10 @@ STALL_STATISTICS = {
 # The run-level code a report-only (provisional) stall contract leaves on a
 # tracked record whose takes exceed its limit: `(<takes above>/<gated takes>)`.
 STALL_REPORT_ONLY_WARNING = "stall.provisional.wouldfail"
+# The record's cell aggregate (benchmark_history.CELL_AGGREGATE_VERSIONS): the
+# take after a cold take stays out of its cell's statistics, and an IQR needs
+# four takes (audit #30).
+CELL_AGGREGATE_VERSION = 2
 # Some rows or layer files are not there yet (sysexits EX_TEMPFAIL). The lane
 # retries only this outcome, briefly; every other failure is deterministic.
 ROWS_NOT_YET_PRESENT_EXIT = 75
@@ -315,16 +320,11 @@ def parse_list(raw: str | None, default: list[str]) -> list[str]:
     return values
 
 
-def expected_cells(modes: list[str], lengths: list[str], warm: int) -> list[str]:
-    cells: list[str] = []
-    cold_length = "medium" if "medium" in lengths else lengths[0]
-    for mode in modes:
-        if mode != "clone":
-            cells.append(f"{mode}/{cold_length}/cold#0")
-        for length in lengths:
-            for repetition in range(warm):
-                cells.append(f"{mode}/{length}/warm#{repetition}")
-    return cells
+def expected_cells(
+    modes: list[str], lengths: list[str], warm: int, allocation: dict[str, int] | None = None,
+) -> list[str]:
+    """The ordered take cells, under a declared matrix allocation when given (audit #30)."""
+    return ui_bench_matrix.expected_cells(modes, lengths, warm, allocation)
 
 
 def read_jsonl_strict(path: Path) -> tuple[list[dict], list[str]]:
@@ -605,12 +605,11 @@ def validate_process_ownership(
     return failures
 
 
-def matrix_scope(modes: list[str], lengths: list[str], warm: int) -> str:
-    return (
-        "canonical"
-        if modes == DEFAULT_MODES and lengths == DEFAULT_LENGTHS and warm == DEFAULT_WARM
-        else "focused"
-    )
+def matrix_scope(
+    modes: list[str], lengths: list[str], warm: int, allocation: dict[str, int] | None = None,
+) -> str:
+    """Canonical only for the declared canonical matrix of config/ui-bench-matrix.json."""
+    return "canonical" if ui_bench_matrix.is_canonical(modes, lengths, warm, allocation) else "focused"
 
 
 def memory_trim_metrics(engine: dict) -> tuple[int, int]:
@@ -851,6 +850,8 @@ def build_manifest(
     stall_gate: dict | None = None,
     runtime_policy: dict | None = None,
     seed_policy: str | None = None,
+    allocation: dict[str, int] | None = None,
+    matrix_version: str | None = None,
 ) -> dict:
     # The gate already qualified these rows; reuse its result (audit #21).
     memory_evidence, memory_run = memory_qualification or qualify_memory_rows(
@@ -905,8 +906,8 @@ def build_manifest(
             "samplingSeedSource": seed_source,
             # The first warm take after a cold take pays a settling cost (audit
             # #30: in the 16 canonical M2 runs it is the slowest take of its
-            # cell in 14 for custom/short and 11 for design/short); flagged
-            # here, never excluded.
+            # cell in 14 for custom/short and 11 for design/short). The tracked
+            # record keeps it but leaves it out of its cell's statistics.
             "followsColdTake": index > 1 and "/cold#" in cells[index - 2],
         })
     run_warnings = list(memory_run["warnings"])
@@ -914,7 +915,7 @@ def build_manifest(
     if stall_warning:
         run_warnings.append(stall_warning)
     status = "passedWithWarnings" if warning_count or run_warnings else "pass"
-    scope = matrix_scope(modes, lengths, warm)
+    scope = matrix_scope(modes, lengths, warm, allocation)
     expected = len(cells)
     hardware = run_hardware_context(engine_rows, canonical_macos_profile_id())
     recorded = sorted(
@@ -1004,6 +1005,9 @@ def build_manifest(
             # engine publisher records it; a generated seed stays in the manifest.
             **({"seed": take["samplingSeed"]} if take["samplingSeedSource"] == "requested"
                and take["samplingSeed"] is not None else {}),
+            # The first warm take after a cold take (audit #30): cell aggregate
+            # 2 leaves it out of its cell's statistics.
+            **({"followsColdTake": True} if take["followsColdTake"] else {}),
             **capture["fields"],
             **take_quality_identity(row),
         })
@@ -1066,6 +1070,9 @@ def build_manifest(
             "memoryQualified": memory_run["memoryQualified"],
             "sampleSidecarCount": memory_run["sampleSidecarCount"],
             "sampleSidecarsDigest": memory_run["sampleSidecarsDigest"],
+            # The cells leave the take after a cold take out and publish an
+            # IQR only from four takes (audit #30).
+            "cellAggregateVersion": CELL_AGGREGATE_VERSION,
         },
         "takes": history_takes,
     }
@@ -1083,6 +1090,9 @@ def build_manifest(
             "modes": modes,
             "lengths": lengths,
             "warm": warm,
+            # The declared matrix version and its warm reallocation (audit #30).
+            **({"version": matrix_version} if matrix_version else {}),
+            "warmAllocation": dict(allocation or {}),
             "scope": scope,
             "expectedTakeCount": expected,
             "orderedCells": cells,
@@ -1129,6 +1139,11 @@ def main() -> int:
         "--stall-contract", type=Path, default=DEFAULT_STALL_CONTRACT, metavar="PATH",
         help="the stall gate's statistic, limit and calibration profile (config/macos-ui-stall-gate.json)",
     )
+    parser.add_argument(
+        "--allocation", default="", metavar="MODE/LENGTH=N,...",
+        help="warm repetitions per mode and length of a declared matrix version (audit #30)",
+    )
+    parser.add_argument("--matrix-version", default="", help="the config/ui-bench-matrix.json version run")
     parser.add_argument(
         "--seed-policy", choices=bench_seed.LANE_SEED_POLICIES, default=None,
         help="the seed policy the lane selected (audit #29); every take must have sampled under it",
@@ -1183,6 +1198,7 @@ def main() -> int:
     try:
         modes = parse_list(args.modes, DEFAULT_MODES)
         lengths = parse_list(args.lengths, DEFAULT_LENGTHS)
+        allocation = ui_bench_matrix.parse_allocation(args.allocation)
     except ValueError as error:
         parser.error(str(error))
     try:
@@ -1191,7 +1207,7 @@ def main() -> int:
         print(f"FAIL: {error}")
         return 1
 
-    expected_cell_order = expected_cells(modes, lengths, args.warm)
+    expected_cell_order = expected_cells(modes, lengths, args.warm, allocation)
     expected = len(expected_cell_order)
     paths = {
         "engine": args.diag_dir / "engine" / "generations.jsonl",
@@ -1462,6 +1478,8 @@ def main() -> int:
             stall_gate=stall_gate,
             runtime_policy=runtime_policy,
             seed_policy=seed_policy,
+            allocation=allocation,
+            matrix_version=args.matrix_version or None,
         )
         write_json_atomic(args.evidence_manifest, manifest)
         print(f"evidence={args.evidence_manifest}")

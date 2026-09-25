@@ -2483,6 +2483,43 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.assertEqual(history.lineage_v1_comparison_key(stamped_v1), stamped_v1["comparison"]["key"])
         history.validate_lineage_inputs(stamped_v1)
 
+    def test_cell_aggregate_2_leaves_the_take_after_a_cold_take_out(self) -> None:
+        """audit #30: the flagged take stays in the record but out of its cell's
+        statistics, and an IQR needs four takes; aggregate 1 is unchanged."""
+        def take(cell: str, state: str, rtf: float, **extra) -> dict:
+            return {"cell": cell, "warmState": state, "metrics": {"rtf": rtf}, **extra}
+
+        takes = [
+            take("custom/medium/cold#0", "cold", 1.0),
+            take("custom/short/warm#0", "warm", 0.9, followsColdTake=True),
+            *(take(f"custom/short/warm#{index}", "warm", 0.60 + index / 100) for index in range(1, 5)),
+            take("custom/long/warm#0", "warm", 0.5),
+            take("custom/long/warm#1", "warm", 0.52),
+        ]
+        cells = {cell["key"]: cell for cell in history.aggregate_cells(takes, 2)}
+        short = cells["custom/short/warm"]
+        self.assertEqual(short["count"], 5)
+        self.assertEqual(short["statistics"]["rtf"]["count"], 4)
+        self.assertEqual(short["statistics"]["rtf"]["max"], 0.64)
+        self.assertIsNotNone(short["statistics"]["rtf"]["iqr"])
+        self.assertIsNone(cells["custom/long/warm"]["statistics"]["rtf"]["iqr"])
+        legacy = {cell["key"]: cell for cell in history.aggregate_cells(takes)}
+        self.assertEqual(legacy["custom/short/warm"]["statistics"]["rtf"]["max"], 0.9)
+        self.assertAlmostEqual(legacy["custom/long/warm"]["statistics"]["rtf"]["iqr"], 0.01)
+
+        history.validate_cold_take_flags(takes, 2)
+        unflagged = copy.deepcopy(takes)
+        unflagged[1].pop("followsColdTake")
+        history.validate_cold_take_flags(unflagged, 1)
+        with self.assertRaises(history.HistoryError):
+            history.validate_cold_take_flags(unflagged, 2)
+        misplaced = copy.deepcopy(takes)
+        misplaced[2]["followsColdTake"] = True
+        with self.assertRaises(history.HistoryError):
+            history.validate_cold_take_flags(misplaced, 1)
+        with self.assertRaises(history.HistoryError):
+            history.cell_aggregate_version({"evidence": {"cellAggregateVersion": 3}})
+
     def test_the_seed_policy_matches_the_published_take_seeds(self) -> None:
         """audit #29: run.seedPolicy is checked against every take's seed."""
         from lib import bench_seed

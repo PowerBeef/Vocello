@@ -652,7 +652,23 @@ built without internal diagnostics ignores the knob and fails here), and the rec
 `run.seedPolicy` and each take's `seed`; lineage contract 2 keys a seeded matrix apart from random
 seeds. The iPhone lane does the same through a per-process cell schedule. The manifest flags the first warm take after a cold
 take (`followsColdTake`, audit #30): in the 16 canonical M2 records it is the slowest take of its cell
-in 14 (custom/short) and 11 (design/short) runs. The flag describes; nothing is excluded from medians.
+in 14 (custom/short) and 11 (design/short) runs. The tracked record keeps that take, flagged
+(`followsColdTake: true`), but its cells use aggregate 2 (`evidence.cellAggregateVersion`): the flagged
+take stays out of its cell's statistics, and an IQR is published only from at least four takes (null
+below). The README medians leave flagged takes out too. Records without the declaration keep aggregate
+1 and their stored cells; lineage contract 2 keys the aggregate version.
+
+**Declared matrices (audit #30).** `config/ui-bench-matrix.json` names the matrix versions. The
+canonical one, `uniform-v1`, is the 29-take matrix; `--matrix-version NAME` runs another (for example
+the audit's provisional `proposal-5-3-2`, 32 takes), whose warm repetitions per mode and length reach
+the XCUITest matrix as `QVOICE_<PLATFORM>_BENCH_ALLOCATION` and the checker as `--allocation`, and whose
+records are focused, never canonical. `python3 scripts/ui_bench_allocation.py derive RECORD...
+[--phases take-phases.jsonl ...] [--write NAME]` computes an allocation from a run's measured per-cell
+spread: the pooled within-run spread of each warm cell's log RTF (the take after a cold take left out)
+and each take's cost (its harness phases when given), spending the canonical matrix's own time budget
+one take at a time on the cell whose median has the largest standard error, two to eight takes per
+cell. Adopting a derived version as `canonicalVersion` is a separate, reviewed change; until then the
+29-take assertion stays the default.
 
 **One-time machine setup:** configure Xcode UI-test runner signing, build the native test host, and
 install the required models.
@@ -669,8 +685,8 @@ scripts/ui_test.sh macos benchmark --modes custom --lengths short --warm 1 --lab
 ```
 
 The test target consumes the canonical matrix and wraps every UI-driven generation in a named
-XCTest activity. The command accepts `--modes`, `--lengths`, `--warm`, and `--label`; without filters
-it runs exactly 29 takes. Cold Custom and Design cells are exact-path relaunches; a cell cannot
+XCTest activity. The command accepts `--modes`, `--lengths`, `--warm`, `--label`, `--seed-policy` and
+`--matrix-version`; without filters it runs exactly 29 takes. Cold Custom and Design cells are exact-path relaunches; a cell cannot
 complete without its matching deterministic History/WAV assertion.
 
 **Played-audio capture.** The runner taps the app's own output for every take through a Core Audio

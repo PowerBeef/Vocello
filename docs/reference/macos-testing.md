@@ -54,8 +54,9 @@ file validated from `scripts/check_project_inputs.sh`, not in this lane.
 ## Platform gate (`scripts/macos_test.sh gate`)
 
 ```sh
-scripts/macos_test.sh gate                         # project inputs → foundation build → core-test → deterministic tests → crash delta
-QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate  # adds a bounded vocello bench step; a PASS publishes its benchmark history
+scripts/macos_test.sh gate                         # project inputs → foundation build → deterministic tests → crash delta
+QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate  # adds a bench preflight and a bounded, seeded vocello bench; a PASS publishes its benchmark history
+QWENVOICE_GATE_BENCH_SEED=1 scripts/macos_test.sh gate  # the same bench, added to the staged baseline instead of compared
 scripts/macos_test.sh release-readiness            # project inputs → exact-path app build → deterministic tests → crash delta
 scripts/macos_test.sh preflight [--strict-models]  # Xcode, app, dSYM and model-fixture status; --strict-models fails on a missing fixture
 scripts/macos_test.sh crashes [--test]             # collect and symbolicate .ips for the app
@@ -64,16 +65,32 @@ scripts/macos_test.sh telemetry-overhead           # model-dependent on/off tele
 
 The gate is release tooling, not the daily loop: `.github/workflows/release.yml` runs it in the
 `archive-ios` job as the `platform-readiness` step (`scripts/macos_test.sh gate &&
-./scripts/build_foundation_targets.sh ios`). Its five ledgered required steps are `project-inputs`
-(`check_project_inputs.sh`, step 0), `foundation-build` (`build_foundation_targets.sh macos`), `core-tests`
-(`VocelloCoreTests`), `deterministic-tests` (the same bundles as `test`) and the gate-fatal
-`crash-delta` over `.ips` files newer than the run's marker. Every step lands in a
-required-step ledger with the verdict under `build/artifacts/macos/gates/`, and
-`QWENVOICE_GATE_BENCH=1` appends a fifth bounded `vocello bench` step whose PASS publishes one
-benchmark record. `release-readiness` is the packaging prerequisite `scripts/release.sh` invokes
-before signing; it needs no model fixture and no UI evidence.
+./scripts/build_foundation_targets.sh ios`). Its four ledgered required steps are `project-inputs`
+(`check_project_inputs.sh`, step 0; locally the gate sets `QVOICE_GATES=quick`, so the Python
+suite CI already ran is skipped while `scripts/` and `config/` are clean, and CI ignores it),
+`foundation-build` (`build_foundation_targets.sh macos`), `deterministic-tests` (the same bundles as
+`test`: `VocelloCoreTests`, which the gate no longer runs a second time, and the Qwen3 runtime
+tests) and the gate-fatal `crash-delta` over `.ips` files newer than the run's marker. Every step
+lands in a required-step ledger with the verdict under `build/artifacts/macos/gates/`.
 
-`gate`, `telemetry-overhead`, `lang-bench` and `memory` refuse to start on a busy host:
+`QWENVOICE_GATE_BENCH=1` adds two steps. A `benchmark-preflight` before step 0 takes seconds: a
+quiet host, the canonical hardware profile, the installed benchmark model and a prediction of the
+baseline identity from the live host and the gate matrix; any failure stops the gate before a
+build, with a finalized ledger and a verdict. After the crash delta, unless an earlier step failed
+(the bench step is then left unrecorded and the ledger marks it missing), a bounded `vocello bench`
+of three seeded warm takes re-checks the host right before the model loads, compares the warm
+medians with the committed baseline and, on a PASS, publishes one benchmark record. A loaded,
+low-power or throttled host makes the bench INCONCLUSIVE: the ledger records the step as failed with
+exit code 3, nothing is published, and the gate prints `GATE: INCONCLUSIVE` and exits 3, never PASS
+or FAIL. The optimized CLI build logs to `cli-build.log`, the measurement to `bench.log`, and every
+threshold used, with the baseline digest, to `bench-verdict.json`. `QWENVOICE_GATE_BENCH_SEED=1`
+runs the same bench but adds the run to the staged baseline instead of comparing
+([benchmarking-procedure.md](benchmarking-procedure.md), baseline comparison).
+`release-readiness` is the packaging prerequisite `scripts/release.sh` invokes before signing; it
+needs no model fixture and no UI evidence.
+
+The gate bench, `telemetry-overhead`, `lang-bench` and `memory` refuse to start on a busy host (the
+deterministic gate without a bench does not check, so it can run beside an agent or a native build):
 `require_quiet_host` in `scripts/lib/host_preflight.sh` rejects a one-minute load above twice the
 core count, a kernel memory-pressure level above normal, another holder of the host-wide native lock
 or a locked agent worktree before any model loads, and

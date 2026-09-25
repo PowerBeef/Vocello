@@ -28,8 +28,8 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import hashlib
 import os
-import platform as platform_module
 import re
 import statistics
 import subprocess
@@ -41,7 +41,6 @@ from pathlib import Path
 SCRIPT_DIRECTORY = Path(__file__).resolve().parent
 if str(SCRIPT_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIRECTORY))
-from lib import jsonio  # noqa: E402
 from lib import rtf as rtf_semantics  # noqa: E402
 
 DEFAULT_DIR = os.path.expanduser(
@@ -378,12 +377,8 @@ def prosody_for_delivery(prosody_rows, mode, model_id, delivery):
     ]
     if not rows:
         return None
-    # `prosodyEffect` is the instructed take's absolute expressiveness (audit
-    # #9); only `pairedProsodyEffect` is the effect against the paired neutral.
-    # A sidecar written before the paired key existed shows no effect.
-    paired = [r["pairedProsodyEffect"] for r in rows if "pairedProsodyEffect" in r]
     return {
-        "effect": med(paired) if len(paired) == len(rows) else None,
+        "effect": med(r["prosodyEffect"] for r in rows),
         "dF0Std": med(r["dF0Std"] for r in rows),
         "dRateCV": med(r["dRateCV"] for r in rows),
         "dPauseRatio": med(r["dPauseRatio"] for r in rows),
@@ -533,6 +528,12 @@ def _engine_run(e, app_lookup, *, cell_override=None):
         # most OOM-relevant peak. headroomMin = closest the process came to
         # exhausting its available memory budget during the run.
         "physFootMB": summary.get("physFootprintPeakMB"),
+        # Exact per-request MLX high-water mark (memoryMetrics, telemetry v8).
+        # Unlike the sampled phys_footprint peak it does not drift between
+        # identical runs, so the gate judges memory on it.
+        "mlxPeakMB": (e.get("memoryMetrics") or {}).get("mlxCumulativePeakMB"),
+        # Seeded takes are token-exact; the count shows whether they were.
+        "generatedTokens": derived.get("generatedTokenCount"),
         "headMinMB": summary.get("headroomMinMB"),
         "gpuWsRatioPeak": summary.get("gpuWorkingSetUsageRatioPeak"),
         "thermalWorst": (e.get("thermalState") or {}).get("worst"),
@@ -641,6 +642,8 @@ class CellAccumulator:
     decode_loop_ms: list = field(default_factory=list)
     peak_gpu_mb: list = field(default_factory=list)
     phys_foot_mb: list = field(default_factory=list)
+    mlx_peak_mb: list = field(default_factory=list)
+    generated_tokens: list = field(default_factory=list)
     head_min_mb: list = field(default_factory=list)
     gpu_ws_ratio_peaks: list = field(default_factory=list)
     thermal_worsts: list = field(default_factory=list)
@@ -675,6 +678,10 @@ class CellAccumulator:
             self.peak_gpu_mb.append(run["peakGpuMB"])
         if run.get("physFootMB") is not None:
             self.phys_foot_mb.append(run["physFootMB"])
+        if run.get("mlxPeakMB") is not None:
+            self.mlx_peak_mb.append(run["mlxPeakMB"])
+        if run.get("generatedTokens") is not None:
+            self.generated_tokens.append(run["generatedTokens"])
         if run.get("headMinMB") is not None:
             self.head_min_mb.append(run["headMinMB"])
         if run.get("gpuWsRatioPeak") is not None:
@@ -762,6 +769,9 @@ class CellAccumulator:
             "rtfMAD": mad(self.rtfs),
             "physFootIQR": iqr(self.phys_foot_mb),
             "physFootMAD": mad(self.phys_foot_mb),
+            "mlxPeakMB": med(self.mlx_peak_mb),
+            "mlxPeakMAD": mad(self.mlx_peak_mb),
+            "generatedTokenCounts": list(self.generated_tokens),
             "trims": med(self.trims),
             "worstTrim": worst_trim,
             "uiDelayedHeartbeat50": med(self.ui_stalls),
@@ -771,6 +781,7 @@ class CellAccumulator:
             "qcFlags": sorted(self.qc_flags),
             "chunkCount": med(self.chunk_counts),
             "firstChunkArrivalMS": med(self.first_chunk_arrivals),
+            "firstChunkArrivalMAD": mad(self.first_chunk_arrivals),
             "medianInterChunkMS": med(self.median_inter_chunks),
             "chunkSubstageMS": {
                 key: med(values) for key, values in self.chunk_substage_values.items()
@@ -1077,7 +1088,10 @@ def fmt_ui_heartbeat(group):
 def build_summary(cells):
     """Build a JSON-serializable summary of per-cell medians for baseline save/compare.
 
-    `cells` is a dict of finalized cell summaries (as returned by aggregate_runs)."""
+    `cells` is a dict of finalized cell summaries (as returned by aggregate_runs).
+    `engineFirstChunkMS` is the engine-side first-chunk arrival (median of
+    chunkTimeline[0].arrivalMS), the only latency a headless `--engine-only` run
+    has; app-level `ttfcMS` stays with the UI lanes."""
     summary = []
     for key, s in cells.items():
         mode, model_id, state, lb = key
@@ -1095,7 +1109,13 @@ def build_summary(cells):
                 "decodeSpeedupX": s.get("decodeSpeedupX"),
                 "tokps": s["tokps"],
                 "ttfcMS": s["ttfcMS"],
+                "engineFirstChunkMS": s.get("firstChunkArrivalMS"),
+                "engineFirstChunkMAD": s.get("firstChunkArrivalMAD"),
                 "physFootMB": s["physFootMB"],
+                "mlxPeakMB": s.get("mlxPeakMB"),
+                "mlxPeakMAD": s.get("mlxPeakMAD"),
+                "generatedTokens": med(s.get("generatedTokenCounts") or []),
+                "generatedTokenCounts": list(s.get("generatedTokenCounts") or []),
                 "qcVerdict": cell_qc(s),
             }
         )
@@ -1135,59 +1155,54 @@ def load_baseline_migrations(path):
 
 BASELINE_SCHEMA_VERSION = 2
 
+# The OS and toolchain that measured a run. They come from the run's own
+# evidence (the pre-run source snapshot folds them into the manifest's hardware
+# and toolchain blocks), never from the tools installed when a baseline is saved
+# or compared, so a baseline seeded from older evidence after a toolchain update
+# keeps the identity of the run that produced it. A new OS or Xcode build number
+# is a new identity and forces a re-seed.
+HOST_IDENTITY_KEYS = ("osVersion", "osBuild", "xcodeVersion", "xcodeBuild", "swiftVersion")
+_HOST_IDENTITY_SOURCES = {
+    "osVersion": "hardware",
+    "osBuild": "hardware",
+    "xcodeVersion": "toolchain",
+    "xcodeBuild": "toolchain",
+    "swiftVersion": "toolchain",
+}
+# The identity keys a pre-run preflight can predict without evidence: the host,
+# the optimization the gate builds and the matrix it will run. Models, corpus
+# and evidence versions are only known once the takes exist.
+PREFLIGHT_IDENTITY_KEYS = (
+    "kind", "platform", "matrixScope", "hardwareProfile", *HOST_IDENTITY_KEYS,
+    "optimization", "matrixHash",
+)
 
-def baseline_identity_from_evidence(payload, *, require_device_class=True):
-    """Return the performance-comparison identity from validated evidence.
 
-    Source and executable digests are deliberately excluded: a regression
-    baseline must survive source changes to detect their performance impact.
-    The optimization, topology, hardware, device tier, model artifact,
-    matrix/corpus, and evidence semantics remain exact so unlike lanes can never
-    compare. The device tier comes from the record's `run.runtimePolicy`
-    provenance, which the publisher derives from the rows' own stamps.
+def _identity_fields(history):
+    """Every identity field the given historyRecord-shaped payload carries."""
+    def section(name):
+        value = history.get(name)
+        return value if isinstance(value, dict) else {}
 
-    Evidence from rows that predate the stamp has no `runtimePolicy`. Saving
-    always requires it; comparing with a baseline that predates the device-class
-    identity passes `require_device_class=False`, and the identity then leaves
-    the tier out, as that baseline does.
-    """
-    if not isinstance(payload, dict):
-        raise ValueError("baseline identity requires an evidence manifest")
-    history = payload.get("historyRecord")
-    if not isinstance(history, dict):
-        raise ValueError("baseline identity evidence has no historyRecord")
-    run = history.get("run")
-    hardware = history.get("hardware")
-    toolchain = history.get("toolchain")
-    inputs = history.get("inputs")
-    evidence = history.get("evidence")
-    models = history.get("models")
-    if not all(isinstance(value, dict) for value in (run, hardware, toolchain, inputs, evidence)):
-        raise ValueError("baseline identity evidence is incomplete")
-    if not isinstance(models, list) or not models or any(not isinstance(model, dict) for model in models):
-        raise ValueError("baseline identity evidence has no model identities")
-    optimization = toolchain.get("optimization")
-    if optimization not in {"-O", "-Onone"}:
-        raise ValueError("baseline identity has an unsupported optimization")
-    runtime_policy = run.get("runtimePolicy")
-    device_class = {}
-    if runtime_policy is not None or require_device_class:
-        if not isinstance(runtime_policy, dict):
-            raise ValueError("baseline identity evidence has no runtimePolicy")
-        if runtime_policy.get("deviceClassForced") is not False:
-            raise ValueError("baseline identity evidence ran under a forced memory class")
-        device_class = {"deviceClass": runtime_policy.get("deviceClass")}
-    identity = {
+    run, hardware, toolchain, inputs, evidence = (
+        section("run"), section("hardware"), section("toolchain"), section("inputs"), section("evidence"),
+    )
+    sources = {"hardware": hardware, "toolchain": toolchain}
+    fields = {
         "kind": run.get("kind"),
         "platform": run.get("platform"),
         "matrixScope": run.get("matrixScope"),
         "hardwareProfile": hardware.get("profileID"),
-        **device_class,
-        **host_identity(),
-        "optimization": optimization,
+        **{key: sources[_HOST_IDENTITY_SOURCES[key]].get(key) for key in HOST_IDENTITY_KEYS},
+        "optimization": toolchain.get("optimization"),
         "matrixHash": inputs.get("matrixHash"),
         "corpusHash": inputs.get("corpusHash"),
-        "models": [
+        "telemetrySchemaVersion": evidence.get("telemetrySchemaVersion"),
+        "qcAlgorithmVersion": evidence.get("qcAlgorithmVersion"),
+    }
+    models = history.get("models")
+    if isinstance(models, list) and models and all(isinstance(model, dict) for model in models):
+        fields["models"] = [
             {
                 key: model.get(key)
                 for key in (
@@ -1197,63 +1212,153 @@ def baseline_identity_from_evidence(payload, *, require_device_class=True):
                 )
             }
             for model in models
-        ],
-        "telemetrySchemaVersion": evidence.get("telemetrySchemaVersion"),
-        "qcAlgorithmVersion": evidence.get("qcAlgorithmVersion"),
+        ]
+    return fields
+
+
+def baseline_identity_from_evidence(payload):
+    """Return the performance-comparison identity from validated evidence.
+
+    Source and executable digests are deliberately excluded: a regression
+    baseline must survive source changes to detect their performance impact.
+    The optimization, topology, hardware, host OS and toolchain build, model
+    artifact, matrix/corpus (the matrix hash binds the sampling seed), and
+    evidence semantics remain exact so unlike lanes can never compare. Every
+    field is read from the evidence; nothing is probed on the comparing host.
+    """
+    if not isinstance(payload, dict):
+        raise ValueError("baseline identity requires an evidence manifest")
+    history = payload.get("historyRecord")
+    if not isinstance(history, dict):
+        raise ValueError("baseline identity evidence has no historyRecord")
+    if not all(
+        isinstance(history.get(name), dict)
+        for name in ("run", "hardware", "toolchain", "inputs", "evidence")
+    ):
+        raise ValueError("baseline identity evidence is incomplete")
+    models = history.get("models")
+    if not isinstance(models, list) or not models or any(not isinstance(model, dict) for model in models):
+        raise ValueError("baseline identity evidence has no model identities")
+    fields = _identity_fields(history)
+    if fields["optimization"] not in {"-O", "-Onone"}:
+        raise ValueError("baseline identity has an unsupported optimization")
+    identity = {
+        key: fields[key]
+        for key in (
+            "kind", "platform", "matrixScope", "hardwareProfile", *HOST_IDENTITY_KEYS,
+            "optimization", "matrixHash", "corpusHash", "models",
+            "telemetrySchemaVersion", "qcAlgorithmVersion",
+        )
     }
     missing = [key for key, value in identity.items() if value in (None, "", [])]
     if missing:
-        raise ValueError("baseline identity is missing: " + ", ".join(sorted(missing)))
+        raise ValueError(
+            "baseline identity is missing: " + ", ".join(sorted(missing))
+            + " (evidence captured before the run-time host identity was recorded cannot seed or compare)"
+        )
     return identity
 
 
-HOST_IDENTITY_KEYS = ("osVersion", "xcodeVersion")
-# Added 2026-09-25 (audit #19). A baseline saved before it compares without it,
-# like a baseline saved before the host keys, and the caller says so.
-RUNTIME_POLICY_IDENTITY_KEYS = ("deviceClass",)
+def identity_differences(baseline_identity, current_identity, keys=None):
+    """Sorted identity keys whose values differ, including keys only one side has."""
+    baseline_identity = baseline_identity if isinstance(baseline_identity, dict) else {}
+    current_identity = current_identity if isinstance(current_identity, dict) else {}
+    candidates = set(keys) if keys is not None else set(baseline_identity) | set(current_identity)
+    return sorted(
+        key for key in candidates
+        if baseline_identity.get(key) != current_identity.get(key)
+        or (key in baseline_identity) != (key in current_identity)
+    )
 
 
-def host_identity():
-    """OS and Xcode versions of the machine doing the measuring.
+def host_load_verdict(evidence_payload, *, cpu_count=None, states=None):
+    """Reasons the host was too busy, throttled or in low power for a verdict.
 
-    A baseline captured on one OS/Xcode pair is not evidence about another; the
-    identity carries both so a toolchain update forces a fresh baseline."""
-    os_version = platform_module.mac_ver()[0] or "unknown"
-    try:
-        xcode = subprocess.run(
-            ["xcodebuild", "-version"], capture_output=True, text=True, check=False, timeout=30,
-        ).stdout.splitlines()
-    except (OSError, subprocess.SubprocessError):
-        xcode = []
-    xcode_version = xcode[0].removeprefix("Xcode ").strip() if xcode else "unknown"
-    return {"osVersion": os_version, "xcodeVersion": xcode_version}
-
-
-def host_load_verdict(evidence_payload, *, cpu_count=None):
-    """Reasons the host was too busy or too hot for a regression judgement.
-
-    Load average and thermal state are captured in every take's run
-    environment and folded into the evidence hardware block; a comparison
-    under heavy load or thermal throttling is inconclusive, not a regression."""
+    Every take records its run environment at generation start; the publisher
+    keeps each take's one-minute load (`metrics.loadAverage1M`) and low-power
+    state, and folds the run's worst thermal state into the hardware block. The
+    busiest judged take decides (the warm takes when `states` names them), so
+    load that arrives after the first sample is not missed; evidence without
+    per-take load falls back to the run's first sample. A comparison under heavy
+    load, throttling or low power is inconclusive, never a pass or a regression.
+    """
     if not isinstance(evidence_payload, dict):
         return []
-    hardware = ((evidence_payload.get("historyRecord") or {}).get("hardware")) or {}
+    history = evidence_payload.get("historyRecord") or {}
+    hardware = history.get("hardware") or {}
+    takes = [take for take in history.get("takes") or [] if isinstance(take, dict)]
+    if states is not None:
+        wanted = set(states)
+        takes = [take for take in takes if take.get("warmState") in wanted]
+
+    def number(value):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return float(value)
+
+    take_loads = [
+        load for take in takes
+        if (load := number((take.get("metrics") or {}).get("loadAverage1M"))) is not None
+    ]
     reasons = []
     cores = cpu_count or os.cpu_count() or 1
-    load = hardware.get("loadAverage1M")
-    if isinstance(load, (int, float)) and not isinstance(load, bool) and load > 2.0 * cores:
-        reasons.append(f"load average {load:.2f} exceeds 2x{cores} cores")
+    if take_loads:
+        load, source = max(take_loads), f"busiest of {len(take_loads)} judged take(s)"
+    else:
+        load, source = number(hardware.get("loadAverage1M")), "run sample"
+    if load is not None and load > 2.0 * cores:
+        reasons.append(f"load average {load:.2f} exceeds 2x{cores} cores ({source})")
     thermal = str(hardware.get("thermalState", "nominal")).lower()
     if thermal in {"serious", "critical"}:
         reasons.append(f"thermal state {thermal}")
+    low_power = hardware.get("lowPowerMode") is True or any(
+        number((take.get("metrics") or {}).get("lowPowerMode")) == 1.0 for take in takes
+    )
+    if low_power:
+        reasons.append("low power mode was enabled")
     return reasons
+
+
+# Regression floors by metric, as fractions of the baseline median. A metric
+# not listed uses the flat --regress-threshold (5 %). A floor keeps a threshold
+# from collapsing onto the flat value when three consecutive takes happen to
+# agree, which the within-run dispersion term alone cannot (audit #5). Each
+# floor clears the drift measured between committed identical-source M2 runs
+# (1,258 ordered pairs of clean records on one commit, replayed offline):
+# - physFootMB: the sampled phys_footprint peak moved up to +25.6 % (+16.5 %
+#   in the gate cell: warm medians 2273, 2315, 2511 and 2649 MB around
+#   b88d6d03), while a baseline's own three takes can agree to 0.05 MB.
+# - engineFirstChunkMS: first-chunk medians moved up to +13 % (p90 of the
+#   between-run range 12.6 %); the first warm take after a load skews it.
+# - mlxPeakMB: the exact MLX high-water mark never moved more than 0.61 % and
+#   agreed to 0.001 MB across four gate runs on three commits, so a tight floor
+#   makes it the memory-regression signal.
+METRIC_THRESHOLD_FLOORS = {
+    "engineFirstChunkMS": 0.15,
+    "physFootMB": 0.30,
+    "mlxPeakMB": 0.02,
+}
+# (metric, regression direction, within-run dispersion key) in verdict order.
+COMPARED_METRICS = (
+    ("rtf", "up", "rtfMAD"),
+    ("ttfcMS", "up", None),
+    ("engineFirstChunkMS", "up", "engineFirstChunkMAD"),
+    ("physFootMB", "up", "physFootMAD"),
+    ("mlxPeakMB", "up", "mlxPeakMAD"),
+    ("tokps", "down", None),
+)
+# Metrics added after baselines were first saved: a baseline cell without the
+# key predates them and is not judged on them (a key present with no value is
+# still a coverage failure).
+LATER_BASELINE_METRICS = frozenset({"engineFirstChunkMS", "mlxPeakMB"})
+# A between-run spread widens a threshold once a baseline pools this many runs.
+MINIMUM_POOLED_RUNS = 3
 
 
 def effective_threshold(base_cell, threshold, median_key="rtf", mad_key="rtfMAD"):
     """Widen the flat threshold to three median absolute deviations of the
     baseline's own takes when it has at least three samples; one-take baselines
-    keep the flat value. Applied to `rtf` and to `physFootMB`, whose sampled
-    per-take peak swings by hundreds of MB between identical takes."""
+    keep the flat value."""
     n = base_cell.get("n")
     mad_value = base_cell.get(mad_key)
     median = base_cell.get(median_key)
@@ -1263,6 +1368,29 @@ def effective_threshold(base_cell, threshold, median_key="rtf", mad_key="rtfMAD"
     ):
         return max(threshold, 3.0 * float(mad_value) / abs(float(median)))
     return threshold
+
+
+def metric_threshold(base_cell, metric, threshold, mad_key=None):
+    """(threshold, basis) for one metric of one baseline cell.
+
+    The largest of: the metric's floor (or the flat threshold), three MADs of
+    the baseline's own takes (n >= 3), and the full range of the per-run medians
+    when the baseline pools at least three seeded runs (so no seed run would
+    have regressed against the baseline it helped build).
+    """
+    candidates = [(METRIC_THRESHOLD_FLOORS.get(metric, threshold), "floor")]
+    if mad_key:
+        within = effective_threshold(base_cell, 0.0, metric, mad_key)
+        if within > 0:
+            candidates.append((within, "3 MAD of the baseline takes"))
+    runs = base_cell.get("runCount")
+    spread = (base_cell.get("runSpread") or {}).get(metric)
+    if (
+        isinstance(runs, int) and runs >= MINIMUM_POOLED_RUNS
+        and isinstance(spread, (int, float)) and not isinstance(spread, bool) and spread > 0
+    ):
+        candidates.append((float(spread), f"range of {runs} seeded runs"))
+    return max(candidates, key=lambda candidate: candidate[0])
 
 
 def baseline_document(cells, evidence_payload=None):
@@ -1280,11 +1408,6 @@ def baseline_document(cells, evidence_payload=None):
         "identity": baseline_identity_from_evidence(evidence_payload),
         "cells": cells,
     }
-
-
-def baseline_bytes(document):
-    """The saved baseline's encoding: indent 2, key order kept, ASCII, newline."""
-    return (json.dumps(document, indent=2) + "\n").encode("utf-8")
 
 
 def baseline_rtf_definition(payload):
@@ -1322,16 +1445,13 @@ def baseline_cells(payload, *, current_identity=None, require_identity=False):
         # let the caller say so.
         for key in HOST_IDENTITY_KEYS:
             comparable_current.pop(key, None)
-    for key in RUNTIME_POLICY_IDENTITY_KEYS:
-        if key not in identity:
-            comparable_current.pop(key, None)
-    if identity != comparable_current:
-        raise ValueError("baseline optimization/topology identity differs from current evidence")
+    differences = identity_differences(identity, comparable_current)
+    if differences:
+        raise ValueError(
+            "baseline optimization/topology identity differs from current evidence: "
+            + ", ".join(differences)
+        )
     return cells
-
-
-def baseline_declares_identity(payload):
-    return isinstance(payload, dict) and payload.get("identity") is not None
 
 
 def baseline_lacks_host_identity(payload):
@@ -1339,40 +1459,25 @@ def baseline_lacks_host_identity(payload):
     return isinstance(identity, dict) and not any(key in identity for key in HOST_IDENTITY_KEYS)
 
 
-def baseline_lacks_device_class(payload):
-    identity = payload.get("identity") if isinstance(payload, dict) else None
-    return isinstance(identity, dict) and any(
-        key not in identity for key in RUNTIME_POLICY_IDENTITY_KEYS
-    )
-
-
-def forced_memory_class_rows(runs):
-    """Rows that ran under QWENVOICE_FORCE_MEMORY_CLASS (audit #19).
-
-    A forced tier changes policy values, not the hardware, so such rows are
-    exploratory evidence: a regression baseline is never saved from them and
-    never compared with them."""
-    return [run for run in runs if run.get("deviceClassForced")]
-
-
 def compare_summaries(
     baseline, current, threshold=0.05, migrations=(),
-    baseline_definition=rtf_semantics.STANDARD_RTF_DEFINITION, states=None,
+    baseline_definition=rtf_semantics.STANDARD_RTF_DEFINITION, states=None, details=None,
 ):
     """Return regression entries where current is worse than baseline by > threshold.
 
     `states` restricts the verdict to cells in those warm states (the gate bench
     compares its three-take warm medians only; the single cold take stays
-    informational). None compares every cell.
+    informational). None compares every cell. `details`, when a list, receives
+    one row per judged (cell, metric) with the threshold and its basis, so the
+    caller can print and keep the thresholds it used.
 
     A regression is:
-      - rtf increased by > threshold (standard RTF = request wall ÷ audio; lower is better);
-        against a legacy baseline the baseline's speedup is compared with the current
-        `decodeSpeedupX` instead (decrease = regression)
-      - tokps decreased by > threshold
-      - ttfcMS increased by > threshold
-      - physFootMB increased by > threshold (widened to three of the baseline's
-        physFootMAD like rtf when the baseline has three samples)
+      - rtf increased beyond its threshold (standard RTF = request wall ÷ audio;
+        lower is better); against a legacy baseline the baseline's speedup is
+        compared with the current `decodeSpeedupX` instead (decrease = regression)
+      - tokps decreased, or ttfcMS, engineFirstChunkMS, physFootMB or mlxPeakMB
+        increased, beyond their thresholds (`metric_threshold`: the metric's floor,
+        three baseline MADs, or the between-run range of a pooled baseline)
       - qcVerdict worsened (pass -> warn/fail, warn -> fail)
     """
     baseline_by_key = {tuple(b["cellKey"]): b for b in baseline}
@@ -1422,13 +1527,16 @@ def compare_summaries(
                 "baseline": base.get("n"), "current": cur.get("n"),
             })
             continue
-        cell_threshold = effective_threshold(base, threshold)
-        for metric, direction in [
-            ("rtf", "down" if legacy_baseline else "up"),
-            ("ttfcMS", "up"),
-            ("physFootMB", "up"),
-            ("tokps", "down"),
-        ]:
+        for metric, direction, mad_key in COMPARED_METRICS:
+            if metric == "rtf" and legacy_baseline:
+                direction = "down"
+            if metric in LATER_BASELINE_METRICS and metric not in base:
+                if details is not None:
+                    details.append({
+                        "cellKey": list(key), "metric": metric, "judged": False,
+                        "reason": "the baseline predates this metric",
+                    })
+                continue
             b = base.get(metric)
             c = cur.get("decodeSpeedupX" if metric == "rtf" and legacy_baseline else metric)
             if b is None and c is None:
@@ -1444,16 +1552,17 @@ def compare_summaries(
                 )
                 continue
             delta = (c - b) / b
-            if metric == "rtf":
-                metric_threshold = cell_threshold
-            elif metric == "physFootMB":
-                metric_threshold = effective_threshold(base, threshold, "physFootMB", "physFootMAD")
-            else:
-                metric_threshold = threshold
+            metric_limit, basis = metric_threshold(base, metric, threshold, mad_key)
             is_regression = (
-                (direction == "up" and delta > metric_threshold)
-                or (direction == "down" and -delta > metric_threshold)
+                (direction == "up" and delta > metric_limit)
+                or (direction == "down" and -delta > metric_limit)
             )
+            if details is not None:
+                details.append({
+                    "cellKey": list(key), "metric": metric, "judged": True,
+                    "direction": direction, "baseline": b, "current": c, "delta": delta,
+                    "threshold": metric_limit, "basis": basis, "regression": is_regression,
+                })
             if is_regression:
                 regressions.append(
                     {
@@ -1491,6 +1600,245 @@ def compare_summaries(
     return regressions
 
 
+# ---------------------------------------------------------------------------
+# Governed seeding: a baseline pooled from several identical-source runs.
+# ---------------------------------------------------------------------------
+
+_POOLED_VALUE_KEYS = (
+    "rtf", "decodeSpeedupX", "tokps", "ttfcMS", "engineFirstChunkMS",
+    "physFootMB", "mlxPeakMB", "generatedTokens",
+)
+_POOLED_MAD_KEYS = ("rtfMAD", "physFootMAD", "engineFirstChunkMAD", "mlxPeakMAD")
+
+
+def _numbers(values):
+    return [
+        float(value) for value in values
+        if isinstance(value, (int, float)) and not isinstance(value, bool)
+    ]
+
+
+def pooled_cells(seeded_runs):
+    """Pool per-run cell summaries into one baseline cell per cell key.
+
+    Each value is the median of the per-run medians, which is what a single gate
+    run is compared with; `runSpread` keeps the between-run range of each
+    compared metric relative to that pooled median, and `n` is the smallest
+    per-run take count.
+    """
+    members_by_key = {}
+    order = []
+    for run in seeded_runs:
+        for cell in run.get("cells") or []:
+            key = tuple(cell["cellKey"])
+            if key not in members_by_key:
+                members_by_key[key] = []
+                order.append(key)
+            members_by_key[key].append(cell)
+    pooled = []
+    for key in order:
+        members = members_by_key[key]
+        mode, model_id, state, bucket = key
+        cell = {
+            "cellKey": list(key), "mode": mode, "modelID": model_id,
+            "warmState": state, "lenBucket": bucket,
+            "n": min(
+                (member["n"] for member in members if isinstance(member.get("n"), int)),
+                default=None,
+            ),
+            "runCount": len(members),
+        }
+        for name in (*_POOLED_VALUE_KEYS, *_POOLED_MAD_KEYS):
+            values = _numbers(member.get(name) for member in members)
+            cell[name] = statistics.median(values) if values else None
+        spread = {}
+        for metric, _direction, _mad in COMPARED_METRICS:
+            values = _numbers(member.get(metric) for member in members)
+            if len(values) >= 2 and cell.get(metric):
+                spread[metric] = (max(values) - min(values)) / abs(cell[metric])
+        cell["runSpread"] = spread
+        verdicts = [member.get("qcVerdict") for member in members if member.get("qcVerdict")]
+        cell["qcVerdict"] = max(
+            verdicts, key=lambda verdict: _QC_SEVERITY.get(verdict.split(":")[0], 0), default=None,
+        )
+        cell["generatedTokenCounts"] = [
+            count for member in members for count in member.get("generatedTokenCounts") or []
+        ]
+        pooled.append(cell)
+    return pooled
+
+
+def _evidence_source(evidence_payload):
+    history = (evidence_payload or {}).get("historyRecord") or {}
+    source = history.get("source") if isinstance(history.get("source"), dict) else {}
+    return source.get("commit"), source.get("dirty")
+
+
+class SeedRefused(ValueError):
+    """The run cannot seed a baseline; nothing was written."""
+
+    def __init__(self, message, *, inconclusive=False):
+        super().__init__(message)
+        self.inconclusive = inconclusive
+
+
+def seed_baseline(path, cells, evidence_payload, *, states=None, minimum_takes=3, cpu_count=None):
+    """Add one governed run to the pooled baseline at `path` and return it.
+
+    Refuses (SeedRefused, nothing written) unless the run has complete evidence
+    identity, a clean source commit, a quiet host over its judged takes and at
+    least `minimum_takes` takes in every judged cell. A baseline at `path` with
+    the same identity whose seeded runs share this run's commit gains the run;
+    any other file is replaced by a new one-run baseline. Returns
+    (document, pooled_run_count, replaced_previous).
+    """
+    if evidence_payload is None:
+        raise SeedRefused("seeding requires --evidence-manifest (the baseline identity comes from the run's evidence)")
+    identity = baseline_identity_from_evidence(evidence_payload)
+    load_reasons = host_load_verdict(evidence_payload, cpu_count=cpu_count, states=states)
+    if load_reasons:
+        raise SeedRefused("the host was not quiet: " + "; ".join(load_reasons), inconclusive=True)
+    commit, dirty = _evidence_source(evidence_payload)
+    if not isinstance(commit, str) or not commit or dirty is not False:
+        raise SeedRefused("seeding requires evidence from a clean source commit")
+    judged = [
+        cell for cell in cells
+        if states is None or cell["cellKey"][2] in set(states)
+    ]
+    if not judged:
+        raise SeedRefused("the run has no cell in the judged states")
+    short = [
+        "/".join(str(part) for part in cell["cellKey"]) for cell in judged
+        if not isinstance(cell.get("n"), int) or cell["n"] < minimum_takes
+    ]
+    if short:
+        raise SeedRefused(f"every judged cell needs at least {minimum_takes} takes: " + ", ".join(short))
+    run_id = evidence_payload.get("runID")
+    if not isinstance(run_id, str) or not run_id:
+        raise SeedRefused("the evidence manifest has no runID")
+
+    existing = None
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as stream:
+                existing = json.load(stream)
+        except (OSError, json.JSONDecodeError):
+            existing = None
+    runs = []
+    replaced = existing is not None
+    if (
+        isinstance(existing, dict)
+        and existing.get("schemaVersion") == BASELINE_SCHEMA_VERSION
+        and existing.get("identity") == identity
+        and isinstance(existing.get("seededRuns"), list)
+        and existing["seededRuns"]
+        and all(
+            isinstance(run, dict) and run.get("sourceCommit") == commit
+            for run in existing["seededRuns"]
+        )
+    ):
+        runs = list(existing["seededRuns"])
+        replaced = False
+    if any(run.get("runID") == run_id for run in runs):
+        return existing, len(runs), False
+    runs.append({"runID": run_id, "sourceCommit": commit, "cells": cells})
+    document = {
+        "schemaVersion": BASELINE_SCHEMA_VERSION,
+        "rtfDefinition": rtf_semantics.STANDARD_RTF_DEFINITION,
+        "identity": identity,
+        "seededRuns": runs,
+        "cells": pooled_cells(runs),
+    }
+    directory = os.path.dirname(os.path.abspath(path))
+    os.makedirs(directory, exist_ok=True)
+    temporary = f"{path}.tmp.{os.getpid()}"
+    with open(temporary, "w", encoding="utf-8") as stream:
+        json.dump(document, stream, indent=2)
+        stream.write("\n")
+    os.replace(temporary, path)
+    return document, len(runs), replaced
+
+
+def _short(value):
+    text = str(value)
+    return text if len(text) <= 24 else text[:12] + "..."
+
+
+def preflight_baseline(baseline_path, expected_payload, *, seeding):
+    """Predict before any build whether the gate bench can use its baseline.
+
+    `expected_payload` is the partial evidence `publish_benchmark_history.py
+    expected-identity` derives from the live host and the gate matrix. Returns
+    (exit_code, lines): 1 when a comparison is predicted to be BASELINE INVALID
+    or a seed run could not be accepted, else 0.
+    """
+    history = (expected_payload or {}).get("historyRecord")
+    if not isinstance(history, dict):
+        return 1, ["preflight: the expected identity has no historyRecord"]
+    fields = _identity_fields(history)
+    expected = {key: fields.get(key) for key in PREFLIGHT_IDENTITY_KEYS}
+    unknown = sorted(key for key, value in expected.items() if value in (None, ""))
+    if unknown:
+        return 1, ["preflight: the expected identity is missing " + ", ".join(unknown)]
+    commit, dirty = _evidence_source(expected_payload)
+    payload = None
+    if os.path.exists(baseline_path):
+        try:
+            with open(baseline_path, "r", encoding="utf-8") as stream:
+                payload = json.load(stream)
+        except (OSError, json.JSONDecodeError) as error:
+            if not seeding:
+                return 1, [f"preflight: the baseline is unreadable: {error}"]
+    identity = payload.get("identity") if isinstance(payload, dict) else None
+
+    if seeding:
+        if dirty is not False or not commit:
+            return 1, ["preflight: seeding needs a clean source commit; commit or discard the changes first"]
+        runs = payload.get("seededRuns") if isinstance(payload, dict) else None
+        if (
+            isinstance(identity, dict)
+            and not identity_differences(identity, expected, PREFLIGHT_IDENTITY_KEYS)
+            and isinstance(runs, list) and runs
+            and all(isinstance(run, dict) and run.get("sourceCommit") == commit for run in runs)
+        ):
+            return 0, [
+                f"preflight: this run joins {len(runs)} staged seed run(s) from commit {commit[:12]} "
+                "if its models, corpus and evidence versions match too"
+            ]
+        return 0, ["preflight: this run starts a new staged baseline (no staged runs share this host, matrix and commit)"]
+
+    if payload is None:
+        return 0, ["preflight: no committed baseline; the gate bench will run without a comparison"]
+    if not isinstance(identity, dict):
+        return 1, ["preflight: the committed baseline has no identity, so the governed comparison cannot use it"]
+    known = list(PREFLIGHT_IDENTITY_KEYS)
+    if not any(key in identity for key in HOST_IDENTITY_KEYS):
+        # The same rule as baseline_cells: a baseline saved before host identity
+        # was recorded is compared on the rest.
+        known = [key for key in known if key not in HOST_IDENTITY_KEYS]
+    differences = identity_differences(identity, expected, known)
+    if differences:
+        return 1, [
+            "preflight: the comparison would be BASELINE INVALID; the baseline differs on "
+            + "; ".join(
+                f"{key} (baseline {_short(identity.get(key, 'absent'))}, "
+                f"this gate {_short(expected.get(key))})"
+                for key in differences
+            )
+        ]
+    runs = payload.get("seededRuns") if isinstance(payload, dict) else None
+    lines = [
+        "preflight: the baseline identity matches on "
+        + ", ".join(known) + "; models, corpus and evidence versions are checked after the run"
+    ]
+    if not isinstance(runs, list) or len(runs) < MINIMUM_POOLED_RUNS:
+        lines.append(
+            f"preflight: note: the baseline pools {len(runs) if isinstance(runs, list) else 0} seeded run(s); "
+            f"at least {MINIMUM_POOLED_RUNS} give it a between-run threshold"
+        )
+    return 0, lines
+
+
 def print_regressions(regressions):
     """Print a Markdown-aligned table of detected regressions."""
     if not regressions:
@@ -1520,6 +1868,130 @@ def print_regressions(regressions):
             f"{mode:<8} {short_model(model_id):<26} {state:<5} {lb:<6} "
             f"{r['metric']:<12} {baseline_str:>10} {current_str:>10} {delta_str:>10}"
         )
+
+
+def _cell_label(cell_key):
+    mode, model_id, state, bucket = cell_key
+    return f"{mode}/{short_model(model_id)}/{state}/{bucket}"
+
+
+def _fmt_value(value):
+    if isinstance(value, float):
+        return f"{value:.4g}" if abs(value) < 10 else f"{value:.1f}"
+    return "-" if value is None else str(value)
+
+
+def print_threshold_floors(threshold):
+    floors = ", ".join(
+        f"{metric} {METRIC_THRESHOLD_FLOORS.get(metric, threshold):.0%}"
+        for metric, _direction, _mad in COMPARED_METRICS
+    )
+    print(
+        f"threshold floors: {floors}; each widens to 3 MADs of the baseline takes (n >= 3) "
+        f"or to the range of a pooled baseline's runs (>= {MINIMUM_POOLED_RUNS} runs)"
+    )
+
+
+def print_comparison(details, threshold):
+    """Print every judged (cell, metric) with the threshold that decided it."""
+    print_threshold_floors(threshold)
+    header = (
+        f"{'cell':<36} {'metric':<18} {'baseline':>10} {'current':>10} "
+        f"{'delta':>8} {'threshold':>9}  basis"
+    )
+    print(header)
+    print("-" * len(header))
+    for row in details:
+        label = _cell_label(row["cellKey"])
+        if not row.get("judged"):
+            print(f"{label:<36} {row['metric']:<18} {'-':>10} {'-':>10} {'-':>8} {'-':>9}  not judged: {row['reason']}")
+            continue
+        flag = "  REGRESSION" if row["regression"] else ""
+        print(
+            f"{label:<36} {row['metric']:<18} {_fmt_value(row['baseline']):>10} "
+            f"{_fmt_value(row['current']):>10} {row['delta']:>+8.2%} {row['threshold']:>9.2%}  "
+            f"{row['basis']}{flag}"
+        )
+
+
+def pooled_threshold_rows(cells, threshold, states=None):
+    """The thresholds a (pooled) baseline implies for each compared metric."""
+    rows = []
+    for cell in cells:
+        if states is not None and cell["cellKey"][2] not in set(states):
+            continue
+        for metric, _direction, mad_key in COMPARED_METRICS:
+            if cell.get(metric) is None:
+                continue
+            limit, basis = metric_threshold(cell, metric, threshold, mad_key)
+            rows.append({
+                "cellKey": list(cell["cellKey"]), "metric": metric, "value": cell[metric],
+                "threshold": limit, "basis": basis,
+                "runSpread": (cell.get("runSpread") or {}).get(metric),
+            })
+    return rows
+
+
+def determinism_report(evidence_payload, current, baseline=None, states=None):
+    """Whether seeded takes agreed on their token counts, and with the baseline.
+
+    Seeded takes are token-exact (request-local sampling), so differing counts
+    inside one seeded cell mean the sampling was not reproducible; a count that
+    differs from the baseline means the engine's output changed. Both are
+    reported, never a performance verdict: a legitimate engine change alters
+    tokens.
+    """
+    history = (evidence_payload or {}).get("historyRecord") or {}
+    seeds = {
+        take.get("seed") for take in history.get("takes") or [] if isinstance(take, dict)
+    }
+    seeded = bool(seeds) and None not in seeds and len(seeds) == 1
+    report = {"seed": next(iter(seeds)) if seeded else None, "cells": []}
+    baseline_by_key = {tuple(cell["cellKey"]): cell for cell in baseline or []}
+    for cell in current:
+        key = tuple(cell["cellKey"])
+        if states is not None and key[2] not in set(states):
+            continue
+        counts = [count for count in cell.get("generatedTokenCounts") or [] if count is not None]
+        entry = {
+            "cellKey": list(key),
+            "generatedTokenCounts": counts,
+            "consistent": len(set(counts)) <= 1 if counts else None,
+        }
+        base = baseline_by_key.get(key)
+        if base is not None and base.get("generatedTokens") is not None and cell.get("generatedTokens") is not None:
+            entry["baselineGeneratedTokens"] = base["generatedTokens"]
+            entry["engineOutputChanged"] = base["generatedTokens"] != cell["generatedTokens"]
+        report["cells"].append(entry)
+    return report
+
+
+def print_determinism(report):
+    for entry in report["cells"]:
+        label = _cell_label(entry["cellKey"])
+        counts = entry["generatedTokenCounts"]
+        if report["seed"] is not None and entry["consistent"] is False:
+            print(
+                f"WARNING: {label}: seeded takes disagree on generatedTokens {counts}; "
+                "sampling was not reproducible (informational, no verdict)"
+            )
+        if entry.get("engineOutputChanged"):
+            print(
+                f"note: {label}: engine output changed (generatedTokens baseline "
+                f"{entry['baselineGeneratedTokens']:g}, current {counts}); informational, no verdict"
+            )
+
+
+def write_verdict(path, payload):
+    if not path:
+        return
+    directory = os.path.dirname(os.path.abspath(path))
+    os.makedirs(directory, exist_ok=True)
+    temporary = f"{path}.tmp.{os.getpid()}"
+    with open(temporary, "w", encoding="utf-8") as stream:
+        json.dump(payload, stream, indent=2, default=list)
+        stream.write("\n")
+    os.replace(temporary, path)
 
 
 def print_merged_table(merged_runs):
@@ -1578,7 +2050,42 @@ def main():
     parser.add_argument("--compare-states", metavar="STATE[,STATE]",
                         help="restrict the baseline verdict to these warm states (e.g. warm); "
                              "other cells are informational")
+    parser.add_argument(
+        "--seed-baseline", metavar="PATH",
+        help="governed seed: add this run to the pooled baseline at PATH when its evidence is "
+             "complete, its source is a clean commit, the host was quiet and every judged cell has "
+             "at least --seed-minimum-takes takes (exit 3 on a busy host, 1 on any other refusal)",
+    )
+    parser.add_argument("--seed-minimum-takes", type=int, default=3,
+                        help="takes every judged cell needs before it may seed (default 3)")
+    parser.add_argument("--verdict-json", metavar="PATH",
+                        help="write the comparison or seed verdict, the baseline digest and every "
+                             "threshold used to PATH")
+    parser.add_argument(
+        "--preflight-baseline", metavar="PATH",
+        help="predict, from --expected-identity and without telemetry, whether the gate bench "
+             "can compare against (or, with --seeding, seed into) the baseline at PATH",
+    )
+    parser.add_argument("--expected-identity", metavar="PATH",
+                        help="partial evidence from publish_benchmark_history.py expected-identity")
+    parser.add_argument("--seeding", action="store_true",
+                        help="with --preflight-baseline: the run will seed rather than compare")
     args = parser.parse_args()
+    if args.preflight_baseline:
+        if not args.expected_identity:
+            parser.error("--preflight-baseline requires --expected-identity")
+        try:
+            with open(args.expected_identity, "r", encoding="utf-8") as stream:
+                expected_payload = json.load(stream)
+        except (OSError, json.JSONDecodeError) as error:
+            print(f"preflight: the expected identity is unreadable: {error}")
+            return 1
+        status, lines = preflight_baseline(
+            args.preflight_baseline, expected_payload, seeding=args.seeding,
+        )
+        for line in lines:
+            print(line)
+        return status
     diag_dir = args.diag_dir
     generation_ids = None
     cell_by_id = None
@@ -1611,27 +2118,17 @@ def main():
         print(f"(skipped {skipped_failed} non-success engine row(s) with finishReason failed/superseded/cancelled)")
     prosody_rows = load_prosody(diag_dir)
 
-    if args.save_baseline or args.compare_baseline:
-        forced = forced_memory_class_rows(runs)
-        if forced:
-            print(
-                f"FAIL: {len(forced)} selected row(s) ran under a forced memory class "
-                "(QWENVOICE_FORCE_MEMORY_CLASS); a regression baseline is never saved "
-                "from or compared with forced rows."
-            )
-            return 1
-
     if args.save_baseline:
-        # Build the whole document before touching the target: a refused
-        # identity must leave an existing (possibly committed) baseline intact.
+        # Ungoverned save for ad-hoc local comparison; the gate seeds through
+        # --seed-baseline, which adds the host, source and take-count checks.
         try:
             document = baseline_document(build_summary(cells), evidence_payload)
-            jsonio.atomic_json(
-                Path(args.save_baseline), document, mkdir=False, encoder=baseline_bytes,
-            )
-        except (OSError, ValueError) as error:
-            print(f"FAIL: baseline not saved to {args.save_baseline}: {error}")
+        except ValueError as error:
+            print(f"FAIL: cannot save the baseline: {error}")
             return 1
+        with open(args.save_baseline, "w", encoding="utf-8") as f:
+            json.dump(document, f, indent=2)
+            f.write("\n")
 
     stamp = f"{today_str()} · {git_short_sha()}"
     if args.label:
@@ -1719,9 +2216,8 @@ def main():
             if has_prosody:
                 p = prosody_for_delivery(prosody_rows, mode, model_id, delivery)
                 if p:
-                    effect = "-" if p["effect"] is None else f"{p['effect']:+.2f}"
                     base += (
-                        f" {p['n']:>5} {effect:>8} {p['dF0Std']:>+7.2f} "
+                        f" {p['n']:>5} {p['effect']:>+8.2f} {p['dF0Std']:>+7.2f} "
                         f"{p['dRateCV']:>+8.3f} {p['dPauseRatio']:>+8.3f} {p['dRoughness']:>+7.3f}"
                     )
                 else:
@@ -1868,9 +2364,8 @@ def main():
     )
     if prosody_rows:
         print(
-            "Delivery prosody: prosEff = paired prosody effect (pairedProsodyEffect): the "
-            "weighted instructed-minus-neutral deltas (+F0 dynamics +rate variability -pauses "
-            "+roughness); '-' for a sidecar that predates it. Requires `vocello bench --delivery`."
+            "Delivery prosody: prosEff = signed prosody-effect score vs paired neutral "
+            "(+F0 dynamics +rate variability -pauses +roughness). Requires `vocello bench --delivery`."
         )
 
     if args.merged:
@@ -1889,68 +2384,188 @@ def main():
         else:
             print("\nNo generations-merged.jsonl found; cross-layer table skipped.")
 
+    compare_states = None
+    if args.compare_states:
+        compare_states = tuple(s for s in args.compare_states.split(",") if s)
+
+    if args.seed_baseline:
+        return seed_baseline_command(args, cells, evidence_payload, compare_states)
+
     if args.compare_baseline:
-        try:
-            with open(args.compare_baseline, "r", encoding="utf-8") as f:
-                baseline_payload = json.load(f)
-            # An ad-hoc baseline declares no identity, so unless the caller
-            # requires one the evidence's identity is never needed.
-            current_identity = None
-            if evidence_payload is not None and (
-                args.require_baseline_identity or baseline_declares_identity(baseline_payload)
-            ):
-                current_identity = baseline_identity_from_evidence(
-                    evidence_payload,
-                    require_device_class=not baseline_lacks_device_class(baseline_payload),
-                )
-            baseline = baseline_cells(
-                baseline_payload,
-                current_identity=current_identity,
-                require_identity=args.require_baseline_identity,
-            )
-            migrations = load_baseline_migrations(args.baseline_migrations)
-            current = build_summary(cells)
-            load_reasons = host_load_verdict(evidence_payload)
-            if load_reasons:
-                print(
-                    "\nINCONCLUSIVE: the host was not quiet during this run ("
-                    + "; ".join(load_reasons)
-                    + "); no regression verdict. Rerun on an idle, cool machine."
-                )
-                return 3
-            if baseline_lacks_host_identity(baseline_payload):
-                print(
-                    "\nnote: legacy baseline has no OS/Xcode identity; "
-                    "re-save it to bind the comparison to this toolchain."
-                )
-            if baseline_lacks_device_class(baseline_payload):
-                print(
-                    "\nnote: baseline predates the device-class identity; "
-                    "re-save it to bind the comparison to this memory tier."
-                )
-            baseline_definition = baseline_rtf_definition(baseline_payload)
-            if baseline_definition != rtf_semantics.STANDARD_RTF_DEFINITION:
-                print(
-                    "\nnote: legacy baseline (pre-2026-09-12) stores the decode-loop speedup under rtf; "
-                    "comparing it with the current decodeSpeedupX. Re-save the baseline to compare "
-                    "standard RTF (wall/audio)."
-                )
-            compare_states = None
-            if args.compare_states:
-                compare_states = tuple(s for s in args.compare_states.split(",") if s)
-                print(f"\n(verdict on {', '.join(compare_states)} cells only; other cells are informational)")
-            regressions = compare_summaries(
-                baseline, current, threshold=args.regress_threshold, migrations=migrations,
-                baseline_definition=baseline_definition, states=compare_states,
-            )
-        except (OSError, ValueError, json.JSONDecodeError) as error:
-            print(f"FAIL: baseline comparison contract is invalid: {error}")
-            return 1
-        print_regressions(regressions)
-        if regressions:
-            return 2
+        return compare_baseline_command(args, cells, evidence_payload, compare_states, selected_run_id)
 
     return 0
+
+
+def seed_baseline_command(args, cells, evidence_payload, compare_states):
+    """Governed seed of a pooled baseline from this run (exit 0/1/3)."""
+    current = build_summary(cells)
+    verdict = {
+        "schemaVersion": 1,
+        "mode": "seed",
+        "runID": (evidence_payload or {}).get("runID"),
+        "baseline": {"file": os.path.basename(args.seed_baseline)},
+        "states": list(compare_states) if compare_states else None,
+        "flatThreshold": args.regress_threshold,
+        "thresholdFloors": dict(METRIC_THRESHOLD_FLOORS),
+        "hostLoad": host_load_verdict(evidence_payload, states=compare_states),
+        "determinism": determinism_report(evidence_payload, current, states=compare_states),
+    }
+    print_determinism(verdict["determinism"])
+    try:
+        document, run_count, replaced = seed_baseline(
+            args.seed_baseline, current, evidence_payload,
+            states=compare_states, minimum_takes=args.seed_minimum_takes,
+        )
+    except SeedRefused as error:
+        verdict["verdict"] = "inconclusive" if error.inconclusive else "refused"
+        verdict["reason"] = str(error)
+        write_verdict(args.verdict_json, verdict)
+        label = "INCONCLUSIVE" if error.inconclusive else "FAIL"
+        print(f"\n{label}: this run cannot seed the baseline: {error}. Nothing was written.")
+        return 3 if error.inconclusive else 1
+    except ValueError as error:
+        verdict["verdict"] = "refused"
+        verdict["reason"] = str(error)
+        write_verdict(args.verdict_json, verdict)
+        print(f"\nFAIL: this run cannot seed the baseline: {error}. Nothing was written.")
+        return 1
+    with open(args.seed_baseline, "rb") as stream:
+        digest = hashlib.sha256(stream.read()).hexdigest()
+    rows = pooled_threshold_rows(document["cells"], args.regress_threshold, compare_states)
+    verdict.update({
+        "verdict": "seeded",
+        "baseline": {
+            "file": os.path.basename(args.seed_baseline), "sha256": digest,
+            "seededRuns": run_count, "replacedPrevious": replaced,
+            "sourceCommits": sorted({run.get("sourceCommit") for run in document.get("seededRuns") or []}),
+        },
+        "thresholds": rows,
+    })
+    write_verdict(args.verdict_json, verdict)
+    prefix = "a new baseline (the previous file had another identity or source commit)" if replaced else "the baseline"
+    print(
+        f"\nBASELINE SEEDED: {prefix} now pools {run_count} run(s) from commit "
+        f"{str(document['seededRuns'][0].get('sourceCommit'))[:12]}"
+        + ("" if run_count >= MINIMUM_POOLED_RUNS
+           else f"; seed at least {MINIMUM_POOLED_RUNS} before promoting it")
+    )
+    print_threshold_floors(args.regress_threshold)
+    for row in rows:
+        spread = row["runSpread"]
+        spread_text = "-" if spread is None else f"{spread:.2%}"
+        print(
+            f"  {_cell_label(row['cellKey']):<36} {row['metric']:<18} {_fmt_value(row['value']):>10}  "
+            f"between-run range {spread_text:>7}  threshold {row['threshold']:.2%} ({row['basis']})"
+        )
+    return 0
+
+
+def compare_baseline_command(args, cells, evidence_payload, compare_states, selected_run_id):
+    """Compare this run with a saved baseline (exit 0 pass, 1 invalid, 2 regression, 3 inconclusive)."""
+    verdict = {
+        "schemaVersion": 1,
+        "mode": "compare",
+        "runID": selected_run_id or None,
+        "baseline": {"file": os.path.basename(args.compare_baseline)},
+        "states": list(compare_states) if compare_states else None,
+        "flatThreshold": args.regress_threshold,
+        "thresholdFloors": dict(METRIC_THRESHOLD_FLOORS),
+    }
+    try:
+        with open(args.compare_baseline, "rb") as f:
+            raw = f.read()
+        verdict["baseline"]["sha256"] = hashlib.sha256(raw).hexdigest()
+        baseline_payload = json.loads(raw)
+        if isinstance(baseline_payload, dict):
+            runs = baseline_payload.get("seededRuns")
+            verdict["baseline"]["seededRuns"] = len(runs) if isinstance(runs, list) else 0
+        migrations = load_baseline_migrations(args.baseline_migrations)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        verdict.update({"verdict": "baselineInvalid", "reason": str(error)})
+        write_verdict(args.verdict_json, verdict)
+        print(f"FAIL: baseline comparison contract is invalid: {error}")
+        return 1
+    # The host verdict comes first: a loaded run says nothing about the engine,
+    # whatever the baseline's identity (audit V-7). An identity problem found
+    # alongside is still printed so the rerun does not discover it next.
+    identity_error = None
+    baseline = None
+    try:
+        current_identity = (
+            baseline_identity_from_evidence(evidence_payload)
+            if evidence_payload is not None
+            else None
+        )
+        baseline = baseline_cells(
+            baseline_payload,
+            current_identity=current_identity,
+            require_identity=args.require_baseline_identity,
+        )
+    except ValueError as error:
+        identity_error = error
+    current = build_summary(cells)
+    load_reasons = host_load_verdict(evidence_payload, states=compare_states)
+    verdict["hostLoad"] = load_reasons
+    verdict["determinism"] = determinism_report(
+        evidence_payload, current, baseline if identity_error is None else None, compare_states,
+    )
+    if load_reasons:
+        verdict["verdict"] = "inconclusive"
+        if identity_error is not None:
+            verdict["identityError"] = str(identity_error)
+        write_verdict(args.verdict_json, verdict)
+        print(
+            "\nINCONCLUSIVE: the host was not quiet during this run ("
+            + "; ".join(load_reasons)
+            + "); no regression verdict. Rerun on an idle, cool machine."
+        )
+        if identity_error is not None:
+            print(f"note: the baseline would not have compared either: {identity_error}")
+        return 3
+    if identity_error is not None:
+        verdict.update({"verdict": "baselineInvalid", "reason": str(identity_error)})
+        write_verdict(args.verdict_json, verdict)
+        print(f"FAIL: baseline comparison contract is invalid: {identity_error}")
+        return 1
+    if baseline_lacks_host_identity(baseline_payload):
+        print(
+            "\nnote: legacy baseline has no OS/Xcode identity; "
+            "re-save it to bind the comparison to this toolchain."
+        )
+    baseline_definition = baseline_rtf_definition(baseline_payload)
+    if baseline_definition != rtf_semantics.STANDARD_RTF_DEFINITION:
+        print(
+            "\nnote: legacy baseline (pre-2026-09-12) stores the decode-loop speedup under rtf; "
+            "comparing it with the current decodeSpeedupX. Re-save the baseline to compare "
+            "standard RTF (wall/audio)."
+        )
+    if compare_states:
+        print(f"\n(verdict on {', '.join(compare_states)} cells only; other cells are informational)")
+    details = []
+    try:
+        regressions = compare_summaries(
+            baseline, current, threshold=args.regress_threshold, migrations=migrations,
+            baseline_definition=baseline_definition, states=compare_states, details=details,
+        )
+    except ValueError as error:
+        verdict.update({"verdict": "baselineInvalid", "reason": str(error)})
+        write_verdict(args.verdict_json, verdict)
+        print(f"FAIL: baseline comparison contract is invalid: {error}")
+        return 1
+    print()
+    print_comparison(details, args.regress_threshold)
+    print_determinism(verdict["determinism"])
+    print_regressions(regressions)
+    verdict.update({
+        "verdict": "regression" if regressions else "pass",
+        "comparisons": details,
+        "regressions": [
+            {**entry, "cellKey": list(entry["cellKey"])} for entry in regressions
+        ],
+    })
+    write_verdict(args.verdict_json, verdict)
+    return 2 if regressions else 0
 
 
 def fmt_trims(group):

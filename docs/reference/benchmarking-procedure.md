@@ -246,8 +246,10 @@ QWENVOICE_DEBUG=1 ./build/vocello bench \
 ```
 
 **The ordinary Clone matrix is warm-only by design.** The CLI awaits explicit model loading
-before its measured Clone takes, without generating an extra warm-up take. `warmState` means
-model residency, not that every conditioning/decoder cache is hot. New engine records require
+and then primes the reference as Studio does (`ensureCloneReferencePrimed`, the same clone
+prewarm a take would otherwise pay inside `warm#0`) before its measured Clone takes, without
+generating an extra warm-up take, so every warm take measures the same warm path. `warmState`
+means model residency, not that every conditioning/decoder cache is hot. New engine records require
 the result label to agree with engine telemetry and any backend/receipt warm-state evidence;
 missing or contradictory state blocks publication. The separate retained-memory protocol below
 does not preload Clone: its first `retained#0` take remains cold. Historical records are immutable.
@@ -625,8 +627,8 @@ Defined in `BenchMatrixSpec` (`Sources/QwenVoiceCore/BenchMatrixSpec.swift`; sha
 | Clone | **none** (warm-by-design) | `--warm` × each length |
 
 CLI forces cold via awaited explicit unload before the cold take; unload/load failure stops the
-matrix instead of inventing a warm/cold label. Ordinary Clone uses explicit model loading before
-its first measurement, as described in §4.3. UI cold uses app relaunch +
+matrix instead of inventing a warm/cold label. Ordinary Clone uses explicit model loading and
+reference priming before its first measurement, as described in §4.3. UI cold uses app relaunch +
 `QWENVOICE_DEBUG=1` + `QWENVOICE_SUPPRESS_WARMUP=1` + `QWENVOICE_BENCH_FORCE_COLD=1`
 (see §4.10).
 
@@ -659,8 +661,11 @@ Useful flags:
 |------|---------|
 | `--show-variance` | IQR / outlier hints per cell |
 | `--merged` | Cross-layer first-chunk table from `generations-merged.jsonl` |
-| `--save-baseline PATH` | Write the current per-cell summary as a **JSON** baseline |
-| `--compare-baseline BASELINE.json` | Fail-closed regression/coverage comparison against a **JSON** baseline from `--save-baseline`. Exit 2 on regression (RTF **rise**, tok/s drop, TTFC/physFoot rise beyond the threshold), removed/added cells, a missing sample count or required metric, or QC worsening; exit 3 (inconclusive) when the evidence shows a host load average above 2× the core count or a serious/critical thermal state. The RTF threshold is `max(--regress-threshold, 3 × baseline MAD ÷ median)` once the baseline cell has n ≥ 3, so a one-take baseline keeps the flat 5%. A baseline saved before 2026-09-12 stores the decode speedup under `rtf` and is compared with the current `decodeSpeedupX`; re-save it to compare standard RTF. Markdown snapshots cannot be fed to this flag — diff those with `git diff`. The `rtf` and `physFootMB` thresholds widen to three median absolute deviations of the baseline's own takes (`rtfMAD`, `physFootMAD`) when it holds three samples: the sampled per-take footprint peak swings by hundreds of MB between identical takes. |
+| `--save-baseline PATH` | Write the current per-cell summary as an ungoverned **JSON** baseline (ad-hoc local comparison; the gate seeds with `--seed-baseline`) |
+| `--seed-baseline PATH` | Governed seed: add this run to the pooled baseline at `PATH` only when its evidence carries the full identity, its source is a clean commit, the judged takes ran on a quiet host (exit 3 otherwise) and every judged cell has at least `--seed-minimum-takes` (3) takes. A file with the same identity whose seeded runs share this commit gains the run; any other file is replaced by a one-run baseline. Prints the thresholds the pooled baseline implies. |
+| `--compare-baseline BASELINE.json` | Fail-closed regression/coverage comparison against a **JSON** baseline. Exit 2 on regression (RTF **rise**, tok/s drop, TTFC, `engineFirstChunkMS`, `physFootMB` or `mlxPeakMB` rise beyond its threshold), removed/added cells, a missing sample count or required metric, or QC worsening; exit 3 (inconclusive) when the busiest judged take ran above 2× the core count, the host was in low power mode or the thermal state was serious/critical. The host verdict comes before the identity check, so a loaded run is inconclusive even against a stale baseline. Each metric's threshold is the largest of its floor (`rtf`, `tokps`, `ttfcMS`: `--regress-threshold`, 5%; `engineFirstChunkMS` 15%; `physFootMB` 30%; `mlxPeakMB` 2%), three median absolute deviations of the baseline's own takes (n ≥ 3), and the range of the per-run medians of a baseline pooled from at least three seeded runs. Every judged metric is printed with its threshold and basis. A baseline cell without the `engineFirstChunkMS` or `mlxPeakMB` key predates them and is not judged on them. A baseline saved before 2026-09-12 stores the decode speedup under `rtf` and is compared with the current `decodeSpeedupX`. Markdown snapshots cannot be fed to this flag — diff those with `git diff`. |
+| `--verdict-json PATH` | Keep the comparison or seed verdict, the baseline's SHA-256, the host-load reasons, the token-count determinism report and every threshold used |
+| `--preflight-baseline PATH --expected-identity FILE [--seeding]` | Without telemetry, predict whether a run with the identity in `FILE` (from `publish_benchmark_history.py expected-identity`) can compare against, or seed into, the baseline at `PATH`; exit 1 when the comparison would be BASELINE INVALID or a seed run would be refused |
 | `--compare-states STATE[,STATE]` | Restrict the baseline verdict to cells in those warm states (the gate passes `warm`: its three-take medians decide, the single cold take stays informational). Without it every cell is judged. |
 | `--baseline-migrations PATH` | Use a reviewed schema-v1 old-cell → new-cell migration map. Defaults to `config/benchmark-baseline-migrations.json`; ambiguous mappings and empty reasons fail. |
 | `--run-id ID` | Reject rows from other benchmark runs. |
@@ -790,32 +795,57 @@ claim to measure.
 ### Baseline comparison (JSON, machine-gated)
 
 ```sh
-# Seed / reseed a baseline (after an intentional, reviewed perf change):
-python3 scripts/summarize_generation_telemetry.py <diag-dir> \
-  --run-id <run-id> --evidence-manifest <run-artifact-dir>/benchmark-evidence.json \
-  --save-baseline benchmarks/baselines/mac-gate-bench.json
+# Seed a baseline (after an intentional, reviewed perf change, on a clean commit):
+# run the gate at least three times; each run joins the staged, pooled baseline.
+QWENVOICE_GATE_BENCH_SEED=1 scripts/macos_test.sh gate
+# then promote the staged file (the gate prints this exact command) and commit it:
+cp build/artifacts/macos/gates/staged-baseline/mac-gate-bench.json benchmarks/baselines/mac-gate-bench.json
 
-# Compare (exit 2 on regression — usable in scripts/gates):
-python3 scripts/summarize_generation_telemetry.py <diag-dir> \
+# Seed from one finished run's own evidence instead of rerunning it:
+python3 scripts/summarize_generation_telemetry.py <run-diag> \
   --run-id <run-id> --evidence-manifest <run-artifact-dir>/benchmark-evidence.json \
+  --engine-only --compare-states warm \
+  --seed-baseline build/artifacts/macos/gates/staged-baseline/mac-gate-bench.json
+
+# Compare (exit 2 on regression, 3 inconclusive — usable in scripts/gates):
+python3 scripts/summarize_generation_telemetry.py <run-diag> \
+  --run-id <run-id> --evidence-manifest <run-artifact-dir>/benchmark-evidence.json \
+  --engine-only --compare-states warm --require-baseline-identity \
   --compare-baseline benchmarks/baselines/mac-gate-bench.json
 ```
 
 The committed **`benchmarks/baselines/mac-gate-bench.json`** (custom/speed/medium,
-cold+warm) is a schema-v2 baseline binding the hardware profile, `-O` optimization,
-matrix/corpus, model artifact, evidence semantics and, since 2026-09-12, the host OS and Xcode
-versions and the RTF definition. It is what `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate`
-compares against — the gate runs three warm takes and compares their medians (`--compare-states
+cold+warm) is a schema-v2 baseline binding the hardware profile, `-O` optimization, matrix
+(including the gate's fixed sampling seed) and corpus, model artifact, evidence semantics, the
+RTF definition and the OS and toolchain that measured it: `osVersion`, `osBuild`,
+`xcodeVersion`, `xcodeBuild` and `swiftVersion`. Those five come from the run's own evidence (the
+pre-run snapshot records them and the publisher folds them into the manifest), never from the tools
+installed when the baseline is saved or compared, so a new OS or Xcode build number forces a
+re-seed. It is what `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` compares against — the
+gate runs three warm takes with `--seed 19790615` and compares their medians (`--compare-states
 warm`; the cold take is informational), uses an isolated runtime directory, rejects rows outside
-its collision-resistant run ID, freezes the exact ordered generation
-selection in `benchmark-evidence.json` before comparing, and reports a loaded or throttled host as
-inconclusive rather than pass or fail. The committed baseline was re-saved from a three-take gate
-run (warm cell n = 3, standard `wall/audio` RTF, host OS and Xcode identity). With
-`--require-baseline-identity` (the gate passes it) an identity mismatch exits 1 and the gate reports
-BASELINE INVALID: re-save it with `summarize_generation_telemetry.py <run-diag> --engine-only
---save-baseline`. The committed baseline is still bound to the retired `mac-mini-m2-8gb` host (macOS
-26.6.2, Xcode 26.6), so a gate bench on the canonical Mac mini M6 reports BASELINE INVALID until
-roadmap item AV-17 re-saves it from a three-take M6 run.
+its collision-resistant run ID, freezes the exact ordered generation selection in
+`benchmark-evidence.json` before comparing, prints every threshold it used (and keeps them with
+the baseline digest in `bench-verdict.json`), and reports a loaded, low-power or throttled host as
+inconclusive (exit 3) rather than pass or fail. Seeded takes are token-exact, so the comparison
+also reports, without a verdict, when the warm takes disagree on `generatedTokens` or differ from
+the baseline's ("engine output changed").
+
+Governed seeding (`QWENVOICE_GATE_BENCH_SEED=1`, or `--seed-baseline` on a finished run) writes
+only the untracked staged file, never the committed baseline, and refuses a busy host, a dirty
+tree or a warm cell with fewer than three takes. A staged baseline pools the runs that share its
+identity and source commit: each cell keeps the median of the per-run medians and the between-run
+range, and once it pools three runs that range becomes a threshold basis, so no seed run
+regresses against the baseline it built. Seed at least three runs from one clean commit, then
+promote. With `--require-baseline-identity` (the gate passes it) an identity mismatch exits 1 and
+the gate reports BASELINE INVALID with the exact seed command for that run's paths; the gate's
+preflight predicts the same mismatch from the live host and the gate matrix before any build.
+
+The committed baseline is still bound to the retired `mac-mini-m2-8gb` host (macOS 26.6.2, Xcode
+26.6). It stays readable, but no gate compares against it any more: the seeded gate has a new
+matrix hash, and the identity now requires `osBuild`, `xcodeBuild` and `swiftVersion`, which it
+lacks. On any host the gate preflight therefore stops within seconds and names the seed command,
+until roadmap item AV-17 seeds the M6 baseline from at least three seeded gate runs.
 Markdown snapshots (`benchmarks/baseline-*.md`) remain the human-readable full-matrix references;
 diff them with `git diff`, not `--compare-baseline`.
 

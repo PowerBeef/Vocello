@@ -22,7 +22,10 @@
 #                                                    # exact-PID xctrace vocello bench
 #   scripts/macos_test.sh memory [--label ID]        # retained-memory qualification sequence
 #   scripts/macos_test.sh gate                      # inputs → build_foundation → test → crashes
-#                                                    # optional: QWENVOICE_GATE_BENCH=1 adds bounded vocello bench
+#                                                    # optional: QWENVOICE_GATE_BENCH=1 adds a bench preflight
+#                                                    # and a bounded, seeded vocello bench compared with the
+#                                                    # committed baseline; QWENVOICE_GATE_BENCH_SEED=1 adds the
+#                                                    # run to the staged baseline instead (exit 3 = inconclusive)
 #   scripts/macos_test.sh release-readiness         # deterministic packaging gate (no UI)
 #   scripts/macos_test.sh models check|ensure|install  # test model fixture (Speed variant)
 #   scripts/macos_test.sh help
@@ -1200,29 +1203,105 @@ cmd_telemetry_overhead() {
   note "telemetry-overhead PASS (local diagnostic; not benchmark-history eligible) · $verdict_path"
 }
 
-# gate: one-command macOS deterministic gate — inputs → build → Core,
-# and runtime tests → crashes.
-# Optional bounded engine bench remains available with QWENVOICE_GATE_BENCH=1.
+# gate: one-command macOS deterministic gate — inputs → build → Core and
+# runtime tests → crashes. QWENVOICE_GATE_BENCH=1 adds a seconds-long bench
+# preflight before step 0 and a bounded engine bench after the crash delta;
+# QWENVOICE_GATE_BENCH_SEED=1 runs the same bench but adds it to a staged,
+# pooled baseline instead of comparing (promote it after at least three runs
+# from one clean commit).
 
 GATE_BENCH_BASELINE="$ROOT_DIR/benchmarks/baselines/mac-gate-bench.json"
+# Untracked: seeding never dirties the tree it measures. Promotion is a copy.
+GATE_BENCH_STAGED_BASELINE="$QVOICE_ARTIFACTS_MACOS/gates/staged-baseline/mac-gate-bench.json"
+# The bench matrix. The preflight predicts the run's matrix hash from these same
+# values, so the prediction and the bench command cannot drift apart.
+GATE_BENCH_MODEL="pro_custom_speed"
+GATE_BENCH_MODES="custom"
+GATE_BENCH_VARIANTS="speed"
+GATE_BENCH_LENGTHS="medium"
+GATE_BENCH_WARM=3
+# Every gate take uses the memory-qualification seed: seeded takes are
+# token-exact, so the gate's audio QC is reproducible from its record (audit
+# #13). The seed is part of the matrix hash and so of the baseline identity.
+GATE_BENCH_SEED=19790615
 
+# The exact commands that seed a baseline, with this run's own paths (audit #14).
+gate_bench_seed_hint() {
+  local run_diag="$1" run_id="$2" artifacts="$3"
+  printf '  seed from this run, no rerun: python3 scripts/summarize_generation_telemetry.py %q --run-id %q --evidence-manifest %q --engine-only --compare-states warm --seed-baseline %q\n' \
+    "$run_diag" "$run_id" "$artifacts/benchmark-evidence.json" "$GATE_BENCH_STAGED_BASELINE"
+  printf '  or seed with new runs: QWENVOICE_GATE_BENCH_SEED=1 scripts/macos_test.sh gate\n'
+  printf '  once at least three runs from one clean commit are staged, promote: cp %q %q\n' \
+    "$GATE_BENCH_STAGED_BASELINE" "$GATE_BENCH_BASELINE"
+}
+
+# Timing lanes refuse a busy host at start (the preflight). The deterministic
+# steps then load the host themselves, so the bench re-checks right before the
+# model loads and lets that load settle for up to a minute (audit #54).
+gate_bench_quiet_host() {
+  local attempt output=""
+  for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    if output="$(require_quiet_host macos-gate-bench 2>&1)"; then
+      printf '%s\n' "$output" >&2
+      return 0
+    fi
+    (( attempt == 12 )) || sleep 5
+  done
+  printf '%s\n' "$output" >&2
+  return 1
+}
+
+# Seconds-long bench prerequisites, checked before any build or test so a busy
+# or non-canonical host, a missing model or a baseline the run could not use
+# stops the gate at once rather than after the deterministic steps (audit #53).
+gate_bench_preflight() {
+  local gate_dir="$1" seeding="$2"
+  local expected="$gate_dir/expected-identity.json"
+  require_quiet_host macos-gate-bench || return 1
+  python3 "$SCRIPT_DIR/publish_benchmark_history.py" expected-identity --platform macos \
+    --modes "$GATE_BENCH_MODES" --variants "$GATE_BENCH_VARIANTS" \
+    --lengths "$GATE_BENCH_LENGTHS" --warm "$GATE_BENCH_WARM" --seed "$GATE_BENCH_SEED" \
+    --output "$expected" || return 1
+  # The model helpers exit the shell on a missing model; the subshell turns
+  # that into a failed step so the ledger is still finalized.
+  ( require_mac_benchmark_models "$GATE_BENCH_MODEL" ) || return 1
+  if (( seeding )); then
+    python3 "$SCRIPT_DIR/summarize_generation_telemetry.py" \
+      --preflight-baseline "$GATE_BENCH_STAGED_BASELINE" --expected-identity "$expected" --seeding
+  else
+    python3 "$SCRIPT_DIR/summarize_generation_telemetry.py" \
+      --preflight-baseline "$GATE_BENCH_BASELINE" --expected-identity "$expected" || {
+        echo "seed a baseline for this host and matrix: QWENVOICE_GATE_BENCH_SEED=1 scripts/macos_test.sh gate (at least three runs from one clean commit), then promote $GATE_BENCH_STAGED_BASELINE to $GATE_BENCH_BASELINE"
+        return 1
+      }
+  fi
+}
+
+# Returns 0 on a pass (or a seeded run), 3 when the host made the run
+# inconclusive, 1 on any failure.
 run_gate_bench() {
-  local gate_dir="$1"
+  local gate_dir="$1" seeding="$2"
   local log="$gate_dir/bench.log"
+  local verdict_json="$gate_dir/bench-verdict.json"
   local run_id
   run_id="mac-gate-bench-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
   local artifacts="$gate_dir/engine-benchmark"
   local runtime="$artifacts/runtime"
   local run_diag="$runtime/diagnostics"
-  note "gate bench: custom/speed/medium warm×3, median compared (engine in-process)"
-  "$ROOT_DIR/scripts/build.sh" cli-optimized >>"$log" 2>&1 || return 1
-  require_mac_benchmark_models pro_custom_speed >>"$log" 2>&1 || return 1
+  note "gate bench: $GATE_BENCH_MODES/$GATE_BENCH_VARIANTS/$GATE_BENCH_LENGTHS warm×$GATE_BENCH_WARM, seed $GATE_BENCH_SEED, medians compared (engine in-process)"
+  # The optimized build logs on its own so bench.log keeps the measurement.
+  "$ROOT_DIR/scripts/build.sh" cli-optimized >"$gate_dir/cli-build.log" 2>&1 \
+    || { echo "gate bench: the optimized CLI build failed (see cli-build.log)" >>"$log"; return 1; }
+  gate_bench_quiet_host >>"$log" 2>&1 \
+    || { echo "gate bench: INCONCLUSIVE — the host was not quiet at bench time; nothing was measured" >>"$log"; return 3; }
+  ( require_mac_benchmark_models "$GATE_BENCH_MODEL" ) >>"$log" 2>&1 || return 1
   mkdir -p "$runtime"
   ln -s "$(debug_models_dir)" "$runtime/models"
-  capture_benchmark_source "$artifacts"
+  ( capture_benchmark_source "$artifacts" ) >>"$log" 2>&1 || return 1
 
-  QWENVOICE_DEBUG=1 "$QVOICE_BUILD_ROOT/vocello" bench --modes custom --variants speed \
-    --lengths medium --warm 3 --run-id "$run_id" --label "mac-gate-bench" \
+  QWENVOICE_DEBUG=1 "$QVOICE_BUILD_ROOT/vocello" bench --modes "$GATE_BENCH_MODES" \
+    --variants "$GATE_BENCH_VARIANTS" --lengths "$GATE_BENCH_LENGTHS" --warm "$GATE_BENCH_WARM" \
+    --seed "$GATE_BENCH_SEED" --run-id "$run_id" --label "mac-gate-bench" \
     --data-dir "$runtime" --force --no-summary >>"$log" 2>&1 || return 1
   [[ -s "$run_diag/engine/generations.jsonl" ]] \
     || { echo "gate bench: bench produced no run-scoped telemetry rows" >>"$log"; return 1; }
@@ -1256,29 +1335,60 @@ PY
     --output-dir "$runtime/outputs/bench" --label "mac-gate-bench" --defer-record \
     >>"$log" 2>&1 || return 1
 
-  python3 "$ROOT_DIR/scripts/summarize_generation_telemetry.py" "$run_diag" \
-    --run-id "$run_id" --evidence-manifest "$artifacts/benchmark-evidence.json" \
-    --engine-only --label "mac-gate-bench" >>"$log" 2>&1 || return 1
+  local -a evidence_args=(
+    "$run_diag" --run-id "$run_id" --evidence-manifest "$artifacts/benchmark-evidence.json" --engine-only
+  )
+  python3 "$ROOT_DIR/scripts/summarize_generation_telemetry.py" "${evidence_args[@]}" \
+    --label "mac-gate-bench" >>"$log" 2>&1 || return 1
 
-  # Regression compare vs the committed baseline: medians of three warm takes,
-  # threshold max(5%, 3 MAD of the baseline); exit 2 on regression, exit 3 when
-  # the host was loaded or throttled (inconclusive, never a pass).
+  if (( seeding )); then
+    # Governed seed: only a quiet host, a clean commit and three takes in every
+    # warm cell add the run to the staged baseline, which prints the thresholds
+    # it now implies.
+    local seed_status=0
+    python3 "$ROOT_DIR/scripts/summarize_generation_telemetry.py" "${evidence_args[@]}" \
+      --compare-states warm --seed-baseline "$GATE_BENCH_STAGED_BASELINE" \
+      --verdict-json "$verdict_json" >>"$log" 2>&1 || seed_status=$?
+    case "$seed_status" in
+      0)
+        {
+          echo "gate bench: BASELINE SEEDED into $GATE_BENCH_STAGED_BASELINE"
+          printf '  once at least three runs from one clean commit are staged, promote: cp %q %q\n' \
+            "$GATE_BENCH_STAGED_BASELINE" "$GATE_BENCH_BASELINE"
+        } >>"$log"
+        return 0 ;;
+      3) echo "gate bench: INCONCLUSIVE — the host was not quiet during the takes; nothing was seeded (see bench.log)" >>"$log"; return 3 ;;
+      *) echo "gate bench: this run cannot seed the baseline (see bench.log)" >>"$log"; return 1 ;;
+    esac
+  fi
+
+  # Regression compare against the committed baseline: medians of the warm
+  # takes, each metric against its floor, three baseline MADs or the range of a
+  # pooled baseline's runs (printed, and kept in bench-verdict.json); exit 2 on
+  # regression, exit 3 when the host was loaded, throttled or in low power
+  # (inconclusive, never a pass or a fail).
   if [[ -f "$GATE_BENCH_BASELINE" ]]; then
     local compare_status=0
-    python3 "$ROOT_DIR/scripts/summarize_generation_telemetry.py" "$run_diag" \
-        --run-id "$run_id" --evidence-manifest "$artifacts/benchmark-evidence.json" \
-        --engine-only --compare-baseline "$GATE_BENCH_BASELINE" \
-        --compare-states warm --require-baseline-identity >>"$log" 2>&1 || compare_status=$?
+    python3 "$ROOT_DIR/scripts/summarize_generation_telemetry.py" "${evidence_args[@]}" \
+        --compare-baseline "$GATE_BENCH_BASELINE" --compare-states warm \
+        --require-baseline-identity --verdict-json "$verdict_json" >>"$log" 2>&1 || compare_status=$?
     case "$compare_status" in
       0) echo "gate bench: no regression vs $(basename "$GATE_BENCH_BASELINE") (warm medians)" >>"$log" ;;
-      1) echo "gate bench: BASELINE INVALID — $GATE_BENCH_BASELINE does not match this run's optimization/topology/host identity; re-save it with summarize_generation_telemetry.py <run-diag> --engine-only --save-baseline (see bench.log)" >>"$log"; return 1 ;;
+      1)
+        {
+          echo "gate bench: BASELINE INVALID — $GATE_BENCH_BASELINE does not match this run's identity (see bench.log)"
+          gate_bench_seed_hint "$run_diag" "$run_id" "$artifacts"
+        } >>"$log"
+        return 1 ;;
       2) echo "gate bench: REGRESSION vs $GATE_BENCH_BASELINE (see bench.log)" >>"$log"; return 1 ;;
-      3) echo "gate bench: INCONCLUSIVE — host load or thermal state invalidated the comparison (see bench.log)" >>"$log"; return 1 ;;
+      3) echo "gate bench: INCONCLUSIVE — host load, low power or thermal state invalidated the comparison (see bench.log)" >>"$log"; return 3 ;;
       *) echo "gate bench: summarizer exited $compare_status before producing a verdict (see bench.log)" >>"$log"; return 1 ;;
     esac
   else
-    echo "gate bench: no committed baseline at $GATE_BENCH_BASELINE — compare skipped" >>"$log"
-    echo "  (seed one: run the gate bench, then summarize_generation_telemetry.py <run-diag> --save-baseline $GATE_BENCH_BASELINE)" >>"$log"
+    {
+      echo "gate bench: no committed baseline at $GATE_BENCH_BASELINE — compare skipped"
+      gate_bench_seed_hint "$run_diag" "$run_id" "$artifacts"
+    } >>"$log"
   fi
   return 0
 }
@@ -1294,6 +1404,29 @@ gate_crash_delta() {
   fi
 }
 
+# Finalize the ledger, print the one gate verdict and exit. An inconclusive
+# bench is its own outcome (exit 3), never PASS or FAIL (release.md); its ledger
+# records the bench step as failed with exit code 3, so that failure alone does
+# not turn the gate into a FAIL.
+gate_finish() {
+  local verdict="$1" step_ledger="$2" gate_dir="$3" overall="$4" inconclusive="$5"
+  local ledger_passed=1 status=0
+  echo | tee -a "$verdict"
+  required_steps_finalize "$step_ledger" || ledger_passed=0
+  if (( ledger_passed == 0 && inconclusive == 0 )); then
+    overall=1
+  fi
+  if (( overall == 0 && inconclusive == 0 )); then
+    echo "GATE: PASS" | tee -a "$verdict"; note "gate PASS · $gate_dir"
+  elif (( overall == 0 )); then
+    echo "GATE: INCONCLUSIVE" | tee -a "$verdict"; note "gate INCONCLUSIVE · $gate_dir"; status=3
+  else
+    echo "GATE: FAIL" | tee -a "$verdict"; note "gate FAIL · $gate_dir"; status=1
+  fi
+  cat "$verdict" >&2
+  exit "$status"
+}
+
 cmd_gate() {
   local run_id
   run_id="mac-gate-$(date +%Y%m%d-%H%M%S)"
@@ -1301,24 +1434,43 @@ cmd_gate() {
   local verdict="$gate_dir/verdict.txt"
   local step_ledger="$gate_dir/required-steps.json"
   mkdir -p "$gate_dir"
-  local overall=0
-  local gate_bench=0
+  local overall=0 inconclusive=0
+  local gate_bench=0 seeding=0
   [[ "${QWENVOICE_GATE_BENCH:-0}" == "1" ]] && gate_bench=1
-  local total_steps=4
-  (( gate_bench )) && total_steps=5
+  if [[ "${QWENVOICE_GATE_BENCH_SEED:-0}" == "1" ]]; then
+    gate_bench=1
+    seeding=1
+  fi
+  local total_steps=3
+  (( gate_bench )) && total_steps=4
   local workflow="macos-gate"
   (( gate_bench )) && workflow="macos-gate-with-benchmark"
   required_steps_init "$step_ledger" "$workflow" "$run_id"
   { echo "Vocello macOS gate — $run_id"; echo; } | tee "$verdict"
+
+  if (( gate_bench )); then
+    note "gate bench preflight: quiet host, canonical hardware, benchmark model, baseline identity"
+    if required_step_run "$step_ledger" benchmark-preflight \
+        gate_bench_preflight "$gate_dir" "$seeding" >>"$gate_dir/preflight.log" 2>&1; then
+      echo "bench preflight: PASS" | tee -a "$verdict"
+    else
+      echo "bench preflight: FAIL (see preflight.log); no gate step ran" | tee -a "$verdict"
+      gate_finish "$verdict" "$step_ledger" "$gate_dir" 1 0
+    fi
+  fi
 
   # Marker for the gate-fatal crash-delta check: only .ips files newer than this
   # (i.e. crashes that happen DURING the gate run) fail the gate.
   local crash_marker="$gate_dir/.crash-marker"
   touch "$crash_marker"
 
+  # CI on the pushed commit already ran the complete Python suite. Locally the
+  # gate skips it while scripts/ and config/ are clean (QVOICE_GATES=quick,
+  # which check_project_inputs.sh ignores in CI); set QVOICE_GATES to override.
   note "gate step 0/$total_steps: check_project_inputs"
   if required_step_run "$step_ledger" project-inputs \
-      "$SCRIPT_DIR/check_project_inputs.sh" >>"$gate_dir/inputs.log" 2>&1; then
+      env QVOICE_GATES="${QVOICE_GATES:-quick}" "$SCRIPT_DIR/check_project_inputs.sh" \
+      >>"$gate_dir/inputs.log" 2>&1; then
     echo "check_project_inputs: PASS" | tee -a "$verdict"
   else echo "check_project_inputs: FAIL" | tee -a "$verdict"; overall=1; fi
 
@@ -1328,19 +1480,15 @@ cmd_gate() {
     echo "build_foundation macos: PASS" | tee -a "$verdict"
   else echo "build_foundation macos: FAIL" | tee -a "$verdict"; overall=1; fi
 
-  note "gate step 2/$total_steps: core-test (VocelloCoreTests)"
-  if required_step_run "$step_ledger" core-tests cmd_core_test \
-      >>"$gate_dir/core-test.log" 2>&1; then
-    echo "core-test: PASS" | tee -a "$verdict"
-  else echo "core-test: FAIL" | tee -a "$verdict"; overall=1; fi
-
-  note "gate step 3/$total_steps: deterministic Core + Qwen3 runtime tests"
+  # `test` runs VocelloCoreTests and the Qwen3 runtime tests; a separate
+  # core-test step ran the same Core bundle a second time (audit #57).
+  note "gate step 2/$total_steps: deterministic Core + Qwen3 runtime tests"
   if required_step_run "$step_ledger" deterministic-tests cmd_test \
       >>"$gate_dir/test.log" 2>&1; then
     echo "test: PASS" | tee -a "$verdict"
   else echo "test: FAIL" | tee -a "$verdict"; overall=1; fi
 
-  note "gate step 4/$total_steps: crashes (GATE-FATAL on new .ips during this run)"
+  note "gate step 3/$total_steps: crashes (GATE-FATAL on new .ips during this run)"
   if required_step_run "$step_ledger" crash-delta \
       gate_crash_delta "$gate_dir" "$crash_marker"; then
     echo "crashes: PASS (no new .ips)" | tee -a "$verdict"
@@ -1350,15 +1498,31 @@ cmd_gate() {
   fi
 
   if (( gate_bench )); then
-    note "gate step 5/$total_steps: bounded vocello bench (QWENVOICE_GATE_BENCH=1)"
-    if required_step_run "$step_ledger" benchmark-validation run_gate_bench "$gate_dir"; then
-      echo "bench: PASS (see bench.log)" | tee -a "$verdict"
+    if (( overall != 0 )); then
+      # A failed gate cannot pass, so the bench's model and build time is not
+      # spent; its step stays unrecorded and finalization marks it missing.
+      echo "bench: SKIPPED (an earlier gate step failed)" | tee -a "$verdict"
     else
-      echo "bench: FAIL (see bench.log)" | tee -a "$verdict"; overall=1
+      local bench_purpose="compared with the committed baseline"
+      (( seeding )) && bench_purpose="seeding the staged baseline"
+      note "gate step 4/$total_steps: bounded vocello bench ($bench_purpose)"
+      local bench_status=0
+      required_step_run "$step_ledger" benchmark-validation \
+        run_gate_bench "$gate_dir" "$seeding" || bench_status=$?
+      case "$bench_status" in
+        0)
+          if (( seeding )); then
+            echo "bench: BASELINE SEEDED (see bench.log)" | tee -a "$verdict"
+          else
+            echo "bench: PASS (see bench.log)" | tee -a "$verdict"
+          fi ;;
+        3) echo "bench: INCONCLUSIVE (host load, low power or thermal state; see bench.log)" | tee -a "$verdict"; inconclusive=1 ;;
+        *) echo "bench: FAIL (see bench.log)" | tee -a "$verdict"; overall=1 ;;
+      esac
     fi
   fi
 
-  if (( overall == 0 && gate_bench )); then
+  if (( overall == 0 && gate_bench && ! inconclusive )); then
     if required_step_run "$step_ledger" history-publication \
         record_benchmark_history "$gate_dir/engine-benchmark" >>"$gate_dir/bench.log" 2>&1; then
       echo "history: PASS" | tee -a "$verdict"
@@ -1368,18 +1532,9 @@ cmd_gate() {
     fi
   fi
 
-  echo | tee -a "$verdict"
-  if ! required_steps_finalize "$step_ledger"; then
-    overall=1
-  fi
-  if (( overall == 0 )); then
-    echo "GATE: PASS" | tee -a "$verdict"; note "gate PASS · $gate_dir"
-  else
-    echo "GATE: FAIL" | tee -a "$verdict"; note "gate FAIL · $gate_dir"
-  fi
-  cat "$verdict" >&2
-  exit "$overall"
+  gate_finish "$verdict" "$step_ledger" "$gate_dir" "$overall" "$inconclusive"
 }
+
 
 cmd_release_readiness() {
   [[ $# -eq 0 ]] || die "release-readiness accepts no arguments"
@@ -1453,8 +1608,9 @@ main() {
       cmd_telemetry_overhead "$@"
       ;;
     gate)
+      # Only the bench needs a quiet host: its ledgered preflight checks it, so
+      # the deterministic gate still runs beside an agent or a native build (V-5).
       require_build_free_space runtime-tests || die "macOS gate storage preflight failed"
-      require_quiet_host macos-gate || die "macOS gate bench needs a quiet host"
       cmd_gate "$@"
       ;;
     release-readiness)

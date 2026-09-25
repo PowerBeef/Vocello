@@ -28,7 +28,6 @@
       "requiredSteps": [
         "project-inputs",
         "foundation-build",
-        "core-tests",
         "deterministic-tests",
         "crash-delta"
       ]
@@ -36,9 +35,9 @@
     "macos-gate-with-benchmark": {
       "producer": "scripts/macos_test.sh",
       "requiredSteps": [
+        "benchmark-preflight",
         "project-inputs",
         "foundation-build",
-        "core-tests",
         "deterministic-tests",
         "crash-delta",
         "benchmark-validation",

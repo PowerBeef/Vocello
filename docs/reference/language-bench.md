@@ -144,7 +144,11 @@ Before the first launch, the driver atomically writes `language-run-plan.json` w
 indexes, child run IDs, cells, prompt-equivalence groups, seeds, and sampling variation. Normal
 quick/full matrices use one stable seed per mode/script language; pinned and Auto Custom cells for
 the same script intentionally share both prompt assembly and seed so the hint is the controlled
-variable. The plan also freezes the corpus-owned Custom speaker and one shared Design delivery
+variable. Their audio is therefore byte-identical on deterministic MLX, and publication checks it:
+every take publishes `output.fileDigest` (macOS from the engine's WAV digest since 2026-09-25, iOS
+from the sentinel), and a prompt-equivalence group whose members published different digests for
+one seed is refused (audit #86; the committed iOS records' eight groups replay identical). Making
+Auto an independent sample is a maintainer decision. The plan also freezes the corpus-owned Custom speaker and one shared Design delivery
 instruction; the shared Design fixture keeps language as the controlled variable and preserves one
 typed fixture identity for the model across the matrix.
 The diagnostic cohort is seed-major and evaluates exactly three cells across five fixed

@@ -2029,6 +2029,8 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(take["metrics"]["independentPrimaryAccuracyScore"], 0.125)
         self.assertEqual(take["metrics"]["independentLanguagePass"], 1.0)
         self.assertEqual(take["detectedLanguages"], {"whisper": "french"})
+        # Audit #86: the macOS take names its audio by the engine's WAV digest.
+        self.assertEqual(take["output"]["fileDigest"], "a" * 64)
         self.assertEqual(verification["languageCheckKinds"], {"whisper": "audio-language-identification"})
         # Whisper's confidence is published beside its verdict (audit #89).
         self.assertEqual(take["metrics"]["independentMaximumNoSpeechProbability"], 0.02)
@@ -2057,6 +2059,28 @@ class PublisherTests(unittest.TestCase):
                     stack.enter_context(item)
                 with self.assertRaisesRegex(publisher.PublicationError, label):
                     publisher.language_command(args)
+
+    def test_pinned_and_auto_takes_of_one_group_must_be_one_audio(self) -> None:
+        """Audit #86: the group shares prompt and seed, so its WAVs are byte-identical."""
+        cells = [
+            {"id": "custom-en-pinned", "promptEquivalenceGroup": "custom-english-v1"},
+            {"id": "custom-en-auto", "promptEquivalenceGroup": "custom-english-v1"},
+            {"id": "design-en-pinned"},
+            {"id": "custom-fr-pinned", "promptEquivalenceGroup": "custom-french-v1"},
+            {"id": "custom-fr-auto", "promptEquivalenceGroup": "custom-french-v1"},
+        ]
+
+        def takes(*digests, seeds=(7, 7, 8, 9, 9)):
+            return [{"seed": seed, "output": {"fileDigest": digest} if digest else {}}
+                    for seed, digest in zip(seeds, digests)]
+
+        publisher.validate_equivalent_outputs(cells, takes("a" * 64, "a" * 64, "b" * 64, "c" * 64, "c" * 64))
+        # A member without a digest cannot be compared; seeds that differ are not one group.
+        publisher.validate_equivalent_outputs(cells, takes("a" * 64, None, "b" * 64, "c" * 64, "c" * 64))
+        publisher.validate_equivalent_outputs(
+            cells, takes("a" * 64, "d" * 64, "b" * 64, "c" * 64, "c" * 64, seeds=(7, 6, 8, 9, 9)))
+        with self.assertRaises(publisher.PublicationError):
+            publisher.validate_equivalent_outputs(cells, takes("a" * 64, "a" * 64, "b" * 64, "c" * 64, "e" * 64))
 
     def test_a_skipped_phrase_under_the_gate_warns_but_never_fails(self) -> None:
         """Audit #84: two consecutive deleted words on a 17-word script pass the

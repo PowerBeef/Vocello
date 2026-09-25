@@ -2309,6 +2309,30 @@ def validate_language_mode_fixture_identity(
     raise PublicationError(f"language cell {cell_id} has an unsupported planned mode fixture")
 
 
+def validate_equivalent_outputs(cells: list[dict[str, Any]], takes: list[dict[str, Any]]) -> None:
+    """Pinned and Auto takes of one prompt-equivalence group are one audio (audit #86).
+
+    The cells of a group share the resolved prompt and the seed, so on
+    deterministic MLX their WAVs are byte-identical; that is the deliberate proof
+    that Auto resolved to the pinned language. Every group member that publishes
+    a file digest must publish the same one.
+    """
+    grouped: dict[tuple[str, int], dict[str, str]] = {}
+    for cell, take in zip(cells, takes):
+        group = cell.get("promptEquivalenceGroup")
+        seed = take.get("seed")
+        digest = (take.get("output") or {}).get("fileDigest")
+        if not isinstance(group, str) or not group or not isinstance(seed, int) or not is_sha256(digest):
+            continue
+        grouped.setdefault((group, seed), {})[str(cell.get("id"))] = digest
+    for (group, seed), members in sorted(grouped.items()):
+        if len(members) >= 2 and len(set(members.values())) != 1:
+            raise PublicationError(
+                f"language prompt-equivalence group {group} seed {seed} produced different audio: "
+                + ", ".join(sorted(members))
+            )
+
+
 def validate_prompt_equivalence(
     *,
     planned_takes: list[dict[str, Any]],
@@ -2925,6 +2949,11 @@ def language_command(args: argparse.Namespace) -> Path:
             observed = uint64_value((row.get("notes") or {}).get("samplingSeed"))
             if observed is not None and observed == stable_default_seed(cell):
                 take["seed"] = observed
+            # The engine's digest of the published WAV (audit #86): macOS
+            # language takes now name their audio as iOS takes do.
+            wav_digest = (row.get("notes") or {}).get("samplingWAVDigest")
+            if is_sha256(wav_digest):
+                take["output"]["fileDigest"] = wav_digest
     if planned_takes is not None:
         validate_prompt_equivalence(
             planned_takes=planned_takes,
@@ -2940,6 +2969,7 @@ def language_command(args: argparse.Namespace) -> Path:
             take["output"] = language_output_evidence(
                 sentinels[cell_id], selected_sentinel_paths[cell_id].parent / "output.wav", cell_id
             )
+    validate_equivalent_outputs(cells, takes)
     asr_evidence: list[dict[str, Any]] = []
     if output_verified:
         if planned_takes is None:

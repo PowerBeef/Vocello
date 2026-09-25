@@ -152,7 +152,7 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
                     // (audit #31): one captured repetition per cell is the played-
                     // audio evidence, and the rest no longer wait out their audio.
                     // Which takes play out is fixed by the matrix, never by the grant.
-                    stopPlayback()
+                    stopPlayback(orWaitUpTo: timeout(for: take))
                     phases.mark("playbackEndedMS")
                     _ = XCTWaiter.wait(for: [XCTestExpectation(description: "post-playback settle")], timeout: 0.5)
                 }
@@ -198,13 +198,21 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
     /// typing it a key at a time (audit #31: about 1,450 keystrokes a run), and
     /// leaves a script that already matches alone. Both happen before the take's
     /// submit, outside every measured window. The general pasteboard's previous
-    /// items, every type of each, are put back once the paste has landed.
+    /// items, every type of each, are put back once the paste has landed, unless
+    /// something else wrote the pasteboard meanwhile (its contents win). Items
+    /// marked concealed or transient (nspasteboard.org: passwords, one-shot
+    /// contents) are never put back.
     private func pasteScript(_ text: String) {
         let editor = element("textInput_textEditor")
         if (editor.value as? String) != text {
             XCTAssertTrue(VocelloUIPrimaryAction.perform(on: editor, timeout: 20))
             let pasteboard = NSPasteboard.general
-            let saved: [NSPasteboardItem] = (pasteboard.pasteboardItems ?? []).map { item in
+            let unrestorable: Set<NSPasteboard.PasteboardType> = [
+                NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"),
+                NSPasteboard.PasteboardType("org.nspasteboard.TransientType"),
+            ]
+            let saved: [NSPasteboardItem] = (pasteboard.pasteboardItems ?? []).compactMap { item in
+                guard unrestorable.isDisjoint(with: item.types) else { return nil }
                 let copy = NSPasteboardItem()
                 for type in item.types {
                     if let data = item.data(forType: type) {
@@ -213,14 +221,17 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
                 }
                 return copy
             }
-            defer {
-                pasteboard.clearContents()
-                if !saved.isEmpty {
-                    pasteboard.writeObjects(saved)
-                }
-            }
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
+            let pastedChangeCount = pasteboard.changeCount
+            defer {
+                if pasteboard.changeCount == pastedChangeCount {
+                    pasteboard.clearContents()
+                    if !saved.isEmpty {
+                        pasteboard.writeObjects(saved)
+                    }
+                }
+            }
             editor.typeKey("a", modifierFlags: .command)
             editor.typeKey("v", modifierFlags: .command)
             _ = VocelloUIWait.settles("pasted script to land", timeout: 10) {
@@ -234,15 +245,23 @@ final class VocelloMacBenchmarkUITests: VocelloMacUITestCase {
 
     /// Pauses the take's playback through the visible player control, if it is
     /// still playing. The control is labelled with the action it performs, so
-    /// "Play" means playback is not running (every lane pins English).
-    private func stopPlayback() {
+    /// "Play" means playback is not running (every lane pins English). When the
+    /// audio ends between the label read and the click, the click starts it
+    /// again: the control then reads "Pause", and one more click pauses it; the
+    /// take otherwise waits for its playback to end, as a captured take does.
+    private func stopPlayback(orWaitUpTo playbackTimeout: TimeInterval) {
         let inline = button("studio_inlinePlayer_playPause")
         let control = inline.exists ? inline : button("sidebarPlayer_playPause")
         guard control.exists, control.label != "Play" else { return }
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: control, timeout: 10))
-        XCTAssertTrue(VocelloUIWait.condition("playback to stop", timeout: 10) {
+        let stopped = VocelloUIWait.settles("playback to stop", timeout: 2) {
             !control.exists || control.label == "Play"
-        })
+        }
+        guard !stopped else { return }
+        if control.exists, control.label == "Pause" {
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: control, timeout: 10))
+        }
+        XCTAssertTrue(waitForPlaybackToFinish(timeout: playbackTimeout))
     }
 
     private func launchEnvironment(

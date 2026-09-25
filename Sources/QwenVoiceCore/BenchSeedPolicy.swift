@@ -81,21 +81,45 @@ public enum BenchSeedPolicy {
     /// The request with the active policy's seed, or unchanged when no policy
     /// is active or no cell resolves (the checker then refuses the take). The
     /// policy seed replaces any requested seed: a benchmark take measures its
-    /// cell, never a draft's pinned seed.
+    /// cell, never a draft's pinned seed. A scheduled cell is consumed per
+    /// call, so the engine applies the policy only to a registered generation.
     public static func applying(to request: GenerationRequest) -> GenerationRequest {
         guard RuntimeDebugGate.internalDiagnosticsAvailable else { return request }
-        let environment = ProcessInfo.processInfo.environment
-        guard policy(environment: environment) != nil else { return request }
+        return applying(
+            to: request,
+            environment: ProcessInfo.processInfo.environment,
+            internalDiagnosticsAvailable: RuntimeDebugGate.internalDiagnosticsAvailable,
+            nextSchedulePosition: {
+                scheduleCursor.withLock { cursor -> Int in
+                    let current = cursor
+                    cursor += 1
+                    return current
+                }
+            },
+            currentTakeCell: { BenchRunContext.telemetryNotes()["benchCell"] }
+        )
+    }
+
+    /// `applying(to:)` over an injected environment, build capability,
+    /// schedule cursor and current-take cell.
+    static func applying(
+        to request: GenerationRequest,
+        environment: [String: String],
+        internalDiagnosticsAvailable: Bool,
+        nextSchedulePosition: () -> Int,
+        currentTakeCell: () -> String?
+    ) -> GenerationRequest {
+        guard policy(
+            environment: environment, internalDiagnosticsAvailable: internalDiagnosticsAvailable
+        ) != nil else { return request }
         let cell: String?
-        if let schedule = scheduledCells(environment: environment) {
-            let position = scheduleCursor.withLock { cursor -> Int in
-                let current = cursor
-                cursor += 1
-                return current
-            }
+        if let schedule = scheduledCells(
+            environment: environment, internalDiagnosticsAvailable: internalDiagnosticsAvailable
+        ) {
+            let position = nextSchedulePosition()
             cell = position < schedule.count ? schedule[position] : nil
         } else {
-            cell = BenchRunContext.telemetryNotes()["benchCell"]
+            cell = currentTakeCell()
         }
         guard let cell, !cell.isEmpty else { return request }
         return request.withSeed(seed(forCell: cell))

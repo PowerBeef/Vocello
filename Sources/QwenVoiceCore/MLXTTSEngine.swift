@@ -1089,11 +1089,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     }
 
     public func generate(_ request: GenerationRequest) async throws -> GenerationResult {
-        // The internal benchmark seed policy (audit #29) returns the request
-        // unchanged unless its registered knob is set under internal diagnostics.
-        let request = BenchSeedPolicy.applying(
-            to: request.generationID == nil ? request.withGenerationID(UUID()) : request
-        )
+        let request = request.generationID == nil ? request.withGenerationID(UUID()) : request
         let deliveryGenerationID = request.generationID!
         eventRouter.beginGeneration(deliveryGenerationID)
         let cancellationIngress = GenerationCancellationIngress()
@@ -1101,8 +1097,12 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         let task = Task { @MainActor [self] in
             await gate.wait()
             try Task.checkCancellation()
+            // The internal benchmark seed policy (audit #29) returns the request
+            // unchanged unless its registered knob is set under internal
+            // diagnostics. It runs only once the generation is registered, so a
+            // rejected generate never consumes a scheduled cell.
             return try await performGenerate(
-                request,
+                BenchSeedPolicy.applying(to: request),
                 cancellationIngress: cancellationIngress
             )
         }

@@ -140,6 +140,75 @@ final class SamplingEvidenceTests: XCTestCase {
         XCTAssertNil(BenchSeedPolicy.scheduledCells(environment: schedule, internalDiagnosticsAvailable: false))
     }
 
+    /// Audit #29: the iPhone lane's launch schedule gives one cell per applied
+    /// generation, ahead of the current take, and past its end a take keeps its
+    /// own seed; without the capability or the knob nothing is consumed.
+    func testBenchSeedPolicyConsumesTheScheduleOneCellPerGeneration() {
+        let request = GenerationRequest(
+            mode: .custom, modelID: "fixture", text: "test", outputPath: "take.wav", shouldStream: true,
+            payload: .custom(speakerID: "aiden", deliveryStyle: nil), generationID: UUID(), seed: 9
+        )
+        let scheduled = [
+            "QWENVOICE_DEBUG": "1",
+            BenchSeedPolicy.policyEnvironmentKey: BenchSeedPolicy.cellHashV1,
+            BenchSeedPolicy.cellScheduleEnvironmentKey: "custom/medium/cold#0,custom/short/warm#0",
+        ]
+        var cursor = 0
+        var currentTakeReads = 0
+        func appliedSeed(environment: [String: String], capability: Bool = true) -> UInt64? {
+            BenchSeedPolicy.applying(
+                to: request,
+                environment: environment,
+                internalDiagnosticsAvailable: capability,
+                nextSchedulePosition: {
+                    defer { cursor += 1 }
+                    return cursor
+                },
+                currentTakeCell: {
+                    currentTakeReads += 1
+                    return "clone/long/warm#2"
+                }
+            ).seed
+        }
+
+        XCTAssertEqual(appliedSeed(environment: scheduled, capability: false), 9)
+        XCTAssertEqual(
+            appliedSeed(environment: scheduled.filter { $0.key != BenchSeedPolicy.policyEnvironmentKey }), 9
+        )
+        XCTAssertEqual(cursor, 0)
+        XCTAssertEqual(appliedSeed(environment: scheduled), BenchSeedPolicy.seed(forCell: "custom/medium/cold#0"))
+        XCTAssertEqual(appliedSeed(environment: scheduled), BenchSeedPolicy.seed(forCell: "custom/short/warm#0"))
+        XCTAssertEqual(appliedSeed(environment: scheduled), 9)
+        XCTAssertEqual(cursor, 3)
+        XCTAssertEqual(currentTakeReads, 0)
+    }
+
+    /// Audit #29: without a schedule (the macOS lane) the seed comes from the
+    /// current-take cell, and a take without one keeps its own seed.
+    func testBenchSeedPolicyFallsBackToTheCurrentTakeCell() {
+        let request = GenerationRequest(
+            mode: .custom, modelID: "fixture", text: "test", outputPath: "take.wav", shouldStream: true,
+            payload: .custom(speakerID: "aiden", deliveryStyle: nil), generationID: UUID(), seed: 9
+        )
+        let environment = ["QWENVOICE_DEBUG": "1", BenchSeedPolicy.policyEnvironmentKey: BenchSeedPolicy.cellHashV1]
+        func appliedSeed(currentTake: String?) -> UInt64? {
+            BenchSeedPolicy.applying(
+                to: request,
+                environment: environment,
+                internalDiagnosticsAvailable: true,
+                nextSchedulePosition: {
+                    XCTFail("a run without a schedule never reads its cursor")
+                    return 0
+                },
+                currentTakeCell: { currentTake }
+            ).seed
+        }
+
+        XCTAssertEqual(appliedSeed(currentTake: "custom/short/warm#1"), 15_229_935_581_363_691_511)
+        XCTAssertEqual(appliedSeed(currentTake: nil), 9)
+        XCTAssertEqual(appliedSeed(currentTake: ""), 9)
+    }
+
     func testWithSeedChangesOnlyTheSeed() {
         let generationID = UUID()
         let request = GenerationRequest(

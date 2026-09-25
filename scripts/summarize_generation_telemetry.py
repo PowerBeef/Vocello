@@ -42,6 +42,7 @@ from pathlib import Path
 SCRIPT_DIRECTORY = Path(__file__).resolve().parent
 if str(SCRIPT_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIRECTORY))
+from lib import jsonio  # noqa: E402
 from lib import rtf as rtf_semantics  # noqa: E402
 
 DEFAULT_DIR = os.path.expanduser(
@@ -378,8 +379,12 @@ def prosody_for_delivery(prosody_rows, mode, model_id, delivery):
     ]
     if not rows:
         return None
+    # `prosodyEffect` is the instructed take's absolute expressiveness (audit
+    # #9); only `pairedProsodyEffect` is the effect against the paired neutral.
+    # A sidecar written before the paired key existed shows no effect.
+    paired = [r["pairedProsodyEffect"] for r in rows if "pairedProsodyEffect" in r]
     return {
-        "effect": med(r["prosodyEffect"] for r in rows),
+        "effect": med(paired) if len(paired) == len(rows) else None,
         "dF0Std": med(r["dF0Std"] for r in rows),
         "dRateCV": med(r["dRateCV"] for r in rows),
         "dPauseRatio": med(r["dPauseRatio"] for r in rows),
@@ -1170,6 +1175,10 @@ _HOST_IDENTITY_SOURCES = {
     "xcodeBuild": "toolchain",
     "swiftVersion": "toolchain",
 }
+# The memory tier the rows ran under (audit #19), from the record's
+# `run.runtimePolicy`. A baseline saved before it compares without it, like a
+# baseline saved before the host keys, and the caller says so.
+RUNTIME_POLICY_IDENTITY_KEYS = ("deviceClass",)
 # The identity keys a pre-run preflight can predict without evidence: the host,
 # the optimization the gate builds and the matrix it will run. Models, corpus
 # and evidence versions are only known once the takes exist.
@@ -1217,7 +1226,7 @@ def _identity_fields(history):
     return fields
 
 
-def baseline_identity_from_evidence(payload, *, require_host_identity=True):
+def baseline_identity_from_evidence(payload, *, require_host_identity=True, require_device_class=True):
     """Return the performance-comparison identity from validated evidence.
 
     Source and executable digests are deliberately excluded: a regression
@@ -1228,6 +1237,13 @@ def baseline_identity_from_evidence(payload, *, require_host_identity=True):
     field is read from the evidence; nothing is probed on the comparing host.
     `require_host_identity=False` is only for comparing with a baseline saved
     before host identity was recorded, which ignores those keys.
+
+    The memory tier (`deviceClass`) comes from the record's `run.runtimePolicy`,
+    which the publisher derives from the rows' own stamps; evidence that ran
+    under a forced memory class never yields an identity. Evidence from rows
+    that predate the stamp has no `runtimePolicy`: seeding always requires it,
+    and comparing with a baseline saved before the tier was bound passes
+    `require_device_class=False`, which leaves the tier out as that baseline does.
     """
     if not isinstance(payload, dict):
         raise ValueError("baseline identity requires an evidence manifest")
@@ -1253,6 +1269,13 @@ def baseline_identity_from_evidence(payload, *, require_host_identity=True):
             "telemetrySchemaVersion", "qcAlgorithmVersion",
         )
     }
+    runtime_policy = history["run"].get("runtimePolicy")
+    if runtime_policy is not None or require_device_class:
+        if not isinstance(runtime_policy, dict):
+            raise ValueError("baseline identity evidence has no runtimePolicy (memory tier)")
+        if runtime_policy.get("deviceClassForced") is not False:
+            raise ValueError("baseline identity evidence ran under a forced memory class")
+        identity["deviceClass"] = runtime_policy.get("deviceClass")
     missing = [
         key for key, value in identity.items()
         if value in (None, "", []) and (require_host_identity or key not in HOST_IDENTITY_KEYS)
@@ -1453,13 +1476,19 @@ def baseline_cells(payload, *, current_identity=None, require_identity=False):
     # A baseline saved before host identity was recorded compares the rest, and
     # the caller says so.
     legacy_host = not any(key in identity for key in HOST_IDENTITY_KEYS)
+    legacy_device = any(key not in identity for key in RUNTIME_POLICY_IDENTITY_KEYS)
     if callable(current_identity):
-        current_identity = current_identity(require_host_identity=not legacy_host)
+        current_identity = current_identity(
+            require_host_identity=not legacy_host, require_device_class=not legacy_device,
+        )
     if current_identity is None:
         raise ValueError("schema-v2 baseline comparison requires current evidence identity")
     comparable_current = dict(current_identity)
     if legacy_host:
         for key in HOST_IDENTITY_KEYS:
+            comparable_current.pop(key, None)
+    if legacy_device:
+        for key in RUNTIME_POLICY_IDENTITY_KEYS:
             comparable_current.pop(key, None)
     differences = identity_differences(identity, comparable_current)
     if differences:
@@ -1473,6 +1502,27 @@ def baseline_cells(payload, *, current_identity=None, require_identity=False):
 def baseline_lacks_host_identity(payload):
     identity = payload.get("identity") if isinstance(payload, dict) else None
     return isinstance(identity, dict) and not any(key in identity for key in HOST_IDENTITY_KEYS)
+
+
+def baseline_lacks_device_class(payload):
+    identity = payload.get("identity") if isinstance(payload, dict) else None
+    return isinstance(identity, dict) and any(
+        key not in identity for key in RUNTIME_POLICY_IDENTITY_KEYS
+    )
+
+
+def forced_memory_class_rows(runs):
+    """Rows that ran under QWENVOICE_FORCE_MEMORY_CLASS (audit #19).
+
+    A forced tier changes policy values, not the hardware, so such rows are
+    exploratory evidence: a regression baseline is never saved or seeded from
+    them and never compared with them."""
+    return [run for run in runs if run.get("deviceClassForced")]
+
+
+def baseline_bytes(document):
+    """The saved baseline's encoding: indent 2, key order kept, ASCII, newline."""
+    return (json.dumps(document, indent=2) + "\n").encode("utf-8")
 
 
 def compare_summaries(
@@ -2136,17 +2186,30 @@ def main():
         print(f"(skipped {skipped_failed} non-success engine row(s) with finishReason failed/superseded/cancelled)")
     prosody_rows = load_prosody(diag_dir)
 
+    if args.save_baseline or args.seed_baseline or args.compare_baseline:
+        forced = forced_memory_class_rows(runs)
+        if forced:
+            print(
+                f"FAIL: {len(forced)} selected row(s) ran under a forced memory class "
+                "(QWENVOICE_FORCE_MEMORY_CLASS); a regression baseline is never saved, "
+                "seeded from or compared with forced rows."
+            )
+            return 1
+
     if args.save_baseline:
         # Ungoverned save for ad-hoc local comparison; the gate seeds through
         # --seed-baseline, which adds the host, source and take-count checks.
+        # The whole document is built before the target is touched, and it is
+        # written atomically: a refused identity leaves an existing (possibly
+        # committed) baseline intact.
         try:
             document = baseline_document(build_summary(cells), evidence_payload)
-        except ValueError as error:
+            jsonio.atomic_json(
+                Path(args.save_baseline), document, mkdir=False, encoder=baseline_bytes,
+            )
+        except (OSError, ValueError) as error:
             print(f"FAIL: cannot save the baseline: {error}")
             return 1
-        with open(args.save_baseline, "w", encoding="utf-8") as f:
-            json.dump(document, f, indent=2)
-            f.write("\n")
 
     stamp = f"{today_str()} · {git_short_sha()}"
     if args.label:
@@ -2234,8 +2297,9 @@ def main():
             if has_prosody:
                 p = prosody_for_delivery(prosody_rows, mode, model_id, delivery)
                 if p:
+                    effect = "-" if p["effect"] is None else f"{p['effect']:+.2f}"
                     base += (
-                        f" {p['n']:>5} {p['effect']:>+8.2f} {p['dF0Std']:>+7.2f} "
+                        f" {p['n']:>5} {effect:>8} {p['dF0Std']:>+7.2f} "
                         f"{p['dRateCV']:>+8.3f} {p['dPauseRatio']:>+8.3f} {p['dRoughness']:>+7.3f}"
                     )
                 else:
@@ -2382,8 +2446,9 @@ def main():
     )
     if prosody_rows:
         print(
-            "Delivery prosody: prosEff = signed prosody-effect score vs paired neutral "
-            "(+F0 dynamics +rate variability -pauses +roughness). Requires `vocello bench --delivery`."
+            "Delivery prosody: prosEff = paired prosody effect (pairedProsodyEffect): the "
+            "weighted instructed-minus-neutral deltas (+F0 dynamics +rate variability -pauses "
+            "+roughness); '-' for a sidecar that predates it. Requires `vocello bench --delivery`."
         )
 
     if args.merged:
@@ -2552,6 +2617,11 @@ def compare_baseline_command(args, cells, evidence_payload, compare_states, sele
         print(
             "\nnote: legacy baseline has no OS/Xcode identity; "
             "re-save it to bind the comparison to this toolchain."
+        )
+    if baseline_lacks_device_class(baseline_payload):
+        print(
+            "\nnote: baseline predates the device-class identity; "
+            "re-save it to bind the comparison to this memory tier."
         )
     baseline_definition = baseline_rtf_definition(baseline_payload)
     if baseline_definition != rtf_semantics.STANDARD_RTF_DEFINITION:

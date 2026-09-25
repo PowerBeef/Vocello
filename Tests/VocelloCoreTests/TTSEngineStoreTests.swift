@@ -600,10 +600,14 @@ final class TTSEngineStoreTests: XCTestCase {
 
     /// The documented contract of `snapshotUpdates` ("fires once per applied
     /// frontend-state change"), which the macOS root shell's warmup coordinator
-    /// relies on. PA-19 finding: `syncFromSnapshot` sends only after its
-    /// chunk-forwarding guards, so the bridge stays silent for an ordinary state
-    /// change (and always for the streaming `MLXTTSEngine`). Delete the expected
-    /// failure below once the send moves ahead of those guards.
+    /// relies on. Known production defect, owned by its own roadmap item rather
+    /// than the coverage work that found it: `syncFromSnapshot` sends only after
+    /// its chunk-forwarding guards, so the bridge stays silent for an ordinary
+    /// state change (and always for the streaming `MLXTTSEngine`), and the macOS
+    /// warmup coordinator never sees busy, idle, loaded or failed transitions.
+    /// The expectation is strict: moving the `frontendStateChanged` send ahead
+    /// of the streaming and chunk guards makes this test fail until the expected
+    /// failure below is deleted in the same commit.
     func testSnapshotUpdatesFireForAnAppliedFrontendChange() async throws {
         let engine = try makeEngine()
         let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
@@ -616,7 +620,7 @@ final class TTSEngineStoreTests: XCTestCase {
             store.loadState == .loaded(modelID: "pro_design")
         }
 
-        XCTExpectFailure("PA-19 finding: TTSEngineStore.snapshotUpdates never fires for a plain state change")
+        XCTExpectFailure("Known defect: syncFromSnapshot returns before snapshotUpdates.send on a plain state change")
         await waitUntil("the snapshot bridge to report the change", timeout: .milliseconds(300)) {
             !recorder.snapshots.isEmpty
         }

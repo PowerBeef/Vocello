@@ -186,7 +186,10 @@ requested.
 - In UI tests: probing an optional element with `VocelloUIWait` (it records `XCTFail` on timeout; use
   `XCTWaiter.wait(for: [XCTNSPredicateExpectation])`); matching visible labels instead of identifiers
   (find Saved Voices rows by `identifier BEGINSWITH "voicesRow_"`); killing a UI lane mid-build.
-- Testing order or state owned by an app-only `@MainActor` iOS type in place: extract it into a value
-  type under `Sources/iOSSupport/Services`, list the file under both `VocelloCoreTests` and
-  `VocelloiOSLogicTests` in `project.yml`, and add it to the matching `promotionRouting` class in
-  `config/quality-promotion-contract.json`.
+- Testing pure order or state logic owned by an app-only `@MainActor` iOS type in place: extract it
+  into a value type under `Sources/iOSSupport/Services`, list the file under both `VocelloCoreTests`
+  and `VocelloiOSLogicTests` in `project.yml`, and add it to the matching `promotionRouting` class in
+  `config/quality-promotion-contract.json`. The orchestrators themselves are the exception: the engine
+  store, the Studio coordinator, the History `DatabaseService`, the export gate's decision logic and the
+  iPhone model inventory are compiled by path into `VocelloCoreTests` only and driven there over fakes;
+  extend those suites instead of extracting their state again.

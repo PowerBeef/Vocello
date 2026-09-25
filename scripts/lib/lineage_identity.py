@@ -198,6 +198,11 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # instead of one on a quiet host, and publishes per-take decode-loop
     # interval statistics that must pass the 36 x (tokens + 1) completeness check.
     ("instrument-profile", "macos"): 2,
+    # 2 (2026-09-26, audit #45/#56): the iPhone gate's generation step and the
+    # memory-qualification wait no longer copy the whole diagnostics tree from
+    # the phone every 10 s while the take runs; they poll only their markers.
+    ("engine-generation", "ios"): 2,
+    ("memory-qualification", "ios"): 2,
 }
 
 # (scheme, extra root targets) whose project.yml subset each lane builds;

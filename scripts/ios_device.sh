@@ -761,8 +761,14 @@ cmd_launch() {
     # (e.g. QWENVOICE_STREAMING_PREVIEW_DATA=off, QWENVOICE_FORCE_MEMORY_CLASS)
     # is forwarded into the launched app's env so on-device benches are reproducible.
     env_json="$(device_diagnostics_env_json "$spec" "$run_id")"
+    # DEVICE_LAUNCH_JSON (a plain, never-exported shell variable, so the
+    # QVOICE_* passthrough above cannot forward a host path into the app): where
+    # a waiting caller wants the launch response, so it can read the exact PID
+    # and stop early if that process vanishes.
+    local -a launch_output=()
+    [[ -z "${DEVICE_LAUNCH_JSON:-}" ]] || launch_output=(--json-output "$DEVICE_LAUNCH_JSON")
     xcrun devicectl device process launch --device "$dev" \
-      --terminate-existing -e "$env_json" "$BUNDLE_ID" >&2
+      --terminate-existing -e "$env_json" ${launch_output[@]+"${launch_output[@]}"} "$BUNDLE_ID" >&2
     printf '%s\n' "$run_id"   # stdout: ONLY the runID (consumed by bench)
   else
     note "launching $BUNDLE_ID"
@@ -819,40 +825,67 @@ cmd_pull() {
 # the generation it was measuring; the sentinel is a few hundred bytes, and the
 # complete tree is pulled once after it appears.
 probe_device_sentinel() {
-  local run_id="$1" dest="$2"
+  probe_device_run_file "$1" "$2" device-diagnostics-done.json "${3:-}"
+}
+
+# probe_device_run_file RUN_ID DEST NAME [DEVICE]
+# Copies only the one small marker `diagnostics/<RUN_ID>/<NAME>` to
+# DEST/RUN_ID/NAME. Every wait polls its markers this way and pulls the
+# complete run tree once, at the end (audit #45, #56).
+probe_device_run_file() {
+  local run_id="$1" dest="$2" name="$3" dev="${4:-}"
   [[ "$run_id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,191}$ ]] \
     || die "diagnostic run ID is not safe for a device-container path"
-  local dev; dev="$(resolve_device)"
+  [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] \
+    || die "device marker name is not safe for a device-container path"
+  [[ -n "$dev" ]] || dev="$(resolve_device)"
   local run_destination="$dest/$run_id"
   mkdir -p "$run_destination"
   xcrun devicectl device copy from --device "$dev" \
     --domain-type appDataContainer --domain-identifier "$BUNDLE_ID" \
-    --source "Library/Caches/Vocello/diagnostics/$run_id/device-diagnostics-done.json" \
-    --destination "$run_destination/device-diagnostics-done.json" --timeout 30 --quiet \
+    --source "Library/Caches/Vocello/diagnostics/$run_id/$name" \
+    --destination "$run_destination/$name" --timeout 30 --quiet \
     >/dev/null 2>&1
 }
 
-# wait_device_diagnostics_sentinel RUN_ID TIMEOUT DEST
+# wait_device_diagnostics_sentinel RUN_ID TIMEOUT DEST [DEVICE PID]
 # Polls the sentinel only until device-diagnostics-done.json exists for RUN_ID,
-# then pulls the complete run once.
+# then pulls the complete run once. Given the launched process's exact PID, a
+# process that exits without writing the sentinel stops the wait with 27.
 # Returns 0 and prints the sentinel path on success; dies on timeout/interference.
 wait_device_diagnostics_sentinel() {
-  local run_id="$1" timeout="${2:-300}" dest="$3"
-  local waited=0 sentinel=""
+  local run_id="$1" timeout="${2:-300}" dest="$3" dev="${4:-}" target_pid="${5:-}"
+  local waited=0 sentinel="" exited=0 wait_started=$SECONDS
   while (( waited < timeout )); do
-    sleep 10
-    waited=$((waited + 10))
-    probe_device_sentinel "$run_id" "$dest" || true
+    if (( exited == 0 )); then
+      sleep 10
+      waited=$((waited + 10))
+    fi
+    probe_device_sentinel "$run_id" "$dest" "$dev" || true
     # Require RUN_ID to be the sentinel's immediate parent. Profile artifacts
     # also contain RUN_ID higher in their path, so a broad */RUN_ID/* match can
     # otherwise select an unrelated historical sentinel from the pulled tree.
     sentinel="$(find "$dest" -type f -path "*/${run_id}/device-diagnostics-done.json" 2>/dev/null | head -1)"
     if [[ -n "$sentinel" && -f "$sentinel" ]]; then
-      note "sentinel found after ${waited}s (runID=$run_id)"
+      # Where the wall time goes (audit #87): the 10 s poll quantizes the
+      # sentinel, and the one full pull follows it.
+      local pull_started=$SECONDS
+      note "sentinel found after ${waited}s of polling, $((pull_started - wait_started))s after launch (runID=$run_id)"
       pull_device_diagnostics_run "$run_id" "$dest" >/dev/null 2>&1 \
         || die "sentinel appeared but the run could not be pulled (runID=$run_id)"
+      note "run pulled in $((SECONDS - pull_started))s (runID=$run_id)"
       printf '%s\n' "$sentinel"
       return 0
+    fi
+    if (( exited == 1 )); then
+      pull_device_diagnostics_run "$run_id" "$dest" >/dev/null 2>&1 || true
+      warn "device-diagnostics process $target_pid exited at ${waited}s without writing its sentinel (runID=$run_id); a jetsam or crash writes none"
+      return 27
+    fi
+    if device_process_exited "$dev" "$target_pid" "$waited"; then
+      # One more probe first: a sentinel written just before exit still wins.
+      exited=1
+      continue
     fi
     local state verdict
     state="$(probe_device_state 2>/dev/null || true)"
@@ -868,18 +901,26 @@ wait_device_diagnostics_sentinel() {
   die "no sentinel after ${timeout}s for runID=$run_id — Device state: $(probe_device_state 2>/dev/null || echo unknown)"
 }
 
-# wait_memory_qualification_sentinel RUN_ID TIMEOUT DEST
+# wait_memory_qualification_sentinel RUN_ID TIMEOUT DEST [DEVICE PID]
 # Same bounded physical-device polling contract as the single-take helper. The PASS result
 # remains the only publishable barrier; a separate failure marker stops the wait promptly.
+# Each poll copies only the two small markers, never the growing tree (audit #45); the
+# complete tree (the run, the global engine telemetry and the samples mirror) is pulled
+# once at the end. Given the exact launch PID, a process that exits without either
+# marker (a jetsam or crash writes neither) stops the wait with 27 instead of 900 s.
 wait_memory_qualification_sentinel() {
-  local run_id="$1" timeout="${2:-900}" dest="$3"
-  local waited=0 sentinel="" failure=""
+  local run_id="$1" timeout="${2:-900}" dest="$3" dev="${4:-}" target_pid="${5:-}"
+  local waited=0 sentinel="" failure="" exited=0
   while (( waited < timeout )); do
-    sleep 10
-    waited=$((waited + 10))
-    cmd_pull "$dest" >/dev/null 2>&1 || true
+    if (( exited == 0 )); then
+      sleep 10
+      waited=$((waited + 10))
+    fi
+    probe_device_run_file "$run_id" "$dest" memory-qualification-failure.json "$dev" || true
+    probe_device_run_file "$run_id" "$dest" memory-qualification-result.json "$dev" || true
     failure="$(find "$dest" -type f -path "*/${run_id}/memory-qualification-failure.json" 2>/dev/null | head -1)"
     if [[ -n "$failure" && -f "$failure" ]]; then
+      cmd_pull "$dest" >/dev/null 2>&1 || true
       if python3 - "$failure" "$run_id" <<'PY' >&2
 import json, pathlib, sys
 path = pathlib.Path(sys.argv[1])
@@ -914,8 +955,20 @@ PY
     sentinel="$(find "$dest" -type f -path "*/${run_id}/memory-qualification-result.json" 2>/dev/null | head -1)"
     if [[ -n "$sentinel" && -f "$sentinel" ]]; then
       note "memory qualification sentinel found after ${waited}s (runID=$run_id)"
+      cmd_pull "$dest" >/dev/null 2>&1 \
+        || die "memory qualification sentinel appeared but the diagnostics tree could not be pulled (runID=$run_id)"
       printf '%s\n' "$sentinel"
       return 0
+    fi
+    if (( exited == 1 )); then
+      cmd_pull "$dest" >/dev/null 2>&1 || true
+      warn "memory qualification process $target_pid exited at ${waited}s without a terminal marker (runID=$run_id); a jetsam or crash writes neither"
+      return 27
+    fi
+    if device_process_exited "$dev" "$target_pid" "$waited"; then
+      # One more probe first: a marker written just before exit still wins.
+      exited=1
+      continue
     fi
     local state verdict
     state="$(probe_device_state 2>/dev/null || true)"
@@ -927,18 +980,25 @@ PY
   die "no memory-qualification-result.json after ${timeout}s for runID=$run_id"
 }
 
-# wait_clone_conditioning_sentinel RUN_ID TIMEOUT DEST
+# wait_clone_conditioning_sentinel RUN_ID TIMEOUT DEST [DEVICE PID]
 # Poll for the two-take PASS record. A bounded allowlisted failure marker stops the
-# wait promptly but can never be mistaken for acceptance evidence.
+# wait promptly but can never be mistaken for acceptance evidence. Each poll copies
+# only the two markers (audit #45); the caller pulls the complete tree once after
+# the wait. Given the exact launch PID, a process that exits without either marker
+# stops the wait with 27.
 wait_clone_conditioning_sentinel() {
-  local run_id="$1" timeout="${2:-900}" dest="$3"
-  local waited=0 sentinel="" failure=""
+  local run_id="$1" timeout="${2:-900}" dest="$3" dev="${4:-}" target_pid="${5:-}"
+  local waited=0 sentinel="" failure="" exited=0
   while (( waited < timeout )); do
-    sleep 10
-    waited=$((waited + 10))
-    cmd_pull "$dest" >/dev/null 2>&1 || true
+    if (( exited == 0 )); then
+      sleep 10
+      waited=$((waited + 10))
+    fi
+    probe_device_run_file "$run_id" "$dest" clone-conditioning-failure.json "$dev" || true
+    probe_device_run_file "$run_id" "$dest" clone-conditioning-result.json "$dev" || true
     failure="$(find "$dest" -type f -path "*/${run_id}/clone-conditioning-failure.json" 2>/dev/null | head -1)"
     if [[ -n "$failure" && -f "$failure" ]]; then
+      cmd_pull "$dest" >/dev/null 2>&1 || true
       python3 - "$failure" "$run_id" <<'PY' >&2 || true
 import json, pathlib, sys
 path = pathlib.Path(sys.argv[1])
@@ -967,6 +1027,16 @@ PY
       note "clone-conditioning sentinel found after ${waited}s (runID=$run_id)"
       printf '%s\n' "$sentinel"
       return 0
+    fi
+    if (( exited == 1 )); then
+      cmd_pull "$dest" >/dev/null 2>&1 || true
+      warn "clone-conditioning process $target_pid exited at ${waited}s without a terminal marker (runID=$run_id); a jetsam or crash writes neither"
+      return 27
+    fi
+    if device_process_exited "$dev" "$target_pid" "$waited"; then
+      # One more probe first: a marker written just before exit still wins.
+      exited=1
+      continue
     fi
     local state verdict
     state="$(probe_device_state 2>/dev/null || true)"
@@ -1053,7 +1123,12 @@ PY
 # successful result means that process has exited; a failed query is unknown and
 # must not be mistaken for process death. The temporary inventory is never retained
 # because it can contain host/device tool metadata unrelated to the governed run.
+# Returns 0 alive, 1 exited, 2 unknown.
 startup_reliability_process_is_alive() {
+  device_process_is_alive "$@"
+}
+
+device_process_is_alive() {
   local dev="$1" target_pid="$2" inventory
   [[ "$target_pid" =~ ^[0-9]+$ ]] || return 2
   inventory="$(mktemp)"
@@ -1078,6 +1153,20 @@ raise SystemExit(0 if any(row.get("processIdentifier") == target for row in rows
 PY
   rm -f "$inventory"
   return "$status"
+}
+
+# device_process_exited DEVICE PID WAITED
+# True only when CoreDevice confirms the exact launched PID is gone. A caller
+# without a PID, or an unanswered query, never counts as an exit.
+device_process_exited() {
+  local dev="$1" target_pid="$2" waited="${3:-0}"
+  [[ -n "$dev" && -n "$target_pid" ]] || return 1
+  local status=0
+  device_process_is_alive "$dev" "$target_pid" || status=$?
+  if (( status == 2 )); then
+    warn "exact-process liveness was temporarily unavailable at ${waited}s (pid $target_pid)"
+  fi
+  (( status == 1 ))
 }
 
 wait_startup_reliability_result() {
@@ -1908,21 +1997,32 @@ cmd_bench() {
   QVOICE_MAC_BENCH_CELL="$(device_benchmark_cell "$spec")"
   export QVOICE_MAC_BENCH_CELL
   export QWENVOICE_NATIVE_TELEMETRY_MODE=verbose
-  local launched_run_id; launched_run_id="$(cmd_launch "$spec" | tail -1)"
+  local launched_run_id
+  DEVICE_LAUNCH_JSON="$artifacts/launch.json"
+  launched_run_id="$(cmd_launch "$spec" | tail -1)"
+  DEVICE_LAUNCH_JSON=""
   unset QVOICE_LAUNCH_RUN_ID QVOICE_MAC_BENCH_RUN_ID QVOICE_MAC_BENCH_TAKE_INDEX \
     QVOICE_MAC_BENCH_CELL QWENVOICE_NATIVE_TELEMETRY_MODE
   [[ "$launched_run_id" == "$run_id" ]] || die "device launch returned the wrong run ID"
+  local dev target_pid=""
+  dev="$(resolve_device)"
+  target_pid="$(read_devicectl_launch_pid "$artifacts/launch.json" 2>/dev/null || true)"
+  rm -f "$artifacts/launch.json"
+  [[ "$target_pid" =~ ^[0-9]+$ ]] \
+    || { warn "bench launch returned no exact PID; an early process exit is detected only at the timeout"; target_pid=""; }
 
   local timeout="${QVOICE_IOS_BENCH_TIMEOUT:-300}"
   local dest="$QVOICE_ARTIFACTS_DIAGNOSTICS/ios/device-diagnostics"
   rm -rf "$dest"
   note "waiting for device-diagnostics sentinel (runID=$run_id, timeout=${timeout}s)…"
-  local waited=0 sentinel=""
+  local waited=0 sentinel="" exited=0
   while (( waited < timeout )); do
-    sleep 10; waited=$((waited + 10))
+    if (( exited == 0 )); then
+      sleep 10; waited=$((waited + 10))
+    fi
     # Sentinel-only probe: the measured take must not share the device with a
     # full container copy every ten seconds. The whole tree is pulled once below.
-    probe_device_sentinel "$run_id" "$dest" || true
+    probe_device_sentinel "$run_id" "$dest" "$dev" || true
     sentinel="$(find "$dest" -name device-diagnostics-done.json -path "*/${run_id}/*" 2>/dev/null | head -1)"
     if [[ -n "$sentinel" && -f "$sentinel" ]]; then
       note "sentinel found after ${waited}s"
@@ -1930,6 +2030,15 @@ cmd_bench() {
       cmd_pull "$dest" >/dev/null 2>&1 || die "sentinel appeared but diagnostics could not be pulled"
       sentinel="$(find "$dest" -name device-diagnostics-done.json -path "*/${run_id}/*" 2>/dev/null | head -1)"
       break
+    fi
+    if (( exited == 1 )); then
+      cmd_pull "$dest" >/dev/null 2>&1 || true
+      die "bench process $target_pid exited at ${waited}s without writing its sentinel (jetsam or crash; check '$0 crashes'); partial diagnostics in $dest"
+    fi
+    if device_process_exited "$dev" "$target_pid" "$waited"; then
+      # One more probe first: a sentinel written just before exit still wins.
+      exited=1
+      continue
     fi
     # Interference probe: abort fast instead of polling to the full timeout.
     # Competing UI ownership or a disconnected device dooms the run immediately.
@@ -2397,8 +2506,13 @@ print(json.dumps(env, sort_keys=True))')"
     QVOICE_IOS_DEVICE_DIAGNOSTICS_CLONE_VOICE_ID QVOICE_IOS_DEVICE_RUN_ID \
     QVOICE_MAC_BENCH_RUN_ID QWENVOICE_NATIVE_TELEMETRY_MODE
 
-  local sentinel
-  sentinel="$({ wait_memory_qualification_sentinel "$run_id" "$timeout" "$dest"; })" \
+  local sentinel wait_status=0
+  sentinel="$({ wait_memory_qualification_sentinel "$run_id" "$timeout" "$dest" "$dev" "$target_pid"; })" \
+    || wait_status=$?
+  if (( wait_status == 27 )); then
+    die "memory qualification process exited before its terminal marker (jetsam or crash; check '$0 crashes'); no history was published (see $artifacts)"
+  fi
+  (( wait_status == 0 )) \
     || die "memory qualification failed or did not produce its PASS sentinel; no history was published (see $artifacts)"
   python3 - "$sentinel" <<'PY' \
     || die "memory qualification terminal sentinel is not a successful nine-take result"
@@ -2512,7 +2626,13 @@ print(json.dumps({"QWENVOICE_DEBUG": "1", **{key: os.environ[key] for key in key
     QVOICE_IOS_DEVICE_DIAGNOSTICS_EXPECTED_CLONE_TRANSCRIPT_SHA256 \
     QVOICE_IOS_DEVICE_RUN_ID QVOICE_MAC_BENCH_RUN_ID QWENVOICE_NATIVE_TELEMETRY_MODE
 
-  sentinel="$({ wait_clone_conditioning_sentinel "$run_id" "$timeout" "$dest"; })" \
+  local wait_status=0
+  sentinel="$({ wait_clone_conditioning_sentinel "$run_id" "$timeout" "$dest" "$dev" "$target_pid"; })" \
+    || wait_status=$?
+  if (( wait_status == 27 )); then
+    die "clone-conditioning process exited before its terminal marker (jetsam or crash; check '$0 crashes'); no PASS evidence was accepted (see $artifacts)"
+  fi
+  (( wait_status == 0 )) \
     || die "clone-conditioning acceptance failed; no PASS evidence was accepted (see $artifacts)"
   eval "$cleanup_command"
   trap - EXIT
@@ -2758,19 +2878,41 @@ _gate_generation_check() {
   export QVOICE_MAC_BENCH_CELL
   export QWENVOICE_NATIVE_TELEMETRY_MODE=verbose
   local launched_run_id
+  DEVICE_LAUNCH_JSON="$artifacts/launch.json"
   launched_run_id="$(cmd_launch "custom:speed:Gate generation smoke." | tail -1)"
+  DEVICE_LAUNCH_JSON=""
   unset QVOICE_LAUNCH_RUN_ID QVOICE_MAC_BENCH_RUN_ID QVOICE_MAC_BENCH_TAKE_INDEX \
     QVOICE_MAC_BENCH_CELL QWENVOICE_NATIVE_TELEMETRY_MODE
   [[ "$launched_run_id" == "$run_id" ]] || { echo "gate generation launched the wrong run ID"; return 1; }
+  local dev target_pid=""
+  dev="$(resolve_device)"
+  target_pid="$(read_devicectl_launch_pid "$artifacts/launch.json" 2>/dev/null || true)"
+  rm -f "$artifacts/launch.json"
+  [[ "$target_pid" =~ ^[0-9]+$ ]] \
+    || { warn "gate generation launch returned no exact PID; an early process exit is detected only at the timeout"; target_pid=""; }
   local timeout="${QVOICE_IOS_BENCH_TIMEOUT:-300}"
   local dest="$artifacts/device-diagnostics"
   rm -rf "$dest"
-  local waited=0 sentinel=""
+  local waited=0 sentinel="" exited=0
   while (( waited < timeout )); do
-    sleep 10; waited=$((waited + 10))
-    ( cmd_pull "$dest" ) >/dev/null 2>&1 || true
+    if (( exited == 0 )); then
+      sleep 10; waited=$((waited + 10))
+    fi
+    # Sentinel-only probe (audit #56): the take must not share the phone with a
+    # full container copy every ten seconds. The whole tree is pulled once below.
+    probe_device_sentinel "$run_id" "$dest" "$dev" || true
     sentinel="$(find "$dest" -name device-diagnostics-done.json -path "*/${run_id}/*" 2>/dev/null | head -1)"
     [[ -n "$sentinel" && -f "$sentinel" ]] && break
+    if (( exited == 1 )); then
+      ( cmd_pull "$dest" ) >/dev/null 2>&1 || true
+      echo "gate generation process $target_pid exited at ${waited}s without writing its sentinel (jetsam or crash)"
+      return 1
+    fi
+    if device_process_exited "$dev" "$target_pid" "$waited"; then
+      # One more probe first: a sentinel written just before exit still wins.
+      exited=1
+      continue
+    fi
     # Abort as soon as the device becomes unreachable (cmd_bench's poll policy).
     local state verdict
     state="$(probe_device_state 2>/dev/null || true)"
@@ -2784,6 +2926,8 @@ _gate_generation_check() {
     esac
   done
   [[ -n "$sentinel" && -f "$sentinel" ]] || { echo "no device-diagnostics sentinel after ${timeout}s (device state: $(probe_device_state 2>/dev/null || echo unknown))"; return 1; }
+  ( cmd_pull "$dest" ) >/dev/null 2>&1 \
+    || { echo "the gate sentinel appeared but the diagnostics tree could not be pulled"; return 1; }
   cp "$sentinel" "$gate_dir/generation-sentinel.json" 2>/dev/null || true
   python3 - "$sentinel" <<'PY' || { report_clone_consent_advice "$sentinel" failureCode; return 1; }
 import json, sys

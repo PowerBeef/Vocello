@@ -525,7 +525,12 @@ and publishes a platform-`ios` `ui-perf` record — the macOS UI-7 twin
 builds the app with `build --optimized` (`-O`, the shipped topology); every build writes a receipt
 naming the app executable and its digest, and publication binds `toolchain.optimization` to that
 receipt instead of a literal. While a headless take runs, the host copies only the run's completion
-sentinel from the device every ten seconds and pulls the full diagnostics tree once it appears.
+sentinel from the device every ten seconds and pulls the full diagnostics tree once it appears; the
+`memory` and `clone-conditioning` waits poll their result and failure markers the same way, and the
+`gate` generation step does too (audit #45, #56). Given the exact PID from the launch response, each
+wait also checks that the process is alive, so a jetsam or crash, which writes no marker, ends the
+wait at once (status 27) with a one-time pull of the partial tree, and the lane fails naming the
+process exit instead of timing out after 900 s.
 Generation lanes write `device-diagnostics-done.json`; `speech-assets` writes its distinct
 `speech-assets-done.json` completion barrier. The runner never drives or inspects the app UI. Clone
 diagnostics require the exact prepared voice ID, and `--memory-profile` can apply a

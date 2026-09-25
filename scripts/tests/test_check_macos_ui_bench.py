@@ -483,6 +483,30 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         result = self.run_checker(self.expected_order, mutate_layers=late_read)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
 
+    def test_each_take_names_its_seed_and_whether_it_follows_a_cold_take(self) -> None:
+        """audit #29 (effective seed) and #30 part 1 (the position effect, flagged)."""
+        def generated(rows: list[dict]) -> None:
+            for index, row in enumerate(rows, start=1):
+                row["notes"].update({"samplingSeed": str(1000 + index), "samplingSeedSource": "generated"})
+
+        result = self.run_checker(self.expected_order, generated, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        takes = self.last_manifest["takes"]
+        self.assertEqual([take["samplingSeed"] for take in takes], [1001, 1002, 1003, 1004, 1005])
+        self.assertTrue(all(take["samplingSeedSource"] == "generated" for take in takes))
+        # custom/medium/cold#0 is first, so only custom/short/warm#0 follows a cold take.
+        self.assertEqual([take["followsColdTake"] for take in takes], [False, True, False, False, False])
+        # A generated seed never reads as a pinned one in the tracked record.
+        self.assertTrue(all("seed" not in take for take in self.last_manifest["historyRecord"]["takes"]))
+
+        def requested(rows: list[dict]) -> None:
+            for row in rows:
+                row["notes"].update({"samplingSeed": "19790615", "samplingSeedSource": "requested"})
+
+        result = self.run_checker(self.expected_order, requested, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(all(take["seed"] == 19790615 for take in self.last_manifest["historyRecord"]["takes"]))
+
     def run_with_stalls(
         self, device_class: str | None, *, forced: bool = False, stalls: int = 2,
         maximum_ms: int = 300, extra_args: list[str] | None = None, evidence: bool = False,

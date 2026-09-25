@@ -111,6 +111,20 @@ def diagnostic_memory_tier(rows: list[dict]) -> bool:
     return False
 
 
+def take_seed(notes: dict) -> tuple[int | None, str | None]:
+    """The take's effective sampling seed and its source from the engine's
+    receipt (`samplingSeed`, `samplingSeedSource`: requested or generated)."""
+    raw = notes.get("samplingSeed")
+    source = notes.get("samplingSeedSource")
+    try:
+        seed = int(str(raw))
+    except (TypeError, ValueError):
+        return None, source if isinstance(source, str) else None
+    if not 0 <= seed <= (1 << 64) - 1:
+        return None, source if isinstance(source, str) else None
+    return seed, source if isinstance(source, str) else None
+
+
 class StallContractError(ValueError):
     pass
 
@@ -850,6 +864,7 @@ def build_manifest(
         if qc.get("verdict") == "warn" or memory.warnings or capture["warnings"]:
             warning_count += 1
         completeness = {"engine": True, "app": True, "merged": True}
+        seed, seed_source = take_seed(row.get("notes") or {})
         takes.append({
             "takeIndex": index,
             "generationID": row["generationID"],
@@ -866,6 +881,14 @@ def build_manifest(
             "outputDurationSeconds": output.get("durationSeconds"),
             "audioQC": {"verdict": qc.get("verdict"), "flags": qc.get("flags") or []},
             "layerCompleteness": completeness,
+            # The seed each take sampled with (audit #29): generated per take
+            # until a seed policy pins it, so run-ons can be reproduced.
+            "samplingSeed": seed,
+            "samplingSeedSource": seed_source,
+            # The first warm take after a cold take pays a settling cost (audit
+            # #30: custom/short/warm#0 is the slowest take in every canonical
+            # run); flagged here, never excluded.
+            "followsColdTake": index > 1 and "/cold#" in cells[index - 2],
         })
     run_warnings = list(memory_run["warnings"])
     stall_warning = stall_report_warning(stall_gate) if stall_gate else None
@@ -958,6 +981,10 @@ def build_manifest(
             "warnings": take_warnings,
             "memoryStatus": memory.status,
             "sampleSidecarDigest": memory.sidecar_digest,
+            # A seed the benchmark requested and the engine confirmed, as the
+            # engine publisher records it; a generated seed stays in the manifest.
+            **({"seed": take["samplingSeed"]} if take["samplingSeedSource"] == "requested"
+               and take["samplingSeed"] is not None else {}),
             **capture["fields"],
             **take_quality_identity(row),
         })

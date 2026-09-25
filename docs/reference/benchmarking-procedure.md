@@ -605,7 +605,11 @@ engine rows name different takes. The runner prints each take's harness phases (
 from the take's start: manifest published, session ready, script entered, submit, completion seen,
 playback ended, settled, end) and the lane keeps them as `take-phases.jsonl` beside the run, so
 per-take harness overhead is measured rather than inferred (audit #31); they time the harness around
-the measured windows, never inside them.
+the measured windows, never inside them. The evidence manifest also names each take's effective seed
+and its source from the engine's receipt (generated per take today, so a run-on can be reproduced; a
+requested seed is published as the take's `seed`, audit #29) and flags the first warm take after a cold
+take (`followsColdTake`, audit #30): in the 16 canonical M2 records it is the slowest take of its cell
+in 14 (custom/short) and 11 (design/short) runs. The flag describes; nothing is excluded from medians.
 
 **One-time machine setup:** configure Xcode UI-test runner signing, build the native test host, and
 install the required models.

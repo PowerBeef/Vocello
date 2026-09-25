@@ -1683,16 +1683,25 @@ def bench_matrix_cells(modes: list[str], variants: list[str], lengths: list[str]
     return cells
 
 
-def engine_matrix_hash(cells: list[Any], telemetry_mode: Any, streaming: Any, seed: Any) -> str:
+def engine_matrix_hash(
+    cells: list[Any], telemetry_mode: Any, streaming: Any, seed: Any,
+    *, profile_kind: str | None = None,
+) -> str:
     """`inputs.matrixHash` of an engine run: its ordered cells, telemetry mode,
     streaming and sampling seed. The seed is part of the matrix, so seeding the
-    gate bench is a new baseline identity."""
-    return digest_bytes(canonical_bytes({
+    gate bench is a new baseline identity. A macOS Instruments profile adds its
+    profile kind (audit #50): the instruments a trace records are what perturb
+    its takes, so a witness, CPU or memory profile never shares a lineage with
+    another kind even over the same cells and seed."""
+    identity: dict[str, Any] = {
         "cells": list(cells),
         "telemetryMode": telemetry_mode,
         "streaming": streaming,
         "seed": seed,
-    }))
+    }
+    if profile_kind is not None:
+        identity["profileKind"] = profile_kind
+    return digest_bytes(canonical_bytes(identity))
 
 
 def expected_identity_command(args: argparse.Namespace) -> Path:
@@ -1899,6 +1908,10 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
             "corpusHash": prompt_corpus_digest(selected),
             "matrixHash": engine_matrix_hash(
                 [take.get("cell") for take in result_takes], telemetry_mode, streaming, seed,
+                profile_kind=(
+                    str(getattr(args, "profile_kind", "cpu"))
+                    if kind == "instrument-profile" else None
+                ),
             ),
             "analysisProfileHash": (
                 memory_policy_digest if kind == "memory-qualification"
@@ -3702,7 +3715,11 @@ def extract_trace_data_summary(
     expected_correlations: set[tuple[str, int, str]],
     take_expectations: dict[tuple[str, int, str], dict[str, Any]] | None = None,
     require_complete_intervals: bool = False,
+    require_cpu_samples: bool = True,
 ) -> dict[str, Any]:
+    """`require_cpu_samples` is False only for the os_signpost-only witness
+    profile (audit #50), which records no sampler: its summary then carries no
+    CPU fields at all rather than zeros."""
     relevant = sorted({
         schema for schema in schemas
         if re.fullmatch(r"[A-Za-z0-9._-]+", schema)
@@ -3773,10 +3790,13 @@ def extract_trace_data_summary(
     captured_rows = sum(rows_by_schema.values())
     if captured_rows == 0:
         raise PublicationError("xctrace exported no performance data rows")
-    if not ({"cpu-profile", "time-profile"} & set(relevant)):
-        raise PublicationError("trace lacks an exportable CPU Profiler or Time Profiler table")
-    if not cpu_sample_times_ns:
-        raise PublicationError("CPU profile trace contains no target-process samples")
+    if require_cpu_samples:
+        if not ({"cpu-profile", "time-profile"} & set(relevant)):
+            raise PublicationError("trace lacks an exportable CPU Profiler or Time Profiler table")
+        if not cpu_sample_times_ns:
+            raise PublicationError("CPU profile trace contains no target-process samples")
+    elif cpu_sample_times_ns:
+        raise PublicationError("a witness profile records no CPU sampler, but its trace has CPU samples")
     correlation_fields_verified = correlated_signposts > 0
     if signpost_events == 0 or not correlation_fields_verified:
         raise PublicationError("trace lacks a run/generation/take/cell-correlated signpost")
@@ -3788,10 +3808,6 @@ def extract_trace_data_summary(
     summary: dict[str, Any] = {
         "capturedRowsBySchema": rows_by_schema,
         "capturedDataRowCount": captured_rows,
-        "cpuSampleCount": len(cpu_sample_times_ns),
-        "cpuSampleSpanMS": round(
-            (max(cpu_sample_times_ns) - min(cpu_sample_times_ns)) / 1_000_000.0, 6
-        ) if len(cpu_sample_times_ns) >= 2 else 0.0,
         # Every target-PID row of every signpost table (points, interval rows
         # and arguments), kept under its historical name; the versioned counts
         # below say what the rows were (audit #96).
@@ -3799,6 +3815,11 @@ def extract_trace_data_summary(
         "correlatedSignpostEventCount": correlated_signposts,
         "correlationFieldsVerified": correlation_fields_verified,
     }
+    if require_cpu_samples:
+        summary["cpuSampleCount"] = len(cpu_sample_times_ns)
+        summary["cpuSampleSpanMS"] = round(
+            (max(cpu_sample_times_ns) - min(cpu_sample_times_ns)) / 1_000_000.0, 6
+        ) if len(cpu_sample_times_ns) >= 2 else 0.0
     if cpu_weights_ns:
         summary["cpuSampleWeightMS"] = round(sum(cpu_weights_ns) / 1_000_000.0, 6)
     if cpu_cycle_weights:
@@ -4150,7 +4171,10 @@ def trace_evidence(
         expected_correlations=expected_correlations,
         take_expectations=take_expectations,
         require_complete_intervals=require_complete_intervals,
+        require_cpu_samples=profile_kind != "witness",
     )
+    if profile_kind == "witness" and "signpostSummaryVersion" not in extracted:
+        raise PublicationError("a witness profile publishes per-take signpost interval statistics")
     if "signpostSummaryVersion" in extracted:
         recorded = _toc_recorded_duration_seconds(toc)
         if recorded is not None:
@@ -4481,7 +4505,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     profile.add_argument("--duration", type=float, required=True)
     profile.add_argument("--target-process", required=True)
     profile.add_argument("--target-pid", type=int)
-    profile.add_argument("--profile-kind", choices=("cpu", "memory"), default="cpu")
+    # witness: os_signpost alone, the low-perturbation timing witness (audit #50).
+    profile.add_argument("--profile-kind", choices=("cpu", "memory", "witness"), default="cpu")
     profile.add_argument(
         "--retention-policy", choices=TRACE_RETENTION_POLICIES,
         default="summaryOnly",

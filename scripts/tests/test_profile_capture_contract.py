@@ -114,7 +114,8 @@ class ProfileCaptureContractTests(unittest.TestCase):
             with self.subTest(script=script):
                 text = (REPO / "scripts" / script).read_text(encoding="utf-8")
                 profile = shell_function(text, "cmd_profile")
-                self.assertIn('case "$kind" in cpu|memory)', profile)
+                # macOS also accepts the signpost-only witness kind (audit #50).
+                self.assertRegex(profile, r'case "\$kind" in cpu\|memory(\|witness)?\)')
                 self.assertIn('local allocations_instrument="Allocations"', profile)
                 self.assertIn('local vm_tracker_instrument="VM Tracker"', profile)
                 self.assertIn('instrument_args+=(--instrument os_signpost)', profile)

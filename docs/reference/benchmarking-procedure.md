@@ -92,7 +92,7 @@ UI heartbeat        —                       yes                    yes
 | **CLI** | `./build/vocello bench` | In-process `MLXTTSEngine` | Deterministic RTF/decode/memory matrix; release QA step 3 |
 | **macOS UI** | App (in-process engine) | In-process engine | Submit-to-first-chunk, playback scheduling and delayed-heartbeat evidence; UI smoke tests |
 | **macOS UI benchmark** | `scripts/ui_test.sh macos benchmark` | In-process engine | Full UI matrix through the real app; merged app + engine telemetry |
-| **macOS profile** | `scripts/macos_test.sh profile --kind cpu|memory` | In-process via CLI inside exact-PID trace | CPU/signpost or allocation/VM validation |
+| **macOS profile** | `scripts/macos_test.sh profile --kind cpu|memory|witness` | In-process via CLI inside exact-PID trace | CPU/signpost, allocation/VM validation, or the signpost-only timing witness |
 | **iOS device** | `scripts/ios_device.sh bench` | In-process | iPhone tier, Jetsam, on-device RTF (headless diagnostics, single take) |
 | **iOS UI benchmark** | `scripts/ui_test.sh ios benchmark` | In-process | Full UI matrix through XCUITest on the paired physical iPhone; telemetry gated per take |
 | **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Nine scripted SwiftUI scenarios with the in-app frame probe; warn-only ceilings; canonical-hardware runs publish `ui-perf` registry records; lane contract in [`macos-testing.md`](macos-testing.md) (history: [`macos-ui-refresh-2026-08.md`](macos-ui-refresh-2026-08.md)) |
@@ -498,11 +498,14 @@ scripts/macos_test.sh profile custom:speed:
 
 scripts/macos_test.sh profile --kind memory custom:speed:
 
+# The low-perturbation timing witness: os_signpost only, on the gate bench's seed.
+scripts/macos_test.sh profile --kind witness
+
 # Only when a CPU profile's raw document must be reopened in Instruments:
 scripts/macos_test.sh profile --keep-trace custom:speed:
 ```
 
-The CPU profile records one cold and three warm medium takes; both kinds refuse a busy host
+The CPU profile records one cold and three warm medium takes; every kind refuses a busy host
 (`require_quiet_host`) and a dirty tree (`--allow-dirty` records an exploratory profile of
 uncommitted source). Publication streams each exported table once and publishes, beside the row
 counts, a versioned signpost block: interval, begin, end and point counts, the orphan intervals
@@ -516,6 +519,14 @@ the token cap (a QC warning, still published). A macOS take short of 36 per step
 publication; an iPhone take is published with `complete: false`.
 Each take also reports how many interval sums drifted from the engine's own JSONL totals
 (`scripts/lib/trace_intervals.py`); that witness only reports.
+
+The witness profile (`--kind witness`, audit #50) records the CPU profile's takes with
+`os_signpost` alone: no CPU sampler, which cost profiled takes 29-80% of their warm tokens/s. It
+runs on the gate bench's seed, so its takes are token-exact with the gate's and its warm tokens/s
+can be set against the gate bench's (expected within about 1%). Its trace summary carries the same
+signpost block and no CPU fields; its matrix hash names its profile kind, so it never shares a
+lineage with a CPU or memory profile. Like the CPU profile it deletes its raw trace after
+publication unless `--keep-trace`, and it is an instrumented record, never canonical.
 
 The macOS memory profile records one cold long take. This captures model-load plus sustained
 allocation/VM peaks. The lane uses Apple's Allocations template for its Allocations and VM Tracker

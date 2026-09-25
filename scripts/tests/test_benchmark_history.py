@@ -1884,7 +1884,11 @@ class BenchmarkHistoryTests(unittest.TestCase):
             with self.subTest(index=index), self.assertRaises(history.HistoryError):
                 history.validate_trace_summary(record("macos", broken))
 
-    def profile_producer_manifest(self, run_id: str, *, quality: bool, policy: str) -> dict:
+    def profile_producer_manifest(
+        self, run_id: str, *, quality: bool, policy: str,
+        profile_kind: str = "cpu", template: str = "CPU Profiler + os_signpost",
+        summary: dict | None = None,
+    ) -> dict:
         """Exercise the production schema selector and retention writer together."""
         fixture = record_fixture(run_id=run_id, kind="instrument-profile")
         take = fixture["takes"][0]
@@ -1902,10 +1906,10 @@ class BenchmarkHistoryTests(unittest.TestCase):
         trace_path = self.root / "build" / f"{run_id}.trace"
         trace_path.mkdir(parents=True)
         (trace_path / "fixture.data").write_bytes(b"synthetic trace")
-        summary = {**trace_summary(), "artifact": f"build/{run_id}.trace"}
+        summary = {**(summary or trace_summary()), "artifact": f"build/{run_id}.trace"}
         args = SimpleNamespace(
-            trace=trace_path, run_id=run_id, template="CPU Profiler + os_signpost",
-            duration=10.0, target_process="vocello", profile_kind="cpu",
+            trace=trace_path, run_id=run_id, template=template,
+            duration=10.0, target_process="vocello", profile_kind=profile_kind,
             retention_policy=policy,
         )
         with (
@@ -1941,6 +1945,91 @@ class BenchmarkHistoryTests(unittest.TestCase):
             # cache cleanup cannot change which validation rule is exercised.
             manifest["historyRecord"]["toolchain"].update(fixture["toolchain"])
             return manifest
+
+    @staticmethod
+    def witness_trace_summary() -> dict:
+        """An os_signpost-only witness summary (audit #50): no CPU fields, the
+        versioned signpost block for the fixture's one take."""
+        correlation = ("gen-1", 1, "custom/speed/medium/warm#0")
+        engine = []
+        cursor = 1_000_000.0
+        for _ in range(3):
+            for name, multiplicity in history.trace_intervals.LOOP_STEP_INTERVALS.items():
+                for _ in range(multiplicity):
+                    engine.append(history.trace_intervals.Interval(name, cursor, 400_000.0))
+                    cursor += 1_000_000.0
+        takes, orphans = history.trace_intervals.interval_statistics(
+            correlated={correlation: [(
+                "Native Generation Stream",
+                history.trace_intervals.Interval("Native Generation Stream", 0.0, 1e10),
+            )]},
+            engine_intervals=engine,
+            expectations={correlation: {"generatedTokens": 2, "endReason": "eos", "timingsMS": {}}},
+        )
+        interval_rows = len(engine) + 1
+        summary = {
+            key: value for key, value in trace_summary().items()
+            if key not in {"cpuCycleWeight", "cpuSampleCount", "cpuSampleSpanMS"}
+        }
+        summary.update({
+            "capturedRowsBySchema": {"os-signpost": 4, "os-signpost-interval": interval_rows},
+            "capturedDataRowCount": 4 + interval_rows,
+            "signpostEventCount": 4 + interval_rows,
+            "signpostSummaryVersion": 1,
+            "signpostIntervalCount": interval_rows,
+            "signpostBeginCount": 1,
+            "signpostEndCount": 1,
+            "signpostPointCount": 2,
+            "orphanIntervalCount": orphans,
+            "recordedDurationSeconds": 12.5,
+            "intervalStatistics": {"version": 1, "takes": takes},
+        })
+        return summary
+
+    def test_a_witness_profile_publishes_without_cpu_fields_and_only_as_a_witness(self) -> None:
+        run_id = "profile-witness"
+        manifest = self.profile_producer_manifest(
+            run_id, quality=True, policy="summaryOnly", profile_kind="witness",
+            template="os_signpost", summary=self.witness_trace_summary(),
+        )
+        record = json.loads(history.record_manifest(self.write_manifest(manifest, run_id)).read_text())
+        self.assertEqual(record["evidence"]["trace"]["captureSettings"]["profileKind"], "witness")
+        self.assertNotIn("cpuSampleCount", record["evidence"]["trace"]["summary"])
+
+        def cpu_summary_without(key: str) -> dict:
+            summary = trace_summary()
+            summary.pop(key)
+            return summary
+
+        for name, kwargs in (
+            # A witness carrying a sampler's evidence is no witness.
+            ("witness-cpu-fields", {
+                "profile_kind": "witness", "template": "os_signpost",
+                "summary": {**self.witness_trace_summary(), "cpuSampleCount": 12},
+            }),
+            # The witness exists for its interval statistics.
+            ("witness-no-intervals", {
+                "profile_kind": "witness", "template": "os_signpost",
+                "summary": {
+                    key: value for key, value in self.witness_trace_summary().items()
+                    if key not in history.SIGNPOST_TRACE_SUMMARY_KEYS
+                },
+            }),
+            # The capture template decides the kind.
+            ("witness-cpu-template", {
+                "profile_kind": "witness", "template": "CPU Profiler + os_signpost",
+                "summary": self.witness_trace_summary(),
+            }),
+            # Every other kind still needs its CPU sampler fields.
+            ("cpu-no-samples", {"summary": cpu_summary_without("cpuSampleCount")}),
+            ("cpu-no-span", {"summary": cpu_summary_without("cpuSampleSpanMS")}),
+        ):
+            candidate = f"{run_id}-{name}"
+            manifest = self.profile_producer_manifest(
+                candidate, quality=True, policy="summaryOnly", **kwargs,
+            )
+            with self.subTest(name=name), self.assertRaises(history.HistoryError):
+                history.record_manifest(self.write_manifest(manifest, candidate))
 
     def test_production_profile_retention_publishes_v2_and_v3_without_downgrade(self) -> None:
         for quality in (False, True):

@@ -376,6 +376,22 @@ V2_ONLY_TRACE_SUMMARY_KEYS = {
     *SIGNPOST_TRACE_SUMMARY_KEYS,
 }
 V2_ONLY_TRACE_KEYS = set(TRACE_RETENTION_KEYS)
+# Profile kinds a trace's capture settings may name. The witness (audit #50,
+# 2026-09-25) records os_signpost alone: no CPU sampler, so its summary carries
+# no CPU fields. From schema v2 on the schema therefore leaves the CPU summary
+# fields optional and the executable validator requires them of every other
+# profile kind; frozen schema-v1 keeps them required.
+TRACE_PROFILE_KINDS = {"cpu", "memory", "witness"}
+WITNESS_TRACE_TEMPLATE = "os_signpost"
+CPU_TRACE_SUMMARY_KEYS = frozenset({"cpuSampleCount", "cpuSampleSpanMS"})
+CPU_SAMPLER_TRACE_SUMMARY_KEYS = CPU_TRACE_SUMMARY_KEYS | {"cpuCycleWeight", "cpuSampleWeightMS"}
+
+
+def schema_required_keys(version: int) -> dict[str, set[str]]:
+    required = {name: set(keys) for name, keys in SCHEMA_REQUIRED_KEYS.items()}
+    if version >= 2:
+        required["traceSummary"] -= CPU_TRACE_SUMMARY_KEYS
+    return required
 
 
 def schema_property_keys(version: int) -> dict[str, set[str]]:
@@ -853,7 +869,7 @@ def load_schema_contract(version: int | None = None) -> dict[str, Any]:
             raise HistoryError(
                 f"benchmark schema $defs.{name} properties drifted from the executable allowlist"
             )
-        if set(definition.get("required", [])) != SCHEMA_REQUIRED_KEYS[name]:
+        if set(definition.get("required", [])) != schema_required_keys(version)[name]:
             raise HistoryError(
                 f"benchmark schema $defs.{name} required fields drifted from the executable validator"
             )
@@ -2494,7 +2510,7 @@ def validate_trace_retention(record: dict[str, Any], trace: dict[str, Any]) -> N
     )
     if missing := sorted(TRACE_CAPTURE_SETTINGS_KEYS - set(capture_settings)):
         raise HistoryError("trace captureSettings is missing: " + ", ".join(missing))
-    if capture_settings["profileKind"] not in {"cpu", "memory"}:
+    if capture_settings["profileKind"] not in TRACE_PROFILE_KINDS:
         raise HistoryError("trace captureSettings.profileKind is unsupported")
     if retention_policy == "keptByDefault" and capture_settings["profileKind"] != "memory":
         raise HistoryError("only a memory profile keeps its raw trace by default")
@@ -2514,7 +2530,11 @@ def validate_trace_retention(record: dict[str, Any], trace: dict[str, Any]) -> N
     ):
         raise HistoryError("trace capture duration does not match validated trace evidence")
     memory_profile = "allocations" in str(trace.get("template", "")).lower()
-    expected_kind = "memory" if memory_profile else "cpu"
+    expected_kind = (
+        "memory" if memory_profile
+        else "witness" if trace.get("template") == WITNESS_TRACE_TEMPLATE
+        else "cpu"
+    )
     if capture_settings["profileKind"] != expected_kind:
         raise HistoryError("trace captureSettings.profileKind conflicts with its template")
     require_digest(
@@ -2533,7 +2553,15 @@ def validate_trace_summary(record: dict[str, Any]) -> None:
     if not isinstance(summary, dict):
         raise HistoryError("instrument-profile requires a structured trace summary")
     reject_unknown_keys(summary, TRACE_SUMMARY_KEYS, "evidence.trace.summary")
+    capture_settings = trace.get("captureSettings")
+    witness = (
+        isinstance(capture_settings, dict) and capture_settings.get("profileKind") == "witness"
+    )
     required = SCHEMA_REQUIRED_KEYS["traceSummary"]
+    if witness:
+        required = required - CPU_TRACE_SUMMARY_KEYS
+        if CPU_SAMPLER_TRACE_SUMMARY_KEYS.intersection(summary):
+            raise HistoryError("a witness trace summary carries CPU sampler evidence")
     if missing := sorted(required - set(summary)):
         raise HistoryError(f"trace summary is missing: {', '.join(missing)}")
     artifact = summary["artifact"]
@@ -2544,9 +2572,11 @@ def validate_trace_summary(record: dict[str, Any]) -> None:
     ):
         raise HistoryError("trace summary artifact must be a safe build-relative trace path")
     count_fields = {
-        "capturedDataRowCount", "cpuSampleCount", "processCount", "schemaCount",
+        "capturedDataRowCount", "processCount", "schemaCount",
         "signpostEventCount", "signpostSchemaCount", "tableCount",
     }
+    if not witness:
+        count_fields.add("cpuSampleCount")
     if any(
         not isinstance(summary[name], int) or isinstance(summary[name], bool) or summary[name] <= 0
         for name in count_fields
@@ -2659,16 +2689,19 @@ def validate_trace_summary(record: dict[str, Any]) -> None:
     require_digest(summary["tocDigest"], "evidence.trace.summary.tocDigest", allow_na=False)
     cpu_rows = sum(rows.get(name, 0) for name in ("cpu-profile", "time-profile"))
     signpost_rows = sum(value for name, value in rows.items() if "signpost" in name)
-    if cpu_rows != summary["cpuSampleCount"] or signpost_rows != summary["signpostEventCount"]:
+    if cpu_rows != summary.get("cpuSampleCount", 0) or signpost_rows != summary["signpostEventCount"]:
         raise HistoryError("trace summary row counts do not match CPU/signpost totals")
     if sum(rows.values()) != summary["capturedDataRowCount"]:
         raise HistoryError("trace summary captured-row total is inconsistent")
-    if not isinstance(summary["cpuSampleSpanMS"], (int, float)) or summary["cpuSampleSpanMS"] <= 0:
-        raise HistoryError("trace summary CPU sample span is empty")
-    weight = summary.get("cpuCycleWeight", summary.get("cpuSampleWeightMS"))
-    if not isinstance(weight, (int, float)) or isinstance(weight, bool) or weight <= 0:
-        raise HistoryError("trace summary lacks positive CPU sample weight")
+    if not witness:
+        if not isinstance(summary["cpuSampleSpanMS"], (int, float)) or summary["cpuSampleSpanMS"] <= 0:
+            raise HistoryError("trace summary CPU sample span is empty")
+        weight = summary.get("cpuCycleWeight", summary.get("cpuSampleWeightMS"))
+        if not isinstance(weight, (int, float)) or isinstance(weight, bool) or weight <= 0:
+            raise HistoryError("trace summary lacks positive CPU sample weight")
     signpost_keys = SIGNPOST_TRACE_SUMMARY_KEYS.intersection(summary)
+    if witness and not signpost_keys:
+        raise HistoryError("a witness trace summary lacks its per-take interval statistics")
     if signpost_keys:
         if missing := sorted(
             SIGNPOST_TRACE_SUMMARY_KEYS - {"recordedDurationSeconds"} - signpost_keys

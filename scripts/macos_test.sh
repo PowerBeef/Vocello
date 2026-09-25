@@ -18,7 +18,7 @@
 #   scripts/macos_test.sh crashes [--test]          # collect + xcsym-symbolicate .ips (app)
 #   scripts/macos_test.sh debug                     # LLDB attach guidance (app PID)
 #   scripts/macos_test.sh logs                      # retained os_log → build/artifacts/macos/logs/<run>.log
-#   scripts/macos_test.sh profile [--kind cpu|memory] [--keep-trace] [--allow-dirty] [spec]
+#   scripts/macos_test.sh profile [--kind cpu|memory|witness] [--keep-trace] [--allow-dirty] [spec]
 #                                                    # exact-PID xctrace vocello bench
 #   scripts/macos_test.sh memory [--label ID]        # retained-memory qualification sequence
 #   scripts/macos_test.sh gate                      # inputs → build_foundation → test → crashes
@@ -399,7 +399,7 @@ cmd_logs() {
   note "saved $out"
 }
 
-# profile [--kind cpu|memory] [--keep-trace] [--allow-dirty] [spec]: Instruments/xctrace trace
+# profile [--kind cpu|memory|witness] [--keep-trace] [--allow-dirty] [spec]: Instruments/xctrace trace
 # of a headless generation via the `vocello` CLI (engine in-process, the same engine code the
 # app runs). The engine emits os_signpost intervals under subsystem com.qwenvoice.engine
 # (categories 'runtime' and 'generation': the take-correlated prepare and generation-stream
@@ -409,8 +409,10 @@ cmd_logs() {
 # tokens for a token-capped one (audit #12).
 # The CPU lane records CPU Profiler + os_signpost over one cold and three warm medium takes
 # (audit #99). The memory lane also records Allocations + VM Tracker in that same trace.
-# Both need a quiet host and a clean tree (--allow-dirty records an exploratory profile of
-# uncommitted source). QVOICE_MAC_PROFILE_DURATION
+# The witness lane records os_signpost alone, no sampler, over the CPU lane's takes on the
+# gate bench's seed: the low-perturbation timing witness (audit #50) whose warm tokens/s can
+# be set against the gate bench's. Every kind needs a quiet host and a clean tree
+# (--allow-dirty records an exploratory profile of uncommitted source). QVOICE_MAC_PROFILE_DURATION
 # controls the capture window (seconds, default 90); QVOICE_MAC_MEMORY_PROFILE_DURATION
 # overrides the memory safety cap (default 180). QVOICE_MAC_PROFILE_GRACE_TIMEOUT bounds target/tracer
 # shutdown after the requested capture window (default 30 seconds for CPU, 60 for memory).
@@ -426,11 +428,11 @@ cmd_profile() {
       --kind=*) kind="${1#*=}"; shift ;;
       --keep-trace) keep_trace=1; shift ;;
       --allow-dirty) allow_dirty=1; shift ;;
-      -*) die "unknown profile flag: $1 (try --kind cpu|memory [--keep-trace] [--allow-dirty])" ;;
+      -*) die "unknown profile flag: $1 (try --kind cpu|memory|witness [--keep-trace] [--allow-dirty])" ;;
       *) [[ -z "$spec" ]] || die "profile accepts one generation spec"; spec="$1"; shift ;;
     esac
   done
-  case "$kind" in cpu|memory) ;; *) die "profile kind must be cpu or memory" ;; esac
+  case "$kind" in cpu|memory|witness) ;; *) die "profile kind must be cpu, memory or witness" ;; esac
   # A profile is a timing witness only on committed source (audit #99): five of
   # the first six profile records came from dirty trees.
   if (( allow_dirty == 0 )) \
@@ -458,6 +460,11 @@ cmd_profile() {
     # allows.
     instrument_args=(--template "$memory_template" --instrument "$cpu_instrument")
     capture_instruments="$cpu_instrument + $allocations_instrument + $vm_tracker_instrument + os_signpost"
+  elif [[ "$kind" == "witness" ]]; then
+    # The witness perturbs only by emitting its signposts: no CPU sampler
+    # (audit #50: the CPU Profiler cost warm tokens/s 29-80%).
+    instrument_args=()
+    capture_instruments="os_signpost"
   else
     instrument_args=(--instrument "$cpu_instrument")
   fi
@@ -466,6 +473,10 @@ cmd_profile() {
   # Three warm takes, so a profile's per-take interval statistics are not one
   # sample (audit #99).
   local profile_length="medium" profile_warm="3"
+  # The witness runs on the gate bench's seed, so its takes are token-exact
+  # with the gate's and its warm tokens/s is directly comparable.
+  local -a profile_seed_args=()
+  [[ "$kind" != "witness" ]] || profile_seed_args=(--seed "$GATE_BENCH_SEED")
   [[ "$kind" != "memory" ]] || duration="${QVOICE_MAC_MEMORY_PROFILE_DURATION:-180}"
   if [[ "$kind" == "memory" ]]; then
     # Retention has its own multi-take lane. The Instruments memory lane focuses
@@ -563,7 +574,7 @@ cmd_profile() {
       QWENVOICE_DEBUG=1 QWENVOICE_NATIVE_TELEMETRY_MODE=verbose \
       "$suspended_launcher" "$target_pid_file" "$QVOICE_BUILD_ROOT/vocello" bench \
       --modes "$mode" --variants "$variant" \
-      --lengths "$profile_length" --warm "$profile_warm" \
+      --lengths "$profile_length" --warm "$profile_warm" ${profile_seed_args[@]+"${profile_seed_args[@]}"} \
       --run-id "$run_id" --label "$profile_label" \
       --data-dir "$runtime" --no-summary --confirm-consent
   ) >"$artifacts/target.log" 2>&1 &

@@ -27,7 +27,9 @@ except ImportError:  # pragma: no cover - bare-name import path
 
 
 GIB = 1024 ** 3
-REQUIRED_FREE_BYTES = {"cpu": 5 * GIB, "memory": 15 * GIB}
+# The witness profile (os_signpost only, audit #50) records no sampler, so its
+# trace is smaller than a CPU profile's; it keeps the CPU floor all the same.
+REQUIRED_FREE_BYTES = {"cpu": 5 * GIB, "memory": 15 * GIB, "witness": 5 * GIB}
 SCHEMA_VERSION = 1
 DEFAULT_MAX_COMPACTED_DIAGNOSTIC_BYTES = 8 * 1024**2
 DEFAULT_MAX_DIAGNOSTIC_LOG_BYTES = 1024**2
@@ -48,7 +50,7 @@ COMPACTED_METADATA_FILES = {
 SUCCESS_RETENTION_POLICIES = ("summaryOnly", "keptExplicitly", "keptByDefault")
 RETAINED_SUCCESS_POLICIES = frozenset({"keptExplicitly", "keptByDefault"})
 RUN_ID_RE = re.compile(
-    r"^(?P<platform>mac|ios)-(?:(?P<kind>cpu|memory)-)?profile-"
+    r"^(?P<platform>mac|ios)-(?:(?P<kind>cpu|memory|witness)-)?profile-"
     r"(?P<timestamp>[0-9]{8}-[0-9]{6})-(?P<nonce>[0-9a-f]{8})$"
 )
 
@@ -192,7 +194,7 @@ def validate_profile_paths(
     if platform not in {"macos", "ios"}:
         raise RetentionError("platform must be macos or ios")
     if kind not in REQUIRED_FREE_BYTES:
-        raise RetentionError("profile kind must be cpu or memory")
+        raise RetentionError("profile kind must be cpu, memory or witness")
     root, profiles_root = real_repository_profiles_root(root, platform)
     if artifact_dir.is_symlink():
         raise RetentionError("profile artifact directory must not be a symlink")

@@ -1148,7 +1148,8 @@
         "profileKind": {
           "enum": [
             "cpu",
-            "memory"
+            "memory",
+            "witness"
           ]
         },
         "requestedDurationSeconds": {
@@ -1339,8 +1340,6 @@
         "capturedRowsBySchema",
         "correlatedSignpostEventCount",
         "correlationFieldsVerified",
-        "cpuSampleCount",
-        "cpuSampleSpanMS",
         "processCount",
         "schemaCount",
         "signpostEventCount",

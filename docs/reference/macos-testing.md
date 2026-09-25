@@ -346,6 +346,9 @@ scripts/macos_test.sh profile --kind memory custom:speed:
 
 # Explicit diagnostic exception: retain a CPU profile's raw Instruments document.
 scripts/macos_test.sh profile --keep-trace custom:speed:
+
+# Low-perturbation timing witness: os_signpost only, on the gate bench's seed (audit #50).
+scripts/macos_test.sh profile --kind witness
 ```
 
 The memory profile captures one cold long take so Allocations/VM Tracker include model-load and

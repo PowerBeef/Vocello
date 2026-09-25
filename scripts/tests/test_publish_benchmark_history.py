@@ -3441,7 +3441,10 @@ class PublisherTests(unittest.TestCase):
             + "</node></trace-query-result>"
         )
 
-    def extract_intervals(self, *, dropped: int = 0, require_complete: bool = True) -> dict:
+    def extract_intervals(
+        self, *, dropped: int = 0, require_complete: bool = True,
+        schemas: set[str] | None = None, require_cpu_samples: bool = True,
+    ) -> dict:
         trace = self.root / "profile-intervals.trace"
         trace.mkdir(exist_ok=True)
         message = "runID=profile-run generationID=gen-1 takeIndex=1 cell=custom/speed/medium/warm#0"
@@ -3473,7 +3476,7 @@ class PublisherTests(unittest.TestCase):
 
         with mock.patch.object(publisher.subprocess, "run", side_effect=fake_export):
             return publisher.extract_trace_data_summary(
-                trace, {"time-profile", "os-signpost", "os-signpost-interval"},
+                trace, schemas or {"time-profile", "os-signpost", "os-signpost-interval"},
                 run_id="profile-run", target_pid=4242,
                 expected_correlations={("gen-1", 1, "custom/speed/medium/warm#0")},
                 take_expectations={
@@ -3484,7 +3487,40 @@ class PublisherTests(unittest.TestCase):
                     },
                 },
                 require_complete_intervals=require_complete,
+                require_cpu_samples=require_cpu_samples,
             )
+
+    def test_a_witness_trace_publishes_its_intervals_without_cpu_fields(self) -> None:
+        # audit #50: the os_signpost-only witness records no sampler, so its
+        # summary has no CPU fields, never zeros, and keeps the full per-take
+        # interval statistics.
+        summary = self.extract_intervals(
+            schemas={"os-signpost", "os-signpost-interval"}, require_cpu_samples=False,
+        )
+        self.assertFalse({"cpuSampleCount", "cpuSampleSpanMS", "cpuSampleWeightMS"} & set(summary))
+        self.assertTrue(summary["intervalStatistics"]["takes"][0]["complete"])
+        # A CPU profile still needs its sampler table.
+        with self.assertRaises(publisher.PublicationError):
+            self.extract_intervals(schemas={"os-signpost", "os-signpost-interval"})
+        # A witness trace that did record CPU samples is not a witness.
+        with self.assertRaises(publisher.PublicationError):
+            self.extract_intervals(require_cpu_samples=False)
+
+    def test_a_profile_matrix_names_its_profile_kind(self) -> None:
+        cells = ["custom/speed/medium/cold#0", "custom/speed/medium/warm#0"]
+        plain = publisher.engine_matrix_hash(cells, "verbose", True, 19790615)
+        kinds = {
+            kind: publisher.engine_matrix_hash(cells, "verbose", True, 19790615, profile_kind=kind)
+            for kind in ("cpu", "memory", "witness")
+        }
+        # The gate and engine matrices keep their hash; no two profile kinds share one.
+        self.assertEqual(
+            plain,
+            publisher.digest_bytes(publisher.canonical_bytes({
+                "cells": cells, "telemetryMode": "verbose", "streaming": True, "seed": 19790615,
+            })),
+        )
+        self.assertEqual(len({plain, *kinds.values()}), 4)
 
     def test_trace_toc_recorded_duration_is_the_run_summary_duration(self) -> None:
         # The shape `xctrace export --toc` writes (Instruments 27.0, checked

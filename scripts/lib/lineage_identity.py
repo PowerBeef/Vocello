@@ -222,7 +222,11 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # 2 (2026-09-25, audit #12/#99): the CPU profile records three warm takes
     # instead of one on a quiet host, and publishes per-take decode-loop
     # interval statistics that must keep 36 intervals per decode step.
-    ("instrument-profile", "macos"): 2,
+    # 3 (2026-09-25, audit #50): the kind gains the os_signpost-only witness
+    # profile, and a macOS profile's matrix hash names its profile kind, so a
+    # witness, CPU or memory profile never shares a lineage. No record of the
+    # kind carried the lineage stamp yet.
+    ("instrument-profile", "macos"): 3,
     # 2 (2026-09-25, audit #45/#56): the iPhone gate's generation step and the
     # memory-qualification wait no longer copy the whole diagnostics tree from
     # the phone every 10 s while the take runs; they poll only their markers.

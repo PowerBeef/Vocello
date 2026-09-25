@@ -870,7 +870,7 @@ wait_device_diagnostics_sentinel() {
       # Where the wall time goes (audit #87): the 10 s poll quantizes the
       # sentinel, and the one full pull follows it.
       local pull_started=$SECONDS
-      note "sentinel found after ${waited}s of polling, $((pull_started - wait_started))s after launch (runID=$run_id)"
+      note "sentinel found after ${waited}s of polling, $((pull_started - wait_started))s of wall time since the wait began (runID=$run_id)"
       pull_device_diagnostics_run "$run_id" "$dest" >/dev/null 2>&1 \
         || die "sentinel appeared but the run could not be pulled (runID=$run_id)"
       note "run pulled in $((SECONDS - pull_started))s (runID=$run_id)"

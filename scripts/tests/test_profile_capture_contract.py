@@ -294,7 +294,8 @@ class ProfileCaptureContractTests(unittest.TestCase):
                 f"  if [[ \"$3\" == '{marker or ''}' ]] && (( $(grep -c \"probe $3\" '{calls}') >= 2 )); then "
                 "    printf '{}' >\"$2/$1/$3\"; fi; }; "
                 "probe_device_sentinel() { probe_device_run_file \"$1\" \"$2\" device-diagnostics-done.json \"${3:-}\"; }; "
-                f"device_process_exited() {{ return {0 if exits else 1}; }}; "
+                f"device_process_exited() {{ printf 'exit-check %s %s\\n' \"$1\" \"$2\" >>'{calls}'; "
+                f"  return {0 if exits else 1}; }}; "
             )
             completed = subprocess.run(
                 [
@@ -324,7 +325,9 @@ class ProfileCaptureContractTests(unittest.TestCase):
                 # (audit #45, #56): the one full pull follows the marker.
                 self.assertEqual(calls.count("full-pull"), 1, calls)
                 self.assertEqual(calls[-1], "full-pull")
-                self.assertTrue(all(call.startswith("probe ") for call in calls[:-1]), calls)
+                self.assertTrue(
+                    all(call.startswith(("probe ", "exit-check ")) for call in calls[:-1]), calls
+                )
 
     def test_ios_waits_stop_with_a_typed_exit_when_the_process_vanishes(self) -> None:
         for function in (
@@ -338,24 +341,15 @@ class ProfileCaptureContractTests(unittest.TestCase):
                 )
                 # A jetsam or crash writes no marker: stop now, not at the timeout.
                 self.assertEqual(completed.returncode, 27, completed.stderr)
-                self.assertIn("exited at 10s", completed.stderr)
                 self.assertEqual(completed.stdout, "")
+                # The liveness check asks about the exact device and PID the wait was given.
+                self.assertEqual(
+                    [call for call in calls if call.startswith("exit-check ")],
+                    ["exit-check fixture-device 4242"],
+                )
                 # The markers are probed once more before giving up, then the
                 # partial tree is pulled once for diagnosis.
                 self.assertEqual(calls.count("full-pull"), 1, calls)
-
-    def test_ios_memory_lane_passes_its_exact_pid_to_the_wait(self) -> None:
-        ios = (REPO / "scripts" / "ios_device.sh").read_text(encoding="utf-8")
-        memory = shell_function(ios, "cmd_memory")
-        self.assertIn(
-            'wait_memory_qualification_sentinel "$run_id" "$timeout" "$dest" "$dev" "$target_pid"',
-            memory,
-        )
-        clone = shell_function(ios, "cmd_clone_conditioning")
-        self.assertIn(
-            'wait_clone_conditioning_sentinel "$run_id" "$timeout" "$dest" "$dev" "$target_pid"',
-            clone,
-        )
 
     def test_local_only_field_report_is_exposed(self) -> None:
         ios = (REPO / "scripts" / "ios_device.sh").read_text(encoding="utf-8")

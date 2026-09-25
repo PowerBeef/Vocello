@@ -92,6 +92,10 @@ enum GenerationOutputVerifier {
         var pass: Bool
         var skipReason: String?
         var recognition: VoiceClipTranscriber.VerificationEvidence
+        /// Warn-only: the longest run of consecutive reference units deleted, on the primary
+        /// accuracy metric's units (words, or characters for Chinese and Japanese). Never part
+        /// of `pass`. Added compatibly; earlier records decode with `nil`.
+        var longestDeletionRun: Int?
     }
 
     static func verify(
@@ -242,6 +246,10 @@ enum GenerationOutputVerifier {
         case .characterErrorRate: characterMetrics.errorRate
         }
         let accuracyPass = accuracyValue <= accuracyThreshold
+        let longestDeletionRun = switch accuracyMetric {
+        case .wordErrorRate: wordMetrics.longestDeletionRun
+        case .characterErrorRate: characterMetrics.longestDeletionRun
+        }
 
         return Result(
             schemaVersion: Result.currentSchemaVersion,
@@ -271,7 +279,8 @@ enum GenerationOutputVerifier {
             accuracyPass: accuracyPass,
             pass: languagePass && accuracyPass,
             skipReason: nil,
-            recognition: recognition
+            recognition: recognition,
+            longestDeletionRun: longestDeletionRun
         )
     }
 

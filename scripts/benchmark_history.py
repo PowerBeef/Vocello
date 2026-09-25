@@ -261,6 +261,7 @@ LANGUAGE_VERIFICATION_IDENTITY_KEYS = {
     "outputSchemaVersion", "outputAlgorithm", "recognitionSchemaVersion",
     "recognitionAlgorithm", "accuracyMetricVersion", "requiredPassCount",
 }
+DELETION_RUN_METRIC_KEYS = ("longestDeletionRun", "independentLongestDeletionRun")
 INDEPENDENT_CONFIDENCE_METRIC_KEYS = (
     "independentMaximumNoSpeechProbability", "independentMeanAverageLogProbability",
 )
@@ -454,6 +455,11 @@ METRIC_KEYS = {
     # the worst segment's no-speech probability and the mean segment log
     # probability. Descriptive only; no gate reads them.
     *INDEPENDENT_CONFIDENCE_METRIC_KEYS,
+    # The longest run of consecutive reference units each family's recognizer
+    # deleted, on the primary metric's units (records since 2026-09-25, audit
+    # #84). Warn-only: a run of two or more on a take that must pass carries
+    # language.deletion_run:<family>.
+    *DELETION_RUN_METRIC_KEYS,
     "chunksForwarded", "transportChunkGaps", "transportDuplicateChunks", "transportOutOfOrderChunks",
     "minimumQueueDurationMS", "hintCellsPassed", "hintCellsExpected",
     "outputCellsPassed", "outputCellsExpected", "medianRTF", "medianTTFCMS",
@@ -2831,6 +2837,11 @@ def validate_record(
             expected_memory_status = "qualifiedWithWarnings" if has_memory_warning else "qualified"
             if take["memoryStatus"] != expected_memory_status:
                 raise HistoryError("take memory status does not match its memory warnings")
+        for key in DELETION_RUN_METRIC_KEYS:
+            if key in take["metrics"] and (
+                not float(take["metrics"][key]).is_integer() or take["metrics"][key] < 0
+            ):
+                raise HistoryError(f"take metric {key} must be a nonnegative count")
         if "accuracyMetric" in take and "whisper" in language_families(record):
             metrics = take["metrics"]
             if missing := sorted(INDEPENDENT_ACCURACY_METRIC_KEYS - set(metrics)):

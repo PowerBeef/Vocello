@@ -25,6 +25,11 @@ import unicodedata
 MAX_ACCURACY_ERROR_RATE = 0.15
 MIN_LANGUAGE_MATCH_SCORE = 0.5
 ACCURACY_METRIC_VERSION = "normalized-edit-rate-v1"
+# Warn-only (audit #84): the longest run of consecutive reference units the
+# recognizer deleted, on the primary metric's units. A skipped phrase of two to
+# four words stays under the 15 % gate on 17-32-unit scripts; the run exposes
+# it. It never changes a verdict or the accuracy metric above.
+DELETION_RUN_WARNING_LENGTH = 2
 
 # The tracked corpus (`config/language-bench-corpus.json`) covers exactly these
 # languages; a cell in another language fails closed until the table grows.
@@ -107,25 +112,33 @@ def edit_metrics(reference: list[Any], hypothesis: list[Any]) -> dict[str, int |
 
     Ties resolve diagonal (match/substitution), then deletion, then insertion,
     exactly as `VoiceClipTranscriber`; keeping the counts lets a consumer refuse
-    an aggregate error rate that does not match its own edits.
+    an aggregate error rate that does not match its own edits. Each cell also
+    carries the deletion run along its chosen path (a match, substitution or
+    insertion ends a run), so ``longestDeletionRun`` describes the same
+    alignment the counts do.
     """
-    previous: list[tuple[int, int, int]] = [(0, index, 0) for index in range(len(hypothesis) + 1)]
+    # (substitutions, insertions, deletions, current deletion run, longest run)
+    previous: list[tuple[int, int, int, int, int]] = [
+        (0, index, 0, 0, 0) for index in range(len(hypothesis) + 1)
+    ]
     for left_index, left in enumerate(reference):
-        current: list[tuple[int, int, int]] = [(0, 0, left_index + 1)]
+        current: list[tuple[int, int, int, int, int]] = [
+            (0, 0, left_index + 1, left_index + 1, left_index + 1)
+        ]
         for right_index, right in enumerate(hypothesis):
-            substitutions, insertions, deletions = previous[right_index]
-            best = (substitutions + (left != right), insertions, deletions)
-            substitutions, insertions, deletions = previous[right_index + 1]
-            candidate = (substitutions, insertions, deletions + 1)
-            if sum(candidate) < sum(best):
+            substitutions, insertions, deletions, _run, longest = previous[right_index]
+            best = (substitutions + (left != right), insertions, deletions, 0, longest)
+            substitutions, insertions, deletions, run, longest = previous[right_index + 1]
+            candidate = (substitutions, insertions, deletions + 1, run + 1, max(longest, run + 1))
+            if sum(candidate[:3]) < sum(best[:3]):
                 best = candidate
-            substitutions, insertions, deletions = current[right_index]
-            candidate = (substitutions, insertions + 1, deletions)
-            if sum(candidate) < sum(best):
+            substitutions, insertions, deletions, _run, longest = current[right_index]
+            candidate = (substitutions, insertions + 1, deletions, 0, longest)
+            if sum(candidate[:3]) < sum(best[:3]):
                 best = candidate
             current.append(best)
         previous = current
-    substitutions, insertions, deletions = previous[-1]
+    substitutions, insertions, deletions, _run, longest_run = previous[-1]
     distance = substitutions + insertions + deletions
     rate = (distance / len(reference)) if reference else (0.0 if not hypothesis else 1.0)
     return {
@@ -135,6 +148,7 @@ def edit_metrics(reference: list[Any], hypothesis: list[Any]) -> dict[str, int |
         "referenceCount": len(reference),
         "hypothesisCount": len(hypothesis),
         "errorRate": rate,
+        "longestDeletionRun": longest_run,
     }
 
 
@@ -226,6 +240,7 @@ def score_recognition(recognition: dict[str, Any], *, script: str, language: str
     score = (character if metric == "characterErrorRate" else word)["errorRate"]
     language_pass = recognition.get("detectedLanguage") == language
     accuracy_pass = score <= MAX_ACCURACY_ERROR_RATE
+    deletion_run = (character if metric == "characterErrorRate" else word)["longestDeletionRun"]
     return {
         "modelFamily": recognition.get("modelFamily"),
         "metric": "CER" if metric == "characterErrorRate" else "WER",
@@ -239,7 +254,16 @@ def score_recognition(recognition: dict[str, Any], *, script: str, language: str
         "languagePass": language_pass,
         "accuracyPass": accuracy_pass,
         "passed": language_pass and accuracy_pass,
+        "longestDeletionRun": deletion_run,
+        "deletionRunWarning": deletion_run >= DELETION_RUN_WARNING_LENGTH,
     }
+
+
+def primary_deletion_run(reference: str, hypothesis: str, expected_language: str) -> int:
+    """The warn-only deletion run of one transcript on its primary metric's units."""
+    word, character = recomputed_accuracy(reference, hypothesis, expected_language)
+    primary = character if primary_accuracy_metric(expected_language) == "characterErrorRate" else word
+    return int(primary["longestDeletionRun"])
 
 
 def consensus(family_votes: dict[str, list[bool]]) -> dict[str, Any]:

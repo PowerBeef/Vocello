@@ -61,6 +61,7 @@ from benchmark_memory import (  # noqa: E402
 )
 from language_bench_evidence import stable_default_seed  # noqa: E402
 from lib.language_metrics import (  # noqa: E402
+    DELETION_RUN_WARNING_LENGTH,
     INDEPENDENT_ASR_ALGORITHM,
     INDEPENDENT_OUTPUT_ALGORITHM,
     INDEPENDENT_OUTPUT_SCHEMA,
@@ -2545,11 +2546,17 @@ def sanitized_asr_evidence(
         or (primary_score > expected_threshold and not expect_failure)
     ):
         raise PublicationError(f"language cell {cell_id} has an invalid primary accuracy gate")
+    primary_metrics = character_metrics if expected_accuracy_metric == "characterErrorRate" else word_metrics
+    deletion_run = int(primary_metrics["longestDeletionRun"])
+    reported_run = verification.get("longestDeletionRun")
+    if reported_run is not None and reported_run != deletion_run:
+        raise PublicationError(f"language cell {cell_id} deletion run does not match its transcript")
     return {
         "cell": cell_id,
         "generationID": str(engine_row.get("generationID")),
         "expectedLanguage": str(expected_language),
         "detectedLanguage": detected_language,
+        "longestDeletionRun": deletion_run,
         "selectedLocaleIdentifier": locale,
         "outputVerifierSchemaVersion": LANGUAGE_OUTPUT_SCHEMA,
         "outputVerifierAlgorithm": LANGUAGE_OUTPUT_ALGORITHM,
@@ -2647,6 +2654,16 @@ def load_independent_recognitions(path: Path, *, run_id: str, platform: str) -> 
     return payload
 
 
+def flag_deletion_run(take: dict[str, Any], run: int, *, family: str, negative_control: bool) -> None:
+    """Warn (never fail) when a recognizer deleted a run of consecutive units (audit #84).
+
+    A negative control is expected to fail recognition, so its runs are not
+    flagged."""
+    if negative_control or run < DELETION_RUN_WARNING_LENGTH:
+        return
+    take["warnings"] = sorted(set(take.get("warnings", [])) | {f"language.deletion_run:{family}"})
+
+
 def _unit_interval(value: Any) -> float | None:
     number = finite_number(value)
     return number if number is not None and 0.0 <= number <= 1.0 else None
@@ -2739,6 +2756,7 @@ def sanitized_independent_evidence(
         "languagePass": verdict["languagePass"],
         "accuracyPass": verdict["accuracyPass"],
         "pass": verdict["passed"],
+        "longestDeletionRun": int(verdict["longestDeletionRun"]),
         "fullFileProcessed": True,
         "recognitionDurationSeconds": recognition_duration,
         # Whisper's own confidence (audit #89); absent from evidence that
@@ -2959,7 +2977,10 @@ def language_command(args: argparse.Namespace) -> Path:
                 "recognitionDurationSeconds": evidence["recognitionDurationSeconds"],
                 "primaryAccuracyScore": evidence["primaryAccuracyScore"],
                 "accuracyThreshold": evidence["accuracyThreshold"],
+                "longestDeletionRun": float(evidence["longestDeletionRun"]),
             })
+            flag_deletion_run(take, evidence["longestDeletionRun"], family="apple-speech",
+                              negative_control=cell.get("expectedOutcome") == "fail")
     independent_evidence: list[dict[str, Any]] = []
     independent_provenance: dict[str, str] | None = None
     if recognitions_path is not None:
@@ -3008,7 +3029,10 @@ def language_command(args: argparse.Namespace) -> Path:
                 "independentLanguagePass": 1.0 if evidence["languagePass"] else 0.0,
                 "independentAccuracyPass": 1.0 if evidence["accuracyPass"] else 0.0,
                 "independentRecognitionDurationSeconds": evidence["recognitionDurationSeconds"],
+                "independentLongestDeletionRun": float(evidence["longestDeletionRun"]),
             })
+            flag_deletion_run(take, evidence["longestDeletionRun"], family="whisper",
+                              negative_control=cell.get("expectedOutcome") == "fail")
             for source, target in (
                 ("maximumNoSpeechProbability", "independentMaximumNoSpeechProbability"),
                 ("meanAverageLogProbability", "independentMeanAverageLogProbability"),

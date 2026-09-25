@@ -32,6 +32,42 @@ final class WordErrorRateTests: XCTestCase {
         XCTAssertEqual(wer, 0, accuracy: 0.001)
     }
 
+    /// Parity fixtures with `scripts/tests/test_language_metrics.py` (audit #84): the run follows
+    /// the tie-broken alignment the counts come from.
+    func testLongestDeletionRunFollowsTheAlignment() {
+        let skipped = VoiceClipTranscriber.wordErrorMetrics(
+            reference: "The quiet garden is open today",
+            hypothesis: "The is open today"
+        )
+        XCTAssertEqual(skipped.deletions, 2)
+        XCTAssertEqual(skipped.longestDeletionRun, 2)
+
+        let scattered = VoiceClipTranscriber.wordErrorMetrics(
+            reference: "a b c d e",
+            hypothesis: "a c e"
+        )
+        XCTAssertEqual(scattered.deletions, 2)
+        XCTAssertEqual(scattered.longestDeletionRun, 1)
+
+        let merged = VoiceClipTranscriber.wordErrorMetrics(
+            reference: "vor Mittag kommt er",
+            hypothesis: "Vormittag kommt er"
+        )
+        XCTAssertEqual(merged.substitutions, 1)
+        XCTAssertEqual(merged.deletions, 1)
+        XCTAssertEqual(merged.longestDeletionRun, 1)
+
+        let substituted = VoiceClipTranscriber.characterErrorMetrics(
+            reference: "kitten",
+            hypothesis: "sitting"
+        )
+        XCTAssertEqual(substituted.longestDeletionRun, 0)
+        XCTAssertEqual(
+            VoiceClipTranscriber.wordErrorMetrics(reference: "a b c", hypothesis: "").longestDeletionRun,
+            3
+        )
+    }
+
     func testSingleSubstitution() {
         let metrics = VoiceClipTranscriber.wordErrorMetrics(
             reference: "one two three four",
@@ -60,6 +96,7 @@ final class WordErrorRateTests: XCTestCase {
         )
         XCTAssertEqual(deletion.deletions, 3)
         XCTAssertEqual(deletion.insertions, 0)
+        XCTAssertEqual(deletion.longestDeletionRun, 3)
 
         let characters = VoiceClipTranscriber.characterErrorMetrics(
             reference: "Café!",
@@ -328,6 +365,7 @@ final class WordErrorRateTests: XCTestCase {
         XCTAssertEqual(result.accuracyMetric, .wordErrorRate)
         XCTAssertEqual(result.accuracyThreshold, 0.30, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(result.accuracyValue), 0.25, accuracy: 0.001)
+        XCTAssertEqual(result.longestDeletionRun, 0)
         XCTAssertTrue(result.recognition.evidenceConsistency)
     }
 
@@ -621,6 +659,36 @@ final class WordErrorRateTests: XCTestCase {
 
         XCTAssertNil(decoded.sourceAudioDurationSeconds)
         XCTAssertEqual(decoded, original)
+    }
+
+    func testVerifierReportsTheDeletionRunAndDecodesEvidenceWithoutIt() throws {
+        let transcript = "The is open today"
+        let recognition = evidence(
+            authorization: .authorized,
+            consensus: .consistent,
+            repetitions: (1 ... 3).map { pass(index: $0, transcript: transcript) },
+            transcript: transcript
+        )
+        let result = GenerationOutputVerifier.evaluate(
+            recognition: recognition,
+            expectedScript: "The quiet garden is open today",
+            expectedLanguage: .english,
+            maxWordErrorRate: 0.5
+        )
+        // Warn-only: the skipped phrase is reported, the verdict is the edit rate's alone.
+        XCTAssertEqual(result.longestDeletionRun, 2)
+        XCTAssertEqual(result.accuracyPass, true)
+
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as? [String: Any]
+        )
+        object.removeValue(forKey: "longestDeletionRun")
+        let earlier = try JSONDecoder().decode(
+            GenerationOutputVerifier.Result.self,
+            from: JSONSerialization.data(withJSONObject: object)
+        )
+        XCTAssertNil(earlier.longestDeletionRun)
+        XCTAssertEqual(earlier.deletions, 2)
     }
 
     private func pass(

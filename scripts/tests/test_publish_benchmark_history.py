@@ -1813,6 +1813,24 @@ class PublisherTests(unittest.TestCase):
         )
         self.assertNotIn("transcript", sanitized)
         self.assertNotIn("runID", sanitized)
+        # Audit #84: the deletion run is recomputed from the transcript, and an
+        # app-reported value must agree with it (one substitution: run 0).
+        self.assertEqual(sanitized["longestDeletionRun"], 0)
+        self.assertEqual(take_metrics["longestDeletionRun"], 0.0)
+        parity = copy.deepcopy(sentinel)
+        parity["outputVerification"]["longestDeletionRun"] = 0
+        publisher.sanitized_asr_evidence(
+            cell={"id": "fr", "expectedHint": "french"}, planned_take=plan["takes"][0],
+            sentinel=parity, engine_row=row, parent_run_id="lang-ios",
+            reference_script=reference_script,
+        )
+        parity["outputVerification"]["longestDeletionRun"] = 2
+        with self.assertRaises(publisher.PublicationError):
+            publisher.sanitized_asr_evidence(
+                cell={"id": "fr", "expectedHint": "french"}, planned_take=plan["takes"][0],
+                sentinel=parity, engine_row=row, parent_run_id="lang-ios",
+                reference_script=reference_script,
+            )
         mismatched = dict(sentinel)
         mismatched["generationID"] = "another-generation"
         with self.assertRaisesRegex(publisher.PublicationError, "another generation"):
@@ -2037,6 +2055,32 @@ class PublisherTests(unittest.TestCase):
                     stack.enter_context(item)
                 with self.assertRaisesRegex(publisher.PublicationError, label):
                     publisher.language_command(args)
+
+    def test_a_skipped_phrase_under_the_gate_warns_but_never_fails(self) -> None:
+        """Audit #84: two consecutive deleted words on a 17-word script pass the
+        15 % gate; the take is published with the run and a warning."""
+        script = ("chaque matin le jardin calme ouvre ses portes et le vieux jardinier "
+                  "arrose chaque rose avant midi")
+        transcript = script.replace("le jardin ", "")
+        evidence = publisher.sanitized_independent_evidence(
+            cell={"id": "fr", "expectedHint": "french"},
+            engine_row={"generationID": "fr-id"},
+            entry={"generationID": "fr-id", "audioSHA256": "a" * 64, "recognitions": [
+                independent_recognition(audio_sha256="a" * 64, script=script, transcript=transcript),
+            ]},
+            reference_script=script, expected_audio_sha256="a" * 64, duration_seconds=2.0,
+            apple_evidence=None,
+        )
+        self.assertTrue(evidence["pass"])
+        self.assertEqual(evidence["longestDeletionRun"], 2)
+        take = {"warnings": []}
+        publisher.flag_deletion_run(take, evidence["longestDeletionRun"], family="whisper",
+                                    negative_control=False)
+        self.assertEqual(take["warnings"], ["language.deletion_run:whisper"])
+        for run, control in ((1, False), (4, True)):
+            quiet = {"warnings": []}
+            publisher.flag_deletion_run(quiet, run, family="whisper", negative_control=control)
+            self.assertEqual(quiet["warnings"], [])
 
     def test_ios_language_requires_two_recognizer_families_to_agree(self) -> None:
         matrix = self.root / "matrix.json"

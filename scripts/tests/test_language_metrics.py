@@ -150,6 +150,81 @@ class RecognitionQualificationTests(unittest.TestCase):
             script="今日は良い天気です", language="japanese")["metric"], "CER")
 
 
+class DeletionRunTests(unittest.TestCase):
+    """Audit #84: a skipped phrase under the edit-rate gate is reported, warn-only.
+
+    The first test mirrors `WordErrorRateTests.testLongestDeletionRunFollowsTheAlignment`.
+    """
+
+    def run_of(self, reference: str, hypothesis: str) -> dict:
+        return metrics.edit_metrics(
+            metrics.normalized_word_tokens(reference), metrics.normalized_word_tokens(hypothesis))
+
+    def test_parity_fixtures_with_the_swift_verifier(self) -> None:
+        skipped = self.run_of("The quiet garden is open today", "The is open today")
+        self.assertEqual((skipped["deletions"], skipped["longestDeletionRun"]), (2, 2))
+        scattered = self.run_of("a b c d e", "a c e")
+        self.assertEqual((scattered["deletions"], scattered["longestDeletionRun"]), (2, 1))
+        merged = self.run_of("vor Mittag kommt er", "Vormittag kommt er")
+        self.assertEqual((merged["substitutions"], merged["deletions"], merged["longestDeletionRun"]), (1, 1, 1))
+        self.assertEqual(metrics.edit_metrics(list("kitten"), list("sitting"))["longestDeletionRun"], 0)
+        self.assertEqual(self.run_of("a b c", "")["longestDeletionRun"], 3)
+
+    def test_a_skip_that_passes_the_gate_still_warns(self) -> None:
+        script = ("Each morning the quiet garden opens its gates and the old gardener "
+                  "waters every rose by noon")
+        transcript = script.replace("the quiet ", "")
+        entry = recognition(script=script, transcript=transcript)
+        verdict = metrics.score_recognition(entry, script=script, language="english")
+        # 2 of 17 words: the gate passes, as the audit showed.
+        self.assertAlmostEqual(verdict["errorRate"], 2 / 17)
+        self.assertTrue(verdict["passed"])
+        self.assertEqual(verdict["longestDeletionRun"], 2)
+        self.assertTrue(verdict["deletionRunWarning"])
+        clean = metrics.score_recognition(recognition(script=script), script=script, language="english")
+        self.assertEqual((clean["longestDeletionRun"], clean["deletionRunWarning"]), (0, False))
+
+    def test_character_languages_count_characters(self) -> None:
+        script = "今日は良い天気です"
+        verdict = metrics.score_recognition(
+            recognition(script=script, transcript="今日は天気です", language="japanese"),
+            script=script, language="japanese")
+        self.assertEqual(verdict["metric"], "CER")
+        self.assertEqual(verdict["longestDeletionRun"], 2)
+        self.assertEqual(metrics.primary_deletion_run(script, "今日は天気です", "japanese"), 2)
+
+
+class NegativeControlScoringTests(unittest.TestCase):
+    """Audit #42: what each channel of the negative control can and cannot show."""
+
+    FRENCH = ("un deux trois quatre cinq six sept huit neuf dix onze douze treize "
+              "quatorze quinze seize")
+
+    def test_english_locked_whisper_fails_the_control_on_accuracy_alone(self) -> None:
+        # English hint over a French script, as the matrix's control cell pins it.
+        # Whisper hears English (p = 0.893 in the audit's take), so its language
+        # check passes; only the edit rate against the French script rejects it.
+        # Nine of sixteen words differ ("six" is spelled alike in both languages).
+        transcript = ("one two three four five six seven eight nine ten onze douze treize "
+                      "quatorze quinze seize")
+        entry = recognition(script=self.FRENCH, transcript=transcript, language="english",
+                            detected="english", languageMatchScore=0.893)
+        verdict = metrics.score_recognition(entry, script=self.FRENCH, language="english")
+        self.assertAlmostEqual(verdict["errorRate"], 0.5625)
+        self.assertTrue(verdict["languagePass"])
+        self.assertFalse(verdict["accuracyPass"])
+        self.assertFalse(verdict["passed"])
+
+    def test_a_french_detection_fails_the_control_on_both_channels(self) -> None:
+        entry = recognition(script=self.FRENCH, language="english", detected="french")
+        verdict = metrics.score_recognition(entry, script=self.FRENCH, language="english")
+        self.assertFalse(verdict["languagePass"])
+        # The transcript is the French script itself: the edit rate is zero, so
+        # the language channel alone carries this failure.
+        self.assertTrue(verdict["accuracyPass"])
+        self.assertFalse(verdict["passed"])
+
+
 class ConsensusTests(unittest.TestCase):
     def test_one_family_is_one_witness(self) -> None:
         result = metrics.consensus({"whisper": [True]})

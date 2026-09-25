@@ -67,6 +67,17 @@ edit-count decompositions remain evidence. The Python gate and history publisher
 recompute the metrics from the tracked corpus and untracked consensus transcript before accepting
 the Swift verdict.
 
+Each family's alignment also yields `longestDeletionRun`, the longest run of consecutive reference
+units the recognizer deleted on the primary metric's units (a match, substitution or insertion ends
+a run; the Swift verifier and `scripts/lib/language_metrics.py` share the tie-broken path and parity
+fixtures). It is warn-only: a skipped phrase of two to four words stays under the 15 % gate on the
+corpus's 17-32-unit scripts, so a run of two or more on a take that must pass publishes the take with
+`language.deletion_run:<family>` and never changes a verdict or the `normalized-edit-rate-v1` contract.
+Published as `longestDeletionRun` (Apple Speech, recomputed and checked against the app's value) and
+`independentLongestDeletionRun` (whisper). Replayed over the committed records, no passing take can
+carry a run of two: the only takes with two deletions are the German cells, whose zero CER makes
+every word error a two-word compound merge.
+
 The host checker also enforces the app's existing **outer-edge** timing rule whenever the
 verification declares `sourceAudioDurationSeconds` or the record includes WAV `outputEvidence`:
 all three recognitions must start within `min(2.5, max(1.0, duration × 0.15))` seconds of the

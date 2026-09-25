@@ -471,6 +471,16 @@ class CheckLanguageOutputTests(unittest.TestCase):
         )
         self.assertTrue(any("WER does not match" in failure for failure in failures), failures)
 
+    def test_app_deletion_run_must_match_the_python_mirror(self) -> None:
+        """Audit #84: the warn-only run is optional in the app's report, but never wrong."""
+        script = "Le train a quitté la gare à l'aube."
+        value = verification("french")
+        self.assertEqual(validate_structured_verification(value, "french", script, "absent"), [])
+        value["longestDeletionRun"] = 0
+        self.assertEqual(validate_structured_verification(value, "french", script, "agrees"), [])
+        value["longestDeletionRun"] = 3
+        self.assertNotEqual(validate_structured_verification(value, "french", script, "tampered"), [])
+
     def test_language_score_above_one_is_rejected(self) -> None:
         value = verification("chinese", script="火车在黎明时分离开了车站。")
         value["languageMatchScore"] = 1.000_000_000_184_127_2

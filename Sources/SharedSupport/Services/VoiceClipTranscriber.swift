@@ -146,6 +146,12 @@ enum VoiceClipTranscriber {
         var insertions: Int
         var deletions: Int
         var errorRate: Double
+        /// The longest run of consecutive reference tokens the alignment deletes (a match,
+        /// substitution or insertion ends a run), on the same tie-broken path as the counts.
+        /// Warn-only evidence of a skipped phrase that stays under the edit-rate gate; the
+        /// Python mirror is `scripts/lib/language_metrics.py`. Optional so earlier encodings
+        /// decode.
+        var longestDeletionRun: Int?
 
         var editDistance: Int { substitutions + insertions + deletions }
     }
@@ -176,6 +182,9 @@ enum VoiceClipTranscriber {
         var substitutions: Int
         var insertions: Int
         var deletions: Int
+        /// Consecutive deletions ending at this cell along its chosen path.
+        var deletionRun = 0
+        var longestDeletionRun = 0
         var distance: Int { substitutions + insertions + deletions }
     }
 
@@ -776,15 +785,25 @@ enum VoiceClipTranscriber {
             EditCell(substitutions: 0, insertions: $0, deletions: 0)
         }
         for (leftIndex, left) in lhs.enumerated() {
-            var current = [EditCell(substitutions: 0, insertions: 0, deletions: leftIndex + 1)]
+            var current = [EditCell(
+                substitutions: 0,
+                insertions: 0,
+                deletions: leftIndex + 1,
+                deletionRun: leftIndex + 1,
+                longestDeletionRun: leftIndex + 1
+            )]
             current.reserveCapacity(rhs.count + 1)
             for (rightIndex, right) in rhs.enumerated() {
                 var diagonal = previous[rightIndex]
                 if left != right { diagonal.substitutions += 1 }
+                diagonal.deletionRun = 0
                 var deletion = previous[rightIndex + 1]
                 deletion.deletions += 1
+                deletion.deletionRun += 1
+                deletion.longestDeletionRun = max(deletion.longestDeletionRun, deletion.deletionRun)
                 var insertion = current[rightIndex]
                 insertion.insertions += 1
+                insertion.deletionRun = 0
 
                 // Stable tie policy: diagonal/substitution, then deletion, then insertion.
                 var best = diagonal
@@ -808,7 +827,8 @@ enum VoiceClipTranscriber {
             substitutions: final.substitutions,
             insertions: final.insertions,
             deletions: final.deletions,
-            errorRate: rate
+            errorRate: rate,
+            longestDeletionRun: final.longestDeletionRun
         )
     }
 

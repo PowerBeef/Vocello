@@ -343,6 +343,14 @@ def validate_structured_verification(
             else "wordErrorRate"
         )
         expected_score = cer if expected_metric == "characterErrorRate" else wer
+        # Warn-only deletion run (audit #84): the app's value, when it reports
+        # one, must be the Python mirror's on the same primary units.
+        expected_run = (
+            recomputed_character if expected_metric == "characterErrorRate" else recomputed_word
+        )["longestDeletionRun"]
+        reported_run = verification.get("longestDeletionRun")
+        if reported_run is not None and reported_run != expected_run:
+            failures.append(f"{identity}: longestDeletionRun does not match the consensus transcript")
         if verification.get("accuracyMetricVersion") != "normalized-edit-rate-v1":
             failures.append(f"{identity}: wrong accuracy metric version")
         if verification.get("accuracyMetric") != expected_metric:

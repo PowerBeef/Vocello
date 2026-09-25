@@ -834,7 +834,7 @@ actor NativeEngineRuntime {
         await telemetrySampler?.captureBoundary("before_model_load")
 
         var mlxMemorySnapshots: [String: NativeMLXMemorySnapshot] = [
-            "before_load": NativeMemoryPolicyResolver.snapshot()
+            "before_load": NativeMemoryPolicyResolver.stageSnapshot()
         ]
         let loadResult = try await loadModel(
             id: request.modelID,
@@ -844,7 +844,7 @@ actor NativeEngineRuntime {
         )
         await telemetryRecorder?.mark(stage: GenerationStartupBoundary.modelLoaded.telemetryStage)
         await telemetrySampler?.captureBoundary("after_model_load")
-        mlxMemorySnapshots["after_load"] = NativeMemoryPolicyResolver.snapshot()
+        mlxMemorySnapshots["after_load"] = NativeMemoryPolicyResolver.stageSnapshot()
         await recordDiagnosticEvent(
             "runtime-prepare-after-load-model",
             request: request,
@@ -902,7 +902,7 @@ actor NativeEngineRuntime {
                 modelRuntimeIdentity: loadResult.modelRuntimeIdentity
             )
             cloneConditioning = conditioning
-            mlxMemorySnapshots["after_clone_conditioning"] = NativeMemoryPolicyResolver.snapshot()
+            mlxMemorySnapshots["after_clone_conditioning"] = NativeMemoryPolicyResolver.stageSnapshot()
             wasPrimed = primedCloneReferenceKeys.contains(conditioning.internalIdentity)
             timingOverridesMS.merge(conditioning.timingsMS) { current, _ in current }
             booleanFlags["clone_prompt_artifact_hit"] = conditioning.timingsMS["clone_prompt_artifact_load"] != nil
@@ -938,7 +938,7 @@ actor NativeEngineRuntime {
                 timingOverridesMS.merge(prewarmTimings) { _, rhs in rhs }
                 booleanFlags.merge(await model.latestPreparationBooleanFlags()) { _, rhs in rhs }
             }
-            mlxMemorySnapshots["after_prewarm"] = NativeMemoryPolicyResolver.snapshot()
+            mlxMemorySnapshots["after_prewarm"] = NativeMemoryPolicyResolver.stageSnapshot()
             booleanFlags["clone_optimized_handler_used"] = model.supportsOptimizedVoiceClone
         case .custom:
             await recordDiagnosticEvent(
@@ -984,7 +984,7 @@ actor NativeEngineRuntime {
                 timingOverridesMS.merge(prewarmTimings) { _, rhs in rhs }
                 booleanFlags.merge(await model.latestPreparationBooleanFlags()) { _, rhs in rhs }
             }
-            mlxMemorySnapshots["after_prewarm"] = NativeMemoryPolicyResolver.snapshot()
+            mlxMemorySnapshots["after_prewarm"] = NativeMemoryPolicyResolver.stageSnapshot()
             booleanFlags["custom_dedicated_handler_used"] = model.supportsDedicatedCustomVoice
         case .design:
             cloneConditioning = nil
@@ -1010,7 +1010,7 @@ actor NativeEngineRuntime {
             booleanFlags["design_warm_bucket_long"] = warmBucket == .long
             booleanFlags["design_optimized_handler_used"] = model.supportsOptimizedVoiceDesign
             stringFlags["design_conditioning_request_key"] = warmState.requestKey
-            mlxMemorySnapshots["after_prewarm"] = NativeMemoryPolicyResolver.snapshot()
+            mlxMemorySnapshots["after_prewarm"] = NativeMemoryPolicyResolver.stageSnapshot()
         }
         await telemetrySampler?.captureBoundary("after_mode_preparation")
         await telemetryRecorder?.mark(stage: GenerationStartupBoundary.prewarmCompleted.telemetryStage)

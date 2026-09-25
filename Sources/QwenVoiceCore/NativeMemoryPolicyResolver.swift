@@ -1,5 +1,6 @@
 import Foundation
 import MLX
+import os
 @preconcurrency import VocelloQwen3Core
 
 public enum NativeMemoryPolicyResolver {
@@ -221,8 +222,64 @@ public enum NativeMemoryPolicyResolver {
         )
     }
 
+    /// Exact per-stage MLX peaks (audit #3 part 2), opt-in with
+    /// `QWENVOICE_MLX_STAGE_PEAKS=1`. MLX keeps one process-wide peak counter,
+    /// reset at each request's start, so a stage snapshot's `peakMB` is the
+    /// request's peak so far and a stage that set no new high has no peak of
+    /// its own. With the knob, each stage snapshot (`stageSnapshot()`) reads
+    /// the peak since the previous stage and resets the counter: the stage's
+    /// exact peak (`stagePeakMB`) is the largest of that peak, the active
+    /// memory at the previous reset and the active memory now, and `peakMB`
+    /// stays the request's running maximum. Off by default: a reset in the
+    /// middle of a request races the generation task's allocations for a few
+    /// microseconds, and the gate compares the per-request peak exactly (seeded
+    /// runs repeat it to the megabyte), so default evidence keeps MLX's own
+    /// uninterrupted counter.
+    public static let stagePeaksEnabled: Bool =
+        ProcessInfo.processInfo.environment["QWENVOICE_MLX_STAGE_PEAKS"] == "1"
+
+    private struct StagePeakState: Sendable {
+        var cumulativePeakBytes = 0
+        var activeAtResetBytes = 0
+    }
+
+    private static let stagePeakState = OSAllocatedUnfairLock(initialState: StagePeakState())
+
     public static func resetPeakMemory() {
-        Memory.peakMemory = 0
+        stagePeakState.withLock { state in
+            Memory.peakMemory = 0
+            state = StagePeakState(cumulativePeakBytes: 0, activeAtResetBytes: Memory.activeMemory)
+        }
+    }
+
+    /// The snapshot a generation stage records in `mlxMemoryByStage`: the
+    /// plain `snapshot()` unless `stagePeaksEnabled`.
+    public static func stageSnapshot() -> NativeMLXMemorySnapshot {
+        guard stagePeaksEnabled else { return snapshot() }
+        return stagePeakState.withLock { state in
+            let current = Memory.snapshot()
+            let stagePeak = Self.stagePeak(
+                peakSinceReset: current.peakMemory,
+                activeAtReset: state.activeAtResetBytes,
+                activeNow: current.activeMemory
+            )
+            state.cumulativePeakBytes = max(state.cumulativePeakBytes, stagePeak)
+            Memory.peakMemory = 0
+            state.activeAtResetBytes = Memory.activeMemory
+            return NativeMLXMemorySnapshot(
+                activeMB: bytesToMB(current.activeMemory),
+                cacheMB: bytesToMB(current.cacheMemory),
+                peakMB: bytesToMB(state.cumulativePeakBytes),
+                stagePeakMB: bytesToMB(stagePeak)
+            )
+        }
+    }
+
+    /// A stage's exact MLX peak: the counter's peak since the last reset can
+    /// read below memory that was already active at that reset (the setter
+    /// resets it to 0), so the active memory at the reset and now bound it.
+    static func stagePeak(peakSinceReset: Int, activeAtReset: Int, activeNow: Int) -> Int {
+        max(peakSinceReset, activeAtReset, activeNow)
     }
 
     private static func bytesToMB(_ bytes: Int) -> Double {

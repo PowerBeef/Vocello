@@ -233,7 +233,7 @@ older rows stay readable but are marked memory-contract-incomplete and excluded 
 | `outputMetrics` | `GenerationOutputMetrics?` | Duration, readable-WAV verdict, atomic-publication verdict, and audio QC. |
 | `timingsMS` / `counters` | compatibility maps | Generated compatibility output for existing summarizers and old rows; new validators consume typed payloads. |
 | `derivedMetrics` | `[String: Double]?` | Headline KPIs (see §7). Includes `kvCacheEstimatedPeakMB` (2026‑07‑01, audit P1‑2) — the peak of the per‑chunk KV‑cache footprint estimates, surfaced at row level so regression tooling doesn't walk the chunk timeline. |
-| `mlxMemoryByStage` | `[String: {activeMB, cacheMB, peakMB}]?` | MLX GPU memory at each stage (see §8). |
+| `mlxMemoryByStage` | `[String: {activeMB, cacheMB, peakMB, stagePeakMB?}]?` | MLX GPU memory at each stage (see §8); `stagePeakMB` only under `QWENVOICE_MLX_STAGE_PEAKS=1`. |
 | `chunkTimeline` | `[GenerationChunkTelemetry]?` | Per‑chunk decode substages, with `arrivalNS` (v5) and optional `mimiDecoderBreakdownMS` (v5) (see §6.3). |
 | `audioQC` | `AudioQCReport?` | Versioned reference‑free overall, model-instability, and written-output verdicts plus flags, defect offsets, and optional per‑chunk QC. Algorithm v6 (`makeAudioQCReport`) judges the atomically published WAV frames and, since 2026-09-12, also asserts the file's sample rate, channel count and frame count against the request. |
 | `summary` | `TelemetrySummary?` | Owning-process resident/physical-footprint/compressed/headroom/Metal start, end, delta, peak/min and aligned extrema snapshots; total RAM and implied process limit; independent memory/thread/headroom/Metal coverage; sampler cadence/boundaries; and process CPU/page-fault/context-switch/block-I/O deltas. `timeToPeakMS` tracks the physical-footprint peak. |
@@ -436,7 +436,12 @@ where time goes; use **Instruments signposts** (see [`benchmarking-procedure.md`
   (`before_stream`, `first_chunk`, `after_stream`, `after_final_write`,
   `after_generation_trim`, `before_marking`/`after_marking` when marking runs, plus
   prepare/clone/prewarm stages). `peak` is cumulative since the request began, so a stage raised
-  the request's high-water mark exactly when its peak exceeds the previous stage's. Both marking
+  the request's high-water mark exactly when its peak exceeds the previous stage's. With
+  `QWENVOICE_MLX_STAGE_PEAKS=1` (a bounded-observability knob, audit #3 part 2) each stage snapshot
+  also carries `stagePeakMB`, that stage's own exact peak: the snapshot reads MLX's peak counter and
+  resets it, bounded below by the memory active at the reset, while `peak` stays the running
+  request maximum. It is off by default because a mid-request reset races the generation's
+  allocations and the gate compares the per-request peak exactly. Both marking
   snapshots follow the cache release that precedes the marking pass, so the take's
   `mlxCachePeakMB` keeps excluding the end-of-generation cache. Shows GPU memory growth
   across the pipeline — key for restricted‑hardware tuning. Captured at boundaries only

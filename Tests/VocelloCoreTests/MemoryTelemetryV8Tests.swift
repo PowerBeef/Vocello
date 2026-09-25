@@ -320,6 +320,34 @@ final class MemoryTelemetryV8Tests: XCTestCase {
         XCTAssertEqual(exact, 0.96, accuracy: 1e-9)
     }
 
+    func testStagePeakCoversMemoryAlreadyActiveAtTheReset() throws {
+        // Audit #3 part 2: MLX's peak setter can only reset to 0, so a stage's
+        // exact peak is bounded below by the memory active at the reset and now.
+        XCTAssertEqual(
+            NativeMemoryPolicyResolver.stagePeak(peakSinceReset: 100, activeAtReset: 400, activeNow: 300),
+            400
+        )
+        XCTAssertEqual(
+            NativeMemoryPolicyResolver.stagePeak(peakSinceReset: 900, activeAtReset: 400, activeNow: 300),
+            900
+        )
+        XCTAssertEqual(
+            NativeMemoryPolicyResolver.stagePeak(peakSinceReset: 0, activeAtReset: 0, activeNow: 50),
+            50
+        )
+        // A stage snapshot written without the opt-in has no stage peak, and
+        // encodes without the key.
+        let legacyJSON = #"{"activeMB":1,"cacheMB":2,"peakMB":3}"#
+        let legacy = try JSONDecoder().decode(NativeMLXMemorySnapshot.self, from: Data(legacyJSON.utf8))
+        XCTAssertNil(legacy.stagePeakMB)
+        let encoded = String(decoding: try JSONEncoder().encode(legacy), as: UTF8.self)
+        XCTAssertFalse(encoded.contains("stagePeakMB"))
+        XCTAssertEqual(
+            try JSONDecoder().decode(NativeMLXMemorySnapshot.self, from: Data(encoded.utf8)),
+            legacy
+        )
+    }
+
     func testFloorTiersSampleAtTheSixteenGigabyteCadence() {
         // Audit #3 part 4: the time periodic ticks save buys the floor tiers
         // the 250 ms cadence.

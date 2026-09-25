@@ -242,7 +242,8 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # 2 (2026-09-25, audit #45/#56): the iPhone gate's generation step and the
     # memory-qualification wait no longer copy the whole diagnostics tree from
     # the phone every 10 s while the take runs; they poll only their markers.
-    # 3 (2026-09-25): the sampler change.
+    # 3 (2026-09-25): the sampler change, and iPhone evidence judged on the
+    # measured process budget instead of absolute bands (audit #68).
     ("engine-generation", "ios"): 3,
     ("memory-qualification", "ios"): 3,
     # 2 (2026-09-25, audit #89): the whisper recognition time excludes model

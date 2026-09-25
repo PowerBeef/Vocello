@@ -939,12 +939,18 @@ public struct AudioPreparationRequest: Hashable, Codable, Sendable {
 public struct NativeMLXMemorySnapshot: Hashable, Codable, Sendable {
     public let activeMB: Double?
     public let cacheMB: Double?
+    /// MLX's peak since the request began.
     public let peakMB: Double?
+    /// The exact MLX peak of the stage this snapshot closes, since the previous
+    /// stage snapshot; nil unless `QWENVOICE_MLX_STAGE_PEAKS=1`
+    /// (`NativeMemoryPolicyResolver.stageSnapshot()`, audit #3 part 2).
+    public let stagePeakMB: Double?
 
-    public init(activeMB: Double?, cacheMB: Double?, peakMB: Double?) {
+    public init(activeMB: Double?, cacheMB: Double?, peakMB: Double?, stagePeakMB: Double? = nil) {
         self.activeMB = activeMB
         self.cacheMB = cacheMB
         self.peakMB = peakMB
+        self.stagePeakMB = stagePeakMB
     }
 }
 

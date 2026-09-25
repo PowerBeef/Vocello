@@ -1527,7 +1527,7 @@ struct StreamingExecutionContext: Sendable {
         var modelOutcomeV9: ModelTerminalOutcomeV9?
         var audioChannelSummary: AudioChannelSummaryV9?
         var mlxMemorySnapshots = initialMLXMemorySnapshots
-        mlxMemorySnapshots["before_stream"] = NativeMemoryPolicyResolver.snapshot()
+        mlxMemorySnapshots["before_stream"] = NativeMemoryPolicyResolver.stageSnapshot()
         let streamingOutputPolicy = NativeStreamingOutputPolicy.current()
         let previewDataPolicy = NativeStreamingPreviewDataPolicy.current()
         let chunkWriter: PCM16ChunkFileWriter?
@@ -1602,7 +1602,7 @@ struct StreamingExecutionContext: Sendable {
                         await telemetryRecorder?.mark(
                             metadata: FirstChunkMetadata(chunkIndex: chunkIndex)
                         )
-                        mlxMemorySnapshots["first_chunk"] = NativeMemoryPolicyResolver.snapshot()
+                        mlxMemorySnapshots["first_chunk"] = NativeMemoryPolicyResolver.stageSnapshot()
                         await telemetrySampler?.captureBoundary("first_chunk")
                     }
 
@@ -1940,7 +1940,7 @@ struct StreamingExecutionContext: Sendable {
                 // Taken after the cache release, which moves neither peak nor
                 // active memory, so this stage never adds the end-of-generation
                 // cache to the take's typed `mlxCachePeakMB` maximum.
-                mlxMemorySnapshots["before_marking"] = NativeMemoryPolicyResolver.snapshot()
+                mlxMemorySnapshots["before_marking"] = NativeMemoryPolicyResolver.stageSnapshot()
                 do {
                     try AudioPublicationMarker.markStagedWAV(
                         at: stagingURL,
@@ -1950,7 +1950,7 @@ struct StreamingExecutionContext: Sendable {
                     throw Self.publicationMarkingError(error)
                 }
                 Memory.clearCache()
-                mlxMemorySnapshots["after_marking"] = NativeMemoryPolicyResolver.snapshot()
+                mlxMemorySnapshots["after_marking"] = NativeMemoryPolicyResolver.stageSnapshot()
                 await telemetrySampler?.captureBoundary("after_marking")
             }
             await telemetrySampler?.captureBoundary("before_audio_qc")
@@ -2028,11 +2028,11 @@ struct StreamingExecutionContext: Sendable {
         )
         signpostTimingsMS["native_final_wav_finish_ms"] = finalWAVFinishStartedAt.elapsedMilliseconds
         await telemetrySampler?.captureBoundary("after_final_wav")
-        mlxMemorySnapshots["after_final_write"] = NativeMemoryPolicyResolver.snapshot()
+        mlxMemorySnapshots["after_final_write"] = NativeMemoryPolicyResolver.stageSnapshot()
 
         let durationSeconds = Double(totalFramesWritten) / Double(sampleRate)
         await telemetryRecorder?.mark(stage: .streamCompleted)
-        mlxMemorySnapshots["after_stream"] = NativeMemoryPolicyResolver.snapshot()
+        mlxMemorySnapshots["after_stream"] = NativeMemoryPolicyResolver.stageSnapshot()
         let postRequestCacheClearApplied = memoryPolicy.clearCacheAfterGeneration
         if postRequestCacheClearApplied {
             await telemetrySampler?.captureBoundary("before_post_generation_trim")
@@ -2044,7 +2044,7 @@ struct StreamingExecutionContext: Sendable {
                 )
             )
             Memory.clearCache()
-            mlxMemorySnapshots["after_generation_trim"] = NativeMemoryPolicyResolver.snapshot()
+            mlxMemorySnapshots["after_generation_trim"] = NativeMemoryPolicyResolver.stageSnapshot()
             await telemetrySampler?.captureBoundary("post_generation_trim")
         } else {
             await telemetrySampler?.captureBoundary("post_generation")

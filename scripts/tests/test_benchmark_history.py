@@ -22,6 +22,9 @@ import publish_benchmark_history as publisher
 
 
 DIGEST = "d" * 64
+# Frozen copies of two published records (audit #94): a new publication or a
+# pruned record never changes a test input.
+FROZEN_RECORDS = Path(__file__).resolve().parent / "fixtures" / "benchmark-records"
 
 
 def generation_take(index: int = 1, *, length: str = "long", warning: bool = False) -> dict:
@@ -658,12 +661,10 @@ class BenchmarkHistoryTests(unittest.TestCase):
         return record
 
     def test_playback_capture_fields_are_v3_take_evidence(self) -> None:
-        # A tracked canonical macOS UI record is the fixture: the capture fields join
-        # its takes without disturbing the rest of the schema-v3 contract.
-        repo = Path(history.__file__).resolve().parents[1]
-        tracked = sorted((repo / "benchmarks" / "runs" / "ui-generation").glob("macos-xcui-benchmark-202609*.json"))
-        self.assertTrue(tracked, "a tracked schema-v3 macOS UI record is the fixture")
-        base = json.loads(tracked[-1].read_text())
+        # A frozen schema-v3 macOS UI record (macos-xcui-benchmark-20260916-014846)
+        # is the fixture: the capture fields join its takes without disturbing the
+        # rest of the schema-v3 contract.
+        base = json.loads((FROZEN_RECORDS / "macos-ui-generation-v3.json").read_text())
         self.assertEqual(base["schemaVersion"], 3)
 
         def with_capture(**overrides: object) -> dict:
@@ -1442,10 +1443,8 @@ class BenchmarkHistoryTests(unittest.TestCase):
         # (macos-xcui-perf-20260913-173142) was refused for a declaration it has
         # nothing to declare. A tracked ui-perf record moved past the cutover must
         # validate as it is, while an RTF-bearing kind keeps the requirement.
-        repo = Path(history.__file__).resolve().parents[1]  # the harness isolates RUNS_ROOT
-        tracked = sorted((repo / "benchmarks" / "runs" / "ui-perf").glob("*.json"))
-        self.assertTrue(tracked, "a tracked ui-perf record is the fixture")
-        record = json.loads(tracked[-1].read_text())
+        # The fixture is a frozen published ui-perf record (macos-xcui-perf-20260922-162034).
+        record = json.loads((FROZEN_RECORDS / "macos-ui-perf.json").read_text())
         self.assertNotIn("rtfDefinition", record["run"])
         record["run"]["finishedAt"] = "2026-09-20T12:01:00Z"
         record["digest"] = history.record_digest(record)

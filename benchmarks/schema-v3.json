@@ -256,7 +256,11 @@
               ]
             },
             "accuracyMetricVersion": {
-              "const": "normalized-edit-rate-v1"
+              "description": "normalized-edit-rate-v1 gates the plain word or character rate; segmentation-aware-edit-rate-v2 (records since 2026-09-25, audit #43) gates the word rate that does not charge word-boundary merges and splits.",
+              "enum": [
+                "normalized-edit-rate-v1",
+                "segmentation-aware-edit-rate-v2"
+              ]
             },
             "requiredPassCount": {
               "enum": [

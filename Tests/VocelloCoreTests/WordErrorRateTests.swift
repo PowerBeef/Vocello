@@ -68,6 +68,57 @@ final class WordErrorRateTests: XCTestCase {
         )
     }
 
+    /// WER v2 parity fixtures with `scripts/tests/test_language_metrics.py` (audit #43): a
+    /// merge, split or moved boundary of up to four words per side costs nothing; any other
+    /// edit keeps its plain cost.
+    func testSegmentationAwareWordMetricsCreditOnlyBoundaryEdits() {
+        let cases: [(String, String, Int, Int, Double)] = [
+            ("Er kommt vor Mittag an und bleibt bis zum Abend",
+             "Er kommt Vormittag an und bleibt biszum Abend", 0, 4, 0),
+            ("Das Donaudampfschiff fährt", "Das Donau dampf schiff fährt", 0, 3, 0),
+            ("ab c", "a bc", 0, 2, 0),
+            ("the quiet garden", "the quite garden", 1, 0, 1.0 / 3.0),
+            ("vor Mittag kommt er", "Vormittag kam er", 1, 2, 0.25),
+            ("a b c d e", "abcde", 5, 0, 1),
+            ("a b c d", "abcd", 0, 4, 0),
+            ("", "x", 1, 0, 1),
+            ("x", "", 1, 0, 1)
+        ]
+        for (reference, hypothesis, distance, credited, rate) in cases {
+            let metrics = VoiceClipTranscriber.segmentationAwareWordMetrics(
+                reference: reference,
+                hypothesis: hypothesis
+            )
+            XCTAssertEqual(metrics.editDistance, distance, "\(reference) / \(hypothesis)")
+            XCTAssertEqual(metrics.wordBoundaryOnlyEdits, credited, "\(reference) / \(hypothesis)")
+            XCTAssertEqual(metrics.errorRate, rate, accuracy: 1e-12, "\(reference) / \(hypothesis)")
+        }
+        XCTAssertEqual(VoiceClipTranscriber.wordBoundarySpanLimit, 4)
+    }
+
+    func testVerifierGatesTheSegmentationAwareRateAndKeepsTheV1Rate() throws {
+        let script = "Er kommt vor Mittag an und bleibt bis zum Abend"
+        let transcript = "Er kommt Vormittag an und bleibt biszum Abend"
+        let passes = (1 ... 3).map { pass(index: $0, transcript: transcript, localeIdentifier: "de-DE") }
+        let result = GenerationOutputVerifier.evaluate(
+            recognition: evidence(
+                authorization: .authorized,
+                consensus: .consistent,
+                repetitions: passes,
+                transcript: transcript,
+                expectedLanguage: .german
+            ),
+            expectedScript: script,
+            expectedLanguage: .german
+        )
+        XCTAssertEqual(result.accuracyMetricVersion, "segmentation-aware-edit-rate-v2")
+        XCTAssertEqual(try XCTUnwrap(result.wordErrorRate), 0.4, accuracy: 1e-12)
+        XCTAssertEqual(try XCTUnwrap(result.segmentationAwareWordErrorRate), 0, accuracy: 1e-12)
+        XCTAssertEqual(result.wordBoundaryOnlyEdits, 4)
+        XCTAssertEqual(try XCTUnwrap(result.accuracyValue), 0, accuracy: 1e-12)
+        XCTAssertEqual(result.accuracyPass, true)
+    }
+
     func testSingleSubstitution() {
         let metrics = VoiceClipTranscriber.wordErrorMetrics(
             reference: "one two three four",
@@ -361,10 +412,12 @@ final class WordErrorRateTests: XCTestCase {
         XCTAssertEqual(result.deletions, 0)
         XCTAssertEqual(result.detectedLanguage, Qwen3SupportedLanguage.auto.rawValue)
         XCTAssertEqual(result.accuracyPass, true)
-        XCTAssertEqual(result.accuracyMetricVersion, "normalized-edit-rate-v1")
+        XCTAssertEqual(result.accuracyMetricVersion, "segmentation-aware-edit-rate-v2")
         XCTAssertEqual(result.accuracyMetric, .wordErrorRate)
         XCTAssertEqual(result.accuracyThreshold, 0.30, accuracy: 0.001)
         XCTAssertEqual(try XCTUnwrap(result.accuracyValue), 0.25, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(result.segmentationAwareWordErrorRate), 0.25, accuracy: 0.001)
+        XCTAssertEqual(result.wordBoundaryOnlyEdits, 0)
         XCTAssertEqual(result.longestDeletionRun, 0)
         XCTAssertTrue(result.recognition.evidenceConsistency)
     }

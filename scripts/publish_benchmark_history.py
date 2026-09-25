@@ -62,6 +62,7 @@ from benchmark_memory import (  # noqa: E402
 )
 from language_bench_evidence import stable_default_seed  # noqa: E402
 from lib.language_metrics import (  # noqa: E402
+    ACCURACY_METRIC_VERSION,
     CHANNEL_CONSENSUS_ALGORITHM,
     DELETION_RUN_WARNING_LENGTH,
     LANGUAGE_CHECK_KINDS,
@@ -77,6 +78,7 @@ from lib.language_metrics import (  # noqa: E402
     is_sha256,
     locale_matches_expected_language,
     primary_accuracy_metric,
+    primary_accuracy_score,
     recognition_issues,
     recomputed_accuracy,
     run_channel_verdicts,
@@ -93,7 +95,9 @@ LANGUAGE_OUTPUT_ALGORITHM = "language-output-verifier-v3"
 ASR_EVIDENCE_SCHEMA = 2
 ASR_EVIDENCE_ALGORITHM = "apple-speech-file-consensus-v2"
 ASR_REQUIRED_PASS_COUNT = 3
-LANGUAGE_ACCURACY_METRIC_VERSION = "normalized-edit-rate-v1"
+# WER v2 (audit #43, 2026-09-25): new records gate the segmentation-aware word
+# rate and keep publishing the v1 rate beside it; lib.language_metrics owns it.
+LANGUAGE_ACCURACY_METRIC_VERSION = ACCURACY_METRIC_VERSION
 LANGUAGE_SEED_POLICY = "sha256-v1-mode-script-language-63bit"
 LANGUAGE_SAMPLING_VARIATION = "expressive"
 SAFE_LOCALE = re.compile(r"^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$")
@@ -2618,9 +2622,21 @@ def sanitized_asr_evidence(
     accuracy_threshold = finite_number(verification.get("accuracyThreshold"))
     accuracy_value = finite_number(verification.get("accuracyValue"))
     expected_threshold = MAX_ACCURACY_ERROR_RATE
-    primary_score = (
-        character_error_rate if expected_accuracy_metric == "characterErrorRate" else word_error_rate
+    # The gated score is recomputed under the current version (v2: the
+    # segmentation-aware word rate); the app must report the same value.
+    primary_score = primary_accuracy_score(
+        word_metrics, character_metrics, str(expected_language), version=LANGUAGE_ACCURACY_METRIC_VERSION,
     )
+    segmentation_aware = finite_number(verification.get("segmentationAwareWordErrorRate"))
+    if (
+        segmentation_aware is None
+        or not math.isclose(
+            segmentation_aware, float(word_metrics["segmentationAwareErrorRate"]),
+            rel_tol=1e-9, abs_tol=1e-12,
+        )
+        or verification.get("wordBoundaryOnlyEdits") != word_metrics["wordBoundaryOnlyEdits"]
+    ):
+        raise PublicationError(f"language cell {cell_id} segmentation-aware WER does not match its transcript")
     if (
         verification.get("accuracyMetricVersion") != LANGUAGE_ACCURACY_METRIC_VERSION
         or accuracy_metric != expected_accuracy_metric
@@ -2662,6 +2678,8 @@ def sanitized_asr_evidence(
         "accuracyMetricVersion": LANGUAGE_ACCURACY_METRIC_VERSION,
         "accuracyThreshold": expected_threshold,
         "primaryAccuracyScore": primary_score,
+        "segmentationAwareWordErrorRate": float(word_metrics["segmentationAwareErrorRate"]),
+        "wordBoundaryOnlyEdits": int(word_metrics["wordBoundaryOnlyEdits"]),
         **count_fields,
         **boolean_fields,
     }
@@ -2853,6 +2871,8 @@ def sanitized_independent_evidence(
         "detectedLanguage": str(recognition.get("detectedLanguage")),
         "languageMatchScore": language_score,
         "wordErrorRate": verdict["wordErrorRate"],
+        "segmentationAwareWordErrorRate": verdict["segmentationAwareWordErrorRate"],
+        "wordBoundaryOnlyEdits": int(verdict["wordBoundaryOnlyEdits"]),
         "characterErrorRate": verdict["characterErrorRate"],
         "accuracyMetric": verdict["accuracyMetric"],
         "accuracyThreshold": verdict["accuracyThreshold"],
@@ -3090,6 +3110,8 @@ def language_command(args: argparse.Namespace) -> Path:
                 "primaryAccuracyScore": evidence["primaryAccuracyScore"],
                 "accuracyThreshold": evidence["accuracyThreshold"],
                 "longestDeletionRun": float(evidence["longestDeletionRun"]),
+                "segmentationAwareWordErrorRate": evidence["segmentationAwareWordErrorRate"],
+                "wordBoundaryOnlyEdits": float(evidence["wordBoundaryOnlyEdits"]),
             })
             record_detected_language(take, "apple-speech", evidence.get("detectedLanguage"))
             flag_deletion_run(take, evidence["longestDeletionRun"], family="apple-speech",
@@ -3153,6 +3175,8 @@ def language_command(args: argparse.Namespace) -> Path:
                 "independentAccuracyPass": 1.0 if evidence["accuracyPass"] else 0.0,
                 "independentRecognitionDurationSeconds": evidence["recognitionDurationSeconds"],
                 "independentLongestDeletionRun": float(evidence["longestDeletionRun"]),
+                "independentSegmentationAwareWordErrorRate": evidence["segmentationAwareWordErrorRate"],
+                "independentWordBoundaryOnlyEdits": float(evidence["wordBoundaryOnlyEdits"]),
             })
             record_detected_language(take, "whisper", evidence.get("detectedLanguage"))
             if evidence.get("channelConsensus") is not None:

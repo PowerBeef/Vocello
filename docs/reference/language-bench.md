@@ -61,18 +61,36 @@ phone. Authorization denied, recognizer unavailable, missing on-device support, 
 error, inconsistent transcripts, or failed WER/CER are distinct machine failures; none is replaced
 with a fabricated score or a listening judgment.
 
-The versioned `normalized-edit-rate-v1` accuracy contract uses **WER ≤ 0.15** for languages with
-word boundaries and **CER ≤ 0.15** for Chinese and Japanese; both scores and both word/character
-edit-count decompositions remain evidence. The Python gate and history publisher independently
-recompute the metrics from the tracked corpus and untracked consensus transcript before accepting
-the Swift verdict.
+The versioned accuracy contract uses **WER ≤ 0.15** for languages with word boundaries and
+**CER ≤ 0.15** for Chinese and Japanese; both scores and both word/character edit-count
+decompositions remain evidence. The Python gate and history publisher independently recompute the
+metrics from the tracked corpus and untracked consensus transcript before accepting the Swift
+verdict.
+
+Since 2026-09-25 the contract is `segmentation-aware-edit-rate-v2` (audit #43; the maintainer
+delegated the decision to the audit's recommendation). The word gate no longer charges a
+recognizer's word-boundary choice as errors: the alignment may pair a block of one to four reference
+words with a block of one to four hypothesis words at no cost when both spell the same characters
+and one side holds two or more words (a merge such as "vor Mittag" heard as "Vormittag", a split, or
+a moved boundary). Every other edit keeps its v1 cost, and a merge of five or more words is charged
+as before. Takes publish `segmentationAwareWordErrorRate` and `wordBoundaryOnlyEdits` (the plain
+edits the v2 alignment credited) per family (`independent…` for whisper) beside the unchanged v1
+`wordErrorRate`, and `primaryAccuracyScore` is the v2 rate for word languages; the character rate is
+the same under both versions. Swift (`VoiceClipTranscriber.segmentationAwareWordMetrics`) and
+`scripts/lib/language_metrics.py` share the operation set and parity fixtures; the minimum is unique,
+so they agree exactly. Records published before carry `normalized-edit-rate-v1` and keep validating
+under it. Replayed offline over the 38 committed scored takes: the three German cells (WER 0.138,
+CER 0.0, 2 substitutions and 2 deletions, so two character-identical merges of at most four words)
+score 0.0 under v2; no passing take can change verdict because the v2 distance never exceeds the v1
+distance; the two macOS accuracy controls (WER 0.5625) need their transcripts, which are not
+committed, so the next lang-bench measures them under v2.
 
 Each family's alignment also yields `longestDeletionRun`, the longest run of consecutive reference
 units the recognizer deleted on the primary metric's units (a match, substitution or insertion ends
 a run; the Swift verifier and `scripts/lib/language_metrics.py` share the tie-broken path and parity
 fixtures). It is warn-only: a skipped phrase of two to four words stays under the 15 % gate on the
 corpus's 17-32-unit scripts, so a run of two or more on a take that must pass publishes the take with
-`language.deletion_run:<family>` and never changes a verdict or the `normalized-edit-rate-v1` contract.
+`language.deletion_run:<family>` and never changes a verdict or the accuracy contract.
 Published as `longestDeletionRun` (Apple Speech, recomputed and checked against the app's value) and
 `independentLongestDeletionRun` (whisper). Replayed over the committed records, no passing take can
 carry a run of two: the only takes with two deletions are the German cells, whose zero CER makes

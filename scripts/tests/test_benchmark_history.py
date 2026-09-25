@@ -1024,6 +1024,66 @@ class BenchmarkHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(history.HistoryError, "language accuracy gate metrics"):
             self.publish(out_of_range_score, "accuracy-out-of-range-score")
 
+    def test_wer_v2_records_gate_the_segmentation_aware_word_rate(self) -> None:
+        """Audit #43: a v2 record's word gate reads each family's segmentation-aware
+        rate, which must follow from the plain edits less the credited ones."""
+        valid = self._schema_v3_language_record("wer-v2-valid")
+        valid["evidence"]["languageVerification"] = {
+            **history.APPLE_SPEECH_VERIFICATION_IDENTITY,
+            "accuracyMetricVersion": "segmentation-aware-edit-rate-v2",
+            "families": ["apple-speech", "whisper"],
+            "independentRecognitionAlgorithm": "mlx-whisper-locked-decode-v1",
+            "independentModelIdentitySHA256": "2" * 64,
+        }
+        valid["takes"][0].update({"accuracyMetric": "wordErrorRate", "accuracyThreshold": 0.15})
+        # The audit's German take: two two-word merges, zero CER. v1 charges
+        # 4 of 29 words (0.138); v2 charges none.
+        valid["takes"][0]["metrics"].update({
+            "wordErrorRate": 4 / 29, "characterErrorRate": 0.0, "primaryAccuracyScore": 0.0,
+            "segmentationAwareWordErrorRate": 0.0, "wordBoundaryOnlyEdits": 4.0,
+            "accuracyThreshold": 0.15, "languageMatchScore": 0.9,
+            "outputLanguagePass": 1.0, "outputAccuracyPass": 1.0,
+            "referenceTokenCount": 29.0, "hypothesisTokenCount": 27.0,
+            "referenceCharacterCount": 140.0, "hypothesisCharacterCount": 140.0,
+            "substitutions": 2.0, "insertions": 0.0, "deletions": 2.0,
+            "characterSubstitutions": 0.0, "characterInsertions": 0.0, "characterDeletions": 0.0,
+            "recognitionPassCount": 3.0, "recognitionDurationSeconds": 0.3,
+            "independentWordErrorRate": 4 / 29, "independentCharacterErrorRate": 0.0,
+            "independentPrimaryAccuracyScore": 0.0, "independentLanguageMatchScore": 0.97,
+            "independentLanguagePass": 1.0, "independentAccuracyPass": 1.0,
+            "independentRecognitionDurationSeconds": 0.4,
+            "independentSegmentationAwareWordErrorRate": 0.0, "independentWordBoundaryOnlyEdits": 4.0,
+        })
+        self.publish(valid, "wer-v2-valid")
+
+        metrics = lambda record: record["takes"][0]["metrics"]  # noqa: E731
+        mutations = {
+            "a v2 record without the segmentation-aware rate": lambda record: metrics(record).pop(
+                "segmentationAwareWordErrorRate"),
+            "credited edits that do not match the rate": lambda record: metrics(record).__setitem__(
+                "wordBoundaryOnlyEdits", 3.0),
+            "a gated score that is the v1 rate": lambda record: metrics(record).__setitem__(
+                "primaryAccuracyScore", 4 / 29),
+            "a v2 rate above the v1 rate": lambda record: metrics(record).update({
+                "independentSegmentationAwareWordErrorRate": 0.2, "independentPrimaryAccuracyScore": 0.2,
+                "independentAccuracyPass": 0.0}),
+            "an unknown accuracy version": lambda record: record["evidence"]["languageVerification"].__setitem__(
+                "accuracyMetricVersion", "edit-rate-v9"),
+        }
+        for index, (label, mutate) in enumerate(mutations.items()):
+            record = copy.deepcopy(valid)
+            record["run"]["id"] = f"wer-v2-invalid-{index}"
+            mutate(record)
+            with self.subTest(label=label), self.assertRaises(history.HistoryError):
+                self.publish(record, f"wer-v2-invalid-{index}")
+
+        # The same take under v1 fails its gate: v1 charged every merge.
+        v1 = copy.deepcopy(valid)
+        v1["run"]["id"] = "wer-v1-merge"
+        v1["evidence"]["languageVerification"]["accuracyMetricVersion"] = "normalized-edit-rate-v1"
+        with self.assertRaises(history.HistoryError):
+            self.publish(v1, "wer-v1-merge")
+
     def test_schema_v2_language_requires_complete_memory_qualification(self) -> None:
         valid = record_fixture(run_id="language-memory-v2", kind="language")
         valid["schemaVersion"] = 2

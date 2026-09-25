@@ -60,7 +60,11 @@ enum GenerationOutputVerifier {
 
         static let currentSchemaVersion = 3
         static let currentAlgorithmVersion = "language-output-verifier-v3"
-        static let currentAccuracyMetricVersion = "normalized-edit-rate-v1"
+        /// WER v2 (audit #43, 2026-09-25): the word gate reads the segmentation-aware rate,
+        /// which does not charge a recognizer's word-boundary merges or splits. `wordErrorRate`
+        /// keeps the v1 rate; characters are unchanged. Mirrors `ACCURACY_METRIC_VERSION` in
+        /// `scripts/lib/language_metrics.py`.
+        static let currentAccuracyMetricVersion = "segmentation-aware-edit-rate-v2"
 
         var schemaVersion: Int
         var algorithmVersion: String
@@ -96,6 +100,10 @@ enum GenerationOutputVerifier {
         /// accuracy metric's units (words, or characters for Chinese and Japanese). Never part
         /// of `pass`. Added compatibly; earlier records decode with `nil`.
         var longestDeletionRun: Int?
+        /// WER v2: the segmentation-aware word rate the word gate reads, and the plain word
+        /// edits it no longer charges. Added compatibly; v1 records decode with `nil`.
+        var segmentationAwareWordErrorRate: Double?
+        var wordBoundaryOnlyEdits: Int?
     }
 
     static func verify(
@@ -241,8 +249,12 @@ enum GenerationOutputVerifier {
             hypothesis: transcript,
             expectedLanguage: expectedLanguage
         )
+        let segmentationAware = VoiceClipTranscriber.segmentationAwareWordMetrics(
+            reference: expectedScript,
+            hypothesis: transcript
+        )
         let accuracyValue = switch accuracyMetric {
-        case .wordErrorRate: wordMetrics.errorRate
+        case .wordErrorRate: segmentationAware.errorRate
         case .characterErrorRate: characterMetrics.errorRate
         }
         let accuracyPass = accuracyValue <= accuracyThreshold
@@ -280,7 +292,9 @@ enum GenerationOutputVerifier {
             pass: languagePass && accuracyPass,
             skipReason: nil,
             recognition: recognition,
-            longestDeletionRun: longestDeletionRun
+            longestDeletionRun: longestDeletionRun,
+            segmentationAwareWordErrorRate: segmentationAware.errorRate,
+            wordBoundaryOnlyEdits: segmentationAware.wordBoundaryOnlyEdits
         )
     }
 

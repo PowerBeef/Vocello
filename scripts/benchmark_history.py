@@ -47,6 +47,8 @@ from lib import bench_seed  # noqa: E402
 from lib import trace_cpu  # noqa: E402
 from lib import trace_intervals  # noqa: E402
 from lib.language_metrics import (  # noqa: E402
+    ACCURACY_METRIC_VERSION,
+    ACCURACY_METRIC_VERSIONS,
     CHANNEL_CONSENSUS_ALGORITHM,
     CHANNEL_STATUSES,
     LANGUAGE_CHANNELS,
@@ -296,6 +298,12 @@ LANGUAGE_VERIFICATION_IDENTITY_KEYS = {
     "recognitionAlgorithm", "accuracyMetricVersion", "requiredPassCount",
 }
 DELETION_RUN_METRIC_KEYS = ("longestDeletionRun", "independentLongestDeletionRun")
+# WER v2 (records since 2026-09-25, audit #43): each family's segmentation-aware
+# word rate and the word-boundary edits it credited; v2 records gate on it.
+SEGMENTATION_AWARE_METRIC_KEYS = {
+    "apple-speech": ("segmentationAwareWordErrorRate", "wordBoundaryOnlyEdits"),
+    "whisper": ("independentSegmentationAwareWordErrorRate", "independentWordBoundaryOnlyEdits"),
+}
 INDEPENDENT_CONFIDENCE_METRIC_KEYS = (
     "independentMaximumNoSpeechProbability", "independentMeanAverageLogProbability",
 )
@@ -530,6 +538,8 @@ METRIC_KEYS = {
     # #84). Warn-only: a run of two or more on a take that must pass carries
     # language.deletion_run:<family>.
     *DELETION_RUN_METRIC_KEYS,
+    # WER v2 per family (records since 2026-09-25, audit #43).
+    *(key for keys in SEGMENTATION_AWARE_METRIC_KEYS.values() for key in keys),
     "chunksForwarded", "transportChunkGaps", "transportDuplicateChunks", "transportOutOfOrderChunks",
     "minimumQueueDurationMS", "hintCellsPassed", "hintCellsExpected",
     "outputCellsPassed", "outputCellsExpected", "medianRTF", "medianTTFCMS",
@@ -2285,6 +2295,28 @@ def language_families(record: dict[str, Any]) -> list[str]:
     return list(families)
 
 
+def validate_segmentation_aware_metrics(
+    metrics: dict[str, Any], aware_key: str, boundary_key: str, *, plain_rate: float,
+    plain_edits: float | None = None, reference_count: Any = None,
+) -> None:
+    """One family's WER v2 decomposition (audit #43).
+
+    The segmentation-aware rate never exceeds the plain rate; the credited
+    boundary edits are a whole count; with the family's edit counts published,
+    the v2 rate is exactly the plain edits less the credited ones.
+    """
+    if aware_key not in metrics or boundary_key not in metrics:
+        raise HistoryError("segmentation-aware word metrics are incomplete")
+    aware, boundary = float(metrics[aware_key]), float(metrics[boundary_key])
+    if aware < 0 or aware > plain_rate + 1e-12 or boundary < 0 or not boundary.is_integer():
+        raise HistoryError("segmentation-aware word metrics are inconsistent")
+    if plain_edits is not None and isinstance(reference_count, (int, float)) and reference_count > 0:
+        if boundary > plain_edits or not math.isclose(
+            aware, (plain_edits - boundary) / float(reference_count), rel_tol=1e-9, abs_tol=1e-12,
+        ):
+            raise HistoryError("segmentation-aware word rate does not match its credited edits")
+
+
 def validate_channel_consensus(
     takes: list[dict[str, Any]],
     language_verification: dict[str, Any] | None,
@@ -3001,6 +3033,11 @@ def validate_record(
     seen_generations: set[str] = set()
     negative_control_count = 0
     declared_verification = record["evidence"].get("languageVerification")
+    # The gated word score under the record's accuracy metric version (v2:
+    # segmentation-aware, audit #43); v1 records keep the plain rate.
+    segmentation_aware = isinstance(declared_verification, dict) and (
+        declared_verification.get("accuracyMetricVersion") == ACCURACY_METRIC_VERSION
+    )
     # Records since 2026-09-25 declare the negative control an accuracy control
     # (audit #42): it must fail on accuracy; its language check is reported only.
     accuracy_control = isinstance(declared_verification, dict) and (
@@ -3157,6 +3194,13 @@ def validate_record(
                 )
             metric = take["accuracyMetric"]
             independent_score = metrics["independent" + metric[0].upper() + metric[1:]]
+            if segmentation_aware:
+                aware_key, boundary_key = SEGMENTATION_AWARE_METRIC_KEYS["whisper"]
+                validate_segmentation_aware_metrics(
+                    metrics, aware_key, boundary_key, plain_rate=float(metrics["independentWordErrorRate"]),
+                )
+                if metric == "wordErrorRate":
+                    independent_score = metrics[aware_key]
             independent_within = float(independent_score) <= float(take["accuracyThreshold"])
             if (
                 not math.isclose(
@@ -3192,6 +3236,15 @@ def validate_record(
                     "language accuracy metrics are incomplete: " + ", ".join(missing)
                 )
             selected_score = metrics[take["accuracyMetric"]]
+            if segmentation_aware:
+                aware_key, boundary_key = SEGMENTATION_AWARE_METRIC_KEYS["apple-speech"]
+                validate_segmentation_aware_metrics(
+                    metrics, aware_key, boundary_key, plain_rate=float(metrics["wordErrorRate"]),
+                    plain_edits=sum(metrics.get(key, -1) for key in ("substitutions", "insertions", "deletions")),
+                    reference_count=metrics.get("referenceTokenCount"),
+                )
+                if take["accuracyMetric"] == "wordErrorRate":
+                    selected_score = metrics[aware_key]
             if (
                 not math.isclose(float(take["accuracyThreshold"]), 0.15, rel_tol=0, abs_tol=1e-12)
                 or not math.isclose(
@@ -3280,10 +3333,15 @@ def validate_record(
             "evidence.languageVerification",
         )
     families = language_families(record)
-    expected_language_verification = (
+    expected_language_verification = dict(
         APPLE_SPEECH_VERIFICATION_IDENTITY if "apple-speech" in families
         else INDEPENDENT_VERIFICATION_IDENTITY
     )
+    if isinstance(language_verification, dict) and language_verification.get(
+        "accuracyMetricVersion"
+    ) in ACCURACY_METRIC_VERSIONS:
+        # v1 records keep their version; records since 2026-09-25 declare WER v2.
+        expected_language_verification["accuracyMetricVersion"] = language_verification["accuracyMetricVersion"]
     if accuracy_evidence_required and (
         run["kind"] != "language" or language_verification is None
         or {key: language_verification.get(key) for key in LANGUAGE_VERIFICATION_IDENTITY_KEYS}

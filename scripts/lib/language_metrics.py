@@ -24,7 +24,18 @@ import unicodedata
 
 MAX_ACCURACY_ERROR_RATE = 0.15
 MIN_LANGUAGE_MATCH_SCORE = 0.5
-ACCURACY_METRIC_VERSION = "normalized-edit-rate-v1"
+# WER v2 (audit #43; decided 2026-09-25 by the audit's recommendation): the
+# word gate reads the segmentation-aware rate, which does not charge a
+# recognizer's word-boundary choice ("vor Mittag" heard as "Vormittag") as
+# errors. The v1 rate stays published beside it; the character rate (Chinese
+# and Japanese) has no word boundaries and is the same under both versions.
+LEGACY_ACCURACY_METRIC_VERSION = "normalized-edit-rate-v1"
+ACCURACY_METRIC_VERSION = "segmentation-aware-edit-rate-v2"
+ACCURACY_METRIC_VERSIONS = (LEGACY_ACCURACY_METRIC_VERSION, ACCURACY_METRIC_VERSION)
+# The longest run of tokens on either side of one merge or split that v2
+# credits (a four-word compound and its spaced spelling). Swift mirrors it as
+# `VoiceClipTranscriber.wordBoundarySpanLimit`.
+WORD_BOUNDARY_SPAN_LIMIT = 4
 # Warn-only (audit #84): the longest run of consecutive reference units the
 # recognizer deleted, on the primary metric's units. A skipped phrase of two to
 # four words stays under the 15 % gate on 17-32-unit scripts; the run exposes
@@ -89,6 +100,23 @@ def locale_matches_expected_language(identifier: str, expected_language: str) ->
 
 def primary_accuracy_metric(expected_language: str) -> str:
     return "characterErrorRate" if expected_language in CHARACTER_ERROR_LANGUAGES else "wordErrorRate"
+
+
+def primary_accuracy_score(
+    word: dict[str, Any], character: dict[str, Any], expected_language: str,
+    *, version: str = ACCURACY_METRIC_VERSION,
+) -> float:
+    """The gated score under one accuracy metric version.
+
+    v1 gates the plain word or character rate; v2 gates the segmentation-aware
+    word rate (characters are unchanged). An unknown version fails closed."""
+    if version not in ACCURACY_METRIC_VERSIONS:
+        raise ValueError(f"unknown accuracy metric version {version!r}")
+    if primary_accuracy_metric(expected_language) == "characterErrorRate":
+        return float(character["errorRate"])
+    if version == ACCURACY_METRIC_VERSION:
+        return float(word["segmentationAwareErrorRate"])
+    return float(word["errorRate"])
 
 
 def normalized_word_tokens(text: str, *, preserve_diacritics: bool = False) -> list[str]:
@@ -162,11 +190,74 @@ def edit_metrics(reference: list[Any], hypothesis: list[Any]) -> dict[str, int |
     }
 
 
+def segmentation_aware_distance(reference: list[str], hypothesis: list[str]) -> int:
+    """Word edit distance that does not charge word-boundary placement (WER v2).
+
+    Levenshtein over the tokens plus one more operation at no cost: a block of
+    one to WORD_BOUNDARY_SPAN_LIMIT reference tokens aligns with a block of one
+    to WORD_BOUNDARY_SPAN_LIMIT hypothesis tokens when both spell the same
+    characters and one side has two or more tokens (a merge, a split or a moved
+    boundary). The minimum is unique, so the Swift mirror needs only the same
+    operation set, not the same traversal, to agree exactly.
+    """
+    if not reference:
+        return len(hypothesis)
+    if not hypothesis:
+        return len(reference)
+    # Every hypothesis block, by spelling: the block ending at `end` of `length` tokens.
+    blocks: dict[str, list[tuple[int, int]]] = {}
+    for end in range(1, len(hypothesis) + 1):
+        spelling = ""
+        for length in range(1, min(WORD_BOUNDARY_SPAN_LIMIT, end) + 1):
+            spelling = hypothesis[end - length] + spelling
+            blocks.setdefault(spelling, []).append((end, length))
+    table = [list(range(len(hypothesis) + 1))]
+    for row in range(1, len(reference) + 1):
+        credited = [math.inf] * (len(hypothesis) + 1)
+        spelling = ""
+        for length in range(1, min(WORD_BOUNDARY_SPAN_LIMIT, row) + 1):
+            spelling = reference[row - length] + spelling
+            for end, hypothesis_length in blocks.get(spelling, ()):
+                if length == 1 and hypothesis_length == 1:
+                    continue
+                credited[end] = min(credited[end], table[row - length][end - hypothesis_length])
+        current = [row]
+        previous = table[row - 1]
+        for column in range(1, len(hypothesis) + 1):
+            current.append(int(min(
+                previous[column - 1] + (reference[row - 1] != hypothesis[column - 1]),
+                previous[column] + 1,
+                current[column - 1] + 1,
+                credited[column],
+            )))
+        table.append(current)
+    return table[-1][-1]
+
+
+def segmentation_aware_metrics(reference: list[str], hypothesis: list[str]) -> dict[str, int | float]:
+    """The WER v2 decomposition: v2 distance, its rate and the credited boundary edits."""
+    legacy = edit_metrics(reference, hypothesis)
+    distance = segmentation_aware_distance(reference, hypothesis)
+    legacy_distance = int(legacy["substitutions"]) + int(legacy["insertions"]) + int(legacy["deletions"])
+    rate = (distance / len(reference)) if reference else (0.0 if not hypothesis else 1.0)
+    return {
+        "segmentationAwareEditDistance": distance,
+        "segmentationAwareErrorRate": rate,
+        "wordBoundaryOnlyEdits": legacy_distance - distance,
+    }
+
+
 def recomputed_accuracy(
     reference: str, hypothesis: str, expected_language: str,
 ) -> tuple[dict[str, int | float], dict[str, int | float]]:
-    """Word and character metrics of one transcript against its script."""
-    word = edit_metrics(normalized_word_tokens(reference), normalized_word_tokens(hypothesis))
+    """Word and character metrics of one transcript against its script.
+
+    The word metrics also carry the WER v2 decomposition
+    (`segmentationAwareErrorRate`, `wordBoundaryOnlyEdits`)."""
+    reference_words = normalized_word_tokens(reference)
+    hypothesis_words = normalized_word_tokens(hypothesis)
+    word = edit_metrics(reference_words, hypothesis_words)
+    word.update(segmentation_aware_metrics(reference_words, hypothesis_words))
     preserve = expected_language in CHARACTER_ERROR_LANGUAGES
     reference_characters = "".join(normalized_word_tokens(reference, preserve_diacritics=preserve))
     hypothesis_characters = "".join(normalized_word_tokens(hypothesis, preserve_diacritics=preserve))
@@ -243,11 +334,14 @@ def recognition_issues(
     return issues
 
 
-def score_recognition(recognition: dict[str, Any], *, script: str, language: str) -> dict[str, Any]:
+def score_recognition(
+    recognition: dict[str, Any], *, script: str, language: str,
+    accuracy_metric_version: str = ACCURACY_METRIC_VERSION,
+) -> dict[str, Any]:
     """Recompute the verdict of one qualified recognition from its transcript."""
     word, character = recomputed_accuracy(script, str(recognition.get("transcript", "")), language)
     metric = primary_accuracy_metric(language)
-    score = (character if metric == "characterErrorRate" else word)["errorRate"]
+    score = primary_accuracy_score(word, character, language, version=accuracy_metric_version)
     language_pass = recognition.get("detectedLanguage") == language
     accuracy_pass = score <= MAX_ACCURACY_ERROR_RATE
     deletion_run = (character if metric == "characterErrorRate" else word)["longestDeletionRun"]
@@ -255,9 +349,12 @@ def score_recognition(recognition: dict[str, Any], *, script: str, language: str
         "modelFamily": recognition.get("modelFamily"),
         "metric": "CER" if metric == "characterErrorRate" else "WER",
         "accuracyMetric": metric,
+        "accuracyMetricVersion": accuracy_metric_version,
         "accuracyThreshold": MAX_ACCURACY_ERROR_RATE,
         "errorRate": score,
         "wordErrorRate": word["errorRate"],
+        "segmentationAwareWordErrorRate": word["segmentationAwareErrorRate"],
+        "wordBoundaryOnlyEdits": word["wordBoundaryOnlyEdits"],
         "characterErrorRate": character["errorRate"],
         "word": word,
         "character": character,

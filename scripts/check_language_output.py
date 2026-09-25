@@ -37,12 +37,15 @@ from language_bench_evidence import (
 
 from lib.audio_qc import finite_number as audio_qc_finite_number  # noqa: E402
 from lib.language_metrics import (  # noqa: E402
+    ACCURACY_METRIC_VERSION,
+    ACCURACY_METRIC_VERSIONS,
     MAX_ACCURACY_ERROR_RATE,
     MIN_LANGUAGE_MATCH_SCORE,
     edge_allowance_seconds,
     edit_metrics,
     locale_matches_expected_language,
     normalized_word_tokens,
+    primary_accuracy_score,
     recomputed_accuracy,
 )
 
@@ -344,7 +347,24 @@ def validate_structured_verification(
             "characterErrorRate" if expected_language in {"chinese", "japanese"}
             else "wordErrorRate"
         )
-        expected_score = cer if expected_metric == "characterErrorRate" else wer
+        # The declared accuracy metric version picks the gated score: v1 the
+        # plain rate, v2 (audit #43) the segmentation-aware word rate. Either
+        # is recomputed here from the consensus transcript.
+        version = verification.get("accuracyMetricVersion")
+        expected_score = (
+            primary_accuracy_score(
+                recomputed_word, recomputed_character, expected_language, version=version,
+            )
+            if version in ACCURACY_METRIC_VERSIONS else None
+        )
+        if version == ACCURACY_METRIC_VERSION:
+            aware = finite_number(verification.get("segmentationAwareWordErrorRate"))
+            if aware is None or not math.isclose(
+                aware, float(recomputed_word["segmentationAwareErrorRate"]), rel_tol=1e-9, abs_tol=1e-12,
+            ):
+                failures.append(f"{identity}: segmentation-aware WER does not match the consensus transcript")
+            if verification.get("wordBoundaryOnlyEdits") != recomputed_word["wordBoundaryOnlyEdits"]:
+                failures.append(f"{identity}: wordBoundaryOnlyEdits does not match the consensus transcript")
         # Warn-only deletion run (audit #84): the app's value, when it reports
         # one, must be the Python mirror's on the same primary units.
         expected_run = (
@@ -353,7 +373,7 @@ def validate_structured_verification(
         reported_run = verification.get("longestDeletionRun")
         if reported_run is not None and reported_run != expected_run:
             failures.append(f"{identity}: longestDeletionRun does not match the consensus transcript")
-        if verification.get("accuracyMetricVersion") != "normalized-edit-rate-v1":
+        if version not in ACCURACY_METRIC_VERSIONS:
             failures.append(f"{identity}: wrong accuracy metric version")
         if verification.get("accuracyMetric") != expected_metric:
             failures.append(f"{identity}: wrong primary accuracy metric")

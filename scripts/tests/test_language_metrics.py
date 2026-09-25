@@ -82,7 +82,76 @@ class TokenizerAndEditDistanceTests(unittest.TestCase):
     def test_thresholds_are_the_product_gate(self) -> None:
         self.assertEqual(metrics.MAX_ACCURACY_ERROR_RATE, 0.15)
         self.assertEqual(metrics.MIN_LANGUAGE_MATCH_SCORE, 0.5)
-        self.assertEqual(metrics.ACCURACY_METRIC_VERSION, "normalized-edit-rate-v1")
+        self.assertEqual(metrics.ACCURACY_METRIC_VERSION, "segmentation-aware-edit-rate-v2")
+        self.assertEqual(metrics.LEGACY_ACCURACY_METRIC_VERSION, "normalized-edit-rate-v1")
+
+
+class SegmentationAwareWERTests(unittest.TestCase):
+    """WER v2 (audit #43): a word-boundary merge, split or moved boundary of up to
+    four words per side is not an error. Parity fixtures mirror
+    `testSegmentationAwareWordMetricsCreditOnlyBoundaryEdits` in Swift."""
+
+    CASES = (
+        ("Er kommt vor Mittag an und bleibt bis zum Abend",
+         "Er kommt Vormittag an und bleibt biszum Abend", 0, 4, 0.0),
+        ("Das Donaudampfschiff fährt", "Das Donau dampf schiff fährt", 0, 3, 0.0),
+        ("ab c", "a bc", 0, 2, 0.0),
+        ("the quiet garden", "the quite garden", 1, 0, 1 / 3),
+        ("vor Mittag kommt er", "Vormittag kam er", 1, 2, 0.25),
+        ("a b c d e", "abcde", 5, 0, 1.0),
+        ("a b c d", "abcd", 0, 4, 0.0),
+        ("", "x", 1, 0, 1.0),
+        ("x", "", 1, 0, 1.0),
+    )
+
+    def test_parity_fixtures_with_the_swift_verifier(self) -> None:
+        for reference, hypothesis, distance, credited, rate in self.CASES:
+            with self.subTest(reference=reference, hypothesis=hypothesis):
+                result = metrics.segmentation_aware_metrics(
+                    metrics.normalized_word_tokens(reference), metrics.normalized_word_tokens(hypothesis),
+                )
+                self.assertEqual(result["segmentationAwareEditDistance"], distance)
+                self.assertEqual(result["wordBoundaryOnlyEdits"], credited)
+                self.assertAlmostEqual(result["segmentationAwareErrorRate"], rate)
+        self.assertEqual(metrics.WORD_BOUNDARY_SPAN_LIMIT, 4)
+
+    def test_the_audits_german_take_no_longer_spends_the_budget(self) -> None:
+        # CER zero: every word error is a two-word merge. v1 charges four edits
+        # (0.4 here); v2 charges none, and the v1 rate stays published.
+        entry = recognition(script=self.CASES[0][0], transcript=self.CASES[0][1], language="german")
+        v2 = metrics.score_recognition(entry, script=self.CASES[0][0], language="german")
+        self.assertEqual(v2["accuracyMetricVersion"], "segmentation-aware-edit-rate-v2")
+        self.assertAlmostEqual(v2["wordErrorRate"], 0.4)
+        self.assertEqual(v2["segmentationAwareWordErrorRate"], 0.0)
+        self.assertEqual(v2["wordBoundaryOnlyEdits"], 4)
+        self.assertEqual(v2["errorRate"], 0.0)
+        self.assertTrue(v2["accuracyPass"])
+        v1 = metrics.score_recognition(entry, script=self.CASES[0][0], language="german",
+                                       accuracy_metric_version="normalized-edit-rate-v1")
+        self.assertAlmostEqual(v1["errorRate"], 0.4)
+        self.assertFalse(v1["accuracyPass"])
+
+    def test_characters_and_unknown_versions(self) -> None:
+        word, character = metrics.recomputed_accuracy("今天天气很好", "今天天气很好", "chinese")
+        for version in metrics.ACCURACY_METRIC_VERSIONS:
+            self.assertEqual(metrics.primary_accuracy_score(word, character, "chinese", version=version), 0.0)
+        with self.assertRaises(ValueError):
+            metrics.primary_accuracy_score(word, character, "chinese", version="edit-rate-v9")
+
+    def test_the_segmentation_aware_rate_never_exceeds_the_plain_rate(self) -> None:
+        import random
+        generator = random.Random(20260925)
+        vocabulary = ["a", "b", "ab", "ba", "c", "abc", "bc"]
+        for _ in range(300):
+            reference = [generator.choice(vocabulary) for _ in range(generator.randint(0, 7))]
+            hypothesis = [generator.choice(vocabulary) for _ in range(generator.randint(0, 7))]
+            plain = metrics.edit_metrics(reference, hypothesis)
+            aware = metrics.segmentation_aware_metrics(reference, hypothesis)
+            plain_distance = plain["substitutions"] + plain["insertions"] + plain["deletions"]
+            self.assertLessEqual(aware["segmentationAwareEditDistance"], plain_distance)
+            self.assertEqual(aware["wordBoundaryOnlyEdits"], plain_distance - aware["segmentationAwareEditDistance"])
+            if "".join(reference) == "".join(hypothesis) and max(len(reference), len(hypothesis)) <= 4:
+                self.assertEqual(aware["segmentationAwareEditDistance"], 0)
 
 
 class EdgeCoverageTests(unittest.TestCase):

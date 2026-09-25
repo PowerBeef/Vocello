@@ -156,6 +156,21 @@ enum VoiceClipTranscriber {
         var editDistance: Int { substitutions + insertions + deletions }
     }
 
+    /// WER v2 (audit #43): the word edit distance that does not charge a recognizer's
+    /// word-boundary choice ("vor Mittag" heard as "Vormittag"). The Python mirror is
+    /// `segmentation_aware_metrics` in `scripts/lib/language_metrics.py`.
+    struct SegmentationAwareMetrics: Codable, Sendable, Equatable {
+        var referenceCount: Int
+        var editDistance: Int
+        /// Plain word edits the segmentation-aware alignment no longer charges.
+        var wordBoundaryOnlyEdits: Int
+        var errorRate: Double
+    }
+
+    /// The longest run of tokens on either side of one merge or split that WER v2 credits.
+    /// Mirrors `WORD_BOUNDARY_SPAN_LIMIT` in `scripts/lib/language_metrics.py`.
+    static let wordBoundarySpanLimit = 4
+
     struct LocaleCapability: Sendable, Equatable {
         var identifier: String
         var language: Qwen3SupportedLanguage
@@ -661,6 +676,32 @@ enum VoiceClipTranscriber {
         wordErrorMetrics(reference: reference, hypothesis: hypothesis).errorRate
     }
 
+    /// WER v2: the plain word alignment plus one free operation, a block of one to
+    /// `wordBoundarySpanLimit` reference words aligned with a block of one to
+    /// `wordBoundarySpanLimit` hypothesis words that spell the same characters, one side
+    /// holding two or more words (a merge, a split or a moved boundary).
+    static func segmentationAwareWordMetrics(
+        reference: String,
+        hypothesis: String
+    ) -> SegmentationAwareMetrics {
+        let lhs = normalizedWordTokens(reference)
+        let rhs = normalizedWordTokens(hypothesis)
+        let plainDistance = editMetrics(lhs: lhs, rhs: rhs).editDistance
+        let distance = segmentationAwareDistance(lhs: lhs, rhs: rhs)
+        let rate: Double
+        if lhs.isEmpty {
+            rate = rhs.isEmpty ? 0 : 1
+        } else {
+            rate = Double(distance) / Double(lhs.count)
+        }
+        return SegmentationAwareMetrics(
+            referenceCount: lhs.count,
+            editDistance: distance,
+            wordBoundaryOnlyEdits: plainDistance - distance,
+            errorRate: rate
+        )
+    }
+
     /// Pure deterministic selection seam used by tests. Availability is preferred before the user's
     /// language-region rank; identifier is the final stable tie-breaker.
     static func selectedCapabilities(
@@ -830,6 +871,49 @@ enum VoiceClipTranscriber {
             errorRate: rate,
             longestDeletionRun: final.longestDeletionRun
         )
+    }
+
+    /// The minimum edit distance under the WER v2 operation set. The minimum is unique, so
+    /// the Python mirror agrees exactly although it walks the table the same way only by
+    /// convention.
+    private static func segmentationAwareDistance(lhs: [String], rhs: [String]) -> Int {
+        if lhs.isEmpty { return rhs.count }
+        if rhs.isEmpty { return lhs.count }
+        let limit = wordBoundarySpanLimit
+        // Every hypothesis block by spelling: the block ending at `end` holding `length` words.
+        var hypothesisBlocks: [String: [(end: Int, length: Int)]] = [:]
+        for end in 1 ... rhs.count {
+            var spelling = ""
+            for length in 1 ... min(limit, end) {
+                spelling = rhs[end - length] + spelling
+                hypothesisBlocks[spelling, default: []].append((end: end, length: length))
+            }
+        }
+        var table: [[Int]] = [Array(0 ... rhs.count)]
+        table.reserveCapacity(lhs.count + 1)
+        for row in 1 ... lhs.count {
+            var credited = [Int](repeating: Int.max, count: rhs.count + 1)
+            var spelling = ""
+            for length in 1 ... min(limit, row) {
+                spelling = lhs[row - length] + spelling
+                guard let blocks = hypothesisBlocks[spelling] else { continue }
+                for block in blocks where !(length == 1 && block.length == 1) {
+                    credited[block.end] = min(
+                        credited[block.end],
+                        table[row - length][block.end - block.length]
+                    )
+                }
+            }
+            let previous = table[row - 1]
+            var current = [row]
+            current.reserveCapacity(rhs.count + 1)
+            for column in 1 ... rhs.count {
+                let diagonal = previous[column - 1] + (lhs[row - 1] == rhs[column - 1] ? 0 : 1)
+                current.append(min(diagonal, previous[column] + 1, current[column - 1] + 1, credited[column]))
+            }
+            table.append(current)
+        }
+        return table[lhs.count][rhs.count]
     }
 
     /// One deterministic, available, on-device-capable locale per Qwen language.

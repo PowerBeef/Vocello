@@ -252,6 +252,37 @@ class CheckLanguageOutputTests(unittest.TestCase):
             skipped = subprocess.run(command, capture_output=True, text=True, check=False)
             self.assertNotEqual(skipped.returncode, 0)
 
+    def test_wer_v2_does_not_charge_word_boundary_merges(self) -> None:
+        """Audit #43: a v2 verification gates the segmentation-aware word rate,
+        recomputed here; a v1 verification keeps gating the plain rate."""
+        script = "Er kommt vor Mittag an und bleibt bis zum Abend"
+        merged = "Er kommt Vormittag an und bleibt biszum Abend"
+        v1 = verification("german", script=script, transcript_override=merged)
+        v1.update({"accuracyValue": 0.4, "accuracyPass": False, "pass": False})
+        self.assertIn(
+            "german: structured output verdict is not true",
+            validate_structured_verification(v1, "german", script, "german"),
+        )
+        v2 = dict(v1)
+        v2.update({
+            "accuracyMetricVersion": "segmentation-aware-edit-rate-v2",
+            "accuracyValue": 0.0, "segmentationAwareWordErrorRate": 0.0, "wordBoundaryOnlyEdits": 4,
+            "accuracyPass": True, "pass": True,
+        })
+        self.assertEqual(validate_structured_verification(v2, "german", script, "german"), [])
+        self.assertAlmostEqual(v2["wordErrorRate"], 0.4)
+        for key, value, message in (
+            ("wordBoundaryOnlyEdits", 3, "wordBoundaryOnlyEdits does not match"),
+            ("segmentationAwareWordErrorRate", 0.1, "segmentation-aware WER does not match"),
+            ("accuracyValue", 0.4, "accuracyValue does not match the primary metric"),
+        ):
+            tampered = dict(v2, **{key: value})
+            with self.subTest(key=key):
+                self.assertTrue(any(
+                    message in failure
+                    for failure in validate_structured_verification(tampered, "german", script, "german")
+                ))
+
     def test_negative_control_is_an_accuracy_control(self) -> None:
         """Audit #42: the control must fail on accuracy; a control that fails
         only its (locked, near-unfalsifiable) language check is not confirmed,

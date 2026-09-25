@@ -186,7 +186,11 @@ One JSON object per line. The field-reading order is in [§10](#10-reading-telem
 **Bounded by design.** These are append‑only but **size‑capped + auto‑pruned** (oldest‑first) by
 `GenerationTelemetryJSONLSink`, so logs can't blow out disk: each `generations.jsonl` (incl. the merged
 file) is front‑trimmed past ~8 MB (`QWENVOICE_DIAGNOSTICS_MAX_MB` scales it), and verbose
-`samples-*.jsonl` sidecars are retained newest‑48 / ≤64 MB. No manual clearing needed for logs.
+`samples-*.jsonl` sidecars keep only the newest files. Ad‑hoc diagnostics keep the newest 48 / ≤64 MiB;
+`vocello bench --telemetry verbose` sizes the budget to its own plan instead (one sidecar per planned
+generation, the same per‑sidecar byte allowance) and refuses a plan above 256 generations
+(`GenerationTelemetrySidecarBudget`; see [`benchmarking-procedure.md`](benchmarking-procedure.md#9-artifact-map)).
+No manual clearing needed for logs.
 
 ---
 

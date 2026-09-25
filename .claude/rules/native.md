@@ -177,6 +177,10 @@ requested.
 - Relying on a class-level `@MainActor` to isolate XCTest `setUp`/`tearDown`; the pinned CI Xcode does
   not, so hop with `await MainActor.run`. CI compile failures are in the run's
   `macos-deterministic-test-artifacts` artifact, not the job log.
+- Trusting the local Xcode 27 compile for what CI's pinned Xcode 26.6 accepts: 26.6 flags a
+  `withUnsafeContinuation` over `Never` as "will never be executed" (loop on `Task.sleep` instead), and
+  its region-isolation checker rejects a throwing `Task { … }` returning a value (return
+  `(any Error)?` from a non-throwing task, as the runtime tests do).
 - AppKit/SwiftUI traps: an `NSScrollView` representable without `sizeThatFits` (it must answer an
   infinite proposal); two same-named files in one target (they collide on `.stringsdata`, which is why
   the macOS `AppPaths.swift`/`AppDefaults` cannot join `VocelloCoreTests`, which compiles the iOS copy);

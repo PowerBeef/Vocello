@@ -357,23 +357,30 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
 
     func testCancelledRequestStopsWithCancellation() async throws {
         let model = try Self.makeModel()
-        let task = Task {
-            try await model.generateVoiceDesign(
-                text: "Hello there, tiny talker.",
-                language: "auto",
-                voiceDescription: "A calm narrator.",
-                generationParameters: model.defaultGenerationParameters,
-                samplingPolicy: Self.samplingPolicy(seed: 0x5EED_0005, maximumCodecTokens: 64),
-                memoryPolicy: .compatibilityDefault
-            )
+        let policy = Self.samplingPolicy(seed: 0x5EED_0005, maximumCodecTokens: 64)
+        // A non-throwing task that hands back its error: the shape the pinned
+        // CI compiler's region-isolation checker accepts (a throwing task
+        // returning the completion is rejected there).
+        let task = Task { () -> (any Error)? in
+            do {
+                _ = try await model.generateVoiceDesign(
+                    text: "Hello there, tiny talker.",
+                    language: "auto",
+                    voiceDescription: "A calm narrator.",
+                    generationParameters: model.defaultGenerationParameters,
+                    samplingPolicy: policy,
+                    memoryPolicy: .compatibilityDefault
+                )
+                return nil
+            } catch {
+                return error
+            }
         }
         task.cancel()
-        do {
-            _ = try await task.value
-            XCTFail("A cancelled request must not complete")
-        } catch is CancellationError {
-            // Cancellation is typed, never a generation failure.
-        }
+        let error = await task.value
+        // Cancellation is typed, never a generation failure, and a cancelled
+        // request never completes.
+        XCTAssertTrue(error is CancellationError, "Expected CancellationError, got \(String(describing: error))")
 
         // The generation gate was released: the next request runs.
         let take = try await generate(model, seed: 0x5EED_0006, maximumCodecTokens: 3)

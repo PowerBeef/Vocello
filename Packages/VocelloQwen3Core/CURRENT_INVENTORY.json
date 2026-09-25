@@ -238,7 +238,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift",
-      "sha256": "513e1065e2734d26fd41a9f370c1b17b187c4e52a1c3ad8704f17b55240992d2",
+      "sha256": "a7538cc66656cb60a14c41d0f5c3111ce6d9231ad658d7fc13ba9ef3c8fa20a1",
       "upstreamStatus": "added"
     },
     {

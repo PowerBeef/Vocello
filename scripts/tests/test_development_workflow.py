@@ -107,6 +107,13 @@ class CheckPlanTests(unittest.TestCase):
         for forbidden in ("test-without-building", "ui_test.sh", "Simulator", "xcodebuild test"):
             self.assertNotIn(forbidden, code, f"{forbidden!r} must not be invoked here")
 
+    def test_lineage_path_changes_are_named_unless_the_identity_changes_too(self) -> None:
+        """A harness change on a kind's path list is only separated by a reviewed version bump."""
+        driver = "Tests/VocelloMacUITests/VocelloMacBenchmarkUITests.swift"
+        self.assertEqual(MODULE.check_plan([driver, "README.md"])["lineageReviewPaths"], [driver])
+        self.assertEqual(MODULE.check_plan([driver, MODULE.LINEAGE_IDENTITY])["lineageReviewPaths"], [])
+        self.assertEqual(MODULE.check_plan(["Sources/Views/SidebarView.swift"])["lineageReviewPaths"], [])
+
     def test_check_never_schedules_ui_device_or_release_lanes(self) -> None:
         plan = MODULE.check_plan(["Sources/iOS/A.swift", "scripts/ui_test.sh", "scripts/release.sh", "website/x.ts"])
         for command in commands(plan):

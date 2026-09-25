@@ -692,7 +692,8 @@ enforces equivalence and selects the nearest earlier compatible clean run; new r
 their kind measures (`scripts/lib/lineage_identity.py`, see benchmarking-procedure.md), legacy
 records keep their stored keys byte for byte. The HISTORY trend takes the median per-cell delta over
 cells with at least three takes and reads "within noise" below max(5%, 3 × the median absolute
-deviation of the cell deltas); UI records trend on the app's submit→first-chunk span. A performance
+deviation of the cell deltas), or "not trended" when only smaller cells carry a delta; UI records
+trend on the app's submit→first-chunk span. A performance
 delta does not automatically fail a benchmark whose own correctness gates passed.
 
 ### Guarding output quality

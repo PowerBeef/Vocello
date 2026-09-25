@@ -20,10 +20,11 @@ The two lineages never share a comparison key.
 A **trend** compares a record with the nearest earlier record of its comparison key: each term
 is the median of the per-cell median deltas over cells with at least three takes, and reads
 "within noise" unless it exceeds max(5%, 3 × the median absolute deviation of those cell
-deltas); otherwise its direction is given in words. TTFC is the engine's first-chunk latency,
-or the app's submit→first-chunk span for UI records. Records keyed by a lineage contract
-(`inputs.lineageContractVersion`) note "harness changed" when their harness files differ
-from the baseline's.
+deltas); otherwise its direction is given in words. When only cells with fewer than three
+takes carry a delta, the trend reads "not trended" instead of a direction. TTFC is the
+engine's first-chunk latency, or the app's submit→first-chunk span for UI records. Records
+keyed by a lineage contract (`inputs.lineageContractVersion`) note "harness changed" when
+their harness files differ from the baseline's.
 
 ## engine-generation / ios / iphone-17-pro / config `1f7856b56aef`
 
@@ -138,7 +139,7 @@ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-08-07 | [`macos-engine-20260807-023057-5275b724`](runs/engine-generation/macos-engine-20260807-023057-5275b724.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.99 | `46da18acdcd5` | `08537b5694f6` | baseline | marking-qc-marked |
-| 2026-08-07 | [`macos-engine-20260807-023242-fce41fcb`](runs/engine-generation/macos-engine-20260807-023242-fce41fcb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.90 | `517e69ea0617` | `08537b5694f6` | vs macos-engine-20260807-023057-5275b724: compatible | marking-qc-off |
+| 2026-08-07 | [`macos-engine-20260807-023242-fce41fcb`](runs/engine-generation/macos-engine-20260807-023242-fce41fcb.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 8 | ~0.90 | `517e69ea0617` | `08537b5694f6` | vs macos-engine-20260807-023057-5275b724: no cell with ≥3 takes (not trended) | marking-qc-off |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `08613eaf0dca`
 
@@ -794,7 +795,7 @@ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-02 | [`mac-gate-bench-20260902-013854-f39c1c91`](runs/engine-generation/mac-gate-bench-20260902-013854-f39c1c91.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | ~0.70 | `fd3bb5d343ea` | `c4e849dcb35b` | baseline | mac-gate-bench |
-| 2026-09-02 | [`mac-gate-bench-20260902-015022-591814fe`](runs/engine-generation/mac-gate-bench-20260902-015022-591814fe.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | ~0.69 | `1fffa64de385` | `c4e849dcb35b` | vs mac-gate-bench-20260902-013854-f39c1c91: compatible | mac-gate-bench |
+| 2026-09-02 | [`mac-gate-bench-20260902-015022-591814fe`](runs/engine-generation/mac-gate-bench-20260902-015022-591814fe.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | ~0.69 | `1fffa64de385` | `c4e849dcb35b` | vs mac-gate-bench-20260902-013854-f39c1c91: no cell with ≥3 takes (not trended) | mac-gate-bench |
 
 ## engine-generation / macos / mac-mini-m2-8gb / config `c8340ad4e716`
 
@@ -1382,7 +1383,7 @@ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-16 | [`macos-xcui-benchmark-20260916-002319-0abd5326`](runs/ui-generation/macos-xcui-benchmark-20260916-002319-0abd5326.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | 0.77 | `c54b8dff3fea` | `4bafacb97dfa` | baseline | macos-xcui-benchmark-20260916-002319-0abd5326 |
-| 2026-09-16 | [`macos-xcui-benchmark-20260916-014846-5892b77c`](runs/ui-generation/macos-xcui-benchmark-20260916-014846-5892b77c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | 0.81 | `2be20f0cec2d` | `4bafacb97dfa` | vs macos-xcui-benchmark-20260916-002319-0abd5326: compatible | macos-xcui-benchmark-20260916-014846-5892b77c |
+| 2026-09-16 | [`macos-xcui-benchmark-20260916-014846-5892b77c`](runs/ui-generation/macos-xcui-benchmark-20260916-014846-5892b77c.json) | focused | focused | passedWithWarnings | qualified-with-warnings | 2 | 0.81 | `2be20f0cec2d` | `4bafacb97dfa` | vs macos-xcui-benchmark-20260916-002319-0abd5326: no cell with ≥3 takes (not trended) | macos-xcui-benchmark-20260916-014846-5892b77c |
 
 ## ui-generation / macos / mac-mini-m2-8gb / config `54c3c1bb6bba`
 

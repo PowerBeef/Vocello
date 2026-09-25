@@ -683,6 +683,12 @@ def validate_lineage_inputs(record: dict[str, Any]) -> None:
     measurement = inputs["lineageMeasurementVersion"]
     if not isinstance(measurement, int) or isinstance(measurement, bool) or measurement < 1:
         raise HistoryError("inputs.lineageMeasurementVersion must be a positive integer")
+    # Versions only rise, so every published record names one that exists.
+    current = lineage_identity.LINEAGE_MEASUREMENT_VERSIONS[(record["run"]["kind"], record["run"]["platform"])]
+    if measurement > current:
+        raise HistoryError(
+            f"inputs.lineageMeasurementVersion {measurement} is newer than this kind's reviewed version {current}"
+        )
     require_digest(inputs["lineageHarnessHash"], "inputs.lineageHarnessHash", allow_na=False)
     require_digest(inputs["lineageProjectHash"], "inputs.lineageProjectHash")
 
@@ -1597,8 +1603,10 @@ def lineage_v1_identity(record: dict[str, Any]) -> dict[str, Any]:
     version labels, the product contract (the models are keyed exactly below),
     the dependency lock and the whole-tree projectInputHash/harnessHash (engine
     and harness churn). It adds the kind's reviewed measurement version, the
-    build-settings subset of project.yml its lane builds and the topology (the
-    take layer set). lineageHarnessHash is provenance only (HISTORY marks it)."""
+    build-settings subset of project.yml its lane builds, the topology (the
+    take layer set) and the memory contract version, which the legacy key read
+    only through the whole-tree hashes. lineageHarnessHash is provenance only
+    (HISTORY marks it)."""
     inputs = record["inputs"]
     return {
         "lineageContractVersion": 1,
@@ -1629,10 +1637,13 @@ def lineage_v1_identity(record: dict[str, Any]) -> dict[str, Any]:
             ]
             for model in record.get("models", [])
         ],
+        # The memory contract names the memory aggregation (audit #1): a change of
+        # it never shares a lineage, whatever the kind's measurement version says.
         "evidenceContract": [
             record.get("schemaVersion"), record["evidence"].get("validatorSchemaVersion"),
             record["evidence"].get("telemetrySchemaVersion"),
             record["evidence"].get("qcAlgorithmVersion"),
+            record["evidence"].get("memoryContractVersion"),
         ],
         "rtfDefinition": record["run"].get("rtfDefinition"),
         "ttfcDefinition": record["run"].get("ttfcDefinition"),
@@ -3474,7 +3485,11 @@ def lineage_replay(
             position for position in range(index)
             if key is not None and rows[position]["lineageKey"] == key
         ]
-        previous = replayed[index - 1][1] if index else None
+        previous = next(
+            (replayed[position][1] for position in range(index - 1, -1, -1)
+             if replayed[position][1] is not None),
+            None,
+        )
         rows.append({
             "runID": record["run"]["id"],
             "finishedAt": record["run"]["finishedAt"],
@@ -3559,14 +3574,25 @@ def trend_summary(record: dict[str, Any], baseline_record: dict[str, Any] | None
         for cell in record.get("cells", []) if isinstance(cell, dict)
     }
     collected: dict[str, list[float]] = {term: [] for term in terms}
+    too_small = False
     for cell_key, metrics in comparison.get("deltas", {}).items():
-        if not isinstance(metrics, dict) or take_counts.get(cell_key, 0) < TREND_MINIMUM_CELL_TAKES:
+        if not isinstance(metrics, dict):
             continue
-        for term, metric in terms.items():
-            value = metrics.get(metric)
-            if isinstance(value, dict) and isinstance(value.get("percent"), (int, float)):
-                collected[term].append(float(value["percent"]))
-    parts = []
+        percents = {
+            term: float(metrics[metric]["percent"]) for term, metric in terms.items()
+            if isinstance(metrics.get(metric), dict)
+            and isinstance(metrics[metric].get("percent"), (int, float))
+        }
+        if take_counts.get(cell_key, 0) < TREND_MINIMUM_CELL_TAKES:
+            too_small = too_small or bool(percents)
+            continue
+        for term, percent in percents.items():
+            collected[term].append(percent)
+    # A trend delta that exists only on cells too small to trend is not "no change".
+    parts = (
+        [f"no cell with ≥{TREND_MINIMUM_CELL_TAKES} takes (not trended)"]
+        if too_small and not any(collected.values()) else []
+    )
     for term, values in collected.items():
         if not values:
             continue
@@ -3618,10 +3644,11 @@ def render_history(records: list[tuple[Path, dict[str, Any]]]) -> str:
         "A **trend** compares a record with the nearest earlier record of its comparison key: each term",
         "is the median of the per-cell median deltas over cells with at least three takes, and reads",
         "\"within noise\" unless it exceeds max(5%, 3 × the median absolute deviation of those cell",
-        "deltas); otherwise its direction is given in words. TTFC is the engine's first-chunk latency,",
-        "or the app's submit→first-chunk span for UI records. Records keyed by a lineage contract",
-        "(`inputs.lineageContractVersion`) note \"harness changed\" when their harness files differ",
-        "from the baseline's.",
+        "deltas); otherwise its direction is given in words. When only cells with fewer than three",
+        "takes carry a delta, the trend reads \"not trended\" instead of a direction. TTFC is the",
+        "engine's first-chunk latency, or the app's submit→first-chunk span for UI records. Records",
+        "keyed by a lineage contract (`inputs.lineageContractVersion`) note \"harness changed\" when",
+        "their harness files differ from the baseline's.",
         "",
     ]
     by_run_id = {record["run"]["id"]: record for _, record in records}

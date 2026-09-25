@@ -1531,7 +1531,10 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.assertAlmostEqual(rtf_delta["absolute"], 0.2)
         self.assertAlmostEqual(rtf_delta["percent"], 10.0)
         # A one-take cell stores its delta but stays out of the trend (audit #71).
-        self.assertIn("vs macos-bench-20260712-120000: compatible", self.index.read_text())
+        # A one-take cell carries the delta but is too small to trend.
+        self.assertIn(
+            "vs macos-bench-20260712-120000: no cell with ≥3 takes (not trended)", self.index.read_text()
+        )
 
     def test_new_records_store_only_the_trend_deltas(self) -> None:
         first = self._schema_v3_language_record("mac-lang-bench-20260712-130000")
@@ -2357,6 +2360,10 @@ class BenchmarkHistoryTests(unittest.TestCase):
             "os build": lambda r: r["hardware"].update(osBuild="25Z99"),
             "matrix": lambda r: r["inputs"].update(matrixHash="0" * 64),
             "qc algorithm": lambda r: r["evidence"].update(qcAlgorithmVersion=99),
+            # The memory aggregation (audit #1): the legacy key read it only
+            # through the whole-tree hashes this key drops.
+            "memory contract": lambda r: r["evidence"].update(
+                memoryContractVersion=int(r["evidence"].get("memoryContractVersion") or 1) + 1),
         }
         for name, mutate in measured.items():
             with self.subTest(measured=name):
@@ -2377,6 +2384,8 @@ class BenchmarkHistoryTests(unittest.TestCase):
             "a boolean contract version": lambda r: r["inputs"].update(lineageContractVersion=True),
             "a zero measurement version": lambda r: r["inputs"].update(lineageMeasurementVersion=0),
             "a text measurement version": lambda r: r["inputs"].update(lineageMeasurementVersion="1"),
+            "an unreviewed measurement version": lambda r: r["inputs"].update(
+                lineageMeasurementVersion=r["inputs"]["lineageMeasurementVersion"] + 1),
             "an absent harness hash": lambda r: r["inputs"].update(lineageHarnessHash="not-applicable"),
             "schema v1": lambda r: r.update(schemaVersion=1),
             "a kind without a lineage": lambda r: r["run"].update(kind="prosody-calibration", platform="ios"),
@@ -2412,12 +2421,17 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.publish(lineage_record("lineage-a-20260712", 0, "a"), "lineage-a")
         second = json.loads(self.publish(lineage_record("lineage-b-20260712", 10, "b"), "lineage-b").read_text())
         self.assertEqual(second["comparison"]["baselineRunID"], "lineage-a-20260712")
-        self.assertIn("vs lineage-a-20260712: harness changed", self.index.read_text())
-        bumped = json.loads(
-            self.publish(lineage_record("lineage-c-20260712", 20, "b", measurement=2), "lineage-c").read_text()
+        self.assertIn(
+            "vs lineage-a-20260712: no cell with ≥3 takes (not trended), harness changed", self.index.read_text()
         )
-        self.assertIsNone(bumped["comparison"]["baselineRunID"])
-        history.validate_all()
+        # A reviewed bump of the kind's measurement version starts a new lineage.
+        kind = (second["run"]["kind"], second["run"]["platform"])
+        with mock.patch.dict(history.lineage_identity.LINEAGE_MEASUREMENT_VERSIONS, {kind: 2}):
+            bumped = json.loads(
+                self.publish(lineage_record("lineage-c-20260712", 20, "b", measurement=2), "lineage-c").read_text()
+            )
+            self.assertIsNone(bumped["comparison"]["baselineRunID"])
+            history.validate_all()
 
     def test_trend_reports_noise_and_the_ui_first_chunk_span(self) -> None:
         def trend(rtf: list[float], ttfc: list[float]) -> str:
@@ -2451,6 +2465,15 @@ class BenchmarkHistoryTests(unittest.TestCase):
         )
         # A wide spread between cells widens the band past the 5% floor.
         self.assertIn("RTF +6.0% (within noise)", trend([6.0, 0.0, 12.0], [0.0, 0.0, 0.0]))
+        # Deltas only on cells too small to trend never read as "compatible".
+        self.assertEqual(trend([], []), "vs base: no cell with ≥3 takes (not trended)")
+        # A kind without trend terms (ui-perf frame metrics) has nothing to trend.
+        perf = {
+            "schemaVersion": 2, "run": {"kind": "ui-perf"}, "inputs": {},
+            "cells": [{"key": "scroll", "count": 1}],
+            "comparison": {"baselineRunID": "base", "deltas": {"scroll": {"frameP95MS": {"percent": 9.0}}}},
+        }
+        self.assertEqual(history.trend_summary(perf), "vs base: compatible")
 
     def test_lineage_replay_reads_each_record_at_its_own_source_commit(self) -> None:
         project = (Path(history.REPO_ROOT) / "project.yml").read_text(encoding="utf-8")
@@ -2476,7 +2499,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
                 pass
 
         records = []
-        for index, commit in enumerate(["1" * 40, "2" * 40, "3" * 40, "4" * 40]):
+        for index, commit in enumerate(["1" * 40, "2" * 40, "3" * 40, "4" * 40, "2" * 40]):
             record = record_fixture(run_id=f"replay-{index}")
             record["run"]["classification"] = "canonical"
             record["run"]["finishedAt"] = f"2026-07-1{index}T00:00:00Z"
@@ -2493,9 +2516,13 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.assertIsNone(rows[2]["lineageBaselineRunID"])
         self.assertEqual(rows[2]["changedFromPrevious"], ["project.yml subset"])
         self.assertFalse(rows[3]["sourceAvailable"])
+        # A record after an unavailable one names what changed from the nearest
+        # replayable record, and links back across the other lineage.
+        self.assertEqual(rows[4]["changedFromPrevious"], ["project.yml subset"])
+        self.assertEqual(rows[4]["lineageBaselineRunID"], "replay-1")
         self.assertEqual(
             (report["lineageLinkedCount"], report["legacyLinkedCount"], report["unavailableSourceCount"]),
-            (1, 0, 1),
+            (2, 0, 1),
         )
 
     def test_registry_names_exactly_one_canonical_profile_per_platform(self) -> None:

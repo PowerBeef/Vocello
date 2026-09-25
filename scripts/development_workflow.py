@@ -252,6 +252,21 @@ def ui_bundle_mode(paths: list[str]) -> str | None:
     return "ios"
 
 
+LINEAGE_IDENTITY = "scripts/lib/lineage_identity.py"
+
+
+def lineage_review_paths(paths: list[str]) -> list[str]:
+    """Changed files on a benchmark kind's lineage path list while the lineage identity is unchanged.
+
+    Advisory: a change to one of them that moves what a kind measures bumps that
+    kind's measurement version in the same change (release.md "Records measure
+    what they claim"); nothing else would separate the lineages."""
+    if LINEAGE_IDENTITY in paths or not (ROOT / LINEAGE_IDENTITY).is_file():
+        return []
+    watched = {path for group in _load(LINEAGE_IDENTITY).LINEAGE_PATHS.values() for path in group}
+    return sorted(set(paths) & watched)
+
+
 def check_plan(paths: list[str]) -> dict:
     lanes = lanes_for(paths)
     commands: list[list[str]] = []
@@ -268,7 +283,8 @@ def check_plan(paths: list[str]) -> dict:
     bundles = ui_bundle_mode(paths)
     if bundles:
         commands.append(["./scripts/build_ui_test_bundles.sh", bundles])
-    return {"changedPaths": paths, "lanes": lanes, "commands": commands}
+    return {"changedPaths": paths, "lanes": lanes, "commands": commands,
+            "lineageReviewPaths": lineage_review_paths(paths)}
 
 
 # Mirrors .github/workflows/ci.yml: contracts, routing-independent lanes, then
@@ -372,6 +388,13 @@ def main(argv: list[str] | None = None) -> int:
                 hint = (f"clean tree and nothing committed since {args.since}: no lane to run" if args.since
                         else "clean tree: no lane to run; `check --since origin/main` plans for committed work")
                 print(f"==> [dev] {hint}", file=sys.stderr, flush=True)
+            if review := plan["lineageReviewPaths"]:
+                print(
+                    f"==> [dev] {len(review)} changed file(s) sit on a benchmark kind's lineage path list "
+                    f"({', '.join(review[:3])}{', …' if len(review) > 3 else ''}): if the change moves what "
+                    f"a kind measures, bump its LINEAGE_MEASUREMENT_VERSIONS entry in {LINEAGE_IDENTITY}",
+                    file=sys.stderr, flush=True,
+                )
             if args.dry_run:
                 lanes = ", ".join(k for k, v in plan["lanes"].items() if v) or "none"
                 print(f"Changed paths: {len(plan['changedPaths'])}; lanes: {lanes}")

@@ -24,7 +24,10 @@ automatic structural guards plus one reviewed number per kind:
   and platform (``LINEAGE_MEASUREMENT_VERSIONS``). A change that alters what
   the kind measures (an in-window driver action, a probe, the metric mapping
   or aggregation) bumps it in the same change (.claude/rules/release.md). The
-  kind's path list (``LINEAGE_PATHS``) is the scope of that review.
+  kind's path list (``LINEAGE_PATHS``) is the scope of that review;
+  ``scripts/dev.sh check`` names changed files on it while this module is
+  untouched. The memory contract version joins the key beside the evidence
+  contract, so a memory aggregation change never depends on this review.
 - ``lineageHarnessHash`` hashes that path list. It is provenance, not identity:
   benchmarks/HISTORY.md marks a delta taken across a harness change.
 

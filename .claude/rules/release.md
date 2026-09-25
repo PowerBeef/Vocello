@@ -88,12 +88,14 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   since 2026-09-12 declares `run.rtfDefinition` (`ui-perf` and `prosody-calibration` publish no RTF); legacy records are never rewritten and never share a comparison
   key with new ones. A comparison key names what its kind measures (`scripts/lib/lineage_identity.py`: the
   project.yml build settings its lane builds, the take topology and a reviewed per-kind measurement version
-  beside hardware, OS, toolchain, matrix, corpus, models, evidence contract and metric definitions; never
-  engine sources or pins), and legacy keys stay byte-identical. A change that moves what a kind measures
-  (an in-window driver step, a probe, the metric mapping or aggregation) bumps its measurement version in
-  the same change; changing what the key reads bumps `LINEAGE_CONTRACT_VERSION` and never edits a
-  published version's key. `toolchain.optimization` comes from the build receipt (`last-build.json`, executable
-  digest bound) via `scripts/lib/build_provenance.py`; the gate bench is seeded, compares medians of five
+  beside hardware, OS, toolchain, matrix, corpus, models, evidence and memory contracts and metric
+  definitions; never engine sources or pins), and legacy keys stay byte-identical. Once a record of a kind
+  carries the lineage stamp, a change that moves what that kind measures (an in-window driver step, a
+  probe, the metric mapping or aggregation) bumps its measurement version in the same change
+  (`scripts/dev.sh check` names changed files on a kind's path list); changing what the key reads bumps
+  `LINEAGE_CONTRACT_VERSION` and never edits a published version's key. `toolchain.optimization` comes
+  from the build receipt (`last-build.json`, executable digest bound) via
+  `scripts/lib/build_provenance.py`; the gate bench is seeded, compares medians of five
   warm takes against a baseline pooled from at least three seeded runs on one clean commit (thresholds
   floored by the between-run spread and printed), and reports a loaded, throttled or low-power host as
   inconclusive (`GATE: INCONCLUSIVE`, exit 3), never as pass or fail. A timing take whose own one-minute

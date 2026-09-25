@@ -3346,8 +3346,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             generatedCodecFrames.reserveCapacity(effectiveMaxTokens)
         }
         var pendingStreamCodes = [MLXArray]()
-        var generatedCodebookTokenIDs = Set<Int>()
-        generatedCodebookTokenIDs.reserveCapacity(effectiveMaxTokens)
         var generatedCodeCount = 0
         let eosTokenId = talkerConfig.codecEosTokenId
 
@@ -3800,7 +3798,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 try await codecTraceSink(materializedCodeFrame)
                 try Task.checkCancellation()
             }
-            generatedCodebookTokenIDs.insert(tokenId)
             samplerScratch.appendRepetitionTokenID(tokenId)
             generatedCodeCount += 1
             if isStreaming {
@@ -4695,7 +4692,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         private var suppressWithEOSArr: MLXArray?
         private var suppressWithEOSNegInf: MLXArray?
 
-        var repetitionTokenIDsBuffer: [Int32] = []
+        /// First-seen order of the penalized token IDs; the cached MLX index
+        /// array is built from it. The set answers membership in constant time
+        /// and always holds exactly the buffer's elements.
+        private(set) var repetitionTokenIDsBuffer: [Int32] = []
+        private var repetitionTokenIDSet: Set<Int32> = []
         private var repetitionTokenIDsMLX: MLXArray?
 
         init(vocabSize: Int) {
@@ -4742,7 +4743,8 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
         func appendRepetitionTokenID(_ tokenID: Int) {
             let value = Int32(tokenID)
-            guard !repetitionTokenIDsBuffer.contains(value) else { return }
+            // A repeated ID keeps the order and the cached index array.
+            guard repetitionTokenIDSet.insert(value).inserted else { return }
             repetitionTokenIDsBuffer.append(value)
             repetitionTokenIDsMLX = nil
         }

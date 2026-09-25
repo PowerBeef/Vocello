@@ -28,6 +28,35 @@ final class Qwen3SamplerBoundaryTests: XCTestCase {
         XCTAssertEqual(processed([4, -2, 0, 1, 8], penalty: 2, scratch: scratch, allowsEOS: false)[3], -.infinity)
     }
 
+    /// AUD-11: set membership keeps the first-seen order of the former linear
+    /// scan, and only a first-seen ID rebuilds the cached MLX index array.
+    func testRepetitionMembershipKeepsFirstSeenOrderAndRebuildsOnlyForNewIDs() {
+        let scratch = Qwen3TTSModel.Qwen3SamplerScratch(vocabSize: 16)
+        XCTAssertNil(scratch.repetitionTokenMLXArray(vocabUpperBound: 16))
+        var reference: [Int32] = []
+        var cached: MLXArray?
+        var rebuilds = 0
+        for step in 0..<96 {
+            let id = (step * 7 + step / 5) % 13
+            let isNew = !reference.contains(Int32(id))
+            if isNew { reference.append(Int32(id)) }
+            scratch.appendRepetitionTokenID(id)
+            XCTAssertEqual(scratch.repetitionTokenIDsBuffer, reference)
+            let indices = scratch.repetitionTokenMLXArray(vocabUpperBound: 16)
+            if isNew {
+                XCTAssertFalse(indices === cached, "A new ID must rebuild the index array (step \(step))")
+                rebuilds += 1
+            } else {
+                XCTAssertTrue(indices === cached, "A repeated ID must keep the cached index array (step \(step))")
+            }
+            cached = indices
+        }
+        XCTAssertEqual(reference, [0, 7, 1, 8, 2, 10, 4, 11, 5, 12, 9, 6, 3])
+        XCTAssertEqual(rebuilds, reference.count)
+        XCTAssertEqual(cached?.shape, [1, reference.count])
+        XCTAssertEqual(cached?.asArray(Int32.self), reference)
+    }
+
     func testTemperaturePrecedesNucleusAndMinP() {
         // At T=.5 the top probability is .867: a .7 nucleus has one token.
         // At T=2 the top probability is .506: that nucleus needs two.

@@ -48,9 +48,10 @@ generation parameters. The subtalker/Code Predictor inherits temperature, top-k,
 by default, but remains independently configurable and never inherits repetition penalty.
 Diagnostic environment values are resolved into the request policy before the model is invoked;
 they are not static mutable runtime authority. Temperature is applied before probability filtering,
-EOS remains eligible, repetition state is maintained incrementally, and reusable sampler/mask
-scratch avoids rebuilding equivalent arrays in each token step. Sampling v2 requires fresh
-fixed-seed quality evidence before its output is promoted as equivalent to historical v1 records.
+EOS remains eligible, repetition state is maintained incrementally (constant-time membership over
+a first-seen token order), and reusable sampler/mask scratch avoids rebuilding equivalent arrays in
+each token step. Sampling v2 requires fresh fixed-seed quality evidence before its output is
+promoted as equivalent to historical v1 records.
 
 Lazy MLX timings around graph construction are not kernel attribution. Performance conclusions
 must use the tracked benchmark registry or an Instruments profile with the runtime signposts.

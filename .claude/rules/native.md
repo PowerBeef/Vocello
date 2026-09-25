@@ -82,7 +82,9 @@ requested.
   `snapshotChanges` with `onReceive` and never reads the store in `body` (W1-D/W2-A).
 - **Memory relief is in-process.** The engine's own kernel-pressure responder trims and unloads; the
   store's `MacMemoryBudgetPolicy` gates admission on footprint and Metal working set; idle unload follows
-  `NativeMemoryPolicyResolver`; `MacWarmupAdmissionPolicy` defers proactive warms. No hard
+  `NativeMemoryPolicyResolver`; `MacWarmupAdmissionPolicy` defers proactive warms. Every tier, the
+  high-memory Mac included, idle-unloads and answers pressure; warms follow Studio intent, never
+  browsing, and a cancelled warm or prime re-arms idle unload (AUD-10). No hard
   `Memory.memoryLimit` on macOS.
 - **Liquid Glass is gated.** Every glass surface renders through `GatedGlass` (`Views/Theme/MacGlass.swift`;
   `macGatedGlass` / `macSubtleGlassSurface` wrap the shared `VocelloGlassSurface` body): the

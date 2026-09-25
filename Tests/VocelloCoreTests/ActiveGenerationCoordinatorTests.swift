@@ -594,10 +594,6 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         let registry = try Self.contractRegistry()
         let model = try XCTUnwrap(registry.models.first)
-        guard NativeMemoryPolicyResolver.policy(mode: model.mode, isBatch: false)
-            .unloadAfterIdleSeconds != nil else {
-            throw XCTSkip("This host's memory tier never idle-unloads a model.")
-        }
         let coordinator = ResidentLoadCoordinator()
         let engine = Self.makeFixtureEngine(
             root: root,
@@ -653,6 +649,145 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         await engine.ensureModelLoadedIfNeeded(id: "superseded-fixture-model")
         XCTAssertEqual(engine.loadState, .idle)
         XCTAssertNil(engine.visibleErrorMessage)
+    }
+
+    /// AUD-10: every tier idle-unloads a resident model, the high-memory Mac
+    /// included, so weights a warm left behind never outlive browsing. The
+    /// roomier the tier, the longer it keeps them for the next take.
+    func testEveryMemoryTierIdleUnloadsAResidentModel() {
+        let expected: [(NativeDeviceMemoryClass, Double)] = [
+            (.floor8GBMac, 120),
+            (.mid16GBMac, 600),
+            (.highMemoryMac, 1_800),
+            (.iPhonePro, 30),
+        ]
+        for (deviceClass, seconds) in expected {
+            for mode in [GenerationMode.custom, .design, .clone] {
+                for isBatch in [false, true] {
+                    XCTAssertEqual(
+                        NativeMemoryPolicyResolver.policy(
+                            deviceClass: deviceClass,
+                            mode: mode,
+                            isBatch: isBatch
+                        ).unloadAfterIdleSeconds,
+                        seconds,
+                        "\(deviceClass.rawValue) \(mode.rawValue) batch=\(isBatch)"
+                    )
+                }
+            }
+        }
+    }
+
+    /// AUD-10 (PA-31 review): a warm prefetch whose intent changed settles
+    /// through the runtime. The model still resident publishes `.loaded` and
+    /// gets back the idle unload the warm cancelled; a cold warm used to
+    /// publish `.idle` over resident weights, and a warm one kept `.loaded`
+    /// with no idle unload armed.
+    @MainActor
+    func testACancelledWarmPrefetchReArmsIdleUnload() async throws {
+        // Cold: another model is resident, so the warm publishes `.starting`.
+        try await assertCancelledWarmPrefetchReArmsIdleUnload(resident: "pro_design", warmed: "pro_custom")
+        // Warm: the warmed model is the resident one.
+        try await assertCancelledWarmPrefetchReArmsIdleUnload(resident: "pro_custom", warmed: "pro_custom")
+    }
+
+    @MainActor
+    private func assertCancelledWarmPrefetchReArmsIdleUnload(
+        resident: String,
+        warmed: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        try await withCancellingResidentEngine(resident: resident) { engine, coordinator in
+            let diagnostics = await engine.prefetchInteractiveReadinessIfNeeded(
+                for: GenerationRequest(
+                    mode: .custom,
+                    modelID: warmed,
+                    text: GenerationSemantics.canonicalCustomWarmText,
+                    outputPath: "",
+                    shouldStream: false,
+                    payload: .custom(
+                        speakerID: GenerationSemantics.canonicalCustomWarmSpeaker,
+                        deliveryStyle: nil
+                    )
+                )
+            )
+            XCTAssertNil(diagnostics, file: file, line: line)
+            XCTAssertEqual(
+                engine.loadState,
+                .loaded(modelID: resident),
+                "the runtime still holds the resident model",
+                file: file,
+                line: line
+            )
+            try await Self.assertIdleUnloadRuns(engine: engine, coordinator: coordinator, file: file, line: line)
+        }
+    }
+
+    /// AUD-10 (PA-31 review): a cancelled clone prime settles through the
+    /// runtime too, whether it primes the resident model or another one, so
+    /// the model it leaves resident keeps its idle unload.
+    @MainActor
+    func testACancelledClonePrimeReArmsIdleUnload() async throws {
+        for resident in ["pro_clone", "pro_custom"] {
+            try await withCancellingResidentEngine(resident: resident) { engine, coordinator in
+                do {
+                    try await engine.ensureCloneReferencePrimed(
+                        modelID: "pro_clone",
+                        reference: CloneReference(
+                            audioPath: "/nonexistent/aud10-reference.wav",
+                            transcript: "Hello."
+                        )
+                    )
+                    XCTFail("The prime must end cancelled")
+                } catch is CancellationError {}
+                XCTAssertEqual(engine.clonePreparationState, .idle)
+                XCTAssertEqual(engine.loadState, .loaded(modelID: resident), "resident: \(resident)")
+                try await Self.assertIdleUnloadRuns(engine: engine, coordinator: coordinator)
+            }
+        }
+    }
+
+    /// An initialized fixture engine with `resident` loaded through the
+    /// runtime and a short idle unload; its warm and prime requests end
+    /// cancelled. `body` runs with no suspension after the load, so the
+    /// load's own idle unload cannot fire first.
+    @MainActor
+    private func withCancellingResidentEngine(
+        resident: String,
+        _ body: @MainActor (MLXTTSEngine, ResidentLoadCoordinator) async throws -> Void
+    ) async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-cancelled-warm-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let coordinator = ResidentLoadCoordinator(cancelsWarmRequests: true)
+        let engine = Self.makeFixtureEngine(
+            root: root,
+            registry: try Self.contractRegistry(),
+            coordinator: coordinator,
+            idleUnloadDelay: 0.5
+        )
+        defer { engine.stop() }
+        try await engine.initialize(appSupportDirectory: root)
+        await engine.ensureModelLoadedIfNeeded(id: resident)
+        XCTAssertEqual(engine.loadState, .loaded(modelID: resident))
+        try await body(engine, coordinator)
+    }
+
+    @MainActor
+    private static func assertIdleUnloadRuns(
+        engine: MLXTTSEngine,
+        coordinator: ResidentLoadCoordinator,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        let deadline = ContinuousClock.now + .seconds(10)
+        while engine.loadState != .idle, ContinuousClock.now < deadline {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertEqual(engine.loadState, .idle, "idle unload must run after the cancelled warm", file: file, line: line)
+        let events = await coordinator.events
+        XCTAssertEqual(events.filter { $0 == "unload" }.count, 1, file: file, line: line)
     }
 
     private static func contractRegistry() throws -> ContractBackedModelRegistry {
@@ -718,12 +853,23 @@ private actor SupersededLoadCoordinator: MLXModelCoordinating {
 
 /// A model coordinator whose load succeeds with an unloaded runtime actor, so
 /// the engine's resident-model lifecycle (idle unload, trims) is observable
-/// without MLX weights. The model is never used to generate.
+/// without MLX weights. The model is never used to generate. With
+/// `cancelsWarmRequests`, a warm prefetch or clone prime (the runtime asks for
+/// capabilities first) ends cancelled before it touches MLX, as one whose
+/// intent changed does, while an earlier load stays resident.
 private actor ResidentLoadCoordinator: MLXModelCoordinating {
     private(set) var events: [String] = []
+    private let cancelsWarmRequests: Bool
+
+    init(cancelsWarmRequests: Bool = false) {
+        self.cancelsWarmRequests = cancelsWarmRequests
+    }
 
     func qwen3Capabilities(for id: String) async throws -> Qwen3TTSModelCapabilities {
-        Self.capabilities
+        if cancelsWarmRequests {
+            throw CancellationError()
+        }
+        return Self.capabilities
     }
 
     func loadModel(

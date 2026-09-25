@@ -343,7 +343,12 @@ The shell harness owns deterministic proof and evidence:
 - **NSOpenPanel** — system-picker interaction belongs to an explicit import scenario. Do not use
   coordinates, hidden mocks, or AppleScript as frontend proof.
 - **Idle unload** — the engine may have unloaded its model while idle; the first generation
-  reloads it. The `sidebar_backendStatus_*` markers reflect the state.
+  reloads it. The `sidebar_backendStatus_*` markers reflect the state. Every Mac tier unloads
+  after idle (2 min up to 10 GB of RAM, 10 min up to 24 GB, 30 min above) and trims on kernel
+  pressure. Entering Studio or generating warms the engine; History, Voices and Settings never
+  do, so browsing cannot keep the weights resident. The longer high-memory window trades a cold
+  first take after a long pause for fewer reloads; see
+  [`../ARCHITECTURE.md`](../ARCHITECTURE.md#45-memory-policy).
 - **First responder** — after navigating, the text editor may need one explicit action before
   typing; re-observe instead of assuming focus.
 

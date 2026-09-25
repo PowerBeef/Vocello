@@ -415,8 +415,15 @@ so it applies only in an internal diagnostics build with the `QWENVOICE_DEBUG` m
 | --- | --- | --- | --- | --- |
 | `.floor8GBMac` | 256 MB | 1 | 120 s | 50 |
 | `.mid16GBMac` | 512 MB | 8 | 600 s | 50 |
-| `.highMemoryMac` | 1 GB | 16 | never (`nil`) | 200 |
+| `.highMemoryMac` | 1 GB | 16 | 1 800 s | 200 |
 | `.iPhonePro` | 128 MB* | 1 | 30 s | 50 |
+
+Every tier idle-unloads and answers kernel pressure (AUD-10). Warms follow intent (entering
+Studio or generating), never browsing, and a warm that ends early or a cancelled clone prime
+settles through the runtime, so resident weights always keep an idle unload. The high-memory window is
+the longest because 2 to 3 GB of idle weights is a small share of 32 GB or more, while an unload
+makes the next take pay a cold load and prewarm; only the floor tier shortens its window under
+pressure.
 
 \* iPhone cache default 128 MB, diagnostically overridable with
 `QVOICE_IOS_MLX_CACHE_LIMIT_MB` only behind the internal capability and `QWENVOICE_DEBUG`.

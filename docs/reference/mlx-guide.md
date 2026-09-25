@@ -252,7 +252,7 @@ Instead, the engine gates behavior on:
 |---|---|---|---|---|---|
 | `floor8GBMac` | 256 MB | single-shot only | yes | 50 tokens | 120 s |
 | `mid16GBMac` | 512 MB | no | yes | 50 tokens | 600 s |
-| `highMemoryMac` | 1 GB | no | no | 200 tokens | never |
+| `highMemoryMac` | 1 GB | no | no | 200 tokens | 1 800 s |
 | `iPhonePro` | 128 MB | always | yes | 50 tokens | 30 s |
 
 These numbers are the result of on-device and constrained-tier benchmarking. They are not derived from a formula; changing them requires re-measuring RTF and peak memory on real hardware.

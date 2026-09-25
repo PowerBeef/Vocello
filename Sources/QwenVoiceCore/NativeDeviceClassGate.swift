@@ -4,8 +4,9 @@ import Foundation
 ///
 /// `NativeMemoryPolicyResolver.deviceClass()` normally reads real
 /// `ProcessInfo.physicalMemory`, so a high-memory dev Mac always resolves to
-/// `highMemoryMac` — where the memory-pressure monitor never starts and the
-/// constrained-tier policy (tight caches, idle unload) is never exercised.
+/// `highMemoryMac` — where the constrained-tier policy (tight caches,
+/// per-chunk clears, a short and pressure-adaptive idle unload) is never
+/// exercised.
 /// This gate lets a benchmark **force** a tier so those code paths run (and
 /// pressure becomes measurable) without special hardware.
 ///

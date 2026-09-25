@@ -222,9 +222,9 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         deviceClass: NativeDeviceMemoryClass
     ) -> Double {
         // Only the floor8GBMac tier reacts to pressure for idle-unload.
-        // mid16GBMac has a 10-minute baseline; even under pressure we'd
-        // rather keep the model warm than churn loads.
-        // highMemoryMac has no policyDelay (nil).
+        // mid16GBMac (10 minutes) and highMemoryMac (30 minutes) keep their
+        // baseline; under pressure they rely on the kernel-pressure trims
+        // rather than churn loads.
         // iPhonePro already runs at a 30s baseline.
         guard deviceClass == .floor8GBMac else { return policyDelay }
         switch memoryPressureMonitor.currentLevel {
@@ -455,11 +455,10 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         let kind: ModelOperationKind
     }
 
-    /// macOS-side memory pressure monitor. On 8 GB and 16 GB Macs this
-    /// subscribes to kernel pressure events and forwards them as trim
-    /// levels to `runtime.trimMemory(...)`. On high-memory Macs the
-    /// monitor is created but never started — there's no value in
-    /// reacting on machines that aren't pressure-bound. On iOS the
+    /// Kernel memory-pressure monitor. On every Mac tier this subscribes to
+    /// kernel pressure events and forwards them as trim levels to
+    /// `runtime.trimMemory(...)`; the high-memory tier joined with AUD-10 so
+    /// weights a warm left resident answer pressure there too. On iOS the
     /// in-process engine starts the same monitor for the iPhonePro
     /// tier so the app process running MLX can shed cache on kernel pressure.
     private var memoryPressureMonitor: NativeMemoryPressureMonitor
@@ -706,12 +705,11 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     }
 
     /// Subscribe to kernel memory-pressure events so the process running
-    /// MLX can softTrim / hardTrim ahead of allocation failures. Idempotent
-    /// and limited to memory-constrained tiers.
+    /// MLX can softTrim / hardTrim ahead of allocation failures. Idempotent;
+    /// every tier responds, the high-memory Mac included (AUD-10).
     private func startMemoryPressureMonitorIfNeeded() {
         guard memoryPressureTask == nil else { return }
         let deviceClass = NativeMemoryPolicyResolver.deviceClass()
-        guard deviceClass == .floor8GBMac || deviceClass == .mid16GBMac || deviceClass == .iPhonePro else { return }
         memoryPressureMonitor.start()
         let runtime = runtime
         let activeGenerationCoordinator = activeGenerationCoordinator
@@ -998,8 +996,17 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             // Background prefetch should not interrupt the active UI with an
             // eager surfaced error. The regular generate path will still
             // report actionable failures if the model cannot be used.
-            if case .starting = loadState {
-                loadState = .idle
+            // A warm that ended early (its intent changed, or it failed)
+            // settles through the runtime like a cancelled load: weights it or
+            // an earlier load left resident publish `.loaded` and get back the
+            // idle unload this warm cancelled, so they never sit without one
+            // (AUD-10). A state this warm did not publish (`stop()` reset it
+            // meanwhile) is left alone.
+            switch loadState {
+            case .starting, .loaded:
+                await settleCancelledModelOperation()
+            case .idle, .running, .failed:
+                break
             }
             return nil
         }
@@ -1045,13 +1052,12 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         } catch let error where Self.isModelOperationCancellation(error) {
             // A raw cancellation, or one the runtime wrapped (a model load
             // inside priming that an unload superseded), is not a failure.
-            let unloaded = await unloadAfterCapturedRuntimeFailureIfNeeded(error)
+            // It settles through the runtime like a cancelled load: whatever
+            // model is still resident publishes `.loaded` and gets back the
+            // idle unload this prime cancelled (AUD-10).
+            await unloadAfterCapturedRuntimeFailureIfNeeded(error)
             clonePreparationState = .idle
-            var stillLoaded = false
-            if !unloaded {
-                stillLoaded = await runtime.loadedModelID() == modelID
-            }
-            loadState = stillLoaded ? .loaded(modelID: modelID) : .idle
+            await settleCancelledModelOperation()
             throw CancellationError()
         } catch {
             // A captured MLX failure gets product copy, and the model it may
@@ -1541,9 +1547,11 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         NativeGenerationTerminalClassifier.reason(for: error) == .cancelled
     }
 
-    /// A model load or prewarm that ended cancelled is not a failure and
-    /// surfaces no error: the unload that superseded it owns the outcome. The
-    /// published state is re-derived from what the runtime still holds.
+    /// A model load, prewarm, warm prefetch or clone prime that ended
+    /// cancelled is not a failure and surfaces no error: the unload that
+    /// superseded it owns the outcome. The published state is re-derived from
+    /// what the runtime still holds, and a model still resident gets back the
+    /// idle unload the operation cancelled.
     private func settleCancelledModelOperation() async {
         if let modelID = await runtime.loadedModelID() {
             loadState = .loaded(modelID: modelID)

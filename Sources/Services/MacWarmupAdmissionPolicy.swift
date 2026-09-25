@@ -1,13 +1,14 @@
 import Foundation
 import QwenVoiceCore
 
-/// Gate for **proactive** engine warm-ups on memory-constrained Macs — the
-/// macOS port of the iOS admission discipline (`allowsProactiveWarmOperations`).
+/// Gate for **proactive** engine warm-ups on every Mac tier — the macOS port
+/// of the iOS admission discipline (`allowsProactiveWarmOperations`).
 ///
-/// While the kernel reports memory pressure on a floor8GB/mid16GB Mac,
-/// pre-loading a 2.3 GB model "for readiness" makes the very pressure that's
-/// stalling the UI worse. This policy defers those warms until pressure
-/// clears (plus a short cool-down after a hard trim on the floor tier).
+/// While the kernel reports memory pressure, pre-loading a 2.3 GB model "for
+/// readiness" makes the very pressure that's stalling the UI worse. This
+/// policy defers those warms until pressure clears (plus a short cool-down
+/// after a hard trim on the floor tier). The high-memory tier is gated too
+/// (AUD-10): memory-pressure relief applies there as on the other tiers.
 /// **User-initiated work is never gated** — generations and explicit model
 /// loads always proceed and surface their own errors.
 ///
@@ -65,9 +66,7 @@ final class MacWarmupAdmissionPolicy {
             label: "com.qwenvoice.app.memory-pressure"
         )
 
-        // Only constrained tiers pay for the monitor; on high-memory Macs the
-        // policy is a constant `allow`.
-        guard mode != .off, deviceClass != .highMemoryMac else { return }
+        guard mode != .off else { return }
         monitor.start()
         eventTask = Task { [weak self, monitor] in
             for await level in monitor.events {
@@ -88,7 +87,6 @@ final class MacWarmupAdmissionPolicy {
 
     /// The raw decision, independent of mode.
     private func rawVerdict() -> Verdict {
-        guard deviceClass != .highMemoryMac else { return .allow }
         if let level = monitor.currentLevel {
             return .deferred(reason: "memory pressure (\(level))")
         }

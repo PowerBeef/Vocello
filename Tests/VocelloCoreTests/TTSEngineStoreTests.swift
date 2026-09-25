@@ -231,8 +231,8 @@ private class StoreFixtureEngine: TTSEngineRuntimeControlling, ActiveGenerationC
         let cancelled = Task.isCancelled
         prefetchSawCancellation.append(cancelled)
         if prefetchLoadsModel {
-            // As MLXTTSEngine does, a cold load cancelled from .starting
-            // reports .idle.
+            // As MLXTTSEngine does when the runtime holds no weights, a cold
+            // load cancelled from .starting reports .idle.
             loadState = cancelled ? .idle : .loaded(modelID: request.modelID)
         }
         return nil
@@ -927,5 +927,54 @@ final class TTSEngineStoreTests: XCTestCase {
         coordinator.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
         try await Task.sleep(for: .milliseconds(30))
         XCTAssertEqual(engine.prefetchCount, 1, "The unload sticks on \(deviceClass)")
+    }
+
+    /// AUD-10: browsing History, Saved Voices or Settings carries no warm
+    /// intent (the shell passes no context there), so on every Mac tier it
+    /// neither warms a cold engine nor reloads weights an idle unload
+    /// released. Entering Studio is the intent that warms.
+    func testNavigationWithoutAStudioIntentNeverWarms() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        for deviceClass in [NativeDeviceMemoryClass.floor8GBMac, .mid16GBMac, .highMemoryMac] {
+            try await assertNavigationWithoutAStudioIntentNeverWarms(deviceClass)
+        }
+    }
+
+    private func assertNavigationWithoutAStudioIntentNeverWarms(_ deviceClass: NativeDeviceMemoryClass) async throws {
+        let engine = try makeEngine()
+        engine.prefetchLoadsModel = true
+        let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+        let coordinator = warmupCoordinator(deviceClass)
+        let subscription = store.snapshotChanges.sink { coordinator.observe(snapshot: $0) }
+        defer { subscription.cancel() }
+
+        browseOutsideStudio(coordinator, store: store)
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(engine.prefetchCount, 0, "Browsing a cold engine warms nothing on \(deviceClass)")
+        XCTAssertEqual(engine.ensureLoadedCount, 0)
+        XCTAssertEqual(store.loadState, .idle)
+
+        coordinator.scheduleWarmupIfNeeded(
+            context: customWarmContext(deviceClass),
+            snapshot: store.snapshot,
+            ttsEngineStore: store
+        )
+        await waitUntil("entering Studio to warm") { engine.prefetchSawCancellation.count == 1 }
+        await waitUntil("the model to load") { store.loadState == .loaded(modelID: "pro_custom") }
+
+        engine.loadState = .idle
+        await waitUntil("the idle unload to reach the store") { store.loadState == .idle }
+        browseOutsideStudio(coordinator, store: store)
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(engine.prefetchCount, 1, "Browsing does not reload the released weights on \(deviceClass)")
+        XCTAssertEqual(engine.ensureLoadedCount, 0)
+    }
+
+    /// A destination change, a download progress tick or a variant change
+    /// outside Studio each schedule with no context.
+    private func browseOutsideStudio(_ coordinator: MacGenerationWarmupCoordinator, store: TTSEngineStore) {
+        for _ in 0..<3 {
+            coordinator.scheduleWarmupIfNeeded(context: nil, snapshot: store.snapshot, ttsEngineStore: store)
+        }
     }
 }

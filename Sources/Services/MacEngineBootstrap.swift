@@ -78,8 +78,9 @@ enum MacEngineBootstrap {
 /// are inert here (`os_proc_available_memory` is iOS-only, so the snapshot's
 /// headroom falls back to total RAM minus footprint and stays far above them);
 /// the live criteria are the process footprint against physical RAM and the
-/// Metal working-set ratio. `highMemoryMac` keeps only the GPU criterion, like
-/// its resolver policy keeps no idle unload.
+/// Metal working-set ratio. `highMemoryMac` keeps only the GPU criterion; its
+/// resident weights are released by the resolver's idle unload and the
+/// engine's kernel-pressure responder instead (AUD-10).
 enum MacMemoryBudgetPolicy {
     static func policy(
         for deviceClass: NativeDeviceMemoryClass,

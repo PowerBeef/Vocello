@@ -60,6 +60,14 @@ public enum NativeMemoryPolicyResolver {
                 unloadAfterIdleSeconds: 600
             )
         case .highMemoryMac:
+            // Unload after idle on this tier too (AUD-10, maintainer decision
+            // 2026-09-24): warming follows intent (entering Studio or
+            // generating), so a finite window keeps browsing from pinning the
+            // weights. The window is the longest of the Mac tiers (floor 2 min,
+            // mid 10 min) because the trade favours latency here: 2-3 GB of
+            // idle weights is a small share of 32 GB or more, while an unload
+            // makes the next take pay a cold start (model load plus prewarm).
+            // Kernel pressure trims this tier as it does the others.
             return NativeMemoryPolicy(
                 name: "high_memory_mac_\(mode.rawValue)_\(isBatch ? "batch" : "single")",
                 deviceClass: deviceClass,
@@ -67,7 +75,7 @@ public enum NativeMemoryPolicyResolver {
                 clearCacheAfterGeneration: false,
                 clearMLXCacheOnStreamChunkEmit: false,
                 mlxTokenMemoryClearCadence: 200,
-                unloadAfterIdleSeconds: nil
+                unloadAfterIdleSeconds: 1_800
             )
         case .iPhonePro:
             let cacheLimitBytes = debugMegabytesOverride(

@@ -415,8 +415,8 @@ where time goes; use **Instruments signposts** (see [`benchmarking-procedure.md`
     separate always‑on `memory_pressure` mark above.
 
   A run with a `hardTrim` mid‑generation is shedding model state under pressure — an early
-  OOM signal. On a non‑pressure‑bound tier (high‑memory Mac) the monitor never starts, so
-  these marks are absent (correct, not missing data). `headroom*` summary fields populate on
+  OOM signal. Every tier starts the monitor (the high‑memory Mac since AUD‑10), so absent
+  marks mean the kernel reported no pressure, not missing data. `headroom*` summary fields populate on
   iOS only (`os_proc_available_memory`); on macOS they're nil and `phys_footprint` is the
   OOM‑relevant figure to watch.
 
@@ -553,17 +553,17 @@ packaging gate.
 
 ### Memory and pressure interpretation
 
-RAM usage (physFoot/RSS/peak‑GPU + the per‑stage GPU block) is captured on **every** run. But the
-**memory‑pressure** signals (`trims`/`pressure`) only fire on a pressure‑bound tier
-(`floor8GBMac`/`mid16GBMac`/`iPhonePro`), and `deviceClass()` is derived from real RAM — so on a
-high‑memory dev Mac they read `0`.
+RAM usage (physFoot/RSS/peak‑GPU + the per‑stage GPU block) is captured on **every** run. The
+**memory‑pressure** signals (`trims`/`pressure`) fire on every tier, but `deviceClass()` is derived
+from real RAM and a high‑memory dev Mac rarely reaches kernel pressure — so there they usually
+read `0`.
 
 `QWENVOICE_FORCE_MEMORY_CLASS` (accepts `floor_8gb_mac`/`mid_16gb_mac`/`high_memory_mac`/`iphone_pro`,
 or aliases `8gb`/`16gb`/`high`/`iphone`) is read in-process by whichever host runs the engine (the
 app or `vocello bench --force-class`).
 When selected by the canonical diagnostic procedure, it makes the engine run the floor-tier code
-paths: the pressure monitor **starts**, caches are tight,
-single‑gen clears fire, and idle‑unload is aggressive. Every engine row stamps
+paths: caches are tight, single‑gen clears fire, and idle‑unload is short and shortens further
+under pressure. Every engine row stamps
 `notes.deviceClass`, so the summarizer header shows `tier: floor_8gb_mac ⚠ forced` — never mistake a
 forced run for native‑tier data.
 

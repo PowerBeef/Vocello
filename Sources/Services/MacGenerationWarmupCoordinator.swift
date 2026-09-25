@@ -119,11 +119,11 @@ final class MacGenerationWarmupCoordinator: ObservableObject {
     private struct DeferredIntent {
         let context: WarmupContext?
     }
-    /// Warm-admission gate for constrained tiers (defers proactive warms
+    /// Warm-admission gate for every Mac tier (defers proactive warms
     /// under kernel memory pressure). Constructed eagerly so its pressure
     /// monitor is already listening before the first pressure transition —
     /// DispatchSource pressure events don't replay the in-progress level to
-    /// a late starter. (On highMemoryMac / gate=off it starts no monitor.)
+    /// a late starter. (With gate=off it starts no monitor.)
     private let admissionPolicy: MacWarmupAdmissionPolicy
 
     init(

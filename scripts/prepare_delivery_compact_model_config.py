@@ -23,7 +23,8 @@ DEFAULT_MODEL_ROOT = REPO / "build/cache/delivery-analysis/external-models"
 RUNTIME_SOURCE = REPO / "scripts/delivery_compact_model_runtime.py"
 ADAPTER_LAYER_SOURCE = REPO / "scripts/delivery_compact_model_adapter.py"
 SUPERVISOR_SOURCE = REPO / "scripts/delivery_resource_supervisor.py"
-INDEPENDENT_ASR_SOURCE = REPO / "scripts/independent_asr.py"
+# The recognizer child alone: its digest is the whisper adapter's source identity.
+INDEPENDENT_ASR_WORKER_SOURCE = REPO / "scripts/independent_asr_worker.py"
 CANDIDATE_ORDER = ("sensevoice-small-q8", "distilhubert", "whisper-small-mlx", "nisqa-v2")
 WHISPER_RUNTIME_PINS = ("mlx", "mlx-whisper", "numpy")
 NISQA_RUNTIME_PINS = ("python", "torch", "torchmetrics", "librosa", "numpy")
@@ -300,10 +301,10 @@ def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
         dependencies = _whisper_runtime_versions(binary)
         if dependencies != candidate["runtimeDependencies"]:
             raise PreparationError("whisper runtime dependency versions drifted from the contract pins")
-        source_digest = file_sha256(INDEPENDENT_ASR_SOURCE)
+        source_digest = file_sha256(INDEPENDENT_ASR_WORKER_SOURCE)
         output_format = "whisper-json"
         command = [
-            "{binary}", str(INDEPENDENT_ASR_SOURCE), "worker",
+            "{binary}", str(INDEPENDENT_ASR_WORKER_SOURCE),
             "--weights", "{weights}", "--audio", "{audio}",
         ]
     elif adapter_id == "nisqa-v2":

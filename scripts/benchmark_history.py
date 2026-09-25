@@ -261,6 +261,9 @@ LANGUAGE_VERIFICATION_IDENTITY_KEYS = {
     "outputSchemaVersion", "outputAlgorithm", "recognitionSchemaVersion",
     "recognitionAlgorithm", "accuracyMetricVersion", "requiredPassCount",
 }
+INDEPENDENT_CONFIDENCE_METRIC_KEYS = (
+    "independentMaximumNoSpeechProbability", "independentMeanAverageLogProbability",
+)
 LANGUAGE_ACCURACY_METRIC_KEYS = {
     "wordErrorRate", "characterErrorRate", "primaryAccuracyScore", "accuracyThreshold",
     "languageMatchScore", "outputLanguagePass", "outputAccuracyPass",
@@ -447,6 +450,10 @@ METRIC_KEYS = {
     "independentWordErrorRate", "independentCharacterErrorRate", "independentPrimaryAccuracyScore",
     "independentLanguageMatchScore", "independentLanguagePass", "independentAccuracyPass",
     "independentRecognitionDurationSeconds",
+    # Whisper's own confidence per take (records since 2026-09-25, audit #89):
+    # the worst segment's no-speech probability and the mean segment log
+    # probability. Descriptive only; no gate reads them.
+    *INDEPENDENT_CONFIDENCE_METRIC_KEYS,
     "chunksForwarded", "transportChunkGaps", "transportDuplicateChunks", "transportOutOfOrderChunks",
     "minimumQueueDurationMS", "hintCellsPassed", "hintCellsExpected",
     "outputCellsPassed", "outputCellsExpected", "medianRTF", "medianTTFCMS",
@@ -2842,6 +2849,8 @@ def validate_record(
                 or metrics["independentLanguagePass"] not in (0.0, 1.0)
                 or not 0.0 <= float(metrics["independentLanguageMatchScore"]) <= 1.0
                 or float(metrics["independentRecognitionDurationSeconds"]) <= 0
+                or not 0.0 <= float(metrics.get("independentMaximumNoSpeechProbability", 0.0)) <= 1.0
+                or float(metrics.get("independentMeanAverageLogProbability", 0.0)) > 0.0
             ):
                 raise HistoryError("independent recognition gate metrics are inconsistent")
             independent_passed = (

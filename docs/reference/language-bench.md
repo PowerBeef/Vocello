@@ -217,9 +217,15 @@ Uses `QWENVOICE_DEBUG=1`, `vocello generate --language … --seed … --out …`
 against `~/Library/Application Support/QwenVoice-Debug/diagnostics/`. Apple Speech is **not**
 available to the CLI (TCC). Spoken content is instead verified after every CLI process has exited by
 `scripts/independent_asr.py`: the pinned `whisper-small` MLX model
-(`config/delivery-evaluator-v2-candidates.json`, `whisper-small-mlx`) is loaded once in a supervised
-subprocess, decodes each take with the language locked to the expected language, detects the language
-from the first 30 s, and the publisher re-scores every transcript against the corpus with the same
+(`config/delivery-evaluator-v2-candidates.json`, `whisper-small-mlx`) is loaded and warmed once in a
+supervised subprocess (`scripts/independent_asr_worker.py`, whose digest alone is the recognizer's
+cache and provenance identity), decodes each take with the language locked to the expected language,
+detects the language from the first 30 s, and reports what it measured: the decoded sample count (the
+processed duration the publisher checks against the WAV), the per-take recognition time without model
+load or warm-up (`modelLoadSeconds` and `warmupSeconds` are reported once per launch; the language
+lineage's measurement version is 2 from this change) and whisper's worst no-speech probability and
+mean log probability, published as `independentMaximumNoSpeechProbability` and
+`independentMeanAverageLogProbability`. The publisher re-scores every transcript against the corpus with the same
 15 % edit-rate gate (whisper-small's character error rate on Chinese and Japanese sits close to that
 gate, so treat those verdicts as real evidence, not noise; recognizer or metric changes go into
 `scripts/lib/language_metrics.py`, never its consumers). The recognizer never runs while the engine

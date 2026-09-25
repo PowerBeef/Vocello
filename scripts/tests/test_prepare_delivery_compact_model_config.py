@@ -76,7 +76,9 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
             self.assertEqual(config["outputFormat"], "whisper-json")
             self.assertEqual(config["decodeOptions"]["languageLock"], "expected-language")
             self.assertEqual(config["weightsPath"], str(snapshot / "weights.npz"))
-            self.assertIn("independent_asr.py", config["commandTemplate"][1])
+            # The recognizer child alone is the adapter source (audit #89).
+            self.assertTrue(config["commandTemplate"][1].endswith("independent_asr_worker.py"))
+            self.assertEqual(config["commandTemplate"][2], "--weights")
             self.assertIs(validate_adapter_config(config), config)
 
             drifted = dict(pins, **{"mlx-whisper": "0.0.1"})

@@ -11,11 +11,13 @@ Design rules for the 8 GB support floor:
   * Nothing here loads a model while the Qwen3 engine may be resident. The
     manifest must declare `generationProcessExited: true`; the lanes build it
     after their generation loop.
-  * Exactly one supervised subprocess (`delivery_resource_supervisor`) loads the
-    model once and transcribes every uncached row; the parent never imports MLX.
+  * Exactly one supervised subprocess (`delivery_resource_supervisor`) runs
+    `independent_asr_worker.py`, which loads and warms the model once and
+    transcribes every uncached row; the parent never imports MLX.
   * Results are cached in `DeliveryAnalysisCache` under an identity that binds
-    the audio bytes, the canonical derivative, the model, the runtime and the
-    per-language decode options, so re-analysis launches nothing.
+    the audio bytes, the canonical derivative, the model, the runtime (the
+    worker's source, not this file's) and the per-language decode options, so
+    re-analysis launches nothing.
   * Evidence carries transcripts of tracked corpus scripts, digests and
     envelopes; never audio bytes or local paths. It stays untracked.
 
@@ -23,7 +25,6 @@ Commands:
   manifest    build the row manifest for a macOS or iOS language run, or for a
               cascade input
   transcribe  run the producer over a manifest and write recognition evidence
-  worker      internal child process (the only place MLX loads)
 """
 
 from __future__ import annotations
@@ -34,7 +35,6 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-import time
 from typing import Any, Callable
 import wave
 
@@ -53,6 +53,7 @@ from lib.language_metrics import (  # noqa: E402
 
 
 SCHEMA_VERSION = 1
+WORKER_SOURCE = SCRIPT_DIR / "independent_asr_worker.py"
 FAMILY = "whisper"
 ADAPTER_ID = "whisper-small-mlx"
 LAYER_ID = "independent-asr"
@@ -298,7 +299,9 @@ def _provenance(config: dict[str, Any], *, language_code: str) -> dict[str, str]
     runtime = digest({
         "runtimeDependencies": config.get("runtimeDependencies"),
         "binarySHA256": config["binarySHA256"],
-        "workerSourceSHA256": file_sha256(Path(__file__)),
+        # Narrowed to the recognizer child (audit #89): editing a manifest
+        # builder or this producer never invalidates cached recognitions.
+        "workerSourceSHA256": file_sha256(WORKER_SOURCE),
         "algorithm": INDEPENDENT_ASR_ALGORITHM,
     })
     model = digest({
@@ -324,6 +327,15 @@ def _recognition(row: dict[str, Any], result: dict[str, Any], *, provenance: dic
     full = bool(segments) and edges_covered(min(starts), max(ends), duration)
     detected_code = str(result.get("detectedLanguage", ""))
     transcript = str(result.get("transcript", "")).strip()
+    # The duration the recognizer decoded, from its own sample count (audit
+    # #89); the WAV header value made the mismatch check unable to fire.
+    samples, rate = result.get("decodedSampleCount"), result.get("sampleRateHz")
+    processed = (
+        samples / rate
+        if type(samples) is int and samples > 0 and type(rate) is int and rate > 0 else None
+    )
+    no_speech = [float(segment["noSpeechProb"]) for segment in segments if "noSpeechProb" in segment]
+    log_probabilities = [float(segment["avgLogprob"]) for segment in segments if "avgLogprob" in segment]
     return {
         "schemaVersion": INDEPENDENT_RECOGNITION_SCHEMA,
         "algorithmVersion": INDEPENDENT_ASR_ALGORITHM,
@@ -337,8 +349,14 @@ def _recognition(row: dict[str, Any], result: dict[str, Any], *, provenance: dic
         "languageMatchScore": float(result.get("expectedLanguageProbability", 0.0)),
         "detectedLanguageProbability": float(result.get("detectedLanguageProbability", 0.0)),
         "fullFileProcessed": full,
-        "processedDurationSeconds": duration,
+        "processedDurationSeconds": processed,
+        "decodedSampleCount": samples if processed is not None else None,
         "segmentCount": len(segments),
+        # Whisper's own confidence, kept rather than computed and dropped.
+        "maximumNoSpeechProbability": max(no_speech) if no_speech else None,
+        "meanAverageLogProbability": (
+            sum(log_probabilities) / len(log_probabilities) if log_probabilities else None
+        ),
         "firstSegmentStartSeconds": min(starts) if starts else None,
         "lastSegmentEndSeconds": max(ends) if ends else None,
         "recognitionDurationSeconds": float(result.get("wallSeconds", 0.0)),
@@ -402,6 +420,8 @@ def transcribe_manifest(
         pending.append((row, identity, provenance, code, canonical.derivative_path))
 
     envelope: dict[str, Any] | None = None
+    model_load_seconds: Any = None
+    warmup_seconds: Any = None
     if pending:
         with tempfile.TemporaryDirectory(prefix="vocello-independent-asr-") as temporary:
             job_path = Path(temporary) / "job.json"
@@ -414,7 +434,7 @@ def transcribe_manifest(
                     for row, _identity, _provenance, code, pcm in pending
                 ],
             }), encoding="utf-8")
-            command = [str(config["binaryPath"]), str(Path(__file__).resolve()), "worker", "--job", str(job_path)]
+            command = [str(config["binaryPath"]), str(WORKER_SOURCE.resolve()), "--job", str(job_path)]
             environment = dict(os.environ)
             environment.update({"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1"})
             # Whisper runs on MLX: its Metal memory is invisible to RSS, so the
@@ -445,6 +465,8 @@ def transcribe_manifest(
             raise IndependentASRError("recognizer worker did not emit one JSON object") from error
         if not isinstance(output, dict) or output.get("kind") != "independent-asr-worker-output":
             raise IndependentASRError("recognizer worker output is not typed")
+        model_load_seconds = output.get("modelLoadSeconds")
+        warmup_seconds = output.get("warmupSeconds")
         by_id = {item.get("id"): item for item in output.get("rows", []) if isinstance(item, dict)}
         for row, identity, provenance, _code, _pcm in pending:
             item = by_id.get(row["id"])
@@ -463,6 +485,9 @@ def transcribe_manifest(
         "rowCount": len(manifest["rows"]),
         "cacheHits": cache_hits,
         "modelLaunches": 1 if pending else 0,
+        # Paid once per launch and kept out of every row's recognition time.
+        "modelLoadSeconds": model_load_seconds,
+        "warmupSeconds": warmup_seconds,
         "resourceEnvelope": envelope,
     }
     if manifest.get("platform") == "cascade":
@@ -495,92 +520,6 @@ def transcribe_manifest(
             for row in manifest["rows"]
         },
     }
-
-
-# --------------------------------------------------------------------------- #
-# Worker (child process; the only place MLX loads)
-# --------------------------------------------------------------------------- #
-
-def _read_pcm16(path: Path) -> Any:
-    import numpy as np
-    data = np.frombuffer(path.read_bytes(), dtype="<i2")
-    return (data.astype(np.float32) / 32768.0)
-
-
-def _read_wav16k(path: Path) -> Any:
-    import numpy as np
-    with wave.open(str(path), "rb") as stream:
-        if stream.getframerate() != 16_000 or stream.getnchannels() != 1 or stream.getsampwidth() != 2:
-            raise IndependentASRError("worker single-file input must be 16 kHz mono PCM16")
-        frames = stream.readframes(stream.getnframes())
-    return np.frombuffer(frames, dtype="<i2").astype(np.float32) / 32768.0
-
-
-def _worker_recognize(model_dir: Path, audio: Any, language: str | None, decode: dict[str, Any]) -> dict[str, Any]:
-    import mlx.core as mx
-    import mlx_whisper
-    from mlx_whisper.audio import N_SAMPLES, log_mel_spectrogram, pad_or_trim
-    from mlx_whisper.transcribe import ModelHolder
-
-    fp16 = decode.get("fp16", True) is not False
-    dtype = mx.float16 if fp16 else mx.float32
-    started = time.monotonic()
-    model = ModelHolder.get_model(str(model_dir), dtype)
-    # Language identification reads the first 30 s exactly as upstream Whisper
-    # does: pad or trim the *audio* to 30 s, then take its log-mel spectrogram.
-    segment = log_mel_spectrogram(pad_or_trim(mx.array(audio), N_SAMPLES), n_mels=model.dims.n_mels).astype(dtype)
-    _tokens, probabilities = model.detect_language(segment)
-    detected = max(probabilities, key=probabilities.get)
-    options: dict[str, Any] = {
-        "path_or_hf_repo": str(model_dir),
-        "temperature": float(decode.get("temperature", 0.0)),
-        "condition_on_previous_text": bool(decode.get("conditionOnPreviousText", False)),
-        "fp16": fp16,
-        "word_timestamps": bool(decode.get("wordTimestamps", False)),
-        "verbose": None,
-    }
-    if language is not None:
-        options["language"] = language
-    result = mlx_whisper.transcribe(audio, **options)
-    segments = [
-        {
-            "start": float(item.get("start", 0.0)),
-            "end": float(item.get("end", 0.0)),
-            "noSpeechProb": float(item.get("no_speech_prob", 0.0)),
-            "avgLogprob": float(item.get("avg_logprob", 0.0)),
-        }
-        for item in result.get("segments", [])
-    ]
-    return {
-        "transcript": str(result.get("text", "")).strip(),
-        "language": result.get("language"),
-        "detectedLanguage": detected,
-        "detectedLanguageProbability": float(probabilities[detected]),
-        "expectedLanguageProbability": float(probabilities.get(language, 0.0)) if language else float(probabilities[detected]),
-        "segments": segments,
-        "wallSeconds": time.monotonic() - started,
-    }
-
-
-def worker_main(args: argparse.Namespace) -> int:
-    if args.job is not None:
-        job = _load_json(args.job)
-        model_dir = Path(str(job["weights"])).parent
-        decode = job.get("decodeOptions") or {}
-        rows = []
-        for row in job.get("rows", []):
-            audio = _read_pcm16(Path(str(row["pcmPath"])))
-            rows.append({"id": row["id"], **_worker_recognize(model_dir, audio, row.get("language"), decode)})
-        payload = {"schemaVersion": SCHEMA_VERSION, "kind": "independent-asr-worker-output", "rows": rows}
-    else:
-        if args.weights is None or args.audio is None:
-            raise IndependentASRError("worker needs --job or --weights with --audio")
-        audio = _read_wav16k(args.audio)
-        payload = _worker_recognize(Path(args.weights).parent, audio, args.language, {})
-    sys.stdout.write(json.dumps(payload, ensure_ascii=False))
-    sys.stdout.write("\n")
-    sys.stdout.flush()
-    return 0
 
 
 # --------------------------------------------------------------------------- #
@@ -635,16 +574,8 @@ def main() -> int:
     transcribe.add_argument("--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS)
     transcribe.add_argument("--maximum-rss-bytes", type=int, default=MAXIMUM_RSS_BYTES)
 
-    worker = commands.add_parser("worker", help=argparse.SUPPRESS)
-    worker.add_argument("--job", type=Path)
-    worker.add_argument("--weights", type=Path)
-    worker.add_argument("--audio", type=Path)
-    worker.add_argument("--language")
-
     args = parser.parse_args()
     try:
-        if args.command == "worker":
-            return worker_main(args)
         from delivery_analysis_cache import DeliveryAnalysisCache, atomic_json, configured_resampler
         if args.command == "manifest":
             if args.platform == "macos":

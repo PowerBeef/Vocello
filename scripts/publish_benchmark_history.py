@@ -2647,6 +2647,16 @@ def load_independent_recognitions(path: Path, *, run_id: str, platform: str) -> 
     return payload
 
 
+def _unit_interval(value: Any) -> float | None:
+    number = finite_number(value)
+    return number if number is not None and 0.0 <= number <= 1.0 else None
+
+
+def _nonpositive(value: Any) -> float | None:
+    number = finite_number(value)
+    return number if number is not None and number <= 0.0 else None
+
+
 def sanitized_independent_evidence(
     *,
     cell: dict[str, Any],
@@ -2731,6 +2741,10 @@ def sanitized_independent_evidence(
         "pass": verdict["passed"],
         "fullFileProcessed": True,
         "recognitionDurationSeconds": recognition_duration,
+        # Whisper's own confidence (audit #89); absent from evidence that
+        # predates it, and never part of the verdict.
+        "maximumNoSpeechProbability": _unit_interval(recognition.get("maximumNoSpeechProbability")),
+        "meanAverageLogProbability": _nonpositive(recognition.get("meanAverageLogProbability")),
         "consensus": agreement,
         "provenance": dict(recognition["provenance"]),
     }
@@ -2995,6 +3009,12 @@ def language_command(args: argparse.Namespace) -> Path:
                 "independentAccuracyPass": 1.0 if evidence["accuracyPass"] else 0.0,
                 "independentRecognitionDurationSeconds": evidence["recognitionDurationSeconds"],
             })
+            for source, target in (
+                ("maximumNoSpeechProbability", "independentMaximumNoSpeechProbability"),
+                ("meanAverageLogProbability", "independentMeanAverageLogProbability"),
+            ):
+                if evidence.get(source) is not None:
+                    take["metrics"][target] = evidence[source]
     families = sorted(
         ({"apple-speech"} if asr_evidence else set()) | ({"whisper"} if independent_evidence else set())
     )

@@ -314,6 +314,8 @@ def independent_recognition(*, audio_sha256: str, script: str, transcript: str |
         "firstSegmentStartSeconds": 0.0,
         "lastSegmentEndSeconds": duration,
         "recognitionDurationSeconds": 0.4,
+        "maximumNoSpeechProbability": 0.02,
+        "meanAverageLogProbability": -0.25,
         "transcript": script if transcript is None else transcript,
         "provenance": provenance or {
             "runtimeSHA256": "1" * 64, "modelIdentitySHA256": "2" * 64, "configSHA256": "3" * 64,
@@ -2008,6 +2010,9 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(take["metrics"]["independentWordErrorRate"], 0.125)
         self.assertEqual(take["metrics"]["independentPrimaryAccuracyScore"], 0.125)
         self.assertEqual(take["metrics"]["independentLanguagePass"], 1.0)
+        # Whisper's confidence is published beside its verdict (audit #89).
+        self.assertEqual(take["metrics"]["independentMaximumNoSpeechProbability"], 0.02)
+        self.assertEqual(take["metrics"]["independentMeanAverageLogProbability"], -0.25)
         self.assertNotIn("wordErrorRate", take["metrics"])
         self.assertNotIn("recognitionPassCount", take["metrics"])
         self.assertEqual(captured["manifest"]["historyRecord"]["inputs"].get("analysisProfileHash") is not None, True)

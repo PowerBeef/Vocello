@@ -108,6 +108,7 @@ LANGUAGE_VERIFICATION = (
     "scripts/check_language_hints.py",
     "scripts/check_language_output.py",
     "scripts/independent_asr.py",
+    "scripts/independent_asr_worker.py",
     "scripts/lib/language_metrics.py",
 )
 PROFILE_SUMMARY = (
@@ -203,6 +204,10 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # the phone every 10 s while the take runs; they poll only their markers.
     ("engine-generation", "ios"): 2,
     ("memory-qualification", "ios"): 2,
+    # 2 (2026-09-25, audit #89): the whisper recognition time excludes model
+    # load and warm-up, and the processed duration is the decoded sample count.
+    ("language", "macos"): 2,
+    ("language", "ios"): 2,
 }
 
 # (scheme, extra root targets) whose project.yml subset each lane builds;

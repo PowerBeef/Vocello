@@ -78,7 +78,7 @@ class IndependentASRTests(unittest.TestCase):
             "offlineAfterAcquisition": True,
             "outputFormat": "whisper-json",
             "decodeOptions": {"temperature": 0.0, "conditionOnPreviousText": False, "fp16": True},
-            "commandTemplate": [sys.executable, "independent_asr.py", "worker", "--weights", "{weights}",
+            "commandTemplate": [sys.executable, "independent_asr_worker.py", "--weights", "{weights}",
                                 "--audio", "{audio}", "{binary}"],
         }
         self.cache = DeliveryAnalysisCache(self.root / "cache")
@@ -100,8 +100,10 @@ class IndependentASRTests(unittest.TestCase):
     def supervisor(self, command, **kwargs):
         """Stand in for the whisper worker: read the job, answer every row."""
         self.launches.append(list(command))
-        self.assertEqual(command[2], "worker")
-        job = json.loads(Path(command[4]).read_text())
+        # The recognizer child is its own file (audit #89).
+        self.assertEqual(Path(command[1]).name, "independent_asr_worker.py")
+        self.assertEqual(command[2], "--job")
+        job = json.loads(Path(command[3]).read_text())
         self.assertEqual(job["weights"], str(self.weights))
         self.assertEqual(kwargs["maximum_rss_bytes"], independent_asr.MAXIMUM_RSS_BYTES)
         # MLX: the footprint ceiling is measured and evaluated, never printed unevaluated.
@@ -114,10 +116,14 @@ class IndependentASRTests(unittest.TestCase):
             rows.append({
                 "id": row["id"], "transcript": SCRIPT, "language": "en", "detectedLanguage": "en",
                 "detectedLanguageProbability": 0.98, "expectedLanguageProbability": 0.98,
-                "segments": [{"start": 0.0, "end": 1.9, "noSpeechProb": 0.01, "avgLogprob": -0.2}],
+                "segments": [{"start": 0.0, "end": 1.0, "noSpeechProb": 0.01, "avgLogprob": -0.2},
+                             {"start": 1.0, "end": 1.9, "noSpeechProb": 0.03, "avgLogprob": -0.4}],
+                "decodedSampleCount": Path(row["pcmPath"]).stat().st_size // 2,
+                "sampleRateHz": 16_000,
                 "wallSeconds": 0.4,
             })
-        payload = {"schemaVersion": 1, "kind": "independent-asr-worker-output", "rows": rows}
+        payload = {"schemaVersion": 1, "kind": "independent-asr-worker-output",
+                   "modelLoadSeconds": 0.3, "warmupSeconds": 0.1, "rows": rows}
         return SupervisedResult(envelope(), json.dumps(payload).encode(), b"")
 
     def test_manifest_must_declare_generator_exit(self) -> None:
@@ -150,6 +156,14 @@ class IndependentASRTests(unittest.TestCase):
         self.assertEqual(recognition["detectedLanguage"], "english")
         self.assertTrue(recognition["fullFileProcessed"])
         self.assertEqual(recognition["languageMatchScore"], 0.98)
+        # Measured by the recognizer, not copied from the WAV header (audit #89).
+        self.assertEqual(recognition["decodedSampleCount"], 32_000)
+        self.assertEqual(recognition["processedDurationSeconds"], 2.0)
+        self.assertEqual(recognition["maximumNoSpeechProbability"], 0.03)
+        self.assertAlmostEqual(recognition["meanAverageLogProbability"], -0.3)
+        self.assertEqual(recognition["recognitionDurationSeconds"], 0.4)
+        self.assertEqual(evidence["producer"]["modelLoadSeconds"], 0.3)
+        self.assertEqual(evidence["producer"]["warmupSeconds"], 0.1)
         self.assertNotIn(str(self.root), json.dumps(evidence))
 
         def must_not_launch(*_args, **_kwargs):
@@ -163,13 +177,74 @@ class IndependentASRTests(unittest.TestCase):
         self.assertEqual(again["producer"]["cacheHits"], 1)
         self.assertEqual(again["cells"], evidence["cells"])
 
+    def test_truncated_decode_is_a_processed_duration_mismatch(self) -> None:
+        """The mismatch check can fire now that the duration is measured (audit #89)."""
+        def truncated(command, **kwargs):
+            result = self.supervisor(command, **kwargs)
+            payload = json.loads(result.stdout)
+            for row in payload["rows"]:
+                row["decodedSampleCount"] = 16_000  # one of the two seconds
+            return SupervisedResult(result.report, json.dumps(payload).encode(), b"")
+
+        evidence = independent_asr.transcribe_manifest(
+            manifest=self.manifest, config=self.config, cache=self.cache,
+            lock_root=self.root, supervisor=truncated,
+        )
+        recognition = evidence["cells"]["en"]["recognitions"][0]
+        self.assertEqual(recognition["processedDurationSeconds"], 1.0)
+        self.assertIn("processed-duration-mismatch", recognition_issues(
+            recognition, audio_sha256=file_sha256(self.wav), script=SCRIPT,
+            script_sha256=text_sha256(SCRIPT), language="english", duration_seconds=2.0,
+        ))
+
+    def test_worker_loads_and_warms_once_before_any_row_is_timed(self) -> None:
+        import independent_asr_worker as worker
+
+        events: list = []
+
+        class FakeRecognizer:
+            def __init__(self, model_dir, decode) -> None:
+                events.append(("load", model_dir.name, decode))
+                self.model_load_seconds, self.warmup_seconds = 1.5, 0.2
+
+            def recognize(self, audio, language):
+                events.append(("row", len(audio), language))
+                return {"decodedSampleCount": len(audio), "wallSeconds": 0.1}
+
+        first, second = self.root / "a.pcm", self.root / "b.pcm"
+        first.write_bytes(b"\x00\x00" * 480)
+        second.write_bytes(b"\x00\x00" * 960)
+        job = {"weights": str(self.weights), "decodeOptions": {"fp16": True}, "rows": [
+            {"id": "a", "pcmPath": str(first), "language": "en"},
+            {"id": "b", "pcmPath": str(second), "language": "fr"},
+        ]}
+        with mock.patch.object(worker, "Recognizer", FakeRecognizer):
+            output = worker.run_job(job)
+        self.assertEqual(events, [("load", self.root.name, {"fp16": True}),
+                                  ("row", 480, "en"), ("row", 960, "fr")])
+        self.assertEqual((output["modelLoadSeconds"], output["warmupSeconds"]), (1.5, 0.2))
+        self.assertEqual([row["decodedSampleCount"] for row in output["rows"]], [480, 960])
+
+    def test_cache_identity_follows_the_worker_not_the_producer(self) -> None:
+        with mock.patch.object(independent_asr, "WORKER_SOURCE", self.root / "worker-a.py"):
+            (self.root / "worker-a.py").write_text("a")
+            first = independent_asr._provenance(self.config, language_code="en")
+            with mock.patch.object(independent_asr, "__file__", str(self.root / "producer-edited.py")):
+                self.assertEqual(independent_asr._provenance(self.config, language_code="en"), first)
+            (self.root / "worker-a.py").write_text("b")
+            self.assertNotEqual(
+                independent_asr._provenance(self.config, language_code="en")["runtimeSHA256"],
+                first["runtimeSHA256"],
+            )
+
     def test_edge_coverage_and_empty_transcripts_are_reported_not_hidden(self) -> None:
         def short_read(command, **kwargs):
-            job = json.loads(Path(command[4]).read_text())
+            job = json.loads(Path(command[3]).read_text())
             rows = [{
                 "id": row["id"], "transcript": "", "language": "en", "detectedLanguage": "fr",
                 "detectedLanguageProbability": 0.6, "expectedLanguageProbability": 0.3,
                 "segments": [{"start": 0.0, "end": 0.4, "noSpeechProb": 0.9, "avgLogprob": -1.0}],
+                "decodedSampleCount": 32_000, "sampleRateHz": 16_000,
                 "wallSeconds": 0.1,
             } for row in job["rows"]]
             payload = {"schemaVersion": 1, "kind": "independent-asr-worker-output", "rows": rows}

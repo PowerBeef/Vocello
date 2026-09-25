@@ -1926,16 +1926,19 @@ struct StreamingExecutionContext: Sendable {
             // marking-shaped telemetry as marking evidence.
             if let markingConfiguration, AudioMarkingPolicy.resolvedEnabled() {
                 await telemetrySampler?.captureBoundary("before_marking")
-                // The MLX peak is cumulative since the request began, so the
-                // marking pass raised the take's exact MLX high-water mark
-                // only if the after-marking peak exceeds this one (audit #67).
-                mlxMemorySnapshots["before_marking"] = NativeMemoryPolicyResolver.snapshot()
                 // Zero-peak ordering (the CP-2 gate's design): release the
                 // generation pass's allocator cache BEFORE the marking
                 // weights load, and drop the marking pass's own buffers
                 // after — the resident peak must never stack marking on top
                 // of generation's still-cached working set.
                 Memory.clearCache()
+                // The MLX peak is cumulative since the request began, so the
+                // marking pass raised the take's exact MLX high-water mark
+                // only if the after-marking peak exceeds this one (audit #67).
+                // Taken after the cache release, which moves neither peak nor
+                // active memory, so this stage never adds the end-of-generation
+                // cache to the take's typed `mlxCachePeakMB` maximum.
+                mlxMemorySnapshots["before_marking"] = NativeMemoryPolicyResolver.snapshot()
                 do {
                     try AudioPublicationMarker.markStagedWAV(
                         at: stagingURL,

@@ -46,9 +46,12 @@ def sidecar_rows(pre_peaks, mark_peaks, boundaries=True):
 
 
 class MarkingPeakEqualityTests(unittest.TestCase):
-    def run_checker(self, takes, *extra: str, mlx_peaks=None) -> int:
+    def run_checker(self, takes, *extra: str, mlx_peaks=None,
+                    engine_rows_file: str | None = None) -> int:
         """`mlx_peaks` maps a take index to its (before, after) marking MLX
-        peaks, written as that take's engine row beside the sidecars."""
+        peaks, written as that take's engine row beside the sidecars; a take
+        it omits gets an unchanged peak, and `mlx_peaks={}` writes no rows.
+        `engine_rows_file` replaces generations.jsonl verbatim ("" omits it)."""
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
             engine = root / "runtime" / "diagnostics" / "engine"
@@ -61,15 +64,16 @@ class MarkingPeakEqualityTests(unittest.TestCase):
                     "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
                 record_takes.append(
                     {"cell": cell, "generationID": gid, "status": "success"})
-                if mlx_peaks and i in mlx_peaks:
-                    before, after = mlx_peaks[i]
+                if mlx_peaks is None or i in mlx_peaks:
+                    before, after = (mlx_peaks or {}).get(i, (2200.0, 2200.0))
                     engine_rows.append({"generationID": gid, "mlxMemoryByStage": {
-                        "before_marking": {"activeMB": 900.0, "cacheMB": 50.0, "peakMB": before},
+                        "before_marking": {"activeMB": 900.0, "cacheMB": 0.0, "peakMB": before},
                         "after_marking": {"activeMB": 900.0, "cacheMB": 0.0, "peakMB": after},
                     }})
-            if engine_rows:
-                (engine / "generations.jsonl").write_text(
-                    "".join(json.dumps(r) + "\n" for r in engine_rows), encoding="utf-8")
+            contents = engine_rows_file if engine_rows_file is not None else "".join(
+                json.dumps(r) + "\n" for r in engine_rows)
+            if contents:
+                (engine / "generations.jsonl").write_text(contents, encoding="utf-8")
             manifest = root / "benchmark-evidence.json"
             manifest.write_text(
                 json.dumps({"historyRecord": {"takes": record_takes}}),
@@ -100,6 +104,31 @@ class MarkingPeakEqualityTests(unittest.TestCase):
         # An unchanged peak, or one page of rounding, passes.
         self.assertEqual(
             self.run_checker([("custom/cold#0", rows)], mlx_peaks={0: (2200.0, 2200.015625)}), 0)
+
+    def test_exact_mlx_check_fails_closed_when_marking_ran_without_its_snapshots(self) -> None:
+        # The sidecar shows the marking pass ran, so the current-source lane
+        # must carry the engine row and both MLX marking snapshots.
+        rows = sidecar_rows(pre_peaks=[400, 858], mark_peaks=[430])
+        take = [("custom/cold#0", rows)]
+        no_snapshots = json.dumps({"generationID": "FIXTURE-0", "mlxMemoryByStage": {
+            "after_stream": {"activeMB": 900.0, "cacheMB": 0.0, "peakMB": 2200.0}}}) + "\n"
+        no_stages = json.dumps({"generationID": "FIXTURE-0"}) + "\n"
+        cases = {
+            "missing generations.jsonl": {"mlx_peaks": {}},
+            "no row for the take": {"engine_rows_file": no_stages.replace("FIXTURE-0", "OTHER")},
+            "row without MLX stages": {"engine_rows_file": no_stages},
+            "row without marking snapshots": {"engine_rows_file": no_snapshots},
+            "unparseable row": {"engine_rows_file": "{not json\n" + no_snapshots},
+        }
+        for label, options in cases.items():
+            with self.subTest(label=label):
+                self.assertEqual(self.run_checker(take, **options), 1)
+        # Only an explicit legacy replay reports the check as unavailable.
+        self.assertEqual(
+            self.run_checker(take, "--allow-legacy-evidence", mlx_peaks={}), 0)
+        self.assertEqual(
+            self.run_checker(take, "--allow-legacy-evidence",
+                             engine_rows_file=no_snapshots), 0)
 
     def test_missing_boundaries_fail_closed(self) -> None:
         # QWENVOICE_MARKING=off: the seam captures no boundaries, so an
@@ -133,6 +162,13 @@ class MarkingPeakEqualityTests(unittest.TestCase):
             rows = sidecar_rows(pre_peaks=[800], mark_peaks=[810])
             (engine / f"samples-{generation_id}.jsonl").write_text(
                 "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
+            )
+            snapshot = {"activeMB": 900.0, "cacheMB": 0.0, "peakMB": 2200.0}
+            (engine / "generations.jsonl").write_text(
+                json.dumps({"generationID": generation_id, "mlxMemoryByStage": {
+                    "before_marking": snapshot, "after_marking": snapshot,
+                }}) + "\n",
+                encoding="utf-8",
             )
             manifest = root / "benchmark-evidence.json"
             manifest.write_text(

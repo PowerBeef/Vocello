@@ -40,40 +40,54 @@ def unwrap_record(document: dict) -> dict:
     return inner if isinstance(inner, dict) else document
 
 
-def engine_rows_by_id(engine_dir: Path) -> dict[str, dict]:
-    """The engine rows beside the sidecars, by generation ID ({} when absent)."""
+def engine_rows_by_id(engine_dir: Path, errors: list[str]) -> dict[str, dict]:
+    """The engine rows beside the sidecars, by generation ID ({} when absent).
+    A line that is not a JSON object is an error, never silently skipped."""
     path = engine_dir / "generations.jsonl"
     if not path.is_file():
         return {}
     rows: dict[str, dict] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         if not line.strip():
             continue
         try:
             row = json.loads(line)
         except json.JSONDecodeError:
+            row = None
+        if not isinstance(row, dict):
+            errors.append(f"{path.name} line {number}: not a JSON object")
             continue
-        if isinstance(row, dict) and isinstance(row.get("generationID"), str):
+        if isinstance(row.get("generationID"), str):
             rows[row["generationID"]] = row
     return rows
 
 
 def check_exact_mlx_peak(take: dict, row: dict | None, tolerance_mb: float,
-                         errors: list[str]) -> None:
+                         allow_legacy: bool, errors: list[str]) -> None:
     """The exact check (audit #67): MLX's peak is cumulative since the request
     began, so the marking pass raised the take's MLX high-water mark only if
-    the peak after marking exceeds the peak before it. A take whose engine row
-    predates the marking snapshots keeps only the sampled check below."""
+    the peak after marking exceeds the peak before it. It runs for every take
+    whose sidecar shows the marking pass ran; the memory lane builds current
+    source with verbose telemetry, so a missing engine row or marking snapshot
+    there is broken wiring and fails. Only `--allow-legacy-evidence` (a replay
+    of evidence that predates the snapshots) reports it as unavailable."""
     label = f"{take.get('cell', take.get('mode', '?'))}"
     stages = (row or {}).get("mlxMemoryByStage")
-    if not isinstance(stages, dict):
-        print(f"  {label:32} exact MLX check unavailable (no engine MLX stages)")
-        return
-    before = (stages.get("before_marking") or {}).get("peakMB")
-    after = (stages.get("after_marking") or {}).get("peakMB")
+    before = after = None
+    if isinstance(stages, dict):
+        before = (stages.get("before_marking") or {}).get("peakMB")
+        after = (stages.get("after_marking") or {}).get("peakMB")
     if not all(isinstance(value, (int, float)) and not isinstance(value, bool)
                for value in (before, after)):
-        print(f"  {label:32} exact MLX check unavailable (no marking snapshots)")
+        reason = ("no engine row" if row is None
+                  else "no engine MLX stages" if not isinstance(stages, dict)
+                  else "no MLX marking snapshots")
+        if allow_legacy:
+            print(f"  {label:32} exact MLX check unavailable ({reason}; legacy evidence)")
+            return
+        errors.append(
+            f"{label}: the marking pass ran but the exact MLX check has {reason}; "
+            f"pass --allow-legacy-evidence only for evidence that predates the snapshots")
         return
     verdict = "PASS" if after <= before + tolerance_mb else "FAIL"
     print(f"  {label:32} MLX peak before marking {before:8.1f} MB  "
@@ -93,11 +107,12 @@ def footprint(row: dict) -> float | None:
 
 
 def check_take(take: dict, sidecar: Path, pct: float, floor: float,
-               errors: list[str]) -> None:
+               errors: list[str]) -> bool:
+    """The sampled check; True when the sidecar shows the marking pass ran."""
     label = f"{take.get('cell', take.get('mode', '?'))}"
     if not sidecar.is_file():
         errors.append(f"{label}: sample sidecar missing: {sidecar.name}")
-        return
+        return False
     with sidecar.open(encoding="utf-8") as stream:
         rows = [json.loads(line) for line in stream]
     rows = [r for r in rows if "capturedUptimeNS" in r and footprint(r) is not None]
@@ -110,13 +125,13 @@ def check_take(take: dict, sidecar: Path, pct: float, floor: float,
             f"{label}: marking boundaries absent — the publication marking "
             f"pass did not run (disabled or bypassed); unmarked takes cannot "
             f"publish as marking evidence")
-        return
+        return False
     before = marks["before_marking"]
     pre = [footprint(r) for r in rows if r["capturedUptimeNS"] <= before]
     post = [footprint(r) for r in rows if r["capturedUptimeNS"] > before]
     if not pre or not post:
         errors.append(f"{label}: sidecar has no samples on one side of the marking boundary")
-        return
+        return True
     peak_pre = max(pre)
     peak_post = max(post)
     allowed = peak_pre + max(peak_pre * pct / 100.0, floor)
@@ -129,6 +144,7 @@ def check_take(take: dict, sidecar: Path, pct: float, floor: float,
             f"({peak_post:.1f} MB) exceeds the take's pre-marking peak "
             f"({peak_pre:.1f} MB) beyond tolerance — the marking pass must "
             f"not raise the take peak")
+    return True
 
 
 DEFAULT_POLICY = Path(__file__).resolve().parents[1] / "config" / "marking-peak-equality.json"
@@ -162,6 +178,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sidecar-dir", type=Path, default=None,
                         help="override the sidecar directory (default: "
                              "runtime/diagnostics/engine beside the manifest)")
+    parser.add_argument("--allow-legacy-evidence", action="store_true",
+                        help="replay evidence that predates the MLX marking snapshots: "
+                             "report the exact MLX check as unavailable instead of failing")
     args = parser.parse_args(argv)
 
     policy_percent, policy_mb, mlx_tolerance_mb = load_tolerances(args.policy)
@@ -179,15 +198,17 @@ def main(argv: list[str] | None = None) -> int:
              if t.get("status") in (None, "success", "passed", "passedWithWarnings")]
     if not takes:
         errors.append(f"{args.evidence}: no successful takes in the record")
-    engine_rows = engine_rows_by_id(sidecar_dir)
+    engine_rows = engine_rows_by_id(sidecar_dir, errors)
     for take in takes:
         gid = take.get("generationID")
         if not isinstance(gid, str) or not gid:
             errors.append(f"take {take.get('cell', '?')}: missing generationID")
             continue
-        check_exact_mlx_peak(take, engine_rows.get(gid), mlx_tolerance_mb, errors)
-        check_take(take, sidecar_dir / f"samples-{gid}.jsonl",
-                   args.tolerance_percent, args.tolerance_mb, errors)
+        marking_ran = check_take(take, sidecar_dir / f"samples-{gid}.jsonl",
+                                 args.tolerance_percent, args.tolerance_mb, errors)
+        if marking_ran:
+            check_exact_mlx_peak(take, engine_rows.get(gid), mlx_tolerance_mb,
+                                 args.allow_legacy_evidence, errors)
 
     if errors:
         print("marking peak equality: FAIL", file=sys.stderr)

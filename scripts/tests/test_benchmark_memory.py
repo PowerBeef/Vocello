@@ -14,7 +14,7 @@ SCRIPTS = Path(__file__).resolve().parents[1]
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-from benchmark_memory import MemoryEvidenceError, qualify_memory_rows  # noqa: E402
+from benchmark_memory import MemoryEvidenceError, load_ios_memory_budget, qualify_memory_rows  # noqa: E402
 
 
 ENGINE_BOUNDARIES = [
@@ -441,8 +441,53 @@ class MemoryEvidenceTests(unittest.TestCase):
         )
         engine = row(engine["generationID"], critical, layer="engine", ios=True)
         self.write_sidecar("engine", engine["generationID"], critical)
-        with self.assertRaisesRegex(MemoryEvidenceError, "5.2 GiB"):
+        with self.assertRaises(MemoryEvidenceError):
             qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")
+
+    def test_ios_footprint_bands_are_the_declared_shipping_policy(self) -> None:
+        # V-4: the gate uses the app's MiB bands (4,500 guarded, 5,200 critical),
+        # not its former 4.5/5.2 GiB copies. The fixture's peak is footprint + 19.
+        bands = load_ios_memory_budget()
+        self.assertEqual(
+            (bands["guardedFootprintMB"], bands["criticalFootprintMB"],
+             bands["healthyHeadroomMB"], bands["guardedHeadroomMB"],
+             bands["criticalGPUWorkingSetUsageRatio"]),
+            (4500.0, 5200.0, 768.0, 384.0, 0.8),
+        )
+
+        def qualify(footprint: float) -> object:
+            sidecar = samples(
+                role="engine", boundaries=ENGINE_BOUNDARIES, ios=True, footprint=footprint,
+            )
+            engine = row(f"generation-band-{int(footprint)}", sidecar, layer="engine", ios=True)
+            self.write_sidecar("engine", engine["generationID"], sidecar)
+            return qualify_memory_rows(rows=[engine], diagnostics=self.root, platform="ios")[0][0]
+
+        below = qualify(4470.0)  # peak 4489
+        self.assertNotIn("memory.footprint.guarded", below.warnings)
+        guarded = qualify(4490.0)  # peak 4509: guarded now, silent under 4.5 GiB
+        self.assertIn("memory.footprint.guarded", guarded.warnings)
+        self.assertEqual(guarded.status, "qualifiedWithWarnings")
+        with self.assertRaises(MemoryEvidenceError):
+            qualify(5190.0)  # peak 5209: critical now, accepted under 5.2 GiB
+
+    def test_ios_memory_budget_contract_fails_closed(self) -> None:
+        cases = {
+            "missing": None,
+            "wrong-schema": {"schemaVersion": 2},
+            "non-positive": {"schemaVersion": 1, "healthyHeadroomMB": 768, "guardedHeadroomMB": 0,
+                             "guardedFootprintMB": 4500, "criticalFootprintMB": 5200,
+                             "criticalGPUWorkingSetUsageRatio": 0.8},
+            "inverted": {"schemaVersion": 1, "healthyHeadroomMB": 384, "guardedHeadroomMB": 768,
+                         "guardedFootprintMB": 4500, "criticalFootprintMB": 5200,
+                         "criticalGPUWorkingSetUsageRatio": 0.8},
+        }
+        for name, document in cases.items():
+            path = self.root / f"policy-{name}.json"
+            if document is not None:
+                path.write_text(json.dumps(document), encoding="utf-8")
+            with self.subTest(case=name), self.assertRaises(MemoryEvidenceError):
+                load_ios_memory_budget(path)
 
     def test_hard_trim_and_application_warning_fail(self) -> None:
         engine, sidecar = self.ios_fixture()

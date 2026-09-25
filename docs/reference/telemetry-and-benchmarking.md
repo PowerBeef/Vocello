@@ -449,8 +449,9 @@ Critical pressure, `application_memory_warning`, a memory exit, `hardTrim`, or `
 publication. Guarded pressure or `softTrim` is `passedWithWarnings`, except the routine per-tier
 cache clear (source `post-generation`, reason `post_generation_cache_clear`): since 2026-09-25 it is
 counted as `policyCacheClearCount` with no pressure level and no warning. iOS additionally fails at
-physical footprint ≥5.2 GB, minimum headroom <384 MB, or Metal working-set ratio ≥0.8; footprint
-≥4.5 GB or headroom <768 MB is a warning. The iOS record retains start/end/min headroom and peak
+physical footprint ≥5,200 MiB, minimum headroom <384 MiB, or Metal working-set ratio ≥0.8; footprint
+≥4,500 MiB or headroom <768 MiB is a warning. These are the app's shipping budget bands, declared
+once in `config/ios-memory-budget-policy.json` (a Swift test pins `IOSMemoryBudgetPolicy` to it). The iOS record retains start/end/min headroom and peak
 process-budget utilization. macOS UI totals pair app and engine samples by absolute uptime within
 one sampler cadence (the larger of the two processes' target intervals: 500 ms on the 8 GB Mac and iPhone tiers, 250 ms on 16 GB, 100 ms above); they never add independent process maxima. Headless CLI/profile evidence reports
 only its owning engine process.

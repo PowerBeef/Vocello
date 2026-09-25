@@ -700,9 +700,10 @@ agreement, zero capture failures, and at least 95% sampler coverage. Critical pr
 warning/exit, `hardTrim`, or `fullUnload` fails publication; guarded pressure, `softTrim`, or 95–<100%
 coverage is explicit warning evidence. The record retains footprint/resident start, end, delta, and
 peak; compressed/GPU peaks; minimum headroom and peak process-budget utilization; sampler coverage;
-and pressure/trim/warning/exit counters. iPhone admission is also strict: physical footprint ≥5.2
-GB, minimum headroom <384 MB, or Metal working-set ratio ≥0.8 fails; footprint ≥4.5 GB or
-headroom <768 MB warns. The lane requires 15 GiB free before device launch. After validation and
+and pressure/trim/warning/exit counters. iPhone admission is also strict, on the app's own
+shipping budget bands (`config/ios-memory-budget-policy.json`): physical footprint ≥5,200 MiB,
+minimum headroom <384 MiB, or Metal working-set ratio ≥0.8 fails; footprint ≥4,500 MiB or
+headroom <768 MiB warns. The lane requires 15 GiB free before device launch. After validation and
 history publication, the raw trace is discarded by default while its digest/settings/extracted
 summary and retention status remain in compact evidence; `--keep-trace` opts into local retention.
 Raw traces and sample rows remain untracked.

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "policyID": "iphone-shipping-default",
+  "description": "The iPhone memory budget bands, in MiB. IOSMemoryBudgetPolicy.iPhoneShippingDefault (Sources/QwenVoiceCore/IOSMemorySnapshot.swift) and the unload quiescence evaluator use these numbers, and a Swift test pins them to this file; scripts/benchmark_memory.py gates published iOS evidence on them: a critical band fails publication and a guarded band warns.",
+  "healthyHeadroomMB": 768,
+  "guardedHeadroomMB": 384,
+  "guardedFootprintMB": 4500,
+  "criticalFootprintMB": 5200,
+  "criticalGPUWorkingSetUsageRatio": 0.8
+}

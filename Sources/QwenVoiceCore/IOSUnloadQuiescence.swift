@@ -55,8 +55,11 @@ public enum IOSUnloadQuiescenceViolation: String, Hashable, Codable, Sendable {
 public enum IOSUnloadQuiescenceEvaluator {
     public static let stabilityToleranceMB = 32.0
     public static let maximumClearedCacheMB = 32.0
-    public static let minimumHealthyHeadroomMB = 768.0
-    public static let maximumGuardedFootprintMB = 4_500.0
+    // The shipping budget's own bands, not a second copy of them (audit V-4).
+    public static let minimumHealthyHeadroomMB =
+        Double(IOSMemoryBudgetPolicy.ShippingBandMiB.healthyHeadroom)
+    public static let maximumGuardedFootprintMB =
+        Double(IOSMemoryBudgetPolicy.ShippingBandMiB.guardedFootprint)
     public static let requiredConsecutiveSamples = 3
 
     public static func violations(

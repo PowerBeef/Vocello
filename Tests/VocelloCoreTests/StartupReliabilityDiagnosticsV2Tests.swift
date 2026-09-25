@@ -446,6 +446,42 @@ assert take_path.read_bytes()==original
         XCTAssertFalse(IOSUnloadQuiescenceEvaluator.isQuiescent(unstable))
     }
 
+    /// Audit V-4: `config/ios-memory-budget-policy.json` declares the iPhone memory
+    /// bands the Python publication gate applies. The shipping budget policy and
+    /// the unload quiescence evaluator must use exactly those numbers.
+    func testShippingMemoryBandsMatchTheDeclaredPolicyContract() throws {
+        let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let data = try Data(
+            contentsOf: repository.appendingPathComponent("config/ios-memory-budget-policy.json")
+        )
+        let contract = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        func mebibytes(_ key: String) throws -> UInt64 {
+            try XCTUnwrap(contract[key] as? NSNumber, key).uint64Value
+        }
+        let policy = IOSMemoryBudgetPolicy.iPhoneShippingDefault
+        XCTAssertEqual(policy.healthyHeadroomBytes, try mebibytes("healthyHeadroomMB") * 1_048_576)
+        XCTAssertEqual(policy.guardedHeadroomBytes, try mebibytes("guardedHeadroomMB") * 1_048_576)
+        XCTAssertEqual(
+            policy.aggregateGuardedFootprintBytes, try mebibytes("guardedFootprintMB") * 1_048_576
+        )
+        XCTAssertEqual(
+            policy.aggregateCriticalFootprintBytes, try mebibytes("criticalFootprintMB") * 1_048_576
+        )
+        XCTAssertEqual(
+            policy.criticalGPUWorkingSetUsageRatio,
+            try XCTUnwrap(contract["criticalGPUWorkingSetUsageRatio"] as? Double)
+        )
+        XCTAssertEqual(
+            IOSUnloadQuiescenceEvaluator.minimumHealthyHeadroomMB,
+            try Double(mebibytes("healthyHeadroomMB"))
+        )
+        XCTAssertEqual(
+            IOSUnloadQuiescenceEvaluator.maximumGuardedFootprintMB,
+            try Double(mebibytes("guardedFootprintMB"))
+        )
+    }
+
     func testUnloadQuiescenceRejectsOwnershipHeadroomCacheAndFootprintFailures() {
         let previous = sample(sequence: 0)
         let current = sample(

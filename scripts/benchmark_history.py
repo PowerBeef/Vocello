@@ -959,6 +959,8 @@ def default_inputs(record: dict[str, Any]) -> dict[str, Any]:
         REPO_ROOT / "Sources" / "SharedSupport" / "Telemetry" / "MainThreadStallWatchdog.swift",
         REPO_ROOT / "benchmarks" / "schema-v2.json",
         REPO_ROOT / "config" / "memory-qualification-policy.json",
+        # The iPhone memory bands benchmark_memory.py gates published evidence on.
+        REPO_ROOT / "config" / "ios-memory-budget-policy.json",
     ]
     corpus_paths = [
         REPO_ROOT / "Tests" / "UIAutomationSupport" / "VocelloUIAutomationSupport.swift",

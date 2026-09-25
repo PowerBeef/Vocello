@@ -147,7 +147,8 @@ def _is_swift(path: str) -> bool:
         return True
     if path.startswith("Packages/"):
         return "/Sources/" in path or path.endswith(PACKAGE_MANIFESTS)
-    if path in (*BUILD_CONFIGS, "config/test-quarantine.json"):
+    # A Swift test pins the shipping iPhone memory bands to this contract (V-4).
+    if path in (*BUILD_CONFIGS, "config/test-quarantine.json", "config/ios-memory-budget-policy.json"):
         return True
     if path.startswith("scripts/tests/"):
         return path in DARWIN_TEST_INPUTS or path.startswith("scripts/tests/fixtures/")

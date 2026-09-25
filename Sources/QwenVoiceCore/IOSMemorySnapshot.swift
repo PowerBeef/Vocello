@@ -319,12 +319,24 @@ public struct IOSMemoryBudgetPolicy: Hashable, Codable, Sendable {
         self.aggregateCriticalFootprintBytes = aggregateCriticalFootprintBytes
     }
 
+    /// The shipping iPhone bands, in MiB. `config/ios-memory-budget-policy.json`
+    /// declares the same numbers for the Python publication gate
+    /// (`scripts/benchmark_memory.py`), and a test pins the two together, so the
+    /// app and the evidence gate cannot drift apart again (audit V-4).
+    public enum ShippingBandMiB {
+        public static let healthyHeadroom: UInt64 = 768
+        public static let guardedHeadroom: UInt64 = 384
+        public static let guardedFootprint: UInt64 = 4_500
+        public static let criticalFootprint: UInt64 = 5_200
+        public static let criticalGPUWorkingSetUsageRatio = 0.80
+    }
+
     public static let iPhoneShippingDefault = IOSMemoryBudgetPolicy(
-        healthyHeadroomBytes: 768 * 1_048_576,
-        guardedHeadroomBytes: 384 * 1_048_576,
-        criticalGPUWorkingSetUsageRatio: 0.80,
-        aggregateGuardedFootprintBytes: 4_500 * 1_048_576,
-        aggregateCriticalFootprintBytes: 5_200 * 1_048_576
+        healthyHeadroomBytes: ShippingBandMiB.healthyHeadroom * 1_048_576,
+        guardedHeadroomBytes: ShippingBandMiB.guardedHeadroom * 1_048_576,
+        criticalGPUWorkingSetUsageRatio: ShippingBandMiB.criticalGPUWorkingSetUsageRatio,
+        aggregateGuardedFootprintBytes: ShippingBandMiB.guardedFootprint * 1_048_576,
+        aggregateCriticalFootprintBytes: ShippingBandMiB.criticalFootprint * 1_048_576
     )
 
     /// Worst pressure band over a whole generation, computed from the telemetry

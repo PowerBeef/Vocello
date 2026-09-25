@@ -125,8 +125,10 @@ from **two independent criteria**, and the engine band is the worse of them:
 
 - **Headroom band** (`band(for:)`): healthy ≥ 768 MB `os_proc_available_memory` headroom, guarded
   ≥ 384 MB, else critical (also critical if GPU working-set usage ≥ 80%).
-- **Footprint band** (`aggregateBand`): healthy < 4.5 GB physFootprint, guarded ≥ 4.5 GB, critical
-  ≥ 5.2 GB. (`pressureBand = maxBand(headroomBand, footprintBand)`.)
+- **Footprint band** (`aggregateBand`): healthy < 4,500 MiB physFootprint, guarded ≥ 4,500 MiB,
+  critical ≥ 5,200 MiB. (`pressureBand = maxBand(headroomBand, footprintBand)`.) Both bands'
+  numbers are declared in `config/ios-memory-budget-policy.json`, which the benchmark publication
+  gate reads and a Swift test pins `IOSMemoryBudgetPolicy.iPhoneShippingDefault` to.
 
 > After the in-process migration these two bands measure the *single* app process (the second,
 > "engine extension" snapshot is gone — `72c95fc`). The footprint band is **not** dead: it is a

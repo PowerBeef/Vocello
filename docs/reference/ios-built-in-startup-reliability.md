@@ -141,7 +141,7 @@ Full-runtime-unload preparation is now fail-closed. The runner records MLX activ
 Metal allocation, physical footprint, process headroom, engine operation/reservation state, and
 loaded-model state before unload, after owned references are released, after cache clearing,
 immediately before reload, and after reload. It polls for at most 30 seconds and admits the next
-request only after three consecutive stable samples meet the existing 4.5 GiB footprint guard,
+request only after three consecutive stable samples meet the existing 4,500 MiB footprint guard,
 the 768 MiB healthy-headroom floor, and the 32 MiB stability tolerance. This is diagnostic
 containment, not a permanent production-threshold change.
 

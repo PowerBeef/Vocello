@@ -26,6 +26,15 @@ MEMORY_CONTRACT_VERSION = 1
 REQUIRED_TELEMETRY_SCHEMA = 8
 MINIMUM_COVERAGE = 0.95
 PERFECT_COVERAGE = 1.0
+# The iPhone memory bands, declared once for the app's shipping budget policy
+# and this publication gate (audit V-4; a Swift test pins the Swift side).
+IOS_MEMORY_BUDGET_POLICY_PATH = (
+    Path(__file__).resolve().parents[1] / "config" / "ios-memory-budget-policy.json"
+)
+IOS_MEMORY_BUDGET_KEYS = (
+    "healthyHeadroomMB", "guardedHeadroomMB", "guardedFootprintMB", "criticalFootprintMB",
+    "criticalGPUWorkingSetUsageRatio",
+)
 
 ENGINE_BOUNDARY_REQUIREMENTS: dict[str, frozenset[str]] = {
     "preparation-start": frozenset({"before_preparation"}),
@@ -127,6 +136,30 @@ MEMORY_EVENT_KINDS = frozenset({
 
 class MemoryEvidenceError(ValueError):
     """Raised when benchmark memory evidence is absent or unsafe to publish."""
+
+
+def load_ios_memory_budget(path: Path | None = None) -> dict[str, float]:
+    """The declared iPhone memory bands; fails closed on a missing or malformed contract."""
+    source = path or IOS_MEMORY_BUDGET_POLICY_PATH
+    try:
+        document = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise MemoryEvidenceError(f"iOS memory budget policy is unreadable: {error}") from error
+    if not isinstance(document, dict) or document.get("schemaVersion") != 1:
+        raise MemoryEvidenceError("iOS memory budget policy must be a schemaVersion 1 object")
+    bands: dict[str, float] = {}
+    for key in IOS_MEMORY_BUDGET_KEYS:
+        value = document.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+            raise MemoryEvidenceError(f"iOS memory budget policy {key} must be a positive number")
+        bands[key] = float(value)
+    if not (
+        bands["guardedHeadroomMB"] < bands["healthyHeadroomMB"]
+        and bands["guardedFootprintMB"] < bands["criticalFootprintMB"]
+        and bands["criticalGPUWorkingSetUsageRatio"] <= 1
+    ):
+        raise MemoryEvidenceError("iOS memory budget policy bands are out of order")
+    return bands
 
 
 def _finite(value: Any, location: str, *, minimum: float = 0.0) -> float:
@@ -1078,24 +1111,29 @@ def qualify_take_memory(
     ):
         warnings = sorted(set(warnings).union({"memory.alignment.coverage"}))
     if platform == "ios":
+        # The app's own shipping bands: critical fails publication, guarded warns.
+        bands = load_ios_memory_budget()
         peak_footprint = float(metrics["peakPhysicalFootprintMB"])
         minimum_headroom = float(metrics["minimumHeadroomMB"])
         metal_ratio = float(metrics["gpuWorkingSetUsageRatioPeak"])
-        if peak_footprint >= 5.2 * 1024:
+        if peak_footprint >= bands["criticalFootprintMB"]:
             raise MemoryEvidenceError(
-                f"generation {generation_id}: physical footprint reached the 5.2 GiB failure limit"
+                f"generation {generation_id}: physical footprint reached the critical band "
+                f"({bands['criticalFootprintMB']:g} MiB)"
             )
-        if minimum_headroom < 384:
+        if minimum_headroom < bands["guardedHeadroomMB"]:
             raise MemoryEvidenceError(
-                f"generation {generation_id}: process headroom fell below 384 MiB"
+                f"generation {generation_id}: process headroom fell below "
+                f"{bands['guardedHeadroomMB']:g} MiB"
             )
-        if metal_ratio >= 0.8:
+        if metal_ratio >= bands["criticalGPUWorkingSetUsageRatio"]:
             raise MemoryEvidenceError(
-                f"generation {generation_id}: Metal working-set ratio reached 0.8"
+                f"generation {generation_id}: Metal working-set ratio reached "
+                f"{bands['criticalGPUWorkingSetUsageRatio']:g}"
             )
-        if peak_footprint >= 4.5 * 1024:
+        if peak_footprint >= bands["guardedFootprintMB"]:
             warnings.append("memory.footprint.guarded")
-        if minimum_headroom < 768:
+        if minimum_headroom < bands["healthyHeadroomMB"]:
             warnings.append("memory.headroom.guarded")
         warnings = sorted(set(warnings))
     metrics.update({

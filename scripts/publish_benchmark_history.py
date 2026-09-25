@@ -2960,6 +2960,8 @@ def _legacy_telemetry_overhead_record(args: argparse.Namespace) -> Path:
         crash_delta=crash_delta_from_snapshot(args.snapshot, expected_scope="macos"),
         executable_paths={"vocello": "build/vocello"},
         optimization="-Onone",
+        # Every take's ttfcMS is `vocello bench` firstChunkMS (audit #59).
+        ttfc_definition=rtf_semantics.TTFC_CLI_SUBMIT_TO_FIRST_CHUNK,
     )
     return write_and_record(args.artifact_dir, manifest)
 

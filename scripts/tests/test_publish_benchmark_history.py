@@ -2191,6 +2191,10 @@ class PublisherTests(unittest.TestCase):
         takes = captured["manifest"]["historyRecord"]["takes"]
         self.assertEqual(len(takes), 18)
         self.assertEqual(
+            captured["manifest"]["historyRecord"]["run"]["ttfcDefinition"],
+            "cli-submit-to-first-chunk",
+        )
+        self.assertEqual(
             [take["cell"] for take in takes[:8]],
             [
                 "rotation-1/order-1/off/take-1",

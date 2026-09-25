@@ -52,6 +52,9 @@ STALL_STATISTICS = {
     "delayedHeartbeatCount250": ("delayedHeartbeatCount250", "mainThreadStallCount250MS", "uiStallCount250"),
     "delayedHeartbeatCount50": ("delayedHeartbeatCount50", "mainThreadStallCount50MS", "uiStallCount50"),
 }
+# The run-level code a report-only (provisional) stall contract leaves on a
+# tracked record whose takes exceed its limit: `(<takes above>/<gated takes>)`.
+STALL_REPORT_ONLY_WARNING = "stall.provisional.wouldfail"
 # Some rows or layer files are not there yet (sysexits EX_TEMPFAIL). The lane
 # retries only this outcome, briefly; every other failure is deterministic.
 ROWS_NOT_YET_PRESENT_EXIT = 75
@@ -104,8 +107,10 @@ class StallContractError(ValueError):
 def load_stall_contract(path: Path) -> dict:
     """The stall gate's declared statistic, limit and calibration profile (audit #6).
 
-    A provisional contract gates on its statistic like a calibrated one; the
-    status only says whether an M6 run has calibrated the limit yet.
+    The status decides whether the limit gates (maintainer decision 2026-09-25):
+    a provisional contract reports only, recording every gated take's value and
+    whether the run would fail, and never fails a run; a calibrated contract,
+    which must name the run IDs that calibrated it, fails a run above its limit.
     """
     try:
         contract = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -134,6 +139,18 @@ def load_stall_contract(path: Path) -> dict:
     return contract
 
 
+def stall_contract_enforced(contract: dict) -> bool:
+    """Whether the contract's limit fails a run: only once it is calibrated."""
+    return contract["calibrationStatus"] == "calibrated" and bool(contract["calibrationRuns"])
+
+
+def stall_report_warning(stall_gate: dict) -> str | None:
+    """The tracked record's run warning for a report-only limit the run exceeded."""
+    if stall_gate.get("enforced") or not stall_gate.get("wouldFail"):
+        return None
+    return f"{STALL_REPORT_ONLY_WARNING}({stall_gate['takesAboveLimit']}/{stall_gate['gatedTakeCount']})"
+
+
 def stall_statistic_value(app_row: dict, statistic: str):
     """The row's value for the contract's statistic, or None when it carries none."""
     frontend = app_row.get("frontendMetrics") or {}
@@ -159,14 +176,18 @@ def stall_gate_summary(contract: dict, observed: list[tuple[str, int]], censored
         return values[min(len(values) - 1, int(round(fraction * (len(values) - 1))))]
 
     limit = contract["maximumAllowed"]
+    above = sum(1 for value in values if value > limit)
     return {
         "policyID": contract["policyID"],
         "statistic": contract["statistic"],
         "maximumAllowed": limit,
         "calibrationProfile": contract["calibrationProfile"],
         "calibrationStatus": contract["calibrationStatus"],
+        # A provisional limit reports only; `wouldFail` is what it would decide.
+        "enforced": stall_contract_enforced(contract),
+        "wouldFail": above > 0,
         "gatedTakeCount": len(values),
-        "takesAboveLimit": sum(1 for value in values if value > limit),
+        "takesAboveLimit": above,
         "median": quantile(0.5),
         "p90": quantile(0.9),
         "maximum": values[-1] if values else None,
@@ -803,7 +824,11 @@ def build_manifest(
             "audioQC": {"verdict": qc.get("verdict"), "flags": qc.get("flags") or []},
             "layerCompleteness": completeness,
         })
-    status = "passedWithWarnings" if warning_count else "pass"
+    run_warnings = list(memory_run["warnings"])
+    stall_warning = stall_report_warning(stall_gate) if stall_gate else None
+    if stall_warning:
+        run_warnings.append(stall_warning)
+    status = "passedWithWarnings" if warning_count or run_warnings else "pass"
     scope = matrix_scope(modes, lengths, warm)
     expected = len(cells)
     hardware = run_hardware_context(engine_rows, canonical_macos_profile_id())
@@ -914,12 +939,12 @@ def build_manifest(
             "id": run_id,
             "kind": "ui-generation",
             "platform": "macos",
-            "status": "passedWithWarnings" if warning_count else "passed",
+            "status": "passedWithWarnings" if warning_count or run_warnings else "passed",
             "label": label or run_id,
             "matrixScope": scope,
             "startedAt": started_at,
             "finishedAt": finished_at,
-            "warnings": memory_run["warnings"],
+            "warnings": run_warnings,
             "rtfDefinition": rtf_semantics.STANDARD_RTF_DEFINITION,
             # A forced or emulated memory tier is exploratory evidence (audit #11).
             **({"classification": "exploratory"} if diagnostic_memory_tier(engine_rows) else {}),
@@ -1205,9 +1230,11 @@ def main() -> int:
                 f"app generation {row.get('generationID', '?')} requires telemetry schema "
                 f"v{REQUIRED_TELEMETRY_SCHEMA} or newer for memory qualification"
             )
-    # The stall gate (audit #6): the contract names the statistic and limit.
+    # The stall gate (audit #6): the contract names the statistic and limit, and
+    # its status whether the limit fails the run or only reports (provisional).
     statistic = stall_contract["statistic"]
     stall_limit = stall_contract["maximumAllowed"]
+    stall_enforced = stall_contract_enforced(stall_contract)
     stall_observed: list[tuple[str, int]] = []
     censored_heartbeats = 0
     for index, engine_row in enumerate(engine_rows, start=1):
@@ -1230,7 +1257,7 @@ def main() -> int:
         censored = (app_row.get("frontendMetrics") or {}).get("censoredHeartbeatCount")
         if isinstance(censored, int) and not isinstance(censored, bool) and censored > 0:
             censored_heartbeats += censored
-        if value > stall_limit:
+        if value > stall_limit and stall_enforced:
             failures.append(
                 f"{statistic} {value} > {stall_limit} (generation {gid}; "
                 f"stall contract {stall_contract['policyID']}, {stall_contract['calibrationStatus']})"
@@ -1264,12 +1291,15 @@ def main() -> int:
         f"macOS UI bench gate: expected={expected} engine={len(engine_rows)} "
         f"app={len(app_rows)} merged={len(merged_rows)}"
     )
+    enforcement = "enforced" if stall_enforced else "report only, never fails the run"
+    would_fail = "yes" if stall_gate["wouldFail"] else "no"
     print(
         f"stall gate {stall_gate['policyID']} ({stall_gate['calibrationStatus']} on "
-        f"{stall_gate['calibrationProfile']}): {statistic} <= {stall_limit} over "
+        f"{stall_gate['calibrationProfile']}, {enforcement}): {statistic} <= {stall_limit} over "
         f"{stall_gate['gatedTakeCount']} gated take(s); median={stall_gate['median']} "
         f"p90={stall_gate['p90']} max={stall_gate['maximum']} "
-        f"above={stall_gate['takesAboveLimit']} censoredHeartbeats={censored_heartbeats}"
+        f"above={stall_gate['takesAboveLimit']} wouldFail={would_fail} "
+        f"censoredHeartbeats={censored_heartbeats}"
     )
     # Every gated take's value, pass or fail: a failing run writes no manifest,
     # so this output is all that records the distribution a calibration needs.

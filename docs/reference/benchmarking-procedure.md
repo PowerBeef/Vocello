@@ -574,13 +574,19 @@ The lane also passes `--stall-contract config/macos-ui-stall-gate.json --variant
 contract names the gate's statistic, its limit and the profile it is calibrated for; today it is the
 provisional "no heartbeat delayed more than 250 ms" on `mac-mini-m6-16gb`, uncalibrated until one
 exploratory M6 run records the per-take distribution and the contract is re-declared `calibrated`
-with that run. The checker prints that distribution to `benchmark-gate.txt` whether the run passes or
-fails: the summary (median, p90, maximum, takes above the limit, censored heartbeats) and every gated
-take's `cell=value`. Expect the calibration run to fail the gate: replayed on the 464 canonical M2
-takes, 250 ms fails 189 (40.7%) and all 16 runs, and the four 2026-09-14 runs have 16 to 23 of 29
-takes above it (per-run medians 295-353 ms). Whether a provisional contract should gate or only
-report is a maintainer decision to settle before AV-17 step 2. A contract naming another profile than
-the registry's canonical one fails the gate.
+with that run. The contract's status decides what the limit does (maintainer decision 2026-09-25): a
+**provisional** limit reports only and never fails a run; the checker still records the full
+distribution and whether the run would have failed (`stallGate.enforced: false` and
+`stallGate.wouldFail` in the evidence manifest; a run over the limit publishes with the run warning
+`stall.provisional.wouldfail(<takes above>/<gated takes>)`). Only a **calibrated** contract, which must
+name its calibrating run IDs in `calibrationRuns`, fails a run with a take above the limit. The checker
+prints the distribution to `benchmark-gate.txt` either way: the summary (median, p90, maximum, takes
+above the limit, would fail, censored heartbeats) and every gated take's `cell=value`. Expect the
+calibration run to exceed the provisional limit: replayed on the 464 canonical M2 takes, 250 ms is
+exceeded by 189 (40.7%) and in all 16 runs, and the four 2026-09-14 runs have 16 to 23 of 29 takes
+above it (per-run medians 295-353 ms). Under the report-only contract all 16 would have published,
+each with its would-fail warning. A contract naming another profile than the registry's canonical one
+fails the gate.
 
 Every take must have run the declared variant (Speed), whatever the tier recommends (the 16 GB tier
 recommends Quality). Before the first take the benchmark makes Speed the active variant of each

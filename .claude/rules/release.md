@@ -122,7 +122,8 @@ CI), `docs/reference/testing-runbook.md` (which lane), `docs/reference/macos-rel
   the ongoing control.
   Prompt comparisons use a run-time frozen holdout judged by `scripts/delivery_promotion_decision.py`.
 - **UI timing gates are declared.** The macOS UI benchmark's stall gate takes its statistic, limit and
-  calibration profile from `config/macos-ui-stall-gate.json`. ui-perf ceilings stay warn-only; a
+  calibration profile from `config/macos-ui-stall-gate.json`; a provisional limit only reports, and only
+  a contract calibrated with its run IDs fails a run. ui-perf ceilings stay warn-only; a
   recalibration derives them from the run-to-run spread of at least three counted runs with a 1.25-1.3x
   floor, and a run off the contract's calibration profile or refresh interval carries
   `uiperf.uncalibrated:<profile>` instead of ceiling verdicts.

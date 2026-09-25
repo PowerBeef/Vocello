@@ -202,6 +202,40 @@ class UICheckerRoundTripTests(unittest.TestCase):
         # The censored-definition marker survives into the tracked record.
         self.assertTrue(all(take["metrics"]["censoredHeartbeatCount"] == 1 for take in record["takes"]))
 
+    def test_a_run_over_the_provisional_stall_limit_publishes_its_warning(self) -> None:
+        """The report-only stall contract (maintainer decision 2026-09-25) never
+        blocks publication; the record carries the would-fail code instead."""
+        def realistic(layers: dict[str, list[dict]]) -> None:
+            make_rows_realistic(layers["engine"])
+            for row in layers["engine"]:
+                row["notes"]["deviceClass"] = "mid_16gb_mac"
+            layers["app"][1]["frontendMetrics"]["maximumDelayedHeartbeatMS"] = 420
+
+        checker = mac_ui.CheckMacOSUIBenchmarkTests("run_checker")
+        result = checker.run_checker(checker.expected_order, mutate_layers=realistic, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        record, _size = publish_through_registry(checker.last_manifest, screenshots=True)
+        self.assertIn("stall.provisional.wouldfail(1/5)", record["run"]["warnings"])
+        self.assertEqual(record["run"]["status"], "passedWithWarnings")
+        self.assertEqual(record["takes"][1]["metrics"]["uiMaximumDelayedHeartbeatMS"], 420)
+
+    def test_an_emulated_floor_run_publishes_only_exploratory_evidence(self) -> None:
+        """audit #11 option b: the 8 GB floor emulated on the M6."""
+        def emulated(layers: dict[str, list[dict]]) -> None:
+            make_rows_realistic(layers["engine"])
+            for row in layers["engine"]:
+                row["notes"].update({
+                    "deviceClass": "floor_8gb_mac", "deviceClassForced": "true",
+                    "simulatedPhysicalMemoryMB": "8192", "simulatedMetalWorkingSetMB": "5461",
+                })
+
+        checker = mac_ui.CheckMacOSUIBenchmarkTests("run_checker")
+        result = checker.run_checker(checker.expected_order, mutate_layers=emulated, evidence=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        record, _size = publish_through_registry(checker.last_manifest, screenshots=True)
+        self.assertEqual(record["run"]["classification"], "exploratory")
+        self.assertFalse(record["comparison"]["comparable"])
+
     def test_canonical_macos_ui_benchmark_fits_the_record_cap(self) -> None:
         checker = mac_ui.CheckMacOSUIBenchmarkTests("run_checker")
         cells = canonical_cells()

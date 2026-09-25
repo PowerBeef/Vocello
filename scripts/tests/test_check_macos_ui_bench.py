@@ -461,15 +461,59 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         path.write_text(json.dumps(contract), encoding="utf-8")
         return path
 
+    def enforced_stall_contract_args(self, **overrides) -> list[str]:
+        """The shipped statistic and limit, re-declared calibrated by one run, so it gates."""
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        path = self.write_stall_contract(
+            Path(temporary.name), calibrationStatus="calibrated",
+            calibrationRuns=["macos-xcui-benchmark-20261001-000000-calibrat"], **overrides,
+        )
+        return ["--stall-contract", str(path)]
+
     def test_main_thread_stall_gate_covers_every_native_mac_tier(self) -> None:
         # Engine rows stamp the raw NativeDeviceMemoryClass value; the case name is accepted too.
+        enforced = self.enforced_stall_contract_args()
         for device_class in ("mid_16gb_mac", "mid16GBMac", "high_memory_mac", "floor_8gb_mac", "floor8GBMac"):
             with self.subTest(device_class=device_class):
-                result = self.run_with_stalls(device_class)
+                result = self.run_with_stalls(device_class, extra_args=enforced)
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         with self.subTest("mid16GBMac without stalls"):
-            result = self.run_with_stalls("mid_16gb_mac", stalls=0, maximum_ms=0)
+            result = self.run_with_stalls("mid_16gb_mac", stalls=0, maximum_ms=0, extra_args=enforced)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_a_provisional_limit_reports_the_distribution_but_never_fails(self) -> None:
+        """Maintainer decision 2026-09-25: the uncalibrated limit reports only."""
+        for device_class in ("mid_16gb_mac", "floor_8gb_mac"):
+            with self.subTest(device_class=device_class):
+                result = self.run_with_stalls(device_class, maximum_ms=300, evidence=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                stall = self.last_manifest["stallGate"]
+                self.assertEqual(stall["calibrationStatus"], "provisional")
+                self.assertFalse(stall["enforced"])
+                self.assertTrue(stall["wouldFail"])
+                self.assertEqual((stall["gatedTakeCount"], stall["takesAboveLimit"], stall["maximum"]), (5, 1, 300))
+                self.assertEqual([take["cell"] for take in stall["takes"]], self.expected_order)
+                record = self.last_manifest["historyRecord"]
+                self.assertIn("stall.provisional.wouldfail(1/5)", record["run"]["warnings"])
+                self.assertEqual(record["run"]["status"], "passedWithWarnings")
+        # The same takes under the calibrated re-declaration fail the run.
+        result = self.run_with_stalls("mid_16gb_mac", maximum_ms=300, extra_args=self.enforced_stall_contract_args())
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+
+    def test_only_a_calibrated_contract_that_names_its_runs_gates(self) -> None:
+        if str(ROOT / "scripts") not in sys.path:
+            sys.path.insert(0, str(ROOT / "scripts"))
+        import check_macos_ui_bench as checker
+
+        shipped = checker.load_stall_contract(checker.DEFAULT_STALL_CONTRACT)
+        self.assertFalse(checker.stall_contract_enforced(shipped))
+        calibrated = {**shipped, "calibrationStatus": "calibrated", "calibrationRuns": ["run-a"]}
+        self.assertTrue(checker.stall_contract_enforced(calibrated))
+        summary = checker.stall_gate_summary(calibrated, [("custom/short/warm#0", 400)], 0)
+        self.assertIsNone(checker.stall_report_warning(summary))
+        summary = checker.stall_gate_summary(shipped, [("custom/short/warm#0", 100)], 0)
+        self.assertIsNone(checker.stall_report_warning(summary))
 
     def test_delayed_heartbeats_within_the_provisional_limit_pass(self) -> None:
         """audit #6: the old zero tolerance on 50 ms heartbeats failed 90% of M2 takes."""
@@ -482,13 +526,14 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         )
 
     def test_main_thread_stall_gate_skips_forced_non_floor_tiers_only(self) -> None:
-        result = self.run_with_stalls("mid_16gb_mac", forced=True)
+        enforced = self.enforced_stall_contract_args()
+        result = self.run_with_stalls("mid_16gb_mac", forced=True, extra_args=enforced)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         # The floor tier stays gated even when forced, as before.
-        result = self.run_with_stalls("floor8GBMac", forced=True)
+        result = self.run_with_stalls("floor8GBMac", forced=True, extra_args=enforced)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         # Rows without a Mac tier are not gated.
-        result = self.run_with_stalls(None)
+        result = self.run_with_stalls(None, extra_args=enforced)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_the_contract_owns_the_statistic_and_limit(self) -> None:
@@ -499,6 +544,7 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             strict = self.write_stall_contract(
                 Path(temporary), statistic="delayedHeartbeatCount50", maximumAllowed=0,
+                calibrationStatus="calibrated", calibrationRuns=["macos-xcui-benchmark-20261001-000000-strict"],
             )
             result = self.run_with_stalls(
                 "mid_16gb_mac", stalls=2, maximum_ms=120, extra_args=["--stall-contract", str(strict)],
@@ -544,7 +590,11 @@ class CheckMacOSUIBenchmarkTests(unittest.TestCase):
         self.assertEqual(stall["policyID"], "macos-ui-stall-gate-provisional-250ms")
         self.assertEqual((stall["statistic"], stall["maximumAllowed"]), ("maximumDelayedHeartbeatMS", 250))
         self.assertEqual((stall["calibrationStatus"], stall["calibrationProfile"]), ("provisional", "mac-mini-m6-16gb"))
+        self.assertEqual((stall["enforced"], stall["wouldFail"]), (False, False))
         self.assertEqual((stall["gatedTakeCount"], stall["maximum"], stall["takesAboveLimit"]), (5, 90, 0))
+        self.assertFalse(any(
+            warning.startswith("stall.") for warning in self.last_manifest["historyRecord"]["run"]["warnings"]
+        ))
         # The whole per-take distribution, in take order, for calibration.
         self.assertEqual([take["cell"] for take in stall["takes"]], self.expected_order)
         self.assertEqual(stall["takes"][0]["value"], 90)

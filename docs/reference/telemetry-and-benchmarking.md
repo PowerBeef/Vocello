@@ -544,7 +544,10 @@ queued behind the main thread when the session ends counts as a censored observa
 rows without the field counted completed heartbeats only, which read low at the generation boundary).
 The UI benchmark records carry the same count as the take metric `censoredHeartbeatCount`, so a
 tracked `uiMaximumDelayedHeartbeatMS` names its definition: a take without the key predates it.
-The macOS UI benchmark gates this statistic under `config/macos-ui-stall-gate.json`.
+The macOS UI benchmark judges this statistic under `config/macos-ui-stall-gate.json`: while the
+contract is `provisional` it only reports (the run publishes, with the run warning
+`stall.provisional.wouldfail(<above>/<gated>)` when a take exceeds the limit); once it is
+`calibrated` with its calibrating run IDs, a take above the limit fails the run.
 
 App telemetry also records bounded playback health: chunks received, continuity failures,
 underruns, queued chunks/audio at playback scheduling, and minimum queue duration. This makes UI

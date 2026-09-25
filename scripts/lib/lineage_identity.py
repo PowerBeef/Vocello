@@ -194,11 +194,11 @@ CORPUS_FREE_KINDS = frozenset({"ui-perf"})
 # claim"); a bump starts a new lineage and never rewrites a stored key.
 LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     **{key: 1 for key in LINEAGE_PATHS},
-    # 2 (2026-09-26, audit #12/#99): the CPU profile records three warm takes
+    # 2 (2026-09-25, audit #12/#99): the CPU profile records three warm takes
     # instead of one on a quiet host, and publishes per-take decode-loop
-    # interval statistics that must pass the 36 x (tokens + 1) completeness check.
+    # interval statistics that must keep 36 intervals per decode step.
     ("instrument-profile", "macos"): 2,
-    # 2 (2026-09-26, audit #45/#56): the iPhone gate's generation step and the
+    # 2 (2026-09-25, audit #45/#56): the iPhone gate's generation step and the
     # memory-qualification wait no longer copy the whole diagnostics tree from
     # the phone every 10 s while the take runs; they poll only their markers.
     ("engine-generation", "ios"): 2,

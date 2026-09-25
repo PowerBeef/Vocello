@@ -3703,7 +3703,7 @@ def extract_trace_data_summary(
         )
         raise PublicationError(
             "trace lost decode-loop signpost intervals "
-            f"({trace_intervals.LOOP_INTERVALS_PER_STEP} x (tokens + 1) required): {detail}"
+            f"({trace_intervals.LOOP_INTERVALS_PER_STEP} per decode step required): {detail}"
         )
     summary.update({
         "signpostSummaryVersion": trace_intervals.SIGNPOST_SUMMARY_VERSION,
@@ -4124,9 +4124,11 @@ def _profile_correlations(args: argparse.Namespace, *, ios: bool) -> set[tuple[s
 def _profile_take_expectations(
     args: argparse.Namespace, correlations: set[tuple[str, int, str]],
 ) -> dict[tuple[str, int, str], dict[str, Any]]:
-    """Each profiled take's generated tokens and JSONL timings, from its own
-    engine row: the tokens size the interval completeness check and the
-    timings are the witness the trace sums are compared with."""
+    """Each profiled take's generated tokens, end reason and JSONL timings,
+    from its own engine row. The tokens and the end reason size the interval
+    completeness check: an EOS take ran tokens + 1 decode steps, a take that
+    hit the token cap (a QC warning, still published) ran tokens. The timings
+    are the witness the trace sums are compared with."""
     ordered = sorted(correlations, key=lambda correlation: correlation[1])
     rows = rows_by_generation(
         load_engine_rows(args.diagnostics), [correlation[0] for correlation in ordered]
@@ -4141,7 +4143,18 @@ def _profile_take_expectations(
                 f"generation {correlation[0]} has no generated-token count to size its "
                 "signpost completeness check"
             )
-        expectations[correlation] = {"generatedTokens": tokens, "timingsMS": timings}
+        notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+        end_reason = notes.get("generation_end_reason")
+        if not isinstance(end_reason, str) or (
+            end_reason not in trace_intervals.LOOP_STEPS_BEYOND_TOKENS
+        ):
+            raise PublicationError(
+                f"generation {correlation[0]} records no eos or token_cap end reason to size "
+                "its signpost completeness check"
+            )
+        expectations[correlation] = {
+            "generatedTokens": tokens, "endReason": end_reason, "timingsMS": timings,
+        }
     return expectations
 
 
@@ -4153,7 +4166,7 @@ def profile_command(args: argparse.Namespace) -> Path:
         require_disabled_vm_auto_snapshot=args.profile_kind == "memory",
         take_expectations=_profile_take_expectations(args, correlations),
         # A macOS profile publishes its per-take interval statistics only when
-        # every take kept 36 x (tokens + 1) decode-loop intervals (audit #12).
+        # every take kept 36 decode-loop intervals per step it ran (audit #12).
         require_complete_intervals=True,
     )
     return engine_command(args, kind="instrument-profile", trace=trace)

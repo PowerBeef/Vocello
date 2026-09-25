@@ -1776,7 +1776,9 @@ class BenchmarkHistoryTests(unittest.TestCase):
                 history.trace_intervals.Interval("Native Generation Stream", 0.0, 1e10),
             )]},
             engine_intervals=engine,
-            expectations={correlation: {"generatedTokens": steps - 1, "timingsMS": {}}},
+            expectations={
+                correlation: {"generatedTokens": steps - 1, "endReason": "eos", "timingsMS": {}},
+            },
         )
         interval_rows = len(engine) + 1
         summary = {
@@ -1811,7 +1813,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
         incomplete = copy.deepcopy(summary)
         entry = incomplete["intervalStatistics"]["takes"][0]
         entry.update(loopIntervalCount=entry["expectedLoopIntervalCount"] - 1, complete=False)
-        with self.assertRaisesRegex(history.HistoryError, "lost loop intervals"):
+        with self.assertRaises(history.HistoryError):
             history.validate_trace_summary(record("macos", incomplete))
         # An iPhone profile keeps the shortfall on the record instead.
         history.validate_trace_summary(record("ios", incomplete))

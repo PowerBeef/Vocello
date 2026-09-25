@@ -405,7 +405,8 @@ cmd_logs() {
 # (categories 'runtime' and 'generation': the take-correlated prepare and generation-stream
 # intervals) and com.qwenvoice.engine.qwen3 (category 'generation': the decode loop, 36
 # intervals per step plus Token Read). The record publishes per-take statistics of those
-# loop intervals, which must pass the 36 x (tokens + 1) completeness check (audit #12).
+# loop intervals, which must keep 36 per decode step: tokens + 1 steps for an EOS take,
+# tokens for a token-capped one (audit #12).
 # The CPU lane records CPU Profiler + os_signpost over one cold and three warm medium takes
 # (audit #99). The memory lane also records Allocations + VM Tracker in that same trace.
 # Both need a quiet host and a clean tree (--allow-dirty records an exploratory profile of

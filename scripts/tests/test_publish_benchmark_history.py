@@ -3356,6 +3356,7 @@ class PublisherTests(unittest.TestCase):
                 take_expectations={
                     ("gen-1", 1, "custom/speed/medium/warm#0"): {
                         "generatedTokens": 2,
+                        "endReason": "eos",
                         "timingsMS": {"qwen_talker_forward_total": 1},
                     },
                 },
@@ -3385,11 +3386,58 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(take["witness"]["outsideToleranceCount"], 0)
         self.assertEqual(take["windowMS"], 900.0)
 
+    def test_profile_takes_are_sized_by_their_own_end_reason(self) -> None:
+        diagnostics = self.root / "profile-end-reason"
+        (diagnostics / "engine").mkdir(parents=True)
+        correlations = {
+            ("gen-eos", 1, "custom/speed/medium/cold#0"),
+            ("gen-cap", 2, "custom/speed/medium/warm#0"),
+        }
+        rows = []
+        for generation_id, reason in (("gen-eos", "eos"), ("gen-cap", "token_cap")):
+            row = engine_row(generation_id)
+            row["timingsMS"]["qwen_generated_code_count"] = 42
+            row["notes"]["generation_end_reason"] = reason
+            rows.append(row)
+        path = diagnostics / "engine" / "generations.jsonl"
+
+        def write(candidates: list[dict]) -> None:
+            path.write_text(
+                "".join(json.dumps(row) + "\n" for row in candidates), encoding="utf-8"
+            )
+
+        write(rows)
+        args = SimpleNamespace(diagnostics=diagnostics)
+        expectations = publisher._profile_take_expectations(args, correlations)
+        self.assertEqual(
+            {correlation[0]: expectation["endReason"] for correlation, expectation in expectations.items()},
+            {"gen-eos": "eos", "gen-cap": "token_cap"},
+        )
+        # A capped take ran exactly its tokens, so a lossless trace of it is
+        # complete at 36 x tokens.
+        takes, _ = publisher.trace_intervals.interval_statistics(
+            correlated={}, engine_intervals=[], expectations=expectations,
+        )
+        self.assertEqual([take["loopSteps"] for take in takes], [43, 42])
+
+        for reason in (None, "failed"):
+            with self.subTest(reason=reason):
+                if reason is None:
+                    rows[1]["notes"].pop("generation_end_reason", None)
+                else:
+                    rows[1]["notes"]["generation_end_reason"] = reason
+                write(rows)
+                with self.assertRaises(publisher.PublicationError):
+                    publisher._profile_take_expectations(args, correlations)
+
     def test_a_macos_trace_short_of_the_loop_intervals_is_refused(self) -> None:
-        with self.assertRaisesRegex(publisher.PublicationError, r"take 1 has 107 of 108"):
+        with self.assertRaises(publisher.PublicationError):
             self.extract_intervals(dropped=1)
+        # The same trace without the requirement: the take is one interval short.
         summary = self.extract_intervals(dropped=1, require_complete=False)
-        self.assertFalse(summary["intervalStatistics"]["takes"][0]["complete"])
+        take = summary["intervalStatistics"]["takes"][0]
+        self.assertEqual((take["loopIntervalCount"], take["expectedLoopIntervalCount"]), (107, 108))
+        self.assertFalse(take["complete"])
 
 
 if __name__ == "__main__":

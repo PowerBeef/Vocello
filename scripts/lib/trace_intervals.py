@@ -11,10 +11,13 @@ the engine's decode-loop intervals into a small versioned block per take:
   whose window was dropped.
 - Completeness: each decode step emits the 36 intervals of
   `LOOP_STEP_INTERVALS` (the 16-codebook Qwen3-TTS 12 Hz models: 15 code
-  predictor steps and 15 samples plus six per-step spans), and a published take
-  always ends on EOS, so it ran `generatedTokens + 1` steps. A take with fewer
-  than 36 x (tokens + 1) loop intervals lost some and its statistics are
-  incomplete. `Token Read` (V-2) is reported beside them, never counted in the 36.
+  predictor steps and 15 samples plus six per-step spans). How many steps a
+  take ran follows from its own end reason (`LOOP_STEPS_BEYOND_TOKENS`): a take
+  that ends on EOS ran `generatedTokens + 1` steps, the last one sampling EOS;
+  a take that hits the token cap (a quality warning, still published) ran
+  exactly `generatedTokens`. A take with fewer than 36 x its steps lost loop
+  intervals and its statistics are incomplete. `Token Read` (V-2) is reported
+  beside them, never counted in the 36.
 - Witness: the engine sums the same spans into its JSONL `timingsMS` keys
   (`WITNESS_TIMINGS`), each clock read taken around the same code as its
   interval, so the trace sums and the telemetry line up; a take reports how
@@ -47,6 +50,17 @@ LOOP_STEP_INTERVALS: dict[str, int] = {
     "EOS Read": 1,
 }
 LOOP_INTERVALS_PER_STEP = sum(LOOP_STEP_INTERVALS.values())
+# Decode steps beyond the generated tokens, by the engine's
+# `generation_end_reason`: the EOS step samples no code; the loop stops at the
+# token cap without one.
+LOOP_STEPS_BEYOND_TOKENS: dict[str, int] = {"eos": 1, "token_cap": 0}
+
+
+def loop_steps(generated_tokens: int, end_reason: str) -> int:
+    """The decode steps a take ran, from its generated tokens and end reason."""
+    if end_reason not in LOOP_STEPS_BEYOND_TOKENS:
+        raise ValueError(f"unknown generation end reason {end_reason!r}")
+    return generated_tokens + LOOP_STEPS_BEYOND_TOKENS[end_reason]
 
 # Every engine interval name and the key it is published under.
 INTERVAL_KEYS: dict[str, str] = {
@@ -80,7 +94,7 @@ WITNESS_TIMINGS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("Audio Chunk Eval", "Audio Chunk Flush"), "qwen_audio_chunk_eval_total"),
 )
 TAKE_KEYS = frozenset({
-    "takeIndex", "generatedTokens", "loopSteps", "loopIntervalCount",
+    "takeIndex", "generatedTokens", "endReason", "loopSteps", "loopIntervalCount",
     "expectedLoopIntervalCount", "complete", "windowMS", "intervals", "witness",
 })
 WITNESS_KEYS = frozenset({"comparedCount", "outsideToleranceCount", "maximumDriftMS"})
@@ -187,8 +201,10 @@ def take_statistics(
     window: tuple[float, float] | None,
     intervals: Iterable[Interval],
     generated_tokens: int,
+    end_reason: str,
     timings_ms: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
+    steps = loop_steps(generated_tokens, end_reason)
     by_name: dict[str, list[float]] = {}
     for interval in intervals:
         by_name.setdefault(interval.name, []).append(interval.duration_ns)
@@ -204,9 +220,8 @@ def take_statistics(
             "p95MS": _milliseconds(_nearest_rank(durations, 0.95)),
             "maxMS": _milliseconds(durations[-1]),
         }
-    loop_steps = generated_tokens + 1
     loop_count = sum(len(by_name.get(name, [])) for name in LOOP_STEP_INTERVALS)
-    expected = LOOP_INTERVALS_PER_STEP * loop_steps
+    expected = LOOP_INTERVALS_PER_STEP * steps
     compared = outside = 0
     maximum_drift = 0.0
     for names, key in WITNESS_TIMINGS:
@@ -225,7 +240,8 @@ def take_statistics(
     return {
         "takeIndex": take_index,
         "generatedTokens": generated_tokens,
-        "loopSteps": loop_steps,
+        "endReason": end_reason,
+        "loopSteps": steps,
         "loopIntervalCount": loop_count,
         "expectedLoopIntervalCount": expected,
         "complete": loop_count >= expected,
@@ -256,6 +272,7 @@ def interval_statistics(
             window=windows.get(correlation),
             intervals=assigned.get(correlation, []),
             generated_tokens=int(expectation["generatedTokens"]),
+            end_reason=str(expectation["endReason"]),
             timings_ms=expectation.get("timingsMS"),
         ))
     return takes, orphans
@@ -304,8 +321,13 @@ def validate_signpost_summary(
         if set(take) != TAKE_KEYS:
             raise ValueError(f"{location} has unexpected or missing fields")
         tokens = _require_count(take["generatedTokens"], f"{location} generatedTokens", minimum=1)
-        if _require_count(take["loopSteps"], f"{location} loopSteps", minimum=2) != tokens + 1:
-            raise ValueError(f"{location} loopSteps must be generatedTokens + 1")
+        end_reason = take["endReason"]
+        if not isinstance(end_reason, str) or end_reason not in LOOP_STEPS_BEYOND_TOKENS:
+            raise ValueError(f"{location} endReason must be eos or token_cap")
+        if _require_count(take["loopSteps"], f"{location} loopSteps", minimum=1) != loop_steps(
+            tokens, end_reason
+        ):
+            raise ValueError(f"{location} loopSteps does not follow from its tokens and endReason")
         count = _require_count(take["loopIntervalCount"], f"{location} loopIntervalCount")
         expected = _require_count(
             take["expectedLoopIntervalCount"], f"{location} expectedLoopIntervalCount"

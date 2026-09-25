@@ -211,7 +211,7 @@ MEMORY_TRACE_V2_SUMMARY_KEYS = {
     "vmTrackerTrackPresent", "vmTrackerRegionMapPresent",
     "vmTrackerDataExportStatus", "vmTrackerTargetRowCount",
 }
-# The versioned signpost block (records since 2026-09-26, audit #12/#96):
+# The versioned signpost block (records from BT-06 on, 2026-09-25, audit #12/#96):
 # begin/end/point/interval counts, orphans, the recorded duration and per-take
 # decode-loop interval statistics (scripts/lib/trace_intervals.py).
 SIGNPOST_TRACE_SUMMARY_KEYS = set(trace_intervals.SUMMARY_KEYS)
@@ -2529,7 +2529,7 @@ def validate_trace_summary(record: dict[str, Any]) -> None:
                 summary,
                 take_indices=[take.get("takeIndex") for take in record["takes"]],
                 # A macOS profile publishes its statistics only when every take
-                # kept 36 x (tokens + 1) decode-loop intervals.
+                # kept 36 decode-loop intervals per step it ran.
                 require_complete=record["run"].get("platform") == "macos",
             )
         except ValueError as error:

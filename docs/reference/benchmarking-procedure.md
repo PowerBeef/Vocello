@@ -496,8 +496,10 @@ outside every take, the trace's recorded duration and, per take, statistics of t
 decode-loop intervals (count, total, median, p95, max per interval name, `Token Read` included)
 assigned by containment in the take's window, from the end of its correlated prepare interval to
 the end of its correlated `Native Generation Stream` interval. Each decode
-step emits 36 loop intervals, so a take that ran `tokens + 1` steps must keep 36 x (tokens + 1); a
-macOS take short of that fails publication, an iPhone take is published with `complete: false`.
+step emits 36 loop intervals, and the take's own end reason (`endReason`) says how many steps it
+ran: `tokens + 1` for an EOS take, whose last step samples EOS, and `tokens` for a take that hit
+the token cap (a QC warning, still published). A macOS take short of 36 per step fails
+publication; an iPhone take is published with `complete: false`.
 Each take also reports how many interval sums drifted from the engine's own JSONL totals
 (`scripts/lib/trace_intervals.py`); that witness only reports.
 

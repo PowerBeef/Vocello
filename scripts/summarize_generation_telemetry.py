@@ -952,7 +952,8 @@ _DECODE_STAGE_KEYS = [
     ("code2wav", "qwen_stream_decoder_total"),      # Code2Wav audio decoder
     ("stepEval", "qwen_stream_step_eval_total"),    # per-frame eval flush
     # The step's sampled-token read (V-2): under `.pipelined` the host's wait
-    # for the GPU work stepEval only enqueued. Rows before 2026-09-26 lack it.
+    # for the GPU work stepEval only enqueued. Rows written before BT-06
+    # (2026-09-25) lack it.
     ("tokRead", "qwen_stream_step_token_read_total"),
 ]
 

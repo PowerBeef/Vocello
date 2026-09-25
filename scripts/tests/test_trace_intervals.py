@@ -75,8 +75,10 @@ class TraceIntervalTests(unittest.TestCase):
         tokens = 4
         complete = intervals.take_statistics(
             take_index=1, window=(0, 10_000 * MS),
-            intervals=loop_intervals(0, tokens + 1), generated_tokens=tokens, timings_ms=None,
+            intervals=loop_intervals(0, tokens + 1), generated_tokens=tokens,
+            end_reason="eos", timings_ms=None,
         )
+        self.assertEqual(complete["endReason"], "eos")
         self.assertEqual(complete["loopSteps"], 5)
         self.assertEqual(complete["expectedLoopIntervalCount"], 180)
         self.assertEqual(complete["loopIntervalCount"], 180)
@@ -88,10 +90,59 @@ class TraceIntervalTests(unittest.TestCase):
 
         short = intervals.take_statistics(
             take_index=1, window=(0, 10_000 * MS),
-            intervals=loop_intervals(0, tokens + 1, drop=1), generated_tokens=tokens, timings_ms=None,
+            intervals=loop_intervals(0, tokens + 1, drop=1), generated_tokens=tokens,
+            end_reason="eos", timings_ms=None,
         )
         self.assertEqual(short["loopIntervalCount"], 179)
         self.assertFalse(short["complete"])
+
+    def test_a_token_capped_take_ran_exactly_its_tokens(self) -> None:
+        # The loop stops at the cap with no EOS step, so a lossless trace of a
+        # capped take holds 36 x tokens loop intervals and is complete.
+        tokens = 4
+        capped = intervals.take_statistics(
+            take_index=1, window=(0, 10_000 * MS),
+            intervals=loop_intervals(0, tokens), generated_tokens=tokens,
+            end_reason="token_cap", timings_ms=None,
+        )
+        self.assertEqual(capped["endReason"], "token_cap")
+        self.assertEqual(capped["loopSteps"], 4)
+        self.assertEqual(capped["expectedLoopIntervalCount"], 144)
+        self.assertEqual(capped["loopIntervalCount"], 144)
+        self.assertTrue(capped["complete"])
+        # The same trace read as an EOS take would wrongly look one step short.
+        as_eos = intervals.take_statistics(
+            take_index=1, window=(0, 10_000 * MS),
+            intervals=loop_intervals(0, tokens), generated_tokens=tokens,
+            end_reason="eos", timings_ms=None,
+        )
+        self.assertFalse(as_eos["complete"])
+        with self.assertRaises(ValueError):
+            intervals.take_statistics(
+                take_index=1, window=None, intervals=[], generated_tokens=tokens,
+                end_reason="failed", timings_ms=None,
+            )
+        # The published block validates, and its step count must follow the reason.
+        summary = {
+            "signpostSummaryVersion": 1,
+            "signpostIntervalCount": 160,
+            "signpostBeginCount": 0,
+            "signpostEndCount": 0,
+            "signpostPointCount": 0,
+            "orphanIntervalCount": 0,
+            "intervalStatistics": {"version": 1, "takes": [capped]},
+        }
+        intervals.validate_signpost_summary(summary, take_indices=[1], require_complete=True)
+        for change in (
+            {"loopSteps": tokens + 1},
+            {"endReason": "failed"},
+            {"endReason": ["token_cap"]},
+            {"endReason": "eos"},
+        ):
+            broken = copy.deepcopy(summary)
+            broken["intervalStatistics"]["takes"][0].update(change)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                intervals.validate_signpost_summary(broken, take_indices=[1], require_complete=True)
 
     def test_the_witness_counts_spans_that_drift_from_the_jsonl_totals(self) -> None:
         tokens = 1
@@ -103,7 +154,7 @@ class TraceIntervalTests(unittest.TestCase):
         }
         statistics = intervals.take_statistics(
             take_index=1, window=(0, 10_000 * MS), intervals=spans,
-            generated_tokens=tokens, timings_ms=timings,
+            generated_tokens=tokens, end_reason="eos", timings_ms=timings,
         )
         self.assertEqual(statistics["witness"]["comparedCount"], 2)
         self.assertEqual(statistics["witness"]["outsideToleranceCount"], 1)
@@ -119,7 +170,9 @@ class TraceIntervalTests(unittest.TestCase):
                 )],
             },
             engine_intervals=loop_intervals(MS, 3),
-            expectations={correlation: {"generatedTokens": 2, "timingsMS": {}}},
+            expectations={
+                correlation: {"generatedTokens": 2, "endReason": "eos", "timingsMS": {}},
+            },
         )
         self.assertEqual(orphans, 0)
         summary = {
@@ -160,7 +213,7 @@ class TraceIntervalTests(unittest.TestCase):
         incomplete = mutated(lambda value: take(value).update(
             loopIntervalCount=take(value)["expectedLoopIntervalCount"] - 1, complete=False,
         ))
-        with self.assertRaisesRegex(ValueError, "lost loop intervals"):
+        with self.assertRaises(ValueError):
             intervals.validate_signpost_summary(incomplete, take_indices=[1], require_complete=True)
         # An iPhone profile records the shortfall instead of being refused.
         intervals.validate_signpost_summary(incomplete, take_indices=[1], require_complete=False)

@@ -113,8 +113,11 @@
   --stroke-stage:     rgba(255, 255, 255, 0.10);
 
   --fg-primary:       #F5F6F8;
+  /* Text tokens keep WCAG AA (4.5:1) on every surface token in both themes;
+     scripts/site-contract.mjs checks it. Tertiary was 0.42 (about 3.8:1 on
+     the canvas) until PA-20 (WEB-03); 0.55 gives 5.0:1 or more. */
   --fg-secondary:     rgba(245, 246, 248, 0.65);
-  --fg-tertiary:      rgba(245, 246, 248, 0.42);
+  --fg-tertiary:      rgba(245, 246, 248, 0.55);
   --fg-disabled:      rgba(245, 246, 248, 0.25);
 
   --sidebar-hover-fill:    rgba(255, 255, 255, 0.03);
@@ -234,8 +237,8 @@
   --stroke-rail:   rgba(123, 138, 165, 0.34);
 
   --fg-primary:    #1B1D24;
-  --fg-secondary:  rgba(27, 29, 36, 0.62);
-  --fg-tertiary:   rgba(27, 29, 36, 0.42);
+  --fg-secondary:  rgba(27, 29, 36, 0.72);
+  --fg-tertiary:   rgba(27, 29, 36, 0.64);
   --fg-disabled:   rgba(27, 29, 36, 0.28);
 
   --sidebar-hover-fill:    #F2F5FA;

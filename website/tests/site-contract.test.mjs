@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateRepository, validateText } from "../scripts/site-contract.mjs";
+import fs from "node:fs";
+import { contrastRatio, validateRepository, validateText, validateTokenContrast } from "../scripts/site-contract.mjs";
 
 const fixture = (source) => validateText({
   indexHTML: '<html lang="en"><head><meta name="description"><meta name="viewport"><meta name="robots"><meta property="og:title"><meta property="og:url"><meta property="og:image:alt"><meta name="twitter:card"><link rel="canonical"><title>Vocello 2.2</title></head></html>',
@@ -30,4 +31,35 @@ test("unqualified performance claims and em dashes fail", () => {
   const errors = fixture('<div id="home">Faster than realtime — everywhere</div>');
   assert.ok(errors.some((value) => value.includes("performance claim")));
   assert.ok(errors.some((value) => value.includes("em dash")));
+});
+
+test("text tokens meet WCAG AA on every surface in both themes", () => {
+  const css = fs.readFileSync(new URL("../src/tokens.css", import.meta.url), "utf8");
+  assert.deepEqual(validateTokenContrast(css), []);
+});
+
+test("contrast is computed over the composited surface", () => {
+  assert.equal(contrastRatio({ rgb: [255, 255, 255], alpha: 1 }, [0, 0, 0]).toFixed(1), "21.0");
+  // The pre-PA-20 tertiary token: about 3.9:1 on the charcoal canvas.
+  const ratio = contrastRatio({ rgb: [245, 246, 248], alpha: 0.42 }, [0x16, 0x18, 0x1e]);
+  assert.ok(ratio > 3.7 && ratio < 4.0, `${ratio}`);
+});
+
+test("low-contrast text tokens fail", () => {
+  const css = `:root {
+  --charcoal-900: #16181E;
+  --bg-canvas: var(--charcoal-900);
+  --bg-stage: #1C1E26;
+  --bg-rail: #171920;
+  --bg-card: #0D0E12;
+  --bg-inline: #111318;
+  --bg-field: #2A2C36;
+  --fg-primary: #F5F6F8;
+  --fg-secondary: rgba(245, 246, 248, 0.65);
+  --fg-tertiary: rgba(245, 246, 248, 0.42);
+}
+`;
+  const errors = validateTokenContrast(css);
+  assert.ok(errors.some((value) => value.startsWith("dark --fg-tertiary on --bg-canvas")), errors.join("; "));
+  assert.ok(!errors.some((value) => value.includes("--fg-secondary")), errors.join("; "));
 });

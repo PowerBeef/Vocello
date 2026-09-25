@@ -123,7 +123,9 @@ from unrelated JSX.
 - Every image needs meaningful alt text or deliberate decorative handling.
 - External `target="_blank"` links require `rel="noreferrer"`; internal targets must resolve.
 - Maintain semantic heading order, keyboard-operable controls, focus visibility, and sufficient
-  contrast across all breakpoints.
+  contrast across all breakpoints. `npm run lint` (`scripts/site-contract.mjs`) holds every text
+  token (`--fg-primary`, `--fg-secondary`, `--fg-tertiary`) at WCAG AA 4.5:1 or more on every
+  surface token in both themes.
 - Do not hide product limitations or replace precise copy with vague marketing language.
 
 ## Definition of done

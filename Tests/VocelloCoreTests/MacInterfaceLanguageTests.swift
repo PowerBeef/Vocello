@@ -136,6 +136,20 @@ final class MacInterfaceLanguageTests: XCTestCase {
         MacInterfaceLanguage.select(IOSAppLanguage.system)
     }
 
+    /// The stopped-engine strip reads "Engine unavailable" for the typed missing-model
+    /// copy in every interface language, not for an English keyword.
+    func testCrashedStatusTitleFollowsTheTypedModelUnavailableCopy() {
+        for language in [IOSAppLanguage.system, IOSUILanguage.french.rawValue] {
+            MacInterfaceLanguage.select(language)
+            let missingModel = MacInterfaceText.generationFailureMessage(TTSEngineError.modelUnavailable("raw"))
+            XCTAssertEqual(MacInterfaceText.shellCrashedTitle(message: missingModel), MacInterfaceText.shellEngineUnavailable, language)
+            let memory = MacInterfaceText.generationFailureMessage(TTSEngineError.insufficientMemory("raw"))
+            XCTAssertEqual(MacInterfaceText.shellCrashedTitle(message: memory), MacInterfaceText.shellEngineStopped, language)
+        }
+        XCTAssertNotEqual(MacInterfaceText.shellEngineUnavailable, MacInterfaceText.shellEngineStopped)
+        MacInterfaceLanguage.select(IOSAppLanguage.system)
+    }
+
     /// PA-20 (MAC-11): count-bearing Mac copy uses catalog plural rules in the interface language.
     func testMacCountCopyUsesPluralRules() {
         XCTAssertEqual(MacInterfaceText.batchClipsGenerated(1), "1 clip generated successfully.")

@@ -51,9 +51,7 @@ struct MacStatusStrip: View {
         case .crashed(let message):
             Descriptor(
                 stateKey: "crashed", symbol: "bolt.slash.fill", tint: MacTheme.Status.critical,
-                title: message.localizedCaseInsensitiveContains("unavailable")
-                    ? MacInterfaceText.shellEngineUnavailable
-                    : MacInterfaceText.shellEngineStopped,
+                title: MacInterfaceText.shellCrashedTitle(message: message),
                 message: message.isEmpty ? MacInterfaceText.shellRestartToContinue : message,
                 fraction: nil, dismissible: false
             )

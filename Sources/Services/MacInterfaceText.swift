@@ -1542,6 +1542,15 @@ enum MacInterfaceText {
         localization.string(localized: "vocello.mac.shell.engineUnavailable", defaultValue: "Engine unavailable",
                comment: "macOS interface: status strip title when the engine reported it is unavailable. Presentation only.")
     }
+    /// Status strip title for an engine that stopped with `message`: "Engine
+    /// unavailable" when the message is the typed missing-or-incomplete-model
+    /// copy in the interface language (PA-20), "Engine stopped" otherwise. The
+    /// message is compared with that copy, never searched for a keyword.
+    static func shellCrashedTitle(message: String) -> String {
+        message == presentation.generationFailureMessage(GenerationFailurePresentationReason.modelUnavailable)
+            ? shellEngineUnavailable
+            : shellEngineStopped
+    }
     static var shellInProgress: String {
         localization.string(localized: "vocello.mac.shell.inProgress", defaultValue: "In progress",
                comment: "macOS interface: VoiceOver value of a live activity without a known fraction. Presentation only.")

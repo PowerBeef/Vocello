@@ -77,7 +77,7 @@ class GenerateReadmeChartsTests(unittest.TestCase):
 
 def write_record(directory: Path, run_id: str, profile: str, finished_at: str,
                  classification: str = "canonical", key: str = "lineage-a",
-                 rtf: float = 0.5) -> None:
+                 rtf: float = 0.5, app_build: str = "24", lock: str = "lock-a") -> None:
     marketing = {
         "mac-mini-m2-8gb": "Mac mini (M2, 8 GB)",
         "mac-mini-m6-16gb": "Mac mini (M6, 16 GB)",
@@ -88,6 +88,8 @@ def write_record(directory: Path, run_id: str, profile: str, finished_at: str,
             "classification": classification, "rtfDefinition": "wall/audio",
         },
         "hardware": {"profileID": profile, "marketingName": marketing},
+        "toolchain": {"appVersion": "3.0.0", "appBuild": app_build},
+        "inputs": {"dependencyLockHash": lock},
         "comparison": {"key": key},
         "takes": [
             {"cell": f"{mode}/{length}/warm#{index}", "metrics": {"rtf": rtf + index / 100}}
@@ -161,6 +163,27 @@ class ChartPoolTests(unittest.TestCase):
         write_record(self.records, "macos-xcui-benchmark-20260922-000000-newkey", "mac-mini-m2-8gb",
                      "2026-09-22T00:00:00Z", key="lineage-b")
         self.assertEqual(self.pool(), ["macos-xcui-benchmark-20260922-000000-newkey"])
+
+    def test_the_pool_never_spans_builds_or_dependency_pins(self) -> None:
+        """A lineage key leaves the app build and pins out; the public pool does not."""
+        write_record(self.records, "macos-xcui-benchmark-20260915-000000-samebuild", "mac-mini-m2-8gb",
+                     "2026-09-15T00:00:00Z")
+        self.assertEqual(len(self.pool()), 2)
+        rebuilt = "macos-xcui-benchmark-20260916-000000-newbuild"
+        write_record(self.records, rebuilt, "mac-mini-m2-8gb", "2026-09-16T00:00:00Z", app_build="25")
+        self.assertEqual(self.pool(), [rebuilt])
+        repinned = "macos-xcui-benchmark-20260917-000000-newlock"
+        write_record(self.records, repinned, "mac-mini-m2-8gb", "2026-09-17T00:00:00Z",
+                     app_build="25", lock="lock-b")
+        self.assertEqual(self.pool(), [repinned])
+
+    def test_the_website_provenance_mirrors_the_chart_footer(self) -> None:
+        medians = {f"{mode}/{length}/warm": 0.5 for mode in MODULE.MODES for length in MODULE.LENGTHS}
+        one = ["macos-xcui-benchmark-20260914-000000-latestm2"]
+        self.assertIn("Record latestm2", MODULE.website_medians_text(one, medians))
+        pooled = ["macos-xcui-benchmark-20260915-000000-pooledm2", *one]
+        self.assertEqual(MODULE.provenance_text(pooled), "median of 2 records through pooledm2")
+        self.assertIn("Median of 2 records through pooledm2", MODULE.website_medians_text(pooled, medians))
 
     def test_pooled_medians_take_every_take_of_the_pool(self) -> None:
         write_record(self.records, "macos-xcui-benchmark-20260915-000000-second", "mac-mini-m2-8gb",

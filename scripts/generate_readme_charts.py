@@ -13,12 +13,15 @@ Data provenance:
     benchmarks/hardware-profiles.json (while that profile has none yet, the
     newest canonical record on any profile), and the pool is the anchor plus
     the canonical records just before it on the same profile that share its
-    comparison key, at most POOL_SIZE records; a lineage change resets the
-    pool. Each bar is the median of every warm take of its cell across the
-    pool, so one run's noise no longer moves the public numbers at each new
-    record. The anchor is derived, never pinned: a new canonical record changes
-    the charts, so `--check` fails until they are regenerated (and the website
-    medians updated from the printed values). Records from different hardware
+    comparison key, app version and build, and dependency lock, at most
+    POOL_SIZE records; a lineage change or a new build resets the pool, so it
+    never spans builds and the bars describe the anchor's build (a lineage
+    key leaves the app version and pins out). Each bar is the median of every
+    warm take of its cell across the pool, so one run's noise no longer moves
+    the public numbers at each new record. The anchor is derived, never
+    pinned: a new canonical record changes the charts, so `--check` fails
+    until they are regenerated (and the website medians and provenance line
+    updated from the printed values). Records from different hardware
     profiles are never pooled; the subtitle names the anchor's hardware and
     the footer the anchor and the pool size. RTF is the standard
     real-time factor (generation seconds per audio second, lower is faster).
@@ -155,15 +158,24 @@ def load_rtf_medians(record_ids: list[str], records_dir: Path | None = None) -> 
     return {key: statistics.median(values) for key, values in per_cell.items()}, derived
 
 
-def canonical_records(records_dir: Path | None = None) -> dict[str, list[tuple[str, str, str]]]:
-    """(finishedAt, run id, comparison key) of each canonical macOS UI record, per profile, oldest first."""
-    by_profile: dict[str, list[tuple[str, str, str]]] = {}
+def canonical_records(records_dir: Path | None = None) -> dict[str, list[tuple[str, str, tuple[str, ...]]]]:
+    """(finishedAt, run id, pool identity) of each canonical macOS UI record, per profile, oldest first.
+
+    The pool identity is the comparison key plus the app version, app build and
+    dependency lock, which a lineage-keyed comparison key leaves out."""
+    by_profile: dict[str, list[tuple[str, str, tuple[str, ...]]]] = {}
     for path in (records_dir or RECORDS_DIR).glob("macos-*.json"):
         payload = json.loads(path.read_text(encoding="utf-8"))
         run = payload["run"]
         if run.get("classification") == "canonical":
+            toolchain = payload.get("toolchain") or {}
+            identity = (
+                str((payload.get("comparison") or {}).get("key", "")),
+                str(toolchain.get("appVersion", "")), str(toolchain.get("appBuild", "")),
+                str((payload.get("inputs") or {}).get("dependencyLockHash", "")),
+            )
             by_profile.setdefault(payload.get("hardware", {}).get("profileID"), []).append(
-                (run["finishedAt"], run["id"], (payload.get("comparison") or {}).get("key", ""))
+                (run["finishedAt"], run["id"], identity)
             )
     return {profile: sorted(rows) for profile, rows in by_profile.items()}
 
@@ -174,8 +186,9 @@ def chart_pool(records_dir: Path | None = None, profiles_path: Path | None = Non
     The anchor is the newest canonical record on the canonical macOS profile or,
     until that profile has one, the newest canonical record on any profile. The
     pool walks back from it through the same profile's canonical records while
-    they share its comparison key, so a lineage change resets it. Profiles are
-    never mixed."""
+    they share its comparison key, app version and build, and dependency lock,
+    so a lineage change or a new build resets it: the published medians always
+    describe the anchor's build. Profiles are never mixed."""
     by_profile = canonical_records(records_dir)
     profile = canonical_macos_profile_id(profiles_path)
     if not by_profile.get(profile):
@@ -183,13 +196,19 @@ def chart_pool(records_dir: Path | None = None, profiles_path: Path | None = Non
             raise SystemExit("error: no canonical macOS ui-generation record found")
         profile = max(by_profile, key=lambda name: by_profile[name][-1])
     rows = by_profile[profile]
-    anchor_key = rows[-1][2]
+    anchor_identity = rows[-1][2]
     pool: list[str] = []
-    for _, run_id, key in reversed(rows):
-        if key != anchor_key or len(pool) == POOL_SIZE:
+    for _, run_id, identity in reversed(rows):
+        if identity != anchor_identity or len(pool) == POOL_SIZE:
             break
         pool.append(run_id)
     return pool
+
+
+def provenance_text(pool: list[str]) -> str:
+    """The chart footer's provenance, which the website's provenance line mirrors."""
+    anchor = pool[0][-8:]
+    return f"record {anchor}" if len(pool) == 1 else f"median of {len(pool)} records through {anchor}"
 
 
 def website_medians_text(pool: list[str], medians: dict[str, float]) -> str:
@@ -198,9 +217,11 @@ def website_medians_text(pool: list[str], medians: dict[str, float]) -> str:
         f"  {MODE_LABELS[mode]}: " + ", ".join(f"{medians[f'{mode}/{length}/warm']:.2f}" for length in LENGTHS)
         for mode in MODES
     ]
+    provenance = provenance_text(pool)
     return "\n".join([
         f"Website medians (short, medium, long) from {len(pool)} record(s), anchor {pool[0][-8:]}:",
         *rows,
+        f"Website provenance line: {provenance[0].upper()}{provenance[1:]}",
     ])
 
 
@@ -307,11 +328,7 @@ def rtf_chart(theme_name: str) -> str:
         parts.append(text(16, height - 6,
                           "RTF derived from each take's app submit→completed span (record predates the 2026-09-12 RTF cutover)",
                           fill=theme["muted"], size=10))
-    provenance = (
-        f"record {anchor[-8:]}" if len(pool) == 1
-        else f"median of {len(pool)} records through {anchor[-8:]}"
-    )
-    parts.append(text(width - 16, height - 6, f"{provenance} · benchmarks/HISTORY.md",
+    parts.append(text(width - 16, height - 6, f"{provenance_text(pool)} · benchmarks/HISTORY.md",
                       fill=theme["muted"], size=10, anchor="end"))
     parts.extend(("</g>", "</svg>"))
     return "\n".join(parts) + "\n"
@@ -485,7 +502,7 @@ def main() -> int:
             print(f"error: README charts are stale: {', '.join(sorted(stale))}", file=sys.stderr)
             print(
                 f"run: python3 scripts/generate_readme_charts.py (anchor {pool[0]}, pool of {len(pool)}), "
-                "then copy the medians it prints into website/src/sections/Engineering.jsx",
+                "then copy the medians and provenance line it prints into website/src/sections/Engineering.jsx",
                 file=sys.stderr,
             )
             return 1

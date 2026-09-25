@@ -3,8 +3,10 @@ import React from "react";
 /*
   Measured performance, from the repository's tracked benchmark records:
   - RTF bars: the warm-take medians `python3 scripts/generate_readme_charts.py` prints, pooled
-    over up to five canonical records that share the newest one's comparison key (the anchor,
-    named in the provenance line below). Today the pool is one record,
+    over up to five canonical records that share the comparison key and app build of the newest
+    one (the anchor). The provenance line below mirrors the chart footer, as the generator prints
+    it: "Record <anchor>" for one record, "Median of N records through <anchor>" for more. Today
+    the pool is one record,
     benchmarks/runs/ui-generation/macos-xcui-benchmark-20260914-062114-379db820.json; the
     generator's `--check` fails when a new canonical record changes the charts.
     RTF is the standard real-time factor: seconds of generation per second of audio, lower is

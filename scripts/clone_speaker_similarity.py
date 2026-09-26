@@ -40,8 +40,13 @@ from typing import Any, Callable
 ECAPA_SOURCE = "speechbrain/spkrec-ecapa-voxceleb"
 ECAPA_REVISION = "0f99f2d0ebe89ac095bcc5903c4dd8f72b367286"
 # The registry judge this backend is (`config/audio-qc-judges.json`): tier B,
-# accepted for internal evaluation only; its snapshot is verified before loading.
+# accepted for internal evaluation only; every file of its snapshot is verified
+# against the registry's Hub pins before loading.
 ECAPA_JUDGE_ID = "speaker.ecapa-voxceleb@1"
+# Runtime packages that can change an embedding. The registry leaves them
+# unpinned (`recorded-at-load`): the loaded versions are part of the score's
+# output identity and every report records them.
+ECAPA_RUNTIME_PACKAGES = ("speechbrain", "torch", "numpy")
 # Waveform preprocessing is part of the score's identity (audit #103): takes
 # arrive at 24 kHz and ECAPA reads 16 kHz. The pinned anti-aliased polyphase
 # resampler (`scripts/audio_resampling.py`, the one the delivery cache uses)
@@ -100,6 +105,24 @@ def advisory_band(similarity: float, profile: dict[str, Any]) -> str:
     return "weak"
 
 
+def backend_identity(embed: Callable[[str], list[float]]) -> dict[str, Any]:
+    """The score's output identity: the pinned backend plus what the loader verified.
+
+    The loaded embedder (`EcapaEmbedder`) adds the SHA-256 of every verified
+    snapshot file, the runtime package versions and the host; an injected test
+    embedder has only the pinned source, revision and preprocessing.
+    """
+    identity: dict[str, Any] = {
+        "source": ECAPA_SOURCE, "revision": ECAPA_REVISION,
+        "preprocessing": dict(ECAPA_PREPROCESSING),
+    }
+    loaded = getattr(embed, "identity", None)
+    if isinstance(loaded, dict):
+        identity.update({key: loaded[key] for key in ("snapshotFileDigests", "runtimeVersions", "hostProfile")
+                         if key in loaded})
+    return identity
+
+
 def analyze_takes(
     reference: str,
     takes: list[str],
@@ -127,10 +150,7 @@ def analyze_takes(
     return {
         "metric": "speaker-cosine-similarity",
         "advisory": True,
-        "backend": {
-            "source": ECAPA_SOURCE, "revision": ECAPA_REVISION,
-            "preprocessing": dict(ECAPA_PREPROCESSING),
-        },
+        "backend": backend_identity(embed),
         "profile": profile,
         "reference": os.path.basename(reference),
         "takes": rows,
@@ -244,38 +264,61 @@ def pinned_ecapa_snapshot(snapshot_download: Callable[..., str]) -> str:
 def verify_ecapa_snapshot(local_source: str) -> dict[str, str]:
     """Verify the cached snapshot against the judge registry before it loads (audit AQ-F04).
 
-    The registry must still let the judge run and name the same repository and
-    revision; every snapshot file must match its content address and any
-    per-file pin. Returns each file's SHA-256.
+    The registry's load-time gate must let the judge load this repository and
+    revision; the snapshot must be that revision's directory and hold exactly
+    the files the registry pins from the Hub tree, each matching its LFS
+    SHA-256 or git blob ID. Returns each file's SHA-256.
     """
     from audio_qc_judges import JudgeRegistryError, verify_judge_snapshot
 
     try:
         return verify_judge_snapshot(
             ECAPA_JUDGE_ID, Path(local_source), repository=ECAPA_SOURCE, revision=ECAPA_REVISION,
+            packages=ECAPA_RUNTIME_PACKAGES,
         )
     except JudgeRegistryError as error:
         raise RuntimeError(f"the pinned ECAPA snapshot failed verification: {error}") from error
 
 
-def ecapa_embedder() -> Callable[[str], list[float]]:
+class EcapaEmbedder:
+    """A loaded ECAPA backend and the identity its loader verified."""
+
+    def __init__(self, embed: Callable[[str], list[float]], identity: dict[str, Any]) -> None:
+        self._embed = embed
+        self.identity = identity
+
+    def __call__(self, path: str) -> list[float]:
+        return self._embed(path)
+
+
+def ecapa_embedder() -> EcapaEmbedder:
     """Load the pinned ECAPA backend. Operator-local heavy dependency.
 
     The exact revision is loaded from the local Hugging Face cache only
     (``local_files_only``), so the pin holds regardless of whether the installed
     speechbrain still forwards a ``revision`` argument (1.x dropped it), and a run
     never fetches a model (audit #103). The maintainer caches the snapshot once.
-    Its bytes are verified against the judge registry before every load.
+    Every file is verified against the judge registry before every load, and the
+    verified digests, runtime versions and host travel with the embedder into
+    every report (`backend_identity`).
     """
     import wave  # noqa: PLC0415
+    from importlib import metadata  # noqa: PLC0415
 
     import numpy as np  # noqa: PLC0415
     import torch  # noqa: PLC0415
     from huggingface_hub import snapshot_download  # noqa: PLC0415
     from speechbrain.inference.speaker import EncoderClassifier  # noqa: PLC0415
 
+    from audio_qc_judges import host_profile  # noqa: PLC0415
+
     local_source = pinned_ecapa_snapshot(snapshot_download)
-    verify_ecapa_snapshot(local_source)
+    digests = verify_ecapa_snapshot(local_source)
+    identity = {
+        "snapshotFileDigests": digests,
+        "runtimeVersions": {name: metadata.version(name) for name in ECAPA_RUNTIME_PACKAGES},
+        "hostProfile": host_profile(),
+    }
     classifier = EncoderClassifier.from_hparams(
         source=local_source,
         run_opts={"device": "cpu"},
@@ -297,7 +340,7 @@ def ecapa_embedder() -> Callable[[str], list[float]]:
             embedding = classifier.encode_batch(waveform)
         return [float(x) for x in embedding.squeeze().tolist()]
 
-    return embed
+    return EcapaEmbedder(embed, identity)
 
 
 def write_sidecar(path: Path, result: dict[str, Any]) -> None:

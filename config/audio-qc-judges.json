@@ -31,8 +31,8 @@
     "note": "The qualifier attests the live host against the one canonical macOS profile. The 8 GB Mac and the iPhone remain product floors, not evaluator hosts."
   },
   "identitySplit": {
-    "output": "Everything that can change a judge's output: model, weights and runtime digests, the worker or adapter source, label map, decode options and preprocessing. It keys caches and calibration records.",
-    "envelope": "How a run was supervised: the resource supervisor's source, its probe and options, the host. Provenance only; a change never invalidates a cache entry or a calibration."
+    "output": "Everything that can change a judge's output: model, weights and runtime digests, runtime package versions, the worker or adapter source and command template, label map, decode options and preprocessing, and the host until the judge's cross-host determinism is measured (AQ-06). It keys caches and calibration records.",
+    "envelope": "How a run was supervised: the resource supervisor's source, its probe and options. Provenance only; a change never invalidates a cache entry or a calibration."
   },
   "judges": {
     "asr.whisper-small@1": {
@@ -79,8 +79,8 @@
         "generatorLabCorrelated": false
       },
       "identity": {
-        "output": ["modelID", "sourceRevision", "weightsSHA256", "labelMapDigest", "binarySHA256", "runtimeDependencies", "workerSourceSHA256", "algorithm", "decodeOptions", "lockedLanguage", "preprocessingConfigDigest"],
-        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions", "hostProfile"]
+        "output": ["modelID", "sourceRevision", "weightsSHA256", "labelMapDigest", "binarySHA256", "runtimeDependencies", "workerSourceSHA256", "commandTemplate", "algorithm", "decodeOptions", "lockedLanguage", "preprocessingConfigDigest", "hostProfile"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "resources": {
         "provisionalCeilingBytes": 2684354560,
@@ -255,8 +255,8 @@
         "correlationNotes": "Same company as the generator's lab and as Paraformer; a different lab. Counts toward the error-correlation audit before any consensus gates."
       },
       "identity": {
-        "output": ["adapterID", "modelID", "sourceRevision", "weightsSHA256", "binarySHA256", "adapterSourceSHA256", "adapterLayerSHA256", "runtimeDependenciesDigest", "labelMapDigest", "outputFormat", "preprocessingConfigDigest"],
-        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions", "hostProfile"]
+        "output": ["adapterID", "modelID", "sourceRevision", "weightsSHA256", "binarySHA256", "adapterSourceSHA256", "adapterLayerSHA256", "commandTemplate", "runtimeDependenciesDigest", "labelMapDigest", "outputFormat", "preprocessingConfigDigest", "hostProfile"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "resources": {
         "provisionalCeilingBytes": 5368709120,
@@ -275,7 +275,12 @@
       "voting": false,
       "family": null,
       "ships": false,
-      "plannedRetirement": {"item": "AQ-05", "reason": "No QC measurand; the fitted heads were never calibrated (audit sections 4.9 and 7.1)."},
+      "plannedRetirement": {
+        "item": "AQ-05",
+        "status": "deferred",
+        "reason": "No QC measurand; the fitted heads were never calibrated (audit sections 4.9 and 7.1).",
+        "note": "Audit section 4.9 excludes DistilHuBERT and its ridge, elastic-net and PLS heads. The retirement is deferred to AQ-05, which removes them from the QC paths with the staged pipeline; until then it stays a non-voting candidate that feeds no verdict, which is why it is not on the exclusion list."
+      },
       "legacyIdentifiers": {"adapterIDs": ["distilhubert"]},
       "pins": {
         "repository": "ntu-spml/distilhubert",
@@ -301,8 +306,8 @@
       },
       "independence": {"vendor": "National Taiwan University SPML", "architecture": "distilled HuBERT encoder", "trainingData": "LibriSpeech", "labelLineage": "self-supervised distillation", "generatorLabCorrelated": false},
       "identity": {
-        "output": ["adapterID", "modelID", "sourceRevision", "weightsSHA256", "binarySHA256", "adapterSourceSHA256", "adapterLayerSHA256", "runtimeDependenciesDigest", "labelMapDigest", "outputFormat", "preprocessingConfigDigest"],
-        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions", "hostProfile"]
+        "output": ["adapterID", "modelID", "sourceRevision", "weightsSHA256", "binarySHA256", "adapterSourceSHA256", "adapterLayerSHA256", "commandTemplate", "runtimeDependenciesDigest", "labelMapDigest", "outputFormat", "preprocessingConfigDigest", "hostProfile"],
+        "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "resources": {
         "provisionalCeilingBytes": 5368709120,
@@ -321,15 +326,27 @@
       "voting": false,
       "family": "speaker-ecapa",
       "ships": false,
-      "plannedRetirement": {"item": "AQ-07", "reason": "Shadow for one cycle, then retired once the CAM++ and ResNet293 families qualify (audit section 4.3)."},
+      "plannedRetirement": {"item": "AQ-07", "status": "deferred", "reason": "Shadow for one cycle, then retired once the CAM++ and ResNet293 families qualify (audit section 4.3)."},
       "legacyIdentifiers": {"sources": ["scripts/clone_speaker_similarity.py"], "reportFields": ["speakerSimilarity", "identityCosine"]},
       "pins": {
         "repository": "speechbrain/spkrec-ecapa-voxceleb",
         "revision": "0f99f2d0ebe89ac095bcc5903c4dd8f72b367286",
-        "files": {},
+        "files": {
+          ".gitattributes": {"gitBlobID": "c79d72cc1197b4b32646fb55b18f4baf69a33dc1", "size": 858},
+          "README.md": {"gitBlobID": "6023cecccb30eba7ed77fea84a9e47d334dd3a6c", "size": 5377},
+          "classifier.ckpt": {"lfsSHA256": "fd9e3634fe68bd0a427c95e354c0c677374f62b3f434e45b78599950d860d535", "size": 5534328},
+          "config.json": {"gitBlobID": "2e8b3b4d97ae58d7daa78954a5c7f5b8abb42934", "size": 51},
+          "embedding_model.ckpt": {"lfsSHA256": "0575cb64845e6b9a10db9bcb74d5ac32b326b8dc90352671d345e2ee3d0126a2", "size": 83316686},
+          "example1.wav": {"gitBlobID": "2d5abbd526328179f0516569cb9ff5ddd289a1fc", "size": 104390},
+          "example2.flac": {"gitBlobID": "a38e3061f91ba51b02b7ef4c5fd4d088659c183d", "size": 39589},
+          "hyperparams.yaml": {"gitBlobID": "70e4cd0beb74ca08a2df9de6bd79d938670a4d15", "size": 1919},
+          "label_encoder.txt": {"gitBlobID": "72c6fa7b170cbfd169df5e09326cd97febdf086a", "size": 128619},
+          "mean_var_norm_emb.ckpt": {"gitBlobID": "1978c5e7f20d5ffd14c8a932a7e85a09816f3da9", "size": 1921}
+        },
+        "filesSource": "The Hugging Face tree metadata of the pinned revision (read 2026-09-25, no download): the LFS SHA-256 of each large file and the git blob ID of every other file.",
         "digestStatus": "content-addressed-snapshot",
-        "verification": "Loaded from the local Hugging Face cache only; before each load every snapshot file is checked against its content address (SHA-256 for large files, the git blob SHA-1 otherwise) and against any per-file pin recorded here. Per-file SHA-256 pins are recorded at acquisition (AQ-06).",
-        "runtime": {"speechbrain": "operator-local", "torch": "operator-local"}
+        "verification": "Loaded from the local Hugging Face cache only (the complete snapshot of `hf download speechbrain/spkrec-ecapa-voxceleb --revision <revision>`). Before each load the snapshot directory must be the pinned revision and hold exactly these files, each matching its pin; an unpinned, missing or altered file refuses. The similarity report records every verified file's SHA-256.",
+        "runtime": {"speechbrain": "recorded-at-load", "torch": "recorded-at-load", "numpy": "recorded-at-load"}
       },
       "license": {
         "weights": "Apache-2.0",
@@ -343,8 +360,8 @@
       "tierBAcceptance": {"decision": "2a", "date": "2026-09-25", "scope": "internal-never-shipped-evaluation"},
       "independence": {"vendor": "SpeechBrain", "architecture": "ECAPA-TDNN", "trainingData": "VoxCeleb", "labelLineage": "speaker identity labels", "generatorLabCorrelated": false},
       "identity": {
-        "output": ["repository", "revision", "snapshotFileDigests", "preprocessing"],
-        "envelope": ["torchVersion", "hostProfile"]
+        "output": ["repository", "revision", "snapshotFileDigests", "runtimeVersions", "preprocessing", "hostProfile"],
+        "envelope": []
       },
       "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Unsupervised in-process CPU scorer today; about 0.4-0.6 GB (audit estimate).", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
       "determinismClass": "unmeasured",
@@ -363,8 +380,7 @@
         "adapterIDs": ["nisqa-v2"],
         "cascadeLayers": ["clip-quality-screen"],
         "reportFields": ["clipQualityScreen"],
-        "sources": ["scripts/clip_quality_screen.py"],
-        "pythonModules": ["torchmetrics.functional.audio.nisqa"]
+        "sources": ["scripts/clip_quality_screen.py"]
       },
       "pins": {
         "repository": "gabrielmittag/NISQA",
@@ -406,7 +422,14 @@
         "cascadeLayers": ["utmos"],
         "guardrails": ["relativeUTMOSDelta", "maximumMedianRelativeUTMOSRegression"],
         "sources": ["scripts/mos_advisory.py"],
-        "pythonModules": ["utmosv2"]
+        "frozenContracts": [
+          {
+            "path": "config/delivery-prompt-remediation-contract.json",
+            "sha256": "e6dc278f9375d97c76fcb463cf4552ff0cf90fa81d5df690a504753f57f54634",
+            "fields": ["acceptance.maximumMedianRelativeUTMOSRegression"],
+            "reason": "The DP-30 per-preset screen pre-registered on 2026-08-25; its execution plans and decisions bind the contract by digest, so it is frozen and never edited. Nothing reads the retired guardrail value, and promotion decisions report a legacy relativeUTMOSDelta without gating."
+          }
+        ]
       },
       "pins": {
         "repository": "sarulab-speech/UTMOSv2",
@@ -471,27 +494,31 @@
     }
   },
   "excluded": [
-    {"id": "nisqa", "category": "license", "tier": "C", "reason": "Weights CC BY-NC-SA 4.0; weak on clean TTS (TTSDS2 correlations 0.05 to -0.64; onset-cluster AUC 0.54).", "models": ["gabrielmittag/NISQA*", "*NISQA-TTS*"], "packages": ["nisqa"], "pythonModules": ["nisqa", "torchmetrics.functional.audio.nisqa", "torchmetrics.audio.nisqa"]},
-    {"id": "utmosv2", "category": "license", "tier": "C", "reason": "SOMOS (CC BY-NC-SA) and Blizzard samples in training; 3.6 GB; out of domain.", "models": ["sarulab-speech/UTMOSv2*"], "packages": ["utmosv2"], "pythonModules": ["utmosv2"]},
-    {"id": "ser-wav2vec2-xlsr-firdhokk", "category": "license", "tier": "C", "reason": "Trained on RAVDESS, TESS and SAVEE (non-commercial or research use).", "models": ["firdhokk/speech-emotion-recognition-with-facebook-wav2vec2-large-xlsr-53"], "packages": [], "pythonModules": []},
-    {"id": "dimensional-and-podcast-emotion-models", "category": "license", "tier": "C", "reason": "audeering dimensional, emotion2vec+, 3loi Odyssey and tiantiaf MSP-Podcast models: CC BY-NC-SA or MSP-Podcast academic data; emotion2vec+ pseudo-labels undisclosed.", "models": ["audeering/*", "emotion2vec/*", "3loi/*", "tiantiaf/*"], "packages": [], "pythonModules": []},
-    {"id": "nc-judges-and-omni-graders", "category": "license", "tier": "C", "reason": "TorchAudio-SQUIM Subjective, SpeechJudge-GRM, Qwen2.5-Omni-3B and Audio Flamingo 3: CC BY-NC, the Qwen Research License or NVIDIA non-commercial terms.", "models": ["*SpeechJudge-GRM*", "Qwen/Qwen2.5-Omni-*", "nvidia/audio-flamingo-3*"], "packages": [], "pythonModules": ["torchaudio.pipelines.SQUIM_SUBJECTIVE"]},
-    {"id": "mms-and-voxpopuli-aligners", "category": "license", "tier": "C", "reason": "MMS-1B-all, MMS-LID, MMS-FA, the ctc-forced-aligner default, the torchaudio VoxPopuli aligners and Moonshine legacy non-English models: CC BY-NC 4.0 or a non-commercial community license.", "models": ["facebook/mms-*"], "packages": ["ctc-forced-aligner"], "pythonModules": ["torchaudio.pipelines.MMS_FA", "torchaudio.pipelines.VOXPOPULI_*", "ctc_forced_aligner"]},
-    {"id": "mhubert-147-and-versa", "category": "license", "tier": "C", "reason": "mHuBERT-147 (TTSDS2 multilingual) is CC BY-NC-SA; VERSA wraps non-commercial models without per-metric licenses and installs unpinned backends.", "models": ["utter-project/mHuBERT-147*"], "packages": ["versa"], "pythonModules": ["versa"]},
-    {"id": "scoreq", "category": "license", "tier": "C", "reason": "Weights CC BY 4.0 but trained on the NISQA corpus and other research data; reported to be gameable.", "models": ["*scoreq*"], "packages": ["scoreq"], "pythonModules": ["scoreq"]},
-    {"id": "utmos22", "category": "license", "tier": "C", "reason": "BVCC and Blizzard training data (Blizzard samples cannot be redistributed); a research column at most.", "models": ["*UTMOS22*", "tarepan/SpeechMOS*"], "packages": [], "pythonModules": []},
-    {"id": "swiftf0", "category": "license", "tier": "C", "reason": "Trained on the CC BY-NC-SA 4.0 pitch benchmark; pYIN replaces it.", "models": ["lars76/swift-f0*"], "packages": ["swift-f0"], "pythonModules": ["swift_f0"]},
-    {"id": "distill-mos", "category": "license", "tier": "C", "reason": "Trained on the NISQA corpus (non-commercial research) and VoiceMOS labels; DNSMOS replaces it.", "models": ["*distill-mos*", "*distillmos*"], "packages": ["distillmos"], "pythonModules": ["distillmos"]},
-    {"id": "wavlm-large-sv", "category": "license", "tier": "C", "reason": "The seed-tts-eval WavLM-large speaker-verification checkpoint: GigaSpeech pretraining, only for non-commercial research. ResNet293 replaces it as the second speaker family.", "models": ["microsoft/wavlm-large*", "*wavlm_large_finetune*"], "packages": [], "pythonModules": []},
-    {"id": "whisper-derivatives", "category": "independence", "tier": null, "reason": "Kotoba-Whisper and distil-whisper are the Whisper family, so not an independent family, and not better on read speech.", "models": ["kotoba-tech/kotoba-whisper*", "distil-whisper/*"], "packages": [], "pythonModules": []},
-    {"id": "qwen3-omni-per-take-judge", "category": "resources", "tier": null, "reason": "Qwen3-Omni-30B-A3B does not fit 16 GB; an omni model as a per-take judge samples (determinism class D2).", "models": ["Qwen/Qwen3-Omni-*"], "packages": [], "pythonModules": []},
-    {"id": "lightning-whisper-mlx", "category": "maintenance", "tier": null, "reason": "Unmaintained since 2024-04; no license metadata.", "models": [], "packages": ["lightning-whisper-mlx"], "pythonModules": ["lightning_whisper_mlx"]},
-    {"id": "cohere-transcribe", "category": "license", "tier": null, "reason": "Gated click-through terms; no Russian (watch-list).", "models": ["CohereLabs/*transcribe*"], "packages": [], "pythonModules": []},
-    {"id": "nvidia-ambernet", "category": "license", "tier": null, "reason": "NGC terms, not a clear permissive license; needs NeMo.", "models": ["*ambernet*"], "packages": [], "pythonModules": []},
-    {"id": "deepfake-detectors", "category": "measurand", "tier": null, "reason": "AASIST and deepfake detectors: every output is synthetic, so the score measures detector domain, not defects.", "models": ["*aasist*"], "packages": [], "pythonModules": []},
-    {"id": "resemblyzer", "category": "measurand", "tier": null, "reason": "Optimized for English speaker similarity.", "models": [], "packages": ["resemblyzer"], "pythonModules": ["resemblyzer"]},
-    {"id": "oas-alignment-metric", "category": "measurand", "tier": null, "reason": "Paper withdrawn (arXiv 2509.19852).", "models": [], "packages": [], "pythonModules": []},
-    {"id": "gpl-and-linux-only-text-normalizers", "category": "license", "tier": null, "reason": "zhconv (GPL-2.0+), pykakasi (GPL-3.0), soynlp (GPL-3.0, pulled in by qwen-asr); nemo-text-processing and WeTextProcessing need pynini wheels that are Linux-only.", "models": [], "packages": ["zhconv", "pykakasi", "soynlp", "nemo-text-processing", "WeTextProcessing"], "pythonModules": ["zhconv", "pykakasi", "soynlp", "nemo_text_processing"]},
-    {"id": "jsut-and-jvs-audio", "category": "license", "tier": "C", "reason": "JSUT and JVS audio are non-commercial; Japanese corpora come from FLEURS, Common Voice, Kokoro, CSS10 and JVNV instead.", "models": ["*jsut*", "*jvs_corpus*"], "packages": [], "pythonModules": []}
+    {"id": "nisqa", "category": "license", "tier": "C", "reason": "Weights CC BY-NC-SA 4.0 (the torchmetrics port downloads the same checkpoint); weak on clean TTS (TTSDS2 correlations 0.05 to -0.64; onset-cluster AUC 0.54).", "models": ["gabrielmittag/NISQA*", "*NISQA*"], "packages": ["nisqa"]},
+    {"id": "utmosv2", "category": "license", "tier": "C", "reason": "SOMOS (CC BY-NC-SA) and Blizzard samples in training; 3.6 GB; out of domain.", "models": ["sarulab-speech/UTMOSv2*", "*utmosv2*"], "packages": ["utmosv2"]},
+    {"id": "ser-wav2vec2-xlsr-firdhokk", "category": "license", "tier": "C", "reason": "Trained on RAVDESS, TESS and SAVEE (non-commercial or research use).", "models": ["firdhokk/speech-emotion-recognition-with-facebook-wav2vec2-large-xlsr-53"], "packages": []},
+    {"id": "dimensional-and-podcast-emotion-models", "category": "license", "tier": "C", "reason": "audeering dimensional, emotion2vec+, 3loi Odyssey and tiantiaf MSP-Podcast models: CC BY-NC-SA or MSP-Podcast academic data; emotion2vec+ pseudo-labels undisclosed.", "models": ["audeering/*", "emotion2vec/*", "3loi/*", "tiantiaf/*"], "packages": []},
+    {"id": "nc-judges-and-omni-graders", "category": "license", "tier": "C", "reason": "TorchAudio-SQUIM Subjective, SpeechJudge-GRM, Qwen2.5-Omni-3B and Audio Flamingo 3: CC BY-NC, the Qwen Research License or NVIDIA non-commercial terms.", "models": ["torchaudio.pipelines.SQUIM_SUBJECTIVE", "*SpeechJudge-GRM*", "Qwen/Qwen2.5-Omni-*", "nvidia/audio-flamingo-3*"], "packages": []},
+    {"id": "mms-and-voxpopuli-aligners", "category": "license", "tier": "C", "reason": "MMS-1B-all, MMS-LID, MMS-FA, the ctc-forced-aligner default (an MMS-300m aligner) and the torchaudio VoxPopuli aligners: CC BY-NC 4.0.", "models": ["facebook/mms-*", "MahmoudAshraf/mms-*", "torchaudio.pipelines.MMS_FA", "torchaudio.pipelines.VOXPOPULI_*"], "packages": ["ctc-forced-aligner"]},
+    {"id": "moonshine-legacy-non-english", "category": "license", "tier": "C", "reason": "The legacy non-English Moonshine models (tiny and base in Arabic, Chinese, Japanese, Korean, Ukrainian and Vietnamese, and Spanish) are under the non-commercial Moonshine Community License; the English moonshine-tiny and moonshine-base are MIT and not excluded.", "models": ["*moonshine-tiny-ar*", "*moonshine-tiny-ja*", "*moonshine-tiny-ko*", "*moonshine-tiny-uk*", "*moonshine-tiny-vi*", "*moonshine-tiny-zh*", "*moonshine-base-ar*", "*moonshine-base-ja*", "*moonshine-base-ko*", "*moonshine-base-uk*", "*moonshine-base-vi*", "*moonshine-base-zh*", "*moonshine-es*", "*moonshine-base-es*"], "packages": []},
+    {"id": "mhubert-147-and-versa", "category": "license", "tier": "C", "reason": "mHuBERT-147 (TTSDS2 multilingual) is CC BY-NC-SA; VERSA wraps non-commercial models without per-metric licenses and installs unpinned backends.", "models": ["utter-project/mHuBERT-147*"], "packages": ["versa"]},
+    {"id": "scoreq", "category": "license", "tier": "C", "reason": "Weights CC BY 4.0 but trained on the NISQA corpus and other research data; reported to be gameable.", "models": ["*scoreq*"], "packages": ["scoreq"]},
+    {"id": "utmos22", "category": "license", "tier": "C", "reason": "BVCC and Blizzard training data (Blizzard samples cannot be redistributed); a research column at most.", "models": ["*UTMOS22*", "tarepan/SpeechMOS*"], "packages": []},
+    {"id": "swiftf0", "category": "license", "tier": "C", "reason": "Trained on the CC BY-NC-SA 4.0 pitch benchmark; pYIN replaces it.", "models": ["lars76/swift-f0*"], "packages": ["swift-f0"]},
+    {"id": "distill-mos", "category": "license", "tier": "C", "reason": "Trained on the NISQA corpus (non-commercial research) and VoiceMOS labels; DNSMOS replaces it.", "models": ["*distill-mos*", "*distillmos*"], "packages": ["distillmos"]},
+    {"id": "wavlm-large-sv", "category": "license", "tier": "C", "reason": "The seed-tts-eval WavLM-large speaker-verification checkpoint: GigaSpeech pretraining, only for non-commercial research. ResNet293 replaces it as the second speaker family.", "models": ["microsoft/wavlm-large*", "*wavlm_large_finetune*"], "packages": []},
+    {"id": "whisper-derivatives", "category": "independence", "tier": null, "reason": "Kotoba-Whisper and distil-whisper are the Whisper family, so not an independent family, and not better on read speech.", "models": ["kotoba-tech/kotoba-whisper*", "distil-whisper/*"], "packages": []},
+    {"id": "qwen3-omni-per-take-judge", "category": "resources", "tier": null, "reason": "Qwen3-Omni-30B-A3B does not fit 16 GB; an omni model as a per-take judge samples (determinism class D2).", "models": ["Qwen/Qwen3-Omni-*"], "packages": []},
+    {"id": "lightning-whisper-mlx", "category": "maintenance", "tier": null, "reason": "Unmaintained since 2024-04; no license metadata.", "models": [], "packages": ["lightning-whisper-mlx"]},
+    {"id": "cohere-transcribe", "category": "license", "tier": null, "reason": "Gated click-through terms; no Russian (watch-list).", "models": ["CohereLabs/*transcribe*"], "packages": []},
+    {"id": "nvidia-ambernet", "category": "license", "tier": null, "reason": "NGC terms, not a clear permissive license; needs NeMo.", "models": ["*ambernet*"], "packages": []},
+    {"id": "deepfake-detectors", "category": "measurand", "tier": null, "reason": "AASIST and deepfake detectors: every output is synthetic, so the score measures detector domain, not defects.", "models": ["*aasist*"], "packages": []},
+    {"id": "resemblyzer", "category": "measurand", "tier": null, "reason": "Optimized for English speaker similarity.", "models": [], "packages": ["resemblyzer"]},
+    {"id": "oas-alignment-metric", "category": "measurand", "tier": null, "reason": "Paper withdrawn (arXiv 2509.19852).", "models": [], "packages": []},
+    {"id": "gpl-and-linux-only-text-normalizers", "category": "license", "tier": null, "reason": "zhconv (GPL-2.0+), pykakasi (GPL-3.0), soynlp (GPL-3.0, pulled in by qwen-asr); nemo-text-processing and WeTextProcessing need pynini wheels that are Linux-only.", "models": [], "packages": ["zhconv", "pykakasi", "soynlp", "nemo-text-processing", "WeTextProcessing"]},
+    {"id": "jsut-and-jvs-audio", "category": "license", "tier": "C", "reason": "JSUT and JVS audio are non-commercial; Japanese corpora come from FLEURS, Common Voice, Kokoro, CSS10 and JVNV instead.", "models": ["*jsut*", "*jvs_corpus*"], "packages": []}
+  ],
+  "useRestrictions": [
+    {"id": "qwen2-audio-per-take-judge", "reason": "Qwen2-Audio shares the generator's lab (decision 3a) and samples its answers (determinism class D2), so a per-take verdict is neither independent nor repeatable (audit section 4.9).", "models": ["*Qwen2-Audio*"], "forbiddenUse": "A per-take judge, a vote or a verdict.", "permittedUse": "Research only: pairwise A/B per cell in both orders, scored by answer log-probabilities (audit section 4.7); a matching judge records this restriction as its useRestriction, never votes and is never warn or gating."}
   ]
 }

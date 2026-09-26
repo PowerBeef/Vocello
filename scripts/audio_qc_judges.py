@@ -3,21 +3,26 @@
 
 `config/audio-qc-judges.json` describes every judge the audio QC and speech
 analysis harness runs or has run (audit 2026-09-25, AQ-01, phase M0). This
-module validates it and is the execution gate for registered judges:
+module validates it and is the load-time gate for registered judges:
 
 - No judge outside `retired` carries tier C or an unknown tier; tier C is
   retired, never quarantined or advisory (decision 1a).
 - A tier-B judge records the decision-2a acceptance: internal evaluation that
   never ships.
 - A judge from the generator's lab never votes (decision 3a).
-- Every neural judge that can still run is pinned by file digest or by a
-  content-addressed local snapshot, verified before each load.
-- The exclusion list (audit section 4.9) is refused by model, package and
-  import: no registered judge, no execution candidate and no script under
-  `scripts/` may use an excluded entry.
-- Retired judges stay out of every QC path: their adapters, cascade layers
-  and guardrails appear in no live contract, their source files are deleted
-  and no script imports their modules.
+- Every neural judge that can still run is pinned by file digest, or by every
+  file of a Hugging Face snapshot at its revision (the LFS SHA-256 or the git
+  blob ID), verified before each load.
+- The exclusion list (audit section 4.9) is refused by model and package: no
+  registered judge, execution candidate or runtime dependency may match it, and
+  every model loader calls `require_loadable` with its registry judge and the
+  repository it actually loads. Use restrictions bound how a judge may run.
+- The output identity (what can change a judge's output, runtime versions and,
+  until cross-host determinism is measured, the host included) and the
+  envelope identity (how a run was supervised) never share a component.
+- Retired judges stay out of every QC path: their adapters, cascade layers and
+  guardrails appear in no live contract, their source files are deleted, and a
+  legacy contract that still names a retired guardrail is frozen by digest.
 - Adoption names the canonical host: two clean runs on the one canonical
   macOS profile of `benchmarks/hardware-profiles.json`.
 
@@ -28,12 +33,14 @@ Commands:
 from __future__ import annotations
 
 import argparse
-import ast
 from fnmatch import fnmatchcase
+import functools
 import hashlib
 import json
 from pathlib import Path
+import platform
 import re
+import subprocess
 import sys
 from typing import Any, Iterable
 
@@ -49,6 +56,8 @@ KIND = "audio-qc-judge-registry"
 STATUSES = ("candidate", "shadow", "advisory", "warn", "gating", "retired", "quarantined")
 # A quarantined judge is registered but blocked until a maintainer decision.
 BLOCKED_STATUSES = frozenset({"retired", "quarantined"})
+# Statuses whose verdicts can fail a take or a lane.
+VERDICT_STATUSES = frozenset({"warn", "gating"})
 KINDS = ("neural", "dsp", "platform")
 TIERS = ("A", "B", "C")
 TIER_B_SCOPE = "internal-never-shipped-evaluation"
@@ -58,12 +67,32 @@ STALE_ADOPTION_MARKERS = ("eight-gib", "eight-gigabyte")
 # The supervisor's source is envelope identity (AQ-F47); an output identity
 # that names it would let a supervisor fix invalidate caches and calibrations.
 ENVELOPE_ONLY_COMPONENTS = frozenset({"resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"})
+# What can change a judge's output. An envelope that named one of these would
+# let a change of weights, code, runtime or preprocessing serve a stale result.
+OUTPUT_ONLY_COMPONENTS = frozenset({
+    "adapterID", "modelID", "repository", "revision", "sourceRevision", "weightsSHA256",
+    "binarySHA256", "snapshotFileDigests", "runtimeDependencies", "runtimeDependenciesDigest",
+    "runtimeVersions", "torchVersion", "numpyVersion", "workerSourceSHA256", "adapterSourceSHA256",
+    "adapterLayerSHA256", "analyzerSourceSHA256", "comparatorSourceSHA256", "commandTemplate",
+    "labelMapDigest", "labelSet", "decodeOptions", "lockedLanguage", "preprocessing",
+    "preprocessingConfigDigest", "outputFormat", "algorithm", "configuration", "resampler",
+})
+# A runtime is part of the output identity under one of these names.
+RUNTIME_COMPONENTS = ("runtimeDependencies", "runtimeDependenciesDigest", "runtimeVersions")
+# A runtime dependency that is not pinned in the registry is read when the judge
+# loads and recorded in its output identity as `runtimeVersions`.
+RECORDED_AT_LOAD = "recorded-at-load"
+# Until a judge's cross-host determinism is measured (AQ-06), the host is part
+# of what produced its output.
+HOST_COMPONENT = "hostProfile"
 DIGEST_STATUS_BY_KIND = {
     "neural": ("pinned", "content-addressed-snapshot"),
     "dsp": ("no-learned-weights",),
     "platform": ("platform-managed",),
 }
+SNAPSHOT_STATUS = "content-addressed-snapshot"
 JUDGE_ID = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*@[0-9]+$")
+ROADMAP_ITEM = re.compile(r"^[A-Z]+-[0-9]+$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 GIT_REVISION = re.compile(r"^[0-9a-f]{40}$")
 
@@ -98,13 +127,6 @@ def _matches(value: str, patterns: Iterable[str]) -> str | None:
     return None
 
 
-def _module_matches(name: str, patterns: Iterable[str]) -> str | None:
-    for pattern in patterns:
-        if fnmatchcase(name, pattern) or name.startswith(pattern + "."):
-            return pattern
-    return None
-
-
 def _is_blocked(judge: dict[str, Any]) -> bool:
     return judge.get("status") in BLOCKED_STATUSES
 
@@ -133,6 +155,37 @@ def _exclusion_errors(label: str, models: Iterable[str], packages: Iterable[str]
     return errors
 
 
+def _snapshot_pin(value: Any) -> bool:
+    """One snapshot file pin: the LFS SHA-256 or the git blob ID, and optionally its size."""
+    if not isinstance(value, dict) or not set(value) <= {"lfsSHA256", "gitBlobID", "size"}:
+        return False
+    size = value.get("size", 0)
+    if isinstance(size, bool) or not isinstance(size, int) or size < 0:
+        return False
+    if "lfsSHA256" in value:
+        return "gitBlobID" not in value and bool(SHA256.match(str(value["lfsSHA256"])))
+    return bool(GIT_REVISION.match(str(value.get("gitBlobID", ""))))
+
+
+def _list_entry_errors(kind: str, entries: Any, required: tuple[str, ...]) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(entries, list):
+        return [f"the {kind} list is missing"]
+    seen: set[str] = set()
+    for entry in entries:
+        identity = entry.get("id") if isinstance(entry, dict) else None
+        if not isinstance(identity, str) or not identity or identity in seen:
+            errors.append(f"every {kind} entry needs a unique id")
+            continue
+        seen.add(identity)
+        if not isinstance(entry.get("reason"), str) or not entry["reason"].strip():
+            errors.append(f"{kind} {identity} needs a reason")
+        for field in required:
+            if not isinstance(entry.get(field), list) or len(_strings(entry[field])) != len(entry[field]):
+                errors.append(f"{kind} {identity} needs a {field} list of strings")
+    return errors
+
+
 def validate_registry(registry: dict[str, Any], *, root: Path = REPO) -> list[str]:
     """Errors in the registry itself and in the files it names; empty when valid."""
     errors: list[str] = []
@@ -151,29 +204,30 @@ def validate_registry(registry: dict[str, Any], *, root: Path = REPO) -> list[st
     if not isinstance(exclusions, list) or not exclusions:
         errors.append("the exclusion list is missing")
         exclusions = []
-    seen_exclusions: set[str] = set()
+    errors.extend(_list_entry_errors("exclusion", exclusions, ("models", "packages")))
     for entry in exclusions:
-        identity = entry.get("id") if isinstance(entry, dict) else None
-        if not isinstance(identity, str) or not identity or identity in seen_exclusions:
-            errors.append("every exclusion needs a unique id")
-            continue
-        seen_exclusions.add(identity)
-        if not isinstance(entry.get("reason"), str) or not entry["reason"].strip():
-            errors.append(f"exclusion {identity} needs a reason")
-        if entry.get("tier") not in (*TIERS, None):
-            errors.append(f"exclusion {identity} has an invalid tier")
-        for field in ("models", "packages", "pythonModules"):
-            if not isinstance(entry.get(field), list) or len(_strings(entry[field])) != len(entry[field]):
-                errors.append(f"exclusion {identity} needs a {field} list of strings")
+        if isinstance(entry, dict) and entry.get("tier") not in (*TIERS, None):
+            errors.append(f"exclusion {entry.get('id')} has an invalid tier")
+    restrictions = registry.get("useRestrictions")
+    errors.extend(_list_entry_errors("use restriction", restrictions, ("models",)))
+    for entry in restrictions if isinstance(restrictions, list) else []:
+        if isinstance(entry, dict) and not (
+            isinstance(entry.get("forbiddenUse"), str) and entry["forbiddenUse"].strip()
+            and isinstance(entry.get("permittedUse"), str) and entry["permittedUse"].strip()
+        ):
+            errors.append(f"use restriction {entry.get('id')} must name its forbidden and permitted use")
     judges = registry.get("judges")
     if not isinstance(judges, dict) or not judges:
         return errors + ["the registry lists no judges"]
+    exclusions = [entry for entry in exclusions if isinstance(entry, dict)]
+    restrictions = [entry for entry in restrictions or [] if isinstance(entry, dict)]
     for judge_id, judge in judges.items():
-        errors.extend(_judge_errors(judge_id, judge, exclusions, root))
+        errors.extend(_judge_errors(judge_id, judge, exclusions, restrictions, root))
     return errors
 
 
-def _judge_errors(judge_id: str, judge: Any, exclusions: list[dict[str, Any]], root: Path) -> list[str]:
+def _judge_errors(judge_id: str, judge: Any, exclusions: list[dict[str, Any]],
+                  restrictions: list[dict[str, Any]], root: Path) -> list[str]:
     label = f"judge {judge_id}"
     if not JUDGE_ID.match(judge_id):
         return [f"{label}: id must read <name>@<version>"]
@@ -231,15 +285,15 @@ def _judge_errors(judge_id: str, judge: Any, exclusions: list[dict[str, Any]], r
         isinstance(calibration, dict) and SHA256.match(str(calibration.get("recordSHA256", "")))
     ):
         errors.append(f"{label}: calibration must be legacy-unqualified or a record digest")
+    planned = judge.get("plannedRetirement")
+    if planned is not None and not (
+        isinstance(planned, dict) and ROADMAP_ITEM.match(str(planned.get("item", "")))
+        and planned.get("status") == "deferred"
+        and isinstance(planned.get("reason"), str) and planned["reason"].strip()
+    ):
+        errors.append(f"{label}: a planned retirement names its roadmap item, status deferred and a reason")
     errors.extend(_pin_errors(label, judge, kind, blocked))
-    identity = judge.get("identity") if isinstance(judge.get("identity"), dict) else {}
-    output, envelope = _strings(identity.get("output")), _strings(identity.get("envelope"))
-    if not output or not isinstance(identity.get("envelope"), list):
-        errors.append(f"{label}: identity needs output and envelope component lists")
-    if set(output) & set(envelope):
-        errors.append(f"{label}: a component is either output or envelope identity, never both")
-    if set(output) & ENVELOPE_ONLY_COMPONENTS:
-        errors.append(f"{label}: supervisor provenance is envelope identity, never output identity")
+    errors.extend(_identity_errors(label, judge, kind, blocked))
     legacy = judge.get("legacyIdentifiers") if isinstance(judge.get("legacyIdentifiers"), dict) else {}
     for path in _strings(legacy.get("sources")):
         exists = (root / path).exists()
@@ -253,8 +307,15 @@ def _judge_errors(judge_id: str, judge: Any, exclusions: list[dict[str, Any]], r
             for model in _judge_models(judge)
         ):
             errors.append(f"{label}: a retired tier-C judge must be on the exclusion list")
-    else:
-        errors.extend(_exclusion_errors(label, _judge_models(judge), _judge_packages(judge), exclusions))
+        return errors
+    errors.extend(_exclusion_errors(label, _judge_models(judge), _judge_packages(judge), exclusions))
+    for entry in restrictions:
+        if not any(_matches(model, _strings(entry.get("models"))) for model in _judge_models(judge)):
+            continue
+        if judge.get("useRestriction") != entry.get("id"):
+            errors.append(f"{label}: matches use restriction {entry.get('id')} and must acknowledge it")
+        if judge.get("voting") is not False or status in VERDICT_STATUSES:
+            errors.append(f"{label}: use restriction {entry.get('id')} forbids votes and verdicts")
     return errors
 
 
@@ -270,14 +331,78 @@ def _pin_errors(label: str, judge: dict[str, Any], kind: Any, blocked: bool) -> 
         if not isinstance(pins.get("repository"), str) or not GIT_REVISION.match(str(pins.get("revision", ""))):
             errors.append(f"{label}: a neural judge is pinned by repository and immutable revision")
         files = pins.get("files")
-        if not isinstance(files, dict) or any(not SHA256.match(str(value)) for value in files.values()):
+        if status == SNAPSHOT_STATUS:
+            if not isinstance(files, dict) or any(not _snapshot_pin(value) for value in files.values()):
+                errors.append(f"{label}: snapshot file pins name an LFS SHA-256 or a git blob ID")
+            elif not files and not blocked:
+                errors.append(f"{label}: a runnable snapshot judge pins every file of its snapshot")
+        elif not isinstance(files, dict) or any(not SHA256.match(str(value)) for value in files.values()):
             errors.append(f"{label}: file pins must be SHA-256 digests")
         elif status == "pinned" and not files:
             errors.append(f"{label}: a pinned judge lists its file digests")
+    runtime = pins.get("runtime")
+    if runtime is not None and (not isinstance(runtime, dict) or any(
+        not isinstance(value, str) or not value.strip() for value in runtime.values()
+    )):
+        errors.append(f"{label}: runtime pins map each package to a version or {RECORDED_AT_LOAD}")
     if blocked:
         return errors
     if status not in DIGEST_STATUS_BY_KIND.get(kind, ()):
         errors.append(f"{label}: a runnable {kind} judge cannot load with digest status {status!r}")
+    return errors
+
+
+def _identity_errors(label: str, judge: dict[str, Any], kind: Any, blocked: bool) -> list[str]:
+    identity = judge.get("identity") if isinstance(judge.get("identity"), dict) else {}
+    output, envelope = _strings(identity.get("output")), _strings(identity.get("envelope"))
+    errors = []
+    if not output or not isinstance(identity.get("envelope"), list):
+        errors.append(f"{label}: identity needs output and envelope component lists")
+    if set(output) & set(envelope):
+        errors.append(f"{label}: a component is either output or envelope identity, never both")
+    if set(output) & ENVELOPE_ONLY_COMPONENTS:
+        errors.append(f"{label}: supervisor provenance is envelope identity, never output identity")
+    if set(envelope) & OUTPUT_ONLY_COMPONENTS:
+        errors.append(f"{label}: what can change the output is output identity, never envelope identity")
+    if blocked:
+        return errors
+    pins = judge.get("pins") if isinstance(judge.get("pins"), dict) else {}
+    runtime = pins.get("runtime") if isinstance(pins.get("runtime"), dict) else {}
+    if runtime and not set(output) & set(RUNTIME_COMPONENTS):
+        errors.append(f"{label}: its runtime is output identity ({', '.join(RUNTIME_COMPONENTS)})")
+    if RECORDED_AT_LOAD in runtime.values() and "runtimeVersions" not in output:
+        errors.append(f"{label}: runtime versions recorded at load are output identity (runtimeVersions)")
+    if kind == "neural" and HOST_COMPONENT not in output:
+        errors.append(f"{label}: until its cross-host determinism is measured, the host is output identity")
+    return errors
+
+
+def _frozen_contract_errors(judge_id: str, judge: dict[str, Any], root: Path) -> list[str]:
+    """A legacy contract that names a retired guardrail is frozen: its bytes never change."""
+    legacy = judge.get("legacyIdentifiers") if isinstance(judge.get("legacyIdentifiers"), dict) else {}
+    guardrails = set(_strings(legacy.get("guardrails")))
+    frozen = legacy.get("frozenContracts", [])
+    if not isinstance(frozen, list):
+        return [f"judge {judge_id}: frozenContracts must be a list"]
+    errors = []
+    for entry in frozen:
+        path = entry.get("path") if isinstance(entry, dict) else None
+        label = f"judge {judge_id}: frozen contract {path}"
+        if not isinstance(path, str) or not SHA256.match(str(entry.get("sha256", ""))) or not _strings(
+            entry.get("fields")
+        ) or not isinstance(entry.get("reason"), str):
+            errors.append(f"judge {judge_id}: a frozen contract records its path, SHA-256, fields and reason")
+            continue
+        if not (root / path).is_file() or _sha256(root / path) != entry["sha256"]:
+            errors.append(f"{label} changed; a digest-bound legacy contract is never edited")
+            continue
+        value = _read_json(root / path)
+        for field in _strings(entry["fields"]):
+            node: Any = value
+            for key in field.split("."):
+                node = node.get(key) if isinstance(node, dict) else None
+            if node is None or field.rsplit(".", 1)[-1] not in guardrails:
+                errors.append(f"{label}: {field} is not a retired guardrail it carries")
     return errors
 
 
@@ -343,21 +468,28 @@ def _executable_errors(registry: dict[str, Any], root: Path) -> list[str]:
             errors.append(f"judge {judge_id}: cascade layer {layer} is still requested")
         for guardrail in set(_strings(legacy.get("guardrails"))) & set(guardrails):
             errors.append(f"judge {judge_id}: guardrail {guardrail} still gates promotion")
+        errors.extend(_frozen_contract_errors(judge_id, judge, root))
     errors.extend(_adoption_errors(registry, root, candidates, evaluator, experiment))
-    errors.extend(excluded_imports(root / "scripts", registry))
     return errors
+
+
+def canonical_profiles(registry: dict[str, Any], root: Path = REPO) -> list[dict[str, Any]]:
+    """The hardware profiles the registry's adoption selector names (exactly one when valid)."""
+    adoption = registry.get("adoption") if isinstance(registry.get("adoption"), dict) else {}
+    selector = adoption.get("profileSelector") if isinstance(adoption.get("profileSelector"), dict) else {}
+    profiles = _read_json(root / str(adoption.get("hardwareProfiles") or HARDWARE_PROFILES)).get("profiles")
+    if not selector:
+        return []
+    return [
+        profile for profile in profiles or [] if isinstance(profile, dict)
+        and all(profile.get(key) == value for key, value in selector.items())
+    ]
 
 
 def _adoption_errors(registry: dict[str, Any], root: Path, candidates: dict[str, Any],
                      evaluator: dict[str, Any], experiment: dict[str, Any]) -> list[str]:
     errors = []
-    profiles = _read_json(root / HARDWARE_PROFILES).get("profiles")
-    selector = (registry.get("adoption") or {}).get("profileSelector") or {}
-    canonical = [
-        profile for profile in profiles or [] if isinstance(profile, dict)
-        and all(profile.get(key) == value for key, value in selector.items())
-    ]
-    if not selector or len(canonical) != 1:
+    if len(canonical_profiles(registry, root)) != 1:
         errors.append("adoption must select exactly one canonical hardware profile")
     compact = evaluator.get("compactAdapters") if isinstance(evaluator.get("compactAdapters"), dict) else {}
     external = experiment.get("externalModelPolicy") if isinstance(experiment.get("externalModelPolicy"), dict) else {}
@@ -374,56 +506,12 @@ def _adoption_errors(registry: dict[str, Any], root: Path, candidates: dict[str,
     return errors
 
 
-def imported_modules(path: Path) -> set[str]:
-    """Every absolute module a Python file imports, with `from a import b` also as `a.b`."""
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    names: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            names.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
-            names.add(node.module)
-            names.update(f"{node.module}.{alias.name}" for alias in node.names)
-    return names
-
-
-def excluded_imports(scripts_root: Path, registry: dict[str, Any]) -> list[str]:
-    """Scripts importing an excluded package or a retired judge's module."""
-    patterns = {
-        pattern: f"exclusion {entry.get('id')}"
-        for entry in registry.get("excluded") or [] if isinstance(entry, dict)
-        for pattern in _strings(entry.get("pythonModules"))
-    }
-    for judge_id, judge in (registry.get("judges") or {}).items():
-        if isinstance(judge, dict) and _is_blocked(judge):
-            legacy = judge.get("legacyIdentifiers") if isinstance(judge.get("legacyIdentifiers"), dict) else {}
-            patterns.update({pattern: f"judge {judge_id}" for pattern in _strings(legacy.get("pythonModules"))})
-    errors = []
-    for path in sorted(scripts_root.rglob("*.py")):
-        for name in sorted(imported_modules(path)):
-            if (pattern := _module_matches(name, patterns)) is not None:
-                errors.append(f"{path.relative_to(scripts_root.parent).as_posix()}: imports {name} "
-                              f"({patterns[pattern]})")
-    return errors
-
-
 def validate_repository(root: Path = REPO, registry: dict[str, Any] | None = None) -> list[str]:
     registry = registry if registry is not None else load_registry(root / "config/audio-qc-judges.json")
     errors = validate_registry(registry, root=root)
     if errors:
         return errors
     return _executable_errors(registry, root)
-
-
-def judge_for_adapter(adapter_id: str, registry: dict[str, Any] | None = None) -> tuple[str, dict[str, Any]]:
-    registry = registry if registry is not None else load_registry()
-    matches = [
-        (judge_id, judge) for judge_id, judge in (registry.get("judges") or {}).items()
-        if adapter_id in _strings((judge.get("legacyIdentifiers") or {}).get("adapterIDs"))
-    ]
-    if len(matches) != 1:
-        raise JudgeRegistryError(f"{adapter_id} is not registered as exactly one audio QC judge")
-    return matches[0]
 
 
 def require_executable(judge_id: str, judge: dict[str, Any]) -> dict[str, Any]:
@@ -435,6 +523,59 @@ def require_executable(judge_id: str, judge: dict[str, Any]) -> dict[str, Any]:
     if tier not in ("A", "B"):
         raise JudgeRegistryError(f"audio QC judge {judge_id} is license tier {tier}; it may not run")
     return judge
+
+
+def require_loadable(judge_id: str, repository: str, revision: str, *, packages: Iterable[str] = (),
+                     registry: dict[str, Any] | None = None) -> dict[str, Any]:
+    """The load-time gate every model loader calls with its registry judge.
+
+    Refuses an unregistered judge, a judge that may not run (retired,
+    quarantined, tier C or unknown), an excluded model or runtime package for
+    what is actually being loaded, and a repository or revision other than the
+    judge's pin. A `:variant` suffix on the repository names a file set inside
+    it (the SenseVoice Q8 GGUF). Returns the registry judge.
+    """
+    registry = registry if registry is not None else load_registry()
+    judge = (registry.get("judges") or {}).get(judge_id)
+    if not isinstance(judge, dict):
+        raise JudgeRegistryError(f"audio QC judge {judge_id} is not registered; it may not load")
+    require_executable(judge_id, judge)
+    exclusions = [entry for entry in registry.get("excluded") or [] if isinstance(entry, dict)]
+    refused = _exclusion_errors(f"audio QC judge {judge_id}", [str(repository)], list(packages), exclusions)
+    if refused:
+        raise JudgeRegistryError(refused[0] + "; it may not load")
+    pins = judge.get("pins") or {}
+    if str(repository).split(":", 1)[0] != pins.get("repository") or revision != pins.get("revision"):
+        raise JudgeRegistryError(
+            f"audio QC judge {judge_id} is pinned to {pins.get('repository')}@{str(pins.get('revision'))[:12]}; "
+            "it may not load another model or revision"
+        )
+    return judge
+
+
+@functools.lru_cache(maxsize=1)
+def _host() -> tuple[str, str, str | None]:
+    model = None
+    if platform.system() == "Darwin":
+        try:
+            result = subprocess.run(
+                ["/usr/sbin/sysctl", "-n", "hw.model"], capture_output=True, text=True,
+                timeout=10, check=False,
+            )
+            model = result.stdout.strip() or None
+        except (OSError, subprocess.SubprocessError):
+            model = None
+    return platform.system(), platform.machine(), model
+
+
+def host_profile() -> dict[str, str | None]:
+    """The host a judge runs on: its `hostProfile` output identity component.
+
+    A neural judge's output keys on the host until its cross-host determinism
+    is measured (AQ-06). The hardware model identifier names no person.
+    """
+    system, machine, model = _host()
+    return {"system": system, "machine": machine, "modelIdentifier": model}
 
 
 def _git_blob_sha1(path: Path) -> str:
@@ -454,57 +595,61 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def verify_hub_snapshot(snapshot: Path, pinned_files: dict[str, str] | None = None) -> dict[str, str]:
-    """Verify a local Hugging Face snapshot before a judge loads it; return file SHA-256s.
+def verify_hub_snapshot(snapshot: Path, pinned_files: dict[str, Any], *, revision: str) -> dict[str, str]:
+    """Verify a local Hugging Face snapshot against its registry pins; return file SHA-256s.
 
-    A snapshot file links to a blob named by its content address: the SHA-256
-    of the bytes for a large-file (LFS) blob, the git blob SHA-1 otherwise.
-    Every file must match its address, and every per-file pin the registry
-    records must match exactly. A copied (unlinked) file cannot be checked
-    against the Hub's address, so it needs a pin.
+    The directory must be the pinned revision's snapshot and hold exactly the
+    pinned files: an unpinned or missing file refuses. Each file's bytes (the
+    blob a cache symlink resolves to, or a plain copy) must match its pin, the
+    LFS SHA-256 of a large file or the git blob ID of any other, and its size
+    when recorded. The pins come from the Hub's tree metadata at the revision,
+    so a fabricated snapshot cannot pass by naming its own blobs.
     """
     if not snapshot.is_dir():
         raise JudgeRegistryError("the pinned snapshot is not in the local cache")
-    pins = dict(pinned_files or {})
+    if snapshot.name != revision:
+        raise JudgeRegistryError("the snapshot directory is not the pinned revision")
+    if not pinned_files:
+        raise JudgeRegistryError("the judge pins no snapshot files; it cannot be verified")
+    present = {
+        path.relative_to(snapshot).as_posix(): path
+        for path in sorted(snapshot.rglob("*")) if not path.is_dir()
+    }
+    unpinned = sorted(set(present) - set(pinned_files))
+    if unpinned:
+        raise JudgeRegistryError(f"the snapshot holds unpinned files: {', '.join(unpinned)}")
+    missing = sorted(set(pinned_files) - set(present))
+    if missing:
+        raise JudgeRegistryError(f"the snapshot lacks pinned files: {', '.join(missing)}")
     digests: dict[str, str] = {}
-    for path in sorted(snapshot.rglob("*")):
-        if path.is_dir():
-            continue
-        relative = path.relative_to(snapshot).as_posix()
+    for relative, path in present.items():
+        pin = pinned_files[relative]
+        if not _snapshot_pin(pin):
+            raise JudgeRegistryError(f"snapshot file {relative} has no valid registry pin")
         blob = path.resolve()
         if not blob.is_file():
             raise JudgeRegistryError(f"snapshot file {relative} has no blob")
-        sha256 = _sha256(blob)
-        address = blob.name if path.is_symlink() else None
-        if address is not None and SHA256.match(address):
-            verified = sha256 == address
-        elif address is not None and GIT_REVISION.match(address):
-            verified = _git_blob_sha1(blob) == address
-        else:
-            verified = relative in pins
-        if not verified:
-            raise JudgeRegistryError(f"snapshot file {relative} does not match its content address")
-        digests[relative] = sha256
-    if not digests:
-        raise JudgeRegistryError("the pinned snapshot is empty")
-    for relative, expected in pins.items():
-        if digests.get(relative) != expected:
+        if "size" in pin and blob.stat().st_size != pin["size"]:
             raise JudgeRegistryError(f"snapshot file {relative} differs from its registry pin")
+        sha256 = _sha256(blob)
+        verified = (sha256 == pin["lfsSHA256"]) if "lfsSHA256" in pin else (
+            _git_blob_sha1(blob) == pin["gitBlobID"]
+        )
+        if not verified:
+            raise JudgeRegistryError(f"snapshot file {relative} differs from its registry pin")
+        digests[relative] = sha256
     return digests
 
 
 def verify_judge_snapshot(judge_id: str, snapshot: Path, *, repository: str, revision: str,
+                          packages: Iterable[str] = (),
                           registry: dict[str, Any] | None = None) -> dict[str, str]:
-    """The registry's gate for a snapshot-loaded judge: runnable, same pins, verified bytes."""
-    registry = registry if registry is not None else load_registry()
-    judge = (registry.get("judges") or {}).get(judge_id)
-    if not isinstance(judge, dict):
-        raise JudgeRegistryError(f"audio QC judge {judge_id} is not registered")
-    require_executable(judge_id, judge)
+    """The load-time gate for a snapshot-loaded judge: loadable, then every file verified."""
+    judge = require_loadable(judge_id, repository, revision, packages=packages, registry=registry)
     pins = judge.get("pins") or {}
-    if pins.get("repository") != repository or pins.get("revision") != revision:
-        raise JudgeRegistryError(f"audio QC judge {judge_id} is pinned to a different snapshot")
-    return verify_hub_snapshot(snapshot, pins.get("files") or {})
+    if pins.get("digestStatus") != SNAPSHOT_STATUS:
+        raise JudgeRegistryError(f"audio QC judge {judge_id} is not pinned by snapshot")
+    return verify_hub_snapshot(snapshot, pins.get("files") or {}, revision=revision)
 
 
 def main() -> int:
@@ -529,6 +674,7 @@ def main() -> int:
         "judges": len(judges),
         "retired": sorted(judge_id for judge_id, judge in judges.items() if judge.get("status") == "retired"),
         "excluded": len(registry["excluded"]),
+        "useRestrictions": len(registry["useRestrictions"]),
     }, sort_keys=True))
     return 0
 

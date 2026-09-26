@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Verify pinned local evaluator assets and emit an untracked adapter config.
 
-Only a registered, runnable judge (`config/audio-qc-judges.json`: tier A or B,
-neither retired nor quarantined) is prepared. The emitted configuration binds
-its output identity (execution identity v3); the resource supervisor is
-envelope provenance and never enters it.
+Only a registered, loadable judge (`config/audio-qc-judges.json`: tier A or B,
+neither retired nor quarantined, its pinned repository and revision, no
+excluded model or package) is prepared. The emitted configuration binds its
+output identity (execution identity v4: the command template and this host
+included); the resource supervisor is envelope provenance and never enters it.
 """
 
 from __future__ import annotations
@@ -17,12 +18,12 @@ import subprocess
 import sys
 from typing import Any
 
-from audio_qc_judges import JudgeRegistryError, judge_for_adapter, require_executable
+from audio_qc_judges import JudgeRegistryError, require_loadable
 from delivery_analysis_cache import (
     atomic_json, digest, file_sha256, canonicalization_identity, RESAMPLER_VERSION,
     SUPPORTED_RESAMPLERS, select_resampler, AnalysisCacheError,
 )
-from delivery_compact_model_adapter import bind_output_identity
+from delivery_compact_model_adapter import ADAPTER_JUDGES, bind_output_identity
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -226,9 +227,12 @@ def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
     if not isinstance(candidate, dict):
         raise PreparationError("candidate is not registered")
     try:
-        require_executable(*judge_for_adapter(adapter_id))
-    except JudgeRegistryError as error:
-        raise PreparationError(str(error)) from None
+        require_loadable(
+            ADAPTER_JUDGES[adapter_id], candidate["modelID"], candidate["sourceRevision"],
+            packages=list(candidate.get("runtimeDependencies") or {}),
+        )
+    except (JudgeRegistryError, KeyError) as error:
+        raise PreparationError(f"{adapter_id} may not be prepared: {error}") from None
     label_map = candidate["labelMap"]
     label_digest = digest(label_map)
     if adapter_id == "sensevoice-small-q8":

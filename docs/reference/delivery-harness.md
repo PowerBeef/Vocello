@@ -75,11 +75,11 @@ default `scripts/dev.sh py`, which selects the modules the dirty tree affects) r
 | `scripts/delivery_evaluator.py` | Preserves ridge-v1 and exposes versioned v2 commands for preset-specific pairwise heads, elastic-net/PLS challengers, blocked validation, conformal intervals, OOD and typed abstention | `test_delivery_evaluator.py`, `test_delivery_evaluator_v2.py` |
 | `scripts/delivery_analysis_cache.py` | Content-addressed, atomic analysis cache keyed by original and canonical audio plus exact analyzer/model/preprocessing provenance; cache hits launch no model | `test_delivery_analysis_cache.py` |
 | `scripts/delivery_temporal_features.py` | Two-pass bounded-memory five-region contour analyzer plus same-identity instructed-minus-neutral deltas | `test_delivery_temporal_features.py` |
-| `scripts/delivery_compact_model_adapter.py` | Contract-first subprocess adapter for fully pinned SenseVoiceSmall Q8, DistilHuBERT or whisper-small MLX candidates, each a runnable judge of `config/audio-qc-judges.json`; every adapter receives the canonical derivative; execution identity v3 keys the cache by output identity and records the resource supervisor as envelope provenance; no candidate is adopted or downloaded by the repository | `test_delivery_compact_model_adapter.py` |
+| `scripts/delivery_compact_model_adapter.py` | Contract-first subprocess adapter for fully pinned SenseVoiceSmall Q8, DistilHuBERT or whisper-small MLX candidates, each a runnable judge of `config/audio-qc-judges.json` named in `ADAPTER_JUDGES` and admitted by the registry's load-time gate before every launch; every adapter receives the canonical derivative; execution identity v4 keys the cache by output identity (the repository-relative command template, its re-hashed source and the host included) and records the resource supervisor as envelope provenance; no candidate is adopted or downloaded by the repository | `test_delivery_compact_model_adapter.py` |
 | `scripts/independent_asr.py` | Second recognizer family: pinned whisper-small MLX loaded once in one supervised subprocess (`scripts/independent_asr_worker.py`, the only place MLX loads and the recognizer's source identity) after the generator has exited; `manifest` (`--platform macos\|ios\|cascade`; the cascade form takes `--cascade-input`) → `transcribe --manifest … --adapter-config <whisper-small-mlx config> --output …` → cached, digest-bound, transcript-carrying recognitions for the language lanes and the cascade's `--review-evidence` | `test_independent_asr.py` |
 | `scripts/lib/language_metrics.py` | The one tokenizer, edit distance, locale table, threshold set and family-consensus rule shared by the output gate, the publisher, the cascade and the producer | `test_language_metrics.py` |
 | `scripts/delivery_compact_model_runtime.py` | Offline CPU executor for DistilHuBERT (one deterministic, normalized 128-dimensional frozen representation); never receives a requested label | `test_delivery_compact_model_runtime.py` |
-| `scripts/audio_qc_judges.py` | Validator and execution gate of the audio QC judge registry (`config/audio-qc-judges.json`): license tiers of weights and data, the exclusion list (models, packages and imports), retired judges kept out of every QC path, canonical-host adoption, and snapshot digest verification before a judge loads | `test_audio_qc_judges.py` |
+| `scripts/audio_qc_judges.py` | Validator and load-time gate of the audio QC judge registry (`config/audio-qc-judges.json`): license tiers of weights and data, the exclusion list (models and packages) and use restrictions, the output/envelope identity split, retired judges kept out of every QC path (a legacy contract that names a retired guardrail frozen by digest), canonical-host adoption; every model loader calls `require_loadable` with its judge and the repository it loads, and a snapshot judge's files are verified against the Hub tree pins before it loads | `test_audio_qc_judges.py` |
 | `scripts/prepare_delivery_compact_model_config.py` | Validates the tracked candidate contract and exact local weights/runtime/dependencies, then emits an untracked path-bearing adapter configuration | `test_prepare_delivery_compact_model_config.py` |
 | `scripts/qualify_delivery_compact_models.py` | Runs exactly two cache-cold probes, retains sanitized resource evidence, and refuses holdout bake-off on any unqualified run | `test_qualify_delivery_compact_models.py` |
 | `scripts/delivery_resource_supervisor.py` | Single-process lock, enforced RSS/optional physical-footprint ceilings, pressure/swap/timeout capture, and post-exit memory-recovery qualification for heavy local analyzers | `test_delivery_resource_supervisor.py` |
@@ -480,13 +480,17 @@ the adapter refuse a retired, quarantined, tier-C or unknown-tier judge. The ret
 candidate stays in the contract's `retiredCandidates` as provenance for the evidence that cites it,
 with its corrected CC BY-NC-SA 4.0 license, and can no longer be prepared.
 
-The local configuration (execution identity v3) binds its output identity (model, weights,
-runtime binary and dependencies, adapter and adapter-layer source, label map, output format and
-preprocessing) into the preprocessing digest that keys the cache, plus an `outputIdentityDigest`
-for calibration. The resource supervisor's source is envelope identity: each run records it as
-provenance, and a supervisor-only change neither refuses a prepared configuration nor misses a
-cache entry. A version-2 configuration, which bound the supervisor into the cache key, is refused
-with a request to prepare it again. No model file or absolute path is tracked:
+The local configuration (execution identity v4) binds its output identity (model, weights,
+runtime binary and dependencies, adapter and adapter-layer source, the command template with
+repository paths made relative, label map, output format, preprocessing and the host, until
+cross-host determinism is measured) into the preprocessing digest that keys the cache, plus an
+`outputIdentityDigest` for calibration. The adapter source the template names is hashed again
+before every run, so an edited source is refused rather than served from the cache, and a
+configuration prepared on another host is refused. The resource supervisor's source is envelope
+identity: each run records it as provenance, and a supervisor-only change neither refuses a
+prepared configuration nor misses a cache entry. Every older configuration (v1 unbound, v2
+supervisor-bound, v3 without its template or host) is refused with a request to prepare it again.
+No model file or absolute path is tracked:
 
 ```sh
 python3 scripts/prepare_delivery_compact_model_config.py --validate-only

@@ -85,8 +85,11 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
             self.assertTrue(config["commandTemplate"][1].endswith("independent_asr_worker.py"))
             self.assertEqual(config["commandTemplate"][2], "--weights")
             self.assertIs(validate_adapter_config(config), config)
-            self.assertEqual(config["executionIdentityVersion"], 3)
+            self.assertEqual(config["executionIdentityVersion"], 4)
             self.assertNotIn("resourceSupervisorSHA256", json.dumps(config))
+            # The template's worker is bound by repository-relative path, not this checkout's.
+            self.assertEqual(config["preprocessingConfig"]["outputIdentity"]["commandTemplate"][1],
+                             "{repository}/scripts/independent_asr_worker.py")
 
             changed = root / "delivery_resource_supervisor.py"
             changed.write_bytes(SUPERVISOR.read_bytes() + b"\n# a supervisor-only fix\n")
@@ -111,6 +114,18 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
             unlocked["candidates"]["whisper-small-mlx"]["decodeOptions"]["languageLock"] = "auto"
             with self.assertRaisesRegex(PreparationError, "lock the language"):
                 validate_candidate_contract(unlocked)
+
+    def test_a_candidate_off_its_registry_pin_never_prepares(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            contract = copy.deepcopy(self.contract)
+            contract["candidates"]["distilhubert"]["sourceRevision"] = "1" * 40
+            contract_path = root / "contract.json"
+            contract_path.write_text(json.dumps(contract))
+            with patch("prepare_delivery_compact_model_config._verified") as verify, \
+                    self.assertRaisesRegex(PreparationError, "another model or revision"):
+                prepare("distilhubert", contract_path=contract_path, model_root=root)
+            verify.assert_not_called()
 
     def test_retired_nisqa_keeps_corrected_provenance_and_never_prepares(self) -> None:
         retired = self.contract["retiredCandidates"]["nisqa-v2"]

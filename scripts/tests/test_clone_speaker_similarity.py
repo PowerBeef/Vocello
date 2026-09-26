@@ -75,6 +75,21 @@ class CloneSpeakerSimilarityTests(unittest.TestCase):
         self.assertEqual(result["backend"]["source"], sim.ECAPA_SOURCE)
         self.assertEqual(len(sim.ECAPA_REVISION), 40)
 
+    def test_the_report_records_what_the_loader_verified(self) -> None:
+        loaded = {
+            "snapshotFileDigests": {"embedding_model.ckpt": "a" * 64, "hyperparams.yaml": "b" * 64},
+            "runtimeVersions": {"speechbrain": "fixture", "torch": "fixture", "numpy": "fixture"},
+            "hostProfile": {"system": "Darwin", "machine": "arm64", "modelIdentifier": "Fixture1,1"},
+        }
+        embeddings = {"ref.wav": [1.0, 0.0], "take.wav": [0.9, 0.1]}
+        embedder = sim.EcapaEmbedder(embeddings.__getitem__, loaded)
+        result = sim.analyze_takes("ref.wav", ["take.wav"], embedder, sim.BUILTIN_PROFILE)
+        self.assertEqual(result["backend"], {
+            "source": sim.ECAPA_SOURCE, "revision": sim.ECAPA_REVISION,
+            "preprocessing": sim.ECAPA_PREPROCESSING, **loaded,
+        })
+        self.assertEqual(sim.backend_identity(embedder), result["backend"])
+
     def test_analyze_takes_requires_at_least_one_take(self) -> None:
         with self.assertRaises(ValueError):
             sim.analyze_takes("ref.wav", [], lambda _: [1.0], sim.BUILTIN_PROFILE)

@@ -12,6 +12,7 @@ import subprocess
 import sys
 from typing import Any
 
+from audio_qc_judges import ADOPTION_REQUIREMENT, HARDWARE_PROFILES, load_registry
 from delivery_analysis_cache import (
     DeliveryAnalysisCache, atomic_json, digest, file_sha256, select_resampler,
     SUPPORTED_RESAMPLERS, canonicalization_identity,
@@ -20,7 +21,6 @@ from delivery_compact_model_adapter import run_compact_adapter
 
 
 SCHEMA_VERSION = 1
-ADOPTION_REQUIREMENT = "two-clean-canonical-host-runs"
 
 
 class QualificationError(ValueError):
@@ -36,13 +36,17 @@ def _required_command_output(command: list[str], label: str) -> str:
 
 
 def canonical_hardware_attestation() -> dict[str, Any]:
-    profiles_path = Path(__file__).resolve().parents[1] / "benchmarks/hardware-profiles.json"
+    """Attest the live host against the one profile the judge registry's adoption selects."""
+    adoption = load_registry().get("adoption") or {}
+    selector = adoption.get("profileSelector")
+    if not isinstance(selector, dict) or not selector:
+        raise QualificationError("the judge registry names no canonical hardware profile selector")
+    profiles_path = Path(__file__).resolve().parents[1] / str(adoption.get("hardwareProfiles") or HARDWARE_PROFILES)
     profiles = _read(profiles_path).get("profiles")
     matches = [
         profile for profile in profiles or []
         if isinstance(profile, dict)
-        and profile.get("platform") == "macos"
-        and profile.get("canonical") is True
+        and all(profile.get(key) == value for key, value in selector.items())
     ]
     if len(matches) != 1:
         raise QualificationError("canonical macOS hardware profile is missing or ambiguous")

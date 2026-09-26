@@ -16,6 +16,8 @@ import wave
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import delivery_compact_model_adapter as adapter  # noqa: E402
+import delivery_resource_supervisor  # noqa: E402
 import independent_asr  # noqa: E402
 from delivery_analysis_cache import (  # noqa: E402
     DeliveryAnalysisCache, RESAMPLER_VERSION, canonicalization_identity, digest, file_sha256,
@@ -59,28 +61,37 @@ class IndependentASRTests(unittest.TestCase):
         }
         label_map = {"type": "locked-language-transcript",
                      "languages": {"english": "en", "french": "fr", "japanese": "ja"}}
-        self.config = {
+        dependencies = {"mlx": "fixture", "mlx-whisper": "fixture", "numpy": "fixture"}
+        # The registry's pinned repository and revision: the load gate refuses any other.
+        pins = json.loads((Path(__file__).resolve().parents[2] / "config/audio-qc-judges.json")
+                          .read_text(encoding="utf-8"))["judges"][independent_asr.JUDGE_ID]["pins"]
+        self.config = adapter.bind_output_identity({
             "schemaVersion": 1,
             "adapterID": "whisper-small-mlx",
-            "modelID": "mlx-community/whisper-small-mlx",
-            "sourceRevision": "revision-fixture",
+            "modelID": pins["repository"],
+            "sourceRevision": pins["revision"],
             "weightsPath": str(self.weights),
             "weightsSHA256": file_sha256(self.weights),
             "binaryPath": sys.executable,
             "binarySHA256": file_sha256(Path(sys.executable)),
+            "adapterSourceSHA256": file_sha256(independent_asr.WORKER_SOURCE),
+            "adapterLayerSHA256": file_sha256(Path(adapter.__file__)),
             "license": "Apache-2.0-fixture",
             "commercialUseCompatible": True,
             "trainingDataDeclaration": "fixture",
+            "sourceURI": "https://example.invalid/whisper",
+            "trainingDataSourceURI": "https://example.invalid/whisper-data",
             "labelMap": label_map,
             "labelMapDigest": digest(label_map),
+            "runtimeDependencies": dependencies,
+            "runtimeDependenciesDigest": digest(dependencies),
             "preprocessingConfig": preprocessing,
-            "preprocessingConfigDigest": digest(preprocessing),
             "offlineAfterAcquisition": True,
             "outputFormat": "whisper-json",
             "decodeOptions": {"temperature": 0.0, "conditionOnPreviousText": False, "fp16": True},
-            "commandTemplate": [sys.executable, "independent_asr_worker.py", "--weights", "{weights}",
-                                "--audio", "{audio}", "{binary}"],
-        }
+            "commandTemplate": ["{binary}", str(independent_asr.WORKER_SOURCE), "--weights", "{weights}",
+                                "--audio", "{audio}"],
+        })
         self.cache = DeliveryAnalysisCache(self.root / "cache")
         self.manifest = {
             "schemaVersion": 1, "kind": "independent-asr-manifest", "runID": "run-1",
@@ -136,6 +147,16 @@ class IndependentASRTests(unittest.TestCase):
             )
         self.assertEqual(self.launches, [])
 
+    def test_the_producer_loads_only_its_registry_judge(self) -> None:
+        # The producer names its judge; a config for another judge's model never launches.
+        with mock.patch.object(independent_asr, "JUDGE_ID", "compact.distilhubert@1"):
+            with self.assertRaisesRegex(independent_asr.IndependentASRError, "another model or revision"):
+                independent_asr.transcribe_manifest(
+                    manifest=self.manifest, config=self.config, cache=self.cache,
+                    lock_root=self.root, supervisor=self.supervisor,
+                )
+        self.assertEqual(self.launches, [])
+
     def test_one_launch_emits_bound_recognitions_and_the_rerun_is_a_cache_hit(self) -> None:
         evidence = independent_asr.transcribe_manifest(
             manifest=self.manifest, config=self.config, cache=self.cache,
@@ -179,24 +200,14 @@ class IndependentASRTests(unittest.TestCase):
 
     def test_supervisor_only_change_replays_cached_recognitions_offline(self) -> None:
         """Audit AQ-F47: the supervisor is envelope provenance; it never keys the cache."""
-        import delivery_compact_model_adapter as adapter
-        import delivery_resource_supervisor
-
-        dependencies = {"mlx": "fixture", "mlx-whisper": "fixture", "numpy": "fixture"}
-        config = adapter.bind_output_identity({
-            **self.config,
-            "sourceURI": "https://example.invalid/whisper",
-            "trainingDataSourceURI": "https://example.invalid/whisper-data",
-            "runtimeDependencies": dependencies,
-            "runtimeDependenciesDigest": digest(dependencies),
-            "adapterSourceSHA256": file_sha256(independent_asr.WORKER_SOURCE),
-            "adapterLayerSHA256": file_sha256(Path(adapter.__file__)),
-        })
+        config = self.config
         first = independent_asr.transcribe_manifest(
             manifest=self.manifest, config=config, cache=self.cache,
             lock_root=self.root, supervisor=self.supervisor,
         )
         self.assertEqual(first["producer"]["modelLaunches"], 1)
+        # The launch records the supervisor that measured it (envelope provenance).
+        self.assertEqual(first["producer"]["envelopeIdentity"], adapter.envelope_identity())
         changed = self.root / "delivery_resource_supervisor.py"
         changed.write_bytes(Path(delivery_resource_supervisor.__file__).read_bytes()
                             + b"\n# a supervisor-only fix\n")
@@ -211,6 +222,7 @@ class IndependentASRTests(unittest.TestCase):
             )
         self.assertEqual(replayed["producer"]["modelLaunches"], 0)
         self.assertEqual(replayed["producer"]["cacheHits"], 1)
+        self.assertIsNone(replayed["producer"]["envelopeIdentity"])
         self.assertEqual(replayed["cells"], first["cells"])
         # A decode-option change is an output-identity change: a new recognition.
         relocked = adapter.bind_output_identity({**config, "decodeOptions": {**config["decodeOptions"], "fp16": False}})

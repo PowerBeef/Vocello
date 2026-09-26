@@ -478,7 +478,11 @@
           "config/delivery-*.json",
           "config/voice-identity-language-reliability.json",
           "config/*prosody*.json",
-          "config/marking-peak-equality.json"
+          "config/marking-peak-equality.json",
+          "config/audio-qc-*.json",
+          "scripts/audio_qc_*.py",
+          "scripts/audio_qc_qualification.py",
+          "scripts/lib/qc_qualification/**"
         ],
         "requiredEvidence": [
           "macos-ui-benchmark",

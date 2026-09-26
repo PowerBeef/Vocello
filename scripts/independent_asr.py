@@ -66,6 +66,8 @@ SCHEMA_VERSION = 1
 WORKER_SOURCE = SCRIPT_DIR / "independent_asr_worker.py"
 FAMILY = "whisper"
 ADAPTER_ID = "whisper-small-mlx"
+# The registry judge this producer loads (`config/audio-qc-judges.json`).
+JUDGE_ID = "asr.whisper-small@1"
 LAYER_ID = "independent-asr"
 # 2 (2026-09-25): entries hold the worker's raw result, not the derived
 # recognition, so version-1 entries are never read as raw results.
@@ -407,8 +409,9 @@ def transcribe_manifest(
     maximum_rss_bytes: int = MAXIMUM_RSS_BYTES,
 ) -> dict[str, Any]:
     """Recognize every manifest row; cached rows launch nothing."""
+    from audio_qc_judges import JudgeRegistryError, require_loadable
     from delivery_analysis_cache import LayerIdentity, configured_resampler, file_sha256
-    from delivery_compact_model_adapter import CompactAdapterError, validate_adapter_config
+    from delivery_compact_model_adapter import CompactAdapterError, envelope_identity, validate_adapter_config
     from delivery_resource_supervisor import run_supervised
 
     manifest = validate_manifest(manifest)
@@ -418,6 +421,12 @@ def transcribe_manifest(
         raise IndependentASRError(str(error)) from error
     if config["adapterID"] != ADAPTER_ID:
         raise IndependentASRError("independent ASR requires the whisper-small-mlx adapter configuration")
+    try:
+        # The load-time gate, named for the judge this producer loads.
+        require_loadable(JUDGE_ID, config["modelID"], config["sourceRevision"],
+                         packages=list(config.get("runtimeDependencies") or {}))
+    except JudgeRegistryError as error:
+        raise IndependentASRError(str(error)) from error
     if cache.resampler_version != configured_resampler(config):
         raise IndependentASRError("cache resampler differs from the pinned adapter preprocessing")
     language_codes = {name: code for code, name in _code_to_language(config).items()}
@@ -465,6 +474,7 @@ def transcribe_manifest(
     cache_hits = sum(1 for row in manifest["rows"] if identities[row["id"]] in cached)
 
     envelope: dict[str, Any] | None = None
+    supervision: dict[str, str] | None = None
     model_load_seconds: Any = None
     warmup_seconds: Any = None
     if pending:
@@ -482,6 +492,9 @@ def transcribe_manifest(
             command = [str(config["binaryPath"]), str(WORKER_SOURCE.resolve()), "--job", str(job_path)]
             environment = dict(os.environ)
             environment.update({"HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1"})
+            # The supervisor that measures this launch: envelope provenance,
+            # never part of a cache key (audit AQ-F47).
+            supervision = envelope_identity()
             # Whisper runs on MLX: its Metal memory is invisible to RSS, so the
             # footprint (with the kernel's lifetime peak) is measured and its
             # ceiling evaluated (audit #101).
@@ -546,6 +559,9 @@ def transcribe_manifest(
         "modelLoadSeconds": model_load_seconds,
         "warmupSeconds": warmup_seconds,
         "resourceEnvelope": envelope,
+        # The resource supervisor's source and probe for the launch above;
+        # None when every row was a cache hit and nothing launched.
+        "envelopeIdentity": supervision,
     }
     if manifest.get("platform") == "cascade":
         rows_by_generation: dict[str, dict[str, list[dict[str, Any]]]] = {}

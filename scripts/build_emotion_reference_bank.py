@@ -387,7 +387,8 @@ def build(arguments: argparse.Namespace) -> int:
 
     from bench_delivery_prosody import analyze
 
-    scored = score_candidates(anchor_path, generated, ecapa_embedder(), analyze)
+    embedder = ecapa_embedder()
+    scored = score_candidates(anchor_path, generated, embedder, analyze)
     selection = select_winners(scored, emotions)
 
     enrolled: list[str] = []
@@ -397,7 +398,7 @@ def build(arguments: argparse.Namespace) -> int:
             arguments.vocello,
         )
 
-    from clone_speaker_similarity import ECAPA_PREPROCESSING, ECAPA_REVISION, ECAPA_SOURCE
+    from clone_speaker_similarity import backend_identity
     from delivery_quality_gate import DELIVERY_GATE_ALGORITHM_VERSION
 
     manifest = {
@@ -428,8 +429,8 @@ def build(arguments: argparse.Namespace) -> int:
         "scorers": {
             "deliveryAdherence": {"algorithmVersion": DELIVERY_GATE_ALGORITHM_VERSION,
                                   "tier": "strong", "reference": "neutral anchor"},
-            "identity": {"source": ECAPA_SOURCE, "revision": ECAPA_REVISION,
-                         "preprocessing": dict(ECAPA_PREPROCESSING)},
+            # The pinned backend with the snapshot digests it verified.
+            "identity": backend_identity(embedder),
         },
     }
     manifest_path = work_dir / "bank-manifest.json"

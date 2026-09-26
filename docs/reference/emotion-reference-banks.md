@@ -38,8 +38,10 @@ and emotion carry into the take.
 The builder and its identity scorer run from a local, untracked virtual environment:
 `python3 -m venv .venv && .venv/bin/pip install torch speechbrain` (the header of
 `scripts/clone_speaker_similarity.py` names the exact ECAPA backend; it loads its pinned snapshot
-from the local Hugging Face cache only, so the maintainer caches it once, and verifies every
-snapshot file against the judge registry, `config/audio-qc-judges.json`, before loading). Never
+from the local Hugging Face cache only, so the maintainer caches the complete snapshot once with
+`hf download speechbrain/spkrec-ecapa-voxceleb --revision <revision>`, and before loading it
+requires exactly the files the judge registry, `config/audio-qc-judges.json`, pins from the Hub
+tree, each matching its LFS SHA-256 or git blob ID; the manifest records the verified digests). Never
 install these into the system interpreter and never run them while the engine is generating.
 
 ```sh

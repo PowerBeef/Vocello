@@ -176,6 +176,13 @@ class QualifyDeliveryCompactModelsTests(unittest.TestCase):
             side_effect=("Mac99,1", str(8 * 1024**3)),
         ), self.assertRaisesRegex(QualificationError, "does not match"):
             canonical_hardware_attestation()
+        # The judge registry's adoption selector names the profile, not this script.
+        judges = {"adoption": {"hardwareProfiles": "benchmarks/hardware-profiles.json",
+                               "profileSelector": {"platform": "macos", "id": "mac-mini-m6-16gb"}}}
+        with patch("qualify_delivery_compact_models.load_registry", return_value=judges), patch(
+            "qualify_delivery_compact_models._read", return_value=registry,
+        ), self.assertRaisesRegex(QualificationError, "missing or ambiguous"):
+            canonical_hardware_attestation()
 
 if __name__ == "__main__":
     unittest.main()

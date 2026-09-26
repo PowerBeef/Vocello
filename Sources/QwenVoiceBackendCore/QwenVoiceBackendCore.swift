@@ -1,5 +1,7 @@
 import Foundation
 
+/// The imported runtime's upstream identity. `scripts/qwen3_core_contract.py`
+/// requires it to match `Packages/VocelloQwen3Core/LINEAGE.json`.
 public enum QwenVoiceBackendProvenance {
     public static let upstreamRepository = "https://github.com/Blaizzy/mlx-audio-swift"
     public static let upstreamTag = "v0.1.2"
@@ -37,24 +39,4 @@ public struct Qwen3GenerationConfiguration: Codable, Equatable, Sendable {
     public static let checkpointDefaultMaxNewTokens = 8_192
     public static let wrapperFallbackMaxNewTokens = 2_048
     public static let officialQualityDefault = Qwen3GenerationConfiguration()
-}
-
-public enum Qwen3GenerationPolicy {
-    public static let minimumGeneratedCodeTokensBeforeEOS = Qwen3GenerationConfiguration
-        .officialQualityDefault
-        .minNewTokens
-    public static let productionFullResultMemoryClearCadence = 0
-    public static let diagnosticStreamingDefaultMemoryClearCadence = 50
-}
-
-public enum QwenVoiceGenerationFinishReason: String, Codable, Hashable, Sendable {
-    case eos
-    case maxTokens = "max_tokens"
-    case cancelled
-    case failed
-}
-
-public protocol QwenVoiceSynthesisBackend: AnyObject, Sendable {
-    var sampleRate: Int { get }
-    func cancelActiveGeneration() async throws
 }

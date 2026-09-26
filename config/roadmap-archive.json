@@ -4073,6 +4073,34 @@
       ],
       "notes": "Closed 2026-09-25. Audit #5 #11 #13 #14 #15 #19 #20 #27 #36 #53 #54 #55 #57 #58 #59 #63 V-5 V-6 V-7. Maintainer decisions 2026-09-25: five warm takes and a stricter per-take load limit. Landed 2026-09-25: a seeded gate with governed pooled seeding (at least three seeded runs on one clean commit) and identity read from the evidence, memory tier bound; five warm takes; spread-floored thresholds printed; a preflight that stops a missing model within seconds with a finalized ledger; INCONCLUSIVE from the busiest judged take and from low power; a take above the core count marks its engine record exploratory; Clone prewarm before the warm takes; no duplicate core tests or full pytest in the gate; the bench's telemetry-off arm truly off; the sidecar budget sized to the run; forced memory-class rows refused and a refused identity never truncates a baseline. The M6 re-seed landed as AV-17 step 1 (ce66096c: three seeded runs from 848e140a, thresholds printed); test_compare_baseline replays flag a synthetic +6% RTF with no false regression; a post-wave-8 compare passed (4de385ef).",
       "updated": "2026-09-25"
+    },
+    {
+      "id": "AQ-01",
+      "title": "License-clean judge registry",
+      "status": "done",
+      "gate": "No non-retired judge is tier C or unknown; NISQA, UTMOSv2 and the SER are retired or quarantined per decision 1; every judge loads offline after digest verification; the adoption wording names the canonical host; output and envelope identities are split, with an offline replay showing no cache invalidation on a supervisor-only change.",
+      "sourceOfTruth": [
+        "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
+        "config/delivery-evaluator-v2-candidates.json",
+        "scripts/prepare_delivery_compact_model_config.py"
+      ],
+      "notes": "Closed 2026-09-26 (wave 10; maintainer decisions 1a, 2a, 3a, 7). config/audio-qc-judges.json registers 12 judges with pins, weight and data licenses, tier, independence and an output/envelope identity split, plus 23 exclusions and a use restriction; its validator runs in the contract gate. NISQA (CC BY-NC-SA weights), UTMOSv2 and the SER are retired from every QC, gate, guardrail and selection path; legacy promotion inputs still load. A load-time require_loadable gate replaces an import scan that broke the rule against reading other scripts; ECAPA pins all 10 snapshot files from the Hub tree. Identity v4 binds the command template, runtime versions and host, re-hashes the adapter source and keeps the supervisor as envelope provenance (replay: a supervisor-only change keeps caches). Adoption reads two clean canonical-host runs. Per-judge memory ceilings stay provisional for AQ-06; DistilHuBERT retirement is AQ-05.",
+      "plan": "audio-qc-audit-2026-09",
+      "updated": "2026-09-26"
+    },
+    {
+      "id": "AQ-03",
+      "title": "Qualification engine and injector catalog",
+      "status": "done",
+      "gate": "CI goldens for injectors, statistics and the verdict composer; the policy file with A1-A10 validates; the first generated meta-evaluation report quantifies Fast QC v8 flags on procedural and committed evidence; the Swift abstained outcome is tested.",
+      "sourceOfTruth": [
+        "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
+        "docs/reference/audio-qc-engineering.md",
+        "Sources/QwenVoiceCore/GenerationQualityComposition.swift"
+      ],
+      "notes": "Closed 2026-09-26 (wave 10; decisions 5a and 7). scripts/lib/qc_qualification: exact Clopper-Pearson bounds, family resampling, correlated-failure audit, threshold derivation from clean clips, persisted pre-registration and confirm-once; 17 seeded injector families with identity shams and golden digests; a pure verdict composer; config/audio-qc-qualification-policy.json (A1-A10, Bonferroni per-language confidence); Swift .abstained, which the bench reports as inconclusive; Stage 0 constants pinned to config/audio-qc-stage0-calibration.json. M1 on Fast QC v8: 0/60 clean false alarms and no sham departs, but realistic clicks, sub-full-scale clipping, noise, truncation, word deletion, pitch breaks and identity swaps go undetected; an adversarial review removed construction artifacts first. Follow-ups: a tracked qc-calibration record kind (AQ-07/AQ-09) and keeping failed-run archives when the bench is inconclusive.",
+      "plan": "audio-qc-audit-2026-09",
+      "updated": "2026-09-26"
     }
   ]
 }

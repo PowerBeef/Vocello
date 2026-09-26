@@ -13,7 +13,7 @@ and deferred backlog. Milestone progress is not a release-readiness score.
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
 | `release-first-3-0-2026-09` | active | release-qa | 6/15 (40%) |
-| `audio-qc-audit-2026-09` | active | backend-mlx | 0/9 (0%) |
+| `audio-qc-audit-2026-09` | active | backend-mlx | 2/9 (22%) |
 | `audit-remediation-2026-09` | active | backend-and-platform | 3/12 (25%) |
 | `autonomous-validation-remediation-2026-08` | active | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | active | backend-and-platform | 1/6 (17%) |
@@ -94,9 +94,7 @@ Narrative authority: [`docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md`
 
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
-| `AQ-01` | planned | License-clean judge registry | — |
-| `AQ-02` | planned | Normalization v2 and ten-language coverage | — |
-| `AQ-03` | planned | Qualification engine and injector catalog | — |
+| `AQ-02` | in-flight | Normalization v2 and ten-language coverage | — |
 | `AQ-04` | planned | Stage 0 observational DSP and engine introspection | — |
 | `AQ-05` | planned | Staged pipeline, workers and admission | `AQ-01` |
 | `AQ-06` | planned | Judge panel acquisition and M6 qualification | `AQ-01`, `AQ-05` |
@@ -106,14 +104,8 @@ Narrative authority: [`docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md`
 
 ### Open items in detail
 
-- **`AQ-01`** (planned) — License-clean judge registry.
-  gate: No non-retired judge is tier C or unknown; NISQA, UTMOSv2 and the SER are retired or quarantined per decision 1; every judge loads offline after digest verification; the adoption wording names the canonical host; output and envelope identities are split, with an offline replay showing no cache invalidation on a supervisor-only change.
-
-- **`AQ-02`** (planned) — Normalization v2 and ten-language coverage.
+- **`AQ-02`** (in-flight) — Normalization v2 and ten-language coverage.
   gate: Per-language fixtures pass in Python and Swift parity; Korean scores by syllable CER; the corpus lint refuses digits and brackets in gated scripts; the CC0 script pool covers all ten languages with manifests; the language kinds' measurement version is bumped with legacy keys unchanged.
-
-- **`AQ-03`** (planned) — Qualification engine and injector catalog.
-  gate: CI goldens for injectors, statistics and the verdict composer; the policy file with A1-A10 validates; the first generated meta-evaluation report quantifies Fast QC v8 flags on procedural and committed evidence; the Swift abstained outcome is tested.
 
 - **`AQ-04`** (planned) — Stage 0 observational DSP and engine introspection.
   gate: Every new field has procedural tests with exact expected values; fields are additive to QC v8 with no verdict change; the Python mirror matches Swift on fixtures.
@@ -271,7 +263,7 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
 | --- | --- | --- | --- |
 | `DP-20` | parked | External delivery-control lever watch list (audit R8) | — |
 | `DP-28` | superseded | Calibrate the layered local delivery evaluator | — |
-| `DP-29` | in-flight | Qualify the native-language delivery corpus and cross-language sentinels | — |
+| `DP-29` | parked | Qualify the native-language delivery corpus and cross-language sentinels | — |
 | `DP-31` | planned | Confirm Speed and Quality candidates with a frozen automated holdout | `AQ-07`, `AQ-08` |
 | `DP-32` | planned | Promote only qualifying delivery changes and revalidate all modes | `DP-31`, `AQ-07`, `AQ-08` |
 
@@ -281,8 +273,9 @@ Narrative authority: [`docs/reference/qwen3-tts-prompting-guide.md`](reference/q
   gate: Re-verify the R8 watch list against primary sources; if a lever runs on-device at the 8 GB floor, open a measured DP item with a pre-registered holdout comparison, else re-park with the reason.
   unparkWhen: Only when a watched lever becomes runnable on-device at the 8 GB floor: a Qwen3-TTS VoiceEditing/instruct variant that combines ICL with instructions, CosyVoice 3-class instruct control in an MLX-portable form, emotion-vector steering (IndexTTS-2/EmoSteer-class) with published weights, or a quantization-robust valence result. The pinned audit's R8 section is the source list; re-verify claims against primary sources at unpark time rather than trusting the 2026-08 snapshot.
 
-- **`DP-29`** (in-flight) — Qualify the native-language delivery corpus and cross-language sentinels.
+- **`DP-29`** (parked) — Qualify the native-language delivery corpus and cross-language sentinels.
   gate: Corpus structure is landed for nine native speaker-language cells, four fixed cross-language sentinels, three lengths and neutral/congruent/conflicting semantics across calibration/development/confirmation splits. Closure requires fluent review of every Mandarin, Japanese and Korean script, immutable review provenance and digests, no speaker/script/seed or translated-equivalent leakage, independent generated cohorts, ASR/CER/language-ID uncertainty and ignored-sample accounting, and AV-08-compliant evidence before any locale is promoted beyond provisional.
+  unparkWhen: Fluent Mandarin, Japanese and Korean reviewers are available to review every gated script with immutable provenance (the maintainer arranges them); AQ-02's corpus lint and CC0 script pool feed that review.
 
 - **`DP-31`** (planned) — Confirm Speed and Quality candidates with a frozen automated holdout.
   gate: Confirm surviving Speed/Quality candidates on one predeclared untouched holdout per candidate family across all nine speakers, eight presets, native-language scripts and sentinels. Use named frozen automatic metrics, at least two independent judge families with reverse-order consistency, paired improvement/2AFC, Holm correction and distributed speaker/script gains. Preserve PCM, WER/CER, identity, memory, cancellation, seed and receipt guardrails; the quality guardrail is the qualified advisory composite of AQ-08 (UTMOS retired by AQ-01). Listening is optional; automatic metric qualification is not listener-proven semantic improvement.
@@ -358,7 +351,7 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | Item | Status | Title | Blocked by |
 | --- | --- | --- | --- |
 | `ASR-02` | planned | Resolve Hugging Face processing and App Privacy disclosure | — |
-| `ASR-04` | in-flight | Bundle complete attributions and record content rights | — |
+| `ASR-04` | parked | Bundle complete attributions and record content rights | — |
 | `ASR-05` | parked | Refresh reviewer notes, metadata guidance, and App Store screenshots | — |
 | `ASR-06` | parked | Define and verify sensitive-file protection and backup policy | — |
 | `ASR-07` | parked | Complete final release logging, API, symbol, and analyzer hygiene | — |
@@ -373,8 +366,9 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 - **`ASR-02`** (planned) — Resolve Hugging Face processing and App Privacy disclosure.
   gate: Obtain a documented vendor-retention and qualified privacy/legal determination for every request field Hugging Face receives during model downloads; then make PrivacyInfo.xcprivacy, the website/in-app policy, App Store privacy answers, and reviewer notes mutually consistent. The current Data Not Collected assertion must not survive without evidence satisfying Apple's third-party-partner and retention definitions.
 
-- **`ASR-04`** (in-flight) — Bundle complete attributions and record content rights.
+- **`ASR-04`** (parked) — Bundle complete attributions and record content rights.
   gate: Generate a deterministic offline attribution/NOTICE manifest from the exact SwiftPM graph and owned runtime, bundle it, expose it through an accessible in-app screen, and bind every downloadable model revision to its license, model-card terms, NOTICE, and redistribution decision. Qualified records must also cover built-in speaker names/previews, generated marketing audio, icons/fonts, and the App Store content-rights declaration.
+  unparkWhen: Owner or counsel evidence exists for license delivery, NOTICE and trademark obligations, output and personality rights, and the marketing audio, scripts and artwork the notes list.
 
 - **`ASR-05`** (parked) — Refresh reviewer notes, metadata guidance, and App Store screenshots.
   gate: Reviewer notes must use current Ready terminology and exact catalog-derived download/storage expectations; metadata instructions must match Apple's current one-set iPhone screenshot rule; and a current signed candidate must provide privacy-safe physical-device screenshots at an accepted 6.9-inch size, or an accepted 6.5-inch fallback, with no clipping, stale UI, diagnostics, personal data, or misleading claims.

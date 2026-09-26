@@ -550,7 +550,7 @@
       "id": "DP-29",
       "plan": "delivery-prompting-2026-08",
       "title": "Qualify the native-language delivery corpus and cross-language sentinels",
-      "status": "in-flight",
+      "status": "parked",
       "gate": "Corpus structure is landed for nine native speaker-language cells, four fixed cross-language sentinels, three lengths and neutral/congruent/conflicting semantics across calibration/development/confirmation splits. Closure requires fluent review of every Mandarin, Japanese and Korean script, immutable review provenance and digests, no speaker/script/seed or translated-equivalent leakage, independent generated cohorts, ASR/CER/language-ID uncertainty and ignored-sample accounting, and AV-08-compliant evidence before any locale is promoted beyond provisional.",
       "sourceOfTruth": [
         "config/delivery-evaluation-corpus.json",
@@ -560,8 +560,9 @@
         "file:scripts/tests/test_delivery_experiment.py",
         "commit:ae446132"
       ],
-      "updated": "2026-09-11",
-      "notes": "September 11 reconciliation: the 2026-09-01 cohort cited below is exploratory and partial by its own record (dirty source, 17 changed paths, all 19 cells passedWithWarnings, no Korean), so it does not qualify any corpus cell; the leakage validators and corpus structure remain the only source-bound evidence. The split-safe nine-speaker corpus, four fixed cross-language sentinels, three lengths, three semantic conditions, immutable identities, and leakage validators are implemented and revalidated. The 2026-09-01 full Mac language cohort passed 19/19 generation and hint cells across English, French, German, Spanish, Chinese, Japanese, CustomVoice, and VoiceDesign (mac-lang-bench-20260902-024501-bd2df074); the one catalog-declared Chinese warning remained explicit rather than being promoted to PASS. That cohort is useful safety evidence but cannot qualify the corpus. Fluent Mandarin, Japanese, and Korean review with immutable provenance, then independent multi-seed/script generation and AV-08 uncertainty/ignored-sample accounting, remain required."
+      "updated": "2026-09-26",
+      "notes": "September 11 reconciliation: the 2026-09-01 cohort cited below is exploratory and partial by its own record (dirty source, 17 changed paths, all 19 cells passedWithWarnings, no Korean), so it does not qualify any corpus cell; the leakage validators and corpus structure remain the only source-bound evidence. The split-safe nine-speaker corpus, four fixed cross-language sentinels, three lengths, three semantic conditions, immutable identities, and leakage validators are implemented and revalidated. The 2026-09-01 full Mac language cohort passed 19/19 generation and hint cells across English, French, German, Spanish, Chinese, Japanese, CustomVoice, and VoiceDesign (mac-lang-bench-20260902-024501-bd2df074); the one catalog-declared Chinese warning remained explicit rather than being promoted to PASS. That cohort is useful safety evidence but cannot qualify the corpus. Fluent Mandarin, Japanese, and Korean review with immutable provenance, then independent multi-seed/script generation and AV-08 uncertainty/ignored-sample accounting, remain required.",
+      "unparkWhen": "Fluent Mandarin, Japanese and Korean reviewers are available to review every gated script with immutable provenance (the maintainer arranges them); AQ-02's corpus lint and CC0 script pool feed that review."
     },
     {
       "id": "DP-31",
@@ -763,7 +764,7 @@
       "id": "ASR-04",
       "plan": "ios-app-store-readiness-2026-08",
       "title": "Bundle complete attributions and record content rights",
-      "status": "in-flight",
+      "status": "parked",
       "gate": "Generate a deterministic offline attribution/NOTICE manifest from the exact SwiftPM graph and owned runtime, bundle it, expose it through an accessible in-app screen, and bind every downloadable model revision to its license, model-card terms, NOTICE, and redistribution decision. Qualified records must also cover built-in speaker names/previews, generated marketing audio, icons/fonts, and the App Store content-rights declaration.",
       "sourceOfTruth": [
         "QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
@@ -781,8 +782,9 @@
         "commit:87636935",
         "doc:docs/reference/content-rights-review.md"
       ],
-      "updated": "2026-09-11",
-      "notes": "September 11 reconciliation: status corrected from planned to in-flight. The deterministic attribution manifest, its bundled in-app screen and the App Store Connect content-rights declaration are shipped (see notes); the open clauses are counsel decisions on previews, marketing audio and artwork, not unstarted work. P1/source-proven plus legal-review-required. Source remediation is complete for software and models: the exact 17-package resolution, owned-runtime license/NOTICE/origins, and six model-card identities generate one deterministic offline manifest; iOS bundles and displays it accessibly, and archive verification requires byte identity. On 2026-08-27 App Store Connect was set to and read back USES_THIRD_PARTY_CONTENT. Exact fork/base revisions, Apache-2.0 declarations, lineage, and modification notices are verified, but qualified review must still confirm license-delivery/NOTICE/trademark obligations and output/personality rights. Owner/counsel evidence remains required for built-in previews/speaker presentation, the voice-clone marketing source, other marketing audio/scripts, and original or licensed artwork."
+      "updated": "2026-09-26",
+      "notes": "September 11 reconciliation: status corrected from planned to in-flight. The deterministic attribution manifest, its bundled in-app screen and the App Store Connect content-rights declaration are shipped (see notes); the open clauses are counsel decisions on previews, marketing audio and artwork, not unstarted work. P1/source-proven plus legal-review-required. Source remediation is complete for software and models: the exact 17-package resolution, owned-runtime license/NOTICE/origins, and six model-card identities generate one deterministic offline manifest; iOS bundles and displays it accessibly, and archive verification requires byte identity. On 2026-08-27 App Store Connect was set to and read back USES_THIRD_PARTY_CONTENT. Exact fork/base revisions, Apache-2.0 declarations, lineage, and modification notices are verified, but qualified review must still confirm license-delivery/NOTICE/trademark obligations and output/personality rights. Owner/counsel evidence remains required for built-in previews/speaker presentation, the voice-clone marketing source, other marketing audio/scripts, and original or licensed artwork.",
+      "unparkWhen": "Owner or counsel evidence exists for license delivery, NOTICE and trademark obligations, output and personality rights, and the marketing audio, scripts and artwork the notes list."
     },
     {
       "id": "ASR-05",
@@ -1536,46 +1538,18 @@
       "updated": "2026-09-25"
     },
     {
-      "id": "AQ-01",
-      "title": "License-clean judge registry",
-      "status": "planned",
-      "gate": "No non-retired judge is tier C or unknown; NISQA, UTMOSv2 and the SER are retired or quarantined per decision 1; every judge loads offline after digest verification; the adoption wording names the canonical host; output and envelope identities are split, with an offline replay showing no cache invalidation on a supervisor-only change.",
-      "sourceOfTruth": [
-        "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
-        "config/delivery-evaluator-v2-candidates.json",
-        "scripts/prepare_delivery_compact_model_config.py"
-      ],
-      "notes": "Audit AQ-F01-F06, F40, F43, F45, F47 (phases P0, P1). Urgent: the evaluator registry labels NISQA commercial-compatible while its weights are CC BY-NC-SA 4.0; UTMOSv2 and the advisory SER are trained on non-commercial data. Correcting the registry stops NISQA in the delivery cascade, so it is decision 1. Provenance records that change no gate can start now. Maintainer 2026-09-25: all nine audit section 9 recommendations accepted (retire the NC judges; tier B for internal evaluation; same-lab judges non-voting; staged downloads; the 60/60/60 warn and FAR fail bars; Apple Speech kept; A1-A10 and rule changes adopted; QC v8 kept; budgeted admission).",
-      "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-09-25"
-    },
-    {
       "id": "AQ-02",
       "title": "Normalization v2 and ten-language coverage",
-      "status": "planned",
+      "status": "in-flight",
       "gate": "Per-language fixtures pass in Python and Swift parity; Korean scores by syllable CER; the corpus lint refuses digits and brackets in gated scripts; the CC0 script pool covers all ten languages with manifests; the language kinds' measurement version is bumped with legacy keys unchanged.",
       "sourceOfTruth": [
         "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
         "scripts/lib/language_metrics.py",
         "Sources/SharedSupport/Services/VoiceClipTranscriber.swift"
       ],
-      "notes": "Audit AQ-F21-F28, F32 (P2a, P2b). The largest avoidable error today: Korean is scored after NFKD splits Hangul into jamo, traditional Chinese is never folded, digits are never reconciled with spelled numbers, and bracketed text Qwen3-TTS speaks is deleted. P2a needs no new package; OpenCC, cn2an, num2words and fugashi pins wait for decision 4. Maintainer 2026-09-25: all nine audit section 9 recommendations accepted (retire the NC judges; tier B for internal evaluation; same-lab judges non-voting; staged downloads; the 60/60/60 warn and FAR fail bars; Apple Speech kept; A1-A10 and rule changes adopted; QC v8 kept; budgeted admission).",
+      "notes": "Wave 10 landed P2a (2026-09-26): normalization v2 in Python and Swift with byte-exact parity over a shared fixture plus a generated Unicode sweep (102 cases): Korean syllable CER, NFKC and casefold, Latin folds, recognizer-tag stripping, bracket and filler safety, space-free CER, ten-language tables; a corpus lint refusing digits, symbols and per-language abbreviations; accuracy metric normalization-v2-edit-rate-v3, language measurement version 4, the in-app languageASR gate at algorithm 6; the promotion contract routes VoiceClipTranscriber. Replay: no published verdict changes. Open: P2b (OpenCC, cn2an, num2words, fugashi pins and downloads), the CC0 ten-language script pool, and a consented lang-bench under v3.",
       "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-09-25"
-    },
-    {
-      "id": "AQ-03",
-      "title": "Qualification engine and injector catalog",
-      "status": "planned",
-      "gate": "CI goldens for injectors, statistics and the verdict composer; the policy file with A1-A10 validates; the first generated meta-evaluation report quantifies Fast QC v8 flags on procedural and committed evidence; the Swift abstained outcome is tested.",
-      "sourceOfTruth": [
-        "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md",
-        "docs/reference/audio-qc-engineering.md",
-        "Sources/QwenVoiceCore/GenerationQualityComposition.swift"
-      ],
-      "notes": "Audit AQ-F07, F33, F34, F36-F39 (P3). Labels come from construction (injected defects with sham controls, codec-trace mutation, forced failures); thresholds come from clean clips only with exact one-sided bounds (299 clean clips with no alarm support FAR <= 1%). A1-A10 and .abstained bind only after decision 7; the engine can run report-only now. Maintainer 2026-09-25: all nine audit section 9 recommendations accepted (retire the NC judges; tier B for internal evaluation; same-lab judges non-voting; staged downloads; the 60/60/60 warn and FAR fail bars; Apple Speech kept; A1-A10 and rule changes adopted; QC v8 kept; budgeted admission).",
-      "plan": "audio-qc-audit-2026-09",
-      "updated": "2026-09-25"
+      "updated": "2026-09-26"
     },
     {
       "id": "AQ-04",

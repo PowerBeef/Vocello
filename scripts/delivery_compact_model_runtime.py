@@ -4,6 +4,11 @@
 This process receives canonical 16 kHz mono PCM16, never receives a requested
 delivery label, and emits one privacy-safe JSON object. Model acquisition and
 provenance validation remain the caller's responsibility.
+
+Retired from QC on 2026-09-26 (AQ-05): the DistilHuBERT judge is retired in
+`config/audio-qc-judges.json`, so no candidate order, preparation, adapter or
+cascade path launches this executor; it remains the executor the cited
+qualification records describe.
 """
 
 from __future__ import annotations

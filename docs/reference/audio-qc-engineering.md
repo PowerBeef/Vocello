@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-25
+reviewed: 2026-09-26
 summary: Source-grounded Audio QC architecture, corrected default preprocessing, M2 resource measurements, accuracy limitations and explicit historical replay boundaries.
 sourceOfTruth:
   - Sources/QwenVoiceCore/GenerationOutputAdapter.swift
@@ -21,6 +21,11 @@ sourceOfTruth:
   - scripts/derive_audio_qc_bounds.py
   - scripts/audio_qc_qualification.py
   - scripts/lib/qc_qualification/composer.py
+  - scripts/audio_qc_orchestrator.py
+  - scripts/audio_qc_worker.py
+  - scripts/lib/qc_pipeline/admission.py
+  - scripts/delivery_resource_supervisor.py
+  - config/audio-qc-judges.json
   - config/audio-qc-qualification-policy.json
   - config/audio-qc-stage0-calibration.json
   - config/prosody-holdout-policy.json
@@ -207,7 +212,7 @@ QC, prompts, models, seeds, personal data and the release queue are unchanged.
 | Spoken content | `VoiceClipTranscriber.swift` (Apple Speech, three locale-locked passes), `scripts/independent_asr.py` (whisper-small MLX, after the generator exits), `scripts/lib/language_metrics.py`, `check_language_output.py` | Locale-locked full-WAV recognition, edge evidence, WER/CER (0.15 threshold). One family is one witness; two families must agree for consensus. |
 | Acoustic measurement | `analyze_prosody.py` v3, `delivery_temporal_features.py` v1 | Two bounded passes each: global features and five-region contours. Measures signal properties, not listener-recognized emotion. |
 | Acoustic decisions | `prosody_quality_gate.py`, `delivery_quality_gate.py`, frozen profile | Warn-first heuristics; incomplete measurement must not become PASS. AV-07's independent calibration is still missing. |
-| Local research | experiment runner, analysis cache, compact adapter, resource supervisor, cascade, evaluator | Source-bound serial screening; native QC and independent ASR evidence compose separately from optional heads. Missing/contradictory evidence abstains. Requested follow-up layers are **requests**, not executed ASR evidence. Every judge is registered in `config/audio-qc-judges.json` with its license tier; NISQA, UTMOSv2 and the speech-emotion classifier are retired (non-commercial terms). No listener-proven semantic claim. |
+| Local research | experiment runner, analysis cache, compact adapter, resource supervisor, cascade, orchestrator | Source-bound screening after the generator exits, admitted within one memory budget; native QC and independent ASR evidence compose the route (the uncalibrated heads and DistilHuBERT left QC, AQ-05). Missing/contradictory evidence abstains. Requested follow-up layers are **requests**, not executed ASR evidence. Every judge is registered in `config/audio-qc-judges.json` with its license tier; NISQA, UTMOSv2 and the speech-emotion classifier are retired (non-commercial terms). No listener-proven semantic claim. |
 | Release composition | typed quality producer/composer, specialized benchmark and promotion validators | Required missing/warning/failure evidence remains blocking. An experimental cascade completing is not release PASS. |
 
 The existing production safety core is already shared and file-bounded. A second Python
@@ -954,8 +959,9 @@ and plain overlap-add, so they are signal-level constructions, not natural proso
 The composer is pure and never cached. It emits `pass`, `warn`, `fail`, `inconclusive` (a gating
 abstention), `uncalibrated` or `unavailable`, in that corrected precedence: fail, unavailable,
 abstain, warn, uncalibrated, pass. A verdict with no calibration record composes as `uncalibrated`,
-one outside its record's scope as an abstention (A1), and a legacy bound keeps its verdict (A10). No
-lane calls it yet; the lanes still compose their own verdicts until the pipeline work (AQ-05, AQ-07).
+one outside its record's scope as an abstention (A1), and a legacy bound keeps its verdict (A10). The
+orchestrator (AQ-05, below) composes every take with it beside the lanes' own verdicts, which it
+replays unchanged; no lane gates on it until its detectors qualify (AQ-07).
 Swift gained the matching `GenerationQualityOutcome.abstained`: it ranks 3 with `fail` and
 `unavailable`, above the unchanged pass 0, uncalibrated 1 and warning 2, and the registry reports it
 distinctly unless a gate failed or was unavailable. No producer emits it yet.
@@ -1003,6 +1009,84 @@ bound, and a rate on them describes the fixtures as much as the detector. The ru
   takes), and the 63 QC v8 takes (23 families) carry no warning. The v8 bound replay sees only each
   take's longest silence, never its pause budget or pause count, so its dropout column misses v8's
   0.9-1.2 s warnings without a declared pause, its excess-pause fails and its cadence warnings.
+
+### Staged pipeline, workers and admission (AQ-05, 2026-09-26)
+
+`scripts/audio_qc_orchestrator.py` is the one orchestrator for Stages 1-3 after the generator exits
+(audit sections 3.1-3.6). It loads no model. A manifest (`manifest --from-independent-asr-manifest`
+for the language lane, `--from-cascade-input` for the delivery lane) must declare
+`generationProcessExited`, and every take is bound to its WAV digest before anything runs.
+
+- **Admission (decision 9a).** A generator and every standalone analyzer still hold
+  `delivery-analysis-supervisor.lock` exclusively. An orchestrator run holds it shared and admits
+  each worker against `config/audio-qc-judges.json#admission`: a 10 GiB budget (16 GiB less about
+  4.5 GiB for macOS and tooling and a 1.5 GiB margin, provisional until AQ-06 measures it), one MLX
+  GPU worker at a time beside at most two CPU workers, and each judge at its ceiling (measured
+  canonical-host peak x 1.2, else its provisional ceiling). The supervisor enforces the same ceiling
+  on the live child and refuses one above its ticket. The ledger lives beside the lock; a live child
+  keeps its budget even if its orchestrator died. `admission-status` prints it.
+- **One persistent worker per judge per run.** `scripts/audio_qc_worker.py` loads its model once,
+  warms it and streams the job's rows as JSON lines (`whisper-mlx` wraps `independent_asr_worker.py`'s
+  recognizer; `native-command` runs the pinned SenseVoice binary per row, whose model reload per
+  invocation stays, and reports each invocation's `wait4` peak since the supervisor samples the host
+  process only). A crash keeps the rows already emitted and retries the remainder once in a fresh
+  worker, recorded as its own launch; a row still missing is `unavailable`. A failed host condition
+  (pressure, swap, recovery) accepts nothing and retries nothing. Each judge's thread count is
+  declared in the registry, fixed in the worker's environment before it starts (the worker refuses a
+  mismatch) and part of its output identity. The delivery cascade's compact layer uses the same
+  worker once per run (`run_compact_adapter_batch`).
+- **L0-L2 cache.** L0 is the canonical 16 kHz derivative; L1 a judge's raw output, keyed by the
+  L0 digests, the judge's output identity (never the supervisor) and the request (a recognizer's
+  locked language); L2 the metrics, keyed by the L1 key, the metric definition's version and source
+  (`lib/language_metrics.py` for a recognizer: `score_recognition`'s measurements without its
+  verdicts or thresholds) and the scoring inputs (script digest, language). A Stage 1 DSP judge's
+  raw output is its metric vector, so its L2 is its L1. Verdicts are never cached.
+- **Stage 3.** Today's verdicts are replayed from L2 through the unchanged code: the language lane's
+  `witness_verdict` and the cascade's `review_automated_audio` and `compose_route`, each given a
+  scorer that rebuilds `score_recognition`'s result from the cached metrics and today's thresholds.
+  Beside them the composer emits content (class B) and language (class D) detector verdicts,
+  Fast QC's (class A, stage 0; v8 cites its legacy-unqualified Stage 0 record) and canonical
+  integrity's (class A, stage 1). None has a qualified record, so a language take composes as
+  `uncalibrated` at best; a judge the run lost makes its detectors `unavailable`.
+- **Evidence.** Each take gets a `vocello.audioqc.take-evidence/1` record: digests, flat metrics,
+  the composer's verdicts and the replayed ones, validated to carry no transcript, text or path. The
+  private bundle (`build/artifacts/macos/audio-qc/<run>/`, untracked) holds `bundle.json` with every
+  worker launch and resource envelope, the records, and per-take private files (audio path,
+  reference text, transcripts); failing takes are named in it, never committed as audio.
+  `validate-bundle` re-hashes and re-validates it and refuses one inside tracked paths.
+
+**Replay.** `replay --manifest … --bundle …` reruns Stage 3 from the cache and refuses if any model
+would have to run; `replay-records` runs the same Stage 3 functions over the committed language
+records. Offline tests (`scripts/tests/test_audio_qc_orchestrator.py`) prove, with a fixture worker
+under the real supervisor and admission: the orchestrator's language verdicts equal
+`witness_verdict`'s over the same recognitions for pass, fail, one-witness, two-family, disagreeing,
+unqualified, Korean and out-of-scope takes; its delivery routes and automated reviews equal
+`run_cascade`'s for clean, native-failure, content-failure, disagreeing and silent pairs; a second
+run launches nothing and reproduces every record exactly; and a metric-definition change recomputes
+L2 from L1 without a model. Over the committed records, accuracy is recomputed for all 45 takes that
+carry recognition metrics (5 of 8 records), the language channel for 31 (Apple Speech's match score;
+whisper's detected language, which the newest whisper record carries; the other 14 use the
+recorded channel), and every take's expectation and each record's `outputCellsPassed` and
+`negativeControlsConfirmed` match.
+
+**Recovery-rule switch.** `delivery_resource_supervisor.run_supervised(recovery_rule=…)` makes the
+child-attributed rule (`attributed-post-exit-recovery-v2`) binding in place of the whole-host rule;
+each envelope keeps the whole-host outcome (`wholeHostRecoveryFailures`) either way. The switch is
+`admission.recoveryRule.candidateBinding` in the registry, `false` today: report-only, and while
+the whole-host rule binds, admission caps the host at one supervised worker, since one worker's
+post-exit drop cannot be told apart from another's allocation. The registry validator accepts
+`true` only with at least two distinct `recovery-report` summaries from separate sessions on the
+canonical profile, each with serial envelopes of every orchestrated GPU and CPU judge,
+`serialCandidateWouldQualifyBindingFailure` 0 (with nothing else running, the candidate never
+blamed a drop on another allocator) and `unattributed` 0. Flipping it lifts the cap to the lane
+limits.
+
+**Retired from QC.** DistilHuBERT (`compact.distilhubert@1`) and the fitted ridge, elastic-net and
+PLS heads (`delivery.fitted-heads@2`) are retired as measurands (audit sections 4.9 and 7.1): the
+cascade takes no evaluator model and requests no `tiny-local-heads` layer, DistilHuBERT left the
+candidate order, the adapter and the preparation tool, and both sit on the exclusion list. Their
+licenses stay recorded as permissive. `delivery_evaluator.py` keeps the heads' fitting commands as
+research tooling outside every QC path.
 
 ### Speech/defect calibration: independent references, no required listening
 
@@ -1135,14 +1219,15 @@ generator, evaluator service, cloud processing or evaluator bundled into the app
 - At least two distinct supported ASR families must agree. Three Whisper/Apple repetitions are
   repeatability, not independent consensus. Wrong-language/partial/missing/drifted receipts or
   disagreement are inconclusive; unanimous valid content rejection is a measured failure.
-  SenseVoice cannot judge French; DistilHuBERT cannot transcribe. No new recognizer was acquired.
-- Optional compact features and fitted heads do not create a mandatory listener dependency.
-  Missing heads report semantic delivery **unmeasured**. Their uncertainty never requests a human
-  as the only continuation; bounded automatic evidence collection or a recorded inconclusive
-  decision replaces manual-listening routing. Requested ASR layers are not automatically
-  launched by this composer. Neural execution stays serial under the existing supervisor after
-  TTS exits; cache hits do not launch models; no retired judge (NISQA, UTMOSv2, the SER) is
-  requested or run.
+  SenseVoice cannot judge French. No new recognizer was acquired.
+- Optional compact features do not create a mandatory listener dependency. Semantic delivery is
+  reported **unmeasured**: the fitted heads that estimated it were never calibrated and left QC
+  with DistilHuBERT (AQ-05). Uncertainty never requests a human as the only continuation; bounded
+  automatic evidence collection or a recorded inconclusive decision replaces manual-listening
+  routing. Requested ASR layers are not automatically launched by this composer. Neural work runs
+  after TTS exits, one persistent worker per run under the supervisor; cache hits do not launch
+  models; no retired judge (NISQA, UTMOSv2, the SER, DistilHuBERT, the fitted heads) is requested
+  or run.
 - `delivery_promotion_decision.py` schema 2 requires a frozen named metric/protocol, complete
   untouched holdout, independent-reference qualification, independent judge families, consistent
   reverse-order judgments, paired improvement/2AFC, distributed gains and unchanged quality/runtime
@@ -1199,7 +1284,7 @@ profile consumes it. Making FIR current does not repair the old HNR proxy, calib
 adopt a model, change production Fast QC, or close RF-06's product-audio findings.
 
 A clean end state has one native product-QC authority, one bounded blind acoustic engine, one
-versioned derivative cache, the existing serial neural supervisor, and explicit per-dimension
-decisions. Listening is optional. Frozen independent-reference qualification supports named measured
+versioned derivative cache, one orchestrator admitting supervised workers within a measured budget,
+and explicit per-dimension decisions. Listening is optional. Frozen independent-reference qualification supports named measured
 improvements, not listener-proven semantic claims; unmeasured dimensions remain explicit.
 No new aggregate score, hidden retry, model/prompt/seed change, QC relaxation, or parallel harness.

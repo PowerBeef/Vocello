@@ -8,7 +8,8 @@
     "1": {"option": "a", "date": "2026-09-25", "summary": "Correct the registry and retire NISQA, UTMOSv2 and the SER from every QC path; the relative-UTMOS guardrail is dropped until the section 4.6 composite passes its ladder test."},
     "2": {"option": "a", "date": "2026-09-25", "summary": "Tier B is accepted for internal evaluation that never ships, recorded per judge."},
     "3": {"option": "a", "date": "2026-09-25", "summary": "Judges from the generator's lab never vote: an adjudicator only corroborates, an aligner only supplies intervals, and neither provides labels."},
-    "7": {"option": "adopted", "date": "2026-09-25", "summary": "Adoption requires two clean canonical-host runs; the 8 GB Mac and iPhone floors are product constraints, not evaluator constraints."}
+    "7": {"option": "adopted", "date": "2026-09-25", "summary": "Adoption requires two clean canonical-host runs; the 8 GB Mac and iPhone floors are product constraints, not evaluator constraints."},
+    "9": {"option": "a", "date": "2026-09-25", "summary": "A budgeted admission semaphore after the generator exits replaces the host-wide single-analyzer flock for the orchestrator's workers; the child-attributed post-exit recovery rule becomes binding once M6 evidence supports it and stays report-only until then."}
   },
   "tiers": {
     "A": "Permissive weights, and training data whose terms allow commercial use, or no learned weights at all.",
@@ -31,8 +32,42 @@
     "note": "The qualifier attests the live host against the one canonical macOS profile. The 8 GB Mac and the iPhone remain product floors, not evaluator hosts."
   },
   "identitySplit": {
-    "output": "Everything that can change a judge's output: model, weights and runtime digests, runtime package versions, the worker or adapter source and command template, label map, decode options and preprocessing, and the host until the judge's cross-host determinism is measured (AQ-06). It keys caches and calibration records.",
+    "output": "Everything that can change a judge's output: model, weights and runtime digests, runtime package versions, the worker or adapter source and command template, label map, decode options and preprocessing, the declared thread count, and the host until the judge's cross-host determinism is measured (AQ-06). It keys caches and calibration records.",
     "envelope": "How a run was supervised: the resource supervisor's source, its probe and options. Provenance only; a change never invalidates a cache entry or a calibration."
+  },
+  "admission": {
+    "decision": "9a",
+    "policy": "budgeted-admission-after-generator-exit",
+    "orchestrator": "scripts/audio_qc_orchestrator.py",
+    "budgetBytes": 10737418240,
+    "budgetBasis": "The canonical Mac mini M6's 16 GiB, less about 4.5 GiB for macOS and tooling and a 1.5 GiB margin (audit section 3.4, est.). Provisional until the first M6 lane measures it (AQ-06).",
+    "budgetStatus": "provisional",
+    "orchestratorReservationBytes": 536870912,
+    "orchestratorReservationBasis": "The orchestrator and its in-process Stage 1 DSP (about 0.2 GB plus 0.3 GB, audit section 3.4, est.); budget only, never a worker slot.",
+    "lanes": {
+      "gpu": {"maximumConcurrent": 1, "note": "One MLX worker at a time: MLX workers share one GPU and its unified-memory working set."},
+      "cpu": {"maximumConcurrent": 2, "note": "At most two CPU neural workers beside the GPU worker."},
+      "dsp": {"maximumConcurrent": 4, "note": "Reserved for a Stage 1 DSP worker pool; Stage 1 runs in the orchestrator today."}
+    },
+    "ceilingRule": "A worker's admission ceiling is its judge's measured canonical-host peak x 1.2 once measured (resources.canonicalHostPeakBytes), else its provisional ceiling; a judge with neither is refused. The supervisor enforces the same ceiling on the live child, so the budget is a bound.",
+    "generatorExclusion": "A generator and every standalone analyzer hold the host lock exclusively; an orchestrator run holds it shared and every worker it admits inherits that descriptor. No evaluator runs beside a resident generator, no generator starts beside an evaluator, and a run on a busy host refuses to start.",
+    "recoveryRule": {
+      "binding": "whole-host-free-percent-v1",
+      "candidate": "attributed-post-exit-recovery-v2",
+      "candidateBinding": false,
+      "workerCapWhileWholeHostBinding": 1,
+      "reason": "While the whole-host rule binds, one worker's post-exit drop in host free memory cannot be told apart from another worker's allocation, so admission caps the host at one supervised worker. Making the child-attributed rule binding lifts the cap to the lane limits.",
+      "promotion": {
+        "switch": "candidateBinding",
+        "requires": [
+          "At least two recovery reports (delivery_resource_supervisor.py recovery-report), each over envelopes from a separate session on the canonical hardware profile.",
+          "Every orchestrated worker judge (lanes gpu and cpu) has at least one serial envelope in each report (byJudge).",
+          "Each report has serialEnvelopes of at least 1 and serialCandidateWouldQualifyBindingFailure of 0: when nothing else ran, the candidate never blamed a post-exit drop on another allocator.",
+          "Each report has unattributed 0: the kernel pressure level and physical memory read on every envelope."
+        ],
+        "evidence": []
+      }
+    }
   },
   "judges": {
     "asr.whisper-small@1": {
@@ -79,9 +114,10 @@
         "generatorLabCorrelated": false
       },
       "identity": {
-        "output": ["modelID", "sourceRevision", "weightsSHA256", "labelMapDigest", "binarySHA256", "runtimeDependencies", "workerSourceSHA256", "commandTemplate", "algorithm", "decodeOptions", "lockedLanguage", "preprocessingConfigDigest", "hostProfile"],
+        "output": ["modelID", "sourceRevision", "weightsSHA256", "labelMapDigest", "binarySHA256", "runtimeDependencies", "workerSourceSHA256", "commandTemplate", "algorithm", "decodeOptions", "lockedLanguage", "preprocessingConfigDigest", "hostProfile", "threads"],
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
+      "execution": {"stage": 2, "lane": "gpu", "orchestrated": true, "engine": "whisper-mlx", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadControl": "environment", "batchSize": 1, "device": "mlx-gpu"},
       "resources": {
         "provisionalCeilingBytes": 2684354560,
         "ceilingBasis": "Set before any canonical-host measurement (AQ-F43); about 0.85 GB was measured on the M2.",
@@ -129,6 +165,7 @@
         "output": ["osBuild", "deviceProfile", "locale", "onDeviceRecognition", "passCount", "verdictAlgorithmVersion"],
         "envelope": ["diagnosticsRunnerSource"]
       },
+      "execution": {"stage": 2, "lane": "device", "orchestrated": false, "note": "Runs inside the iPhone app; the orchestrator reads its channel verdicts from the diagnostics sentinels."},
       "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "In-app; bounded by the product's memory budget.", "ceilingPolicy": "product memory contract", "canonicalHostPeakBytes": null},
       "determinismClass": "unmeasured",
       "canary": null
@@ -149,6 +186,7 @@
       "license": {"weights": "none", "code": "Vocello (owned)", "trainingData": "none", "tier": "A", "trainingDataRisk": "none", "commercialUseCompatible": true, "sources": []},
       "independence": {"vendor": "Vocello", "architecture": "deterministic DSP", "trainingData": "none", "labelLineage": "none", "generatorLabCorrelated": false},
       "identity": {"output": ["qcAlgorithmVersion", "pcmSHA256"], "envelope": []},
+      "execution": {"stage": 0, "lane": "engine", "orchestrated": false, "note": "Inside the engine on every take; the orchestrator reads its receipt."},
       "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Bounded, file-bound streaming inside the engine.", "ceilingPolicy": "engine memory contract", "canonicalHostPeakBytes": null},
       "determinismClass": "unmeasured",
       "canary": null
@@ -165,7 +203,8 @@
       "pins": {"digestStatus": "no-learned-weights", "verification": "Owned deterministic code bound by source digest in every cache identity."},
       "license": {"weights": "none", "code": "Vocello (owned)", "trainingData": "none", "tier": "A", "trainingDataRisk": "none", "commercialUseCompatible": true, "sources": []},
       "independence": {"vendor": "Vocello", "architecture": "deterministic DSP", "trainingData": "none", "labelLineage": "none", "generatorLabCorrelated": false},
-      "identity": {"output": ["analyzerSourceSHA256", "analyzerAlgorithmVersion", "numpyVersion", "canonicalizationIdentity"], "envelope": []},
+      "identity": {"output": ["analyzerSourceSHA256", "analyzerAlgorithmVersion", "numpyVersion", "canonicalizationIdentity", "threads"], "envelope": []},
+      "execution": {"stage": 1, "lane": "dsp", "orchestrated": true, "engine": "in-process", "worker": "scripts/audio_qc_orchestrator.py", "threads": 1, "threadControl": "orchestrator-process", "batchSize": 1, "device": "cpu"},
       "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Bounded-memory analyzer.", "ceilingPolicy": "bounded by construction", "canonicalHostPeakBytes": null},
       "determinismClass": "unmeasured",
       "canary": null
@@ -182,8 +221,27 @@
       "pins": {"digestStatus": "no-learned-weights", "verification": "Owned deterministic code bound by source digest in every cache identity."},
       "license": {"weights": "none", "code": "Vocello (owned)", "trainingData": "none", "tier": "A", "trainingDataRisk": "none", "commercialUseCompatible": true, "sources": []},
       "independence": {"vendor": "Vocello", "architecture": "deterministic DSP", "trainingData": "none", "labelLineage": "none", "generatorLabCorrelated": false},
-      "identity": {"output": ["analyzerSourceSHA256", "layerVersion", "numpyVersion", "canonicalizationIdentity"], "envelope": []},
+      "identity": {"output": ["analyzerSourceSHA256", "layerVersion", "numpyVersion", "canonicalizationIdentity", "threads"], "envelope": []},
+      "execution": {"stage": 1, "lane": "dsp", "orchestrated": true, "engine": "in-process", "worker": "scripts/audio_qc_orchestrator.py", "threads": 1, "threadControl": "orchestrator-process", "batchSize": 1, "device": "cpu"},
       "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Bounded-memory analyzer.", "ceilingPolicy": "bounded by construction", "canonicalHostPeakBytes": null},
+      "determinismClass": "unmeasured",
+      "canary": null
+    },
+    "integrity.canonical-pcm@1": {
+      "role": "Canonical 16 kHz PCM integrity (sample count, peak, RMS, clipped fraction; all-zero and truncated PCM are rejected) ahead of every other delivery layer; a rejection routes the pair to rejected.",
+      "kind": "dsp",
+      "status": "gating",
+      "calibration": "legacy-unqualified",
+      "voting": false,
+      "family": null,
+      "ships": false,
+      "legacyIdentifiers": {"cascadeLayers": ["pcm-integrity-qc"], "sources": ["scripts/run_local_delivery_cascade.py"]},
+      "pins": {"digestStatus": "no-learned-weights", "verification": "Owned deterministic code bound by source digest in every cache identity."},
+      "license": {"weights": "none", "code": "Vocello (owned)", "trainingData": "none", "tier": "A", "trainingDataRisk": "none", "commercialUseCompatible": true, "sources": []},
+      "independence": {"vendor": "Vocello", "architecture": "deterministic DSP", "trainingData": "none", "labelLineage": "none", "generatorLabCorrelated": false},
+      "identity": {"output": ["analyzerSourceSHA256", "layerVersion", "numpyVersion", "canonicalizationIdentity", "threads"], "envelope": []},
+      "execution": {"stage": 1, "lane": "dsp", "orchestrated": true, "engine": "in-process", "worker": "scripts/audio_qc_orchestrator.py", "threads": 1, "threadControl": "orchestrator-process", "batchSize": 1, "device": "cpu"},
+      "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Streams the canonical derivative in 1 MiB blocks.", "ceilingPolicy": "bounded by construction", "canonicalHostPeakBytes": null},
       "determinismClass": "unmeasured",
       "canary": null
     },
@@ -209,6 +267,7 @@
       },
       "independence": {"vendor": "Vocello", "architecture": "deterministic DSP against a reference base", "trainingData": "acted emotion corpora", "labelLineage": "corpus actor labels", "generatorLabCorrelated": false},
       "identity": {"output": ["referenceBaseSHA256", "comparatorSourceSHA256", "numpyVersion", "canonicalizationIdentity"], "envelope": []},
+      "execution": {"stage": 1, "lane": "dsp", "orchestrated": false, "note": "An advisory comparison inside run_local_delivery_cascade.py only; it never changes a route or a verdict."},
       "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Bounded-memory comparator.", "ceilingPolicy": "bounded by construction", "canonicalHostPeakBytes": null},
       "determinismClass": "unmeasured",
       "canary": null
@@ -255,9 +314,10 @@
         "correlationNotes": "Same company as the generator's lab and as Paraformer; a different lab. Counts toward the error-correlation audit before any consensus gates."
       },
       "identity": {
-        "output": ["adapterID", "modelID", "sourceRevision", "weightsSHA256", "binarySHA256", "adapterSourceSHA256", "adapterLayerSHA256", "commandTemplate", "runtimeDependenciesDigest", "labelMapDigest", "outputFormat", "preprocessingConfigDigest", "hostProfile"],
+        "output": ["adapterID", "modelID", "sourceRevision", "weightsSHA256", "binarySHA256", "adapterSourceSHA256", "adapterLayerSHA256", "commandTemplate", "runtimeDependenciesDigest", "labelMapDigest", "outputFormat", "preprocessingConfigDigest", "hostProfile", "threads"],
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
+      "execution": {"stage": 2, "lane": "cpu", "orchestrated": true, "engine": "native-command", "worker": "scripts/audio_qc_worker.py", "threads": 2, "threadControl": "environment (OMP and BLAS variables); the pinned native binary reads no thread flag the harness has verified, so its own default on the recorded host applies (hostProfile is output identity)", "batchSize": 1, "device": "cpu", "note": "The native binary loads its model on every invocation; the persistent worker makes supervision and admission per run, not the model load."},
       "resources": {
         "provisionalCeilingBytes": 5368709120,
         "ceilingBasis": "The shared provisional compact-adapter ceiling, set for the 8 GB floor before any canonical-host measurement (AQ-F43).",
@@ -268,19 +328,14 @@
       "canary": null
     },
     "compact.distilhubert@1": {
-      "role": "Compact research representation in the delivery cascade: a frozen 128-dimensional projection; transcribes nothing.",
+      "role": "Former compact research representation in the delivery cascade: a frozen 128-dimensional projection that fed only the fitted heads; transcribes nothing.",
       "kind": "neural",
-      "status": "candidate",
-      "calibration": "legacy-unqualified",
+      "status": "retired",
+      "calibration": "none",
       "voting": false,
       "family": null,
       "ships": false,
-      "plannedRetirement": {
-        "item": "AQ-05",
-        "status": "deferred",
-        "reason": "No QC measurand; the fitted heads were never calibrated (audit sections 4.9 and 7.1).",
-        "note": "Audit section 4.9 excludes DistilHuBERT and its ridge, elastic-net and PLS heads. The retirement is deferred to AQ-05, which removes them from the QC paths with the staged pipeline; until then it stays a non-voting candidate that feeds no verdict, which is why it is not on the exclusion list."
-      },
+      "retirement": {"date": "2026-09-26", "decision": "audit-7.1-delete-from-qc", "item": "AQ-05", "reason": "No QC measurand: it transcribes nothing, and the ridge, elastic-net and PLS heads it fed were never calibrated and always abstained (audit sections 4.9 and 7.1, AQ-F48). Removed from the candidate order, the adapter, the preparation tool and the cascade; its license stays tier A, so it is excluded as a measurand, not for its terms.", "successor": "None needed: class H delivery detectors (AQ-08) measure paired arousal and prosody contrasts directly."},
       "legacyIdentifiers": {"adapterIDs": ["distilhubert"]},
       "pins": {
         "repository": "ntu-spml/distilhubert",
@@ -291,8 +346,8 @@
           "preprocessor_config.json": "7a8f0fc8ee1272ed28a8b468e183c56a19329a92babd3ca8d4d21ae02ba511cd"
         },
         "digestStatus": "pinned",
-        "verification": "prepare_delivery_compact_model_config.py verifies every file; the adapter re-verifies the weights before each launch; the runtime loads local files only.",
-        "executionRegistry": "config/delivery-evaluator-v2-candidates.json#distilhubert",
+        "verification": "Retired: no QC path loads it. The registry's load gate refuses it and the compact adapter no longer names it.",
+        "executionRegistry": "config/delivery-evaluator-v2-candidates.json#retiredCandidates.distilhubert",
         "runtime": {"numpy": "2.5.2", "python": "3.14.4", "safetensors": "0.7.0", "torch": "2.13.0", "transformers": "4.57.6"}
       },
       "license": {
@@ -310,11 +365,29 @@
         "envelope": ["resourceSupervisorSHA256", "probeAlgorithmVersion", "supervisorOptions"]
       },
       "resources": {
-        "provisionalCeilingBytes": 5368709120,
-        "ceilingBasis": "The shared provisional compact-adapter ceiling, set for the 8 GB floor before any canonical-host measurement (AQ-F43).",
-        "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)",
+        "provisionalCeilingBytes": null,
+        "ceilingBasis": "Retired; two cold probes measured 572.87 and 562.99 MB peak RSS on the M2 (2026-09).",
+        "ceilingPolicy": "retired",
         "canonicalHostPeakBytes": null
       },
+      "determinismClass": "unmeasured",
+      "canary": null
+    },
+    "delivery.fitted-heads@2": {
+      "role": "Former tiny local heads of the delivery evaluator v2 (ridge-v1 baseline, elastic-net-v2 and partial-least-squares-v2 challengers, with the pairwise logistic head) that estimated semantic delivery from paired acoustic and compact deltas in the cascade.",
+      "kind": "fitted",
+      "status": "retired",
+      "calibration": "none",
+      "voting": false,
+      "family": null,
+      "ships": false,
+      "retirement": {"date": "2026-09-26", "decision": "audit-7.1-delete-from-qc", "item": "AQ-05", "reason": "Never calibrated and always abstained, so they had no QC measurand (audit sections 4.9 and 7.1, AQ-F48). The cascade no longer accepts an evaluator model or requests the tiny-local-heads layer; the fitting and scoring commands of delivery_evaluator.py remain research tooling outside every QC path.", "successor": "Class H paired arousal and prosody contrasts at cell level (AQ-08)."},
+      "legacyIdentifiers": {"cascadeLayers": ["tiny-local-heads"], "reportFields": ["tinyLocalHeads"], "evaluatorModels": ["ridge-v1", "elastic-net-v2", "partial-least-squares-v2", "per-preset-regularized-logistic-v2"]},
+      "pins": {"digestStatus": "fitted-model-digest", "verification": "Retired: no QC path loads a fitted model. A fitted model was a local file bound by its modelDigest."},
+      "license": {"weights": "none: coefficients fitted locally per calibration", "code": "Vocello (owned)", "trainingData": "Operator-local fits over Vocello's own paired delivery features and dimensional labels; no fit was ever qualified", "tier": "A", "trainingDataRisk": "none", "commercialUseCompatible": true, "sources": []},
+      "independence": {"vendor": "Vocello", "architecture": "regularized linear and logistic heads over acoustic and compact deltas", "trainingData": "Vocello delivery features", "labelLineage": "operator-local dimensional labels", "generatorLabCorrelated": false},
+      "identity": {"output": ["modelDigest", "featureNames", "analyzerSourceSHA256"], "envelope": []},
+      "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Retired; ran in-process in the cascade.", "ceilingPolicy": "retired", "canonicalHostPeakBytes": null},
       "determinismClass": "unmeasured",
       "canary": null
     },
@@ -363,6 +436,7 @@
         "output": ["repository", "revision", "snapshotFileDigests", "runtimeVersions", "preprocessing", "hostProfile"],
         "envelope": []
       },
+      "execution": {"stage": 2, "lane": "cpu", "orchestrated": false, "note": "Runs in-process and unsupervised in clone_speaker_similarity.py (the clone lane); it joins the orchestrator as a CPU worker once AQ-06 measures its ceiling."},
       "resources": {"provisionalCeilingBytes": null, "ceilingBasis": "Unsupervised in-process CPU scorer today; about 0.4-0.6 GB (audit estimate).", "ceilingPolicy": "measured canonical-host peak x 1.2 (AQ-06)", "canonicalHostPeakBytes": null},
       "determinismClass": "unmeasured",
       "canary": null
@@ -516,7 +590,8 @@
     {"id": "resemblyzer", "category": "measurand", "tier": null, "reason": "Optimized for English speaker similarity.", "models": [], "packages": ["resemblyzer"]},
     {"id": "oas-alignment-metric", "category": "measurand", "tier": null, "reason": "Paper withdrawn (arXiv 2509.19852).", "models": [], "packages": []},
     {"id": "gpl-and-linux-only-text-normalizers", "category": "license", "tier": null, "reason": "zhconv (GPL-2.0+), pykakasi (GPL-3.0), soynlp (GPL-3.0, pulled in by qwen-asr); nemo-text-processing and WeTextProcessing need pynini wheels that are Linux-only.", "models": [], "packages": ["zhconv", "pykakasi", "soynlp", "nemo-text-processing", "WeTextProcessing"]},
-    {"id": "jsut-and-jvs-audio", "category": "license", "tier": "C", "reason": "JSUT and JVS audio are non-commercial; Japanese corpora come from FLEURS, Common Voice, Kokoro, CSS10 and JVNV instead.", "models": ["*jsut*", "*jvs_corpus*"], "packages": []}
+    {"id": "jsut-and-jvs-audio", "category": "license", "tier": "C", "reason": "JSUT and JVS audio are non-commercial; Japanese corpora come from FLEURS, Common Voice, Kokoro, CSS10 and JVNV instead.", "models": ["*jsut*", "*jvs_corpus*"], "packages": []},
+    {"id": "distilhubert-and-uncalibrated-heads", "category": "measurand", "tier": null, "reason": "DistilHuBERT transcribes nothing and its ridge, elastic-net and PLS heads were never calibrated: no QC measurand (audit section 4.9; retired by AQ-05 as compact.distilhubert@1 and delivery.fitted-heads@2).", "models": ["ntu-spml/distilhubert*"], "packages": []}
   ],
   "useRestrictions": [
     {"id": "qwen2-audio-per-take-judge", "reason": "Qwen2-Audio shares the generator's lab (decision 3a) and samples its answers (determinism class D2), so a per-take verdict is neither independent nor repeatable (audit section 4.9).", "models": ["*Qwen2-Audio*"], "forbiddenUse": "A per-take judge, a vote or a verdict.", "permittedUse": "Research only: pairwise A/B per cell in both orders, scored by answer log-probabilities (audit section 4.7); a matching judge records this restriction as its useRestriction, never votes and is never warn or gating."}

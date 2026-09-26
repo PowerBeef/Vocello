@@ -596,8 +596,14 @@ def transcribe_manifest(
     }
 
 
-def witness_verdict(manifest: dict[str, Any], evidence: dict[str, Any]) -> dict[str, Any]:
+def witness_verdict(
+    manifest: dict[str, Any], evidence: dict[str, Any],
+    *, scorer: Callable[..., dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Per-row family consensus for a lane that publishes no record (audit #44).
+
+    `scorer` replaces `score_recognition` with the same signature and result;
+    the audio QC orchestrator passes one that reads cached L2 metrics.
 
     Each row's whisper recognition is re-qualified and re-scored from its
     transcript; when the manifest carries the in-app Apple Speech channel
@@ -626,7 +632,9 @@ def witness_verdict(manifest: dict[str, Any], evidence: dict[str, Any]) -> dict[
             script_sha256=row["scriptSHA256"], language=row["expectedLanguage"],
             duration_seconds=float(row["durationSeconds"]),
         )
-        whisper = score_recognition(recognition, script=row["referenceText"], language=row["expectedLanguage"])
+        whisper = (scorer or score_recognition)(
+            recognition, script=row["referenceText"], language=row["expectedLanguage"],
+        )
         family_channels: dict[str, dict[str, bool]] = {
             "whisper": {"language": bool(whisper["languagePass"]), "accuracy": bool(whisper["accuracyPass"])},
         }

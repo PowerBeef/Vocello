@@ -1,22 +1,30 @@
 #!/usr/bin/env python3
-"""Run the existing delivery harness as a local, serial perceptual cascade.
+"""Run the existing delivery harness as a local perceptual cascade.
 
 Always-on deterministic layers are cached by audio bytes and source identity.
-Compact neural features are optional until a candidate is fully pinned. Rows
-are explicitly accepted for more screening, rejected, or inconclusive. Listening
-is optional. Measured screening is not listener-proven semantic improvement.
+Compact neural features are optional until a candidate is fully pinned; when
+requested, one persistent worker per run analyzes every clip that survived the
+deterministic layers (audit AQ-F42), never one process per clip. Rows are
+explicitly accepted for more screening, rejected, or inconclusive. Listening is
+optional. Measured screening is not listener-proven semantic improvement.
+
+The fitted tiny local heads (ridge, elastic-net and PLS) and the DistilHuBERT
+representation left this QC path on 2026-09-26 (AQ-05; audit sections 4.9 and
+7.1): neither has a QC measurand and the heads were never calibrated. The
+route is composed by `compose_route` from the deterministic layers, the
+automated review and the prosody gate alone; the audio QC orchestrator
+(`audio_qc_orchestrator.py`) replays it from cached metrics.
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import math
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -31,9 +39,8 @@ from delivery_analysis_cache import (
     canonicalization_identity,
     SUPPORTED_RESAMPLERS,
 )
-from delivery_compact_model_adapter import run_compact_adapter
+from delivery_compact_model_adapter import run_compact_adapter_batch
 from delivery_evaluator import atomic_json
-from delivery_evaluator_v2 import evaluate_v2
 from delivery_temporal_features import analyze_temporal, paired_temporal_delta
 from lib.language_metrics import (
     ACCURACY_METRIC_VERSION,
@@ -67,13 +74,19 @@ class CascadeError(ValueError):
     """The cascade input is incomplete, cross-run, or unsafe."""
 
 
-def review_automated_audio(row: dict[str, Any], role: str, duration: float) -> dict[str, Any]:
+def review_automated_audio(
+    row: dict[str, Any], role: str, duration: float,
+    *, scorer: Callable[..., dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Compose byte-bound native QC and independent full-file recognitions.
 
     This consumes retained evidence; it never launches a model or treats an
     absent scorer as PASS. Transcripts are private inputs, never report fields.
     Repetitions of one ASR family are one witness, not independent votes.
+    `scorer` replaces `score_recognition` with the same signature and result;
+    the audio QC orchestrator passes one that reads cached L2 metrics.
     """
+    score = scorer or score_recognition
     all_evidence = row.get("reviewEvidence") or {}
     evidence = all_evidence.get(role, {}) if isinstance(all_evidence, dict) else {}
     if not isinstance(evidence, dict):
@@ -126,7 +139,7 @@ def review_automated_audio(row: dict[str, Any], role: str, duration: float) -> d
         ):
             reasons.append("unqualified-recognition-evidence")
             continue
-        verdict = score_recognition(recognition, script=script, language=language)
+        verdict = score(recognition, script=script, language=language)
         families.setdefault(verdict["modelFamily"], []).append(verdict["passed"])
         metrics.append({"modelFamily": verdict["modelFamily"], "metric": verdict["metric"],
                         "accuracyMetricVersion": verdict["accuracyMetricVersion"],
@@ -239,25 +252,7 @@ def _compact_delta(
     instructed_output = instructed.get("outputs", {})
     neutral_output = neutral.get("outputs", {})
     features: dict[str, float] = {}
-    if adapter_id == "distilhubert":
-        left = instructed_output.get("embedding")
-        right = neutral_output.get("embedding")
-        if (
-            not isinstance(left, list) or not isinstance(right, list)
-            or len(left) != len(right) or not left
-        ):
-            raise CascadeError("DistilHuBERT pair has incompatible embeddings")
-        for index, (lhs, rhs) in enumerate(zip(left, right)):
-            if (
-                isinstance(lhs, bool) or isinstance(rhs, bool)
-                or not isinstance(lhs, (int, float)) or not isinstance(rhs, (int, float))
-            ):
-                raise CascadeError("DistilHuBERT embedding contains a non-numeric value")
-            value = float(lhs) - float(rhs)
-            if not math.isfinite(value):
-                raise CascadeError("DistilHuBERT embedding delta is non-finite")
-            features[f"embedding.{index:03d}"] = value
-    elif adapter_id == "sensevoice-small-q8":
+    if adapter_id == "sensevoice-small-q8":
         label_map = config.get("labelMap", {})
         for output_field, labels_key in (
             ("languageTag", "languages"), ("emotionTag", "emotions"),
@@ -287,17 +282,35 @@ def _compact_delta(
     }
 
 
-def _flatten_numeric(value: Any, prefix: str, output: dict[str, float]) -> None:
-    if isinstance(value, dict):
-        for key in sorted(value):
-            if key in {"schemaVersion", "promotionAuthority", "memory"}:
-                continue
-            _flatten_numeric(value[key], f"{prefix}.{key}" if prefix else key, output)
-    elif isinstance(value, list):
-        for index, child in enumerate(value):
-            _flatten_numeric(child, f"{prefix}[{index}]", output)
-    elif isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value)):
-        output[prefix] = float(value)
+ROLES = ("instructed", "neutral")
+DETERMINISTIC_LAYERS = ("qc", "global", "temporal")
+
+
+def compose_route(
+    per_audio: dict[str, dict[str, Any]], automated: dict[str, dict[str, Any]],
+    prosody: dict[str, dict[str, Any]],
+) -> tuple[str, list[str]]:
+    """One pair's route from its deterministic layers, automated review and prosody gate.
+
+    A failed deterministic layer or a failed review rejects; an incomplete
+    review or a prosody warning abstains; otherwise the pair continues to
+    screening. Pure: the orchestrator replays it from cached metrics.
+    """
+    reasons: list[str] = []
+    route = "accepted-for-continued-screening"
+    if any(per_audio[role][layer].get("status") != "complete" for role in ROLES for layer in DETERMINISTIC_LAYERS):
+        route = "rejected"
+        reasons.append("deterministic-audio-qc-or-global-analysis-failed")
+    if any(value["status"] == "fail" for value in automated.values()):
+        route = "rejected"
+        reasons.append("byte-bound-native-qc-or-independent-content-failed")
+    if route != "rejected" and (any(value["status"] != "pass" for value in automated.values())
+                                or any(not value["passed"] for value in prosody.values())):
+        route = "abstained"
+        reasons.append("automated-quality-evidence-incomplete-or-prosody-warning")
+    if not reasons:
+        reasons.append("all-always-on-layers-complete-and-noncontradictory")
+    return route, sorted(set(reasons))
 
 
 def build_cascade_manifest(*, plan_path: Path, run_dir: Path, review_evidence: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -447,13 +460,12 @@ def _validate_manifest(payload: dict[str, Any]) -> list[dict[str, Any]]:
 def run_cascade(
     *, manifest: dict[str, Any], cache: DeliveryAnalysisCache, lock_root: Path,
     compact_config: dict[str, Any] | None = None,
-    evaluator_model: dict[str, Any] | None = None,
     compact_supervisor_options: dict[str, Any] | None = None,
     reference_audio_dir: Path | None = None,
+    compact_runner: Callable[..., Any] = run_compact_adapter_batch,
 ) -> dict[str, Any]:
     select_resampler(cache.resampler_version, compact_config)
     rows = _validate_manifest(manifest)
-    output_rows = []
     cache_hits = 0
     cache_misses = 0
     reference_base = None
@@ -471,6 +483,8 @@ def run_cascade(
     except (ValueError, OSError, KeyError, TypeError):
         # An optional reference cannot manufacture a PASS or block native QC.
         reference_status['reason'] = 'reference-base-missing-invalid-or-drifted'
+    # Pass 1: every deterministic layer, review and route, before any neural process.
+    screened = []
     for row in rows:
         per_audio: dict[str, dict[str, Any]] = {}
         for role, field in (("instructed", "instructedWAV"), ("neutral", "neutralWAV")):
@@ -509,36 +523,44 @@ def run_cascade(
                     cache_hits += hit; cache_misses += not hit
                 except (ValueError, OSError, KeyError):
                     pass  # Explicit unavailable comparison below; never change quality routing.
-        reasons: list[str] = []
-        route = "accepted-for-continued-screening"
-        if any(
-            per_audio[role][layer].get("status") != "complete"
-            for role in ("instructed", "neutral") for layer in ("qc", "global", "temporal")
-        ):
-            route = "rejected"
-            reasons.append("deterministic-audio-qc-or-global-analysis-failed")
         automated = {role: review_automated_audio(row, role, per_audio[role]["canonical"]["durationSeconds"])
-                     for role in ("instructed", "neutral")}
-        if any(value["status"] == "fail" for value in automated.values()):
-            route = "rejected"
-            reasons.append("byte-bound-native-qc-or-independent-content-failed")
+                     for role in ROLES}
         # Advisory features are not trained perceptual truth. Report them without
         # duplicating extraction or weakening native QC to match a proxy.
         prosody = {role: evaluate_metrics(per_audio[role]["global"].get("features", {}))
-                   for role in ("instructed", "neutral")}
+                   for role in ROLES}
         for report in prosody.values():
             report.pop("clip", None)
-        # Qualify BOTH sides before launching any neural process. A rejected
-        # neutral control invalidates the pair just as a rejected take does.
+        route, reasons = compose_route(per_audio, automated, prosody)
+        screened.append((row, per_audio, automated, prosody, route, reasons))
+    # Pass 2: one persistent compact worker for the run. Both sides of a pair
+    # qualify before any neural process: a rejected neutral control invalidates
+    # the pair just as a rejected take does, and no rejected pair is analyzed.
+    compact_payloads: dict[str, tuple[dict[str, Any], bool]] = {}
+    if compact_config is not None:
+        wavs = []
+        for row, _per_audio, _automated, _prosody, route, _reasons in screened:
+            if route != "rejected":
+                wavs.extend(Path(row[field]) for field in ("instructedWAV", "neutralWAV"))
+        unique = list(dict.fromkeys(wavs))
+        if unique:
+            results = compact_runner(
+                wav_paths=unique, config=compact_config, cache=cache, lock_root=lock_root,
+                supervisor_options=compact_supervisor_options,
+            )
+            compact_payloads = {str(path): value for path, value in results.items()}
+    output_rows = []
+    for row, per_audio, automated, prosody, route, reasons in screened:
+        compact_delta = None
         if route != "rejected" and compact_config is not None:
             for role, field in (("instructed", "instructedWAV"), ("neutral", "neutralWAV")):
-                compact_report, compact_hit = run_compact_adapter(
-                    wav_path=Path(row[field]), config=compact_config, cache=cache,
-                    lock_root=lock_root, supervisor_options=compact_supervisor_options,
-                )
+                compact_report, compact_hit = compact_payloads[str(Path(row[field]))]
                 per_audio[role]["compact"] = compact_report
                 per_audio[role]["compactCacheHit"] = compact_hit
                 cache_hits += bool(compact_hit); cache_misses += not bool(compact_hit)
+            compact_delta = _compact_delta(
+                compact_config, per_audio["instructed"]["compact"], per_audio["neutral"]["compact"],
+            )
         global_delta = _numeric_delta(
             per_audio["instructed"]["global"].get("features", {}),
             per_audio["neutral"]["global"].get("features", {}),
@@ -548,102 +570,46 @@ def run_cascade(
                 per_audio["instructed"]["temporal"]["features"],
                 per_audio["neutral"]["temporal"]["features"],
             )
-            if all(per_audio[role]["temporal"].get("status") == "complete" for role in ("instructed", "neutral"))
+            if all(per_audio[role]["temporal"].get("status") == "complete" for role in ROLES)
             else {"schemaVersion": 1, "kind": "temporal-delta-unavailable"}
         )
-        compact_delta = None
-        if route != "rejected" and compact_config is not None:
-            compact_delta = _compact_delta(
-                compact_config,
-                per_audio["instructed"]["compact"],
-                per_audio["neutral"]["compact"],
-            )
-        evaluation = None
-        if route != "rejected" and evaluator_model is not None:
-            flat_features: dict[str, float] = {}
-            _flatten_numeric(global_delta, "global", flat_features)
-            _flatten_numeric(temporal_delta, "temporal", flat_features)
-            if compact_delta is not None:
-                _flatten_numeric(compact_delta["featureVector"], "compact", flat_features)
-            expected_features = evaluator_model.get("featureNames", [])
-            missing_features = sorted(set(expected_features) - set(flat_features))
-            if missing_features:
-                raise CascadeError(
-                    f"{row['generationID']}: evaluator features unavailable: {missing_features[:3]}"
-                )
-            flat_features = {name: flat_features[name] for name in expected_features}
-            evaluation_payload = {
-                "schemaVersion": 2,
-                "manifestDigest": hashlib.sha256(
-                    (manifest.get("runIdentity", "") + row["generationID"]).encode()
-                ).hexdigest(),
-                "rows": [{
-                    "generationID": row["generationID"],
-                    "speakerID": row["speakerID"], "scriptID": row["scriptID"],
-                    "scriptTranslationGroup": row["scriptTranslationGroup"],
-                    "seed": row["seed"], "outputLanguage": row["outputLanguage"],
-                    "preset": row["preset"], "flatFeatureVector": flat_features,
-                }],
-            }
-            evaluation = evaluate_v2(evaluation_payload, evaluator_model)["rows"][0]
-        if route != "rejected" and (any(value["status"] != "pass" for value in automated.values())
-                                    or any(not value["passed"] for value in prosody.values())):
-            route = "abstained"
-            reasons.append("automated-quality-evidence-incomplete-or-prosody-warning")
-        if evaluation is not None and evaluation.get("abstained"):
-            route = "abstained"
-            reasons.extend(evaluation.get("abstainReasons", []))
-        if evaluation is not None and not evaluation.get("abstained"):
-            probability = evaluation.get("pairwise", {}).get("targetAlignedProbability")
-            if isinstance(probability, (int, float)) and 0.4 <= probability <= 0.6:
-                route = "abstained"
-                reasons.append("pairwise-target-adherence-ambiguous")
-        if not reasons:
-            reasons.append("all-always-on-layers-complete-and-noncontradictory")
         ambiguous = route == "abstained"
-        finalist = (
-            evaluation is not None and not evaluation.get("abstained")
-            and float(evaluation.get("pairwise", {}).get("targetAlignedProbability", 0.0)) >= 0.7
-        )
         reference_comparison = {**reference_status, 'status': 'unavailable'}
         if reference_status['status'] == 'available':
-            if all(per_audio[role]['referenceFeatures'] is not None for role in ('instructed', 'neutral')):
+            if all(per_audio[role]['referenceFeatures'] is not None for role in ROLES):
                 reference_comparison = acoustic_reference.compare(
                     reference_base, preset=row['preset'], language=row['outputLanguage'],
                     instructed=per_audio['instructed']['referenceFeatures'],
                     neutral=per_audio['neutral']['referenceFeatures'])
-                reference_comparison['inputAudio'] = {role: per_audio[role]['canonical']
-                                                      for role in ('instructed', 'neutral')}
+                reference_comparison['inputAudio'] = {role: per_audio[role]['canonical'] for role in ROLES}
                 reference_comparison['featureRuntime'] = {'pythonVersion': sys.version,
                                                           'numpyVersion': np.__version__}
             else:
                 reference_comparison['reason'] = 'canonical-reference-features-unavailable'
         output_rows.append({
             "generationID": row["generationID"],
-            "route": route, "reasons": sorted(set(reasons)),
+            "route": route, "reasons": reasons,
             "promotionAuthority": False,
             "automatedReview": automated,
             "advisoryProsody": prosody,
-            "semanticDelivery": "unmeasured" if evaluation is None else "model-estimate",
+            # No semantic-delivery measurand remains in this path: the fitted
+            # heads that estimated it were uncalibrated and left QC (AQ-05).
+            "semanticDelivery": "unmeasured",
             "humanListeningRequired": False,
             "acousticReference": reference_comparison,
             "alwaysLayers": {
-                "audioQC": {
-                    role: per_audio[role]["qc"] for role in ("instructed", "neutral")
-                },
+                "audioQC": {role: per_audio[role]["qc"] for role in ROLES},
                 "globalAcoustics": global_delta,
                 "temporalAcoustics": temporal_delta,
                 "compactRepresentation": compact_delta if compact_delta is not None else "unavailable",
-                "tinyLocalHeads": evaluation,
             },
             "ambiguousLayers": {
                 "required": ambiguous,
                 "requested": list(AMBIGUOUS_LAYERS) if ambiguous else [],
             },
-            "finalistLayers": {
-                "required": finalist,
-                "requested": list(FINALIST_LAYERS) if finalist else [],
-            },
+            # Finalists were the heads' confident target-aligned pairs; with no
+            # qualified delivery detector (class H, AQ-08) no pair is one.
+            "finalistLayers": {"required": False, "requested": []},
         })
     report = {
         "schemaVersion": SCHEMA_VERSION,
@@ -677,7 +643,6 @@ def main() -> int:
     parser.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT)
     parser.add_argument("--lock-root", type=Path, default=DEFAULT_CACHE_ROOT)
     parser.add_argument("--compact-adapter-config", type=Path)
-    parser.add_argument("--evaluator-model", type=Path)
     parser.add_argument("--review-evidence", type=Path, help="untracked, run-bound full-file ASR receipts; never listener responses")
     parser.add_argument("--resampler", choices=SUPPORTED_RESAMPLERS)
     parser.add_argument("--reference-audio-dir", type=Path,
@@ -692,7 +657,6 @@ def main() -> int:
                                            review_evidence=_read(args.review_evidence) if args.review_evidence else None),
             cache=DeliveryAnalysisCache(args.cache_root, resampler_version=resampler), lock_root=args.lock_root,
             compact_config=compact,
-            evaluator_model=_read(args.evaluator_model) if args.evaluator_model else None,
             reference_audio_dir=args.reference_audio_dir,
         )
         atomic_json(args.out, result)

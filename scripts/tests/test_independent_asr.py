@@ -149,7 +149,7 @@ class IndependentASRTests(unittest.TestCase):
 
     def test_the_producer_loads_only_its_registry_judge(self) -> None:
         # The producer names its judge; a config for another judge's model never launches.
-        with mock.patch.object(independent_asr, "JUDGE_ID", "compact.distilhubert@1"):
+        with mock.patch.object(independent_asr, "JUDGE_ID", "compact.sensevoice-small-q8@1"):
             with self.assertRaisesRegex(independent_asr.IndependentASRError, "another model or revision"):
                 independent_asr.transcribe_manifest(
                     manifest=self.manifest, config=self.config, cache=self.cache,

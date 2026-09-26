@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 from pathlib import Path
 import subprocess
 import sys
@@ -90,19 +89,17 @@ def _summary(payload: dict[str, Any]) -> dict[str, Any]:
             "transcriptSHA256": hashlib.sha256(transcript).hexdigest(),
             "transcriptByteCount": len(transcript),
         }
-    embedding = outputs.get("embedding")
-    if not isinstance(embedding, list) or not embedding:
-        raise QualificationError("DistilHuBERT did not emit an embedding")
-    values = [float(value) for value in embedding]
-    if any(not math.isfinite(value) for value in values):
-        raise QualificationError("DistilHuBERT embedding is non-finite")
-    return {
-        "embeddingDimensions": len(values),
-        "embeddingSHA256": digest(values),
-        "embeddingNorm": math.sqrt(sum(value * value for value in values)),
-        "projectionVersion": outputs.get("projectionVersion"),
-        "frameCount": outputs.get("frameCount"),
-    }
+    if payload["adapterID"] == "whisper-small-mlx":
+        transcript = str(outputs["transcript"]).encode("utf-8")
+        segments = outputs.get("segments")
+        return {
+            "detectedLanguage": outputs.get("detectedLanguage"),
+            "segmentCount": len(segments) if isinstance(segments, list) else None,
+            "transcriptSHA256": hashlib.sha256(transcript).hexdigest(),
+            "transcriptByteCount": len(transcript),
+        }
+    # DistilHuBERT was retired from QC (AQ-05); no other adapter is qualified here.
+    raise QualificationError(f"compact adapter {payload['adapterID']} has no qualification summary")
 
 
 def qualify(

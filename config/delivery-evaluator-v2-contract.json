@@ -4,7 +4,9 @@
   "boundary": "Operator-local research. Automated review requires no human listening; qualified results support only their named measured claims. This contract cannot alter product instructions or become an ordinary CI prerequisite. Optional listener-labelled models retain their original provenance, not a required operational stage.",
   "hostClass": {
     "canonical": "Mac mini M6 16GB (mac-mini-m6-16gb)",
-    "executionPolicy": "strictly-sequential-subprocesses",
+    "executionPolicy": "budgeted-admission-after-generator-exit",
+    "admissionRegistry": "config/audio-qc-judges.json#admission",
+    "orchestrator": "scripts/audio_qc_orchestrator.py",
     "provisionalMaximumProcessPeakRSSBytes": 5368709120,
     "ceilingIsProvisional": true,
     "requireNoMemoryPressureWarning": true,
@@ -89,13 +91,14 @@
     "challengerMayRegressAnyPreset": false,
     "challengerMayRegressAnySpeaker": false,
     "challengerMayRegressAnyScriptGroup": false,
-    "distributedSpeakerAndScriptGainRequired": true
+    "distributedSpeakerAndScriptGainRequired": true,
+    "qcRole": "retired-from-qc",
+    "qcRoleNote": "The fitted heads left every QC path on 2026-09-26 (AQ-05; registry judge delivery.fitted-heads@2): never calibrated, always abstaining. These fields bound the research fitting and scoring commands only."
   },
   "compactAdapters": {
     "contractFirst": true,
     "candidateOrder": [
-      "sensevoice-small-q8",
-      "distilhubert"
+      "sensevoice-small-q8"
     ],
     "adopted": [],
     "requiredBeforeExecution": [
@@ -127,8 +130,7 @@
       "independent-full-file-asr-evidence"
     ],
     "optionalQualifiedLayers": [
-      "cached-compact-representation",
-      "tiny-local-heads"
+      "cached-compact-representation"
     ],
     "ambiguousOnly": [
       "coarse-ser-asr",

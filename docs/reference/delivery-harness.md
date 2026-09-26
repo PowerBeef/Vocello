@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-12
+reviewed: 2026-09-26
 summary: Operator's reference for the audio delivery analysis harness — the tools, the bench --delivery measurement protocol, evidence and provenance conventions, the statistics the separability scorer reports, the pre-registration discipline, the DP results ledger, and re-run recipes.
 sourceOfTruth:
   - scripts/custom_delivery_matrix.py
@@ -18,6 +18,8 @@ sourceOfTruth:
   - scripts/prepare_delivery_compact_model_config.py
   - scripts/qualify_delivery_compact_models.py
   - scripts/delivery_resource_supervisor.py
+  - scripts/audio_qc_orchestrator.py
+  - scripts/audio_qc_worker.py
   - scripts/check_language_output.py
   - scripts/independent_asr.py
   - scripts/lib/language_metrics.py
@@ -72,18 +74,19 @@ default `scripts/dev.sh py`, which selects the modules the dirty tree affects) r
 | `scripts/delivery_experiment.py` | Validates and compiles the six registered prompt arms, multilingual split-safe corpus, factorial sampling profiles, stable digests, and bounded seed-power plan | `test_delivery_experiment.py` |
 | `scripts/delivery_experiment_runner.py` | Source-bound, serial and resumable CLI experiment runner; seals the binary, exact instructions, corpus, sampling, seeds, receipts, audio digests, failures, and analysis layers without publishing | `test_delivery_experiment_runner.py` |
 | `scripts/delivery_prompt_remediation.py` | Pre-registered per-preset automatic acoustic screen: exact candidate digests, shared neutral controls, independently calibrated bounded-magnitude scoring, signed target-over-competitor margins, paired bootstrap, explicit legacy recomposition, and typed abstention without semantic or publication authority | `test_delivery_prompt_remediation.py` |
-| `scripts/delivery_evaluator.py` | Preserves ridge-v1 and exposes versioned v2 commands for preset-specific pairwise heads, elastic-net/PLS challengers, blocked validation, conformal intervals, OOD and typed abstention | `test_delivery_evaluator.py`, `test_delivery_evaluator_v2.py` |
+| `scripts/delivery_evaluator.py` | Research tooling only since AQ-05 (the fitted heads are the retired judge `delivery.fitted-heads@2`; no QC path loads a fitted model): preserves ridge-v1 and exposes versioned v2 commands for preset-specific pairwise heads, elastic-net/PLS challengers, blocked validation, conformal intervals, OOD and typed abstention | `test_delivery_evaluator.py`, `test_delivery_evaluator_v2.py` |
 | `scripts/delivery_analysis_cache.py` | Content-addressed, atomic analysis cache keyed by original and canonical audio plus exact analyzer/model/preprocessing provenance; cache hits launch no model | `test_delivery_analysis_cache.py` |
 | `scripts/delivery_temporal_features.py` | Two-pass bounded-memory five-region contour analyzer plus same-identity instructed-minus-neutral deltas | `test_delivery_temporal_features.py` |
-| `scripts/delivery_compact_model_adapter.py` | Contract-first subprocess adapter for fully pinned SenseVoiceSmall Q8, DistilHuBERT or whisper-small MLX candidates, each a runnable judge of `config/audio-qc-judges.json` named in `ADAPTER_JUDGES` and admitted by the registry's load-time gate before every launch; every adapter receives the canonical derivative; execution identity v4 keys the cache by output identity (the repository-relative command template, its re-hashed source and the host included) and records the resource supervisor as envelope provenance; no candidate is adopted or downloaded by the repository | `test_delivery_compact_model_adapter.py` |
+| `scripts/delivery_compact_model_adapter.py` | Contract-first subprocess adapter for fully pinned SenseVoiceSmall Q8 or whisper-small MLX candidates (DistilHuBERT retired, AQ-05), each a runnable judge of `config/audio-qc-judges.json` named in `ADAPTER_JUDGES` and admitted by the registry's load-time gate before every launch; every adapter receives the canonical derivative; execution identity v4 keys the cache by output identity (the repository-relative command template, its re-hashed source and the host included) and records the resource supervisor as envelope provenance; `run_compact_adapter_batch` runs a run's clips in one persistent worker (`audio_qc_worker.py`) at the judge's registry ceiling and thread count, and the one-clip path remains for the two cold qualification probes; no candidate is adopted or downloaded by the repository | `test_delivery_compact_model_adapter.py` |
 | `scripts/independent_asr.py` | Second recognizer family: pinned whisper-small MLX loaded once in one supervised subprocess (`scripts/independent_asr_worker.py`, the only place MLX loads and the recognizer's source identity) after the generator has exited; `manifest` (`--platform macos\|ios\|cascade`; the cascade form takes `--cascade-input`) → `transcribe --manifest … --adapter-config <whisper-small-mlx config> --output …` → cached, digest-bound, transcript-carrying recognitions for the language lanes and the cascade's `--review-evidence` | `test_independent_asr.py` |
 | `scripts/lib/language_metrics.py` | The one tokenizer, edit distance, locale table, threshold set and family-consensus rule shared by the output gate, the publisher, the cascade and the producer | `test_language_metrics.py` |
-| `scripts/delivery_compact_model_runtime.py` | Offline CPU executor for DistilHuBERT (one deterministic, normalized 128-dimensional frozen representation); never receives a requested label | `test_delivery_compact_model_runtime.py` |
+| `scripts/delivery_compact_model_runtime.py` | Offline CPU executor for the retired DistilHuBERT judge (one deterministic, normalized 128-dimensional frozen representation); no QC path launches it since AQ-05, and nothing prepares a configuration for it; never receives a requested label | `test_delivery_compact_model_runtime.py` |
 | `scripts/audio_qc_judges.py` | Validator and load-time gate of the audio QC judge registry (`config/audio-qc-judges.json`): license tiers of weights and data, the exclusion list (models and packages) and use restrictions, the output/envelope identity split, retired judges kept out of every QC path (a legacy contract that names a retired guardrail frozen by digest), canonical-host adoption; every model loader calls `require_loadable` with its judge and the repository it loads, and a snapshot judge's files are verified against the Hub tree pins before it loads | `test_audio_qc_judges.py` |
 | `scripts/prepare_delivery_compact_model_config.py` | Validates the tracked candidate contract and exact local weights/runtime/dependencies, then emits an untracked path-bearing adapter configuration | `test_prepare_delivery_compact_model_config.py` |
 | `scripts/qualify_delivery_compact_models.py` | Runs exactly two cache-cold probes, retains sanitized resource evidence, and refuses holdout bake-off on any unqualified run | `test_qualify_delivery_compact_models.py` |
-| `scripts/delivery_resource_supervisor.py` | Single-process lock, enforced RSS/optional physical-footprint ceilings, pressure/swap/timeout capture, and post-exit memory-recovery qualification for heavy local analyzers | `test_delivery_resource_supervisor.py` |
-| `scripts/run_local_delivery_cascade.py` | Existing-harness composer: byte-bound native QC, independent full-file ASR receipts, cached acoustics, optional heads, rejection and explicit inconclusive routes; no mandatory listening | `test_run_local_delivery_cascade.py` |
+| `scripts/delivery_resource_supervisor.py` | Host lock (exclusive for a generator or a standalone analyzer, shared by the orchestrator's admitted workers), enforced RSS/optional physical-footprint ceilings, pressure/swap/timeout capture, and post-exit memory-recovery qualification for heavy local analyzers; `recovery_rule` switches the binding recovery rule (the child-attributed candidate stays report-only until the registry records its M6 evidence) | `test_delivery_resource_supervisor.py` |
+| `scripts/run_local_delivery_cascade.py` | Existing-harness composer: byte-bound native QC, independent full-file ASR receipts, cached acoustics, one optional compact worker per run, rejection and explicit inconclusive routes (`compose_route`); the uncalibrated heads left it (AQ-05); no mandatory listening |
+| `scripts/audio_qc_orchestrator.py` | The one Stage 1-3 orchestrator after the generator exits (AQ-05): budgeted admission, one persistent worker per judge per run, the L0-L2 cache, Stage 3 replayed from cached metrics beside the composer, take-evidence records and the untracked private bundle; `replay` and `replay-records` prove today's verdicts from the cache and from committed metrics | `test_audio_qc_orchestrator.py`, `test_audio_qc_admission.py`, `test_audio_qc_workers.py`, `test_audio_qc_evidence.py` | `test_run_local_delivery_cascade.py` |
 | `scripts/delivery_acoustic_reference.py` | Default digest-pinned numerical reference comparison in the cascade: same-language paired deltas, unpaired style context, warning retention and flagged-exclusion sensitivity; descriptive only, no downloads or quality authority | `test_delivery_acoustic_reference.py` |
 | `scripts/delivery_promotion_decision.py` | Automatic measured-claim decision (schema 2); schema 1 is the optional historical listener reader. Paired statistics, independent judges, multiplicity correction and runtime/quality guardrails | `test_delivery_promotion_decision.py` |
 | `scripts/voice_identity_language_reliability.py` | Source-bound, serial Clone fidelity/enrollment-transcription/tokenizer and French Voice Design diagnosis; personal references stay in a private content-addressed bundle, rows never retry, and sanitized analysis has no semantic-promotion authority | `test_voice_identity_language_reliability.py` |
@@ -443,15 +446,16 @@ source identities and exact WAV digests after the generator has exited, then reu
 controls through `build/cache/delivery-analysis` (bounded with
 `python3 scripts/delivery_analysis_cache.py prune --keep-newest N`; a pruned entry is recomputed
 on its next use). The default root is overridable with `QVOICE_DELIVERY_ANALYSIS_CACHE`; the
-cascade and `independent_asr.py transcribe` also take `--cache-root` and `--lock-root`. All heavy
-analyzers and the experiment runner serialize on `<lock root>/delivery-analysis-supervisor.lock`
-(the runner's `run_execution_plan` requires an explicit `lock_root`, and its CLI always passes the
-shared default root), so point every serial tool at the same root or they will not exclude one
-another. Cache identity binds original and canonical
+cascade and `independent_asr.py transcribe` also take `--cache-root` and `--lock-root`. The
+experiment runner and every standalone analyzer hold `<lock root>/delivery-analysis-supervisor.lock`
+exclusively (the runner's `run_execution_plan` requires an explicit `lock_root`, and its CLI always
+passes the shared default root); the audio QC orchestrator holds it shared for its run and admits
+its workers against the judge registry's memory budget (decision 9a). Point every tool at the same
+root or they will not exclude one another. Cache identity binds original and canonical
 16 kHz mono PCM bytes to layer, binary, model, revision, weights, and preprocessing digests;
 corruption or drift fails closed and a cache hit launches no model. Reports contain digests and
-measurements, never local paths or audio. Always-on acoustics can reject a broken row, but absent a
-qualified compact adapter and calibrated tiny head the honest result is `abstained`.
+measurements, never local paths or audio. Always-on acoustics can reject a broken row, but with no
+qualified class H delivery detector (AQ-08) the honest result is `abstained`.
 
 New analysis defaults to anti-aliased bounded `polyphase-kaiser5-v2` FIR preprocessing.
 Prepared compact configs bind its version and implementation digests; stale or mismatched configs
@@ -471,8 +475,9 @@ for numerical/resource evidence, compatibility rules and independent-calibration
 External candidates are governed separately by
 [`config/delivery-evaluator-v2-candidates.json`](../../config/delivery-evaluator-v2-candidates.json).
 The tracked contract pins the exact SenseVoiceSmall Q8 model revision, GGUF and runtime archive/
-binary digests, the exact DistilHuBERT revision, safetensors/support-file digests and Python,
-Torch, Transformers, safetensors and NumPy versions, and the whisper-small MLX weights. Each
+binary digests and the whisper-small MLX weights. DistilHuBERT moved to `retiredCandidates` on
+2026-09-26 (AQ-05): it transcribes nothing and fed only the uncalibrated heads; its permissive license
+stays recorded, and it can no longer be prepared. Each
 candidate is a judge of the audio QC registry
 ([`config/audio-qc-judges.json`](../../config/audio-qc-judges.json)), which records the license
 of its weights and training data, its tier, its independence and its status; the prepare step and
@@ -496,8 +501,6 @@ No model file or absolute path is tracked:
 python3 scripts/prepare_delivery_compact_model_config.py --validate-only
 python3 scripts/prepare_delivery_compact_model_config.py sensevoice-small-q8 \
   --output build/artifacts/macos/delivery-evaluator-v2/candidate-configs/sensevoice.json
-python3 scripts/prepare_delivery_compact_model_config.py distilhubert \
-  --output build/artifacts/macos/delivery-evaluator-v2/candidate-configs/distilhubert.json
 ```
 
 Qualification uses two byte-distinct real clips, one candidate at a time. It records peak process
@@ -1034,5 +1037,6 @@ ready; AV-07 remains open until an independently labelled real corpus produces a
 
 Constraint that governs all of the above: no analyzer model runs beside a resident generator, on
 any host; generate first, score after. After the generator exits, the canonical Mac mini M6's
-measured budget governs (per-judge ceilings from measured canonical-host peaks, AQ-06); the 8 GB
-Mac is a product floor, not an evaluator host.
+budget governs through the orchestrator's admission (`config/audio-qc-judges.json#admission`:
+per-judge ceilings, provisional until AQ-06 measures them); the 8 GB Mac is a product floor, not an
+evaluator host.

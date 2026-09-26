@@ -256,6 +256,15 @@ class DeliveryEvaluatorV2Tests(unittest.TestCase):
         authority["promotion"]["automaticLayersMayPromoteSemanticDelivery"] = True
         with self.assertRaisesRegex(EvaluatorError, "cannot gain"):
             validate_v2_contract(authority)
+        # Decision 9a: budgeted admission after the generator exits, owned by the judge registry.
+        self.assertEqual(contract["hostClass"]["executionPolicy"], "budgeted-admission-after-generator-exit")
+        serial = copy.deepcopy(contract)
+        serial["hostClass"]["executionPolicy"] = "strictly-sequential-subprocesses"
+        with self.assertRaisesRegex(EvaluatorError, "budgeted admission"):
+            validate_v2_contract(serial)
+        # AQ-05: the fitted heads are research tooling, never a QC layer.
+        self.assertEqual(contract["evaluator"]["qcRole"], "retired-from-qc")
+        self.assertNotIn("tiny-local-heads", contract["cascade"]["optionalQualifiedLayers"])
 
 
 if __name__ == "__main__":

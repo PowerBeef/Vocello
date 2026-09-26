@@ -40,8 +40,11 @@ def validate_v2_contract(payload: dict[str, Any]) -> dict[str, Any]:
     host = payload.get("hostClass")
     if not isinstance(host, dict):
         raise EvaluatorError("delivery evaluator v2 host policy is missing")
-    if host.get("executionPolicy") != "strictly-sequential-subprocesses":
-        raise EvaluatorError("delivery evaluator v2 requires serial subprocesses")
+    # Decision 9a (AQ-05): admitted workers share the host within the judge
+    # registry's memory budget, after the generator exits.
+    if (host.get("executionPolicy") != "budgeted-admission-after-generator-exit"
+            or host.get("admissionRegistry") != "config/audio-qc-judges.json#admission"):
+        raise EvaluatorError("delivery evaluator v2 requires budgeted admission after the generator exits")
     if host.get("provisionalMaximumProcessPeakRSSBytes") != 5 * 1024**3:
         raise EvaluatorError("delivery evaluator v2 provisional RSS ceiling drifted")
     if host.get("ceilingIsProvisional") is not True or host.get("qualificationRuns") != 2:
@@ -68,6 +71,9 @@ def validate_v2_contract(payload: dict[str, Any]) -> dict[str, Any]:
     evaluator = payload.get("evaluator")
     if not isinstance(evaluator, dict) or evaluator.get("baseline") != "ridge-v1":
         raise EvaluatorError("ridge-v1 must remain the delivery evaluator baseline")
+    # AQ-05: the heads were never calibrated; they are research tooling only.
+    if evaluator.get("qcRole") != "retired-from-qc":
+        raise EvaluatorError("the fitted delivery heads stay out of every QC path")
     if evaluator.get("challengerMustImproveUntouchedHoldout") is not True:
         raise EvaluatorError("challengers require untouched holdout improvement")
     if evaluator.get("challengerMayRegressAnyVADDimension") is not False:

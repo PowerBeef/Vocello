@@ -1,13 +1,24 @@
 #!/usr/bin/env python3
-"""Serial resource supervisor for operator-local delivery analyzers.
+"""Resource supervisor for operator-local audio analyzers.
 
-It enforces one governed child at a time and records a compact, privacy-safe
-resource envelope. The 5 GiB ceiling is provisional: it predates any
-canonical-host measurement, and per-judge ceilings (the measured peak on the
-canonical Mac mini M6 times 1.2) replace it once each judge has two clean
-canonical-host runs (audit AQ-F43; `config/audio-qc-judges.json`). The 8 GB Mac
-is a product floor, not an evaluator host. This module's source is envelope
-identity: it is recorded with each run and never keys a cache entry.
+It supervises one governed child and records a compact, privacy-safe resource
+envelope. Two exclusion modes share one host lock file
+(`delivery-analysis-supervisor.lock`):
+
+- A standalone caller (no admission ticket) holds it exclusively, as the
+  generator (`delivery_experiment_runner.py`) does: one heavy process host-wide.
+- A worker the audio QC orchestrator admitted (audit AQ-05, decision 9a) holds
+  it shared through its ticket (`scripts/lib/qc_pipeline/admission.py`): admitted
+  workers coexist within the registry's memory budget, while a generator or a
+  standalone analyzer still excludes them all. The ticket's ceiling bounds the
+  child's ceilings, so a worker can never run above what it was admitted for.
+
+The 5 GiB ceiling is provisional: it predates any canonical-host measurement,
+and per-judge ceilings (the measured peak on the canonical Mac mini M6 times
+1.2) replace it once each judge has two clean canonical-host runs (audit
+AQ-F43; `config/audio-qc-judges.json`). The 8 GB Mac is a product floor, not an
+evaluator host. This module's source is envelope identity: it is recorded with
+each run and never keys a cache entry.
 
 ``owned-process-probe-v3`` (audit #7, #38, #101, #102):
 
@@ -33,10 +44,17 @@ identity: it is recorded with each run and never keys a cache entry.
   attributes it); a drop larger than the child's peak is a concurrent
   allocator's. ``recovery-report`` tabulates the binding and candidate
   verdicts over saved envelopes, the evidence a rule change needs.
+- ``recovery_rule`` is the policy switch (decision 9a): the default
+  ``whole-host-free-percent-v1`` keeps the five-point rule binding; passing
+  ``attributed-post-exit-recovery-v2`` makes the candidate binding in its
+  place. Only the orchestrator passes it, from
+  ``config/audio-qc-judges.json#admission.recoveryRule``, whose validator keeps
+  the switch off until the M6 evidence the registry names is recorded.
 """
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
 import ctypes
 import errno
@@ -72,6 +90,11 @@ PROBE_ALGORITHM_VERSION = "owned-process-probe-v3"
 # Text probes are only a fallback for the sysctl reads; they run in the C
 # locale so a decimal comma (fr_CA prints "0,00M") never reaches the parser.
 PROBE_ENVIRONMENT_OVERRIDES = {"LC_ALL": "C", "LANG": "C"}
+# The host lock a generator and every heavy analyzer share: exclusive for a
+# generator or standalone analyzer, shared by admitted orchestrator workers.
+HOST_LOCK_NAME = "delivery-analysis-supervisor.lock"
+EXCLUSIVE_EXCLUSION = "host-exclusive-lock"
+ADMITTED_EXCLUSION = "budgeted-admission"
 
 
 class ResourceSupervisorError(RuntimeError):
@@ -555,22 +578,33 @@ def recovery_attribution(
 
 
 CANDIDATE_RECOVERY_RULE = "attributed-post-exit-recovery-v2"
+# The binding rule today: host free memory recovers within five points of the
+# pre-launch snapshot, judged with the free-percent pressure warning.
+WHOLE_HOST_RECOVERY_RULE = "whole-host-free-percent-v1"
+RECOVERY_RULES = (WHOLE_HOST_RECOVERY_RULE, CANDIDATE_RECOVERY_RULE)
+# What the whole-host rule contributes to the qualification failures; the
+# candidate's own failures replace exactly these when it is binding. The swap
+# rule and every probe, exit and limit failure bind under either rule.
+WHOLE_HOST_RECOVERY_FAILURES = frozenset({
+    "post-exit-memory-recovery-unqualified", "host-pressure-not-clean", "host-memory-probe-failed",
+})
 # The kernel pressure level the timing lanes accept (`require_quiet_host`).
 MAXIMUM_NORMAL_KERNEL_PRESSURE_LEVEL = 1
 
 
 def candidate_recovery_verdict(
     before: HostSnapshot, after: HostSnapshot, attribution: dict[str, Any],
-    *, exit_confirmed: bool,
+    *, exit_confirmed: bool, binding: bool = False,
 ) -> dict[str, Any]:
-    """The recovery rule the audit recommends proposing after M6 evidence (#102).
+    """The child-attributed recovery rule (#102), binding only behind the switch.
 
-    Report only: it never enters ``qualified``. Pressure is the kernel level
-    the timing lanes judge (normal is 1) when both snapshots read it, else the
-    binding free-percent warning. A post-exit drop beyond the five-point
-    tolerance fails only when attribution leaves it to the child
-    (``drop-within-child-peak``) or cannot attribute it; a drop larger than the
-    child's own peak (``drop-exceeds-child-peak``) is another allocator's.
+    Report only unless ``binding`` (decision 9a's policy switch, off until M6
+    evidence supports it). Pressure is the kernel level the timing lanes judge
+    (normal is 1) when both snapshots read it, else the free-percent warning. A
+    post-exit drop beyond the five-point tolerance fails only when attribution
+    leaves it to the child (``drop-within-child-peak``) or cannot attribute it;
+    a drop larger than the child's own peak (``drop-exceeds-child-peak``) is
+    another allocator's.
     """
     failures: list[str] = []
     if not exit_confirmed:
@@ -588,38 +622,95 @@ def candidate_recovery_verdict(
         failures.append("post-exit-recovery-unattributed")
     return {
         "algorithm": CANDIDATE_RECOVERY_RULE,
-        "binding": False,
+        "binding": bool(binding),
         "attribution": status,
         "qualified": not failures,
         "failures": failures,
     }
 
 
+def binding_qualification_failures(
+    whole_host_failures: Sequence[str], candidate: dict[str, Any], recovery_rule: str,
+) -> list[str]:
+    """The qualification failures under the binding recovery rule.
+
+    Under the whole-host rule they are unchanged. Under the candidate, the
+    whole-host rule's recovery and pressure failures give way to the
+    candidate's own; every other failure (exit, limits, probes, swap) stays.
+    """
+    if recovery_rule not in RECOVERY_RULES:
+        raise ResourceSupervisorError(f"unknown recovery rule {recovery_rule!r}")
+    if recovery_rule == WHOLE_HOST_RECOVERY_RULE:
+        return list(whole_host_failures)
+    kept = [failure for failure in whole_host_failures if failure not in WHOLE_HOST_RECOVERY_FAILURES]
+    return list(dict.fromkeys(kept + list(candidate.get("failures") or [])))
+
+
+@contextlib.contextmanager
+def host_exclusion(lock_root: Path, admission: Any | None = None):
+    """The host lock for one supervised child; yields the descriptor it inherits.
+
+    Without an admission ticket the lock is taken exclusively (a generator or a
+    standalone analyzer). With one, the ticket already holds it shared for its
+    orchestrator run and yields that descriptor, so the child keeps a generator
+    out even if its orchestrator dies.
+    """
+    if admission is not None:
+        yield admission.host_lock_fd()
+        return
+    lock_root.mkdir(parents=True, exist_ok=True)
+    with (lock_root / HOST_LOCK_NAME).open("a+b") as lock:
+        try:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise ResourceSupervisorError(
+                "another generator or heavy delivery analyzer is already active"
+            ) from error
+        yield lock.fileno()
+
+
 def recovery_report(envelopes: Sequence[dict[str, Any]]) -> dict[str, Any]:
     """Binding against candidate recovery verdicts over saved envelopes (audit #102).
 
-    Counts each envelope's binding recovery outcome (the five-point rule and the
-    free-percent pressure warning), the candidate's, and the attribution, so a
-    proposed rule change cites how many results it would flip and why.
+    Counts each envelope's whole-host recovery outcome (the five-point rule and
+    the free-percent pressure warning), the candidate's, and the attribution, so
+    a proposed rule change cites how many results it would flip and why.
+
+    The promotion evidence the judge registry names (decision 9a) reads three
+    of these: ``serialEnvelopes`` (a child that ran with no other admitted
+    worker: an exclusive lock, or an admission whose worker cap was one),
+    ``serialCandidateWouldQualifyBindingFailure`` (a drop the candidate blames
+    on another allocator although nothing else ran, which would be a
+    misattribution) and ``unattributed``; ``byJudge`` counts admitted envelopes.
     """
     rows = []
     for envelope in envelopes:
-        failures = set(envelope.get("qualificationFailures") or [])
+        # Envelopes since AQ-05 keep the whole-host outcome apart, whichever
+        # rule was binding; older ones carry it in their qualification failures.
+        recorded = envelope.get("wholeHostRecoveryFailures")
+        failures = set(recorded if isinstance(recorded, list) else envelope.get("qualificationFailures") or [])
         binding_recovery = not failures & {
             "post-exit-memory-recovery-unqualified", "host-pressure-not-clean",
         }
         candidate = envelope.get("candidateRecoveryRule") or {}
         attribution = (envelope.get("recoveryAttribution") or {}).get("status")
+        admission = envelope.get("admission") if isinstance(envelope.get("admission"), dict) else None
+        serial = admission is None or admission.get("workerCap") == 1
         rows.append({
             "bindingRecoveryQualified": binding_recovery,
             "candidateQualified": candidate.get("qualified"),
             "attribution": attribution,
+            "serial": serial,
+            "judge": admission.get("judge") if admission else None,
         })
     judged = [row for row in rows if row["candidateQualified"] is not None]
     by_attribution: dict[str, int] = {}
+    by_judge: dict[str, int] = {}
     for row in rows:
         key = str(row["attribution"])
         by_attribution[key] = by_attribution.get(key, 0) + 1
+        if isinstance(row["judge"], str):
+            by_judge[row["judge"]] = by_judge.get(row["judge"], 0) + 1
     return {
         "candidateRule": CANDIDATE_RECOVERY_RULE,
         "envelopes": len(rows),
@@ -632,7 +723,14 @@ def recovery_report(envelopes: Sequence[dict[str, Any]]) -> dict[str, Any]:
         "candidateWouldFailBindingPass": sum(
             1 for row in judged if not row["candidateQualified"] and row["bindingRecoveryQualified"]
         ),
+        "serialEnvelopes": sum(1 for row in rows if row["serial"]),
+        "serialCandidateWouldQualifyBindingFailure": sum(
+            1 for row in judged
+            if row["serial"] and row["candidateQualified"] and not row["bindingRecoveryQualified"]
+        ),
+        "unattributed": by_attribution.get("unattributed", 0) + by_attribution.get("None", 0),
         "attribution": dict(sorted(by_attribution.items())),
+        "byJudge": dict(sorted(by_judge.items())),
     }
 
 
@@ -662,6 +760,8 @@ def run_supervised(
     maximum_physical_footprint_bytes: int = PROVISIONAL_MAXIMUM_RSS_BYTES,
     measure_physical_footprint: bool = False,
     process_sampler: Callable[[int], ProcessSample] = owned_process_sample,
+    admission: Any | None = None,
+    recovery_rule: str = WHOLE_HOST_RECOVERY_RULE,
 ) -> SupervisedResult:
     """Run one governed child and qualify its resource envelope.
 
@@ -670,6 +770,12 @@ def run_supervised(
     ``physical_footprint_sampler`` is given or ``measure_physical_footprint`` is
     set (MLX callers, whose Metal memory RSS cannot see); the in-process probe then
     also supplies the kernel's lifetime peak.
+
+    ``admission`` is an orchestrator ticket (``AdmissionTicket``): the child runs
+    under the ticket's shared host lock instead of an exclusive one, its
+    ceilings may not exceed the admitted ceiling, and the ticket learns the
+    child's PID so a dead orchestrator's budget stays reserved while the child
+    lives. ``recovery_rule`` selects the binding post-exit recovery rule.
     """
     if not command or any(not isinstance(item, str) or not item for item in command):
         raise ResourceSupervisorError("supervised command must be a non-empty string vector")
@@ -681,17 +787,18 @@ def run_supervised(
         raise ResourceSupervisorError("maximum physical footprint must be positive")
     if not math.isfinite(recovery_timeout_seconds) or recovery_timeout_seconds < 0:
         raise ResourceSupervisorError("recovery timeout must be finite and nonnegative")
+    if recovery_rule not in RECOVERY_RULES:
+        raise ResourceSupervisorError(f"unknown recovery rule {recovery_rule!r}")
+    if admission is not None:
+        admitted = getattr(admission, "ceiling_bytes", None)
+        if type(admitted) is not int or admitted <= 0:
+            raise ResourceSupervisorError("an admission ticket must name a positive ceiling")
+        if maximum_rss_bytes > admitted or maximum_physical_footprint_bytes > admitted:
+            raise ResourceSupervisorError("a supervised worker's ceilings exceed its admitted ceiling")
     footprint_requested = physical_footprint_sampler is not None or bool(measure_physical_footprint)
     footprint_from_process_probe = footprint_requested and physical_footprint_sampler is None
     lock_root.mkdir(parents=True, exist_ok=True)
-    lock_path = lock_root / "delivery-analysis-supervisor.lock"
-    with lock_path.open("a+b") as lock:
-        try:
-            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as error:
-            raise ResourceSupervisorError(
-                "another generator or heavy delivery analyzer is already active"
-            ) from error
+    with host_exclusion(lock_root, admission) as lock_fd:
         before = snapshotter()
         started = time.monotonic()
         timed_out = False
@@ -715,8 +822,10 @@ def run_supervised(
                 # Preserve exclusion if shutdown cannot reap the child or the
                 # supervisor itself exits. Do not unlock this shared description
                 # explicitly: the inherited descriptor lasts until child exit.
-                pass_fds=(lock.fileno(),),
+                pass_fds=(lock_fd,),
             )
+            if admission is not None:
+                admission.bind_child(process.pid)
             try:
                 while True:
                     state = _exited_unreaped(process)
@@ -886,6 +995,14 @@ def run_supervised(
         attribution = recovery_attribution(
             before, after, child_peak_bytes=child_peak, child_peak_basis=child_basis,
         )
+        candidate = candidate_recovery_verdict(
+            before, after, attribution, exit_confirmed=exit_confirmed,
+            binding=recovery_rule == CANDIDATE_RECOVERY_RULE,
+        )
+        # The whole-host outcome is kept whichever rule binds, so a recovery
+        # report can always compare the two.
+        whole_host_failures = sorted(set(failures) & WHOLE_HOST_RECOVERY_FAILURES)
+        failures = binding_qualification_failures(failures, candidate, recovery_rule)
         report = {
             "schemaVersion": SCHEMA_VERSION,
             "probeAlgorithmVersion": PROBE_ALGORITHM_VERSION,
@@ -924,9 +1041,11 @@ def run_supervised(
             "swapDeltaBytes": swap_delta,
             "postExitMemoryRecovered": memory_recovered,
             "recoveryAttribution": attribution,
-            "candidateRecoveryRule": candidate_recovery_verdict(
-                before, after, attribution, exit_confirmed=exit_confirmed,
-            ),
+            "candidateRecoveryRule": candidate,
+            "bindingRecoveryRule": recovery_rule,
+            "wholeHostRecoveryFailures": whole_host_failures,
+            "exclusion": ADMITTED_EXCLUSION if admission is not None else EXCLUSIVE_EXCLUSION,
+            "admission": admission.report() if admission is not None else None,
             "recoverySnapshotCount": recovery_snapshot_count,
             "recoveryWaitSeconds": recovery_wait_seconds,
             "stdoutSHA256": _digest(stdout),

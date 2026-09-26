@@ -63,7 +63,8 @@ class JudgeRegistryTests(unittest.TestCase):
         for judge in self.registry["judges"].values():
             if judge["status"] == "retired":
                 continue
-            for relative in judge.get("legacyIdentifiers", {}).get("sources", []):
+            worker = (judge.get("execution") or {}).get("worker")
+            for relative in judge.get("legacyIdentifiers", {}).get("sources", []) + ([worker] if worker else []):
                 target = self.root / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text("# fixture\n", encoding="utf-8")
@@ -83,7 +84,8 @@ class JudgeRegistryTests(unittest.TestCase):
                 if judge["status"] != "retired":
                     self.assertIn(judge["license"]["tier"], ("A", "B"))
         retired = {judge_id for judge_id, judge in judges.items() if judge["status"] == "retired"}
-        self.assertEqual(retired, {"quality.nisqa-v2@1", "quality.utmosv2@1", "emotion.ser-wav2vec2-xlsr@2"})
+        self.assertEqual(retired, {"quality.nisqa-v2@1", "quality.utmosv2@1", "emotion.ser-wav2vec2-xlsr@2",
+                                   "compact.distilhubert@1", "delivery.fitted-heads@2"})
         nisqa = judges["quality.nisqa-v2@1"]["license"]
         self.assertEqual((nisqa["tier"], nisqa["commercialUseCompatible"]), ("C", False))
         self.assertIn("CC BY-NC-SA 4.0", nisqa["weights"])
@@ -143,7 +145,7 @@ class JudgeRegistryTests(unittest.TestCase):
             registry["judges"][ECAPA]["pins"]["runtime"]["torch"] = ""
         self.assertTrue(any("runtime pins" in e for e in self._errors(unpinned)))
 
-        for judge_id in ("compact.sensevoice-small-q8@1", "compact.distilhubert@1", WHISPER, ECAPA):
+        for judge_id in ("compact.sensevoice-small-q8@1", WHISPER, ECAPA):
             def hostless(registry, judge_id=judge_id):
                 identity = registry["judges"][judge_id]["identity"]
                 identity["output"].remove("hostProfile")
@@ -177,20 +179,129 @@ class JudgeRegistryTests(unittest.TestCase):
                               self._errors(malformed))
 
     def test_planned_retirements_are_explicitly_deferred(self) -> None:
-        distilhubert = self.registry["judges"]["compact.distilhubert@1"]["plannedRetirement"]
-        self.assertEqual((distilhubert["item"], distilhubert["status"]), ("AQ-05", "deferred"))
+        ecapa = self.registry["judges"][ECAPA]["plannedRetirement"]
+        self.assertEqual((ecapa["item"], ecapa["status"]), ("AQ-07", "deferred"))
 
         def undated(registry):
-            del registry["judges"]["compact.distilhubert@1"]["plannedRetirement"]["status"]
+            del registry["judges"][ECAPA]["plannedRetirement"]["status"]
         self.assertTrue(any("planned retirement" in e for e in self._errors(undated)))
 
+    def test_distilhubert_and_the_fitted_heads_left_every_qc_path(self) -> None:
+        """AQ-05 (audit sections 4.9 and 7.1): retired as measurands, not for their terms."""
+        judges = self.registry["judges"]
+        for judge_id in ("compact.distilhubert@1", "delivery.fitted-heads@2"):
+            with self.subTest(judge=judge_id):
+                judge = judges[judge_id]
+                self.assertEqual((judge["status"], judge["calibration"], judge["license"]["tier"]),
+                                 ("retired", "none", "A"))
+                self.assertEqual(judge["retirement"]["item"], "AQ-05")
+                self.assertNotIn("plannedRetirement", judge)
+                self.assertNotIn("execution", judge)
+        exclusion = {entry["id"]: entry for entry in self.registry["excluded"]}["distilhubert-and-uncalibrated-heads"]
+        self.assertEqual(exclusion["category"], "measurand")
+        pins = judges["compact.distilhubert@1"]["pins"]
+        with self.assertRaisesRegex(JudgeRegistryError, "retired"):
+            require_loadable("compact.distilhubert@1", pins["repository"], pins["revision"], registry=self.registry)
+        root = self._repository_copy()
+        # The heads' layer and the DistilHuBERT adapter never return to a live contract.
+        self._rewrite("config/delivery-evaluator-v2-contract.json",
+                      lambda value: value["cascade"]["optionalQualifiedLayers"].append("tiny-local-heads"))
+        self.assertIn("judge delivery.fitted-heads@2: cascade layer tiny-local-heads is still requested",
+                      validate_repository(root))
+        shutil.copyfile(REPO / "config/delivery-evaluator-v2-contract.json",
+                        root / "config/delivery-evaluator-v2-contract.json")
+        self._rewrite("config/delivery-evaluator-v2-contract.json",
+                      lambda value: value["compactAdapters"]["candidateOrder"].append("distilhubert"))
+        self.assertIn("judge compact.distilhubert@1: adapter distilhubert is still a live candidate",
+                      validate_repository(root))
+        shutil.copyfile(REPO / "config/delivery-evaluator-v2-contract.json",
+                        root / "config/delivery-evaluator-v2-contract.json")
+        # A permissive judge retired as a measurand keeps its commercial license.
+        self._rewrite("config/delivery-evaluator-v2-candidates.json",
+                      lambda value: value["retiredCandidates"]["distilhubert"].update(commercialUseCompatible=False))
+        self.assertIn("retired candidate distilhubert: commercialUseCompatible must match its registry tier A",
+                      validate_repository(root))
+
+    def test_admission_is_budgeted_and_the_recovery_switch_needs_m6_evidence(self) -> None:
+        """Decision 9a: one budget, one GPU worker beside two CPU workers, a report-only switch."""
+        admission = self.registry["admission"]
+        self.assertEqual(admission["policy"], "budgeted-admission-after-generator-exit")
+        self.assertEqual({lane: value["maximumConcurrent"] for lane, value in admission["lanes"].items()},
+                         {"gpu": 1, "cpu": 2, "dsp": 4})
+        self.assertIs(admission["recoveryRule"]["candidateBinding"], False)
+        self.assertEqual(admission["recoveryRule"]["workerCapWhileWholeHostBinding"], 1)
+        self.assertEqual(admission["recoveryRule"]["promotion"]["evidence"], [])
+
+        def two_gpu(registry):
+            registry["admission"]["lanes"]["gpu"]["maximumConcurrent"] = 2
+        self.assertIn("admission runs one MLX GPU worker at a time beside at most two CPU workers",
+                      self._errors(two_gpu))
+
+        def uncapped(registry):
+            registry["admission"]["recoveryRule"]["workerCapWhileWholeHostBinding"] = 2
+        self.assertIn("while the whole-host recovery rule binds, admission caps the host at one worker",
+                      self._errors(uncapped))
+
+        def flipped(registry):
+            registry["admission"]["recoveryRule"]["candidateBinding"] = True
+        self.assertIn("a binding child-attributed recovery rule cites at least 2 recovery reports",
+                      self._errors(flipped))
+
+        def report(digest: str, **overrides) -> dict:
+            value = {"recoveryReportSHA256": digest, "hardwareProfileID": "mac-mini-m6-16gb", "date": "2026-10-01",
+                     "serialEnvelopes": 4, "serialCandidateWouldQualifyBindingFailure": 0, "unattributed": 0,
+                     "byJudge": {WHISPER: 2, "compact.sensevoice-small-q8@1": 2}}
+            return {**value, **overrides}
+
+        def evidenced(registry, reports):
+            registry["admission"]["recoveryRule"]["candidateBinding"] = True
+            registry["admission"]["recoveryRule"]["promotion"]["evidence"] = reports
+        self.assertEqual(self._errors(lambda r: evidenced(r, [report("a" * 64), report("b" * 64)])), [])
+        misattributed = self._errors(lambda r: evidenced(
+            r, [report("a" * 64), report("b" * 64, serialCandidateWouldQualifyBindingFailure=1)]))
+        self.assertTrue(any("blamed a serial post-exit drop" in e for e in misattributed))
+        self.assertTrue(any("canonical hardware profile" in e for e in self._errors(lambda r: evidenced(
+            r, [report("a" * 64), report("b" * 64, hardwareProfileID="mac-mini-m2-8gb")]))))
+        self.assertTrue(any("lacks envelopes of compact.sensevoice-small-q8@1" in e for e in self._errors(
+            lambda r: evidenced(r, [report("a" * 64), report("b" * 64, byJudge={WHISPER: 1})]))))
+        self.assertIn("recovery evidence reports must be distinct",
+                      self._errors(lambda r: evidenced(r, [report("a" * 64), report("a" * 64)])))
+
+        def oversized(registry):
+            registry["judges"][WHISPER]["resources"]["provisionalCeilingBytes"] = 10 * 1024**3
+        self.assertIn(f"judge {WHISPER}: its ceiling never fits the admission budget", self._errors(oversized))
+
+        def measured(registry):
+            registry["judges"][WHISPER]["resources"]["canonicalHostPeakBytes"] = 9 * 1024**3
+        self.assertIn(f"judge {WHISPER}: its ceiling never fits the admission budget", self._errors(measured))
+
+        def threadless(registry):
+            registry["judges"][WHISPER]["identity"]["output"].remove("threads")
+        self.assertIn(f"judge {WHISPER}: an orchestrated judge declares its thread count, which is output identity",
+                      self._errors(threadless))
+
+        def undeclared(registry):
+            del registry["judges"]["prosody@3"]["execution"]
+        self.assertTrue(any("judge prosody@3: execution names its lane" in e for e in self._errors(undeclared)))
+
+        def retired_runs(registry):
+            registry["judges"]["compact.distilhubert@1"]["execution"] = {"lane": "cpu", "orchestrated": False}
+        self.assertIn("judge compact.distilhubert@1: a retired or quarantined judge declares no execution",
+                      self._errors(retired_runs))
+
     def test_exclusion_list_refuses_excluded_models_and_packages(self) -> None:
+        sensevoice = "compact.sensevoice-small-q8@1"
+
         def excluded_model(registry):
-            registry["judges"]["compact.distilhubert@1"]["pins"]["repository"] = "utter-project/mHuBERT-147"
+            registry["judges"][sensevoice]["pins"]["repository"] = "utter-project/mHuBERT-147"
         self.assertTrue(any("mhubert-147-and-versa" in e for e in self._errors(excluded_model)))
 
+        def excluded_distilhubert(registry):
+            registry["judges"][sensevoice]["pins"]["repository"] = "ntu-spml/distilhubert"
+        self.assertTrue(any("distilhubert-and-uncalibrated-heads" in e for e in self._errors(excluded_distilhubert)))
+
         def excluded_package(registry):
-            registry["judges"]["compact.distilhubert@1"]["pins"]["runtime"]["pykakasi"] = "2.3.0"
+            registry["judges"][sensevoice]["pins"]["runtime"]["pykakasi"] = "2.3.0"
         self.assertTrue(any("package pykakasi is excluded" in e for e in self._errors(excluded_package)))
 
         def uncovered(registry):
@@ -200,7 +311,7 @@ class JudgeRegistryTests(unittest.TestCase):
 
         root = self._repository_copy()
         self._rewrite("config/delivery-evaluator-v2-candidates.json",
-                      lambda value: value["candidates"]["distilhubert"]["runtimeDependencies"].update(zhconv="1.4.3"))
+                      lambda value: value["candidates"]["whisper-small-mlx"]["runtimeDependencies"].update(zhconv="1.4.3"))
         self.assertTrue(any("package zhconv is excluded" in e for e in validate_repository(root)))
 
     def test_use_restrictions_bound_how_a_judge_runs(self) -> None:

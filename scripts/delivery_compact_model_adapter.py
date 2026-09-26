@@ -5,9 +5,17 @@ No external checkpoint is selected or acquired here. A caller must provide a
 fully pinned, commercially compatible configuration of a registered judge
 (`config/audio-qc-judges.json`); each adapter names its registry judge in
 `ADAPTER_JUDGES`, and the registry's load-time gate (`require_loadable`) runs
-before every launch. SenseVoiceSmall Q8 is the first permitted candidate;
-DistilHuBERT is the second. Neither is adopted until the separate
-untouched-holdout and two-clean-canonical-host-run gates pass.
+before every launch. SenseVoiceSmall Q8 is the permitted research candidate and
+whisper-small MLX the recognizer; neither is adopted until the separate
+untouched-holdout and two-clean-canonical-host-run gates pass. DistilHuBERT was
+retired from every QC path on 2026-09-26 (AQ-05): it transcribes nothing and
+fed only the uncalibrated heads.
+
+`run_compact_adapter_batch` analyzes a run's clips in one persistent worker
+(`audio_qc_worker.py`, audit AQ-F42); `run_compact_adapter` launches one
+process for one clip and remains for the two cold qualification probes. Both
+fix the judge's declared thread count in the worker's environment and key the
+cache on it, so either path reuses the other's entries.
 
 Identity v4 (audit AQ-F47) splits what a run produced from how it was
 supervised. The output identity (model, weights, runtime binary and
@@ -27,8 +35,9 @@ import json
 import os
 from pathlib import Path
 import re
+import sys
 import tempfile
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 import wave
 
 from delivery_analysis_cache import (
@@ -40,7 +49,8 @@ from delivery_analysis_cache import (
     file_sha256,
     configured_resampler,
 )
-from audio_qc_judges import JudgeRegistryError, host_profile, require_loadable
+from audio_qc_judges import JudgeRegistryError, host_profile, load_registry, require_loadable
+from audio_qc_worker import thread_environment
 from delivery_resource_supervisor import SupervisedResult, run_supervised
 import delivery_resource_supervisor
 
@@ -49,7 +59,6 @@ SCHEMA_VERSION = 1
 # Each permitted adapter and the registry judge it loads.
 ADAPTER_JUDGES = {
     "sensevoice-small-q8": "compact.sensevoice-small-q8@1",
-    "distilhubert": "compact.distilhubert@1",
     "whisper-small-mlx": "asr.whisper-small@1",
 }
 PERMITTED_ADAPTERS = tuple(ADAPTER_JUDGES)
@@ -73,6 +82,9 @@ OUTPUT_IDENTITY_FIELDS = (
 REPOSITORY = Path(__file__).resolve().parents[1]
 ADAPTER_LAYER_SOURCE = Path(__file__).resolve()
 SUPERVISOR_SOURCE = Path(delivery_resource_supervisor.__file__).resolve()
+WORKER_HOST = REPOSITORY / "scripts/audio_qc_worker.py"
+# The worker engine each adapter runs under the persistent worker host.
+ADAPTER_ENGINES = {"sensevoice-small-q8": "native-command", "whisper-small-mlx": "whisper-mlx"}
 SENSEVOICE_OUTPUT = re.compile(
     r"^<\|(?P<language>[^|]+)\|><\|(?P<emotion>[^|]+)\|>"
     r"<\|(?P<event>[^|]+)\|><\|(?P<textnorm>[^|]+)\|>(?P<transcript>.*)$",
@@ -302,7 +314,7 @@ def _parse_output(config: dict[str, Any], output: bytes) -> dict[str, Any]:
     elif config["adapterID"] == "whisper-small-mlx":
         required = ("transcript", "language", "detectedLanguage", "segments")
     else:
-        required = ("embedding",)
+        raise CompactAdapterError("compact adapter output format is not recognized")
     for field in required:
         if field not in payload:
             raise CompactAdapterError(f"compact adapter output lacks {field}")
@@ -310,18 +322,19 @@ def _parse_output(config: dict[str, Any], output: bytes) -> dict[str, Any]:
     return payload
 
 
-def run_compact_adapter(
-    *, wav_path: Path, config: dict[str, Any], cache: DeliveryAnalysisCache,
-    lock_root: Path,
-    supervisor: Callable[..., SupervisedResult] = run_supervised,
-    supervisor_options: dict[str, Any] | None = None,
-    return_unqualified: bool = False,
-) -> tuple[dict[str, Any], bool]:
-    config = validate_adapter_config(config)
-    if cache.resampler_version != configured_resampler(config):
-        raise CompactAdapterError("cache resampler differs from pinned model preprocessing")
-    canonical = cache.canonicalize(wav_path)
-    identity = LayerIdentity(
+def adapter_threads(adapter_id: str, registry: dict[str, Any] | None = None) -> int:
+    """The thread count the registry declares for an adapter's judge (output identity)."""
+    registry = registry if registry is not None else load_registry()
+    judge = (registry.get("judges") or {}).get(ADAPTER_JUDGES.get(adapter_id, ""))
+    threads = ((judge or {}).get("execution") or {}).get("threads")
+    if type(threads) is not int or threads <= 0:
+        raise CompactAdapterError(f"the judge registry declares no thread count for {adapter_id}")
+    return threads
+
+
+def compact_layer_identity(canonical: CanonicalAudio, config: dict[str, Any], threads: int) -> LayerIdentity:
+    """The cache key of one clip's compact output: the output identity and the thread count."""
+    return LayerIdentity(
         original_wav_sha256=canonical.original_wav_sha256,
         canonical_derivative_sha256=canonical.canonical_derivative_sha256,
         layer_id="compact-speech-representation",
@@ -330,48 +343,21 @@ def run_compact_adapter(
         model_id=config["modelID"],
         model_revision=config["sourceRevision"],
         weights_sha256=config["weightsSHA256"],
-        preprocessing_config_digest=config["preprocessingConfigDigest"],
+        preprocessing_config_digest=digest({
+            "preprocessingConfigDigest": config["preprocessingConfigDigest"], "threads": threads,
+        }),
     )
-    retained = cache.load(identity)
-    if retained is not None:
-        return retained, True
-    envelope = envelope_identity()
-    with tempfile.TemporaryDirectory(prefix="vocello-compact-adapter-") as temporary:
-        model_input = Path(temporary) / "canonical.wav"
-        _canonical_wav(canonical, model_input)
-        substitutions = {
-            "binary": str(config["binaryPath"]),
-            "audio": str(model_input),
-            "weights": str(config["weightsPath"]),
-        }
-        command = []
-        for item in config["commandTemplate"]:
-            rendered = item
-            for name, value in substitutions.items():
-                rendered = rendered.replace("{" + name + "}", value)
-            command.append(rendered)
-        environment = dict(os.environ)
-        environment.update({"VOCELLO_DELIVERY_ADAPTER_DEVICE": "cpu"})
-        options = dict(supervisor_options or {})
-        if config["adapterID"] in MLX_ADAPTERS:
-            # MLX allocates Metal memory that RSS cannot see (audit #101).
-            options.setdefault("measure_physical_footprint", True)
-        result = supervisor(
-            command, lock_root=lock_root, environment=environment, **options
-        )
-    if not result.report.get("qualified") and not return_unqualified:
-        raise CompactAdapterError(
-            "compact adapter resource envelope is unqualified: "
-            + ",".join(result.report.get("qualificationFailures", []))
-        )
-    output = _parse_output(config, result.stdout)
-    payload = {
+
+
+def _payload(config: dict[str, Any], output: dict[str, Any], envelope_report: dict[str, Any],
+             envelope: dict[str, str], threads: int) -> dict[str, Any]:
+    return {
         "schemaVersion": SCHEMA_VERSION,
         "kind": "compact-delivery-representation",
         "promotionAuthority": False,
         "adapterID": config["adapterID"],
         "outputs": output,
-        "resourceEnvelope": result.report,
+        "resourceEnvelope": envelope_report,
         "modelProvenance": {
             "modelID": config["modelID"],
             "sourceRevision": config["sourceRevision"],
@@ -387,6 +373,7 @@ def run_compact_adapter(
             "adapterSourceSHA256": config.get("adapterSourceSHA256"),
             "adapterLayerSHA256": config.get("adapterLayerSHA256"),
             "outputIdentityDigest": config.get("outputIdentityDigest"),
+            "threads": threads,
             # The supervisor that ran this measurement: provenance of the
             # cached result, never part of its key.
             "envelopeIdentity": envelope,
@@ -396,9 +383,160 @@ def run_compact_adapter(
             "adopted": False,
         },
     }
+
+
+def _render(config: dict[str, Any], *, audio: str) -> list[str]:
+    substitutions = {"binary": str(config["binaryPath"]), "audio": audio, "weights": str(config["weightsPath"])}
+    command = []
+    for item in config["commandTemplate"]:
+        rendered = item
+        for name, value in substitutions.items():
+            rendered = rendered.replace("{" + name + "}", value)
+        command.append(rendered)
+    return command
+
+
+def run_compact_adapter(
+    *, wav_path: Path, config: dict[str, Any], cache: DeliveryAnalysisCache,
+    lock_root: Path,
+    supervisor: Callable[..., SupervisedResult] = run_supervised,
+    supervisor_options: dict[str, Any] | None = None,
+    return_unqualified: bool = False,
+) -> tuple[dict[str, Any], bool]:
+    """One process for one clip: the two cold qualification probes use it."""
+    config = validate_adapter_config(config)
+    if cache.resampler_version != configured_resampler(config):
+        raise CompactAdapterError("cache resampler differs from pinned model preprocessing")
+    threads = adapter_threads(config["adapterID"])
+    canonical = cache.canonicalize(wav_path)
+    identity = compact_layer_identity(canonical, config, threads)
+    retained = cache.load(identity)
+    if retained is not None:
+        return retained, True
+    envelope = envelope_identity()
+    with tempfile.TemporaryDirectory(prefix="vocello-compact-adapter-") as temporary:
+        model_input = Path(temporary) / "canonical.wav"
+        _canonical_wav(canonical, model_input)
+        command = _render(config, audio=str(model_input))
+        environment = dict(os.environ)
+        environment.update({"VOCELLO_DELIVERY_ADAPTER_DEVICE": "cpu", **thread_environment(threads)})
+        options = dict(supervisor_options or {})
+        if config["adapterID"] in MLX_ADAPTERS:
+            # MLX allocates Metal memory that RSS cannot see (audit #101).
+            options.setdefault("measure_physical_footprint", True)
+        result = supervisor(
+            command, lock_root=lock_root, environment=environment, **options
+        )
+    if not result.report.get("qualified") and not return_unqualified:
+        raise CompactAdapterError(
+            "compact adapter resource envelope is unqualified: "
+            + ",".join(result.report.get("qualificationFailures", []))
+        )
+    output = _parse_output(config, result.stdout)
+    payload = _payload(config, output, result.report, envelope, threads)
     if result.report.get("qualified"):
         try:
             cache.store(identity, payload)
         except AnalysisCacheError as error:
             raise CompactAdapterError(str(error)) from error
     return payload, False
+
+
+# Options the persistent-worker runner sets itself from the registry.
+_RUNNER_OWNED_OPTIONS = frozenset({
+    "timeout_seconds", "maximum_rss_bytes", "maximum_physical_footprint_bytes",
+    "measure_physical_footprint", "environment", "admission", "recovery_rule", "lock_root",
+})
+
+
+def run_compact_adapter_batch(
+    *, wav_paths: Sequence[Path], config: dict[str, Any], cache: DeliveryAnalysisCache,
+    lock_root: Path,
+    supervisor: Callable[..., SupervisedResult] = run_supervised,
+    supervisor_options: dict[str, Any] | None = None,
+    run_admission: Any | None = None,
+    recovery_rule: str = delivery_resource_supervisor.WHOLE_HOST_RECOVERY_RULE,
+    registry: dict[str, Any] | None = None,
+) -> dict[Path, tuple[dict[str, Any], bool]]:
+    """Every clip's compact output from one persistent worker for the run (AQ-F42).
+
+    Cache hits launch nothing; clips with byte-identical canonical audio share
+    one row. The worker runs under the judge's registry ceiling and thread
+    count, admitted when `run_admission` is given (the orchestrator) or under
+    the exclusive host lock otherwise. Accepted rows are cached before any
+    unavailable row is reported, so a rerun resumes rather than repeats.
+    """
+    from lib.qc_pipeline.admission import AdmissionError, judge_admission as admission_for, judge_ceiling
+    from lib.qc_pipeline.workers import WorkerSpec, run_persistent_worker
+
+    config = validate_adapter_config(config)
+    if cache.resampler_version != configured_resampler(config):
+        raise CompactAdapterError("cache resampler differs from pinned model preprocessing")
+    registry = registry if registry is not None else load_registry()
+    adapter_id = config["adapterID"]
+    judge_id = ADAPTER_JUDGES[adapter_id]
+    threads = adapter_threads(adapter_id, registry)
+    judge = registry["judges"][judge_id]
+    try:
+        ceiling = judge_ceiling(judge)[0]
+    except AdmissionError as error:
+        raise CompactAdapterError(f"{judge_id}: {error}") from None
+    results: dict[Path, tuple[dict[str, Any], bool]] = {}
+    pending: dict[str, tuple[LayerIdentity, CanonicalAudio, list[Path]]] = {}
+    for path in wav_paths:
+        canonical = cache.canonicalize(path)
+        identity = compact_layer_identity(canonical, config, threads)
+        retained = cache.load(identity)
+        if retained is not None:
+            results[path] = (retained, True)
+            continue
+        pending.setdefault(identity.key, (identity, canonical, []))[2].append(path)
+    if not pending:
+        return results
+    engine = ADAPTER_ENGINES[adapter_id]
+    if engine == "native-command":
+        command: tuple[str, ...] = (sys.executable, str(WORKER_HOST))
+        engine_config: dict[str, Any] = {"command": _render(config, audio="{audio}"), "ceilingBytes": ceiling}
+        rows = [{"id": key, "pcmPath": str(canonical.derivative_path)} for key, (_i, canonical, _p) in pending.items()]
+    else:
+        # The single-file whisper mode: default decode options, no locked language.
+        command = (str(config["binaryPath"]), str(WORKER_HOST))
+        engine_config = {"weights": str(config["weightsPath"]), "decodeOptions": {}}
+        rows = [{"id": key, "pcmPath": str(canonical.derivative_path), "language": None}
+                for key, (_i, canonical, _p) in pending.items()]
+    options = {key: value for key, value in dict(supervisor_options or {}).items() if key not in _RUNNER_OWNED_OPTIONS}
+    spec = WorkerSpec(
+        judge_id=judge_id, engine=engine, command=command, threads=threads,
+        lane=str((judge.get("execution") or {}).get("lane")), ceiling_bytes=ceiling,
+        engine_config=engine_config, measure_physical_footprint=adapter_id in MLX_ADAPTERS,
+        environment={"VOCELLO_DELIVERY_ADAPTER_DEVICE": "cpu"},
+    )
+    envelope = envelope_identity()
+    with tempfile.TemporaryDirectory(prefix="vocello-compact-batch-") as temporary:
+        outcome = run_persistent_worker(
+            spec, rows, workdir=Path(temporary), lock_root=lock_root,
+            run_admission=run_admission,
+            judge_admission=admission_for(registry, judge_id) if run_admission is not None else None,
+            supervisor=supervisor, recovery_rule=recovery_rule, supervisor_options=options,
+        )
+    missing: list[str] = []
+    for key, (identity, _canonical, paths) in pending.items():
+        raw = outcome.results.get(key)
+        if raw is None:
+            missing.append(outcome.unavailable.get(key, "crash"))
+            continue
+        stdout = raw["stdout"].encode("utf-8") if engine == "native-command" else json.dumps(raw).encode("utf-8")
+        output = _parse_output(config, stdout)
+        launch = outcome.launches[outcome.row_launch[key] - 1]
+        payload = _payload(config, output, launch["resourceEnvelope"], envelope, threads)
+        try:
+            stored = cache.store(identity, payload)
+        except AnalysisCacheError as error:
+            raise CompactAdapterError(str(error)) from error
+        for path in paths:
+            results[path] = (stored, False)
+    if missing:
+        raise CompactAdapterError(
+            f"compact adapter worker left {len(missing)} clip(s) unavailable: " + ",".join(sorted(set(missing)))
+        )
+    return results

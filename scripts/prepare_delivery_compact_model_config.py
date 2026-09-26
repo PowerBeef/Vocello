@@ -29,14 +29,14 @@ from delivery_compact_model_adapter import ADAPTER_JUDGES, bind_output_identity
 REPO = Path(__file__).resolve().parents[1]
 DEFAULT_CONTRACT = REPO / "config/delivery-evaluator-v2-candidates.json"
 DEFAULT_MODEL_ROOT = REPO / "build/cache/delivery-analysis/external-models"
-RUNTIME_SOURCE = REPO / "scripts/delivery_compact_model_runtime.py"
 ADAPTER_LAYER_SOURCE = REPO / "scripts/delivery_compact_model_adapter.py"
 # The recognizer child alone: its digest is the whisper adapter's source identity.
 INDEPENDENT_ASR_WORKER_SOURCE = REPO / "scripts/independent_asr_worker.py"
-CANDIDATE_ORDER = ("sensevoice-small-q8", "distilhubert", "whisper-small-mlx")
+# DistilHuBERT left the order on 2026-09-26 (AQ-05); it is a retired candidate.
+CANDIDATE_ORDER = ("sensevoice-small-q8", "whisper-small-mlx")
 WHISPER_RUNTIME_PINS = ("mlx", "mlx-whisper", "numpy")
 ADOPTION_REQUIREMENTS = frozenset({
-    "two-clean-canonical-host-runs", "serial-process-isolation",
+    "two-clean-canonical-host-runs", "supervised-process-isolation",
     "post-exit-memory-recovery", "untouched-independent-reference-holdout-gain",
     "no-vad-dimension-regression", "no-preset-regression",
 })
@@ -92,16 +92,6 @@ def validate_candidate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         raise PreparationError("SenseVoice runtime identity is missing")
     for field in ("archiveSHA256", "binarySHA256"):
         _sha(runtime.get(field), f"sensevoice.{field}")
-    supporting = candidates["distilhubert"].get("supportingFiles")
-    dependencies = candidates["distilhubert"].get("runtimeDependencies")
-    if not isinstance(supporting, dict) or not supporting:
-        raise PreparationError("DistilHuBERT supporting-file identity is missing")
-    for name, value in supporting.items():
-        _sha(value, f"distilhubert.{name}")
-    if not isinstance(dependencies, dict) or set(dependencies) != {
-        "python", "torch", "transformers", "safetensors", "numpy"
-    } or any(not isinstance(value, str) or not value for value in dependencies.values()):
-        raise PreparationError("DistilHuBERT runtime dependency pins are incomplete")
     whisper = candidates["whisper-small-mlx"]
     whisper_files = whisper.get("supportingFiles")
     if not isinstance(whisper_files, dict) or set(whisper_files) != {"config.json"}:
@@ -124,14 +114,16 @@ def validate_candidate_contract(contract: dict[str, Any]) -> dict[str, Any]:
     ):
         raise PreparationError("whisper label map must name the corpus languages")
     # Retired candidates stay as provenance for the evidence that cites them;
-    # none is executable, and each records the corrected license.
+    # none is executable. One retired for its terms (tier C) records the
+    # corrected license; one retired as a measurand keeps its permissive one.
     retired = contract.get("retiredCandidates")
     if not isinstance(retired, dict):
         raise PreparationError("retired candidate provenance is missing")
     for adapter_id, candidate in retired.items():
         if adapter_id in candidates or not isinstance(candidate, dict):
             raise PreparationError(f"{adapter_id} cannot be both executable and retired")
-        if candidate.get("status") != "retired" or candidate.get("commercialUseCompatible") is not False:
+        if (candidate.get("status") != "retired" or candidate.get("licenseTier") not in ("A", "B", "C")
+                or candidate.get("commercialUseCompatible") is not (candidate.get("licenseTier") != "C")):
             raise PreparationError(f"retired candidate {adapter_id} must record status and license")
         for field in ("license", "trainingDataDeclaration", "retiredOn", "decision", "registryJudge"):
             if not isinstance(candidate.get(field), str) or not candidate[field].strip():
@@ -194,25 +186,6 @@ def whisper_snapshot_dir(candidate: dict[str, Any], model_root: Path) -> Path:
     return Path(hub) / repo / "snapshots" / str(candidate["sourceRevision"])
 
 
-def _runtime_versions(python: Path) -> dict[str, str]:
-    command = [str(python), "-c", (
-        "import json,sys,torch,transformers,safetensors,numpy;"
-        "print(json.dumps({'python':'.'.join(map(str,sys.version_info[:3])),"
-        "'torch':torch.__version__,'transformers':transformers.__version__,"
-        "'safetensors':safetensors.__version__,'numpy':numpy.__version__},sort_keys=True))"
-    )]
-    result = subprocess.run(command, check=False, capture_output=True, text=True, timeout=30)
-    if result.returncode != 0:
-        raise PreparationError("DistilHuBERT runtime dependencies cannot be inspected")
-    try:
-        value = json.loads(result.stdout)
-    except json.JSONDecodeError as error:
-        raise PreparationError("DistilHuBERT runtime dependency output is invalid") from error
-    if not isinstance(value, dict) or any(not isinstance(item, str) for item in value.values()):
-        raise PreparationError("DistilHuBERT runtime dependency inventory is invalid")
-    return value
-
-
 def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
             resampler_version: str = RESAMPLER_VERSION) -> dict[str, Any]:
     try:
@@ -258,26 +231,6 @@ def prepare(adapter_id: str, *, contract_path: Path, model_root: Path,
         command = [
             "{binary}", "-m", "{weights}", "-a", "{audio}",
             "--backend", "cpu", "--keep-tags",
-        ]
-    elif adapter_id == "distilhubert":
-        model_dir = model_root / "distilhubert"
-        weights = _verified(
-            model_dir / candidate["weightsFile"], candidate["weightsSHA256"],
-            "DistilHuBERT weights",
-        )
-        for name, expected in candidate["supportingFiles"].items():
-            _verified(model_dir / name, expected, f"DistilHuBERT {name}")
-        binary = model_root / "distilhubert-runtime-py314/bin/python"
-        if not binary.is_file():
-            raise PreparationError("DistilHuBERT Python runtime is missing")
-        dependencies = _runtime_versions(binary)
-        if dependencies != candidate["runtimeDependencies"]:
-            raise PreparationError("DistilHuBERT runtime dependency versions drifted")
-        source_digest = file_sha256(RUNTIME_SOURCE)
-        output_format = "json"
-        command = [
-            "{binary}", str(RUNTIME_SOURCE), "distilhubert",
-            "--weights", "{weights}", "--audio", "{audio}",
         ]
     elif adapter_id == "whisper-small-mlx":
         model_dir = whisper_snapshot_dir(candidate, model_root)

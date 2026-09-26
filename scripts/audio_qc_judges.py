@@ -25,6 +25,12 @@ module validates it and is the load-time gate for registered judges:
   legacy contract that still names a retired guardrail is frozen by digest.
 - Adoption names the canonical host: two clean runs on the one canonical
   macOS profile of `benchmarks/hardware-profiles.json`.
+- Admission (decision 9a, AQ-05) is budgeted: one memory budget, one GPU
+  worker beside at most two CPU workers, and every orchestrated worker judge
+  declares its lane, engine and thread count (part of its output identity) and
+  has a ceiling the budget can hold. The child-attributed recovery rule stays
+  report-only (`candidateBinding: false`, one worker host-wide) until the
+  registry records the M6 evidence its promotion names.
 
 Commands:
   validate   check the registry against the repository (the contract gate)
@@ -58,7 +64,7 @@ STATUSES = ("candidate", "shadow", "advisory", "warn", "gating", "retired", "qua
 BLOCKED_STATUSES = frozenset({"retired", "quarantined"})
 # Statuses whose verdicts can fail a take or a lane.
 VERDICT_STATUSES = frozenset({"warn", "gating"})
-KINDS = ("neural", "dsp", "platform")
+KINDS = ("neural", "dsp", "platform", "fitted")
 TIERS = ("A", "B", "C")
 TIER_B_SCOPE = "internal-never-shipped-evaluation"
 ADOPTION_REQUIREMENT = "two-clean-canonical-host-runs"
@@ -76,6 +82,7 @@ OUTPUT_ONLY_COMPONENTS = frozenset({
     "adapterLayerSHA256", "analyzerSourceSHA256", "comparatorSourceSHA256", "commandTemplate",
     "labelMapDigest", "labelSet", "decodeOptions", "lockedLanguage", "preprocessing",
     "preprocessingConfigDigest", "outputFormat", "algorithm", "configuration", "resampler",
+    "threads", "modelDigest", "featureNames",
 })
 # A runtime is part of the output identity under one of these names.
 RUNTIME_COMPONENTS = ("runtimeDependencies", "runtimeDependenciesDigest", "runtimeVersions")
@@ -89,7 +96,22 @@ DIGEST_STATUS_BY_KIND = {
     "neural": ("pinned", "content-addressed-snapshot"),
     "dsp": ("no-learned-weights",),
     "platform": ("platform-managed",),
+    "fitted": ("fitted-model-digest",),
 }
+# Admission (decision 9a). Lanes a worker is admitted in, and where the other
+# judges run.
+ADMISSION_POLICY = "budgeted-admission-after-generator-exit"
+WORKER_LANES = ("gpu", "cpu", "dsp")
+EXECUTION_LANES = (*WORKER_LANES, "engine", "device")
+WHOLE_HOST_RECOVERY_RULE = "whole-host-free-percent-v1"
+CANDIDATE_RECOVERY_RULE = "attributed-post-exit-recovery-v2"
+IN_PROCESS_ENGINE = "in-process"
+# What a promotion of the child-attributed recovery rule must cite per report.
+RECOVERY_EVIDENCE_FIELDS = (
+    "recoveryReportSHA256", "hardwareProfileID", "date", "serialEnvelopes",
+    "serialCandidateWouldQualifyBindingFailure", "unattributed", "byJudge",
+)
+MINIMUM_RECOVERY_REPORTS = 2
 SNAPSHOT_STATUS = "content-addressed-snapshot"
 JUDGE_ID = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*@[0-9]+$")
 ROADMAP_ITEM = re.compile(r"^[A-Z]+-[0-9]+$")
@@ -194,9 +216,9 @@ def validate_registry(registry: dict[str, Any], *, root: Path = REPO) -> list[st
     decisions = registry.get("decisions")
     if not isinstance(decisions, dict) or any(
         not isinstance(decisions.get(key), dict) or decisions[key].get("option") != "a"
-        for key in ("1", "2", "3")
+        for key in ("1", "2", "3", "9")
     ):
-        errors.append("decisions 1, 2 and 3 must record option a")
+        errors.append("decisions 1, 2, 3 and 9 must record option a")
     adoption = registry.get("adoption")
     if not isinstance(adoption, dict) or adoption.get("requirement") != ADOPTION_REQUIREMENT:
         errors.append(f"adoption must require {ADOPTION_REQUIREMENT}")
@@ -223,6 +245,123 @@ def validate_registry(registry: dict[str, Any], *, root: Path = REPO) -> list[st
     restrictions = [entry for entry in restrictions or [] if isinstance(entry, dict)]
     for judge_id, judge in judges.items():
         errors.extend(_judge_errors(judge_id, judge, exclusions, restrictions, root))
+    errors.extend(admission_errors(registry, root=root))
+    return errors
+
+
+def _positive_int(value: Any) -> bool:
+    return type(value) is int and value > 0
+
+
+def judge_admission_ceiling(judge: dict[str, Any]) -> int | None:
+    """A worker judge's admission ceiling: measured peak x 1.2, else provisional."""
+    resources = judge.get("resources") if isinstance(judge.get("resources"), dict) else {}
+    measured = resources.get("canonicalHostPeakBytes")
+    if _positive_int(measured):
+        return -(-measured * 12 // 10)
+    provisional = resources.get("provisionalCeilingBytes")
+    return provisional if _positive_int(provisional) else None
+
+
+def _recovery_evidence_errors(evidence: Any, registry: dict[str, Any], root: Path) -> list[str]:
+    """The M6 evidence that alone may make the child-attributed rule binding."""
+    if not isinstance(evidence, list) or len(evidence) < MINIMUM_RECOVERY_REPORTS:
+        return [f"a binding child-attributed recovery rule cites at least {MINIMUM_RECOVERY_REPORTS} recovery reports"]
+    errors: list[str] = []
+    try:
+        canonical = [profile.get("id") for profile in canonical_profiles(registry, root)]
+    except JudgeRegistryError:
+        canonical = []
+    workers = sorted(
+        judge_id for judge_id, judge in (registry.get("judges") or {}).items()
+        if judge.get("status") not in BLOCKED_STATUSES and isinstance(judge.get("execution"), dict)
+        and judge["execution"].get("orchestrated") is True and judge["execution"].get("lane") in ("gpu", "cpu")
+    )
+    digests = set()
+    for index, report in enumerate(evidence):
+        label = f"recovery evidence {index + 1}"
+        if not isinstance(report, dict) or any(field not in report for field in RECOVERY_EVIDENCE_FIELDS):
+            errors.append(f"{label} records {', '.join(RECOVERY_EVIDENCE_FIELDS)}")
+            continue
+        if not SHA256.match(str(report["recoveryReportSHA256"])):
+            errors.append(f"{label} names its recovery report by SHA-256")
+        digests.add(report["recoveryReportSHA256"])
+        if report["hardwareProfileID"] not in canonical:
+            errors.append(f"{label} was not measured on the canonical hardware profile")
+        if not _positive_int(report["serialEnvelopes"]):
+            errors.append(f"{label} holds no serial envelope")
+        if report["serialCandidateWouldQualifyBindingFailure"] != 0:
+            errors.append(f"{label}: the candidate blamed a serial post-exit drop on another allocator")
+        if report["unattributed"] != 0:
+            errors.append(f"{label} has unattributed envelopes")
+        by_judge = report["byJudge"] if isinstance(report["byJudge"], dict) else {}
+        missing = [judge_id for judge_id in workers if not _positive_int(by_judge.get(judge_id))]
+        if missing:
+            errors.append(f"{label} lacks envelopes of {', '.join(missing)}")
+    if len(digests) < MINIMUM_RECOVERY_REPORTS:
+        errors.append("recovery evidence reports must be distinct")
+    return errors
+
+
+def admission_errors(registry: dict[str, Any], *, root: Path = REPO) -> list[str]:
+    """The budgeted admission block and every judge's execution declaration (decision 9a)."""
+    admission = registry.get("admission")
+    if not isinstance(admission, dict) or admission.get("policy") != ADMISSION_POLICY:
+        return [f"admission must declare the {ADMISSION_POLICY} policy"]
+    errors: list[str] = []
+    budget, reservation = admission.get("budgetBytes"), admission.get("orchestratorReservationBytes")
+    if not _positive_int(budget) or not _positive_int(reservation) or reservation >= budget:
+        errors.append("admission needs a positive budget and a smaller orchestrator reservation")
+        budget, reservation = 0, 0
+    lanes = admission.get("lanes") if isinstance(admission.get("lanes"), dict) else {}
+    limits = {lane: (lanes.get(lane) or {}).get("maximumConcurrent") if isinstance(lanes.get(lane), dict) else None
+              for lane in WORKER_LANES}
+    if set(lanes) != set(WORKER_LANES) or not all(_positive_int(limit) for limit in limits.values()):
+        errors.append("admission lanes are gpu, cpu and dsp, each with a positive maximumConcurrent")
+    elif limits["gpu"] != 1 or limits["cpu"] > 2:
+        errors.append("admission runs one MLX GPU worker at a time beside at most two CPU workers")
+    recovery = admission.get("recoveryRule") if isinstance(admission.get("recoveryRule"), dict) else {}
+    if (recovery.get("binding") != WHOLE_HOST_RECOVERY_RULE or recovery.get("candidate") != CANDIDATE_RECOVERY_RULE
+            or not isinstance(recovery.get("candidateBinding"), bool)):
+        errors.append("admission.recoveryRule names the whole-host rule, the child-attributed candidate and the switch")
+    promotion = recovery.get("promotion") if isinstance(recovery.get("promotion"), dict) else {}
+    if not _strings(promotion.get("requires")) or not isinstance(promotion.get("evidence"), list):
+        errors.append("the recovery-rule promotion lists what it requires and the evidence recorded")
+    if recovery.get("candidateBinding") is True:
+        errors.extend(_recovery_evidence_errors(promotion.get("evidence"), registry, root))
+    elif recovery.get("candidateBinding") is False and recovery.get("workerCapWhileWholeHostBinding") != 1:
+        errors.append("while the whole-host recovery rule binds, admission caps the host at one worker")
+    for judge_id, judge in (registry.get("judges") or {}).items():
+        if not isinstance(judge, dict):
+            continue
+        execution = judge.get("execution")
+        label = f"judge {judge_id}"
+        if judge.get("status") in BLOCKED_STATUSES:
+            if execution is not None:
+                errors.append(f"{label}: a retired or quarantined judge declares no execution")
+            continue
+        if not isinstance(execution, dict) or execution.get("lane") not in EXECUTION_LANES \
+                or not isinstance(execution.get("orchestrated"), bool):
+            errors.append(f"{label}: execution names its lane ({', '.join(EXECUTION_LANES)}) and whether the orchestrator runs it")
+            continue
+        if not execution["orchestrated"]:
+            continue
+        identity = judge.get("identity") if isinstance(judge.get("identity"), dict) else {}
+        if not _positive_int(execution.get("threads")) or "threads" not in _strings(identity.get("output")):
+            errors.append(f"{label}: an orchestrated judge declares its thread count, which is output identity")
+        if execution.get("lane") not in WORKER_LANES or not isinstance(execution.get("engine"), str):
+            errors.append(f"{label}: an orchestrated judge runs in a worker lane with a named engine")
+            continue
+        worker = execution.get("worker")
+        if not isinstance(worker, str) or not (root / worker).is_file():
+            errors.append(f"{label}: its worker source {worker} does not exist")
+        if execution["engine"] == IN_PROCESS_ENGINE:
+            continue
+        ceiling = judge_admission_ceiling(judge)
+        if ceiling is None:
+            errors.append(f"{label}: an orchestrated worker has a measured or provisional ceiling")
+        elif budget and ceiling + reservation > budget:
+            errors.append(f"{label}: its ceiling never fits the admission budget")
     return errors
 
 
@@ -451,8 +590,12 @@ def _executable_errors(registry: dict[str, Any], root: Path) -> list[str]:
         matches = by_adapter.get(adapter_id, [])
         if len(matches) != 1 or matches[0][1].get("status") != "retired":
             errors.append(f"retired candidate {adapter_id}: needs one retired registry judge")
-        if not isinstance(candidate, dict) or candidate.get("commercialUseCompatible") is not False:
-            errors.append(f"retired candidate {adapter_id}: must record commercialUseCompatible false")
+            continue
+        # A judge retired for its terms (tier C) records the corrected license;
+        # one retired as a measurand (AQ-05) keeps its permissive one.
+        tier = (matches[0][1].get("license") or {}).get("tier")
+        if not isinstance(candidate, dict) or candidate.get("commercialUseCompatible") is not (tier != "C"):
+            errors.append(f"retired candidate {adapter_id}: commercialUseCompatible must match its registry tier {tier}")
     cascade = evaluator.get("cascade") if isinstance(evaluator.get("cascade"), dict) else {}
     live_layers = {layer for values in cascade.values() for layer in _strings(values)}
     compact = evaluator.get("compactAdapters") if isinstance(evaluator.get("compactAdapters"), dict) else {}

@@ -26,7 +26,9 @@ from delivery_analysis_cache import (  # noqa: E402
     AnalysisCacheError, DeliveryAnalysisCache, canonicalization_identity, configured_resampler,
     digest, file_sha256, RESAMPLER_VERSION, LEGACY_RESAMPLER_VERSION,
 )
-from delivery_compact_model_adapter import run_compact_adapter, validate_adapter_config  # noqa: E402
+from delivery_compact_model_adapter import (  # noqa: E402
+    CompactAdapterError, run_compact_adapter, run_compact_adapter_batch, validate_adapter_config,
+)
 from delivery_resource_supervisor import SupervisedResult  # noqa: E402
 from run_local_delivery_cascade import run_cascade  # noqa: E402
 import delivery_resource_supervisor  # noqa: E402
@@ -50,11 +52,11 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
 
     def test_digest_runtime_and_adoption_drift_fail_closed(self) -> None:
         digest_drift = copy.deepcopy(self.contract)
-        digest_drift["candidates"]["distilhubert"]["weightsSHA256"] = "0" * 63
+        digest_drift["candidates"]["whisper-small-mlx"]["weightsSHA256"] = "0" * 63
         with self.assertRaisesRegex(PreparationError, "SHA-256"):
             validate_candidate_contract(digest_drift)
         runtime_drift = copy.deepcopy(self.contract)
-        runtime_drift["candidates"]["distilhubert"]["runtimeDependencies"].pop("torch")
+        runtime_drift["candidates"]["whisper-small-mlx"]["runtimeDependencies"].pop("mlx")
         with self.assertRaisesRegex(PreparationError, "dependency pins"):
             validate_candidate_contract(runtime_drift)
         gate_drift = copy.deepcopy(self.contract)
@@ -119,13 +121,32 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             contract = copy.deepcopy(self.contract)
-            contract["candidates"]["distilhubert"]["sourceRevision"] = "1" * 40
+            contract["candidates"]["sensevoice-small-q8"]["sourceRevision"] = "1" * 40
             contract_path = root / "contract.json"
             contract_path.write_text(json.dumps(contract))
             with patch("prepare_delivery_compact_model_config._verified") as verify, \
                     self.assertRaisesRegex(PreparationError, "another model or revision"):
-                prepare("distilhubert", contract_path=contract_path, model_root=root)
+                prepare("sensevoice-small-q8", contract_path=contract_path, model_root=root)
             verify.assert_not_called()
+
+    def test_retired_distilhubert_is_provenance_only(self) -> None:
+        """AQ-05: retired as a measurand; its permissive license stays recorded."""
+        retired = self.contract["retiredCandidates"]["distilhubert"]
+        self.assertNotIn("distilhubert", self.contract["candidateOrder"])
+        self.assertEqual((retired["status"], retired["licenseTier"], retired["commercialUseCompatible"]),
+                         ("retired", "A", True))
+        self.assertEqual(retired["registryJudge"], "compact.distilhubert@1")
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaisesRegex(PreparationError, "not registered"):
+                prepare("distilhubert", contract_path=DEFAULT_CONTRACT, model_root=Path(temporary))
+        mislabeled = copy.deepcopy(self.contract)
+        mislabeled["retiredCandidates"]["distilhubert"]["commercialUseCompatible"] = False
+        with self.assertRaisesRegex(PreparationError, "status and license"):
+            validate_candidate_contract(mislabeled)
+        revived = copy.deepcopy(self.contract)
+        revived["candidateOrder"].insert(1, "distilhubert")
+        with self.assertRaisesRegex(PreparationError, "candidate order"):
+            validate_candidate_contract(revived)
 
     def test_retired_nisqa_keeps_corrected_provenance_and_never_prepares(self) -> None:
         retired = self.contract["retiredCandidates"]["nisqa-v2"]
@@ -235,17 +256,18 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
                 }],
             }
             manifest["manifestDigest"] = digest(manifest)
-            # Bind the real adapter with a no-launch guard. Identical paired
-            # audio must reuse the representation even across candidate arms.
-            def cached_adapter(**kwargs):
-                return run_compact_adapter(**kwargs, supervisor=never_launch)
+            # Bind the real batch adapter with a no-launch guard. Identical paired
+            # audio must reuse the representation the one-clip path cached.
+            def cached_batch(**kwargs):
+                return run_compact_adapter_batch(**kwargs, supervisor=never_launch)
 
-            with patch("run_local_delivery_cascade.run_compact_adapter", side_effect=cached_adapter):
-                report = run_cascade(manifest=manifest, cache=cache, lock_root=root, compact_config=config)
+            report = run_cascade(manifest=manifest, cache=cache, lock_root=root, compact_config=config,
+                                 compact_runner=cached_batch)
             never_launch.assert_not_called()
             self.assertEqual(len(launches), 1)
             self.assertEqual(report["canonicalizationIdentity"], canonicalization_identity(RESAMPLER_VERSION))
-            self.assertEqual(report["rows"][0]["route"], "abstained")  # no calibrated heads
+            # No review evidence, so the automated review is inconclusive.
+            self.assertEqual(report["rows"][0]["route"], "abstained")
             self.assertNotIn(str(root), json.dumps(report))
             self.assertEqual(report["rows"][0]["alwaysLayers"]["compactRepresentation"]["outputIdentityDigest"],
                              config["outputIdentityDigest"])
@@ -279,6 +301,86 @@ class PrepareDeliveryCompactModelConfigTests(unittest.TestCase):
             with self.assertRaises(AnalysisCacheError):
                 run_compact_adapter(wav_path=audio, config=drifted, cache=cache,
                                     lock_root=root, supervisor=never_launch)
+
+    def test_a_run_of_clips_uses_one_persistent_worker(self) -> None:
+        """AQ-F42: one supervised worker per run, never one process per clip."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            contract = copy.deepcopy(self.contract)
+            candidate = contract["candidates"]["sensevoice-small-q8"]
+            for name, content, target, field in (
+                ("sensevoice-q8/" + candidate["weightsFile"], b"fixture q8 weights", candidate, "weightsSHA256"),
+                ("runtime-v0.1.9/" + candidate["runtime"]["archiveFile"], b"fixture archive",
+                 candidate["runtime"], "archiveSHA256"),
+                ("runtime-v0.1.9/extracted/" + candidate["runtime"]["binaryFile"], b"fixture binary",
+                 candidate["runtime"], "binarySHA256"),
+            ):
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+                target[field] = file_sha256(path)
+            contract_path = root / "contract.json"
+            contract_path.write_text(json.dumps(contract))
+            config = prepare("sensevoice-small-q8", contract_path=contract_path, model_root=root)
+            clips = []
+            for index, frequency in enumerate((150, 190, 230)):
+                clip = root / f"clip-{index}.wav"
+                samples = np.rint(6000 * np.sin(2 * np.pi * frequency * np.arange(24000) / 24000)).astype("<i2")
+                with wave.open(str(clip), "wb") as wav:
+                    wav.setparams((1, 2, 24000, 0, "NONE", "not compressed"))
+                    wav.writeframes(samples.tobytes())
+                clips.append(clip)
+            cache = DeliveryAnalysisCache(root / "cache")
+            launches = []
+
+            def worker(command, **kwargs):
+                job = json.loads(Path(command[command.index("--job") + 1]).read_text(encoding="utf-8"))
+                launches.append((job, kwargs))
+                self.assertEqual(job["engine"], "native-command")
+                self.assertEqual(kwargs["environment"]["OMP_NUM_THREADS"], "2")
+                self.assertEqual(kwargs["maximum_rss_bytes"], 5 * 1024**3)
+                self.assertIsNone(kwargs["admission"])
+                lines = [{"kind": "ready", "engine": "native-command", "threads": 2}]
+                lines += [{"kind": "row", "id": row["id"], "childMaxRSSBytes": 1024,
+                           "result": {"stdout": "<|en|><|NEUTRAL|><|Speech|><|withitn|>fixture", "wallSeconds": 0.1}}
+                          for row in job["rows"]]
+                lines.append({"kind": "done", "rows": len(job["rows"])})
+                stdout = "".join(json.dumps(line) + "\n" for line in lines).encode()
+                return SupervisedResult(report={"qualified": True, "qualificationFailures": [], "returnCode": 0},
+                                        stdout=stdout, stderr=b"")
+
+            # Two paths name the same audio: one row, one launch, every clip answered.
+            results = run_compact_adapter_batch(wav_paths=clips + [clips[0]], config=config, cache=cache,
+                                                lock_root=root, supervisor=worker)
+            self.assertEqual(len(launches), 1)
+            self.assertEqual(len(launches[0][0]["rows"]), 3)
+            self.assertEqual({path for path in results}, set(clips))
+            self.assertTrue(all(not hit for _payload, hit in results.values()))
+            self.assertEqual(results[clips[0]][0]["modelProvenance"]["threads"], 2)
+            # The one-clip path and a second run are served from the same cache entries.
+            never = Mock(side_effect=AssertionError("a cached clip launched a model"))
+            payload, hit = run_compact_adapter(wav_path=clips[1], config=config, cache=cache, lock_root=root,
+                                               supervisor=never)
+            self.assertTrue(hit)
+            self.assertEqual(payload, results[clips[1]][0])
+            again = run_compact_adapter_batch(wav_paths=clips, config=config, cache=cache, lock_root=root,
+                                              supervisor=never)
+            self.assertTrue(all(hit for _payload, hit in again.values()))
+            never.assert_not_called()
+
+            # A clip the worker never answers is refused after the others are cached.
+            fresh = root / "fresh.wav"
+            with wave.open(str(fresh), "wb") as wav:
+                wav.setparams((1, 2, 24000, 0, "NONE", "not compressed"))
+                wav.writeframes(np.rint(5000 * np.sin(np.arange(24000) / 3)).astype("<i2").tobytes())
+
+            def silent(command, **_kwargs):
+                return SupervisedResult(report={"qualified": True, "qualificationFailures": [], "returnCode": 0},
+                                        stdout=b'{"kind": "done", "rows": 1}\n', stderr=b"")
+
+            with self.assertRaisesRegex(CompactAdapterError, "unavailable: crash"):
+                run_compact_adapter_batch(wav_paths=[fresh], config=config, cache=cache, lock_root=root,
+                                          supervisor=silent)
 
     def test_invalid_resampler_fails_before_asset_inspection(self) -> None:
         with patch("prepare_delivery_compact_model_config._verified") as verify:

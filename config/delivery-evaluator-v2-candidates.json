@@ -6,7 +6,6 @@
   "normalCIPrerequisite": false,
   "candidateOrder": [
     "sensevoice-small-q8",
-    "distilhubert",
     "whisper-small-mlx"
   ],
   "candidates": {
@@ -72,44 +71,6 @@
         "normalization": "none",
         "backend": "cpu",
         "keepTags": true
-      }
-    },
-    "distilhubert": {
-      "modelID": "ntu-spml/distilhubert",
-      "sourceRevision": "fa87d96265d6b7af66e112faff6ff44df419cec9",
-      "sourceURI": "https://huggingface.co/ntu-spml/distilhubert/tree/fa87d96265d6b7af66e112faff6ff44df419cec9",
-      "weightsFile": "model.safetensors",
-      "weightsSHA256": "77ad8f985c97750d8d27d6950c917800d80732a141370bf316058bded71a6cbe",
-      "supportingFiles": {
-        "config.json": "0427043d1c4c8d58298d2050420a0c2ce85c8b92ec3865eaecc62c3fc5a97006",
-        "preprocessor_config.json": "7a8f0fc8ee1272ed28a8b468e183c56a19329a92babd3ca8d4d21ae02ba511cd"
-      },
-      "license": "Apache-2.0",
-      "commercialUseCompatible": true,
-      "trainingDataDeclaration": "The model card identifies 16 kHz English LibriSpeech as the pretraining dataset and describes layer-wise distillation from HuBERT across ten speech tasks.",
-      "trainingDataSourceURI": "https://huggingface.co/ntu-spml/distilhubert",
-      "labelMap": {
-        "type": "frozen-continuous-speech-representation",
-        "projectionDimensions": 128,
-        "projectionVersion": "signed-gaussian-mean-std-five-region-v1"
-      },
-      "runtimeDependencies": {
-        "numpy": "2.5.2",
-        "python": "3.14.4",
-        "safetensors": "0.7.0",
-        "torch": "2.13.0",
-        "transformers": "4.57.6"
-      },
-      "preprocessingConfig": {
-        "sampleRateHz": 16000,
-        "channels": 1,
-        "format": "pcm-s16le",
-        "normalization": "divide-by-32768",
-        "pooling": "global-mean-std-plus-five-equal-frame-region-means",
-        "projectionSeed": 20260823,
-        "projectionDimensions": 128,
-        "projectionVersion": "signed-gaussian-mean-std-five-region-v1",
-        "backend": "cpu"
       }
     },
     "whisper-small-mlx": {
@@ -227,11 +188,54 @@
           "note": "The sorted corpus has a gap between 3.68 and 4.11; the tenth percentile names the six takes below it. median minus three MAD (4.23) would also name two bulk takes."
         }
       }
+    },
+    "distilhubert": {
+      "status": "retired",
+      "retiredOn": "2026-09-26",
+      "licenseTier": "A",
+      "registryJudge": "compact.distilhubert@1",
+      "decision": "Audio QC audit 2026-09-25, section 7.1 (delete from QC), carried out by AQ-05: DistilHuBERT transcribes nothing and fed only the ridge, elastic-net and PLS heads, which were never calibrated (AQ-F48). Its license is permissive; it is retired as a measurand. Kept only as provenance for the qualification records and pilots that cite it.",
+      "modelID": "ntu-spml/distilhubert",
+      "sourceRevision": "fa87d96265d6b7af66e112faff6ff44df419cec9",
+      "sourceURI": "https://huggingface.co/ntu-spml/distilhubert/tree/fa87d96265d6b7af66e112faff6ff44df419cec9",
+      "weightsFile": "model.safetensors",
+      "weightsSHA256": "77ad8f985c97750d8d27d6950c917800d80732a141370bf316058bded71a6cbe",
+      "supportingFiles": {
+        "config.json": "0427043d1c4c8d58298d2050420a0c2ce85c8b92ec3865eaecc62c3fc5a97006",
+        "preprocessor_config.json": "7a8f0fc8ee1272ed28a8b468e183c56a19329a92babd3ca8d4d21ae02ba511cd"
+      },
+      "license": "Apache-2.0",
+      "commercialUseCompatible": true,
+      "trainingDataDeclaration": "The model card identifies 16 kHz English LibriSpeech as the pretraining dataset and describes layer-wise distillation from HuBERT across ten speech tasks.",
+      "trainingDataSourceURI": "https://huggingface.co/ntu-spml/distilhubert",
+      "labelMap": {
+        "type": "frozen-continuous-speech-representation",
+        "projectionDimensions": 128,
+        "projectionVersion": "signed-gaussian-mean-std-five-region-v1"
+      },
+      "runtimeDependencies": {
+        "numpy": "2.5.2",
+        "python": "3.14.4",
+        "safetensors": "0.7.0",
+        "torch": "2.13.0",
+        "transformers": "4.57.6"
+      },
+      "preprocessingConfig": {
+        "sampleRateHz": 16000,
+        "channels": 1,
+        "format": "pcm-s16le",
+        "normalization": "divide-by-32768",
+        "pooling": "global-mean-std-plus-five-equal-frame-region-means",
+        "projectionSeed": 20260823,
+        "projectionDimensions": 128,
+        "projectionVersion": "signed-gaussian-mean-std-five-region-v1",
+        "backend": "cpu"
+      }
     }
   },
   "adoptionRequirements": [
     "two-clean-canonical-host-runs",
-    "serial-process-isolation",
+    "supervised-process-isolation",
     "post-exit-memory-recovery",
     "untouched-independent-reference-holdout-gain",
     "no-vad-dimension-regression",

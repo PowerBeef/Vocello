@@ -95,10 +95,11 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
         row['reviewEvidence']['instructed']['audioQC']['writtenOutputVerdict'] = 'fail'
         self.assertEqual(review_automated_audio(row, 'instructed', 2.0)['status'], 'fail')
         manifest = self._seal({**self.manifest, 'rows': [row]})
-        with mock.patch('run_local_delivery_cascade.run_compact_adapter') as adapter:
-            result = run_cascade(manifest=manifest, cache=self.cache, lock_root=self.root,
-                                 compact_config={'preprocessingConfig': {
-                                     'canonicalizationIdentity': canonicalization_identity(RESAMPLER_VERSION)}})
+        adapter = mock.Mock()
+        result = run_cascade(manifest=manifest, cache=self.cache, lock_root=self.root,
+                             compact_config={'preprocessingConfig': {
+                                 'canonicalizationIdentity': canonicalization_identity(RESAMPLER_VERSION)}},
+                             compact_runner=adapter)
         adapter.assert_not_called()
         self.assertEqual(result['rows'][0]['route'], 'rejected')
 
@@ -266,15 +267,16 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
                     output.writeframes(b"\x01\x00" * 100)
                 manifest["rows"][0][f"{bad_role}WAV"] = str(short)
                 manifest["rows"][0][f"{bad_role}SHA256"] = self._sha(short)
-                with mock.patch("run_local_delivery_cascade.run_compact_adapter") as adapter:
-                    result = run_cascade(
-                        manifest=self._seal(manifest), cache=self.cache,
-                        lock_root=self.root / "lock", compact_config={
-                            "adapterID": "unneeded", "preprocessingConfig": {
-                                "canonicalizationIdentity": canonicalization_identity(RESAMPLER_VERSION),
-                            },
+                adapter = mock.Mock()
+                result = run_cascade(
+                    manifest=self._seal(manifest), cache=self.cache,
+                    lock_root=self.root / "lock", compact_config={
+                        "adapterID": "unneeded", "preprocessingConfig": {
+                            "canonicalizationIdentity": canonicalization_identity(RESAMPLER_VERSION),
                         },
-                    )
+                    },
+                    compact_runner=adapter,
+                )
                 adapter.assert_not_called()
                 self.assertEqual(result["rows"][0]["route"], "rejected")
                 self.assertFalse(result["rows"][0]["finalistLayers"]["required"])
@@ -289,7 +291,8 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
             layer for judge in registry["judges"].values() if judge["status"] == "retired"
             for layer in judge["legacyIdentifiers"].get("cascadeLayers", [])
         }
-        self.assertEqual(retired_layers, {"clip-quality-screen", "utmos", "legacy-ser-during-bakeoff"})
+        self.assertEqual(retired_layers, {"clip-quality-screen", "utmos", "legacy-ser-during-bakeoff",
+                                          "tiny-local-heads"})
         self.assertLessEqual(set(cascade.AMBIGUOUS_LAYERS), set(contract["cascade"]["ambiguousOnly"]))
         self.assertLessEqual(set(cascade.FINALIST_LAYERS), set(contract["cascade"]["finalistsOnly"]))
         self.assertFalse(retired_layers & (set(cascade.AMBIGUOUS_LAYERS) | set(cascade.FINALIST_LAYERS)))
@@ -297,11 +300,56 @@ class LocalDeliveryCascadeTests(unittest.TestCase):
         self.assertNotIn("clipQualityScreen", result)
         for row in result["rows"]:
             self.assertNotIn("clipQualityScreen", row["alwaysLayers"])
+            # AQ-05: the uncalibrated heads left the cascade with DistilHuBERT.
+            self.assertNotIn("tinyLocalHeads", row["alwaysLayers"])
+            self.assertEqual(row["semanticDelivery"], "unmeasured")
             requested = set(row["ambiguousLayers"]["requested"]) | set(row["finalistLayers"]["requested"])
             self.assertFalse(requested & retired_layers)
         with self.assertRaises(TypeError):
             run_cascade(manifest=self.manifest, cache=self.cache, lock_root=self.root / "lock",
                         clip_quality_config={"adapterID": "nisqa-v2"})
+        with self.assertRaises(TypeError):
+            run_cascade(manifest=self.manifest, cache=self.cache, lock_root=self.root / "lock",
+                        evaluator_model={"featureNames": []})
+
+    def test_compact_layer_runs_one_worker_for_the_run_after_both_sides_qualify(self) -> None:
+        """AQ-F42: every surviving clip goes to one batch call, shared audio once."""
+        compact_config = {"adapterID": "sensevoice-small-q8", "labelMap": {
+            "languages": ["en"], "emotions": ["NEUTRAL"], "events": ["Speech"], "textNormalization": ["withitn"],
+        }, "preprocessingConfig": {"canonicalizationIdentity": canonicalization_identity(RESAMPLER_VERSION)}}
+        calls = []
+
+        def batch(**kwargs):
+            calls.append(kwargs["wav_paths"])
+            payload = {"outputs": {"languageTag": "en", "emotionTag": "NEUTRAL", "eventTag": "Speech",
+                                   "textNormalizationTag": "withitn"}}
+            return {path: (payload, False) for path in kwargs["wav_paths"]}
+
+        result = run_cascade(manifest=self.manifest, cache=self.cache, lock_root=self.root / "lock",
+                             compact_config=compact_config, compact_runner=batch)
+        self.assertEqual(len(calls), 1)
+        # Two pairs share one neutral clip: three distinct clips in one call.
+        self.assertEqual(sorted(str(path) for path in calls[0]),
+                         sorted({str(self.one), str(self.two), str(self.neutral)}))
+        for row in result["rows"]:
+            delta = row["alwaysLayers"]["compactRepresentation"]
+            self.assertEqual(delta["kind"], "compact-instructed-minus-neutral-delta")
+
+    def test_route_composition_is_pure_and_matches_the_cascade(self) -> None:
+        complete = {"status": "complete"}
+        per_audio = {role: {"qc": complete, "global": complete, "temporal": complete}
+                     for role in ("instructed", "neutral")}
+        passing = {role: {"status": "pass"} for role in ("instructed", "neutral")}
+        clean = {role: {"passed": True} for role in ("instructed", "neutral")}
+        self.assertEqual(cascade.compose_route(per_audio, passing, clean),
+                         ("accepted-for-continued-screening", ["all-always-on-layers-complete-and-noncontradictory"]))
+        warned = {**clean, "neutral": {"passed": False}}
+        self.assertEqual(cascade.compose_route(per_audio, passing, warned)[0], "abstained")
+        failed = {**passing, "instructed": {"status": "fail"}}
+        self.assertEqual(cascade.compose_route(per_audio, failed, warned),
+                         ("rejected", ["byte-bound-native-qc-or-independent-content-failed"]))
+        broken = {**per_audio, "neutral": {**per_audio["neutral"], "temporal": {"status": "rejected"}}}
+        self.assertEqual(cascade.compose_route(broken, passing, clean)[0], "rejected")
 
     def test_temporal_cache_binds_its_imported_global_analyzer(self) -> None:
         canonical = self.cache.canonicalize(self.one)

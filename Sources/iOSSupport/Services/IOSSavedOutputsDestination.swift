@@ -122,6 +122,10 @@ public enum IOSSavedOutputsDestination {
             return nil
         }
         let source = URL(fileURLWithPath: internalAudioPath)
+        // The copy's outcome belongs to the folder it resolved; if the user clears or re-picks
+        // the folder meanwhile (which clears the issue), a late result must not land on the new
+        // choice.
+        let resolvedBookmark = defaults.data(forKey: Keys.bookmark)
         return Task.detached(priority: .utility) {
             let didAccess = folder.startAccessingSecurityScopedResource()
             defer { if didAccess { folder.stopAccessingSecurityScopedResource() } }
@@ -141,7 +145,11 @@ public enum IOSSavedOutputsDestination {
                 copied = (try? FileManager.default.copyItem(at: source, to: writeURL)) != nil
             }
             let landed = copied && coordinationError == nil
-            recordExportIssue(landed ? nil : .copyFailed)
+            await MainActor.run {
+                if defaults.data(forKey: Keys.bookmark) == resolvedBookmark {
+                    recordExportIssue(landed ? nil : .copyFailed)
+                }
+            }
             return landed
         }
     }

@@ -548,7 +548,7 @@
     },
     {
       "id": "settings-preferences",
-      "identifierPattern": "iosSettings_(autoPlayToggle|variationRow|savedOutputsRow|reduceMotionToggle|reduceTransparencyToggle|voiceModelsRow)",
+      "identifierPattern": "iosSettings_(autoPlayToggle|variationRow|savedOutputsRow|savedOutputsFolderFailureDismiss|reduceMotionToggle|reduceTransparencyToggle|voiceModelsRow)",
       "sourceToken": "iosSettings_autoPlayToggle",
       "screen": "Settings",
       "prerequisite": "Settings tab",

@@ -99,6 +99,24 @@ final class IOSSavedOutputsDestinationTests: XCTestCase {
         XCTAssertNil(IOSSavedOutputsDestination.exportIssue, "choosing the folder again clears the issue")
     }
 
+    /// A copy still in flight when the folder is cleared reports into the
+    /// folder it resolved, not onto the new choice: its failure is dropped.
+    func testALateFailureDoesNotLandAfterTheFolderChanges() async throws {
+        try IOSSavedOutputsDestination.setFolder(folder)
+        let take = try clip("custom_late.wav")
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: folder.path)
+        let refused = try XCTUnwrap(IOSSavedOutputsDestination.exportIfConfigured(
+            internalAudioPath: take.path, generationMode: "custom"
+        ) { _ in true })
+        // The outcome is recorded on the main actor, which this test holds
+        // until it awaits, so the folder change always comes first.
+        IOSSavedOutputsDestination.clearFolder()
+        let copied = await refused.value
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: folder.path)
+        XCTAssertFalse(copied)
+        XCTAssertNil(IOSSavedOutputsDestination.exportIssue)
+    }
+
     /// IOS-25: a folder that went away is reported, not skipped in silence;
     /// clearing the folder ends the report.
     func testAFolderThatWentAwayIsRecorded() async throws {

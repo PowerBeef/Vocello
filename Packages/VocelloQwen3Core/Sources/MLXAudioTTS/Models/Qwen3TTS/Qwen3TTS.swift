@@ -3722,8 +3722,14 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             // distribution, two scalars built from the logits already computed
             // and evaluated with the step below (no extra synchronization).
             let stepIntrospection: (entropy: MLXArray, eosProbability: MLXArray)? =
-                introspectionStepScalars.map { scalars in
-                    let values = scalars([logits])
+                introspectionStepScalars.flatMap { scalars in
+                    // The last position only, so the prefill step ([1, L, V])
+                    // and later steps ([1, 1, V]) share one compiled trace.
+                    let values = scalars([logits[0..., (-1)..., 0...]])
+                    // Under an MLX error handler a failed compile or apply
+                    // returns no outputs; the step then reaches its typed
+                    // failure at the next error check instead of trapping.
+                    guard values.count == 2 else { return nil }
                     return (entropy: values[0], eosProbability: values[1])
                 }
             // Measured do-NOT (2026-07-26): submitting the talker+sampling

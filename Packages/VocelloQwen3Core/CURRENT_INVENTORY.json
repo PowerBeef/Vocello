@@ -63,7 +63,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/ModelDiagnostics.swift",
-      "sha256": "0a62bd931d64cf60351833ab9cfc90bcb1c74aaaf8896a67f79a8e3d48a7791a",
+      "sha256": "d0f2f1dc00f1c85ff2227c0fb5a63b1ca2b113a68c6cb501d6ce41a108f7eb2f",
       "upstreamStatus": "added"
     },
     {
@@ -73,7 +73,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-      "sha256": "65066cbb3024e016696469398a1e68b7b9ae4d1fd65a98176c36c77ba684f63c",
+      "sha256": "1d38252ecdd306399796b02c09b06ec92571d938c500e45d2f5494dd5f8d28aa",
       "upstreamStatus": "modified"
     },
     {
@@ -83,7 +83,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictorCompiled.swift",
-      "sha256": "b5585ee12789a90d44f4a5651cec97185cc9b0098b5feb0967cc41ef83265e8f",
+      "sha256": "9ad8546e79a9b10b99252795c197450573ec7f5691cdbcd74c7241510a8178c3",
       "upstreamStatus": "added"
     },
     {

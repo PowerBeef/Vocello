@@ -76,6 +76,13 @@ final class CodePredictorCompiledPlan {
         inputs.append(contentsOf: keyBuffers)
         inputs.append(contentsOf: valueBuffers)
         let outputs = function(inputs)
+        // Under an MLX error handler a failed compile or apply returns no
+        // outputs. Keep the buffers and return placeholder logits of the pass
+        // shape, so the step reaches its typed failure at the next error
+        // check instead of trapping on the index.
+        guard outputs.count == 1 + 2 * layerCount else {
+            return MLXArray.zeros([1, 1, predictor.config.vocabSize], dtype: keyBuffers[0].dtype)
+        }
         keyBuffers = Array(outputs[1 ..< (1 + layerCount)])
         valueBuffers = Array(outputs[(1 + layerCount) ..< (1 + 2 * layerCount)])
         return outputs[0]

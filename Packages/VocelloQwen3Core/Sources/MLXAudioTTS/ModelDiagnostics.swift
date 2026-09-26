@@ -65,7 +65,11 @@ public struct Qwen3GenerationIntrospectionSummary: Sendable, Equatable {
 /// graph compiled once per generation, so the step's GPU work grows by a few
 /// fused kernels). Every host buffer here is allocated once at init (a
 /// 32-token ring, 33 run counters, a 256-bin histogram, 256 seam slots), so an
-/// observation allocates nothing, takes no lock and formats no string.
+/// observation allocates nothing, takes no lock and formats no string. The
+/// compiled scalar call itself pays what every compiled call in the step pays
+/// (mlx-swift's compile and eval locks and small input arrays), as the code
+/// predictor's per-pass plan already does 15 times a frame. Only the first 256
+/// seams are kept.
 struct Qwen3GenerationIntrospector {
     static let maximumCyclePeriod = 32
     static let entropyHistogramBinsPerNat = 32
